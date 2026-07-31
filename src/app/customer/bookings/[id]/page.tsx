@@ -257,17 +257,38 @@ export default function BookingDetailPage({
                 </p>
               </div>
             )}
+            {booking.approx_arrival && (
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Approx. arrival</p>
+                <p className="font-medium text-foreground">{booking.approx_arrival}</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* QR placeholder — Phase 1.4+ when QR API is ready */}
-        <div className="glass-panel rounded-2xl border border-dashed border-border p-6 mb-6 text-center">
-          <div className="w-28 h-28 mx-auto mb-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium">
-            QR Code
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Show this QR at the restaurant when check-in scanning is enabled.
-          </p>
+        <div className="glass-panel rounded-2xl border border-border p-6 mb-6 text-center">
+          {booking.qr_token ? (
+            <>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(booking.qr_token)}`}
+                alt="Booking QR code"
+                className="w-40 h-40 mx-auto mb-3 rounded-xl border border-slate-200 bg-white p-2"
+              />
+              <p className="text-sm text-muted-foreground mb-1">
+                Show this QR at the restaurant for check-in.
+              </p>
+              <p className="text-[11px] text-slate-400 font-mono break-all">{booking.qr_token}</p>
+            </>
+          ) : (
+            <>
+              <div className="w-28 h-28 mx-auto mb-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium">
+                QR Code
+              </div>
+              <p className="text-sm text-muted-foreground">
+                QR will appear once check-in scanning is enabled for this booking.
+              </p>
+            </>
+          )}
         </div>
 
         {isUpcoming && (

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User, Phone, Mail, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Save, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetCustomerProfileQuery,
@@ -20,6 +20,9 @@ export default function CustomerProfilePage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -48,6 +51,9 @@ export default function CustomerProfilePage() {
     setName(profile.name || "");
     setPhone(profile.phone || "");
     setEmail(profile.email || user?.email || "");
+    setAddress(profile.address || "");
+    setCity(profile.city || "");
+    setState(profile.state || "");
     setInitialized(true);
   }, [profile, user?.email, initialized]);
 
@@ -65,6 +71,9 @@ export default function CustomerProfilePage() {
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        state: state.trim(),
       }).unwrap();
 
       dispatch(
@@ -161,6 +170,43 @@ export default function CustomerProfilePage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
                   placeholder="you@example.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Address</label>
+              <div className="relative">
+                <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+                  placeholder="Street address"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">City</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+                  placeholder="City"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">State</label>
+                <input
+                  type="text"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+                  placeholder="State"
                 />
               </div>
             </div>

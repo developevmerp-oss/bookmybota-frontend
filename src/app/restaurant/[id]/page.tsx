@@ -554,6 +554,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         booking_time: bookingDateTime,
         booking_source: 'ONLINE',
         guests: Number(guests),
+        approx_arrival: arrivalTime,
         ...(customerIdPayload ? { customer_id: customerIdPayload } : {}),
       }).unwrap();
       setBookingSuccess(true);

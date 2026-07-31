@@ -122,6 +122,8 @@ export interface Booking {
   status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'ARRIVED';
   table_number?: string;
   created_at?: string;
+  approx_arrival?: string;
+  qr_token?: string;
 }
 
 export interface CustomerProfile {
@@ -129,8 +131,13 @@ export interface CustomerProfile {
   name: string;
   phone?: string;
   email?: string;
+  profile_image_url?: string;
+  address?: string;
+  city?: string;
+  state?: string;
   is_registered_user?: boolean;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface AdminStats {
@@ -344,7 +351,7 @@ export const api = createApi({
     }),
 
     createBooking: builder.mutation<
-      { message?: string; booking_id?: string; table_assigned?: string },
+      { message?: string; booking_id?: string; table_assigned?: string; qr_token?: string },
       {
         business_id: string;
         customer_name: string;
@@ -353,6 +360,7 @@ export const api = createApi({
         booking_source: 'ONLINE' | 'WALK_IN';
         guests: number;
         customer_id?: string;
+        approx_arrival?: string;
       }
     >({
       query: (body) => ({
@@ -382,7 +390,16 @@ export const api = createApi({
 
     updateCustomerProfile: builder.mutation<
       { message: string; data: CustomerProfile },
-      { customerId: string; name: string; phone?: string; email?: string }
+      {
+        customerId: string;
+        name: string;
+        phone?: string;
+        email?: string;
+        profile_image_url?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+      }
     >({
       query: ({ customerId, ...body }) => ({
         url: `/auth/customer-profile/${customerId}`,

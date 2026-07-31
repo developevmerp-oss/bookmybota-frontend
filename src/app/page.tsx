@@ -1,9 +1,16 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Search, MapPin, Star, ArrowRight, ChevronLeft, ChevronRight, Navigation, Loader2, X, Percent } from "lucide-react";
 import Link from "next/link";
 import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business, Collection, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
+import DiningFiltersBar from "@/components/DiningFiltersBar";
+import {
+  applyDiningFilters,
+  DEFAULT_DINING_FILTERS,
+  DiningFilterState,
+  extractCuisines,
+} from "@/lib/diningFilters";
 
 
 
@@ -318,6 +325,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
 
   const collectionsRef = useRef<HTMLDivElement>(null);
 
@@ -490,22 +498,31 @@ export default function Home() {
   }, []);
 
   // ── Filtering ──
-  const filteredRestaurants = businesses.filter((r) => {
-    const name = r.name || "";
-    const cuisine = r.cuisine || "";
-    const address = r.address || "";
+  const cuisineOptions = useMemo(() => extractCuisines(businesses), [businesses]);
 
-    const matchesSearch =
-      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      address.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = activeFilter === "All" || (r.type_name && r.type_name.toLowerCase() === activeFilter.toLowerCase());
-    const matchesLocation =
-      !locationCity ||
-      locationCity === "All Cities" ||
-      address.toLowerCase().includes(locationCity.toLowerCase());
-    return matchesSearch && matchesFilter && matchesLocation;
-  });
+  const filteredRestaurants = useMemo(() => {
+    const base = businesses.filter((r) => {
+      const name = r.name || "";
+      const cuisine = r.cuisine || "";
+      const address = r.address || "";
+
+      const matchesSearch =
+        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        address.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter = activeFilter === "All" || (r.type_name && r.type_name.toLowerCase() === activeFilter.toLowerCase());
+      const matchesLocation =
+        !locationCity ||
+        locationCity === "All Cities" ||
+        address.toLowerCase().includes(locationCity.toLowerCase());
+      return matchesSearch && matchesFilter && matchesLocation;
+    });
+    return applyDiningFilters(base, diningFilters);
+  }, [businesses, searchQuery, activeFilter, locationCity, diningFilters]);
+
+  const cityDisplay =
+    locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
+  const restaurantCountLabel = `${filteredRestaurants.length} restaurant${filteredRestaurants.length !== 1 ? "s" : ""}`;
 
   const getFilteredSectionTitle = () => {
     const city = locationCity;
@@ -904,7 +921,11 @@ export default function Home() {
                     <Loader2 size={12} className="animate-spin" /> Locating restaurants…
                   </span>
                 ) : (
-                  `${filteredRestaurants.length} place${filteredRestaurants.length !== 1 ? "s" : ""} to explore`
+                  <>
+                    <span className="font-semibold text-slate-700">{cityDisplay}</span>
+                    {" · "}
+                    {restaurantCountLabel} to explore
+                  </>
                 )}
               </p>
             </div>
@@ -937,12 +958,13 @@ export default function Home() {
                 </div>
               )}
 
-              {(activeFilter !== "All" || searchQuery) && (
+              {(activeFilter !== "All" || searchQuery || diningFilters.cuisine || diningFilters.minRating > 0 || diningFilters.offersOnly) && (
                 <button
                   onClick={() => {
                     setSearchInput("");
                     setSearchQuery("");
                     setActiveFilter("All");
+                    setDiningFilters(DEFAULT_DINING_FILTERS);
                   }}
                   className="text-xs text-rose-600 hover:text-rose-700 font-bold px-2 py-1.5 transition-colors cursor-pointer"
                 >
@@ -951,6 +973,13 @@ export default function Home() {
               )}
             </div>
           </div>
+
+          <DiningFiltersBar
+            cuisines={cuisineOptions}
+            filters={diningFilters}
+            onChange={setDiningFilters}
+            onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
+          />
 
           {businessesLoading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">

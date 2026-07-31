@@ -106,14 +106,31 @@ export interface Table {
 
 export interface Booking {
   id: string;
+  business_id?: string;
   business_name?: string;
   business_address?: string;
-  customer_name: string;
-  customer_phone: string;
+  business_cover_image?: string;
+  business_phone?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guests?: number;
   booking_time: string;
+  end_time?: string;
   booking_source: 'ONLINE' | 'WALK_IN';
-  status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+  status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'ARRIVED';
   table_number?: string;
+  created_at?: string;
+}
+
+export interface CustomerProfile {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  is_registered_user?: boolean;
+  created_at?: string;
 }
 
 export interface AdminStats {
@@ -162,7 +179,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -327,7 +344,7 @@ export const api = createApi({
     }),
 
     createBooking: builder.mutation<
-      { success: boolean },
+      { message?: string; booking_id?: string; table_assigned?: string },
       {
         business_id: string;
         customer_name: string;
@@ -343,7 +360,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: (_result, _error, { business_id }) => [{ type: 'Bookings', id: business_id }],
+      invalidatesTags: ['Bookings'],
     }),
 
     phoneLogin: builder.mutation<
@@ -357,12 +374,36 @@ export const api = createApi({
       }),
     }),
 
+    getCustomerProfile: builder.query<CustomerProfile, string>({
+      query: (customerId) => `/auth/customer-profile/${customerId}`,
+      transformResponse: (res: { data: CustomerProfile }) => res.data,
+      providesTags: (_result, _error, customerId) => [{ type: 'CustomerProfile', id: customerId }],
+    }),
+
+    updateCustomerProfile: builder.mutation<
+      { message: string; data: CustomerProfile },
+      { customerId: string; name: string; phone?: string; email?: string }
+    >({
+      query: ({ customerId, ...body }) => ({
+        url: `/auth/customer-profile/${customerId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { customerId }) => [{ type: 'CustomerProfile', id: customerId }],
+    }),
+
     cancelBooking: builder.mutation<{ success: boolean }, { id: string; refetchId?: string }>({
       query: ({ id }) => ({
         url: `/bookings/${id}/cancel`,
         method: 'PUT',
       }),
       invalidatesTags: ['Bookings'],
+    }),
+
+    getBookingById: builder.query<Booking, string>({
+      query: (id) => `/bookings/detail/${id}`,
+      transformResponse: (res: { data: Booking }) => res.data,
+      providesTags: (_result, _error, id) => [{ type: 'Bookings', id }],
     }),
 
     // ── Reviews ──────────────────────────────────────────────────────────────
@@ -515,9 +556,12 @@ export const {
   useDeleteTableMutation,
   useGetBusinessBookingsQuery,
   useGetCustomerBookingsQuery,
+  useGetBookingByIdQuery,
   useCheckAvailabilityQuery,
   useCreateBookingMutation,
   usePhoneLoginMutation,
+  useGetCustomerProfileQuery,
+  useUpdateCustomerProfileMutation,
   useCancelBookingMutation,
   useGetAdminStatsQuery,
   useUpdateSubscriptionMutation,

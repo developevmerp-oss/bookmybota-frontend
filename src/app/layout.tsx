@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect, useRef, useCallback } from "react";
 import "./globals.css";
 import Link from "next/link";
-import { UtensilsCrossed, Calendar, LogOut, Search, MapPin, ChevronLeft, X, Navigation, Loader2 } from "lucide-react";
+import { UtensilsCrossed, Calendar, LogOut, Search, MapPin, ChevronLeft, X, Navigation, Loader2, User } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
@@ -541,12 +541,20 @@ export default function RootLayout({
                       {user ? (
                         <div className="flex items-center gap-4 sm:gap-6">
                           {user.role === 'customer' && (
-                            <Link href="/customer/dashboard" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                              isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
-                            }`} title="My Reservations">
-                              <Calendar size={18} className="sm:hidden" />
-                              <span className="hidden sm:inline">My Reservations</span>
-                            </Link>
+                            <>
+                              <Link href="/customer/dashboard" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                                isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                              }`} title="My Reservations">
+                                <Calendar size={18} className="sm:hidden" />
+                                <span className="hidden sm:inline">My Reservations</span>
+                              </Link>
+                              <Link href="/customer/settings" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                                isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                              }`} title="Settings">
+                                <User size={18} className="sm:hidden" />
+                                <span className="hidden sm:inline">Account</span>
+                              </Link>
+                            </>
                           )}
                           {user.role === 'business_admin' && (
                             <Link href="/business" className={`text-sm font-medium transition-colors ${

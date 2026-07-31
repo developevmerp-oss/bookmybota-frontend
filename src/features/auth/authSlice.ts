@@ -83,8 +83,18 @@ const authSlice = createSlice({
         }
       }
     },
+    updateUser: (state, action: PayloadAction<Partial<AuthUser>>) => {
+      if (!state.user) return;
+      state.user = { ...state.user, ...action.payload };
+      if (typeof window !== 'undefined') {
+        let userKey = 'user_customer';
+        if (state.user.role === 'super_admin') userKey = 'user_super_admin';
+        else if (state.user.role === 'business_admin') userKey = 'user_business_admin';
+        localStorage.setItem(userKey, JSON.stringify(state.user));
+      }
+    },
   },
 });
 
-export const { setCredentials, clearCredentials, loadFromStorage } = authSlice.actions;
+export const { setCredentials, clearCredentials, loadFromStorage, updateUser } = authSlice.actions;
 export default authSlice.reducer;

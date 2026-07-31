@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   useGetBusinessPublicQuery,
   useCreateBookingMutation,
@@ -283,6 +284,7 @@ const StarRatingInput = ({ value, onChange }: { value: number, onChange: (val: n
 
 export default function RestaurantPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
+  const router = useRouter();
   const { data: profile, isLoading } = useGetBusinessPublicQuery(resolvedParams.id);
   const [createBooking] = useCreateBookingMutation();
   const { data: reviews = [] } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
@@ -331,6 +333,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [guests, setGuests] = useState('2');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [arrivalTime, setArrivalTime] = useState('On time');
+  const [lastBookingId, setLastBookingId] = useState<string | null>(null);
   const [availabilityStatus, setAvailabilityStatus] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
@@ -543,7 +547,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           ? authUser.customer_id
           : undefined;
 
-      await createBooking({
+      const result = await createBooking({
         business_id: resolvedParams.id,
         customer_name: name,
         customer_phone: phone,
@@ -554,6 +558,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       }).unwrap();
       setBookingSuccess(true);
       setDrawerStep(4);
+      if (result.booking_id) {
+        setLastBookingId(result.booking_id);
+      }
+      toast.success('Booking confirmed!');
     } catch {
       toast.error('Booking failed. Please try again.');
     }
@@ -565,6 +573,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setSelectedTime('');
     setName('');
     setPhone('');
+    setArrivalTime('On time');
+    setLastBookingId(null);
     setDrawerStep(1);
   };
 
@@ -1019,20 +1029,24 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           }}
                           className="text-xs bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg border border-rose-100 font-bold hover:bg-rose-100 transition-all flex items-center gap-1 cursor-pointer"
                         >
-                          <Compass size={11} /> Directions
+                          <Compass size={11} /> Get Directions
                         </button>
                       </div>
                     </div>
-                    <div className="w-full md:w-56 h-36 bg-slate-200 rounded-xl relative overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center">
-                      {/* Placeholder Map View */}
-                      <div
-                        className="absolute inset-0 bg-cover bg-center filter grayscale opacity-80"
-                        style={{ backgroundImage: "url(https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&q=80)" }}
-                      />
-                      <div className="absolute inset-0 bg-rose-500/10" />
-                      <div className="relative z-10 p-2 bg-white rounded-full shadow-md">
-                        <MapPin size={18} className="text-rose-600 animate-bounce" />
-                      </div>
+                    <div className="w-full md:w-64 h-44 bg-slate-200 rounded-xl relative overflow-hidden border border-slate-200 shrink-0">
+                      {profile.address ? (
+                        <iframe
+                          title={`Map of ${profile.name}`}
+                          className="absolute inset-0 w-full h-full border-0"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          src={`https://maps.google.com/maps?q=${encodeURIComponent(profile.address)}&z=15&output=embed`}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs">
+                          Map unavailable
+                        </div>
+                      )}
                     </div>
                   </div>
                 </section>
@@ -2191,11 +2205,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <p className="text-xs font-extrabold text-slate-800">{guests} {Number(guests) === 1 ? 'Guest' : 'Guests'}</p>
                       </div>
                       <div className="space-y-0.5">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Promotion</span>
-                        <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                          {bookingDates[selectedDateIndex].getDay() === 5 || bookingDates[selectedDateIndex].getDay() === 6 || bookingDates[selectedDateIndex].getDay() === 0 ? '15% Off' : '20% Off'}
-                        </p>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Arrival</span>
+                        <p className="text-xs font-extrabold text-slate-800">{arrivalTime}</p>
                       </div>
                     </div>
                   </div>
@@ -2250,6 +2261,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             placeholder="+91 99000-00000"
                           />
                         </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Approx. Arrival</label>
+                          <select
+                            value={arrivalTime}
+                            onChange={(e) => setArrivalTime(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
+                          >
+                            <option value="On time">On time</option>
+                            <option value="15 min early">15 min early</option>
+                            <option value="10 min late">Up to 10 min late</option>
+                            <option value="15 min late">Up to 15 min late</option>
+                          </select>
+                        </div>
                         <button
                           type="submit"
                           className="bg-rose-600 hover:bg-rose-700 text-white rounded-2xl w-full py-3.5 text-xs font-bold shadow-md shadow-rose-600/10 hover-lift transition-all cursor-pointer mt-2"
@@ -2289,9 +2313,27 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <span className="text-slate-400 font-semibold">Time:</span>
                       <span className="text-slate-800 font-bold">{formatSlotLabel(selectedTime)}</span>
                     </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400 font-semibold">Arrival:</span>
+                      <span className="text-slate-800 font-bold">{arrivalTime}</span>
+                    </div>
                   </div>
 
-                  <div className="pt-6 max-w-xs mx-auto">
+                  <div className="pt-6 max-w-xs mx-auto space-y-3">
+                    {lastBookingId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDrawerOpen(false);
+                          const params = new URLSearchParams({ id: lastBookingId });
+                          if (arrivalTime) params.set('arrival', arrivalTime);
+                          router.push(`/customer/bookings/confirmation?${params.toString()}`);
+                        }}
+                        className="bg-rose-600 hover:bg-rose-700 text-white rounded-2xl px-6 py-3 text-xs font-bold transition-all shadow-md w-full cursor-pointer"
+                      >
+                        View Confirmation
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {

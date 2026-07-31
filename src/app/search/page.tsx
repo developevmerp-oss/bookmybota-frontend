@@ -1,9 +1,16 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Star, MapPin, Loader2, X, Percent, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
+import DiningFiltersBar from "@/components/DiningFiltersBar";
+import {
+  applyDiningFilters,
+  DEFAULT_DINING_FILTERS,
+  DiningFilterState,
+  extractCuisines,
+} from "@/lib/diningFilters";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -123,6 +130,8 @@ function SearchContent() {
   const queryParam = searchParams.get("search") || "";
   const cityParam = searchParams.get("city") || "";
 
+  const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
+
   // Dynamic API calls with active filters
   const { data: businesses = [], isLoading: loadingBusinesses } = useGetBusinessesQuery({
     collection: collectionParam,
@@ -137,21 +146,26 @@ function SearchContent() {
   // Find the selected Mood metadata for the banner
   const activeMood = moods.find((m) => m.query_tag.toLowerCase() === moodParam.toLowerCase());
 
-  // Client-side filtering for city & search text
-  const filteredRestaurants = businesses.filter((r) => {
-    const address = r.address || "";
-    const name = r.name || "";
-    const cuisine = r.cuisine || "";
+  const cuisineOptions = useMemo(() => extractCuisines(businesses), [businesses]);
 
-    const matchesCity = !cityParam || cityParam === "All Cities" || address.toLowerCase().includes(cityParam.toLowerCase());
-    const matchesQuery =
-      !queryParam ||
-      name.toLowerCase().includes(queryParam.toLowerCase()) ||
-      cuisine.toLowerCase().includes(queryParam.toLowerCase()) ||
-      address.toLowerCase().includes(queryParam.toLowerCase());
+  // Client-side filtering for city & search text, then dining filters/sort
+  const filteredRestaurants = useMemo(() => {
+    const base = businesses.filter((r) => {
+      const address = r.address || "";
+      const name = r.name || "";
+      const cuisine = r.cuisine || "";
 
-    return matchesCity && matchesQuery;
-  });
+      const matchesCity = !cityParam || cityParam === "All Cities" || address.toLowerCase().includes(cityParam.toLowerCase());
+      const matchesQuery =
+        !queryParam ||
+        name.toLowerCase().includes(queryParam.toLowerCase()) ||
+        cuisine.toLowerCase().includes(queryParam.toLowerCase()) ||
+        address.toLowerCase().includes(queryParam.toLowerCase());
+
+      return matchesCity && matchesQuery;
+    });
+    return applyDiningFilters(base, diningFilters);
+  }, [businesses, cityParam, queryParam, diningFilters]);
 
   // Calculate dynamic banner styling
   const getBannerDetails = () => {
@@ -369,6 +383,13 @@ function SearchContent() {
             )}
           </div>
         </div>
+
+        <DiningFiltersBar
+          cuisines={cuisineOptions}
+          filters={diningFilters}
+          onChange={setDiningFilters}
+          onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
+        />
 
         {/* ── 3. Listings Grid ─────────────────────────────────────────────── */}
         {loadingBusinesses ? (

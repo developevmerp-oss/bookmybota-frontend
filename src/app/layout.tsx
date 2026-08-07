@@ -254,8 +254,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const isAdminOrBusiness = pathname?.startsWith('/admin') || pathname?.startsWith('/business');
+  const isAdminOrBusiness =
+    pathname?.startsWith('/admin') ||
+    pathname?.startsWith('/business') ||
+    pathname?.startsWith('/organizer');
   const isHomePage = pathname === '/';
+  const isAuthPage = pathname === '/login' || pathname === '/register';
 
   const [user, setUser] = useState<any>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -266,6 +270,8 @@ export default function RootLayout({
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
+
+  const showNavSearch = !isAuthPage && (!isHomePage || scrolled);
 
   const detectCurrentLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -388,8 +394,10 @@ export default function RootLayout({
   const readAuthFromStorage = () => {
     const isBusiness = pathname?.startsWith('/business');
     const isAdmin = pathname?.startsWith('/admin');
+    const isOrganizer = pathname?.startsWith('/organizer');
     let userKey = 'user_customer';
     if (isAdmin) userKey = 'user_super_admin';
+    else if (isOrganizer) userKey = 'user_event_admin';
     else if (isBusiness) userKey = 'user_business_admin';
     const userStr = localStorage.getItem(userKey);
     setUser(userStr ? JSON.parse(userStr) : null);
@@ -414,11 +422,15 @@ export default function RootLayout({
   const handleLogout = () => {
     const isBusiness = pathname?.startsWith('/business');
     const isAdmin = pathname?.startsWith('/admin');
+    const isOrganizer = pathname?.startsWith('/organizer');
     let tokenKey = 'token_customer';
     let userKey = 'user_customer';
     if (isAdmin) {
       tokenKey = 'token_super_admin';
       userKey = 'user_super_admin';
+    } else if (isOrganizer) {
+      tokenKey = 'token_event_admin';
+      userKey = 'user_event_admin';
     } else if (isBusiness) {
       tokenKey = 'token_business_admin';
       userKey = 'user_business_admin';
@@ -454,8 +466,8 @@ export default function RootLayout({
                       </span>
                     </Link>
 
-                    {/* Desktop Search & Location capsule */}
-                    {(!isHomePage || scrolled) && (
+                    {/* Desktop Search & Location capsule — hidden on login/register */}
+                    {showNavSearch && (
                       <div className="hidden md:flex items-center bg-white border border-slate-200/80 rounded-xl shadow-sm max-w-xl flex-1 mx-8 overflow-hidden h-11 text-slate-800">
                         {/* Location Select (Custom Dropdown behavior) */}
                         <div ref={locationRef} className="flex items-center gap-1.5 px-3 shrink-0 h-full border-r border-slate-100 hover:bg-slate-50 relative">
@@ -563,6 +575,13 @@ export default function RootLayout({
                               Dashboard
                             </Link>
                           )}
+                          {user.role === 'event_admin' && (
+                            <Link href="/organizer" className={`text-sm font-medium transition-colors ${
+                              isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                            }`}>
+                              Organizer Portal
+                            </Link>
+                          )}
                           {user.role === 'super_admin' && (
                             <Link href="/admin" className={`text-sm font-medium transition-colors ${
                               isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
@@ -596,8 +615,8 @@ export default function RootLayout({
 
                   </div>
 
-                  {/* Row 2: Mobile Sticky Search Capsule */}
-                  {(!isHomePage || scrolled) && (
+                  {/* Row 2: Mobile Sticky Search Capsule — hidden on login/register */}
+                  {showNavSearch && (
                     <div className="md:hidden border-t border-slate-100 pt-2 pb-3">
                       <button
                         onClick={() => setMobileSearchActive(true)}
@@ -617,7 +636,7 @@ export default function RootLayout({
                   )}
 
                   {/* Full width mobile search overlay inside layout header */}
-                  {(!isHomePage || scrolled) && mobileSearchActive && (
+                  {showNavSearch && mobileSearchActive && (
                     <div className="absolute inset-0 bg-white z-50 flex items-center px-4 gap-3 animate-fadeIn">
                       {/* Close button */}
                       <button 

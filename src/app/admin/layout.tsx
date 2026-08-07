@@ -12,8 +12,12 @@ import {
   Settings,
   Menu,
   X,
-  Megaphone
+  Megaphone,
+  CalendarDays,
+  Percent
 } from "lucide-react";
+import AuthGate from "@/components/AuthGate";
+import { clearSessionForRole } from "@/lib/authStorage";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -24,21 +28,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navigation = [
     { name: 'Global Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Businesses Onboarding', href: '/admin/businesses', icon: Store },
+    { name: 'Events', href: '/admin/events', icon: CalendarDays },
+    { name: 'Fees & Commission', href: '/admin/commission', icon: Percent },
     { name: 'Subscription & Billing', href: '/admin/billing', icon: CreditCard },
     { name: 'Marketing Plans', href: '/admin/marketing', icon: Megaphone },
     { name: 'Content Management', href: '/admin/content', icon: FileText },
     { name: 'User Management', href: '/admin/users', icon: Users },
   ];
 
+  const isNavActive = (href: string) => {
+    if (href === '/admin') return pathname === '/admin';
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const currentNavName =
+    navigation.find((n) => isNavActive(n.href) && n.href !== '/admin')?.name ||
+    (pathname === '/admin' ? 'Global Dashboard' : 'Admin Panel');
+
   const handleLogout = () => {
-    localStorage.removeItem('token_super_admin');
-    localStorage.removeItem('user_super_admin');
+    clearSessionForRole('super_admin');
     router.push('/login');
   };
 
   return (
+    <AuthGate mode="require" roles={['super_admin']}>
     <div className="min-h-screen flex bg-background admin-dashboard-layout">
-      {/* Sidebar */}
       <aside className="w-64 glass-panel border-r border-white/5 fixed h-full z-40 hidden md:flex flex-col">
         <div className="p-6 border-b border-white/5">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -50,7 +64,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {navigation.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = isNavActive(item.href);
             const Icon = item.icon;
             return (
               <Link 
@@ -70,15 +84,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
       </aside>
 
-      {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
-          {/* Backdrop */}
           <div 
             onClick={() => setMobileMenuOpen(false)}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
-          {/* Drawer Content */}
           <div className="relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-6 animate-fadeIn">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-lg font-bold text-white flex items-center gap-2 truncate">
@@ -96,7 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <nav className="flex-1 space-y-2">
               {navigation.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = isNavActive(item.href);
                 const Icon = item.icon;
                 return (
                   <Link 
@@ -119,9 +130,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       )}
 
-      {/* Main Content */}
       <main className="flex-1 md:ml-64 relative">
-        {/* Header */}
         <header className="h-20 glass-panel border-b border-white/5 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30">
            <div className="flex items-center gap-3 min-w-0">
              <button 
@@ -131,7 +140,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                <Menu size={24} />
              </button>
              <h1 className="text-lg sm:text-xl font-semibold text-white truncate">
-                {navigation.find(n => n.href === pathname)?.name || 'Admin Panel'}
+                {currentNavName}
              </h1>
            </div>
            <div className="flex items-center gap-4">
@@ -142,11 +151,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
            </div>
         </header>
         
-        {/* Page Content */}
         <div className="p-4 sm:p-8">
           {children}
         </div>
       </main>
     </div>
+    </AuthGate>
   );
 }

@@ -14,7 +14,8 @@ import {
   X,
   Megaphone,
   CalendarDays,
-  Percent
+  Percent,
+  UtensilsCrossed,
 } from "lucide-react";
 import AuthGate from "@/components/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
@@ -27,7 +28,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navigation = [
     { name: 'Global Dashboard', href: '/admin', icon: LayoutDashboard },
-    { name: 'Businesses Onboarding', href: '/admin/businesses', icon: Store },
+    { name: 'Dining Businesses', href: '/admin/businesses/dining', icon: UtensilsCrossed },
+    { name: 'Event Organizers', href: '/admin/businesses/event', icon: Store },
     { name: 'Events', href: '/admin/events', icon: CalendarDays },
     { name: 'Fees & Commission', href: '/admin/commission', icon: Percent },
     { name: 'Subscription & Billing', href: '/admin/billing', icon: CreditCard },

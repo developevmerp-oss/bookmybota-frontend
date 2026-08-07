@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User, Phone, Mail, Save, Loader2, MapPin } from "lucide-react";
+import { ArrowLeft, User, Mail, Save, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetCustomerProfileQuery,
@@ -11,6 +11,8 @@ import {
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, updateUser } from "@/features/auth/authSlice";
+import PhoneInput from "@/components/PhoneInput";
+import { isValidPhone } from "@/lib/validation";
 
 export default function CustomerProfilePage() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function CustomerProfilePage() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [phoneValid, setPhoneValid] = useState(false);
 
   useEffect(() => {
     dispatch(loadFromStorage());
@@ -62,6 +65,10 @@ export default function CustomerProfilePage() {
     if (!customerId) return;
     if (!name.trim()) {
       toast.error("Name is required");
+      return;
+    }
+    if (phone.trim() && !isValidPhone(phone)) {
+      toast.error("Phone must be 9–12 digits (numbers only)");
       return;
     }
 
@@ -146,19 +153,16 @@ export default function CustomerProfilePage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
-              <div className="relative">
-                <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
-                  placeholder="Mobile number"
-                />
-              </div>
-            </div>
+            <PhoneInput
+              label="Phone"
+              labelClassName="block text-sm font-medium text-foreground mb-1.5"
+              value={phone}
+              onChange={setPhone}
+              onValidChange={setPhoneValid}
+              required={!!phone.trim()}
+              placeholder="9876543210"
+              inputClassName="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+            />
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
@@ -213,7 +217,7 @@ export default function CustomerProfilePage() {
 
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || (phone.trim() !== "" && !phoneValid)}
               className="btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 disabled:opacity-60"
             >
               {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}

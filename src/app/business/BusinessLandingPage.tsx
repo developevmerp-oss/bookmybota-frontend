@@ -1,8 +1,12 @@
 "use client";
 import { useState } from 'react';
 import Link from 'next/link';
-import { UtensilsCrossed, CheckCircle, Building2, Plus, Loader2 } from 'lucide-react';
+import { UtensilsCrossed, CheckCircle, Plus, Loader2 } from 'lucide-react';
 import { useGetBusinessTypesQuery, useRegisterBusinessMutation } from '@/services/api';
+import PartnerTypeFields, { resolvePartnerFromParentId } from '@/components/PartnerTypeFields';
+import PhoneInput from '@/components/PhoneInput';
+import PasswordInput from '@/components/PasswordInput';
+import { isValidPhone, isValidPassword } from '@/lib/validation';
 
 export default function BusinessLandingPage() {
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
@@ -13,23 +17,34 @@ export default function BusinessLandingPage() {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [description, setDescription] = useState('');
-  const [typeId, setTypeId] = useState('');
+  const [parentTypeId, setParentTypeId] = useState('');
+  const [venueTypeId, setVenueTypeId] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [phoneValid, setPhoneValid] = useState(false);
+  const [passwordValid, setPasswordValid] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<string | null>(null);
+
+  const selectedParent = businessTypes.find((t) => String(t.id) === parentTypeId);
+  const isEventParent = selectedParent?.module_key === 'event';
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidPhone(phone) || !isValidPassword(adminPassword)) return;
     setOnboardStatus('loading');
     try {
+      const eventPartner = resolvePartnerFromParentId(businessTypes, parentTypeId);
       await registerBusiness({
         business_name: businessName,
         address,
         phone,
         description,
-        type_id: parseInt(typeId || businessTypes[0]?.id?.toString() || '1'),
+        type_id: eventPartner
+          ? eventPartner.type_id
+          : parseInt(venueTypeId, 10),
         admin_email: adminEmail,
         admin_password: adminPassword,
+        partner_type: eventPartner ? 'event' : 'dining',
       }).unwrap();
       setOnboardStatus('success');
       setTimeout(() => {
@@ -37,6 +52,7 @@ export default function BusinessLandingPage() {
         setOnboardStatus(null);
         setBusinessName(''); setAddress(''); setPhone('');
         setDescription(''); setAdminEmail(''); setAdminPassword('');
+        setParentTypeId(''); setVenueTypeId('');
       }, 2000);
     } catch {
       setOnboardStatus('error');
@@ -123,21 +139,15 @@ export default function BusinessLandingPage() {
             ) : (
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Venue Type */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Venue Type</label>
-                    <select 
-                      value={typeId} 
-                      onChange={(e) => setTypeId(e.target.value)} 
-                      className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 text-sm"
-                      required
-                    >
-                      <option value="" disabled>Select venue type</option>
-                      {businessTypes.map((type) => (
-                        <option key={type.id} value={type.id}>{type.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <PartnerTypeFields
+                    partnerType="combined"
+                    businessTypes={businessTypes}
+                    parentTypeId={parentTypeId}
+                    venueTypeId={venueTypeId}
+                    onParentTypeIdChange={setParentTypeId}
+                    onVenueTypeIdChange={setVenueTypeId}
+                    variant="light"
+                  />
 
                   {/* Business Name */}
                   <div>
@@ -166,17 +176,17 @@ export default function BusinessLandingPage() {
                   </div>
 
                   {/* Phone Number */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Phone Number</label>
-                    <input 
-                      type="text" 
-                      value={phone} 
-                      onChange={(e) => setPhone(e.target.value)} 
-                      className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 text-sm" 
-                      placeholder="+1 (555) 123-4567" 
-                      required 
-                    />
-                  </div>
+                  <PhoneInput
+                    label="Phone Number"
+                    labelClassName="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2"
+                    variant="light"
+                    value={phone}
+                    onChange={setPhone}
+                    onValidChange={setPhoneValid}
+                    required
+                    placeholder="9876543210"
+                    helperText="9–12 digits, numbers only"
+                  />
 
                   {/* Description */}
                   <div className="md:col-span-2">
@@ -212,17 +222,17 @@ export default function BusinessLandingPage() {
                   </div>
 
                   {/* Password */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Password</label>
-                    <input 
-                      type="password" 
-                      value={adminPassword} 
-                      onChange={(e) => setAdminPassword(e.target.value)} 
-                      className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 text-sm" 
-                      placeholder="Create a password..." 
-                      required 
-                    />
-                  </div>
+                  <PasswordInput
+                    label="Password"
+                    labelClassName="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2"
+                    variant="light"
+                    mode="create"
+                    value={adminPassword}
+                    onChange={setAdminPassword}
+                    onValidChange={setPasswordValid}
+                    required
+                    placeholder="Create a password..."
+                  />
                 </div>
 
                 {onboardStatus === 'error' && (
@@ -232,7 +242,15 @@ export default function BusinessLandingPage() {
                 <div className="mt-4 pt-4 border-t border-slate-150">
                   <button 
                     type="submit" 
-                    disabled={isOnboarding || !businessName || !adminEmail || !adminPassword} 
+                    disabled={
+                      isOnboarding ||
+                      !businessName ||
+                      !adminEmail ||
+                      !phoneValid ||
+                      !passwordValid ||
+                      !parentTypeId ||
+                      (!isEventParent && !venueTypeId)
+                    } 
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 transition-colors"
                   >
                     {isOnboarding ? (

@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
+import PhoneInput from '@/components/PhoneInput';
+import { isValidPhone } from '@/lib/validation';
 
 export default function ProfilePage() {
   const dispatch = useAppDispatch();
@@ -16,6 +18,7 @@ export default function ProfilePage() {
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
 
   const [phone, setPhone] = useState('');
+  const [phoneValid, setPhoneValid] = useState(true);
   const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
@@ -54,6 +57,10 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!bizId) return;
+    if (phone.trim() && !isValidPhone(phone)) {
+      toast.error('Phone must be 9–12 digits (numbers only)');
+      return;
+    }
     try {
       await updateSettings({
         bizId,
@@ -145,7 +152,7 @@ export default function ProfilePage() {
           </button>
         ))}
         </div>
-        <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2 shrink-0 mb-2 sm:mb-0">
+        <button onClick={handleSave} disabled={saving || (phone.trim() !== '' && !phoneValid)} className="btn-primary flex items-center gap-2 shrink-0 mb-2 sm:mb-0">
           <Save size={18} /> {saving ? 'Saving...' : 'Save Profile'}
         </button>
       </div>
@@ -160,10 +167,16 @@ export default function ProfilePage() {
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Venue Name</label>
                   <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="input-field" placeholder="e.g. The Grand Place" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-2">Public Phone Number</label>
-                  <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="input-field" placeholder="+1 (555) 123-4567" />
-                </div>
+                <PhoneInput
+                  label="Public Phone Number"
+                  labelClassName="block text-sm font-medium text-zinc-400 mb-2"
+                  variant="dark"
+                  value={phone}
+                  onChange={setPhone}
+                  onValidChange={setPhoneValid}
+                  required={false}
+                  placeholder="9876543210"
+                />
               </div>
 
               <div>

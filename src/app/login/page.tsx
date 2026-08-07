@@ -8,6 +8,8 @@ import { useAppDispatch } from '@/lib/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
 import { homePathForRole } from '@/lib/authStorage';
 import AuthGate from '@/components/AuthGate';
+import PasswordInput from '@/components/PasswordInput';
+import { isValidPhone, sanitizePhoneInput, getPhoneValidationError } from '@/lib/validation';
 
 type LoginTab = 'customer' | 'business';
 type CustomerStep = 'phone' | 'otp' | 'register';
@@ -48,8 +50,9 @@ function LoginForm() {
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
     setCustomerError(null);
-    if (!phone || phone.replace(/\D/g, '').length < 8) {
-      setCustomerError('Please enter a valid phone number.');
+    const phoneErr = getPhoneValidationError(phone);
+    if (phoneErr) {
+      setCustomerError(phoneErr);
       return;
     }
     setCustomerStep('otp');
@@ -78,6 +81,11 @@ function LoginForm() {
     setCustomerError(null);
     if (!regName || !regEmail || !regPhone) {
       setCustomerError('All fields are required.');
+      return;
+    }
+    const phoneErr = getPhoneValidationError(regPhone);
+    if (phoneErr) {
+      setCustomerError(phoneErr);
       return;
     }
     try {
@@ -185,16 +193,18 @@ function LoginForm() {
                             type="tel"
                             required
                             value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                            onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-14 pr-4 py-3.5 text-sm focus:outline-none focus:border-rose-400 focus:bg-white text-slate-800 font-semibold transition-all"
-                            placeholder="99000-00000"
+                            placeholder="9876543210"
+                            inputMode="numeric"
+                            maxLength={12}
                             autoFocus
                           />
                         </div>
                       </div>
                       <button
                         type="submit"
-                        disabled={isPhoneLoading}
+                        disabled={isPhoneLoading || !isValidPhone(phone)}
                         className="w-full bg-rose-500 hover:bg-rose-600 text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-md shadow-rose-200 cursor-pointer flex justify-center items-center gap-2"
                       >
                         Send OTP <ChevronRight size={16} />
@@ -316,15 +326,17 @@ function LoginForm() {
                             type="tel"
                             required
                             value={regPhone}
-                            onChange={(e) => setRegPhone(e.target.value)}
+                            onChange={(e) => setRegPhone(sanitizePhoneInput(e.target.value))}
                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-14 pr-4 py-3.5 text-sm focus:outline-none focus:border-rose-400 focus:bg-white text-slate-800 font-semibold transition-all"
-                            placeholder="99000-00000"
+                            placeholder="9876543210"
+                            inputMode="numeric"
+                            maxLength={12}
                           />
                         </div>
                       </div>
                       <button
                         type="submit"
-                        disabled={isRegistering}
+                        disabled={isRegistering || !isValidPhone(regPhone)}
                         className="w-full bg-rose-500 hover:bg-rose-600 text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-md shadow-rose-200 cursor-pointer flex justify-center items-center gap-2 mt-2"
                       >
                         {isRegistering ? 'Creating account...' : 'Create Account'}
@@ -366,14 +378,14 @@ function LoginForm() {
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Password</label>
                     <div className="relative">
-                      <Lock size={16} className="absolute left-4 top-3.5 text-slate-400" />
-                      <input
-                        type="password"
+                      <Lock size={16} className="absolute left-4 top-3.5 text-slate-400 z-10 pointer-events-none" />
+                      <PasswordInput
+                        mode="login"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-sm focus:outline-none focus:border-slate-400 focus:bg-white text-slate-800 font-semibold transition-all"
-                        placeholder="••••••••"
+                        onChange={setPassword}
                         required
+                        placeholder="••••••••"
+                        inputClassName="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-11 py-3.5 text-sm focus:outline-none focus:border-slate-400 focus:bg-white text-slate-800 font-semibold transition-all"
                       />
                     </div>
                   </div>

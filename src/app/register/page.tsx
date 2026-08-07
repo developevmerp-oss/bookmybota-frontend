@@ -7,6 +7,9 @@ import { useAppDispatch } from '@/lib/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
 import { toast } from 'sonner';
 import AuthGate from '@/components/AuthGate';
+import PhoneInput from '@/components/PhoneInput';
+import PasswordInput from '@/components/PasswordInput';
+import { isValidPhone, isValidPassword } from '@/lib/validation';
 
 function RegisterForm() {
   const router = useRouter();
@@ -15,10 +18,13 @@ function RegisterForm() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [phoneValid, setPhoneValid] = useState(false);
+  const [passwordValid, setPasswordValid] = useState(false);
   const [registerCustomer, { isLoading, error }] = useRegisterCustomerMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidPhone(phone) || !isValidPassword(password)) return;
     try {
       const data = await registerCustomer({ name, email, phone, password }).unwrap();
       dispatch(setCredentials({ user: data.user, token: data.token }));
@@ -56,16 +62,28 @@ function RegisterForm() {
             <label className="block text-sm font-medium text-muted-foreground mb-2">Email</label>
             <input type="email" required className="input-field" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">Phone Number</label>
-            <input type="tel" required className="input-field" placeholder="(555) 123-4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            <p className="text-xs text-muted-foreground mt-1">We will use this to sync any past guest bookings.</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">Password</label>
-            <input type="password" required className="input-field" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          <button type="submit" disabled={isLoading} className="w-full btn-primary mt-6">
+          <PhoneInput
+            label="Phone Number"
+            value={phone}
+            onChange={setPhone}
+            onValidChange={setPhoneValid}
+            required
+            helperText="We will use this to sync any past guest bookings."
+          />
+          <PasswordInput
+            label="Password"
+            mode="create"
+            value={password}
+            onChange={setPassword}
+            onValidChange={setPasswordValid}
+            required
+            placeholder="••••••••"
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !phoneValid || !passwordValid || !name || !email}
+            className="w-full btn-primary mt-6 disabled:opacity-50"
+          >
             {isLoading ? 'Creating Account...' : 'Sign Up'}
           </button>
         </form>

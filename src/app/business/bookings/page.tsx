@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { useGetBusinessBookingsQuery, useCancelBookingMutation, useCreateBookingMutation } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
+import PhoneInput from '@/components/PhoneInput';
+import { isValidPhone } from '@/lib/validation';
 
 export default function BookingsManager() {
   const dispatch = useAppDispatch();
@@ -18,7 +20,8 @@ export default function BookingsManager() {
 
   const [showModal, setShowModal] = useState(false);
   const [walkInName, setWalkInName] = useState('Walk-in Guest');
-  const [walkInPhone, setWalkInPhone] = useState('0000000000');
+  const [walkInPhone, setWalkInPhone] = useState('');
+  const [walkInPhoneValid, setWalkInPhoneValid] = useState(true);
   const [walkInGuests, setWalkInGuests] = useState('2');
 
   // DataTable States
@@ -34,11 +37,15 @@ export default function BookingsManager() {
   };
 
   const handleAddWalkIn = async () => {
+    if (walkInPhone.trim() && !isValidPhone(walkInPhone)) {
+      toast.error('Guest phone must be 9–12 digits (numbers only)');
+      return;
+    }
     try {
       await createBooking({
         business_id: bizId,
         customer_name: walkInName,
-        customer_phone: walkInPhone,
+        customer_phone: walkInPhone.trim() || '0000000000',
         booking_time: new Date().toISOString(),
         booking_source: 'WALK_IN',
         guests: Number(walkInGuests),
@@ -334,16 +341,17 @@ export default function BookingsManager() {
                   placeholder="e.g. John Doe"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Guest Phone (Optional)</label>
-                <input 
-                  type="text" 
-                  value={walkInPhone} 
-                  onChange={(e) => setWalkInPhone(e.target.value)} 
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all placeholder:text-zinc-650"
-                  placeholder="e.g. +251 912 345678"
-                />
-              </div>
+              <PhoneInput
+                label="Guest Phone (Optional)"
+                labelClassName="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2"
+                variant="dark"
+                value={walkInPhone}
+                onChange={setWalkInPhone}
+                onValidChange={setWalkInPhoneValid}
+                required={false}
+                placeholder="9876543210"
+                helperText="Leave empty or enter 9–12 digits"
+              />
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Party Size</label>
                 <input 
@@ -357,7 +365,7 @@ export default function BookingsManager() {
               </div>
               <button 
                 onClick={handleAddWalkIn} 
-                disabled={isAddingWalkIn} 
+                disabled={isAddingWalkIn || (walkInPhone.trim() !== '' && !walkInPhoneValid)} 
                 className="btn-primary w-full mt-4 disabled:opacity-50 flex items-center justify-center gap-2 rounded-xl py-3 hover-lift text-sm font-semibold shadow-lg shadow-rose-600/10"
               >
                 {isAddingWalkIn ? 'Adding...' : 'Seat Walk-in Now'}

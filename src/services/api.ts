@@ -19,6 +19,10 @@ export interface Business {
   phone?: string;
   description?: string;
   type_name?: string;
+  module_key?: string;
+  module_name?: string;
+  admin_role?: string;
+  admin_email?: string;
   cover_image_url?: string;
   subscription_plan?: string;
   cuisine?: string;
@@ -58,6 +62,81 @@ export interface BusinessSettings {
 export interface BusinessType {
   id: number;
   name: string;
+  module_id?: number;
+  module_key?: string;
+  module_name?: string;
+  parent_type_id?: number | null;
+  slug?: string;
+}
+
+export interface AdminEvent {
+  id: string;
+  business_id: string;
+  name: string;
+  status: string;
+  is_visible: boolean;
+  convenience_fee_per_ticket: number | string;
+  commission_percent: number | string;
+  organizer_name?: string;
+  category_name?: string;
+  language?: string;
+  about_event?: string;
+  age_group?: string;
+  duration_minutes?: number;
+  tickets_sold?: number;
+  convenience_fee_earned?: number | string;
+  commission_earned?: number | string;
+  platform_earned?: number | string;
+  created_at?: string;
+  updated_at?: string;
+  ticket_types?: Array<{
+    id: string;
+    ticket_type: string;
+    total_count: number;
+    available_count: number;
+    price: number | string;
+  }>;
+  showtimes?: Array<{
+    id: string;
+    venue_name?: string;
+    venue_address?: string;
+    starts_at: string;
+    ends_at?: string;
+  }>;
+  bookings?: Array<Record<string, unknown>>;
+}
+
+export interface CommissionLedgerRow {
+  event_id?: string;
+  event_name?: string;
+  business_id?: string;
+  organizer_name?: string;
+  booking_date?: string;
+  convenience_fee_per_ticket?: number | string;
+  commission_percent?: number | string;
+  bookings_count: number;
+  tickets_sold: number;
+  ticket_amount: number | string;
+  convenience_fee_total: number | string;
+  commission_total: number | string;
+  platform_earned: number | string;
+  organizer_payout: number | string;
+  grand_total: number | string;
+}
+
+export interface CommissionLedger {
+  group_by: string;
+  rows: CommissionLedgerRow[];
+  totals: {
+    bookings_count: number;
+    tickets_sold: number;
+    ticket_amount: number | string;
+    convenience_fee_total: number | string;
+    commission_total: number | string;
+    platform_earned: number | string;
+    organizer_payout: number | string;
+    grand_total: number | string;
+  };
 }
 
 export interface Collection {
@@ -156,7 +235,7 @@ export interface Analytics {
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'super_admin' | 'business_admin' | 'customer';
+  role: 'super_admin' | 'business_admin' | 'event_admin' | 'customer';
   business_id?: string;
   customer_id?: string;
   name?: string;
@@ -175,6 +254,8 @@ export const api = createApi({
         let tokenKey = 'token_customer';
         if (pathname.startsWith('/admin')) {
           tokenKey = 'token_super_admin';
+        } else if (pathname.startsWith('/organizer')) {
+          tokenKey = 'token_event_admin';
         } else if (pathname.startsWith('/business')) {
           tokenKey = 'token_business_admin';
         }
@@ -186,7 +267,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -211,7 +292,7 @@ export const api = createApi({
     }),
 
     registerBusiness: builder.mutation<
-      { success: boolean },
+      { success?: boolean; business_id?: string; role?: string; message?: string },
       {
         business_name: string;
         address: string;
@@ -220,6 +301,7 @@ export const api = createApi({
         type_id: number;
         admin_email: string;
         admin_password: string;
+        partner_type?: 'dining' | 'event';
       }
     >({
       query: (body) => ({
@@ -528,6 +610,72 @@ export const api = createApi({
       invalidatesTags: ['MarketingCampaigns', 'Businesses'],
     }),
 
+    // ── Admin Events & Commission ─────────────────────────────────────────────
+
+    getAdminEvents: builder.query<AdminEvent[], { status?: string } | void>({
+      query: (params) => {
+        let url = '/admin/events';
+        if (params?.status) url += `?status=${encodeURIComponent(params.status)}`;
+        return url;
+      },
+      transformResponse: (res: { data: AdminEvent[] }) => res.data || [],
+      providesTags: ['AdminEvents'],
+    }),
+
+    getAdminEventDetail: builder.query<AdminEvent, string>({
+      query: (id) => `/admin/events/${id}`,
+      transformResponse: (res: { data: AdminEvent }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'AdminEvents', id }],
+    }),
+
+    updateAdminEvent: builder.mutation<
+      AdminEvent,
+      {
+        id: string;
+        action?: 'approve' | 'reject' | 'go_live' | 'close';
+        status?: string;
+        is_visible?: boolean;
+        convenience_fee_per_ticket?: number;
+        commission_percent?: number;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/events/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: AdminEvent }) => res.data,
+      invalidatesTags: ['AdminEvents', 'AdminCommission'],
+    }),
+
+    getCommissionLedger: builder.query<
+      CommissionLedger,
+      { from?: string; to?: string; group_by?: 'event' | 'business' | 'date' } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.from) searchParams.append('from', params.from);
+        if (params?.to) searchParams.append('to', params.to);
+        if (params?.group_by) searchParams.append('group_by', params.group_by);
+        const qs = searchParams.toString();
+        return `/admin/commission${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: CommissionLedger }) => res.data,
+      providesTags: ['AdminCommission'],
+    }),
+
+    getAdminEventBookings: builder.query<any[], { event_id?: string; business_id?: string } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.event_id) searchParams.append('event_id', params.event_id);
+        if (params?.business_id) searchParams.append('business_id', params.business_id);
+        const qs = searchParams.toString();
+        return `/admin/event-bookings${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: any[] }) => res.data || [],
+      providesTags: ['AdminEvents'],
+    }),
+
     // ── Analytics ─────────────────────────────────────────────────────────────
 
     getAnalytics: builder.query<Analytics, string>({
@@ -594,4 +742,9 @@ export const {
   useGetMarketingCampaignsQuery,
   useAssignMarketingCampaignMutation,
   useGetBusinessCampaignsQuery,
+  useGetAdminEventsQuery,
+  useGetAdminEventDetailQuery,
+  useUpdateAdminEventMutation,
+  useGetCommissionLedgerQuery,
+  useGetAdminEventBookingsQuery,
 } = api;

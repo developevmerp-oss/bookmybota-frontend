@@ -6,11 +6,13 @@ import Link from 'next/link';
 import { useLoginMutation, usePhoneLoginMutation, useRegisterCustomerMutation } from '@/services/api';
 import { useAppDispatch } from '@/lib/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
+import { homePathForRole } from '@/lib/authStorage';
+import AuthGate from '@/components/AuthGate';
 
 type LoginTab = 'customer' | 'business';
 type CustomerStep = 'phone' | 'otp' | 'register';
 
-export default function Login() {
+function LoginForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
 
@@ -99,9 +101,7 @@ export default function Login() {
       const data = await login({ email, password }).unwrap();
       dispatch(setCredentials({ user: data.user, token: data.token }));
       window.dispatchEvent(new Event('auth_changed'));
-      if (data.user.role === 'super_admin') router.push('/admin');
-      else if (data.user.role === 'customer') router.push('/customer/dashboard');
-      else router.push('/business');
+      router.push(homePathForRole(data.user.role));
     } catch {
       // error shown via RTK error state
     }
@@ -404,5 +404,13 @@ export default function Login() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <AuthGate mode="guest">
+      <LoginForm />
+    </AuthGate>
   );
 }

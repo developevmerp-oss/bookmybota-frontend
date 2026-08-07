@@ -6,8 +6,9 @@ import { useRegisterCustomerMutation } from '@/services/api';
 import { useAppDispatch } from '@/lib/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
 import { toast } from 'sonner';
+import AuthGate from '@/components/AuthGate';
 
-export default function Register() {
+function RegisterForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [name, setName] = useState('');
@@ -75,5 +76,13 @@ export default function Register() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function Register() {
+  return (
+    <AuthGate mode="guest">
+      <RegisterForm />
+    </AuthGate>
   );
 }

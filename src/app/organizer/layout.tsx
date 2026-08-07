@@ -1,96 +1,47 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAppDispatch, useAppSelector } from "@/lib/hooks";
-import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
+import { useAppSelector } from "@/lib/hooks";
 import { useGetBusinessSettingsQuery } from "@/services/api";
-import {
-  clearSessionForRole,
-  getActiveSession,
-  homePathForRole,
-  readSessionForRole,
-} from "@/lib/authStorage";
+import AuthGate from "@/components/AuthGate";
+import { clearSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,
-  CalendarCheck,
-  LayoutGrid,
-  Clock,
-  Settings,
+  CalendarDays,
+  Ticket,
   LogOut,
   Menu,
   X,
-  Star,
-  Megaphone,
+  CalendarCheck,
 } from "lucide-react";
 
-export default function BusinessLayout({ children }: { children: React.ReactNode }) {
+function OrganizerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const [checkingAuth, setCheckingAuth] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
-  const businessName = settings?.name || "Venue Admin";
-
-  const isPublicLanding = pathname === "/business";
-  const isBusinessAdmin = user?.role === "business_admin";
-
-  useEffect(() => {
-    const dining = readSessionForRole("business_admin");
-    if (dining) {
-      dispatch(setCredentials({ user: dining.user, token: dining.token }));
-    } else {
-      dispatch(loadFromStorage());
-    }
-
-    if (readSessionForRole("event_admin")) {
-      router.replace("/organizer");
-      return;
-    }
-
-    if (!dining && !isPublicLanding) {
-      const any = getActiveSession();
-      if (any) {
-        router.replace(homePathForRole(any.user.role));
-      } else {
-        router.replace("/login");
-      }
-      return;
-    }
-
-    setCheckingAuth(false);
-  }, [dispatch, router, isPublicLanding, pathname]);
+  const organizerName = settings?.name || "Event Organizer";
 
   const navigation = [
-    { name: "Global Settings", href: "/business", icon: LayoutDashboard },
-    { name: "Bookings Manager", href: "/business/bookings", icon: CalendarCheck },
-    { name: "Table Management", href: "/business/tables", icon: LayoutGrid },
-    { name: "Analytics", href: "/business/analytics", icon: Clock },
-    { name: "Profile Editor", href: "/business/profile", icon: Settings },
-    { name: "Reviews", href: "/business/reviews", icon: Star },
-    { name: "Promotions", href: "/business/promotions", icon: Megaphone },
+    { name: "Dashboard", href: "/organizer", icon: LayoutDashboard },
+    { name: "My Events", href: "/organizer/events", icon: CalendarDays },
+    { name: "Bookings", href: "/organizer/bookings", icon: CalendarCheck },
+    { name: "Ticket Types", href: "/organizer/tickets", icon: Ticket },
   ];
 
-  const handleLogout = () => {
-    clearSessionForRole("business_admin");
-    router.push("/login");
+  const isNavActive = (href: string) => {
+    if (href === "/organizer") return pathname === "/organizer";
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
-        Loading...
-      </div>
-    );
-  }
-
-  if (!isBusinessAdmin) {
-    return <div className="min-h-screen bg-slate-50">{children}</div>;
-  }
+  const handleLogout = () => {
+    clearSessionForRole("event_admin");
+    router.push("/login");
+  };
 
   return (
     <div className="min-h-screen flex bg-background admin-dashboard-layout">
@@ -98,17 +49,18 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
         <div className="p-6 border-b border-white/5">
           <h2
             className="text-xl font-bold text-white flex items-center gap-2 min-w-0"
-            title={businessName}
+            title={organizerName}
           >
-            <span className="bg-rose-600 p-1.5 rounded-lg text-white shrink-0">
-              <Settings size={20} />
+            <span className="bg-violet-600 p-1.5 rounded-lg text-white shrink-0">
+              <CalendarDays size={20} />
             </span>
-            <span className="truncate text-lg font-bold">{businessName}</span>
+            <span className="truncate text-lg font-bold">{organizerName}</span>
           </h2>
+          <p className="text-xs text-zinc-500 mt-2">Event Organizer</p>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {navigation.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = isNavActive(item.href);
             const Icon = item.icon;
             return (
               <Link
@@ -116,7 +68,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
                 href={item.href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                   isActive
-                    ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                    ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
                     : "text-zinc-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
@@ -134,27 +86,24 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
             onClick={() => setMobileMenuOpen(false)}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
-          <div className="relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-6 animate-fadeIn">
+          <div className="relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-6">
             <div className="flex items-center justify-between mb-8">
-              <h2
-                className="text-lg font-bold text-white flex items-center gap-2 truncate"
-                title={businessName}
-              >
-                <span className="bg-rose-600 p-1.5 rounded-lg text-white shrink-0">
-                  <Settings size={18} />
+              <h2 className="text-lg font-bold text-white flex items-center gap-2 truncate">
+                <span className="bg-violet-600 p-1.5 rounded-lg text-white shrink-0">
+                  <CalendarDays size={18} />
                 </span>
-                <span className="truncate">{businessName}</span>
+                <span className="truncate">{organizerName}</span>
               </h2>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5"
               >
                 <X size={20} />
               </button>
             </div>
             <nav className="flex-1 space-y-2">
               {navigation.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = isNavActive(item.href);
                 const Icon = item.icon;
                 return (
                   <Link
@@ -163,7 +112,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                       isActive
-                        ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                        ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
                         : "text-zinc-400 hover:bg-white/5 hover:text-white"
                     }`}
                   >
@@ -182,15 +131,18 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5 cursor-pointer"
+              className="md:hidden p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5"
             >
               <Menu size={24} />
             </button>
             <h1 className="text-lg sm:text-xl font-semibold text-white truncate">
-              {navigation.find((n) => n.href === pathname)?.name || "Business Panel"}
+              {navigation.find((n) => isNavActive(n.href))?.name || "Organizer Panel"}
             </h1>
           </div>
           <div className="flex items-center gap-4">
+            <span className="hidden sm:inline text-xs text-zinc-500 truncate max-w-[180px]">
+              {user?.email}
+            </span>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-all cursor-pointer"
@@ -204,5 +156,13 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
         <div className="p-4 sm:p-8">{children}</div>
       </main>
     </div>
+  );
+}
+
+export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGate mode="require" roles={["event_admin"]}>
+      <OrganizerShell>{children}</OrganizerShell>
+    </AuthGate>
   );
 }

@@ -22,6 +22,7 @@ import {
 } from '@/services/api';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
+import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 
 // ─── Helpers & Fallback Datasets ──────────────────────────────────────────────
 
@@ -370,8 +371,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     e.preventDefault();
     setLoginError(null);
     if (loginStep === 1) {
-      if (!loginPhone || loginPhone.replace(/\D/g, '').length < 8) {
-        setLoginError('Please enter a valid phone number.');
+      const phoneErr = getPhoneValidationError(loginPhone);
+      if (phoneErr) {
+        setLoginError(phoneErr);
         return;
       }
       setLoginStep(2);
@@ -401,6 +403,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setLoginError(null);
     if (!regName || !regEmail || !regPhone) {
       setLoginError('All fields are required.');
+      return;
+    }
+    const phoneErr = getPhoneValidationError(regPhone);
+    if (phoneErr) {
+      setLoginError(phoneErr);
       return;
     }
     try {
@@ -537,6 +544,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const handleBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (availabilityStatus !== 'available') return;
+    const phoneErr = getPhoneValidationError(phone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      return;
+    }
     try {
       const bookingDateTime = getBookingISO();
 
@@ -1410,7 +1422,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     type="tel"
                                     required
                                     value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
+                                    onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
+                                    inputMode="numeric"
+                                    maxLength={12}
                                     className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
                                     placeholder="+91 99000-00000"
                                   />
@@ -2040,7 +2054,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 type="tel"
                                 required
                                 value={loginPhone}
-                                onChange={(e) => setLoginPhone(e.target.value)}
+                                onChange={(e) => setLoginPhone(sanitizePhoneInput(e.target.value))}
+                                inputMode="numeric"
+                                maxLength={12}
                                 className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
                                 placeholder="99000-00000"
                               />
@@ -2146,7 +2162,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               type="tel"
                               required
                               value={regPhone}
-                              onChange={(e) => setRegPhone(e.target.value)}
+                              onChange={(e) => setRegPhone(sanitizePhoneInput(e.target.value))}
+                              inputMode="numeric"
+                              maxLength={12}
                               className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
                               placeholder="99000-00000"
                             />
@@ -2257,7 +2275,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             type="tel"
                             required
                             value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                            onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
+                            inputMode="numeric"
+                            maxLength={12}
                             className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
                             placeholder="+91 99000-00000"
                           />

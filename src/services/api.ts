@@ -19,6 +19,7 @@ export interface Business {
   phone?: string;
   description?: string;
   type_name?: string;
+  parent_type_name?: string;
   module_key?: string;
   module_name?: string;
   admin_role?: string;
@@ -66,6 +67,7 @@ export interface BusinessType {
   module_key?: string;
   module_name?: string;
   parent_type_id?: number | null;
+  parent_name?: string;
   slug?: string;
 }
 
@@ -298,7 +300,7 @@ export const api = createApi({
         address: string;
         phone: string;
         description: string;
-        type_id: number;
+        type_id?: number;
         admin_email: string;
         admin_password: string;
         partner_type?: 'dining' | 'event';
@@ -314,13 +316,17 @@ export const api = createApi({
 
     // ── Businesses (Public) ───────────────────────────────────────────────────
 
-    getBusinesses: builder.query<Business[], { collection?: string; mood?: string } | void>({
+    getBusinesses: builder.query<
+      Business[],
+      { collection?: string; mood?: string; module?: 'dining' | 'event' } | void
+    >({
       query: (params) => {
         let url = '/businesses';
         if (params) {
           const searchParams = new URLSearchParams();
           if (params.collection) searchParams.append('collection', params.collection);
           if (params.mood) searchParams.append('mood', params.mood);
+          if (params.module) searchParams.append('module', params.module);
           const queryString = searchParams.toString();
           if (queryString) url += `?${queryString}`;
         }

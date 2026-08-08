@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, MapPin, Search, Ticket } from "lucide-react";
 import { useGetPublicEventsQuery, useGetBusinessTypesQuery } from "@/services/api";
@@ -71,7 +71,13 @@ function EventCard({
 export default function PublicEventsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [city, setCity] = useState("");
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
+
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("selected_city") : "";
+    if (stored && stored !== "All Cities") setCity(stored);
+  }, []);
 
   const categories = useMemo(
     () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
@@ -82,8 +88,9 @@ export default function PublicEventsPage() {
     () => ({
       ...(search.trim() ? { q: search.trim() } : {}),
       ...(category ? { category } : {}),
+      ...(city ? { city } : {}),
     }),
-    [search, category]
+    [search, category, city]
   );
 
   const { data: events = [], isLoading } = useGetPublicEventsQuery(queryArg);
@@ -128,6 +135,15 @@ export default function PublicEventsPage() {
               </option>
             ))}
           </select>
+          {city && (
+            <button
+              type="button"
+              onClick={() => setCity("")}
+              className="px-4 py-3 rounded-xl border border-rose-100 bg-rose-50 text-rose-700 text-sm font-semibold"
+            >
+              {city} ×
+            </button>
+          )}
         </div>
 
         {isLoading ? (

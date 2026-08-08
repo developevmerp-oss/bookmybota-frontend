@@ -1,24 +1,23 @@
 "use client";
 
-import { useEffect, use } from "react";
+import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
   Calendar,
   Clock,
-  MapPin,
-  Phone,
-  Users,
-  UtensilsCrossed,
-  XCircle,
   ExternalLink,
+  MapPin,
+  Ticket,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useGetBookingByIdQuery, useCancelBookingMutation } from "@/services/api";
+import { useCancelEventBookingMutation, useGetEventBookingByIdQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
+import { extractApiError } from "@/lib/apiErrors";
 
 function statusStyles(status: string) {
   switch (status) {
@@ -26,16 +25,24 @@ function statusStyles(status: string) {
       return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
     case "CANCELLED":
       return "bg-rose-500/10 text-rose-500 border-rose-500/20";
-    case "COMPLETED":
+    case "USED":
       return "bg-sky-500/10 text-sky-600 border-sky-500/20";
-    case "NO_SHOW":
+    case "REFUNDED":
       return "bg-amber-500/10 text-amber-600 border-amber-500/20";
     default:
       return "bg-slate-500/10 text-slate-500 border-slate-500/20";
   }
 }
 
-export default function BookingDetailPage({
+function formatInr(n: number | string | undefined) {
+  const value = Number(n) || 0;
+  return `₹${value.toLocaleString("en-IN", {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export default function EventBookingDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -60,17 +67,20 @@ export default function BookingDetailPage({
     if (parsed.role !== "customer") router.push("/");
   }, [user, router]);
 
-  const { data: booking, isLoading, error } = useGetBookingByIdQuery(id, { skip: !id });
-  const [cancelBooking, { isLoading: isCancelling }] = useCancelBookingMutation();
+  const { data: booking, isLoading, error } = useGetEventBookingByIdQuery(id, { skip: !id });
+  const [cancelBooking, { isLoading: isCancelling }] = useCancelEventBookingMutation();
 
   const handleCancel = async () => {
     if (!booking) return;
-    if (!confirm("Are you sure you want to cancel this reservation?")) return;
+    if (!confirm("Cancel this ticket booking? Seats will be released.")) return;
     try {
-      await cancelBooking({ id: booking.id }).unwrap();
-      toast.success("Reservation cancelled");
-    } catch {
-      toast.error("Failed to cancel reservation");
+      await cancelBooking({
+        id: booking.id,
+        customerId: user?.customer_id,
+      }).unwrap();
+      toast.success("Booking cancelled");
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to cancel booking"));
     }
   };
 
@@ -94,11 +104,13 @@ export default function BookingDetailPage({
   }
 
   const isUpcoming =
-    new Date(booking.booking_time) > new Date() && booking.status === "CONFIRMED";
-  const guestName = booking.guest_name || booking.customer_name || user.name || "Guest";
-  const guestPhone = booking.guest_phone || booking.customer_phone || user.phone || "—";
-  const mapsUrl = booking.business_address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.business_address)}`
+    !!booking.starts_at &&
+    new Date(booking.starts_at) > new Date() &&
+    booking.status === "CONFIRMED";
+  const mapsUrl = booking.venue_address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        `${booking.venue_name || ""} ${booking.venue_address}`
+      )}`
     : null;
 
   return (
@@ -113,7 +125,7 @@ export default function BookingDetailPage({
 
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Booking Details</h1>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Ticket details</h1>
             <p className="text-muted-foreground text-sm">Booking ID: {booking.id.slice(0, 8)}…</p>
           </div>
           <span
@@ -124,37 +136,37 @@ export default function BookingDetailPage({
         </div>
 
         <div className="glass-panel rounded-2xl border border-border overflow-hidden mb-6">
-          {booking.business_cover_image && (
+          {(booking.poster_horizontal_url || booking.poster_vertical_url) && (
             <div
               className="h-40 bg-cover bg-center"
-              style={{ backgroundImage: `url(${booking.business_cover_image})` }}
+              style={{
+                backgroundImage: `url(${booking.poster_horizontal_url || booking.poster_vertical_url})`,
+              }}
             />
           )}
           <div className="p-6 space-y-5">
             <div>
               <div className="flex items-center gap-2 text-rose-600 mb-1">
-                <UtensilsCrossed size={18} />
-                <span className="text-xs font-semibold uppercase tracking-wider">Restaurant</span>
+                <Ticket size={18} />
+                <span className="text-xs font-semibold uppercase tracking-wider">Event</span>
               </div>
-              <h2 className="text-xl font-bold text-foreground">{booking.business_name}</h2>
-              {booking.business_address && (
+              <h2 className="text-xl font-bold text-foreground">{booking.event_name}</h2>
+              {booking.organizer_name && (
+                <p className="text-sm text-muted-foreground mt-1">By {booking.organizer_name}</p>
+              )}
+              {(booking.venue_name || booking.venue_address) && (
                 <p className="text-sm text-muted-foreground mt-1 flex items-start gap-1.5">
                   <MapPin size={14} className="mt-0.5 shrink-0" />
-                  {booking.business_address}
-                </p>
-              )}
-              {booking.business_phone && (
-                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-                  <Phone size={14} /> {booking.business_phone}
+                  {[booking.venue_name, booking.venue_address].filter(Boolean).join(", ")}
                 </p>
               )}
               <div className="flex flex-wrap gap-3 mt-3">
-                {booking.business_id && (
+                {booking.event_id && (
                   <Link
-                    href={`/restaurant/${booking.business_id}`}
+                    href={`/events/${booking.event_id}`}
                     className="text-sm font-medium text-rose-600 hover:text-rose-700 inline-flex items-center gap-1"
                   >
-                    View restaurant <ExternalLink size={14} />
+                    View event <ExternalLink size={14} />
                   </Link>
                 )}
                 {mapsUrl && (
@@ -176,9 +188,9 @@ export default function BookingDetailPage({
                   <Calendar size={16} />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Date</p>
+                  <p className="text-xs text-muted-foreground">Showtime</p>
                   <p className="font-medium text-foreground">
-                    {formatDateTime12h(booking.booking_time)}
+                    {formatDateTime12h(booking.starts_at)}
                   </p>
                 </div>
               </div>
@@ -187,36 +199,9 @@ export default function BookingDetailPage({
                   <Clock size={16} />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Time</p>
+                  <p className="text-xs text-muted-foreground">Ends</p>
                   <p className="font-medium text-foreground">
-                    {formatTime12h(booking.booking_time)}
-                    {booking.end_time && (
-                      <span className="text-muted-foreground font-normal">
-                        {" "}
-                        –{" "}
-                        {formatTime12h(booking.end_time)}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <Users size={16} />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Guests</p>
-                  <p className="font-medium text-foreground">{booking.guests ?? "—"}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <UtensilsCrossed size={16} />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Table</p>
-                  <p className="font-medium text-foreground">
-                    {booking.table_number ? `Table ${booking.table_number}` : "Assigned at venue"}
+                    {booking.ends_at ? formatTime12h(booking.ends_at) : "—"}
                   </p>
                 </div>
               </div>
@@ -225,58 +210,67 @@ export default function BookingDetailPage({
         </div>
 
         <div className="glass-panel rounded-2xl border border-border p-6 mb-6">
-          <h3 className="font-semibold text-foreground mb-4">Guest details</h3>
+          <h3 className="font-semibold text-foreground mb-4">Tickets & fees</h3>
+          <ul className="space-y-2 text-sm mb-4">
+            {(booking.items || []).map((item) => (
+              <li key={item.id} className="flex justify-between text-muted-foreground">
+                <span>
+                  {item.ticket_type} × {item.qty}
+                </span>
+                <span className="font-medium text-foreground">
+                  {formatInr(Number(item.unit_price) * item.qty)}
+                </span>
+              </li>
+            ))}
+            <li className="flex justify-between text-muted-foreground pt-2 border-t border-border">
+              <span>Tickets</span>
+              <span className="font-medium text-foreground">{formatInr(booking.ticket_amount)}</span>
+            </li>
+            <li className="flex justify-between text-muted-foreground">
+              <span>
+                Convenience fee
+                {booking.convenience_fee_percent
+                  ? ` (${Number(booking.convenience_fee_percent)}%)`
+                  : ""}
+              </span>
+              <span className="font-medium text-foreground">
+                {formatInr(booking.convenience_fee_total)}
+              </span>
+            </li>
+            <li className="flex justify-between font-semibold text-foreground pt-2 border-t border-border">
+              <span>Total payable</span>
+              <span>{formatInr(booking.grand_total)}</span>
+            </li>
+          </ul>
           <div className="grid sm:grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-muted-foreground text-xs mb-0.5">Name</p>
-              <p className="font-medium text-foreground">{guestName}</p>
+              <p className="text-muted-foreground text-xs mb-0.5">Guest name</p>
+              <p className="font-medium text-foreground">{booking.guest_name || user.name || "Guest"}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs mb-0.5">Phone</p>
-              <p className="font-medium text-foreground">{guestPhone}</p>
+              <p className="font-medium text-foreground">{booking.guest_phone || user.phone || "—"}</p>
             </div>
-            <div>
-              <p className="text-muted-foreground text-xs mb-0.5">Booking source</p>
-              <p className="font-medium text-foreground">{booking.booking_source}</p>
-            </div>
-            {booking.created_at && (
-              <div>
-                <p className="text-muted-foreground text-xs mb-0.5">Booked on</p>
-                <p className="font-medium text-foreground">
-                  {formatDateTime12h(booking.created_at)}
-                </p>
-              </div>
-            )}
-            {booking.approx_arrival && (
-              <div>
-                <p className="text-muted-foreground text-xs mb-0.5">Approx. arrival</p>
-                <p className="font-medium text-foreground">{booking.approx_arrival}</p>
-              </div>
-            )}
           </div>
         </div>
 
         <div className="glass-panel rounded-2xl border border-border p-6 mb-6 text-center">
-          {booking.qr_token ? (
+          {booking.qr_code ? (
             <>
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(booking.qr_token)}`}
-                alt="Booking QR code"
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(booking.qr_code)}`}
+                alt="Ticket QR code"
                 className="w-40 h-40 mx-auto mb-3 rounded-xl border border-slate-200 bg-white p-2"
               />
-              <p className="text-sm text-muted-foreground mb-1">
-                Show this QR at the restaurant for check-in.
-              </p>
-              <p className="text-[11px] text-slate-400 font-mono break-all">{booking.qr_token}</p>
+              <p className="text-sm text-muted-foreground mb-1">Show this QR at the venue for entry.</p>
+              <p className="text-[11px] text-slate-400 font-mono break-all">{booking.qr_code}</p>
             </>
           ) : (
             <>
               <div className="w-28 h-28 mx-auto mb-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium">
                 QR Code
               </div>
-              <p className="text-sm text-muted-foreground">
-                QR will appear once check-in scanning is enabled for this booking.
-              </p>
+              <p className="text-sm text-muted-foreground">QR will appear once this booking is confirmed.</p>
             </>
           )}
         </div>
@@ -288,7 +282,7 @@ export default function BookingDetailPage({
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-sm text-rose-500 hover:text-rose-400 px-5 py-2.5 border border-rose-500/20 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer disabled:opacity-60"
           >
             <XCircle size={16} />
-            {isCancelling ? "Cancelling..." : "Cancel Reservation"}
+            {isCancelling ? "Cancelling..." : "Cancel tickets"}
           </button>
         )}
       </div>

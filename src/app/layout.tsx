@@ -565,9 +565,9 @@ export default function RootLayout({
                             <>
                               <Link href="/customer/dashboard" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                                 isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
-                              }`} title="My Reservations">
+                              }`} title="My Bookings">
                                 <Calendar size={18} className="sm:hidden" />
-                                <span className="hidden sm:inline">My Reservations</span>
+                                <span className="hidden sm:inline">My Bookings</span>
                               </Link>
                               <Link href="/customer/settings" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
                                 isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'

@@ -194,6 +194,47 @@ export interface PublicEvent {
   status?: string;
 }
 
+export interface EventBookingItem {
+  id: string;
+  ticket_type_id: string;
+  ticket_type?: string;
+  qty: number;
+  unit_price: number | string;
+}
+
+export interface EventBooking {
+  id: string;
+  event_id: string;
+  showtime_id?: string;
+  customer_id?: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'USED' | 'REFUNDED' | string;
+  ticket_amount: number | string;
+  convenience_fee_percent?: number | string;
+  convenience_fee_total?: number | string;
+  grand_total: number | string;
+  ticket_qty: number;
+  qr_code?: string;
+  qr_payload?: string;
+  booking_source?: string;
+  created_at?: string;
+  updated_at?: string;
+  event_name?: string;
+  event_status?: string;
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  language?: string;
+  category_name?: string;
+  organizer_name?: string;
+  venue_name?: string;
+  venue_address?: string;
+  starts_at?: string;
+  ends_at?: string;
+  items?: EventBookingItem[];
+}
+
 export interface CommissionLedgerRow {
   event_id?: string;
   event_name?: string;
@@ -355,7 +396,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'PublicEvents', 'EventMasters'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'PublicEvents', 'EventMasters'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -884,11 +925,12 @@ export const api = createApi({
       invalidatesTags: ['OrganizerEvents', 'PublicEvents'],
     }),
 
-    getPublicEvents: builder.query<PublicEvent[], { q?: string; category?: string } | void>({
+    getPublicEvents: builder.query<PublicEvent[], { q?: string; category?: string; city?: string } | void>({
       query: (params) => {
         const sp = new URLSearchParams();
         if (params?.q) sp.append('q', params.q);
         if (params?.category) sp.append('category', params.category);
+        if (params?.city) sp.append('city', params.city);
         const qs = sp.toString();
         return `/events/public${qs ? `?${qs}` : ''}`;
       },
@@ -900,6 +942,52 @@ export const api = createApi({
       query: (id) => `/events/public/${id}`,
       transformResponse: (res: { data: OrganizerEvent }) => res.data,
       providesTags: (_r, _e, id) => [{ type: 'PublicEvents', id }],
+    }),
+
+    createEventBooking: builder.mutation<
+      { message?: string; booking_id?: string; qr_code?: string; grand_total?: number; ticket_qty?: number },
+      {
+        event_id: string;
+        showtime_id: string;
+        items: Array<{ ticket_type_id: string; qty: number }>;
+        guest_name: string;
+        guest_phone: string;
+        guest_email?: string;
+        customer_id?: string;
+        booking_source?: 'ONLINE' | 'WALK_IN' | 'CASH';
+      }
+    >({
+      query: (body) => ({
+        url: '/events/bookings',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['EventBookings', 'PublicEvents'],
+    }),
+
+    getCustomerEventBookings: builder.query<EventBooking[], string>({
+      query: (customerId) => `/events/bookings/customer/${customerId}`,
+      transformResponse: (res: { data: EventBooking[] }) => res.data || [],
+      providesTags: (_result, _error, customerId) => [{ type: 'EventBookings', id: customerId }],
+    }),
+
+    getEventBookingById: builder.query<EventBooking, string>({
+      query: (id) => `/events/bookings/detail/${id}`,
+      transformResponse: (res: { data: EventBooking }) => res.data,
+      providesTags: (_result, _error, id) => [{ type: 'EventBookings', id }],
+    }),
+
+    cancelEventBooking: builder.mutation<{ message?: string }, { id: string; customerId?: string }>({
+      query: ({ id }) => ({
+        url: `/events/bookings/${id}/cancel`,
+        method: 'PUT',
+      }),
+      invalidatesTags: (_result, _error, { id, customerId }) => [
+        { type: 'EventBookings', id },
+        ...(customerId ? [{ type: 'EventBookings' as const, id: customerId }] : []),
+        'EventBookings',
+        'PublicEvents',
+      ],
     }),
 
     getEventMasters: builder.query<EventMastersResponse, number>({
@@ -1092,6 +1180,10 @@ export const {
   useCloseOrganizerEventMutation,
   useGetPublicEventsQuery,
   useGetPublicEventQuery,
+  useCreateEventBookingMutation,
+  useGetCustomerEventBookingsQuery,
+  useGetEventBookingByIdQuery,
+  useCancelEventBookingMutation,
   useGetEventMastersQuery,
   useGetAdminEventGenresQuery,
   useCreateAdminEventGenreMutation,

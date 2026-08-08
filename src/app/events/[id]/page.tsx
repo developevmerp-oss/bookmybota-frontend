@@ -1,10 +1,11 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, Clock, Languages, Ticket, Users } from "lucide-react";
 import { useGetPublicEventQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
+import EventCheckout from "@/components/EventCheckout";
 
 export default function PublicEventDetailPage({
   params,
@@ -13,6 +14,7 @@ export default function PublicEventDetailPage({
 }) {
   const { id } = use(params);
   const { data: event, isLoading, isError } = useGetPublicEventQuery(id);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   if (isLoading) {
     return <div className="text-center py-20 text-slate-500">Loading event...</div>;
@@ -154,7 +156,12 @@ export default function PublicEventDetailPage({
                       key={t.id}
                       className="flex justify-between text-sm text-slate-600"
                     >
-                      <span>{t.ticket_type}</span>
+                      <span>
+                        {t.ticket_type}
+                        <span className="block text-[11px] text-slate-400 font-normal">
+                          {Number(t.available_count) || 0} left
+                        </span>
+                      </span>
                       <span className="font-semibold text-slate-900">
                         ₹{Number(t.price).toFixed(0)}
                       </span>
@@ -164,16 +171,43 @@ export default function PublicEventDetailPage({
               </div>
             )}
 
-            <button
-              disabled
-              className="w-full py-3 rounded-xl bg-slate-200 text-slate-500 font-semibold text-sm cursor-not-allowed"
-              title="Ticket booking coming soon"
-            >
-              Book tickets (coming soon)
-            </button>
+            {(() => {
+              const isLive = event.status === "LIVE";
+              const hasShowtimes = (event.showtimes?.length || 0) > 0;
+              const hasTickets = (event.ticket_types || []).some(
+                (t) => Number(t.available_count) > 0
+              );
+              const canBook = isLive && hasShowtimes && hasTickets;
+              return (
+                <button
+                  type="button"
+                  disabled={!canBook}
+                  onClick={() => setCheckoutOpen(true)}
+                  className={`w-full py-3 rounded-xl font-semibold text-sm ${
+                    canBook
+                      ? "bg-rose-600 hover:bg-rose-700 text-white"
+                      : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                  }`}
+                >
+                  {!isLive
+                    ? "Tickets not on sale yet"
+                    : !hasShowtimes
+                      ? "Showtimes coming soon"
+                      : !hasTickets
+                        ? "Sold out"
+                        : "Book tickets"}
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>
+
+      <EventCheckout
+        event={event}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+      />
     </div>
   );
 }

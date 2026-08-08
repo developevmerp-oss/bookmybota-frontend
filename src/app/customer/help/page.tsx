@@ -18,7 +18,11 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "Can I cancel a reservation?",
-        a: "Yes. Go to My Reservations, open the booking, and tap Cancel if it is still upcoming.",
+        a: "Yes. Go to My Bookings, open the booking, and tap Cancel if it is still upcoming.",
+      },
+      {
+        q: "How do I book event tickets?",
+        a: "Open an event, tap Book tickets, choose a showtime and quantities, review the convenience fee, then confirm.",
       },
     ],
   },

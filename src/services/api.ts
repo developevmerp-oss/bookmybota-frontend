@@ -18,6 +18,7 @@ export interface Business {
   address: string;
   phone?: string;
   description?: string;
+  type_id?: number;
   type_name?: string;
   parent_type_name?: string;
   module_key?: string;
@@ -31,6 +32,7 @@ export interface Business {
   reviews_count?: number;
   price_range?: string;
   is_open?: boolean;
+  is_enabled?: boolean;
   owner_id?: string;
   operating_hours?: Record<string, { open: string; close: string; closed: boolean }>;
   gallery_images?: string[];
@@ -77,7 +79,7 @@ export interface AdminEvent {
   name: string;
   status: string;
   is_visible: boolean;
-  convenience_fee_per_ticket: number | string;
+  convenience_fee_percent: number | string;
   commission_percent: number | string;
   organizer_name?: string;
   category_name?: string;
@@ -198,7 +200,7 @@ export interface CommissionLedgerRow {
   business_id?: string;
   organizer_name?: string;
   booking_date?: string;
-  convenience_fee_per_ticket?: number | string;
+  convenience_fee_percent?: number | string;
   commission_percent?: number | string;
   bookings_count: number;
   tickets_sold: number;
@@ -378,7 +380,7 @@ export const api = createApi({
     }),
 
     registerBusiness: builder.mutation<
-      { success?: boolean; business_id?: string; role?: string; message?: string },
+      { success?: boolean; business_id?: string; role?: string; message?: string; is_enabled?: boolean },
       {
         business_name: string;
         address: string;
@@ -396,6 +398,47 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['Businesses'],
+    }),
+
+    updateAdminBusiness: builder.mutation<
+      { message?: string; data?: Business },
+      {
+        id: string;
+        name?: string;
+        address?: string;
+        phone?: string;
+        description?: string;
+        type_id?: number;
+        admin_email?: string;
+        admin_password?: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/businesses/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Businesses'],
+    }),
+
+    setBusinessEnabled: builder.mutation<
+      { message?: string; data?: Business },
+      { id: string; is_enabled: boolean }
+    >({
+      query: ({ id, is_enabled }) => ({
+        url: `/admin/businesses/${id}/status`,
+        method: 'PATCH',
+        body: { is_enabled },
+      }),
+      invalidatesTags: ['Businesses', 'AdminStats'],
+    }),
+
+    softDeleteBusiness: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/businesses/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Businesses', 'AdminStats'],
     }),
 
     // ── Businesses (Public) ───────────────────────────────────────────────────
@@ -725,7 +768,7 @@ export const api = createApi({
         action?: 'approve' | 'reject' | 'go_live' | 'close';
         status?: string;
         is_visible?: boolean;
-        convenience_fee_per_ticket?: number;
+        convenience_fee_percent?: number;
         commission_percent?: number;
         rejection_reason?: string;
       }
@@ -999,6 +1042,9 @@ export const {
   useRegisterCustomerMutation,
   useRegisterBusinessMutation,
   useGetBusinessesQuery,
+  useUpdateAdminBusinessMutation,
+  useSetBusinessEnabledMutation,
+  useSoftDeleteBusinessMutation,
   useGetCollectionsQuery,
   useGetMoodsQuery,
   useGetBusinessTypesQuery,

@@ -19,12 +19,12 @@ export default function AdminEventDetailPage({
   const [rejectionReason, setRejectionReason] = useState('');
 
   const convenienceValue =
-    convenienceFee ?? String(event?.convenience_fee_per_ticket ?? 0);
+    convenienceFee ?? String(event?.convenience_fee_percent ?? 0);
   const commissionValue =
     commissionPercent ?? String(event?.commission_percent ?? 0);
 
   const feePayload = () => ({
-    convenience_fee_per_ticket: Number(convenienceValue) || 0,
+    convenience_fee_percent: Number(convenienceValue) || 0,
     commission_percent: Number(commissionValue) || 0,
   });
 
@@ -177,17 +177,20 @@ export default function AdminEventDetailPage({
           <h3 className="portal-heading text-lg font-semibold">Fees</h3>
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-2">
-              Convenience fee (₹ / ticket)
+              Convenience fee (%)
             </label>
             <input
               type="number"
               min="0"
+              max="100"
               step="0.01"
               value={convenienceValue}
               onChange={(e) => setConvenienceFee(e.target.value)}
               className="input-field"
             />
-            <p className="text-xs text-zinc-500 mt-1">Paid by the customer.</p>
+            <p className="text-xs text-zinc-500 mt-1">
+              Paid by the customer as % of ticket amount.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-2">

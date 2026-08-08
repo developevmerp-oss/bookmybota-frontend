@@ -16,6 +16,7 @@ import {
 import { useGetBookingByIdQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+import { formatDate, formatTime12h } from "@/lib/dateFormat";
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
@@ -101,11 +102,7 @@ function ConfirmationContent() {
               <div>
                 <p className="text-xs text-muted-foreground">Date</p>
                 <p className="text-sm font-medium text-foreground">
-                  {new Date(booking.booking_time).toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {formatDate(booking.booking_time)}
                 </p>
               </div>
             </div>
@@ -114,10 +111,7 @@ function ConfirmationContent() {
               <div>
                 <p className="text-xs text-muted-foreground">Time</p>
                 <p className="text-sm font-medium text-foreground">
-                  {new Date(booking.booking_time).toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                  {formatTime12h(booking.booking_time)}
                 </p>
               </div>
             </div>

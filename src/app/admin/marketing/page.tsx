@@ -12,6 +12,7 @@ import {
 } from '@/services/api';
 import { Megaphone, Plus, Trash2, Calendar, Target, Loader2, Store } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate } from '@/lib/dateFormat';
 
 export default function AdminMarketingPage() {
   const [activeTab, setActiveTab] = useState<'plans' | 'campaigns'>('plans');
@@ -287,7 +288,7 @@ export default function AdminMarketingPage() {
                             {camp.plan_name}
                           </td>
                           <td className="p-4 text-zinc-400">
-                            {new Date(camp.end_date).toLocaleDateString()}
+                            {formatDate(camp.end_date)}
                           </td>
                           <td className="p-4">
                             {isExpired ? (

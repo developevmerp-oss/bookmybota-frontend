@@ -1,6 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { useGetCommissionLedgerQuery } from '@/services/api';
+import { formatDate } from '@/lib/dateFormat';
 
 function money(v: number | string | undefined) {
   return `₹${Number(v || 0).toFixed(2)}`;
@@ -150,9 +151,7 @@ export default function AdminCommissionPage() {
                 )}
                 {groupBy === 'date' && (
                   <td className="px-6 py-4 font-medium text-white">
-                    {row.booking_date
-                      ? new Date(row.booking_date).toLocaleDateString()
-                      : '—'}
+                    {row.booking_date ? formatDate(row.booking_date) : '—'}
                   </td>
                 )}
                 <td className="px-6 py-4 text-zinc-300">{row.tickets_sold}</td>

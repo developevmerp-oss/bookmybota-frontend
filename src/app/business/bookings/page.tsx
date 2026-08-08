@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import PhoneInput from '@/components/PhoneInput';
 import { isValidPhone } from '@/lib/validation';
+import { formatDate, formatTime12h } from '@/lib/dateFormat';
 
 export default function BookingsManager() {
   const dispatch = useAppDispatch();
@@ -202,10 +203,10 @@ export default function BookingsManager() {
                     </td>
                     <td className="py-4 px-6">
                       <div className="text-sm font-semibold text-white">
-                        {new Date(booking.booking_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatDate(booking.booking_time)}
                       </div>
                       <div className="text-xs text-zinc-500 mt-0.5">
-                        {new Date(booking.booking_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        {formatTime12h(booking.booking_time)}
                       </div>
                     </td>
                     <td className="py-4 px-6">

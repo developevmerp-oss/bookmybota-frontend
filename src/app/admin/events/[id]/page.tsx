@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle, Radio, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGetAdminEventDetailQuery, useUpdateAdminEventMutation } from '@/services/api';
+import { formatDateTime12h } from '@/lib/dateFormat';
 
 export default function AdminEventDetailPage({
   params,
@@ -15,6 +16,7 @@ export default function AdminEventDetailPage({
   const [updateEvent, { isLoading: isUpdating }] = useUpdateAdminEventMutation();
   const [convenienceFee, setConvenienceFee] = useState<string | null>(null);
   const [commissionPercent, setCommissionPercent] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const convenienceValue =
     convenienceFee ?? String(event?.convenience_fee_per_ticket ?? 0);
@@ -32,6 +34,9 @@ export default function AdminEventDetailPage({
         id,
         action,
         ...(action === 'approve' ? feePayload() : {}),
+        ...(action === 'reject'
+          ? { rejection_reason: rejectionReason.trim() || undefined }
+          : {}),
       }).unwrap();
       toast.success('Event updated');
     } catch {
@@ -52,14 +57,14 @@ export default function AdminEventDetailPage({
   };
 
   if (isLoading) {
-    return <div className="text-white p-10 text-center">Loading event...</div>;
+    return <div className="portal-muted p-10 text-center">Loading event...</div>;
   }
 
   if (!event) {
     return (
       <div className="text-center py-16">
-        <p className="text-zinc-400 mb-4">Event not found.</p>
-        <Link href="/admin/events" className="text-rose-400 hover:text-rose-300">
+        <p className="portal-muted mb-4">Event not found.</p>
+        <Link href="/admin/events" className="text-rose-600 hover:text-rose-700">
           Back to events
         </Link>
       </div>
@@ -70,15 +75,15 @@ export default function AdminEventDetailPage({
     <div className="max-w-5xl mx-auto space-y-6">
       <Link
         href="/admin/events"
-        className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
+        className="inline-flex items-center gap-2 text-sm portal-muted hover:text-slate-900"
       >
         <ArrowLeft size={16} /> Back to events
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">{event.name}</h2>
-          <p className="text-zinc-400 mt-1">
+          <h2 className="portal-heading text-2xl font-bold">{event.name}</h2>
+          <p className="portal-muted mt-1">
             {event.organizer_name || 'Organizer'} · {event.category_name || 'Uncategorized'} ·{' '}
             {event.status}
           </p>
@@ -123,38 +128,53 @@ export default function AdminEventDetailPage({
         </div>
       </div>
 
+      {event.status === 'PENDING_APPROVAL' && (
+        <div className="glass-panel rounded-2xl border border-white/5 p-6">
+          <label className="block text-sm font-medium text-zinc-400 mb-2">
+            Rejection reason (shown to organizer if you reject)
+          </label>
+          <textarea
+            rows={3}
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            placeholder="e.g. Poster quality is low, please upload a clearer image..."
+            className="input-field resize-y min-h-[80px] w-full"
+          />
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 gap-6">
         <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-white">Details</h3>
+          <h3 className="portal-heading text-lg font-semibold">Details</h3>
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-zinc-500">Language</dt>
-              <dd className="text-zinc-200">{event.language || '—'}</dd>
+              <dt className="portal-muted">Language</dt>
+              <dd className="text-slate-800">{event.language || '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-zinc-500">Age group</dt>
-              <dd className="text-zinc-200">{event.age_group || '—'}</dd>
+              <dt className="portal-muted">Age group</dt>
+              <dd className="text-slate-800">{event.age_group || '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-zinc-500">Duration</dt>
-              <dd className="text-zinc-200">
+              <dt className="portal-muted">Duration</dt>
+              <dd className="text-slate-800">
                 {event.duration_minutes ? `${event.duration_minutes} min` : '—'}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-zinc-500">Visible</dt>
-              <dd className="text-zinc-200">{event.is_visible ? 'Yes' : 'No'}</dd>
+              <dt className="portal-muted">Visible</dt>
+              <dd className="text-slate-800">{event.is_visible ? 'Yes' : 'No'}</dd>
             </div>
           </dl>
           {event.about_event && (
-            <p className="text-zinc-400 text-sm pt-2 border-t border-white/5">
+            <p className="portal-muted text-sm pt-2 border-t border-slate-200">
               {event.about_event}
             </p>
           )}
         </div>
 
         <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-white">Fees</h3>
+          <h3 className="portal-heading text-lg font-semibold">Fees</h3>
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-2">
               Convenience fee (₹ / ticket)
@@ -197,7 +217,7 @@ export default function AdminEventDetailPage({
       </div>
 
       <div className="glass-panel rounded-2xl border border-white/5 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Ticket types</h3>
+        <h3 className="portal-heading text-lg font-semibold mb-4">Ticket types</h3>
         {event.ticket_types && event.ticket_types.length > 0 ? (
           <table className="w-full text-left text-sm">
             <thead className="text-zinc-400 border-b border-white/5">
@@ -225,16 +245,16 @@ export default function AdminEventDetailPage({
       </div>
 
       <div className="glass-panel rounded-2xl border border-white/5 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Showtimes</h3>
+        <h3 className="portal-heading text-lg font-semibold mb-4">Showtimes</h3>
         {event.showtimes && event.showtimes.length > 0 ? (
           <ul className="space-y-3">
             {event.showtimes.map((s) => (
-              <li key={s.id} className="text-sm text-zinc-300 border-b border-white/5 pb-3">
-                <div className="font-medium text-white">{s.venue_name || 'Venue TBD'}</div>
-                <div className="text-zinc-500">{s.venue_address}</div>
-                <div className="text-zinc-400 mt-1">
-                  {new Date(s.starts_at).toLocaleString()}
-                  {s.ends_at ? ` → ${new Date(s.ends_at).toLocaleString()}` : ''}
+              <li key={s.id} className="text-sm portal-table-muted border-b border-slate-200 pb-3">
+                <div className="font-medium portal-heading">{s.venue_name || 'Venue TBD'}</div>
+                <div className="portal-muted">{s.venue_address}</div>
+                <div className="text-slate-700 mt-1">
+                  {formatDateTime12h(s.starts_at)}
+                  {s.ends_at ? ` → ${formatDateTime12h(s.ends_at)}` : ''}
                 </div>
               </li>
             ))}
@@ -245,7 +265,7 @@ export default function AdminEventDetailPage({
       </div>
 
       <div className="glass-panel rounded-2xl border border-white/5 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Recent bookings</h3>
+        <h3 className="portal-heading text-lg font-semibold mb-4">Recent bookings</h3>
         {event.bookings && event.bookings.length > 0 ? (
           <table className="w-full text-left text-sm">
             <thead className="text-zinc-400 border-b border-white/5">

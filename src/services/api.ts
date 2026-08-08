@@ -81,6 +81,7 @@ export interface AdminEvent {
   commission_percent: number | string;
   organizer_name?: string;
   category_name?: string;
+  category_type_id?: number | null;
   language?: string;
   about_event?: string;
   age_group?: string;
@@ -106,6 +107,89 @@ export interface AdminEvent {
     ends_at?: string;
   }>;
   bookings?: Array<Record<string, unknown>>;
+  rejection_reason?: string;
+  genres?: string[];
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  documents?: EventDocumentUpload[] | string[];
+}
+
+export interface EventDocumentUpload {
+  document_type_id: number;
+  url: string;
+  document_name?: string;
+}
+
+export interface EventGenreMaster {
+  id: number;
+  category_type_id: number;
+  name: string;
+  slug?: string;
+  is_active: boolean;
+  sort_order: number;
+  category_name?: string;
+}
+
+export interface EventDocumentMaster {
+  id: number;
+  name: string;
+  description?: string;
+  category_type_id?: number | null;
+  is_required: boolean;
+  importance_level: number;
+  is_active: boolean;
+  sort_order: number;
+  category_name?: string;
+}
+
+export interface EventMastersResponse {
+  genres: EventGenreMaster[];
+  documents: EventDocumentMaster[];
+}
+
+export interface OrganizerEvent extends AdminEvent {
+  genres?: string[];
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  documents?: EventDocumentUpload[] | string[];
+  rejection_reason?: string;
+}
+
+export interface EventFormPayload {
+  name: string;
+  category_type_id: number | null;
+  genres: string[];
+  poster_horizontal_url: string;
+  poster_vertical_url: string;
+  documents: EventDocumentUpload[];
+  language: string;
+  about_event: string;
+  age_group: string;
+  duration_minutes: number | null;
+  ticket_types: Array<{ ticket_type: string; total_count: number; price: number }>;
+  showtimes: Array<{
+    venue_name: string;
+    venue_address: string;
+    starts_at: string;
+    ends_at: string;
+  }>;
+}
+
+export interface PublicEvent {
+  id: string;
+  name: string;
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  language?: string;
+  about_event?: string;
+  age_group?: string;
+  duration_minutes?: number;
+  category_name?: string;
+  category_slug?: string;
+  organizer_name?: string;
+  next_showtime?: string;
+  min_price?: number | string;
+  status?: string;
 }
 
 export interface CommissionLedgerRow {
@@ -269,7 +353,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'PublicEvents', 'EventMasters'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -643,6 +727,7 @@ export const api = createApi({
         is_visible?: boolean;
         convenience_fee_per_ticket?: number;
         commission_percent?: number;
+        rejection_reason?: string;
       }
     >({
       query: ({ id, ...body }) => ({
@@ -651,7 +736,7 @@ export const api = createApi({
         body,
       }),
       transformResponse: (res: { data: AdminEvent }) => res.data,
-      invalidatesTags: ['AdminEvents', 'AdminCommission'],
+      invalidatesTags: ['AdminEvents', 'AdminCommission', 'PublicEvents', 'OrganizerEvents'],
     }),
 
     getCommissionLedger: builder.query<
@@ -694,6 +779,205 @@ export const api = createApi({
       query: (bizId) => `/businesses/${bizId}/campaigns`,
       transformResponse: (res: { data: any[] }) => res.data,
       providesTags: (_result, _error, bizId) => [{ type: 'MarketingCampaigns', id: bizId }],
+    }),
+
+    // ── Organizer Events ──────────────────────────────────────────────────────
+
+    getOrganizerEvents: builder.query<OrganizerEvent[], { q?: string; status?: string } | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.append('q', params.q);
+        if (params?.status) sp.append('status', params.status);
+        const qs = sp.toString();
+        return `/events/organizer${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: OrganizerEvent[] }) => res.data || [],
+      providesTags: ['OrganizerEvents'],
+    }),
+
+    getOrganizerEvent: builder.query<OrganizerEvent, string>({
+      query: (id) => `/events/organizer/${id}`,
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id }],
+    }),
+
+    createOrganizerEvent: builder.mutation<OrganizerEvent, EventFormPayload>({
+      query: (body) => ({ url: '/events/organizer', method: 'POST', body }),
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      invalidatesTags: ['OrganizerEvents'],
+    }),
+
+    updateOrganizerEvent: builder.mutation<
+      { data: OrganizerEvent; message?: string },
+      { id: string; body: EventFormPayload }
+    >({
+      query: ({ id, body }) => ({ url: `/events/organizer/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['OrganizerEvents'],
+    }),
+
+    submitOrganizerEvent: builder.mutation<
+      { data: OrganizerEvent; message?: string },
+      { id: string; body: EventFormPayload }
+    >({
+      query: ({ id, body }) => ({ url: `/events/organizer/${id}/submit`, method: 'POST', body }),
+      invalidatesTags: ['OrganizerEvents', 'AdminEvents', 'PublicEvents'],
+    }),
+
+    toggleOrganizerEventVisibility: builder.mutation<
+      OrganizerEvent,
+      { id: string; is_visible?: boolean }
+    >({
+      query: ({ id, is_visible }) => ({
+        url: `/events/organizer/${id}/visibility`,
+        method: 'PATCH',
+        body: is_visible !== undefined ? { is_visible } : {},
+      }),
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      invalidatesTags: ['OrganizerEvents', 'PublicEvents'],
+    }),
+
+    closeOrganizerEvent: builder.mutation<{ data: OrganizerEvent }, string>({
+      query: (id) => ({ url: `/events/organizer/${id}/close`, method: 'POST' }),
+      invalidatesTags: ['OrganizerEvents', 'PublicEvents'],
+    }),
+
+    getPublicEvents: builder.query<PublicEvent[], { q?: string; category?: string } | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.append('q', params.q);
+        if (params?.category) sp.append('category', params.category);
+        const qs = sp.toString();
+        return `/events/public${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: PublicEvent[] }) => res.data || [],
+      providesTags: ['PublicEvents'],
+    }),
+
+    getPublicEvent: builder.query<OrganizerEvent, string>({
+      query: (id) => `/events/public/${id}`,
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'PublicEvents', id }],
+    }),
+
+    getEventMasters: builder.query<EventMastersResponse, number>({
+      query: (categoryTypeId) => `/events/masters?category_type_id=${categoryTypeId}`,
+      transformResponse: (res: { data: EventMastersResponse }) => res.data,
+      providesTags: ['EventMasters'],
+    }),
+
+    // ── Admin Event Masters ───────────────────────────────────────────────────
+
+    getAdminEventGenres: builder.query<EventGenreMaster[], { category_type_id?: number }>({
+      query: (params = {}) => {
+        const sp = new URLSearchParams();
+        if (params.category_type_id) sp.set('category_type_id', String(params.category_type_id));
+        const qs = sp.toString();
+        return `/admin/event-genres${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: EventGenreMaster[] }) => res?.data ?? [],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
+              { type: 'EventMasters', id: 'GENRE_LIST' },
+            ]
+          : [{ type: 'EventMasters', id: 'GENRE_LIST' }],
+    }),
+
+    createAdminEventGenre: builder.mutation<
+      EventGenreMaster,
+      { category_type_id: number; name: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({
+        url: '/admin/event-genres',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: EventGenreMaster }) => res?.data ?? ({} as EventGenreMaster),
+      invalidatesTags: [{ type: 'EventMasters', id: 'GENRE_LIST' }, 'EventMasters'],
+    }),
+
+    updateAdminEventGenre: builder.mutation<
+      EventGenreMaster,
+      { id: number; body: Partial<EventGenreMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/event-genres/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: EventGenreMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'EventMasters', id: `genre-${id}` },
+        { type: 'EventMasters', id: 'GENRE_LIST' },
+      ],
+    }),
+
+    deleteAdminEventGenre: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/event-genres/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'EventMasters', id: 'GENRE_LIST' }, 'EventMasters'],
+    }),
+
+    getAdminEventDocuments: builder.query<
+      EventDocumentMaster[],
+      { category_type_id?: number | 'global' }
+    >({
+      query: (params = {}) => {
+        const sp = new URLSearchParams();
+        if (params.category_type_id !== undefined) {
+          sp.set('category_type_id', String(params.category_type_id));
+        }
+        const qs = sp.toString();
+        return `/admin/event-documents${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: EventDocumentMaster[] }) => res?.data ?? [],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
+              { type: 'EventMasters', id: 'DOC_LIST' },
+            ]
+          : [{ type: 'EventMasters', id: 'DOC_LIST' }],
+    }),
+
+    createAdminEventDocument: builder.mutation<
+      EventDocumentMaster,
+      {
+        name: string;
+        description?: string;
+        category_type_id?: number | null;
+        is_required?: boolean;
+        importance_level?: number;
+        is_active?: boolean;
+        sort_order?: number;
+      }
+    >({
+      query: (body) => ({
+        url: '/admin/event-documents',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: EventDocumentMaster }) => res?.data ?? ({} as EventDocumentMaster),
+      invalidatesTags: [{ type: 'EventMasters', id: 'DOC_LIST' }, 'EventMasters'],
+    }),
+
+    updateAdminEventDocument: builder.mutation<
+      EventDocumentMaster,
+      { id: number; body: Partial<EventDocumentMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/event-documents/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: EventDocumentMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'EventMasters', id: `doc-${id}` },
+        { type: 'EventMasters', id: 'DOC_LIST' },
+      ],
+    }),
+
+    deleteAdminEventDocument: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/event-documents/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'EventMasters', id: 'DOC_LIST' }, 'EventMasters'],
     }),
 
     // ── Upload ────────────────────────────────────────────────────────────────
@@ -753,4 +1037,22 @@ export const {
   useUpdateAdminEventMutation,
   useGetCommissionLedgerQuery,
   useGetAdminEventBookingsQuery,
+  useGetOrganizerEventsQuery,
+  useGetOrganizerEventQuery,
+  useCreateOrganizerEventMutation,
+  useUpdateOrganizerEventMutation,
+  useSubmitOrganizerEventMutation,
+  useToggleOrganizerEventVisibilityMutation,
+  useCloseOrganizerEventMutation,
+  useGetPublicEventsQuery,
+  useGetPublicEventQuery,
+  useGetEventMastersQuery,
+  useGetAdminEventGenresQuery,
+  useCreateAdminEventGenreMutation,
+  useUpdateAdminEventGenreMutation,
+  useDeleteAdminEventGenreMutation,
+  useGetAdminEventDocumentsQuery,
+  useCreateAdminEventDocumentMutation,
+  useUpdateAdminEventDocumentMutation,
+  useDeleteAdminEventDocumentMutation,
 } = api;

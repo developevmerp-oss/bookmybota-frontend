@@ -324,4 +324,61 @@ html.admin-theme .admin-dashboard-layout .bg-rose-500\/10 {
   color: #e11d48 !important;
 }
 
+/* Status banners — readable on light admin/organizer panels */
+html.admin-theme .admin-dashboard-layout .portal-banner-warning {
+  background-color: #fffbeb !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-warning p,
+html.admin-theme .admin-dashboard-layout .portal-banner-warning svg {
+  color: #92400e !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-banner-error {
+  background-color: #fff1f2 !important;
+  border-color: #fda4af !important;
+  color: #9f1239 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-error p,
+html.admin-theme .admin-dashboard-layout .portal-banner-error svg {
+  color: #9f1239 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-banner-success {
+  background-color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+  color: #065f46 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-success p {
+  color: #065f46 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-label {
+  color: #374151 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-muted {
+  color: #6b7280 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-heading {
+  color: #111827 !important;
+}
+
+/* Table text — readable on light panels (override button.text-white in tables) */
+html.admin-theme .admin-dashboard-layout table button.text-white,
+html.admin-theme .admin-dashboard-layout table .portal-table-link {
+  color: #111827 !important;
+}
+html.admin-theme .admin-dashboard-layout table button.text-white:hover {
+  color: #e11d48 !important;
+}
+html.admin-theme .admin-dashboard-layout table a.portal-table-link:hover {
+  color: #7c3aed !important;
+}
+html.admin-theme .admin-dashboard-layout table td.portal-table-muted,
+html.admin-theme .admin-dashboard-layout table .portal-table-muted {
+  color: #4b5563 !important;
+}
 

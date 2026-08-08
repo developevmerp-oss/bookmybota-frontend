@@ -4,6 +4,7 @@ import { Megaphone, Calendar, Target, Loader2, Store } from 'lucide-react';
 import { useGetBusinessCampaignsQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
+import { formatDate } from '@/lib/dateFormat';
 
 export default function BusinessPromotionsPage() {
   const dispatch = useAppDispatch();
@@ -79,7 +80,7 @@ export default function BusinessPromotionsPage() {
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500">Expires On</span>
                     <span className="font-medium text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
-                      {new Date(camp.end_date).toLocaleDateString()}
+                      {formatDate(camp.end_date)}
                     </span>
                   </div>
                 </div>
@@ -109,7 +110,7 @@ export default function BusinessPromotionsPage() {
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500">Ended On</span>
                     <span className="font-medium text-slate-600">
-                      {new Date(camp.end_date).toLocaleDateString()}
+                      {formatDate(camp.end_date)}
                     </span>
                   </div>
                 </div>

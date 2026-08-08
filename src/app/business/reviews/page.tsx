@@ -6,6 +6,7 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import { Star, StarHalf, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate } from '@/lib/dateFormat';
 
 export default function BusinessReviewsPage() {
   const dispatch = useAppDispatch();
@@ -145,7 +146,7 @@ export default function BusinessReviewsPage() {
                       {rev.user_name}
                     </h4>
                     <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold whitespace-nowrap shrink-0">
-                      {new Date(rev.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {formatDate(rev.created_at)}
                     </span>
                   </div>
                   
@@ -190,7 +191,7 @@ export default function BusinessReviewsPage() {
                                 )}
                               </div>
                               <span className="text-[10px] text-zinc-500">
-                                {new Date(reply.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                {formatDate(reply.created_at)}
                               </span>
                             </div>
                             <p className={reply.user_type === 'owner' ? 'text-rose-900 dark:text-rose-100/80' : 'text-zinc-400'}>

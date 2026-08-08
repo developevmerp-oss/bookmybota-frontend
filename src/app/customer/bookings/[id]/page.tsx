@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useGetBookingByIdQuery, useCancelBookingMutation } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
 
 function statusStyles(status: string) {
   switch (status) {
@@ -177,12 +178,7 @@ export default function BookingDetailPage({
                 <div>
                   <p className="text-xs text-muted-foreground">Date</p>
                   <p className="font-medium text-foreground">
-                    {new Date(booking.booking_time).toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                    {formatDateTime12h(booking.booking_time)}
                   </p>
                 </div>
               </div>
@@ -193,18 +189,12 @@ export default function BookingDetailPage({
                 <div>
                   <p className="text-xs text-muted-foreground">Time</p>
                   <p className="font-medium text-foreground">
-                    {new Date(booking.booking_time).toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                    {formatTime12h(booking.booking_time)}
                     {booking.end_time && (
                       <span className="text-muted-foreground font-normal">
                         {" "}
                         –{" "}
-                        {new Date(booking.end_time).toLocaleTimeString([], {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
+                        {formatTime12h(booking.end_time)}
                       </span>
                     )}
                   </p>
@@ -253,7 +243,7 @@ export default function BookingDetailPage({
               <div>
                 <p className="text-muted-foreground text-xs mb-0.5">Booked on</p>
                 <p className="font-medium text-foreground">
-                  {new Date(booking.created_at).toLocaleString()}
+                  {formatDateTime12h(booking.created_at)}
                 </p>
               </div>
             )}

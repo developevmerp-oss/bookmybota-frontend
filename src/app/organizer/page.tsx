@@ -1,38 +1,69 @@
 "use client";
+
+import Link from "next/link";
 import { useAppSelector } from "@/lib/hooks";
-import { useGetBusinessSettingsQuery } from "@/services/api";
-import { CalendarDays, Ticket, Info } from "lucide-react";
+import { useGetBusinessSettingsQuery, useGetOrganizerEventsQuery } from "@/services/api";
+import { CalendarDays, Ticket, Info, Plus } from "lucide-react";
 
 export default function OrganizerDashboardPage() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
+  const { data: events = [] } = useGetOrganizerEventsQuery();
+
+  const pending = events.filter((e) => e.status === "PENDING_APPROVAL").length;
+  const drafts = events.filter((e) => e.status === "DRAFT").length;
+  const live = events.filter((e) => e.status === "LIVE" || e.status === "APPROVED").length;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">
-          Welcome{settings?.name ? `, ${settings.name}` : ""}
-        </h2>
-        <p className="text-zinc-400 mt-1">
-          You are logged in as an <span className="text-violet-400 font-medium">event organizer</span>.
-          This portal is separate from the dining venue system.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">
+            Welcome{settings?.name ? `, ${settings.name}` : ""}
+          </h2>
+          <p className="text-zinc-400 mt-1">
+            Create events, submit for approval, and manage your listings from this portal.
+          </p>
+        </div>
+        <Link href="/organizer/events/new" className="btn-primary inline-flex items-center gap-2 w-fit">
+          <Plus size={18} /> New event
+        </Link>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="glass-panel rounded-2xl border border-white/5 p-5">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide">Drafts</p>
+          <p className="text-3xl font-bold text-white mt-1">{drafts}</p>
+        </div>
+        <div className="glass-panel rounded-2xl border border-amber-500/20 p-5">
+          <p className="text-xs text-amber-400/80 uppercase tracking-wide">Pending review</p>
+          <p className="text-3xl font-bold text-amber-300 mt-1">{pending}</p>
+        </div>
+        <div className="glass-panel rounded-2xl border border-green-500/20 p-5">
+          <p className="text-xs text-green-400/80 uppercase tracking-wide">Approved / live</p>
+          <p className="text-3xl font-bold text-green-300 mt-1">{live}</p>
+        </div>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="glass-panel rounded-2xl border border-white/5 p-6">
+        <Link
+          href="/organizer/events"
+          className="glass-panel rounded-2xl border border-white/5 p-6 hover:border-violet-500/30 transition-colors group"
+        >
           <div className="flex items-center gap-3 mb-3">
             <span className="bg-violet-500/15 text-violet-400 p-2 rounded-lg">
               <CalendarDays size={20} />
             </span>
-            <h3 className="text-lg font-semibold text-white">My Events</h3>
+            <h3 className="text-lg font-semibold text-white group-hover:text-violet-300">
+              My Events
+            </h3>
           </div>
           <p className="text-sm text-zinc-400">
-            Create and submit events for Super Admin approval. Event CRUD APIs will be wired by the
-            organizer build — shell routes are ready under this portal.
+            Add event details, upload posters & documents, and submit for Super Admin approval.
+            Rejected events can be edited and resubmitted.
           </p>
-        </div>
+        </Link>
         <div className="glass-panel rounded-2xl border border-white/5 p-6">
           <div className="flex items-center gap-3 mb-3">
             <span className="bg-violet-500/15 text-violet-400 p-2 rounded-lg">
@@ -41,7 +72,7 @@ export default function OrganizerDashboardPage() {
             <h3 className="text-lg font-semibold text-white">Fees</h3>
           </div>
           <p className="text-sm text-zinc-400">
-            Super Admin sets two fees on approval (read-only for you):
+            Super Admin sets two fees when approving your event (read-only for you):
           </p>
           <ul className="text-sm text-zinc-400 mt-2 list-disc list-inside space-y-1">
             <li>
@@ -58,12 +89,12 @@ export default function OrganizerDashboardPage() {
       <div className="glass-panel rounded-2xl border border-violet-500/20 bg-violet-500/5 p-5 flex gap-3">
         <Info className="text-violet-400 shrink-0 mt-0.5" size={18} />
         <div className="text-sm text-zinc-300">
-          <p className="font-medium text-white mb-1">Role isolation</p>
-          <p className="text-zinc-400">
-            Dining tables, restaurant bookings, and venue settings are only for{" "}
-            <code className="text-zinc-300">business_admin</code>. Your account (
-            <code className="text-zinc-300">event_admin</code>) cannot open the dining dashboard.
-          </p>
+          <p className="font-medium text-white mb-1">How approval works</p>
+          <ol className="text-zinc-400 list-decimal list-inside space-y-1">
+            <li>Save a draft or submit the full form for review.</li>
+            <li>Super Admin approves or rejects with a reason.</li>
+            <li>Approved events appear on the public <Link href="/events" className="text-violet-400 hover:text-violet-300">Events page</Link> for customers.</li>
+          </ol>
           {user?.email && (
             <p className="text-zinc-500 mt-2">Signed in as {user.email}</p>
           )}

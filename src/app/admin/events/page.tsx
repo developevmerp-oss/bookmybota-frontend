@@ -1,4 +1,5 @@
 "use client";
+
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle, Eye, EyeOff, XCircle, Radio } from 'lucide-react';
@@ -34,6 +35,7 @@ export default function AdminEventsPage() {
   const [selected, setSelected] = useState<AdminEvent | null>(null);
   const [convenienceFee, setConvenienceFee] = useState('0');
   const [commissionPercent, setCommissionPercent] = useState('0');
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const queryArg = statusFilter ? { status: statusFilter } : undefined;
   const { data: events = [], isLoading } = useGetAdminEventsQuery(queryArg);
@@ -48,6 +50,7 @@ export default function AdminEventsPage() {
     setSelected(event);
     setConvenienceFee(String(event.convenience_fee_per_ticket ?? 0));
     setCommissionPercent(String(event.commission_percent ?? 0));
+    setRejectionReason('');
   };
 
   const feePayload = () => ({
@@ -67,9 +70,13 @@ export default function AdminEventsPage() {
         action: typeof action;
         convenience_fee_per_ticket?: number;
         commission_percent?: number;
+        rejection_reason?: string;
       } = { id, action };
       if (action === 'approve') {
         Object.assign(body, feePayload());
+      }
+      if (action === 'reject') {
+        body.rejection_reason = rejectionReason.trim() || undefined;
       }
       await updateEvent(body).unwrap();
       toast.success(
@@ -113,15 +120,15 @@ export default function AdminEventsPage() {
   };
 
   if (isLoading) {
-    return <div className="text-white p-10 text-center">Loading Events...</div>;
+    return <div className="portal-muted p-10 text-center">Loading Events...</div>;
   }
 
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-white">Events</h2>
-          <p className="text-zinc-400">
+          <h2 className="portal-heading text-2xl font-bold">Events</h2>
+          <p className="portal-muted">
             Approve organizer submissions and set Convenience fee + Commission %.
             {statusFilter === 'PENDING_APPROVAL' && pendingCount > 0
               ? ` ${pendingCount} awaiting review.`
@@ -163,15 +170,15 @@ export default function AdminEventsPage() {
                 <td className="px-6 py-4">
                   <button
                     onClick={() => openDetail(event)}
-                    className="text-left font-medium text-white hover:text-rose-400"
+                    className="text-left font-medium portal-table-link hover:text-rose-600"
                   >
                     {event.name}
                   </button>
-                  <div className="text-xs text-zinc-500 mt-0.5">
+                  <div className="text-xs portal-table-muted mt-0.5">
                     {event.category_name || 'Uncategorized'}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-zinc-400">{event.organizer_name || '—'}</td>
+                <td className="px-6 py-4 portal-table-muted">{event.organizer_name || '—'}</td>
                 <td className="px-6 py-4">
                   <span
                     className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
@@ -179,9 +186,9 @@ export default function AdminEventsPage() {
                     {event.status.replace('_', ' ')}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-zinc-300 text-sm">
+                <td className="px-6 py-4 text-sm portal-table-muted">
                   <div>₹{Number(event.convenience_fee_per_ticket || 0).toFixed(2)} / ticket</div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="text-xs">
                     {Number(event.commission_percent || 0).toFixed(2)}% commission
                   </div>
                 </td>
@@ -232,8 +239,8 @@ export default function AdminEventsPage() {
             >
               ✕
             </button>
-            <h2 className="text-xl font-bold text-white mb-1">{selected.name}</h2>
-            <p className="text-zinc-400 text-sm mb-6">
+            <h2 className="portal-heading text-xl font-bold mb-1">{selected.name}</h2>
+            <p className="portal-muted text-sm mb-6">
               {selected.organizer_name || 'Organizer'} · {selected.status}
             </p>
 
@@ -271,6 +278,21 @@ export default function AdminEventsPage() {
                 Taken from the <span className="text-zinc-300">organizer</span> as % of ticket amount.
               </p>
             </div>
+
+            {selected.status === 'PENDING_APPROVAL' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-zinc-400 mb-2">
+                  Rejection reason (if rejecting)
+                </label>
+                <textarea
+                  rows={3}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Tell the organizer what needs to be fixed..."
+                  className="input-field resize-y min-h-[80px]"
+                />
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2 mt-6">
               {selected.status === 'PENDING_APPROVAL' && (

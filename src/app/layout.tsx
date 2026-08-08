@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import { useState, useEffect, useRef, useCallback } from "react";
 import "./globals.css";
 import Link from "next/link";
-import { UtensilsCrossed, Calendar, LogOut, Search, MapPin, ChevronLeft, X, Navigation, Loader2, User } from "lucide-react";
+import { UtensilsCrossed, Calendar, LogOut, Search, MapPin, ChevronLeft, X, Navigation, Loader2, User, CalendarDays } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
@@ -550,6 +550,15 @@ export default function RootLayout({
 
                     {/* User Action Links */}
                     <div className="flex gap-4 sm:gap-6 items-center shrink-0">
+                      <Link
+                        href="/events"
+                        className={`hidden sm:flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                          isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <CalendarDays size={16} />
+                        Events
+                      </Link>
                       {user ? (
                         <div className="flex items-center gap-4 sm:gap-6">
                           {user.role === 'customer' && (

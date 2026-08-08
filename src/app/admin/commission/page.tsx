@@ -137,9 +137,9 @@ export default function AdminCommissionPage() {
                     <td className="px-6 py-4 font-medium text-white">{row.event_name}</td>
                     <td className="px-6 py-4 text-zinc-400">{row.organizer_name || '—'}</td>
                     <td className="px-6 py-4 text-zinc-300 text-sm">
-                      <div>₹{Number(row.convenience_fee_per_ticket || 0).toFixed(2)}/tkt</div>
+                      <div>{Number(row.convenience_fee_percent || 0).toFixed(2)}% convenience</div>
                       <div className="text-xs text-zinc-500">
-                        {Number(row.commission_percent || 0).toFixed(2)}%
+                        {Number(row.commission_percent || 0).toFixed(2)}% commission
                       </div>
                     </td>
                   </>

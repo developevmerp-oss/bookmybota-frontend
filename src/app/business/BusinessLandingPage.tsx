@@ -24,6 +24,7 @@ export default function BusinessLandingPage() {
   const [phoneValid, setPhoneValid] = useState(false);
   const [passwordValid, setPasswordValid] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
 
   const selectedParent = businessTypes.find((t) => String(t.id) === parentTypeId);
   const isEventParent = selectedParent?.module_key === 'event';
@@ -32,6 +33,7 @@ export default function BusinessLandingPage() {
     e.preventDefault();
     if (!isValidPhone(phone) || !isValidPassword(adminPassword)) return;
     setOnboardStatus('loading');
+    setRegisterError(null);
     try {
       const eventPartner = resolvePartnerFromParentId(businessTypes, parentTypeId);
       await registerBusiness({
@@ -53,9 +55,14 @@ export default function BusinessLandingPage() {
         setBusinessName(''); setAddress(''); setPhone('');
         setDescription(''); setAdminEmail(''); setAdminPassword('');
         setParentTypeId(''); setVenueTypeId('');
-      }, 2000);
-    } catch {
+      }, 2500);
+    } catch (err: unknown) {
       setOnboardStatus('error');
+      const message =
+        err && typeof err === 'object' && 'data' in err
+          ? ((err as { data?: { error?: string } }).data?.error ?? null)
+          : null;
+      setRegisterError(message || 'Registration failed. Please check your details or try again.');
     }
   };
 
@@ -126,15 +133,19 @@ export default function BusinessLandingPage() {
               ✕
             </button>
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Register Business</h2>
-            <p className="text-slate-500 text-sm mb-6">Create your business profile and generate your login credentials.</p>
+            <p className="text-slate-500 text-sm mb-6">
+              Create your business profile and login credentials. Your account stays disabled until Super Admin approval.
+            </p>
 
             {onboardStatus === 'success' ? (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Registration Successful!</h3>
-                <p className="text-slate-500">Your venue has been registered. You can now log in using the credentials you created.</p>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Registration Received!</h3>
+                <p className="text-slate-500">
+                  Your account is disabled until a Super Admin enables it. You will not be able to log in until then.
+                </p>
               </div>
             ) : (
               <form onSubmit={handleRegister} className="space-y-4">
@@ -236,7 +247,9 @@ export default function BusinessLandingPage() {
                 </div>
 
                 {onboardStatus === 'error' && (
-                  <p className="text-sm font-semibold text-rose-500 text-center mt-2">Registration failed. Please check your credentials or try again.</p>
+                  <p className="text-sm font-semibold text-rose-500 text-center mt-2">
+                    {registerError || 'Registration failed. Please check your credentials or try again.'}
+                  </p>
                 )}
 
                 <div className="mt-4 pt-4 border-t border-slate-150">

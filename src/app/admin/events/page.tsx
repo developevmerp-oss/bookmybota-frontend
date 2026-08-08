@@ -48,13 +48,13 @@ export default function AdminEventsPage() {
 
   const openDetail = (event: AdminEvent) => {
     setSelected(event);
-    setConvenienceFee(String(event.convenience_fee_per_ticket ?? 0));
+    setConvenienceFee(String(event.convenience_fee_percent ?? 0));
     setCommissionPercent(String(event.commission_percent ?? 0));
     setRejectionReason('');
   };
 
   const feePayload = () => ({
-    convenience_fee_per_ticket: Number(convenienceFee) || 0,
+    convenience_fee_percent: Number(convenienceFee) || 0,
     commission_percent: Number(commissionPercent) || 0,
   });
 
@@ -68,7 +68,7 @@ export default function AdminEventsPage() {
       const body: {
         id: string;
         action: typeof action;
-        convenience_fee_per_ticket?: number;
+        convenience_fee_percent?: number;
         commission_percent?: number;
         rejection_reason?: string;
       } = { id, action };
@@ -187,7 +187,7 @@ export default function AdminEventsPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm portal-table-muted">
-                  <div>₹{Number(event.convenience_fee_per_ticket || 0).toFixed(2)} / ticket</div>
+                  <div>{Number(event.convenience_fee_percent || 0).toFixed(2)}% convenience</div>
                   <div className="text-xs">
                     {Number(event.commission_percent || 0).toFixed(2)}% commission
                   </div>
@@ -246,18 +246,19 @@ export default function AdminEventsPage() {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Convenience fee (₹ / ticket)
+                Convenience fee (%)
               </label>
               <input
                 type="number"
                 min="0"
+                max="100"
                 step="0.01"
                 value={convenienceFee}
                 onChange={(e) => setConvenienceFee(e.target.value)}
                 className="input-field"
               />
               <p className="text-xs text-zinc-500 mt-1">
-                Charged to the <span className="text-zinc-300">customer</span> on each ticket.
+                Charged to the <span className="text-zinc-300">customer</span> as % of ticket amount.
               </p>
             </div>
 

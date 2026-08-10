@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle, Eye, EyeOff, XCircle, Radio } from 'lucide-react';
+import { CheckCircle, Eye, EyeOff, XCircle, Radio, FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useGetAdminEventsQuery,
@@ -129,7 +129,7 @@ export default function AdminEventsPage() {
         <div>
           <h2 className="portal-heading text-2xl font-bold">Events</h2>
           <p className="portal-muted">
-            Approve organizer submissions and set Convenience fee + Commission %.
+            Review organizer submissions, then create & sign the dynamic contract. Events go public only after both signatures.
             {statusFilter === 'PENDING_APPROVAL' && pendingCount > 0
               ? ` ${pendingCount} awaiting review.`
               : ''}
@@ -215,6 +215,14 @@ export default function AdminEventsPage() {
                     >
                       Review
                     </button>
+                  )}
+                  {(event.status === 'PENDING_APPROVAL' || event.status === 'APPROVED') && (
+                    <Link
+                      href={`/admin/event-contracts/create?eventId=${event.id}`}
+                      className="text-emerald-400 hover:text-emerald-300 text-sm font-medium inline-flex items-center gap-1"
+                    >
+                      <FileSignature size={14} /> Create contract
+                    </Link>
                   )}
                 </td>
               </tr>
@@ -343,6 +351,12 @@ export default function AdminEventsPage() {
                   )}
                 </>
               )}
+              <Link
+                href={`/admin/event-contracts/create?eventId=${selected.id}`}
+                className="px-4 py-2 rounded-xl border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-sm font-medium flex items-center gap-2"
+              >
+                <FileSignature size={16} /> Create contract
+              </Link>
               <Link
                 href={`/admin/events/${selected.id}`}
                 className="px-4 py-2 rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5 text-sm font-medium"

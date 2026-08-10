@@ -8,8 +8,8 @@ import AuthGate from "@/components/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,
+  BarChart3,
   CalendarDays,
-  Ticket,
   LogOut,
   Menu,
   X,
@@ -30,7 +30,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
     { name: "Dashboard", href: "/organizer", icon: LayoutDashboard },
     { name: "My Events", href: "/organizer/events", icon: CalendarDays },
     { name: "Bookings", href: "/organizer/bookings", icon: CalendarCheck },
-    { name: "Ticket Types", href: "/organizer/tickets", icon: Ticket },
+    { name: "Ticket Stats", href: "/organizer/tickets", icon: BarChart3 },
   ];
 
   const isNavActive = (href: string) => {

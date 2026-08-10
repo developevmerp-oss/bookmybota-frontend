@@ -1,0 +1,107 @@
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useState } from "react";
+import { ArrowLeft, CheckCircle, Loader2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import EventContractDocument from "@/components/EventContractDocument";
+import {
+  useGetOrganizerEventContractQuery,
+  useRejectOrganizerEventContractMutation,
+  useSignOrganizerEventContractMutation,
+} from "@/services/api";
+import { contractStatusLabel } from "@/lib/contractPlaceholders";
+import { extractApiError } from "@/lib/apiErrors";
+
+export default function OrganizerContractPage() {
+  const params = useParams();
+  const eventId = String(params.id);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const { data: contract, isLoading, isError } = useGetOrganizerEventContractQuery(eventId, {
+    skip: !eventId,
+  });
+  const [sign, { isLoading: signing }] = useSignOrganizerEventContractMutation();
+  const [reject, { isLoading: rejecting }] = useRejectOrganizerEventContractMutation();
+
+  const handleSign = async () => {
+    try {
+      await sign(eventId).unwrap();
+      toast.success("Contract signed. Event goes public once Super Admin has also signed.");
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to sign"));
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      await reject({ eventId, rejection_reason: rejectReason }).unwrap();
+      toast.success("Contract rejected.");
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to reject"));
+    }
+  };
+
+  if (isLoading) {
+    return <div className="p-10 text-center portal-muted">Loading contract…</div>;
+  }
+
+  if (isError || !contract) {
+    return (
+      <div className="p-10 text-center space-y-3">
+        <p className="portal-muted">No contract available yet. Super Admin will create it after reviewing your event.</p>
+        <Link href="/organizer/events" className="text-violet-600 hover:underline">
+          ← Back to My Events
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div>
+        <Link
+          href="/organizer/events"
+          className="inline-flex items-center gap-1 text-sm text-violet-600 hover:text-violet-800 mb-3"
+        >
+          <ArrowLeft size={16} /> Back to My Events
+        </Link>
+        <h2 className="portal-heading text-2xl font-bold">Platform contract</h2>
+        <p className="portal-muted">{contractStatusLabel(contract.status)}</p>
+      </div>
+
+      <EventContractDocument contract={contract} />
+
+      {contract.status === "PENDING_SIGNATURES" && !contract.organizer_signed_at && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            disabled={signing}
+            onClick={handleSign}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-50"
+          >
+            {signing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+            Sign contract
+          </button>
+          <div className="flex-1 flex gap-2">
+            <input
+              className="input-field flex-1"
+              placeholder="Rejection reason (optional)"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+            <button
+              type="button"
+              disabled={rejecting}
+              onClick={handleReject}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            >
+              <XCircle size={16} /> Reject
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

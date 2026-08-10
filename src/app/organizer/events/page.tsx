@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { useGetOrganizerEventsQuery } from "@/services/api";
+import { contractStatusLabel, organizerWorkflowLabel } from "@/lib/contractPlaceholders";
 const STATUS_FILTERS = [
   { label: "All", value: "" },
   { label: "Draft", value: "DRAFT" },
@@ -42,7 +43,7 @@ export default function OrganizerEventsPage() {
         <div>
           <h2 className="portal-heading text-2xl font-bold">My Events</h2>
           <p className="portal-muted mt-1">
-            Create events, upload posters & documents, then submit for Super Admin approval.
+            Create events, upload posters & documents, submit for review, then sign the platform contract.
           </p>
         </div>
         <Link href="/organizer/events/new" className="btn-primary inline-flex items-center gap-2 w-fit">
@@ -94,6 +95,7 @@ export default function OrganizerEventsPage() {
                 <th className="px-6 py-4 font-medium">Event</th>
                 <th className="px-6 py-4 font-medium">Category</th>
                 <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Contract</th>
                 <th className="px-6 py-4 font-medium">Visible</th>
                 <th className="px-6 py-4 font-medium text-right">Actions</th>
               </tr>
@@ -119,13 +121,18 @@ export default function OrganizerEventsPage() {
                     <span
                       className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
                     >
-                      {event.status.replace("_", " ")}
+                      {organizerWorkflowLabel(event)}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 portal-table-muted text-sm">
+                    {event.contract
+                      ? contractStatusLabel(event.contract.status)
+                      : "Waiting for Super Admin"}
                   </td>
                   <td className="px-6 py-4 text-zinc-400 text-sm">
                     {event.is_visible ? "Yes" : "No"}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right space-x-3">
                     <Link
                       href={`/organizer/events/${event.id}`}
                       className="text-sm text-violet-400 hover:text-violet-300"
@@ -134,6 +141,14 @@ export default function OrganizerEventsPage() {
                         ? "Edit"
                         : "View"}
                     </Link>
+                    {event.contract && (
+                      <Link
+                        href={`/organizer/events/${event.id}/contract`}
+                        className="text-sm text-violet-600 hover:text-violet-800 font-medium"
+                      >
+                        {event.contract.organizer_signed_at ? "View contract" : "Sign contract →"}
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}

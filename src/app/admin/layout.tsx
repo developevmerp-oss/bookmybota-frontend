@@ -6,8 +6,8 @@ import {
   LayoutDashboard, 
   Store, 
   CreditCard, 
-  FileText, 
-  Users, 
+  FileText,
+  Users,
   LogOut,
   Settings,
   Menu,
@@ -17,6 +17,7 @@ import {
   Percent,
   UtensilsCrossed,
   ListChecks,
+  FileSignature,
 } from "lucide-react";
 import AuthGate from "@/components/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
@@ -32,6 +33,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Dining Businesses', href: '/admin/businesses/dining', icon: UtensilsCrossed },
     { name: 'Event Organizers', href: '/admin/businesses/event', icon: Store },
     { name: 'Events', href: '/admin/events', icon: CalendarDays },
+    { name: 'Event Contracts', href: '/admin/event-contracts', icon: FileSignature },
     { name: 'Event Masters', href: '/admin/event-masters', icon: ListChecks },
     { name: 'Fees & Commission', href: '/admin/commission', icon: Percent },
     { name: 'Subscription & Billing', href: '/admin/billing', icon: CreditCard },

@@ -149,12 +149,56 @@ export interface EventMastersResponse {
   documents: EventDocumentMaster[];
 }
 
+export interface EventContract {
+  id: string;
+  event_id: string;
+  contract_number: string;
+  body_html: string;
+  terms_and_conditions?: string | null;
+  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
+  convenience_fee_percent: number | string;
+  commission_percent: number | string;
+  dynamic_data?: Record<string, string | number> | null;
+  admin_signed_at?: string | null;
+  organizer_signed_at?: string | null;
+  rejection_reason?: string | null;
+  event_name?: string;
+  organizer_name?: string;
+  created_at?: string;
+}
+
+export interface EligibleContractEvent {
+  id: string;
+  name: string;
+  status: string;
+  organizer_name?: string;
+  category_name?: string;
+  contract_id?: string;
+  contract_status?: string;
+}
+
+export interface ContractPrefill {
+  event: AdminEvent & { organizer_name?: string; category_name?: string };
+  showtimes: AdminEvent['showtimes'];
+  ticket_types: AdminEvent['ticket_types'];
+  existing_contract: EventContract | null;
+  suggested: {
+    contract_number: string;
+    convenience_fee_percent: number;
+    commission_percent: number;
+    terms_and_conditions: string;
+    body_html: string;
+    dynamic_data: Record<string, string | number>;
+  };
+}
+
 export interface OrganizerEvent extends AdminEvent {
   genres?: string[];
   poster_horizontal_url?: string;
   poster_vertical_url?: string;
   documents?: EventDocumentUpload[] | string[];
   rejection_reason?: string;
+  contract?: EventContract | null;
 }
 
 export interface EventFormPayload {
@@ -192,6 +236,68 @@ export interface PublicEvent {
   next_showtime?: string;
   min_price?: number | string;
   status?: string;
+}
+
+export interface EventTicketTypeStats {
+  id: string;
+  ticket_type: string;
+  price: number;
+  total_count: number;
+  available_count: number;
+  sold: number;
+  sold_from_bookings: number;
+  confirmed_sold: number;
+  cancelled_qty: number;
+  remaining: number;
+  revenue: number;
+  fill_percent: number;
+}
+
+export interface EventTicketStatsSummary {
+  total_capacity: number;
+  total_remaining: number;
+  total_sold: number;
+  tickets_sold_bookings: number;
+  bookings_count: number;
+  cancelled_bookings: number;
+  ticket_revenue: number;
+  organizer_payout: number;
+  fill_percent: number;
+}
+
+export interface OrganizerEventTicketStats {
+  event_id: string;
+  event_name: string;
+  status: string;
+  is_visible?: boolean;
+  summary: EventTicketStatsSummary;
+  ticket_types: EventTicketTypeStats[];
+}
+
+export interface OrganizerTicketStatsResponse {
+  overall: EventTicketStatsSummary & { events_count: number };
+  events: OrganizerEventTicketStats[];
+}
+
+export interface OrganizerEventBooking {
+  id: string;
+  event_id: string;
+  showtime_id?: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  status: string;
+  ticket_amount: number;
+  grand_total: number;
+  ticket_qty: number;
+  organizer_payout?: number;
+  qr_code?: string;
+  booking_source?: string;
+  created_at?: string;
+  event_name?: string;
+  venue_name?: string;
+  starts_at?: string;
+  items?: EventBookingItem[];
 }
 
 export interface EventBookingItem {
@@ -396,7 +502,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'PublicEvents', 'EventMasters'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -851,6 +957,84 @@ export const api = createApi({
       providesTags: ['AdminEvents'],
     }),
 
+    // ── Event Contracts ───────────────────────────────────────────────────────
+
+    getEligibleContractEvents: builder.query<EligibleContractEvent[], void>({
+      query: () => '/admin/event-contracts/eligible-events',
+      transformResponse: (res: { data: EligibleContractEvent[] }) => res.data || [],
+      providesTags: ['EventContracts'],
+    }),
+
+    getContractPrefill: builder.query<ContractPrefill, string>({
+      query: (eventId) => `/admin/event-contracts/prefill/${eventId}`,
+      transformResponse: (res: { data: ContractPrefill }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventContracts', id: `prefill-${id}` }],
+    }),
+
+    getEventContracts: builder.query<EventContract[], void>({
+      query: () => '/admin/event-contracts',
+      transformResponse: (res: { data: EventContract[] }) => res.data || [],
+      providesTags: ['EventContracts'],
+    }),
+
+    getAdminEventContract: builder.query<EventContract, string>({
+      query: (eventId) => `/admin/event-contracts/event/${eventId}`,
+      transformResponse: (res: { data: EventContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventContracts', id }],
+    }),
+
+    createEventContract: builder.mutation<
+      EventContract,
+      {
+        event_id: string;
+        body_html: string;
+        terms_and_conditions?: string;
+        convenience_fee_percent?: number;
+        commission_percent?: number;
+        sign_as_admin?: boolean;
+      }
+    >({
+      query: (body) => ({ url: '/admin/event-contracts', method: 'POST', body }),
+      transformResponse: (res: { data: EventContract }) => res.data,
+      invalidatesTags: ['EventContracts', 'AdminEvents', 'OrganizerEvents', 'PublicEvents'],
+    }),
+
+    signAdminEventContract: builder.mutation<EventContract, string>({
+      query: (eventId) => ({
+        url: `/admin/event-contracts/event/${eventId}/sign-admin`,
+        method: 'POST',
+      }),
+      transformResponse: (res: { data: EventContract }) => res.data,
+      invalidatesTags: ['EventContracts', 'AdminEvents', 'PublicEvents', 'OrganizerEvents'],
+    }),
+
+    getOrganizerEventContract: builder.query<EventContract, string>({
+      query: (eventId) => `/events/organizer/${eventId}/contract`,
+      transformResponse: (res: { data: EventContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id: `${id}-contract` }],
+    }),
+
+    signOrganizerEventContract: builder.mutation<EventContract, string>({
+      query: (eventId) => ({
+        url: `/events/organizer/${eventId}/contract/sign`,
+        method: 'POST',
+      }),
+      transformResponse: (res: { data: EventContract }) => res.data,
+      invalidatesTags: ['OrganizerEvents', 'EventContracts', 'PublicEvents'],
+    }),
+
+    rejectOrganizerEventContract: builder.mutation<
+      { message?: string },
+      { eventId: string; rejection_reason?: string }
+    >({
+      query: ({ eventId, rejection_reason }) => ({
+        url: `/events/organizer/${eventId}/contract/reject`,
+        method: 'POST',
+        body: { rejection_reason },
+      }),
+      invalidatesTags: ['OrganizerEvents', 'EventContracts'],
+    }),
+
     // ── Analytics ─────────────────────────────────────────────────────────────
 
     getAnalytics: builder.query<Analytics, string>({
@@ -883,6 +1067,35 @@ export const api = createApi({
       query: (id) => `/events/organizer/${id}`,
       transformResponse: (res: { data: OrganizerEvent }) => res.data,
       providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id }],
+    }),
+
+    getOrganizerTicketStats: builder.query<
+      OrganizerTicketStatsResponse,
+      { event_id?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.event_id) sp.set('event_id', params.event_id);
+        const qs = sp.toString();
+        return `/events/organizer/ticket-stats${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: OrganizerTicketStatsResponse }) => res.data,
+      providesTags: ['OrganizerTicketStats'],
+    }),
+
+    getOrganizerBookings: builder.query<
+      OrganizerEventBooking[],
+      { event_id?: string; status?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.event_id) sp.set('event_id', params.event_id);
+        if (params?.status) sp.set('status', params.status);
+        const qs = sp.toString();
+        return `/events/organizer/bookings${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: OrganizerEventBooking[] }) => res.data || [],
+      providesTags: ['OrganizerBookings'],
     }),
 
     createOrganizerEvent: builder.mutation<OrganizerEvent, EventFormPayload>({
@@ -962,7 +1175,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['EventBookings', 'PublicEvents'],
+      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings'],
     }),
 
     getCustomerEventBookings: builder.query<EventBooking[], string>({
@@ -1171,8 +1384,19 @@ export const {
   useUpdateAdminEventMutation,
   useGetCommissionLedgerQuery,
   useGetAdminEventBookingsQuery,
+  useGetEligibleContractEventsQuery,
+  useGetContractPrefillQuery,
+  useGetEventContractsQuery,
+  useGetAdminEventContractQuery,
+  useCreateEventContractMutation,
+  useSignAdminEventContractMutation,
+  useGetOrganizerEventContractQuery,
+  useSignOrganizerEventContractMutation,
+  useRejectOrganizerEventContractMutation,
   useGetOrganizerEventsQuery,
   useGetOrganizerEventQuery,
+  useGetOrganizerTicketStatsQuery,
+  useGetOrganizerBookingsQuery,
   useCreateOrganizerEventMutation,
   useUpdateOrganizerEventMutation,
   useSubmitOrganizerEventMutation,

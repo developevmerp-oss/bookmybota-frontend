@@ -26,10 +26,11 @@ function formatInr(n: number) {
 type Props = {
   event: OrganizerEvent;
   open: boolean;
+  initialShowtimeId?: string;
   onClose: () => void;
 };
 
-export default function EventCheckout({ event, open, onClose }: Props) {
+export default function EventCheckout({ event, open, initialShowtimeId, onClose }: Props) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
@@ -51,11 +52,11 @@ export default function EventCheckout({ event, open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setStep(1);
-    setShowtimeId("");
+    setShowtimeId(initialShowtimeId || "");
+    setStep(initialShowtimeId ? 2 : 1);
     setQtyByType({});
     setSubmitting(false);
-  }, [open, event.id]);
+  }, [open, event.id, initialShowtimeId]);
 
   useEffect(() => {
     if (authUser?.role === "customer") {

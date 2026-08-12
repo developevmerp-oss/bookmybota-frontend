@@ -44,12 +44,12 @@ type Props = {
 export default function EventCheckout({
   event,
   open,
+  initialShowtimeId,
   onClose,
   mode = "customer",
   onOrganizerSuccess,
 }: Props) {
   const isOrganizer = mode === "organizer";
-export default function EventCheckout({ event, open, initialShowtimeId, onClose }: Props) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);

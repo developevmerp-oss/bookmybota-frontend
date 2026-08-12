@@ -15,6 +15,9 @@ import {
   X,
   CalendarCheck,
   KeyRound,
+  Star,
+  Tag,
+  Wallet,
 } from "lucide-react";
 
 function OrganizerShell({ children }: { children: React.ReactNode }) {
@@ -32,6 +35,9 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
     { name: "My Events", href: "/organizer/events", icon: CalendarDays },
     { name: "Bookings", href: "/organizer/bookings", icon: CalendarCheck },
     { name: "Ticket Stats", href: "/organizer/tickets", icon: BarChart3 },
+    { name: "Offers", href: "/organizer/offers", icon: Tag },
+    { name: "Reviews", href: "/organizer/reviews", icon: Star },
+    { name: "Ledger", href: "/organizer/ledger", icon: Wallet },
     { name: "Change Password", href: "/organizer/change-password", icon: KeyRound },
   ];
 

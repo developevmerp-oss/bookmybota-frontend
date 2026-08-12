@@ -184,6 +184,14 @@ export interface EligibleContractEvent {
   contract_status?: string;
 }
 
+export interface OfferEligibleEvent {
+  id: string;
+  name: string;
+  status: string;
+  starts_on?: string | null;
+  ends_on?: string | null;
+}
+
 export interface ContractPrefill {
   event: AdminEvent & { organizer_name?: string; category_name?: string };
   showtimes: AdminEvent['showtimes'];
@@ -243,6 +251,8 @@ export interface PublicEvent {
   next_showtime?: string;
   min_price?: number | string;
   status?: string;
+  rating?: number | string;
+  reviews_count?: number;
 }
 
 export interface EventTicketTypeStats {
@@ -417,6 +427,95 @@ export interface Review {
   replies?: ReviewReply[];
 }
 
+export interface EventReviewReply {
+  id: number;
+  review_id: number;
+  user_name: string;
+  user_type: string;
+  text: string;
+  created_at: string;
+}
+
+export interface EventReview {
+  id: number;
+  event_id: string;
+  customer_id?: string | null;
+  user_name: string;
+  rating: number | string;
+  text: string;
+  created_at: string;
+  event_name?: string;
+  replies?: EventReviewReply[];
+}
+
+export interface EventOffer {
+  id: string;
+  event_id: string;
+  business_id: string;
+  title: string;
+  description?: string | null;
+  discount_type: 'PERCENT' | 'FLAT';
+  discount_value: number | string;
+  promo_code?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  is_active: boolean;
+  event_name?: string;
+  event_status?: string;
+  created_at?: string;
+}
+
+export interface OrganizerLedgerRow {
+  event_id: string;
+  event_name: string;
+  event_status: string;
+  bookings_count: number;
+  tickets_sold: number;
+  ticket_amount: number | string;
+  commission_total: number | string;
+  organizer_earned: number | string;
+  paid_amount: number | string;
+  pending_amount: number | string;
+}
+
+export interface OrganizerLedger {
+  summary: {
+    bookings_count: number;
+    tickets_sold: number;
+    ticket_amount: number;
+    commission_total: number;
+    organizer_earned: number;
+    paid_amount: number;
+    pending_amount: number;
+    total_paid: number;
+    admin_pending_payments: number;
+    events_count: number;
+  };
+  rows: OrganizerLedgerRow[];
+  recent_payouts: Array<{
+    id: string;
+    amount: number | string;
+    status: string;
+    payment_reference?: string;
+    event_name?: string;
+    paid_at?: string;
+    created_at?: string;
+  }>;
+}
+
+export interface OrganizerPayout {
+  id: string;
+  business_id: string;
+  event_id?: string | null;
+  amount: number | string;
+  status: 'PENDING' | 'PAID';
+  payment_reference?: string | null;
+  notes?: string | null;
+  paid_at?: string | null;
+  created_at?: string;
+  organizer_name?: string;
+  event_name?: string;
+}
 
 export interface Table {
   id: string;
@@ -509,7 +608,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerPayouts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1105,6 +1204,171 @@ export const api = createApi({
       invalidatesTags: ['OrganizerEvents', 'EventContracts'],
     }),
 
+    // ── Event reviews ─────────────────────────────────────────────────────────
+
+    getPublicEventReviews: builder.query<EventReview[], string>({
+      query: (eventId) => `/events/public/${eventId}/reviews`,
+      transformResponse: (res: { data: EventReview[] }) => res.data || [],
+      providesTags: (_r, _e, id) => [{ type: 'EventReviews', id }],
+    }),
+
+    createEventReview: builder.mutation<
+      { data: EventReview; newStats?: { rating: string; reviews_count: number } },
+      { eventId: string; user_name: string; rating: number; text: string }
+    >({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/public/${eventId}/reviews`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { eventId }) => [
+        { type: 'EventReviews', id: eventId },
+        'PublicEvents',
+      ],
+    }),
+
+    getOrganizerEventReviews: builder.query<EventReview[], { event_id?: string } | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.event_id) sp.set('event_id', params.event_id);
+        const qs = sp.toString();
+        return `/events/organizer/reviews${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: EventReview[] }) => res.data || [],
+      providesTags: ['EventReviews'],
+    }),
+
+    createEventReviewReply: builder.mutation<
+      { data: EventReviewReply },
+      { reviewId: number; user_name: string; text: string }
+    >({
+      query: ({ reviewId, ...body }) => ({
+        url: `/events/organizer/reviews/${reviewId}/reply`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['EventReviews'],
+    }),
+
+    // ── Event offers ──────────────────────────────────────────────────────────
+
+    getOrganizerOffers: builder.query<EventOffer[], void>({
+      query: () => '/events/organizer/offers',
+      transformResponse: (res: { data: EventOffer[] }) => res.data || [],
+      providesTags: ['EventOffers'],
+    }),
+
+    getOfferEligibleEvents: builder.query<
+      OfferEligibleEvent[],
+      void
+    >({
+      query: () => '/events/organizer/offers/eligible-events',
+      transformResponse: (res: { data: OfferEligibleEvent[] }) =>
+        res.data || [],
+    }),
+
+    getPublicEventOffers: builder.query<EventOffer[], string>({
+      query: (eventId) => `/events/public/${eventId}/offers`,
+      transformResponse: (res: { data: EventOffer[] }) => res.data || [],
+    }),
+
+    createEventOffer: builder.mutation<
+      EventOffer,
+      {
+        eventId: string;
+        title: string;
+        description?: string;
+        discount_type: 'PERCENT' | 'FLAT';
+        discount_value: number;
+        promo_code?: string;
+        valid_from?: string;
+        valid_until?: string;
+        is_active?: boolean;
+      }
+    >({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/organizer/${eventId}/offers`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: EventOffer }) => res.data,
+      invalidatesTags: ['EventOffers'],
+    }),
+
+    updateEventOffer: builder.mutation<
+      EventOffer,
+      {
+        offerId: string;
+        title: string;
+        description?: string;
+        discount_type: 'PERCENT' | 'FLAT';
+        discount_value: number;
+        promo_code?: string;
+        valid_from?: string;
+        valid_until?: string;
+        is_active?: boolean;
+      }
+    >({
+      query: ({ offerId, ...body }) => ({
+        url: `/events/organizer/offers/${offerId}`,
+        method: 'PUT',
+        body,
+      }),
+      transformResponse: (res: { data: EventOffer }) => res.data,
+      invalidatesTags: ['EventOffers'],
+    }),
+
+    deleteEventOffer: builder.mutation<{ message?: string }, string>({
+      query: (offerId) => ({
+        url: `/events/organizer/offers/${offerId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['EventOffers'],
+    }),
+
+    // ── Organizer ledger ──────────────────────────────────────────────────────
+
+    getOrganizerLedger: builder.query<OrganizerLedger, { event_id?: string } | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.event_id) sp.set('event_id', params.event_id);
+        const qs = sp.toString();
+        return `/events/organizer/ledger${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: OrganizerLedger }) => res.data,
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    createOrganizerPayout: builder.mutation<
+      { data: OrganizerPayout },
+      {
+        business_id: string;
+        event_id?: string;
+        amount: number;
+        status?: 'PENDING' | 'PAID';
+        payment_reference?: string;
+        notes?: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/admin/organizer-payouts',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['OrganizerLedger', 'AdminCommission', 'OrganizerPayouts'],
+    }),
+
+    getOrganizerPayouts: builder.query<OrganizerPayout[], { business_id?: string } | void>({
+      query: (params) => {
+        const qs = params?.business_id
+          ? `?business_id=${encodeURIComponent(params.business_id)}`
+          : '';
+        return `/admin/organizer-payouts${qs}`;
+      },
+      transformResponse: (res: { data: OrganizerPayout[] }) => res.data,
+      providesTags: ['OrganizerPayouts'],
+    }),
+
     // ── Analytics ─────────────────────────────────────────────────────────────
 
     getAnalytics: builder.query<Analytics, string>({
@@ -1470,6 +1734,19 @@ export const {
   useRequestOrganizerContractOtpMutation,
   useSignOrganizerEventContractMutation,
   useRejectOrganizerEventContractMutation,
+  useGetPublicEventReviewsQuery,
+  useCreateEventReviewMutation,
+  useGetOrganizerEventReviewsQuery,
+  useCreateEventReviewReplyMutation,
+  useGetOrganizerOffersQuery,
+  useGetOfferEligibleEventsQuery,
+  useGetPublicEventOffersQuery,
+  useCreateEventOfferMutation,
+  useUpdateEventOfferMutation,
+  useDeleteEventOfferMutation,
+  useGetOrganizerLedgerQuery,
+  useCreateOrganizerPayoutMutation,
+  useGetOrganizerPayoutsQuery,
   useGetOrganizerEventsQuery,
   useGetOrganizerEventQuery,
   useGetOrganizerTicketStatsQuery,

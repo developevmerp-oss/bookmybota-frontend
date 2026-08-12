@@ -14,6 +14,16 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 
+/** YYYY-MM-DD for the day before a given date string */
+function dayBefore(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const EMPTY_FORM = {
   eventId: "",
   title: "",
@@ -42,23 +52,22 @@ export default function OrganizerOffersPage() {
     [eligibleEvents, form.eventId]
   );
   const eventStartDate = selectedEvent?.starts_on || "";
-  const eventEndDate = selectedEvent?.ends_on || "";
+  /** Latest allowed date for offer validity — must be before event day */
+  const lastOfferDate = eventStartDate ? dayBefore(eventStartDate) : "";
 
   const openCreate = () => {
     setEditing(null);
     const eventId = eligibleEvents[0]?.id || "";
-    const firstEvent = eligibleEvents[0];
     setForm({
       ...EMPTY_FORM,
       eventId,
-      valid_from: firstEvent?.starts_on || "",
-      valid_until: firstEvent?.ends_on || "",
+      valid_from: "",
+      valid_until: "",
     });
     setShowForm(true);
   };
 
   const openEdit = (offer: EventOffer) => {
-    const matchedEvent = eligibleEvents.find((ev) => ev.id === offer.event_id);
     setEditing(offer);
     setForm({
       eventId: offer.event_id,
@@ -67,20 +76,19 @@ export default function OrganizerOffersPage() {
       discount_type: offer.discount_type,
       discount_value: String(offer.discount_value),
       promo_code: offer.promo_code || "",
-      valid_from: offer.valid_from?.slice(0, 10) || matchedEvent?.starts_on || "",
-      valid_until: offer.valid_until?.slice(0, 10) || matchedEvent?.ends_on || "",
+      valid_from: offer.valid_from?.slice(0, 10) || "",
+      valid_until: offer.valid_until?.slice(0, 10) || "",
       is_active: offer.is_active,
     });
     setShowForm(true);
   };
 
   const handleEventChange = (eventId: string) => {
-    const event = eligibleEvents.find((ev) => ev.id === eventId);
     setForm((f) => ({
       ...f,
       eventId,
-      valid_from: event?.starts_on || "",
-      valid_until: event?.ends_on || "",
+      valid_from: "",
+      valid_until: "",
     }));
   };
 
@@ -92,23 +100,19 @@ export default function OrganizerOffersPage() {
       return;
     }
     if (form.valid_from && form.valid_until && form.valid_from > form.valid_until) {
-      toast.error("Valid until date must be after valid from date.");
+      toast.error("Valid until must be on or after valid from.");
       return;
     }
-    if (eventStartDate && form.valid_from && form.valid_from < eventStartDate) {
-      toast.error("Valid from must be on or after the event start date.");
+    if (!form.valid_until) {
+      toast.error("Valid until date is required.");
       return;
     }
-    if (eventEndDate && form.valid_until && form.valid_until > eventEndDate) {
-      toast.error("Valid until must be on or before the event end date.");
+    if (eventStartDate && form.valid_until >= eventStartDate) {
+      toast.error(`Valid until must be before the event date (${eventStartDate}).`);
       return;
     }
-    if (eventStartDate && form.valid_until && form.valid_until < eventStartDate) {
-      toast.error("Valid until cannot be before the event start date.");
-      return;
-    }
-    if (eventEndDate && form.valid_from && form.valid_from > eventEndDate) {
-      toast.error("Valid from cannot be after the event end date.");
+    if (eventStartDate && form.valid_from && form.valid_from >= eventStartDate) {
+      toast.error(`Valid from must be before the event date (${eventStartDate}).`);
       return;
     }
     const payload = {
@@ -201,9 +205,11 @@ export default function OrganizerOffersPage() {
                   </option>
                 ))}
               </select>
-              {selectedEvent?.starts_on && selectedEvent?.ends_on && (
+              {eventStartDate && (
                 <p className="text-xs portal-muted mt-1">
-                  Offer dates must stay between {selectedEvent.starts_on} and {selectedEvent.ends_on}.
+                  Offers run before the event. Valid until must be before{" "}
+                  <strong>{eventStartDate}</strong>
+                  {lastOfferDate ? ` (latest: ${lastOfferDate})` : ""}.
                 </p>
               )}
             </div>
@@ -273,9 +279,9 @@ export default function OrganizerOffersPage() {
                 value={form.valid_from}
                 onChange={(e) => setForm((f) => ({ ...f, valid_from: e.target.value }))}
                 className="input-field"
-                min={eventStartDate || undefined}
-                max={eventEndDate || undefined}
+                max={lastOfferDate || form.valid_until || undefined}
               />
+              <p className="text-[10px] portal-muted mt-1">When the offer starts (optional)</p>
             </div>
             <div>
               <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Valid until</label>
@@ -284,9 +290,11 @@ export default function OrganizerOffersPage() {
                 value={form.valid_until}
                 onChange={(e) => setForm((f) => ({ ...f, valid_until: e.target.value }))}
                 className="input-field"
-                min={eventStartDate || form.valid_from || undefined}
-                max={eventEndDate || undefined}
+                min={form.valid_from || undefined}
+                max={lastOfferDate || undefined}
+                required
               />
+              <p className="text-[10px] portal-muted mt-1">Must be before event day</p>
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm portal-muted">

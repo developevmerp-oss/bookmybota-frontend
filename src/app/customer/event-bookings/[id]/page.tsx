@@ -226,6 +226,15 @@ export default function EventBookingDetailPage({
               <span>Tickets</span>
               <span className="font-medium text-foreground">{formatInr(booking.ticket_amount)}</span>
             </li>
+            {Number(booking.discount_amount || 0) > 0 && (
+              <li className="flex justify-between text-emerald-700">
+                <span>
+                  Promo discount
+                  {booking.promo_code ? ` (${booking.promo_code})` : ""}
+                </span>
+                <span className="font-medium">−{formatInr(booking.discount_amount)}</span>
+              </li>
+            )}
             <li className="flex justify-between text-muted-foreground">
               <span>
                 Convenience fee

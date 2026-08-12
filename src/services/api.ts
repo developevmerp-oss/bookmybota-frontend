@@ -356,6 +356,17 @@ export interface EventBooking {
   starts_at?: string;
   ends_at?: string;
   items?: EventBookingItem[];
+  promo_code?: string | null;
+  discount_amount?: number | string;
+}
+
+export interface AppliedPromoOffer {
+  offer_id: string;
+  title: string;
+  promo_code: string;
+  discount_type: 'PERCENT' | 'FLAT';
+  discount_value: number;
+  discount_amount: number;
 }
 
 export interface CommissionLedgerRow {
@@ -1272,6 +1283,18 @@ export const api = createApi({
       transformResponse: (res: { data: EventOffer[] }) => res.data || [],
     }),
 
+    validateEventPromoCode: builder.mutation<
+      AppliedPromoOffer,
+      { eventId: string; promo_code: string; ticket_amount: number }
+    >({
+      query: ({ eventId, promo_code, ticket_amount }) => ({
+        url: `/events/public/${eventId}/validate-promo`,
+        method: 'POST',
+        body: { promo_code, ticket_amount },
+      }),
+      transformResponse: (res: { data: AppliedPromoOffer }) => res.data,
+    }),
+
     createEventOffer: builder.mutation<
       EventOffer,
       {
@@ -1502,6 +1525,7 @@ export const api = createApi({
         guest_email?: string;
         customer_id?: string;
         booking_source?: 'ONLINE' | 'WALK_IN' | 'CASH' | 'ORGANIZER';
+        promo_code?: string;
         /** When true, POST to organizer booking API (event_admin selling for a customer) */
         for_organizer?: boolean;
       }
@@ -1741,6 +1765,7 @@ export const {
   useGetOrganizerOffersQuery,
   useGetOfferEligibleEventsQuery,
   useGetPublicEventOffersQuery,
+  useValidateEventPromoCodeMutation,
   useCreateEventOfferMutation,
   useUpdateEventOfferMutation,
   useDeleteEventOfferMutation,

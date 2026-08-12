@@ -18,6 +18,7 @@ import {
   UtensilsCrossed,
   ListChecks,
   FileSignature,
+  KeyRound,
 } from "lucide-react";
 import AuthGate from "@/components/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
@@ -40,6 +41,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Marketing Plans', href: '/admin/marketing', icon: Megaphone },
     { name: 'Content Management', href: '/admin/content', icon: FileText },
     { name: 'User Management', href: '/admin/users', icon: Users },
+    { name: 'Change Password', href: '/admin/change-password', icon: KeyRound },
   ];
 
   const isNavActive = (href: string) => {

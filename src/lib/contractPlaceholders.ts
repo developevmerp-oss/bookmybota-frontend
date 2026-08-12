@@ -19,6 +19,8 @@ export interface EventContractRecord {
   dynamic_data?: Record<string, string | number> | null;
   admin_signed_at?: string | null;
   organizer_signed_at?: string | null;
+  admin_signature_url?: string | null;
+  organizer_signature_url?: string | null;
   rejection_reason?: string | null;
   event_name?: string;
   organizer_name?: string;

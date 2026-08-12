@@ -376,7 +376,15 @@ function LoginForm() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Password</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Password</label>
+                      <Link
+                        href="/forgot-password"
+                        className="text-[11px] font-semibold text-rose-500 hover:text-rose-600"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                     <div className="relative">
                       <Lock size={16} className="absolute left-4 top-3.5 text-slate-400 z-10 pointer-events-none" />
                       <PasswordInput

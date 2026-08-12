@@ -23,13 +23,31 @@ function formatInr(n: number) {
   })}`;
 }
 
+export type EventCheckoutMode = "customer" | "organizer";
+
+export type EventCheckoutResult = {
+  booking_id?: string;
+  qr_code?: string;
+  grand_total?: number;
+  ticket_qty?: number;
+};
+
 type Props = {
   event: OrganizerEvent;
   open: boolean;
   onClose: () => void;
+  mode?: EventCheckoutMode;
+  onOrganizerSuccess?: (result: EventCheckoutResult) => void;
 };
 
-export default function EventCheckout({ event, open, onClose }: Props) {
+export default function EventCheckout({
+  event,
+  open,
+  onClose,
+  mode = "customer",
+  onOrganizerSuccess,
+}: Props) {
+  const isOrganizer = mode === "organizer";
   const router = useRouter();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
@@ -42,28 +60,30 @@ export default function EventCheckout({ event, open, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
 
   const customerId = authUser?.role === "customer" ? authUser.customer_id || "" : "";
-  const { data: profile } = useGetCustomerProfileQuery(customerId, { skip: !customerId });
+  const { data: profile } = useGetCustomerProfileQuery(customerId, { skip: !customerId || isOrganizer });
   const [createEventBooking] = useCreateEventBookingMutation();
 
   useEffect(() => {
-    dispatch(loadFromStorage());
-  }, [dispatch]);
+    if (!isOrganizer) dispatch(loadFromStorage());
+  }, [dispatch, isOrganizer]);
 
   useEffect(() => {
     if (!open) return;
     setStep(1);
     setShowtimeId("");
     setQtyByType({});
+    setName("");
+    setPhone("");
+    setEmail("");
     setSubmitting(false);
   }, [open, event.id]);
 
   useEffect(() => {
-    if (authUser?.role === "customer") {
-      setName(profile?.name || authUser.name || "");
-      setPhone(sanitizePhoneInput(profile?.phone || authUser.phone || ""));
-      setEmail(profile?.email || authUser.email || "");
-    }
-  }, [authUser, profile]);
+    if (isOrganizer || authUser?.role !== "customer") return;
+    setName(profile?.name || authUser.name || "");
+    setPhone(sanitizePhoneInput(profile?.phone || authUser.phone || ""));
+    setEmail(profile?.email || authUser.email || "");
+  }, [authUser, profile, isOrganizer]);
 
   const showtimes = event.showtimes || [];
   const ticketTypes = event.ticket_types || [];
@@ -101,31 +121,64 @@ export default function EventCheckout({ event, open, onClose }: Props) {
 
     const phoneErr = getPhoneValidationError(phone);
     if (!name.trim()) {
-      toast.error("Please enter your name.");
+      toast.error(isOrganizer ? "Please enter the customer's name." : "Please enter your name.");
       return;
     }
     if (phoneErr) {
       toast.error(phoneErr);
       return;
     }
+    if (!email.trim()) {
+      toast.error("Enter an email so we can send the tickets.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const result = await createEventBooking({
-        event_id: event.id,
-        showtime_id: showtimeId,
-        items: selectedLines.map((l) => ({ ticket_type_id: l.id, qty: l.qty })),
-        guest_name: name.trim(),
-        guest_phone: sanitizePhoneInput(phone),
-        guest_email: email.trim() || undefined,
-        customer_id: customerId || undefined,
-        booking_source: "ONLINE",
-      }).unwrap();
+      const items = selectedLines.map((l) => ({ ticket_type_id: l.id, qty: l.qty }));
+      const guest_name = name.trim();
+      const guest_phone = sanitizePhoneInput(phone);
+      const guest_email = email.trim() || undefined;
 
-      toast.success("Tickets booked!");
-      onClose();
-      if (result.booking_id) {
-        router.push(`/customer/event-bookings/confirmation?id=${result.booking_id}`);
+      let result;
+      if (isOrganizer) {
+        result = await createEventBooking({
+          event_id: event.id,
+          showtime_id: showtimeId,
+          items,
+          guest_name,
+          guest_phone,
+          guest_email,
+          booking_source: "ORGANIZER",
+          for_organizer: true,
+        }).unwrap();
+      } else {
+        result = await createEventBooking({
+          event_id: event.id,
+          showtime_id: showtimeId,
+          items,
+          guest_name,
+          guest_phone,
+          guest_email,
+          customer_id: customerId || undefined,
+          booking_source: "ONLINE",
+        }).unwrap();
+      }
+
+      if (isOrganizer) {
+        toast.success(`Tickets booked and sent to ${email.trim()}.`);
+        onOrganizerSuccess?.(result);
+        onClose();
+      } else {
+        toast.success(`Tickets booked! Confirmation sent to ${email.trim()}.`);
+        onClose();
+        if (result.booking_id) {
+          router.push(`/customer/event-bookings/confirmation?id=${result.booking_id}`);
+        }
       }
     } catch (err) {
       toast.error(extractApiError(err, "Booking failed. Please try again."));
@@ -135,6 +188,14 @@ export default function EventCheckout({ event, open, onClose }: Props) {
   };
 
   if (!open) return null;
+
+  const accentBtn = isOrganizer
+    ? "bg-violet-600 hover:bg-violet-700"
+    : "bg-rose-600 hover:bg-rose-700";
+  const accentBorder = isOrganizer ? "border-violet-500 bg-violet-50" : "border-rose-500 bg-rose-50";
+  const accentHover = isOrganizer ? "hover:border-violet-200" : "hover:border-rose-200";
+  const accentIcon = isOrganizer ? "text-violet-500" : "text-rose-500";
+  const accentFocus = isOrganizer ? "focus:border-violet-500" : "focus:border-rose-500";
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -160,6 +221,7 @@ export default function EventCheckout({ event, open, onClose }: Props) {
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Step {step} of 3
+                {isOrganizer && " · Organizer sale"}
               </p>
               <h3 className="text-base font-black text-slate-800">
                 {step === 1 ? "Choose showtime" : step === 2 ? "Select tickets" : "Order summary"}
@@ -191,8 +253,8 @@ export default function EventCheckout({ event, open, onClose }: Props) {
                       onClick={() => setShowtimeId(s.id)}
                       className={`w-full text-left rounded-2xl border p-4 transition-all ${
                         active
-                          ? "border-rose-500 bg-rose-50 shadow-sm"
-                          : "border-slate-200 bg-white hover:border-rose-200"
+                          ? `${accentBorder} shadow-sm`
+                          : `border-slate-200 bg-white ${accentHover}`
                       }`}
                     >
                       <p className="font-bold text-slate-800">{s.venue_name || "Venue TBA"}</p>
@@ -229,9 +291,7 @@ export default function EventCheckout({ event, open, onClose }: Props) {
                         <p className="text-sm font-semibold text-slate-700 mt-0.5">
                           {formatInr(Number(t.price) || 0)}
                         </p>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {available} available
-                        </p>
+                        <p className="text-xs text-slate-400 mt-1">{available} available</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -262,8 +322,8 @@ export default function EventCheckout({ event, open, onClose }: Props) {
           {step === 3 && (
             <form id="event-checkout-form" onSubmit={handleConfirm} className="space-y-5">
               <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Ticket size={14} className="text-rose-500" /> Order summary
+                <h4 className={`text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5`}>
+                  <Ticket size={14} className={accentIcon} /> Order summary
                 </h4>
                 <p className="text-sm font-semibold text-slate-800">{event.name}</p>
                 {selectedShowtime && (
@@ -277,9 +337,7 @@ export default function EventCheckout({ event, open, onClose }: Props) {
                       <span>
                         {l.ticket_type} × {l.qty}
                       </span>
-                      <span className="font-semibold text-slate-800">
-                        {formatInr(l.unit * l.qty)}
-                      </span>
+                      <span className="font-semibold text-slate-800">{formatInr(l.unit * l.qty)}</span>
                     </li>
                   ))}
                 </ul>
@@ -295,19 +353,29 @@ export default function EventCheckout({ event, open, onClose }: Props) {
                   <span>Total payable</span>
                   <span>{formatInr(grandTotal)}</span>
                 </div>
-                <p className="text-[11px] text-slate-400">{ticketQty} ticket{ticketQty === 1 ? "" : "s"}</p>
+                <p className="text-[11px] text-slate-400">
+                  {ticketQty} ticket{ticketQty === 1 ? "" : "s"}
+                </p>
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-800">Contact details</h4>
-                {authUser?.role !== "customer" && (
+                <h4 className="text-sm font-bold text-slate-800">
+                  {isOrganizer ? "Customer contact details" : "Contact details"}
+                </h4>
+                {isOrganizer ? (
                   <p className="text-xs text-slate-500">
-                    Booking as guest.{" "}
-                    <Link href="/login" className="text-rose-600 font-semibold hover:underline">
-                      Log in
-                    </Link>{" "}
-                    to save this booking to My Bookings.
+                    Enter the attendee&apos;s information. Same fields as the public booking flow.
                   </p>
+                ) : (
+                  authUser?.role !== "customer" && (
+                    <p className="text-xs text-slate-500">
+                      Booking as guest.{" "}
+                      <Link href="/login" className="text-rose-600 font-semibold hover:underline">
+                        Log in
+                      </Link>{" "}
+                      to save this booking to My Bookings.
+                    </p>
+                  )
                 )}
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
@@ -317,8 +385,8 @@ export default function EventCheckout({ event, open, onClose }: Props) {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                    placeholder="Your name"
+                    className={`w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none ${accentFocus} text-slate-800 font-semibold`}
+                    placeholder={isOrganizer ? "Customer name" : "Your name"}
                   />
                 </div>
                 <div>
@@ -332,21 +400,25 @@ export default function EventCheckout({ event, open, onClose }: Props) {
                     onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
                     inputMode="numeric"
                     maxLength={12}
-                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
+                    className={`w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none ${accentFocus} text-slate-800 font-semibold`}
                     placeholder="9900000000"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
-                    Email (optional)
+                    Email
                   </label>
                   <input
+                    required
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
+                    className={`w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none ${accentFocus} text-slate-800 font-semibold`}
                     placeholder="you@example.com"
                   />
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    Tickets and QR code will be sent to this email.
+                  </p>
                 </div>
               </div>
             </form>
@@ -359,7 +431,7 @@ export default function EventCheckout({ event, open, onClose }: Props) {
               type="button"
               disabled={!showtimeId}
               onClick={() => setStep(2)}
-              className="w-full py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-bold text-sm"
+              className={`w-full py-3.5 rounded-2xl ${accentBtn} disabled:bg-slate-200 disabled:text-slate-500 text-white font-bold text-sm`}
             >
               Continue
             </button>
@@ -369,7 +441,7 @@ export default function EventCheckout({ event, open, onClose }: Props) {
               type="button"
               disabled={ticketQty < 1}
               onClick={() => setStep(3)}
-              className="w-full py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-bold text-sm"
+              className={`w-full py-3.5 rounded-2xl ${accentBtn} disabled:bg-slate-200 disabled:text-slate-500 text-white font-bold text-sm`}
             >
               Review order
             </button>
@@ -379,7 +451,7 @@ export default function EventCheckout({ event, open, onClose }: Props) {
               type="submit"
               form="event-checkout-form"
               disabled={submitting}
-              className="w-full py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-bold text-sm inline-flex items-center justify-center gap-2"
+              className={`w-full py-3.5 rounded-2xl ${accentBtn} disabled:opacity-60 text-white font-bold text-sm inline-flex items-center justify-center gap-2`}
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
               Confirm booking · {formatInr(grandTotal)}

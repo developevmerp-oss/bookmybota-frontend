@@ -68,9 +68,8 @@ export default function CreateEventContractPage() {
         terms_and_conditions: terms,
         convenience_fee_percent: Number(convenienceFee) || 0,
         commission_percent: Number(commission) || 0,
-        sign_as_admin: true,
       }).unwrap();
-      toast.success("Contract created and signed. Organizer must sign before the event goes public.");
+      toast.success("Contract created. Sign with signature + OTP, then ask the organizer to sign.");
       router.push(`/admin/event-contracts/${eventId}`);
     } catch (err) {
       toast.error(extractApiError(err, "Failed to create contract"));
@@ -106,7 +105,7 @@ export default function CreateEventContractPage() {
         <h2 className="text-2xl font-bold text-white">Create Event Contract</h2>
         <p className="text-zinc-400 mt-1">
           Select a pending event, review auto-filled details, compose the contract with dynamic fields,
-          then sign as Super Admin. The event goes public only after the organizer also signs.
+          then open the contract and sign with your signature + email OTP. The event goes public only after the organizer also signs.
         </p>
       </div>
 
@@ -241,7 +240,7 @@ export default function CreateEventContractPage() {
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
         >
           {creating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-          Create contract & sign
+          Create contract
         </button>
       </div>
     </div>

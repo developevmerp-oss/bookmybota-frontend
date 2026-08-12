@@ -3,7 +3,8 @@
 import { useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CalendarCheck, Search } from "lucide-react";
+import { CalendarCheck, Plus, Search } from "lucide-react";
+import OrganizerTicketPurchase from "@/components/OrganizerTicketPurchase";
 import { useGetOrganizerBookingsQuery, useGetOrganizerEventsQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
 
@@ -41,6 +42,7 @@ function OrganizerBookingsContent() {
   const [eventFilter, setEventFilter] = useState(initialEvent);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
 
   const { data: events = [] } = useGetOrganizerEventsQuery();
   const { data: bookings = [], isLoading } = useGetOrganizerBookingsQuery({
@@ -87,13 +89,29 @@ function OrganizerBookingsContent() {
             Customer ticket purchases appear here in real time after checkout.
           </p>
         </div>
-        <Link
-          href="/organizer/tickets"
-          className="text-sm text-violet-600 hover:text-violet-700 font-medium w-fit"
-        >
-          View ticket statistics →
-        </Link>
+        <div className="flex flex-wrap gap-2 w-fit">
+          <button
+            type="button"
+            onClick={() => setPurchaseOpen(true)}
+            className="btn-primary inline-flex items-center gap-2 text-sm"
+          >
+            <Plus size={16} /> Buy tickets for customer
+          </button>
+          <Link
+            href="/organizer/tickets"
+            className="text-sm text-violet-600 hover:text-violet-700 font-medium inline-flex items-center px-3 py-2"
+          >
+            View ticket statistics →
+          </Link>
+        </div>
       </div>
+
+      <OrganizerTicketPurchase
+        open={purchaseOpen}
+        onClose={() => setPurchaseOpen(false)}
+        preselectedEventId={eventFilter || undefined}
+        onSuccess={() => setPurchaseOpen(false)}
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="glass-panel rounded-xl p-4">

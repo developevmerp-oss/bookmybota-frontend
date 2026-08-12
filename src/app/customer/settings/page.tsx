@@ -11,6 +11,7 @@ import {
   Settings,
   ChevronRight,
   LogOut,
+  Lock,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { clearCredentials, loadFromStorage } from "@/features/auth/authSlice";
@@ -21,6 +22,12 @@ const SETTINGS_LINKS = [
     icon: User,
     title: "Edit Profile",
     subtitle: "Name, phone, email",
+  },
+  {
+    href: "/customer/change-password",
+    icon: Lock,
+    title: "Change Password",
+    subtitle: "Update your account password",
   },
   {
     href: "/customer/dashboard",

@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   CalendarCheck,
+  KeyRound,
 } from "lucide-react";
 
 function OrganizerShell({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
     { name: "My Events", href: "/organizer/events", icon: CalendarDays },
     { name: "Bookings", href: "/organizer/bookings", icon: CalendarCheck },
     { name: "Ticket Stats", href: "/organizer/tickets", icon: BarChart3 },
+    { name: "Change Password", href: "/organizer/change-password", icon: KeyRound },
   ];
 
   const isNavActive = (href: string) => {

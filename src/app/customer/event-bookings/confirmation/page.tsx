@@ -4,7 +4,6 @@ import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowRight,
   Calendar,
   CheckCircle,
   Clock,
@@ -178,22 +177,14 @@ function ConfirmationContent() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        {user?.role === "customer" && (
           <Link
-            href={`/customer/event-bookings/${booking.id}`}
-            className="btn-primary flex-1 inline-flex items-center justify-center gap-2 py-3"
+            href="/customer/dashboard"
+            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-border bg-white text-sm font-semibold text-foreground hover:bg-accent transition-colors"
           >
-            View booking details <ArrowRight size={16} />
+            My Bookings
           </Link>
-          {user?.role === "customer" && (
-            <Link
-              href="/customer/dashboard"
-              className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-border bg-white text-sm font-semibold text-foreground hover:bg-accent transition-colors"
-            >
-              My Bookings
-            </Link>
-          )}
-        </div>
+        )}
 
         <button
           onClick={() => router.push("/events")}

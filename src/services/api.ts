@@ -161,6 +161,8 @@ export interface EventContract {
   dynamic_data?: Record<string, string | number> | null;
   admin_signed_at?: string | null;
   organizer_signed_at?: string | null;
+  admin_signature_url?: string | null;
+  organizer_signature_url?: string | null;
   rejection_reason?: string | null;
   event_name?: string;
   organizer_name?: string;
@@ -513,6 +515,39 @@ export const api = createApi({
         method: 'POST',
         body: credentials,
       }),
+    }),
+
+    forgotPassword: builder.mutation<{ message?: string; email_hint?: string }, { email: string }>({
+      query: (body) => ({
+        url: '/auth/forgot-password',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [],
+    }),
+
+    resetPassword: builder.mutation<
+      { message?: string },
+      { token: string; new_password: string; confirm_password: string }
+    >({
+      query: (body) => ({
+        url: '/auth/reset-password',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [],
+    }),
+
+    changePassword: builder.mutation<
+      { message?: string },
+      { current_password: string; new_password: string; confirm_password: string }
+    >({
+      query: (body) => ({
+        url: '/auth/change-password',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [],
     }),
 
     registerCustomer: builder.mutation<
@@ -999,10 +1034,25 @@ export const api = createApi({
       invalidatesTags: ['EventContracts', 'AdminEvents', 'OrganizerEvents', 'PublicEvents'],
     }),
 
-    signAdminEventContract: builder.mutation<EventContract, string>({
+    requestAdminContractOtp: builder.mutation<
+      { message?: string; email_hint?: string; expires_in_seconds?: number },
+      string
+    >({
       query: (eventId) => ({
+        url: `/admin/event-contracts/event/${eventId}/request-otp-admin`,
+        method: 'POST',
+      }),
+      invalidatesTags: [],
+    }),
+
+    signAdminEventContract: builder.mutation<
+      EventContract,
+      { eventId: string; signature_url: string; otp: string }
+    >({
+      query: ({ eventId, signature_url, otp }) => ({
         url: `/admin/event-contracts/event/${eventId}/sign-admin`,
         method: 'POST',
+        body: { signature_url, otp },
       }),
       transformResponse: (res: { data: EventContract }) => res.data,
       invalidatesTags: ['EventContracts', 'AdminEvents', 'PublicEvents', 'OrganizerEvents'],
@@ -1014,10 +1064,25 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id: `${id}-contract` }],
     }),
 
-    signOrganizerEventContract: builder.mutation<EventContract, string>({
+    requestOrganizerContractOtp: builder.mutation<
+      { message?: string; email_hint?: string; expires_in_seconds?: number },
+      string
+    >({
       query: (eventId) => ({
+        url: `/events/organizer/${eventId}/contract/request-otp`,
+        method: 'POST',
+      }),
+      invalidatesTags: [],
+    }),
+
+    signOrganizerEventContract: builder.mutation<
+      EventContract,
+      { eventId: string; signature_url: string; otp: string }
+    >({
+      query: ({ eventId, signature_url, otp }) => ({
         url: `/events/organizer/${eventId}/contract/sign`,
         method: 'POST',
+        body: { signature_url, otp },
       }),
       transformResponse: (res: { data: EventContract }) => res.data,
       invalidatesTags: ['OrganizerEvents', 'EventContracts', 'PublicEvents'],
@@ -1167,15 +1232,17 @@ export const api = createApi({
         guest_phone: string;
         guest_email?: string;
         customer_id?: string;
-        booking_source?: 'ONLINE' | 'WALK_IN' | 'CASH';
+        booking_source?: 'ONLINE' | 'WALK_IN' | 'CASH' | 'ORGANIZER';
+        /** When true, POST to organizer booking API (event_admin selling for a customer) */
+        for_organizer?: boolean;
       }
     >({
-      query: (body) => ({
-        url: '/events/bookings',
+      query: ({ for_organizer, ...body }) => ({
+        url: for_organizer ? '/events/organizer/bookings' : '/events/bookings',
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings'],
+      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'OrganizerEvents'],
     }),
 
     getCustomerEventBookings: builder.query<EventBooking[], string>({
@@ -1340,6 +1407,9 @@ export const api = createApi({
 // Export auto-generated hooks
 export const {
   useLoginMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useChangePasswordMutation,
   useRegisterCustomerMutation,
   useRegisterBusinessMutation,
   useGetBusinessesQuery,
@@ -1389,8 +1459,10 @@ export const {
   useGetEventContractsQuery,
   useGetAdminEventContractQuery,
   useCreateEventContractMutation,
+  useRequestAdminContractOtpMutation,
   useSignAdminEventContractMutation,
   useGetOrganizerEventContractQuery,
+  useRequestOrganizerContractOtpMutation,
   useSignOrganizerEventContractMutation,
   useRejectOrganizerEventContractMutation,
   useGetOrganizerEventsQuery,

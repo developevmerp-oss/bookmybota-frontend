@@ -22,6 +22,7 @@ import {
   X,
   Star,
   Megaphone,
+  KeyRound,
 } from "lucide-react";
 
 export default function BusinessLayout({ children }: { children: React.ReactNode }) {
@@ -73,6 +74,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
     { name: "Profile Editor", href: "/business/profile", icon: Settings },
     { name: "Reviews", href: "/business/reviews", icon: Star },
     { name: "Promotions", href: "/business/promotions", icon: Megaphone },
+    { name: "Change Password", href: "/business/change-password", icon: KeyRound },
   ];
 
   const handleLogout = () => {

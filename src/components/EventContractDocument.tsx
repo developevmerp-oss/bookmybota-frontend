@@ -41,25 +41,52 @@ export default function EventContractDocument({
       />
 
       {showSignatures && (
-        <div className="mt-8 pt-4 border-t border-slate-100 grid sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="font-medium text-slate-700">Super Admin</p>
-            <p className={contract.admin_signed_at ? "text-green-700" : "text-amber-700"}>
-              {contract.admin_signed_at
-                ? `Signed ${new Date(contract.admin_signed_at).toLocaleString()}`
-                : "Awaiting signature"}
-            </p>
-          </div>
-          <div>
-            <p className="font-medium text-slate-700">Event Organizer</p>
-            <p className={contract.organizer_signed_at ? "text-green-700" : "text-amber-700"}>
-              {contract.organizer_signed_at
-                ? `Signed ${new Date(contract.organizer_signed_at).toLocaleString()}`
-                : "Awaiting signature"}
-            </p>
-          </div>
+        <div className="mt-8 pt-4 border-t border-slate-100 grid sm:grid-cols-2 gap-6 text-sm">
+          <SignatureBlock
+            title="Super Admin"
+            signedAt={contract.admin_signed_at}
+            signatureUrl={contract.admin_signature_url}
+          />
+          <SignatureBlock
+            title="Event Organizer"
+            signedAt={contract.organizer_signed_at}
+            signatureUrl={contract.organizer_signature_url}
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+function SignatureBlock({
+  title,
+  signedAt,
+  signatureUrl,
+}: {
+  title: string;
+  signedAt?: string | null;
+  signatureUrl?: string | null;
+}) {
+  return (
+    <div>
+      <p className="font-medium text-slate-700 mb-2">{title}</p>
+      {signatureUrl ? (
+        <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-3 min-h-[80px] flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={signatureUrl}
+            alt={`${title} signature`}
+            className="max-h-20 max-w-full object-contain"
+          />
+        </div>
+      ) : (
+        <div className="mb-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-xs text-slate-400">
+          Signature not yet provided
+        </div>
+      )}
+      <p className={signedAt ? "text-green-700" : "text-amber-700"}>
+        {signedAt ? `Signed ${new Date(signedAt).toLocaleString()}` : "Awaiting signature + OTP"}
+      </p>
     </div>
   );
 }

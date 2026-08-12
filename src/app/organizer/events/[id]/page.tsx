@@ -1,11 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import EventForm from "@/components/EventForm";
+import OrganizerTicketPurchase from "@/components/OrganizerTicketPurchase";
 import {
   useGetOrganizerEventQuery,
   useUpdateOrganizerEventMutation,
@@ -22,6 +23,7 @@ export default function EditOrganizerEventPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
   const { data: event, isLoading } = useGetOrganizerEventQuery(id);
   const [updateEvent, { isLoading: saving }] = useUpdateOrganizerEventMutation();
   const [submitEvent, { isLoading: submitting }] = useSubmitOrganizerEventMutation();
@@ -30,6 +32,7 @@ export default function EditOrganizerEventPage({
   const editable = event?.status === "DRAFT" || event?.status === "PENDING_APPROVAL";
   const canSubmit = event?.status === "DRAFT";
   const canToggleVisibility = event?.status === "APPROVED" || event?.status === "LIVE";
+  const canSellTickets = event?.status === "LIVE";
 
   const handleSaveDraft = async (payload: EventFormPayload) => {
     try {
@@ -98,7 +101,23 @@ export default function EditOrganizerEventPage({
             {event.is_visible ? "Hide from customers" : "Show to customers"}
           </button>
         )}
+        {canSellTickets && (
+          <button
+            type="button"
+            onClick={() => setPurchaseOpen(true)}
+            className="btn-primary inline-flex items-center gap-2 text-sm"
+          >
+            <Ticket size={16} /> Buy tickets for customer
+          </button>
+        )}
       </div>
+
+      <OrganizerTicketPurchase
+        open={purchaseOpen}
+        onClose={() => setPurchaseOpen(false)}
+        preselectedEventId={event.id}
+        onSuccess={() => setPurchaseOpen(false)}
+      />
 
       <EventForm
         event={event}

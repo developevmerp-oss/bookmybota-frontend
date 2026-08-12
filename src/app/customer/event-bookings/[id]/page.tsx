@@ -18,6 +18,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import { formatMoney } from "@/lib/currencyFormat";
 
 function statusStyles(status: string) {
   switch (status) {
@@ -32,14 +33,6 @@ function statusStyles(status: string) {
     default:
       return "bg-slate-500/10 text-slate-500 border-slate-500/20";
   }
-}
-
-function formatInr(n: number | string | undefined) {
-  const value = Number(n) || 0;
-  return `₹${value.toLocaleString("en-IN", {
-    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 export default function EventBookingDetailPage({
@@ -218,13 +211,13 @@ export default function EventBookingDetailPage({
                   {item.ticket_type} × {item.qty}
                 </span>
                 <span className="font-medium text-foreground">
-                  {formatInr(Number(item.unit_price) * item.qty)}
+                  {formatMoney(Number(item.unit_price) * item.qty)}
                 </span>
               </li>
             ))}
             <li className="flex justify-between text-muted-foreground pt-2 border-t border-border">
               <span>Tickets</span>
-              <span className="font-medium text-foreground">{formatInr(booking.ticket_amount)}</span>
+              <span className="font-medium text-foreground">{formatMoney(booking.ticket_amount)}</span>
             </li>
             {Number(booking.discount_amount || 0) > 0 && (
               <li className="flex justify-between text-emerald-700">
@@ -232,7 +225,7 @@ export default function EventBookingDetailPage({
                   Promo discount
                   {booking.promo_code ? ` (${booking.promo_code})` : ""}
                 </span>
-                <span className="font-medium">−{formatInr(booking.discount_amount)}</span>
+                <span className="font-medium">−{formatMoney(booking.discount_amount)}</span>
               </li>
             )}
             <li className="flex justify-between text-muted-foreground">
@@ -243,12 +236,12 @@ export default function EventBookingDetailPage({
                   : ""}
               </span>
               <span className="font-medium text-foreground">
-                {formatInr(booking.convenience_fee_total)}
+                {formatMoney(booking.convenience_fee_total)}
               </span>
             </li>
             <li className="flex justify-between font-semibold text-foreground pt-2 border-t border-border">
               <span>Total payable</span>
-              <span>{formatInr(booking.grand_total)}</span>
+              <span>{formatMoney(booking.grand_total)}</span>
             </li>
           </ul>
           <div className="grid sm:grid-cols-2 gap-4 text-sm">

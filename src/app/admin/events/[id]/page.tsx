@@ -19,6 +19,7 @@ import {
 } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import { formatMoney } from "@/lib/currencyFormat";
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
@@ -473,7 +474,7 @@ export default function AdminEventDetailPage({
                   return (
                     <tr key={t.id}>
                       <td className="py-3 font-medium">{t.ticket_type}</td>
-                      <td className="py-3">₹{Number(t.price).toFixed(2)}</td>
+                      <td className="py-3">{formatMoney(t.price)}</td>
                       <td className="py-3">{t.available_count}</td>
                       <td className="py-3">{t.total_count}</td>
                       <td className="py-3">{sold}</td>
@@ -536,10 +537,10 @@ export default function AdminEventDetailPage({
                     </td>
                     <td className="py-3">{String(b.ticket_qty ?? "—")}</td>
                     <td className="py-3">
-                      ₹{Number(b.convenience_fee_total || 0).toFixed(2)}
+                      {formatMoney(Number(b.convenience_fee_total) || 0)}
                     </td>
-                    <td className="py-3">₹{Number(b.commission_total || 0).toFixed(2)}</td>
-                    <td className="py-3">₹{Number(b.grand_total || 0).toFixed(2)}</td>
+                    <td className="py-3">{formatMoney(Number(b.commission_total) || 0)}</td>
+                    <td className="py-3">{formatMoney(Number(b.grand_total) || 0)}</td>
                     <td className="py-3">{String(b.status || "—")}</td>
                   </tr>
                 ))}

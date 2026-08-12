@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
 import { useRouter } from 'next/navigation';
 import {
   useGetBusinessPublicQuery,
@@ -75,14 +76,6 @@ const getMenuForVenue = (typeName?: string) => {
     (typeName && (typeName.toLowerCase().includes("bar") || typeName.toLowerCase().includes("pub"))) ? "Bar" :
       "Restaurant";
   return defaults[key];
-};
-
-const getCostForTwo = (priceRange?: string) => {
-  if (priceRange === "₹") return "₹250 for two (approx.)";
-  if (priceRange === "₹₹") return "₹500 for two (approx.)";
-  if (priceRange === "₹₹₹") return "₹1000 for two (approx.)";
-  if (priceRange === "₹₹₹₹") return "₹2000 for two (approx.)";
-  return "₹450 for two (approx.)";
 };
 
 // ─── Date & Time Slot Helpers ─────────────────────────────────────────────────
@@ -679,7 +672,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const menus = profile
     ? (profile.menu_images && profile.menu_images.length > 0 ? profile.menu_images : getMenuForVenue(profile.type_name))
     : [];
-  const costText = profile?.average_cost ? `₹${profile.average_cost} for two (approx.)` : getCostForTwo(profile?.price_range);
+  const costText = profile?.average_cost
+    ? `${formatMoney(profile.average_cost, { compact: true })} for two (approx.)`
+    : getCostForTwoFromRange(profile?.price_range);
   const ratingValue = Number(profile.rating || 4.5).toFixed(1);
   const reviewsCount = profile.reviews_count || 120;
 
@@ -1616,7 +1611,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   const cuisine = restaurant.cuisine || "Italian, Chinese, Continental";
                   const coverImg = restaurant.cover_image_url || "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
                   const locality = restaurant.address ? restaurant.address.split(",")[0].trim() : "";
-                  const priceForTwo = restaurant.average_cost ? `₹${restaurant.average_cost} for two` : "₹1200 for two";
+                  const priceForTwo = restaurant.average_cost
+                    ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
+                    : `${formatMoney(1200, { compact: true })} for two`;
 
                   return (
                     <Link

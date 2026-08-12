@@ -13,6 +13,7 @@ import {
   type OfferEligibleEvent,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 
 /** YYYY-MM-DD for the day before a given date string */
 function dayBefore(dateStr: string): string {
@@ -151,10 +152,7 @@ export default function OrganizerOffersPage() {
     }
   };
 
-  const discountLabel = (o: EventOffer) =>
-    o.discount_type === "PERCENT"
-      ? `${o.discount_value}% off`
-      : `₹${Number(o.discount_value).toLocaleString("en-IN")} off`;
+  const discountLabel = (o: EventOffer) => formatOfferDiscount(o.discount_type, o.discount_value);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -247,7 +245,7 @@ export default function OrganizerOffersPage() {
                 className="portal-select"
               >
                 <option value="PERCENT">Percent (%)</option>
-                <option value="FLAT">Flat amount (₹)</option>
+                <option value="FLAT">Flat amount (ETB)</option>
               </select>
             </div>
             <div>

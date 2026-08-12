@@ -489,13 +489,35 @@ export interface OrganizerLedgerRow {
   pending_amount: number | string;
 }
 
+export interface OrganizerLedgerCustomerEntry {
+  booking_id: string;
+  event_id: string;
+  event_name: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  customer_id?: string | null;
+  ticket_qty: number;
+  ticket_amount: number | string;
+  discount_amount?: number | string;
+  commission_total: number | string;
+  organizer_earned: number | string;
+  grand_total: number | string;
+  promo_code?: string | null;
+  status: string;
+  booking_source?: string;
+  created_at?: string;
+}
+
 export interface OrganizerLedger {
   summary: {
     bookings_count: number;
     tickets_sold: number;
     ticket_amount: number;
+    discount_total?: number;
     commission_total: number;
     organizer_earned: number;
+    customer_paid_total?: number;
     paid_amount: number;
     pending_amount: number;
     total_paid: number;
@@ -512,6 +534,18 @@ export interface OrganizerLedger {
     paid_at?: string;
     created_at?: string;
   }>;
+}
+
+export interface OrganizerLedgerCustomersResponse {
+  items: OrganizerLedgerCustomerEntry[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+    has_prev: boolean;
+    has_next: boolean;
+  };
 }
 
 export interface OrganizerPayout {
@@ -619,7 +653,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerPayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1351,15 +1385,49 @@ export const api = createApi({
 
     // ── Organizer ledger ──────────────────────────────────────────────────────
 
-    getOrganizerLedger: builder.query<OrganizerLedger, { event_id?: string } | void>({
+    getOrganizerLedger: builder.query<
+      OrganizerLedger,
+      {
+        event_id?: string;
+        q?: string;
+        from?: string;
+        to?: string;
+      } | void
+    >({
       query: (params) => {
         const sp = new URLSearchParams();
         if (params?.event_id) sp.set('event_id', params.event_id);
+        if (params?.q) sp.set('q', params.q);
+        if (params?.from) sp.set('from', params.from);
+        if (params?.to) sp.set('to', params.to);
         const qs = sp.toString();
         return `/events/organizer/ledger${qs ? `?${qs}` : ''}`;
       },
       transformResponse: (res: { data: OrganizerLedger }) => res.data,
       providesTags: ['OrganizerLedger'],
+    }),
+
+    getOrganizerLedgerCustomers: builder.query<
+      OrganizerLedgerCustomersResponse,
+      {
+        event_id?: string;
+        q?: string;
+        from?: string;
+        to?: string;
+        page: number;
+      }
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        sp.set('page', String(params.page));
+        if (params.event_id) sp.set('event_id', params.event_id);
+        if (params.q) sp.set('q', params.q);
+        if (params.from) sp.set('from', params.from);
+        if (params.to) sp.set('to', params.to);
+        return `/events/organizer/ledger/customers?${sp.toString()}`;
+      },
+      transformResponse: (res: { data: OrganizerLedgerCustomersResponse }) => res.data,
+      providesTags: ['OrganizerLedgerCustomers'],
     }),
 
     createOrganizerPayout: builder.mutation<
@@ -1378,7 +1446,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['OrganizerLedger', 'AdminCommission', 'OrganizerPayouts'],
+      invalidatesTags: ['OrganizerLedger', 'OrganizerLedgerCustomers', 'AdminCommission', 'OrganizerPayouts'],
     }),
 
     getOrganizerPayouts: builder.query<OrganizerPayout[], { business_id?: string } | void>({
@@ -1770,6 +1838,7 @@ export const {
   useUpdateEventOfferMutation,
   useDeleteEventOfferMutation,
   useGetOrganizerLedgerQuery,
+  useGetOrganizerLedgerCustomersQuery,
   useCreateOrganizerPayoutMutation,
   useGetOrganizerPayoutsQuery,
   useGetOrganizerEventsQuery,

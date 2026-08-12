@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarDays, MapPin, Search, Ticket } from "lucide-react";
 import { useGetPublicEventsQuery, useGetBusinessTypesQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
+import { formatMoney } from "@/lib/currencyFormat";
 
 function EventCard({
   event,
@@ -59,7 +60,7 @@ function EventCard({
           {event.min_price !== undefined && event.min_price !== null && (
             <span className="flex items-center gap-1 font-semibold text-slate-700">
               <Ticket size={13} />
-              From ₹{Number(event.min_price).toFixed(0)}
+              From {formatMoney(event.min_price, { compact: true })}
             </span>
           )}
         </div>

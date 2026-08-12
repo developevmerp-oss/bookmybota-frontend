@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business, Collection, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DiningFiltersBar";
+import { formatMoney } from "@/lib/currencyFormat";
 import {
   applyDiningFilters,
   DEFAULT_DINING_FILTERS,
@@ -97,7 +98,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
   const getPriceForTwo = (id: number) => {
     const bases = [1200, 1500, 2000, 2400, 1800];
-    return `₹${bases[id % bases.length]} for two`;
+    return `${formatMoney(bases[id % bases.length], { compact: true })} for two`;
   };
 
   const getDistance = (id: number) => {

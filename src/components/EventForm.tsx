@@ -524,7 +524,7 @@ export default function EventForm({
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className={labelClass}>Price (₹)</label>
+                <label className={labelClass}>Price (ETB)</label>
                 <input disabled={readOnly} type="number" min={0} step="0.01" className={inputClass} {...register(`ticket_types.${i}.price`, { valueAsNumber: true })} />
               </div>
               {!readOnly && ticketFields.length > 1 && (

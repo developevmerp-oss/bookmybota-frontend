@@ -2,10 +2,9 @@
 import { useState } from 'react';
 import { useGetCommissionLedgerQuery } from '@/services/api';
 import { formatDate } from '@/lib/dateFormat';
+import { formatMoney } from '@/lib/currencyFormat';
 
-function money(v: number | string | undefined) {
-  return `₹${Number(v || 0).toFixed(2)}`;
-}
+const money = formatMoney;
 
 export default function AdminCommissionPage() {
   const [groupBy, setGroupBy] = useState<'event' | 'business' | 'date'>('event');

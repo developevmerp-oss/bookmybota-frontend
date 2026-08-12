@@ -16,14 +16,8 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDateTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import { formatMoney } from "@/lib/currencyFormat";
 import { getPhoneValidationError, sanitizePhoneInput } from "@/lib/validation";
-
-function formatInr(n: number) {
-  return `₹${Number(n).toLocaleString("en-IN", {
-    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 export type EventCheckoutMode = "customer" | "organizer";
 
@@ -328,7 +322,7 @@ export default function EventCheckout({
                       <div>
                         <p className="font-bold text-slate-800">{t.ticket_type}</p>
                         <p className="text-sm font-semibold text-slate-700 mt-0.5">
-                          {formatInr(Number(t.price) || 0)}
+                          {formatMoney(Number(t.price) || 0)}
                         </p>
                         <p className="text-xs text-slate-400 mt-1">{available} available</p>
                       </div>
@@ -376,13 +370,13 @@ export default function EventCheckout({
                       <span>
                         {l.ticket_type} × {l.qty}
                       </span>
-                      <span className="font-semibold text-slate-800">{formatInr(l.unit * l.qty)}</span>
+                      <span className="font-semibold text-slate-800">{formatMoney(l.unit * l.qty)}</span>
                     </li>
                   ))}
                 </ul>
                 <div className="flex justify-between text-sm text-slate-600 pt-2 border-t border-slate-100">
                   <span>Tickets</span>
-                  <span className="font-semibold text-slate-800">{formatInr(ticketAmount)}</span>
+                  <span className="font-semibold text-slate-800">{formatMoney(ticketAmount)}</span>
                 </div>
                 {!isOrganizer && (
                   <div className="pt-2 border-t border-slate-100 space-y-2">
@@ -396,7 +390,7 @@ export default function EventCheckout({
                             {appliedPromo.promo_code} · {appliedPromo.title}
                           </p>
                           <p className="text-[11px] text-emerald-700">
-                            You save {formatInr(appliedPromo.discount_amount)}
+                            You save {formatMoney(appliedPromo.discount_amount)}
                           </p>
                         </div>
                         <button
@@ -431,16 +425,16 @@ export default function EventCheckout({
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-sm text-emerald-700">
                     <span>Promo discount</span>
-                    <span className="font-semibold">−{formatInr(discountAmount)}</span>
+                    <span className="font-semibold">−{formatMoney(discountAmount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm text-slate-600">
                   <span>Convenience fee{conveniencePct ? ` (${conveniencePct}%)` : ""}</span>
-                  <span className="font-semibold text-slate-800">{formatInr(convenienceFee)}</span>
+                  <span className="font-semibold text-slate-800">{formatMoney(convenienceFee)}</span>
                 </div>
                 <div className="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-100">
                   <span>Total payable</span>
-                  <span>{formatInr(grandTotal)}</span>
+                  <span>{formatMoney(grandTotal)}</span>
                 </div>
                 <p className="text-[11px] text-slate-400">
                   {ticketQty} ticket{ticketQty === 1 ? "" : "s"}
@@ -543,7 +537,7 @@ export default function EventCheckout({
               className={`w-full py-3.5 rounded-2xl ${accentBtn} disabled:opacity-60 text-white font-bold text-sm inline-flex items-center justify-center gap-2`}
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
-              Confirm booking · {formatInr(grandTotal)}
+              Confirm booking · {formatMoney(grandTotal)}
             </button>
           )}
         </div>

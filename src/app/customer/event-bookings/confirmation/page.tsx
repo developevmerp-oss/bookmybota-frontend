@@ -15,14 +15,7 @@ import { useGetEventBookingByIdQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
-
-function formatInr(n: number | string | undefined) {
-  const value = Number(n) || 0;
-  return `₹${value.toLocaleString("en-IN", {
-    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
+import { formatMoney } from "@/lib/currencyFormat";
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
@@ -133,7 +126,7 @@ function ConfirmationContent() {
               <div>
                 <p className="text-xs text-muted-foreground">Total paid</p>
                 <p className="text-sm font-medium text-foreground">
-                  {formatInr(booking.grand_total)}
+                  {formatMoney(booking.grand_total)}
                 </p>
               </div>
             </div>
@@ -147,14 +140,14 @@ function ConfirmationContent() {
                     {item.ticket_type} × {item.qty}
                   </span>
                   <span className="text-foreground font-medium">
-                    {formatInr(Number(item.unit_price) * item.qty)}
+                    {formatMoney(Number(item.unit_price) * item.qty)}
                   </span>
                 </li>
               ))}
               <li className="flex justify-between pt-1">
                 <span className="text-muted-foreground">Convenience fee</span>
                 <span className="font-medium text-foreground">
-                  {formatInr(booking.convenience_fee_total)}
+                  {formatMoney(booking.convenience_fee_total)}
                 </span>
               </li>
             </ul>

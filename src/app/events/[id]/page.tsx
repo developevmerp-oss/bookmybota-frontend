@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useGetPublicEventQuery, useGetPublicEventOffersQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
+import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 import EventCheckout from "@/components/EventCheckout";
 import EventReviewsSection from "@/components/EventReviewsSection";
 
@@ -31,10 +32,6 @@ function parseGenres(genres?: string[] | string | null): string[] {
       .map((g) => g.trim())
       .filter(Boolean);
   }
-}
-
-function formatInr(n: number) {
-  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
 export default function PublicEventDetailPage({
@@ -295,7 +292,7 @@ export default function PublicEventDetailPage({
                     <p className="text-sm font-bold text-violet-700 mt-2">
                       {o.discount_type === "PERCENT"
                         ? `${o.discount_value}% off`
-                        : `₹${Number(o.discount_value).toLocaleString("en-IN")} off`}
+                        : formatOfferDiscount(o.discount_type, o.discount_value)}
                       {o.promo_code ? ` · Use code ${o.promo_code}` : ""}
                     </p>
                   </li>
@@ -316,7 +313,7 @@ export default function PublicEventDetailPage({
             {minPrice !== null && (
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wide">Starting from</p>
-                <p className="text-2xl font-black text-slate-900">{formatInr(minPrice)}</p>
+                <p className="text-2xl font-black text-slate-900">{formatMoney(minPrice, { compact: true })}</p>
               </div>
             )}
 
@@ -359,7 +356,7 @@ export default function PublicEventDetailPage({
                         </span>
                       </span>
                       <span className="font-semibold text-slate-900">
-                        {formatInr(Number(t.price) || 0)}
+                        {formatMoney(Number(t.price) || 0, { compact: true })}
                       </span>
                     </li>
                   ))}

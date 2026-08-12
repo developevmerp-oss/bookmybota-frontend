@@ -6,7 +6,7 @@ import {
   BarChart3,
   Ticket,
   Users,
-  IndianRupee,
+  Banknote,
   Package,
   TrendingUp,
   XCircle,
@@ -16,10 +16,9 @@ import {
   useGetOrganizerEventsQuery,
   useGetOrganizerTicketStatsQuery,
 } from "@/services/api";
+import { formatMoney } from "@/lib/currencyFormat";
 
-function formatInr(n: number) {
-  return `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
-}
+const formatPrice = (n: number) => formatMoney(n, { compact: true });
 
 function statusBadge(status: string) {
   switch (status) {
@@ -150,16 +149,16 @@ export default function OrganizerTicketStatsPage() {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <StatCard
-              icon={IndianRupee}
+              icon={Banknote}
               label="Ticket revenue"
-              value={formatInr(overall.ticket_revenue)}
+              value={formatPrice(overall.ticket_revenue)}
               sub="Confirmed sales (excl. convenience fee)"
               accent="text-emerald-600"
             />
             <StatCard
-              icon={IndianRupee}
+              icon={Banknote}
               label="Your payout (est.)"
-              value={formatInr(overall.organizer_payout)}
+              value={formatPrice(overall.organizer_payout)}
               sub="After platform commission"
               accent="text-violet-600"
             />
@@ -200,7 +199,7 @@ export default function OrganizerTicketStatsPage() {
                       </div>
                       <p className="text-sm portal-muted mt-1">
                         {ev.summary.total_sold} sold · {ev.summary.total_remaining} remaining ·{" "}
-                        {ev.summary.bookings_count} bookings · {formatInr(ev.summary.ticket_revenue)} revenue
+                        {ev.summary.bookings_count} bookings · {formatPrice(ev.summary.ticket_revenue)} revenue
                       </p>
                     </div>
                     <div className="text-right min-w-[100px]">
@@ -233,7 +232,7 @@ export default function OrganizerTicketStatsPage() {
                           {ev.ticket_types.map((t) => (
                             <tr key={t.id} className="hover:bg-slate-50/80">
                               <td className="px-5 py-3 portal-table-strong">{t.ticket_type}</td>
-                              <td className="px-5 py-3 portal-table-cell">{formatInr(t.price)}</td>
+                              <td className="px-5 py-3 portal-table-cell">{formatPrice(t.price)}</td>
                               <td className="px-5 py-3 portal-table-cell">{t.total_count}</td>
                               <td className="px-5 py-3 text-green-600 font-semibold">{t.sold}</td>
                               <td className="px-5 py-3 text-violet-600 font-semibold">{t.remaining}</td>
@@ -243,7 +242,7 @@ export default function OrganizerTicketStatsPage() {
                                   <span className="text-xs portal-stat-sub shrink-0">{t.fill_percent}%</span>
                                 </div>
                               </td>
-                              <td className="px-5 py-3 text-right portal-table-strong">{formatInr(t.revenue)}</td>
+                              <td className="px-5 py-3 text-right portal-table-strong">{formatPrice(t.revenue)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -257,7 +256,7 @@ export default function OrganizerTicketStatsPage() {
                             <td className="px-5 py-3 text-violet-600">{ev.summary.total_remaining}</td>
                             <td className="px-5 py-3 portal-table-cell">{ev.summary.fill_percent}%</td>
                             <td className="px-5 py-3 text-right portal-table-strong">
-                              {formatInr(ev.summary.ticket_revenue)}
+                              {formatPrice(ev.summary.ticket_revenue)}
                             </td>
                           </tr>
                         </tfoot>

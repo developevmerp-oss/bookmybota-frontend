@@ -5,6 +5,7 @@ import { Star, MapPin, Loader2, X, Percent, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
 import DiningFiltersBar from "@/components/DiningFiltersBar";
+import { formatMoney } from "@/lib/currencyFormat";
 import {
   applyDiningFilters,
   DEFAULT_DINING_FILTERS,
@@ -40,7 +41,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
   const getPriceForTwo = (id: number) => {
     const bases = [1200, 1500, 2000, 2400, 1800];
-    return `₹${bases[id % bases.length]} for two`;
+    return `${formatMoney(bases[id % bases.length], { compact: true })} for two`;
   };
 
   const getDistance = (id: number) => {

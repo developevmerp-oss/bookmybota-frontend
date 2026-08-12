@@ -7,10 +7,9 @@ import { CalendarCheck, Plus, Search } from "lucide-react";
 import OrganizerTicketPurchase from "@/components/OrganizerTicketPurchase";
 import { useGetOrganizerBookingsQuery, useGetOrganizerEventsQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
+import { formatMoney } from "@/lib/currencyFormat";
 
-function formatInr(n: number | string) {
-  return `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
-}
+const formatPrice = (n: number | string) => formatMoney(n, { compact: true });
 
 const STATUS_FILTERS = [
   { label: "All statuses", value: "" },
@@ -124,7 +123,7 @@ function OrganizerBookingsContent() {
         </div>
         <div className="glass-panel rounded-xl border border-violet-200 p-4 col-span-2 sm:col-span-1">
           <p className="text-[10px] text-violet-700 uppercase tracking-wide font-semibold">Ticket revenue</p>
-          <p className="text-2xl font-bold text-violet-600 mt-1">{formatInr(totals.revenue)}</p>
+          <p className="text-2xl font-bold text-violet-600 mt-1">{formatPrice(totals.revenue)}</p>
         </div>
       </div>
 
@@ -229,8 +228,8 @@ function OrganizerBookingsContent() {
                       </ul>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="font-semibold portal-table-strong">{formatInr(b.grand_total)}</p>
-                      <p className="text-xs portal-table-muted">Tickets {formatInr(b.ticket_amount)}</p>
+                      <p className="font-semibold portal-table-strong">{formatPrice(b.grand_total)}</p>
+                      <p className="text-xs portal-table-muted">Tickets {formatPrice(b.ticket_amount)}</p>
                     </td>
                     <td className="px-5 py-4">
                       <span

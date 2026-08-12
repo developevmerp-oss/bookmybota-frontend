@@ -117,7 +117,7 @@ export default function OrganizerDashboardPage() {
           </p>
           <ul className="text-sm text-zinc-400 mt-2 list-disc list-inside space-y-1">
             <li>
-              <span className="text-zinc-200">Convenience fee</span> (₹ / ticket) — charged to the
+              <span className="text-zinc-200">Convenience fee</span> (% of ticket) — charged to the
               customer
             </li>
             <li>

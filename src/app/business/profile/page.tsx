@@ -227,7 +227,7 @@ export default function ProfilePage() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Average Cost for Two (₹)</label>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Average Cost for Two (ETB)</label>
                 <input
                   type="number"
                   value={averageCost}

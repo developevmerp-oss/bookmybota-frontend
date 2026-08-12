@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { IndianRupee, Loader2, Plus, Wallet } from "lucide-react";
+import { Banknote, Loader2, Plus, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateOrganizerPayoutMutation,
@@ -11,10 +11,9 @@ import {
 } from "@/services/api";
 import { formatDate } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import { formatMoney } from "@/lib/currencyFormat";
 
-function money(v: number | string | undefined) {
-  return `₹${Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const money = formatMoney;
 
 const EMPTY_FORM = {
   business_id: "",
@@ -161,7 +160,7 @@ export default function AdminOrganizerPayoutsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Amount (₹) *</label>
+              <label className="block text-xs text-zinc-500 mb-1">Amount (ETB) *</label>
               <input
                 type="number"
                 min="0.01"
@@ -280,12 +279,9 @@ export default function AdminOrganizerPayoutsPage() {
                     <td className="px-6 py-4 text-white">{p.organizer_name || "—"}</td>
                     <td className="px-6 py-4 text-zinc-400">{p.event_name || "General"}</td>
                     <td className="px-6 py-4 text-right font-semibold text-emerald-400">
-                      <span className="inline-flex items-center justify-end gap-0.5">
-                        <IndianRupee size={14} />
-                        {Number(p.amount).toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                      <span className="inline-flex items-center justify-end gap-1">
+                        <Banknote size={14} />
+                        {money(p.amount)}
                       </span>
                     </td>
                     <td className="px-6 py-4">

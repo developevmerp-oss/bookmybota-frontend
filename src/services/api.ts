@@ -82,6 +82,9 @@ export interface AdminEvent {
   convenience_fee_percent: number | string;
   commission_percent: number | string;
   organizer_name?: string;
+  organizer_phone?: string;
+  organizer_address?: string;
+  organizer_email?: string;
   category_name?: string;
   category_type_id?: number | null;
   language?: string;
@@ -107,6 +110,8 @@ export interface AdminEvent {
     venue_address?: string;
     starts_at: string;
     ends_at?: string;
+    latitude?: number | string | null;
+    longitude?: number | string | null;
   }>;
   bookings?: Array<Record<string, unknown>>;
   rejection_reason?: string;

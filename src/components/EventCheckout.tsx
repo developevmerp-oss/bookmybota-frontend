@@ -35,6 +35,7 @@ export type EventCheckoutResult = {
 type Props = {
   event: OrganizerEvent;
   open: boolean;
+  initialShowtimeId?: string;
   onClose: () => void;
   mode?: EventCheckoutMode;
   onOrganizerSuccess?: (result: EventCheckoutResult) => void;
@@ -48,6 +49,7 @@ export default function EventCheckout({
   onOrganizerSuccess,
 }: Props) {
   const isOrganizer = mode === "organizer";
+export default function EventCheckout({ event, open, initialShowtimeId, onClose }: Props) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
@@ -69,14 +71,14 @@ export default function EventCheckout({
 
   useEffect(() => {
     if (!open) return;
-    setStep(1);
-    setShowtimeId("");
+    setShowtimeId(initialShowtimeId || "");
+    setStep(initialShowtimeId ? 2 : 1);
     setQtyByType({});
     setName("");
     setPhone("");
     setEmail("");
     setSubmitting(false);
-  }, [open, event.id]);
+  }, [open, event.id, initialShowtimeId]);
 
   useEffect(() => {
     if (isOrganizer || authUser?.role !== "customer") return;

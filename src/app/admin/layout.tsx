@@ -19,6 +19,7 @@ import {
   ListChecks,
   FileSignature,
   KeyRound,
+  Wallet,
 } from "lucide-react";
 import AuthGate from "@/components/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
@@ -37,6 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Event Contracts', href: '/admin/event-contracts', icon: FileSignature },
     { name: 'Event Masters', href: '/admin/event-masters', icon: ListChecks },
     { name: 'Fees & Commission', href: '/admin/commission', icon: Percent },
+    { name: 'Organizer Payouts', href: '/admin/organizer-payouts', icon: Wallet },
     { name: 'Subscription & Billing', href: '/admin/billing', icon: CreditCard },
     { name: 'Marketing Plans', href: '/admin/marketing', icon: Megaphone },
     { name: 'Content Management', href: '/admin/content', icon: FileText },

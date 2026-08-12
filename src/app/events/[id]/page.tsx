@@ -10,12 +10,14 @@ import {
   Languages,
   MapPin,
   Phone,
+  Tag,
   Ticket,
   Users,
 } from "lucide-react";
-import { useGetPublicEventQuery } from "@/services/api";
+import { useGetPublicEventQuery, useGetPublicEventOffersQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
 import EventCheckout from "@/components/EventCheckout";
+import EventReviewsSection from "@/components/EventReviewsSection";
 
 function parseGenres(genres?: string[] | string | null): string[] {
   if (!genres) return [];
@@ -42,6 +44,7 @@ export default function PublicEventDetailPage({
 }) {
   const { id } = use(params);
   const { data: event, isLoading, isError } = useGetPublicEventQuery(id);
+  const { data: offers = [] } = useGetPublicEventOffersQuery(id);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [selectedShowtimeId, setSelectedShowtimeId] = useState("");
 
@@ -273,6 +276,39 @@ export default function PublicEventDetailPage({
               )}
             </section>
           )}
+
+          {offers.length > 0 && (
+            <section className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Tag size={18} className="text-violet-600" /> Offers
+              </h2>
+              <ul className="space-y-3">
+                {offers.map((o) => (
+                  <li
+                    key={o.id}
+                    className="rounded-xl border border-violet-100 bg-violet-50/50 p-4"
+                  >
+                    <p className="font-semibold text-slate-900">{o.title}</p>
+                    {o.description && (
+                      <p className="text-sm text-slate-600 mt-1">{o.description}</p>
+                    )}
+                    <p className="text-sm font-bold text-violet-700 mt-2">
+                      {o.discount_type === "PERCENT"
+                        ? `${o.discount_value}% off`
+                        : `₹${Number(o.discount_value).toLocaleString("en-IN")} off`}
+                      {o.promo_code ? ` · Use code ${o.promo_code}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <EventReviewsSection
+            eventId={id}
+            eventRating={(event as { rating?: number }).rating}
+            reviewsCount={(event as { reviews_count?: number }).reviews_count}
+          />
         </div>
 
         <div className="space-y-4">

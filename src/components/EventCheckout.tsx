@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Loader2, Minus, Plus, Ticket, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, Loader2, Minus, Plus, Tag, Ticket, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateEventBookingMutation,
   useGetCustomerProfileQuery,
+  useValidateEventPromoCodeMutation,
+  type AppliedPromoOffer,
   type OrganizerEvent,
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -59,11 +61,14 @@ export default function EventCheckout({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromoOffer | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const customerId = authUser?.role === "customer" ? authUser.customer_id || "" : "";
   const { data: profile } = useGetCustomerProfileQuery(customerId, { skip: !customerId || isOrganizer });
   const [createEventBooking] = useCreateEventBookingMutation();
+  const [validatePromo, { isLoading: validatingPromo }] = useValidateEventPromoCodeMutation();
 
   useEffect(() => {
     if (!isOrganizer) dispatch(loadFromStorage());
@@ -77,6 +82,8 @@ export default function EventCheckout({
     setName("");
     setPhone("");
     setEmail("");
+    setPromoInput("");
+    setAppliedPromo(null);
     setSubmitting(false);
   }, [open, event.id, initialShowtimeId]);
 
@@ -106,15 +113,44 @@ export default function EventCheckout({
   );
 
   const ticketAmount = moneySum(selectedLines.map((l) => l.unit * l.qty));
-  const convenienceFee = moneySum([(ticketAmount * conveniencePct) / 100]);
-  const grandTotal = moneySum([ticketAmount, convenienceFee]);
+  const discountAmount = !isOrganizer && appliedPromo ? appliedPromo.discount_amount : 0;
+  const netTicketAmount = moneySum([Math.max(0, ticketAmount - discountAmount)]);
+  const convenienceFee = moneySum([(netTicketAmount * conveniencePct) / 100]);
+  const grandTotal = moneySum([netTicketAmount, convenienceFee]);
   const ticketQty = selectedLines.reduce((sum, l) => sum + l.qty, 0);
 
   const setQty = (id: string, next: number, max: number) => {
+    setAppliedPromo(null);
+    setPromoInput("");
     setQtyByType((prev) => ({
       ...prev,
       [id]: Math.max(0, Math.min(max, next)),
     }));
+  };
+
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) {
+      toast.error("Enter a promo code.");
+      return;
+    }
+    try {
+      const result = await validatePromo({
+        eventId: event.id,
+        promo_code: code,
+        ticket_amount: ticketAmount,
+      }).unwrap();
+      setAppliedPromo(result);
+      toast.success(`Promo code "${result.promo_code}" applied!`);
+    } catch (err) {
+      setAppliedPromo(null);
+      toast.error(extractApiError(err, "Invalid or expired promo code."));
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput("");
   };
 
   const handleConfirm = async (e: React.FormEvent) => {
@@ -168,6 +204,7 @@ export default function EventCheckout({
           guest_email,
           customer_id: customerId || undefined,
           booking_source: "ONLINE",
+          promo_code: appliedPromo?.promo_code,
         }).unwrap();
       }
 
@@ -347,6 +384,56 @@ export default function EventCheckout({
                   <span>Tickets</span>
                   <span className="font-semibold text-slate-800">{formatInr(ticketAmount)}</span>
                 </div>
+                {!isOrganizer && (
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Tag size={12} /> Promo code
+                    </p>
+                    {appliedPromo ? (
+                      <div className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-emerald-800 truncate">
+                            {appliedPromo.promo_code} · {appliedPromo.title}
+                          </p>
+                          <p className="text-[11px] text-emerald-700">
+                            You save {formatInr(appliedPromo.discount_amount)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemovePromo}
+                          className="text-xs font-semibold text-emerald-800 hover:underline shrink-0"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                          placeholder="Enter promo code"
+                          className={`flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none ${accentFocus} text-slate-800 font-semibold uppercase`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyPromo}
+                          disabled={validatingPromo || !promoInput.trim()}
+                          className="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 shrink-0"
+                        >
+                          {validatingPromo ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-700">
+                    <span>Promo discount</span>
+                    <span className="font-semibold">−{formatInr(discountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm text-slate-600">
                   <span>Convenience fee{conveniencePct ? ` (${conveniencePct}%)` : ""}</span>
                   <span className="font-semibold text-slate-800">{formatInr(convenienceFee)}</span>

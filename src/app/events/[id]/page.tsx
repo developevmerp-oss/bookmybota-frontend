@@ -79,7 +79,7 @@ export default function PublicEventDetailPage({
   const isLive = event.status === "LIVE";
   const hasShowtimes = showtimes.length > 0;
   const hasTickets = ticketTypes.some((t) => Number(t.available_count) > 0);
-  const canBook = isLive && hasShowtimes && hasTickets;
+  const canBook = true; // TEMP: Forcing to true for testing // isLive && hasShowtimes && hasTickets;
 
   const openCheckout = (showtimeId?: string) => {
     setSelectedShowtimeId(showtimeId || "");
@@ -235,7 +235,7 @@ export default function PublicEventDetailPage({
                               Directions <ExternalLink size={12} />
                             </a>
                           )}
-                          {canBook && !isPast && (
+                          {canBook && (
                             <button
                               type="button"
                               onClick={() => openCheckout(s.id)}
@@ -374,13 +374,7 @@ export default function PublicEventDetailPage({
                   : "bg-slate-200 text-slate-500 cursor-not-allowed"
               }`}
             >
-              {!isLive
-                ? "Tickets not on sale yet"
-                : !hasShowtimes
-                  ? "Showtimes coming soon"
-                  : !hasTickets
-                    ? "Sold out"
-                    : "Book tickets"}
+              Book tickets (Test Mode)
             </button>
           </div>
         </div>

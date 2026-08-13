@@ -673,7 +673,7 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -864,10 +864,10 @@ export const api = createApi({
       providesTags: (result) =>
         result
           ? [
-              ...result.map((d) => ({ type: 'PartnerDocuments' as const, id: d.id })),
-              { type: 'PartnerDocuments', id: 'LIST' },
-              'PartnerDocuments',
-            ]
+            ...result.map((d) => ({ type: 'PartnerDocuments' as const, id: d.id })),
+            { type: 'PartnerDocuments', id: 'LIST' },
+            'PartnerDocuments',
+          ]
           : [{ type: 'PartnerDocuments', id: 'LIST' }, 'PartnerDocuments'],
     }),
 
@@ -1598,6 +1598,20 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id }],
     }),
 
+    getEventLayout: builder.query<any, string>({
+      query: (id) => `/events/organizer/${id}/layout`,
+      providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id }],
+    }),
+
+    updateEventLayout: builder.mutation<any, { eventId: string; seating_config: any; seats: any[] }>({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/organizer/${eventId}/layout`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { eventId }) => [{ type: 'EventLayouts', id: eventId }],
+    }),
+
     getOrganizerTicketStats: builder.query<
       OrganizerTicketStatsResponse,
       { event_id?: string } | void
@@ -1686,6 +1700,11 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'PublicEvents', id }],
     }),
 
+    getPublicEventLayout: builder.query<any, string>({
+      query: (id) => `/events/public/${id}/layout`,
+      providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id: `public-${id}` }],
+    }),
+
     createEventBooking: builder.mutation<
       { message?: string; booking_id?: string; qr_code?: string; grand_total?: number; ticket_qty?: number },
       {
@@ -1754,9 +1773,9 @@ export const api = createApi({
       providesTags: (result) =>
         result
           ? [
-              ...result.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
-              { type: 'EventMasters', id: 'GENRE_LIST' },
-            ]
+            ...result.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
+            { type: 'EventMasters', id: 'GENRE_LIST' },
+          ]
           : [{ type: 'EventMasters', id: 'GENRE_LIST' }],
     }),
 
@@ -1809,9 +1828,9 @@ export const api = createApi({
       providesTags: (result) =>
         result
           ? [
-              ...result.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
-              { type: 'EventMasters', id: 'DOC_LIST' },
-            ]
+            ...result.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
+            { type: 'EventMasters', id: 'DOC_LIST' },
+          ]
           : [{ type: 'EventMasters', id: 'DOC_LIST' }],
     }),
 
@@ -1952,6 +1971,8 @@ export const {
   useGetOrganizerPayoutsQuery,
   useGetOrganizerEventsQuery,
   useGetOrganizerEventQuery,
+  useGetEventLayoutQuery,
+  useUpdateEventLayoutMutation,
   useGetOrganizerTicketStatsQuery,
   useGetOrganizerBookingsQuery,
   useCreateOrganizerEventMutation,
@@ -1961,6 +1982,7 @@ export const {
   useCloseOrganizerEventMutation,
   useGetPublicEventsQuery,
   useGetPublicEventQuery,
+  useGetPublicEventLayoutQuery,
   useCreateEventBookingMutation,
   useGetCustomerEventBookingsQuery,
   useGetEventBookingByIdQuery,

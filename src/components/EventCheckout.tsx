@@ -10,6 +10,8 @@ import {
   useGetCustomerProfileQuery,
   useValidateEventPromoCodeMutation,
   type AppliedPromoOffer,
+  useGetEventLayoutQuery,
+  useGetPublicEventLayoutQuery,
   type OrganizerEvent,
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -18,6 +20,12 @@ import { formatDateTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { getPhoneValidationError, sanitizePhoneInput } from "@/lib/validation";
+import dynamic from "next/dynamic";
+
+const VenueLayoutViewer = dynamic(
+  () => import("@/components/events/VenueLayoutViewer"),
+  { ssr: false }
+);
 
 export type EventCheckoutMode = "customer" | "organizer";
 
@@ -58,9 +66,16 @@ export default function EventCheckout({
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromoOffer | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
   const customerId = authUser?.role === "customer" ? authUser.customer_id || "" : "";
   const { data: profile } = useGetCustomerProfileQuery(customerId, { skip: !customerId || isOrganizer });
+  const { data: layoutData } = useGetEventLayoutQuery(event.id, { skip: !isOrganizer });
+  const { data: publicLayoutData } = useGetPublicEventLayoutQuery(event.id, { skip: isOrganizer });
+
+  const activeLayoutData = isOrganizer ? layoutData : publicLayoutData;
+
   const [createEventBooking] = useCreateEventBookingMutation();
   const [validatePromo, { isLoading: validatingPromo }] = useValidateEventPromoCodeMutation();
 
@@ -93,18 +108,46 @@ export default function EventCheckout({
   const selectedShowtime = showtimes.find((s) => s.id === showtimeId);
   const conveniencePct = Number(event.convenience_fee_percent) || 0;
 
-  const selectedLines = useMemo(
-    () =>
-      ticketTypes
-        .map((t) => ({
-          ...t,
-          qty: qtyByType[t.id] || 0,
-          unit: Number(t.price) || 0,
-          available: Number(t.available_count) || 0,
-        }))
-        .filter((t) => t.qty > 0),
-    [ticketTypes, qtyByType]
-  );
+  const selectedLines = useMemo(() => {
+    const lines = [];
+
+    // First add seats
+    if (selectedSeats.length > 0) {
+      const seatGrouped: Record<string, number> = {};
+      selectedSeats.forEach(s => {
+        seatGrouped[s.ticket_type_id] = (seatGrouped[s.ticket_type_id] || 0) + 1;
+      });
+
+      for (const [ttId, qty] of Object.entries(seatGrouped)) {
+        const t = ticketTypes.find(type => type.id === ttId);
+        if (t) {
+          lines.push({
+            id: t.id,
+            ticket_type: t.ticket_type,
+            qty,
+            unit: Number(t.price) || 0,
+            available: Number(t.available_count) || 0,
+            event_seat_ids: selectedSeats.filter(s => s.ticket_type_id === ttId).map(s => s.id)
+          });
+        }
+      }
+    } else {
+      // General qty
+      ticketTypes.forEach(t => {
+        if (qtyByType[t.id] > 0) {
+          lines.push({
+            ...t,
+            id: t.id,
+            ticket_type: t.ticket_type,
+            qty: qtyByType[t.id],
+            unit: Number(t.price) || 0,
+            available: Number(t.available_count) || 0,
+          });
+        }
+      });
+    }
+    return lines;
+  }, [ticketTypes, qtyByType, selectedSeats]);
 
   const ticketAmount = moneySum(selectedLines.map((l) => l.unit * l.qty));
   const discountAmount = !isOrganizer && appliedPromo ? appliedPromo.discount_amount : 0;
@@ -171,7 +214,17 @@ export default function EventCheckout({
 
     setSubmitting(true);
     try {
-      const items = selectedLines.map((l) => ({ ticket_type_id: l.id, qty: l.qty }));
+      const items: any[] = [];
+      if (selectedSeats.length > 0) {
+        selectedSeats.forEach(s => {
+          items.push({ ticket_type_id: s.ticket_type_id, qty: 1, event_seat_id: s.id });
+        });
+      } else {
+        selectedLines.forEach((l) => {
+          items.push({ ticket_type_id: l.id, qty: l.qty });
+        });
+      }
+
       const guest_name = name.trim();
       const guest_phone = sanitizePhoneInput(phone);
       const guest_email = email.trim() || undefined;
@@ -284,11 +337,10 @@ export default function EventCheckout({
                       key={s.id}
                       type="button"
                       onClick={() => setShowtimeId(s.id)}
-                      className={`w-full text-left rounded-2xl border p-4 transition-all ${
-                        active
+                      className={`w-full text-left rounded-2xl border p-4 transition-all ${active
                           ? `${accentBorder} shadow-sm`
                           : `border-slate-200 bg-white ${accentHover}`
-                      }`}
+                        }`}
                     >
                       <p className="font-bold text-slate-800">{s.venue_name || "Venue TBA"}</p>
                       {s.venue_address && (
@@ -308,7 +360,57 @@ export default function EventCheckout({
 
           {step === 2 && (
             <div className="space-y-3">
-              {ticketTypes.length === 0 ? (
+              {activeLayoutData?.data?.seats?.length > 0 ? (
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-4">
+                  <p className="text-sm font-semibold text-slate-700">This event uses reserved seating.</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsMapFullscreen(true)}
+                    className={`w-full py-3 ${accentBtn} text-white text-sm font-bold rounded-xl`}
+                  >
+                    Open Seating Map
+                  </button>
+                  {selectedSeats.length > 0 && (
+                    <p className={`text-sm font-bold ${accentIcon}`}>{selectedSeats.length} seats selected</p>
+                  )}
+                  {isMapFullscreen && (
+                    <div className="fixed inset-0 z-[100] bg-white flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                      <div className="flex items-center justify-between p-4 border-b border-slate-200 shrink-0">
+                        <div className="text-left">
+                          <h3 className="font-bold text-lg text-slate-900">Select your seats</h3>
+                          <p className="text-sm text-slate-500">Pick up to 10 seats</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsMapFullscreen(false)}
+                          className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-hidden bg-slate-50 relative flex flex-col p-2 sm:p-4">
+                        <VenueLayoutViewer
+                          layoutData={activeLayoutData}
+                          ticketTypes={ticketTypes}
+                          onSeatsSelected={setSelectedSeats}
+                          maxSelectable={10}
+                          initialSelectedSeats={selectedSeats}
+                        />
+                      </div>
+                      <div className="p-5 border-t border-slate-200 bg-white flex justify-between items-center">
+                        <p className="font-bold text-slate-800">{selectedSeats.length} seats selected</p>
+                        <button
+                          type="button"
+                          onClick={() => setIsMapFullscreen(false)}
+                          className={`px-6 py-2.5 ${accentBtn} text-white font-bold text-sm rounded-xl`}
+                        >
+                          Confirm Selection
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : ticketTypes.length === 0 ? (
                 <p className="text-sm text-slate-500">No ticket types yet.</p>
               ) : (
                 ticketTypes.map((t) => {

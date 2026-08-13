@@ -80,6 +80,7 @@ export default function PhoneInput({
           }
         >
           {label}
+          {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       )}
       <input

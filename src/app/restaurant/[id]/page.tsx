@@ -408,7 +408,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         name: regName,
         email: regEmail,
         phone: regPhone,
-        password: 'OtpDefaultPassword123'
+        auto_generate_password: true,
       }).unwrap();
       dispatch(setCredentials({ user: data.user, token: data.token }));
       // Notify the header to update immediately (no page refresh needed)

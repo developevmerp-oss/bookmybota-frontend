@@ -37,7 +37,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const businessName = settings?.name || "Venue Admin";
 
-  const isPublicLanding = pathname === "/business";
+  const isPublicLanding = pathname === "/business" || pathname === "/business/register";
   const isBusinessAdmin = user?.role === "business_admin";
 
   useEffect(() => {

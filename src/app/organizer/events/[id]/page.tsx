@@ -110,6 +110,12 @@ export default function EditOrganizerEventPage({
             <Ticket size={16} /> Buy tickets for customer
           </button>
         )}
+        <Link
+          href={`/organizer/events/${event.id}/layout`}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          Seating Layout
+        </Link>
       </div>
 
       <OrganizerTicketPurchase

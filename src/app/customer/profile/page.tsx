@@ -11,7 +11,7 @@ import {
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, updateUser } from "@/features/auth/authSlice";
-import PhoneInput from "@/components/PhoneInput";
+import PhoneInput from "@/components/Shared/PhoneInput";
 import { isValidPhone } from "@/lib/validation";
 
 export default function CustomerProfilePage() {

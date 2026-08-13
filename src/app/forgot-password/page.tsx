@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
-import AuthGate from "@/components/AuthGate";
+import AuthGate from "@/components/Shared/AuthGate";
 import { useForgotPasswordMutation } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 

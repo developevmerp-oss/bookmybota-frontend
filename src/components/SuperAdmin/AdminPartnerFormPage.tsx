@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import PartnerOnboardForm from "@/components/PartnerOnboardForm";
+import PartnerOnboardForm from "@/components/DiningAdminPanel/PartnerOnboardForm";
 import { useGetBusinessesQuery } from "@/services/api";
 
 interface AdminPartnerFormPageProps {

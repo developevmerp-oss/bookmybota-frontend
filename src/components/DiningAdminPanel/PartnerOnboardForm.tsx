@@ -8,12 +8,12 @@ import { toast } from "sonner";
 import PartnerTypeFields, {
   resolvePartnerFromParentId,
   type PartnerModule,
-} from "@/components/PartnerTypeFields";
+} from "@/components/DiningAdminPanel/PartnerTypeFields";
 import PartnerDocumentsFields, {
   validateRequiredPartnerDocuments,
-} from "@/components/PartnerDocumentsFields";
-import PhoneInput from "@/components/PhoneInput";
-import PasswordInput from "@/components/PasswordInput";
+} from "@/components/DiningAdminPanel/PartnerDocumentsFields";
+import PhoneInput from "@/components/Shared/PhoneInput";
+import PasswordInput from "@/components/Shared/PasswordInput";
 import { isValidPhone, isValidPassword } from "@/lib/validation";
 import { extractApiError } from "@/lib/apiErrors";
 import {

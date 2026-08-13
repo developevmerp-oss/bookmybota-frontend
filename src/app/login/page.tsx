@@ -12,8 +12,8 @@ import { useAppDispatch } from '@/lib/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
 import { homePathForRole } from '@/lib/authStorage';
 import { extractApiError, extractApiSuccessMessage } from '@/lib/apiErrors';
-import AuthGate from '@/components/AuthGate';
-import PasswordInput from '@/components/PasswordInput';
+import AuthGate from '@/components/Shared/AuthGate';
+import PasswordInput from '@/components/Shared/PasswordInput';
 import { sanitizePhoneInput } from '@/lib/validation';import {
   phoneLoginSchema,
   otpVerifySchema,

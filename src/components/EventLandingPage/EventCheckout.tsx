@@ -23,7 +23,7 @@ import { getPhoneValidationError, sanitizePhoneInput } from "@/lib/validation";
 import dynamic from "next/dynamic";
 
 const VenueLayoutViewer = dynamic(
-  () => import("@/components/events/VenueLayoutViewer"),
+  () => import("@/components/EventLandingPage/VenueLayoutViewer"),
   { ssr: false }
 );
 

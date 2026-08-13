@@ -31,6 +31,7 @@ type Shape = {
   height: number;
   fill: string;
   text?: string;
+  ticket_type_id?: string;
 };
 
 export default function VenueLayoutViewer({
@@ -116,7 +117,6 @@ export default function VenueLayoutViewer({
     const dummyId = `zone-${shape.id}-${Date.now()}`;
     const dummySeat: Seat = {
       id: dummyId,
-      internalId: dummyId,
       ticket_type_id: shape.ticket_type_id,
       section_name: shape.text || "General Admission",
       row_label: "GA",

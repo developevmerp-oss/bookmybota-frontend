@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { UtensilsCrossed } from "lucide-react";
-import PartnerOnboardForm from "@/components/PartnerOnboardForm";
+import PartnerOnboardForm from "@/components/DiningAdminPanel/PartnerOnboardForm";
 
 export default function BusinessRegisterPage() {
   return (

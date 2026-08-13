@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { X, Ticket } from "lucide-react";
-import EventCheckout from "@/components/EventCheckout";
+import EventCheckout from "@/components/EventLandingPage/EventCheckout";
 import {
   useGetOrganizerEventQuery,
   useGetOrganizerEventsQuery,

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import ContractRichTextEditor from "@/components/ContractRichTextEditor";
-import EventContractDocument from "@/components/EventContractDocument";
+import ContractRichTextEditor from "@/components/SuperAdmin/ContractRichTextEditor";
+import EventContractDocument from "@/components/EventAdminPanel/EventContractDocument";
 import {
   useCreateEventContractMutation,
   useGetContractPrefillQuery,

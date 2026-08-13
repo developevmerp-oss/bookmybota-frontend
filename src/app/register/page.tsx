@@ -6,9 +6,9 @@ import { useRegisterCustomerMutation } from '@/services/api';
 import { useAppDispatch } from '@/lib/hooks';
 import { setCredentials } from '@/features/auth/authSlice';
 import { toast } from 'sonner';
-import AuthGate from '@/components/AuthGate';
-import PhoneInput from '@/components/PhoneInput';
-import PasswordInput from '@/components/PasswordInput';
+import AuthGate from '@/components/Shared/AuthGate';
+import PhoneInput from '@/components/Shared/PhoneInput';
+import PasswordInput from '@/components/Shared/PasswordInput';
 import { isValidPhone, isValidPassword } from '@/lib/validation';
 
 function RegisterForm() {

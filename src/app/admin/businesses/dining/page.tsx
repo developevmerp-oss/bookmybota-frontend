@@ -1,4 +1,4 @@
-import ModuleBusinessesPage from "@/components/ModuleBusinessesPage";
+import ModuleBusinessesPage from "@/components/SuperAdmin/ModuleBusinessesPage";
 
 export default function AdminDiningBusinessesPage() {
   return <ModuleBusinessesPage module="dining" />;

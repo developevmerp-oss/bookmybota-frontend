@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import AuthGate from "@/components/AuthGate";
+import AuthGate from "@/components/Shared/AuthGate";
 
 /** Booking confirmation stays reachable without login (post-checkout). */
 const PUBLIC_CUSTOMER_PREFIXES = [

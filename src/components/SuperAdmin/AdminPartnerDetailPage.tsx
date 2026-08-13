@@ -11,7 +11,7 @@ import {
   Phone,
   XCircle,
 } from "lucide-react";
-import PartnerDocumentsFields from "@/components/PartnerDocumentsFields";
+import PartnerDocumentsFields from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import { useGetBusinessesQuery, type PartnerDocumentUpload } from "@/services/api";
 
 interface AdminPartnerDetailPageProps {

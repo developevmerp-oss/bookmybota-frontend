@@ -1,6 +1,6 @@
 "use client";
 
-import ChangePasswordForm from "@/components/ChangePasswordForm";
+import ChangePasswordForm from "@/components/Shared/ChangePasswordForm";
 
 export default function BusinessChangePasswordPage() {
   return (

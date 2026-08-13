@@ -137,7 +137,13 @@ export default function OrganizerDashboardPage() {
             <li>Approved events appear on the public <Link href="/events" className="text-violet-400 hover:text-violet-300">Events page</Link> for customers.</li>
           </ol>
           {user?.email && (
-            <p className="text-zinc-500 mt-2">Signed in as {user.email}</p>
+            <p className="text-zinc-500 mt-2">
+              Signed in as {user.email}. Manage your details from{" "}
+              <Link href="/organizer/profile" className="text-violet-400 hover:text-violet-300">
+                Profile
+              </Link>
+              .
+            </p>
           )}
         </div>
       </div>

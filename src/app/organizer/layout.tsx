@@ -14,10 +14,10 @@ import {
   Menu,
   X,
   CalendarCheck,
-  KeyRound,
   Star,
   Tag,
   Wallet,
+  User,
 } from "lucide-react";
 
 function OrganizerShell({ children }: { children: React.ReactNode }) {
@@ -38,7 +38,6 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
     { name: "Offers", href: "/organizer/offers", icon: Tag },
     { name: "Reviews", href: "/organizer/reviews", icon: Star },
     { name: "Ledger", href: "/organizer/ledger", icon: Wallet },
-    { name: "Change Password", href: "/organizer/change-password", icon: KeyRound },
   ];
 
   const isNavActive = (href: string) => {
@@ -54,18 +53,22 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex bg-background admin-dashboard-layout">
       <aside className="w-64 glass-panel border-r border-white/5 fixed h-full z-40 hidden md:flex flex-col">
-        <div className="p-6 border-b border-white/5">
+        <Link
+          href="/organizer/profile"
+          className="p-6 border-b border-white/5 block hover:bg-white/[0.03] transition-colors"
+          title="Open profile"
+        >
           <h2
             className="text-xl font-bold text-white flex items-center gap-2 min-w-0"
             title={organizerName}
           >
             <span className="bg-violet-600 p-1.5 rounded-lg text-white shrink-0">
-              <CalendarDays size={20} />
+              <User size={20} />
             </span>
             <span className="truncate text-lg font-bold">{organizerName}</span>
           </h2>
-          <p className="text-xs text-zinc-500 mt-2">Event Organizer</p>
-        </div>
+          <p className="text-xs text-zinc-500 mt-2">Profile · Event Organizer</p>
+        </Link>
         <nav className="flex-1 p-4 space-y-2">
           {navigation.map((item) => {
             const isActive = isNavActive(item.href);
@@ -96,12 +99,16 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
           />
           <div className="relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-6">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2 truncate">
+              <Link
+                href="/organizer/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-lg font-bold text-white flex items-center gap-2 truncate min-w-0"
+              >
                 <span className="bg-violet-600 p-1.5 rounded-lg text-white shrink-0">
-                  <CalendarDays size={18} />
+                  <User size={18} />
                 </span>
                 <span className="truncate">{organizerName}</span>
-              </h2>
+              </Link>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5"
@@ -143,14 +150,33 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
             >
               <Menu size={24} />
             </button>
+            <Link
+              href="/organizer/profile"
+              className={`flex items-center gap-2 max-w-[220px] px-2.5 py-1.5 rounded-xl border transition-colors shrink-0 ${
+                pathname.startsWith("/organizer/profile") ||
+                pathname.startsWith("/organizer/change-password")
+                  ? "bg-violet-500/10 text-violet-300 border-violet-500/20"
+                  : "text-zinc-300 border-white/10 hover:bg-white/5 hover:text-white"
+              }`}
+              title="Profile & password"
+            >
+              <span className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center text-sm font-bold shrink-0">
+                {(organizerName || user?.email || "O").charAt(0).toUpperCase()}
+              </span>
+              <span className="min-w-0 text-left hidden sm:block">
+                <span className="block text-sm font-medium truncate">{organizerName}</span>
+                <span className="block text-[11px] text-zinc-500 truncate">{user?.email}</span>
+              </span>
+            </Link>
             <h1 className="text-lg sm:text-xl font-semibold text-white truncate">
-              {navigation.find((n) => isNavActive(n.href))?.name || "Organizer Panel"}
+              {pathname.startsWith("/organizer/profile")
+                ? "Profile"
+                : pathname.startsWith("/organizer/change-password")
+                  ? "Profile"
+                  : navigation.find((n) => isNavActive(n.href))?.name || "Organizer Panel"}
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-xs text-zinc-500 truncate max-w-[180px]">
-              {user?.email}
-            </span>
+          <div className="flex items-center gap-3">
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-all cursor-pointer"

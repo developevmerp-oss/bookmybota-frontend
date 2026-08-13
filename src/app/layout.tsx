@@ -258,7 +258,10 @@ export default function RootLayout({
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/business') ||
     pathname?.startsWith('/organizer');
-  const isHomePage = pathname === '/';
+  const isLandingPage = pathname === '/';
+  const isDiningPage = pathname === '/dining';
+  // Keep alias so layout HMR never hits a stale isHomePage reference
+  const isHomePage = isLandingPage;
   const isAuthPage = pathname === '/login' || pathname === '/register';
 
   const [user, setUser] = useState<any>(null);
@@ -271,7 +274,7 @@ export default function RootLayout({
   const [locationError, setLocationError] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
 
-  const showNavSearch = !isAuthPage && (!isHomePage || scrolled);
+  const showNavSearch = !isAuthPage && (!isDiningPage || scrolled);
 
   const detectCurrentLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -354,7 +357,7 @@ export default function RootLayout({
   }, []);
 
   useEffect(() => {
-    if (!isHomePage) {
+    if (!isDiningPage) {
       setScrolled(false);
       return;
     }
@@ -369,7 +372,7 @@ export default function RootLayout({
     handleScroll();
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isHomePage]);
+  }, [isDiningPage]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -445,9 +448,9 @@ export default function RootLayout({
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={inter.className}>
         <StoreProvider>
-            {!isAdminOrBusiness && (
+            {!isAdminOrBusiness && !isLandingPage && (
               <nav className={`fixed top-0 w-full z-50 border-b transition-all duration-300 ${
-                isHomePage && !scrolled
+                isDiningPage && !scrolled
                   ? 'bg-black/40 backdrop-blur-md border-white/10'
                   : 'bg-white border-slate-200 shadow-sm'
               }`}>
@@ -460,7 +463,7 @@ export default function RootLayout({
                         <UtensilsCrossed size={24} className="text-white" />
                       </div>
                       <span className={`text-xl font-bold tracking-tight transition-all ${
-                        (isHomePage && !scrolled) ? 'text-white' : 'text-foreground'
+                        (isDiningPage && !scrolled) ? 'text-white' : 'text-foreground'
                       }`}>
                         Book My Bota
                       </span>
@@ -553,7 +556,7 @@ export default function RootLayout({
                       <Link
                         href="/events"
                         className={`hidden sm:flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                          isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                          isDiningPage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
                         }`}
                       >
                         <CalendarDays size={16} />
@@ -564,13 +567,13 @@ export default function RootLayout({
                           {user.role === 'customer' && (
                             <>
                               <Link href="/customer/dashboard" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                                isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                                isDiningPage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
                               }`} title="My Bookings">
                                 <Calendar size={18} className="sm:hidden" />
                                 <span className="hidden sm:inline">My Bookings</span>
                               </Link>
                               <Link href="/customer/settings" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                                isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                                isDiningPage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
                               }`} title="Settings">
                                 <User size={18} className="sm:hidden" />
                                 <span className="hidden sm:inline">Account</span>
@@ -579,21 +582,21 @@ export default function RootLayout({
                           )}
                           {user.role === 'business_admin' && (
                             <Link href="/business" className={`text-sm font-medium transition-colors ${
-                              isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                              isDiningPage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
                             }`}>
                               Dashboard
                             </Link>
                           )}
                           {user.role === 'event_admin' && (
                             <Link href="/organizer" className={`text-sm font-medium transition-colors ${
-                              isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                              isDiningPage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
                             }`}>
                               Organizer Portal
                             </Link>
                           )}
                           {user.role === 'super_admin' && (
                             <Link href="/admin" className={`text-sm font-medium transition-colors ${
-                              isHomePage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                              isDiningPage && !scrolled ? 'text-white/80 hover:text-white' : 'text-muted-foreground hover:text-foreground'
                             }`}>
                               Admin Panel
                             </Link>
@@ -608,7 +611,7 @@ export default function RootLayout({
                            <Link
                              href="/business"
                              className={`px-2.5 py-1.5 text-[11px] sm:px-3.5 sm:py-2 sm:text-xs font-bold rounded-xl transition-all border whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
-                               isHomePage && !scrolled
+                               isDiningPage && !scrolled
                                  ? "bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/40"
                                  : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
                              }`}
@@ -726,9 +729,9 @@ export default function RootLayout({
                 </div>
               </nav>
             )}
-          <main className={!isAdminOrBusiness ? "pt-20" : ""}>
+          <main className={!isAdminOrBusiness && !isLandingPage ? "pt-20" : ""}>
             {children}
-            {!isAdminOrBusiness && <Footer />}
+            {!isAdminOrBusiness && !isLandingPage && <Footer />}
           </main>
           <Toaster position="top-center" richColors />
         </StoreProvider>

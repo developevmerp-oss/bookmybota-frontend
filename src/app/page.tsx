@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "@/components/LandingPage/Navbar";
 import HeroSection from "@/components/LandingPage/HeroSection";
-import EventDiningCardsSection from "@/components/LandingPage/EventDiningCardsSection";
 import PopularEventDiningSection from "@/components/LandingPage/PopularEventDiningSection";
 import ExploreByLocationSection from "@/components/LandingPage/ExploreByLocationSection";
 import SpecialOffersSection from "@/components/LandingPage/SpecialOffersSection";
@@ -28,7 +27,6 @@ export default function Home() {
     <div className="min-h-screen bg-[#f7f4ee]">
       <Navbar city={city} onCityChange={handleCityChange} />
       <HeroSection city={city} onCityChange={handleCityChange} />
-      <EventDiningCardsSection />
       <PopularEventDiningSection city={city} />
       <ExploreByLocationSection onCityChange={handleCityChange} />
       <SpecialOffersSection />

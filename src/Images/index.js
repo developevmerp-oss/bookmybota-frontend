@@ -1,5 +1,7 @@
-import hero from './LandingPage/hero.png';
+import hero from "./LandingPage/Hero.png";
+
 const images = {
-    hero,
-}
+  hero,
+};
+
 export default images;

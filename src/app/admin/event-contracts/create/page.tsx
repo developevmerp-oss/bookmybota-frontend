@@ -1,5 +1,5 @@
-import CreateEventContractPage from "./CreateEventContractPage";
+"use client";
 
-export default function Page() {
-  return <CreateEventContractPage />;
-}
+import CreateEventContractPage from "@/components/SuperAdmin/CreateEventContractPage";
+
+export default CreateEventContractPage;

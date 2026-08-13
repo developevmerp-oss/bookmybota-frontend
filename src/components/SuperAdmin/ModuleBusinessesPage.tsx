@@ -11,7 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { type PartnerModule } from "@/components/PartnerTypeFields";
+import { type PartnerModule } from "@/components/DiningAdminPanel/PartnerTypeFields";
 import {
   useGetBusinessesQuery,
   useSetBusinessEnabledMutation,

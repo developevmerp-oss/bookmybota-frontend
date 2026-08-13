@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import ChangePasswordForm from "@/components/ChangePasswordForm";
+import ChangePasswordForm from "@/components/Shared/ChangePasswordForm";
 
 export default function CustomerChangePasswordPage() {
   return (

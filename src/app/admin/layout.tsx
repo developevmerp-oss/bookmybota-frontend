@@ -21,7 +21,7 @@ import {
   KeyRound,
   Wallet,
 } from "lucide-react";
-import AuthGate from "@/components/AuthGate";
+import AuthGate from "@/components/Shared/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

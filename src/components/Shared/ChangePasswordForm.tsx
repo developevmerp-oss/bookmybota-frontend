@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
-import PasswordInput from "@/components/PasswordInput";
+import PasswordInput from "@/components/Shared/PasswordInput";
 import { useChangePasswordMutation } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { isValidPassword } from "@/lib/validation";

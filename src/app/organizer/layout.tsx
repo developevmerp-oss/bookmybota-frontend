@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAppSelector } from "@/lib/hooks";
 import { useGetBusinessSettingsQuery } from "@/services/api";
-import AuthGate from "@/components/AuthGate";
+import AuthGate from "@/components/Shared/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,

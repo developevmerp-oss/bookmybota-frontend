@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import EventForm from "@/components/EventForm";
+import EventForm from "@/components/EventAdminPanel/EventForm";
 import {
   useCreateOrganizerEventMutation,
   useSubmitOrganizerEventMutation,

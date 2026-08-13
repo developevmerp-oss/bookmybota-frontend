@@ -7,7 +7,7 @@ import Link from "next/link";
 
 // Konva relies on window, so we must load it client-side only
 const VenueLayoutBuilder = dynamic(
-  () => import("@/components/events/VenueLayoutBuilder"),
+  () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
   { ssr: false }
 );
 

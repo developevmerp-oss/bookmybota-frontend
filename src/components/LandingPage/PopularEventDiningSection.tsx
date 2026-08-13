@@ -74,9 +74,9 @@ function EventCard({ event }: { event: PublicEvent }) {
   return (
     <Link
       href={`/events/${event.id}`}
-      className="snap-start shrink-0 w-[260px] bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+      className="snap-start shrink-0 w-[330px] bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
     >
-      <div className="relative h-40">
+      <div className="relative h-70">
         <img src={image} alt={event.name} className="w-full h-full object-cover" />
         <div className="absolute top-3 left-3 w-12 h-12 rounded-lg bg-[#1B5E3B] text-white flex flex-col items-center justify-center leading-none">
           <span className="text-[9px] font-bold tracking-wider">{month}</span>
@@ -114,9 +114,9 @@ function DiningCard({ place }: { place: Business }) {
   return (
     <Link
       href={`/restaurant/${place.id}`}
-      className="snap-start shrink-0 w-[260px] bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+      className="snap-start shrink-0 w-[330px] bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
     >
-      <div className="h-40">
+      <div className="h-70">
         <img src={image} alt={place.name} className="w-full h-full object-cover" />
       </div>
       <div className="p-4 space-y-1.5">
@@ -168,7 +168,7 @@ export default function PopularEventDiningSection({ city }: PopularEventDiningSe
 
   return (
     <section className="bg-[#f7f4ee] py-12 sm:py-16 space-y-14">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-end justify-between mb-6">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Upcoming Events</h2>
           <Link
@@ -191,7 +191,7 @@ export default function PopularEventDiningSection({ city }: PopularEventDiningSe
         )}
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-end justify-between mb-6">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
             Popular Dining Places

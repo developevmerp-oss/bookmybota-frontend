@@ -37,6 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Events', href: '/admin/events', icon: CalendarDays },
     { name: 'Event Contracts', href: '/admin/event-contracts', icon: FileSignature },
     { name: 'Event Masters', href: '/admin/event-masters', icon: ListChecks },
+    { name: 'Partner Documents', href: '/admin/partner-documents', icon: FileText },
     { name: 'Fees & Commission', href: '/admin/commission', icon: Percent },
     { name: 'Organizer Payouts', href: '/admin/organizer-payouts', icon: Wallet },
     { name: 'Subscription & Billing', href: '/admin/billing', icon: CreditCard },

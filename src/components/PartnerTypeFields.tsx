@@ -132,7 +132,9 @@ export default function PartnerTypeFields({
       }
     >
       <div>
-        <label className={labelClass[variant]}>{parentLabel}</label>
+        <label className={labelClass[variant]}>
+          {parentLabel} <span className="text-rose-500">*</span>
+        </label>
         <select
           value={parentTypeId}
           onChange={(e) => {
@@ -162,7 +164,9 @@ export default function PartnerTypeFields({
       </div>
 
       <div>
-        <label className={labelClass[variant]}>Venue Type</label>
+        <label className={labelClass[variant]}>
+          Venue Type{!isEventSelected ? <span className="text-rose-500"> *</span> : null}
+        </label>
         <select
           value={venueTypeId}
           onChange={(e) => onVenueTypeIdChange(e.target.value)}

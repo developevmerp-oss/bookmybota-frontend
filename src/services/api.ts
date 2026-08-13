@@ -42,6 +42,26 @@ export interface Business {
   average_cost?: number;
   is_promoted?: boolean;
   collection_slugs?: string[];
+  documents?: PartnerDocumentUpload[];
+}
+
+export interface PartnerDocumentUpload {
+  document_type_id: number;
+  url: string;
+  document_name?: string;
+  uploaded_at?: string;
+}
+
+export interface PartnerDocumentMaster {
+  id: number;
+  name: string;
+  slug: string;
+  module: 'dining' | 'event' | 'both';
+  description?: string | null;
+  is_required: boolean;
+  accept?: string;
+  is_active?: boolean;
+  sort_order?: number;
 }
 
 export interface BusinessSettings {
@@ -653,12 +673,15 @@ export const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
 
-    login: builder.mutation<{ token: string; user: AuthUser }, { email: string; password: string }>({
+    login: builder.mutation<
+      { token: string; user: AuthUser; message?: string },
+      { email: string; password: string }
+    >({
       query: (credentials) => ({
         url: '/auth/login',
         method: 'POST',
@@ -700,8 +723,14 @@ export const api = createApi({
     }),
 
     registerCustomer: builder.mutation<
-      { token: string; user: AuthUser },
-      { name: string; email: string; phone: string; password: string }
+      { token: string; user: AuthUser; message?: string },
+      {
+        name: string;
+        email: string;
+        phone: string;
+        password?: string;
+        auto_generate_password?: boolean;
+      }
     >({
       query: (body) => ({
         url: '/auth/register-customer',
@@ -719,8 +748,9 @@ export const api = createApi({
         description: string;
         type_id?: number;
         admin_email: string;
-        admin_password: string;
+        admin_password?: string;
         partner_type?: 'dining' | 'event';
+        documents?: PartnerDocumentUpload[];
       }
     >({
       query: (body) => ({
@@ -742,6 +772,7 @@ export const api = createApi({
         type_id?: number;
         admin_email?: string;
         admin_password?: string;
+        documents?: PartnerDocumentUpload[];
       }
     >({
       query: ({ id, ...body }) => ({
@@ -807,6 +838,79 @@ export const api = createApi({
     getBusinessTypes: builder.query<BusinessType[], void>({
       query: () => '/businesses/types',
       transformResponse: (res: { data: BusinessType[] }) => res.data || [],
+    }),
+
+    getPartnerDocumentMasters: builder.query<
+      PartnerDocumentMaster[],
+      'dining' | 'event' | void
+    >({
+      query: (module) => {
+        const qs = module ? `?module=${module}` : '';
+        return `/businesses/partner-documents${qs}`;
+      },
+      transformResponse: (res: { data?: PartnerDocumentMaster[] }) => res?.data ?? [],
+      providesTags: ['PartnerDocuments'],
+    }),
+
+    getAdminPartnerDocuments: builder.query<
+      PartnerDocumentMaster[],
+      { module?: 'dining' | 'event' | 'both' } | void
+    >({
+      query: (params) => {
+        const qs = params?.module ? `?module=${params.module}` : '';
+        return `/admin/partner-documents${qs}`;
+      },
+      transformResponse: (res: { data?: PartnerDocumentMaster[] }) => res?.data ?? [],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((d) => ({ type: 'PartnerDocuments' as const, id: d.id })),
+              { type: 'PartnerDocuments', id: 'LIST' },
+              'PartnerDocuments',
+            ]
+          : [{ type: 'PartnerDocuments', id: 'LIST' }, 'PartnerDocuments'],
+    }),
+
+    createAdminPartnerDocument: builder.mutation<
+      PartnerDocumentMaster,
+      {
+        name: string;
+        description?: string;
+        module?: 'dining' | 'event' | 'both';
+        is_required?: boolean;
+        is_active?: boolean;
+        sort_order?: number;
+      }
+    >({
+      query: (body) => ({
+        url: '/admin/partner-documents',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: PartnerDocumentMaster }) =>
+        res?.data ?? ({} as PartnerDocumentMaster),
+      invalidatesTags: [{ type: 'PartnerDocuments', id: 'LIST' }, 'PartnerDocuments'],
+    }),
+
+    updateAdminPartnerDocument: builder.mutation<
+      PartnerDocumentMaster,
+      { id: number; body: Partial<PartnerDocumentMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/partner-documents/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: PartnerDocumentMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'PartnerDocuments', id },
+        { type: 'PartnerDocuments', id: 'LIST' },
+        'PartnerDocuments',
+      ],
+    }),
+
+    deleteAdminPartnerDocument: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/partner-documents/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'PartnerDocuments', id: 'LIST' }, 'PartnerDocuments'],
     }),
 
     getBusinessPublic: builder.query<Business, string>({
@@ -918,7 +1022,7 @@ export const api = createApi({
     }),
 
     phoneLogin: builder.mutation<
-      { token: string; user: AuthUser },
+      { token: string; user: AuthUser; message?: string },
       { phone: string; otp: string }
     >({
       query: (body) => ({
@@ -1780,6 +1884,11 @@ export const {
   useGetCollectionsQuery,
   useGetMoodsQuery,
   useGetBusinessTypesQuery,
+  useGetPartnerDocumentMastersQuery,
+  useGetAdminPartnerDocumentsQuery,
+  useCreateAdminPartnerDocumentMutation,
+  useUpdateAdminPartnerDocumentMutation,
+  useDeleteAdminPartnerDocumentMutation,
   useGetBusinessPublicQuery,
   useGetBusinessSettingsQuery,
   useUpdateBusinessSettingsMutation,

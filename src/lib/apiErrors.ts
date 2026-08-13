@@ -33,3 +33,12 @@ export function extractApiError(error: unknown, fallback = 'Something went wrong
 
   return fallback;
 }
+
+/** Extract success message from API response body */
+export function extractApiSuccessMessage(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object' && 'message' in data) {
+    const msg = (data as { message?: string }).message;
+    if (typeof msg === 'string' && msg.trim()) return msg.trim();
+  }
+  return fallback;
+}

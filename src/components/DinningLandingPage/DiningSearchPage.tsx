@@ -76,7 +76,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
         )}
 
         {hasDiscount && (
-          <div className="absolute bottom-3 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md shadow-blue-900/10">
+          <div className="absolute bottom-3 left-0 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md" style={{ backgroundColor: "#E85D04" }}>
             <Percent size={11} className="text-white shrink-0" />
             <span>Flat 10% OFF</span>
           </div>

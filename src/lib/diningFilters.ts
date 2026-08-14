@@ -1,12 +1,16 @@
 import type { Business } from "@/services/api";
 
-export type SortOption = "relevance" | "rating" | "popular";
+export type SortOption = "relevance" | "rating" | "popular" | "costAsc" | "costDesc";
 
 export interface DiningFilterState {
   cuisine: string;
   minRating: number;
   offersOnly: boolean;
   sort: SortOption;
+  bookTable: boolean;
+  pureVeg: boolean;
+  servesAlcohol: boolean;
+  maxCost: number;
 }
 
 export const DEFAULT_DINING_FILTERS: DiningFilterState = {
@@ -14,6 +18,10 @@ export const DEFAULT_DINING_FILTERS: DiningFilterState = {
   minRating: 0,
   offersOnly: false,
   sort: "relevance",
+  bookTable: false,
+  pureVeg: false,
+  servesAlcohol: false,
+  maxCost: 0,
 };
 
 export function extractCuisines(businesses: Business[]): string[] {
@@ -36,6 +44,11 @@ export function businessHasOffer(b: Business): boolean {
   return idHash % 3 === 0 || idHash % 5 === 0;
 }
 
+function businessText(b: Business): string {
+  const amenities = (b.amenities || []).join(" ");
+  return `${b.name || ""} ${b.cuisine || ""} ${b.type_name || ""} ${b.description || ""} ${amenities}`.toLowerCase();
+}
+
 export function applyDiningFilters(
   businesses: Business[],
   filters: DiningFilterState
@@ -43,14 +56,29 @@ export function applyDiningFilters(
   let list = businesses.filter((r) => {
     const cuisine = r.cuisine || "";
     const rating = Number(r.rating || 0);
+    const text = businessText(r);
+    const cost = Number(r.average_cost || 0);
 
     const matchesCuisine =
       !filters.cuisine ||
       cuisine.toLowerCase().includes(filters.cuisine.toLowerCase());
     const matchesRating = !filters.minRating || rating >= filters.minRating;
     const matchesOffers = !filters.offersOnly || businessHasOffer(r);
+    const matchesBookTable = !filters.bookTable || r.is_open !== false;
+    const matchesVeg = !filters.pureVeg || /veg|vegetarian|jain/.test(text);
+    const matchesAlcohol =
+      !filters.servesAlcohol || /alcohol|bar|wine|beer|liquor|cocktail/.test(text);
+    const matchesCost = !filters.maxCost || !cost || cost <= filters.maxCost;
 
-    return matchesCuisine && matchesRating && matchesOffers;
+    return (
+      matchesCuisine &&
+      matchesRating &&
+      matchesOffers &&
+      matchesBookTable &&
+      matchesVeg &&
+      matchesAlcohol &&
+      matchesCost
+    );
   });
 
   if (filters.sort === "rating") {
@@ -58,6 +86,14 @@ export function applyDiningFilters(
   } else if (filters.sort === "popular") {
     list = [...list].sort(
       (a, b) => Number(b.reviews_count || 0) - Number(a.reviews_count || 0)
+    );
+  } else if (filters.sort === "costAsc") {
+    list = [...list].sort(
+      (a, b) => Number(a.average_cost || 0) - Number(b.average_cost || 0)
+    );
+  } else if (filters.sort === "costDesc") {
+    list = [...list].sort(
+      (a, b) => Number(b.average_cost || 0) - Number(a.average_cost || 0)
     );
   }
 

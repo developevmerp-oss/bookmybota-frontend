@@ -233,7 +233,10 @@ export interface OrganizerEvent extends AdminEvent {
   poster_vertical_url?: string;
   documents?: EventDocumentUpload[] | string[];
   rejection_reason?: string;
+  terms_points?: { selected?: Array<{ id?: number; text?: string } | string>; custom?: string[] };
   contract?: EventContract | null;
+  rating?: number | string;
+  reviews_count?: number;
 }
 
 export interface EventFormPayload {

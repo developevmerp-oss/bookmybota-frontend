@@ -259,6 +259,7 @@ export default function RootLayout({
     pathname?.startsWith('/business') ||
     pathname?.startsWith('/organizer');
   const isLandingPage = pathname === '/';
+  const isEventsPublicPage = pathname === '/events' || Boolean(pathname?.startsWith('/events/'));
   const isDiningPage = pathname === '/dining';
   // Keep alias so layout HMR never hits a stale isHomePage reference
   const isHomePage = isLandingPage;
@@ -448,7 +449,7 @@ export default function RootLayout({
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={inter.className}>
         <StoreProvider>
-            {!isAdminOrBusiness && !isLandingPage && (
+            {!isAdminOrBusiness && !isLandingPage && !isEventsPublicPage && (
               <nav className={`fixed top-0 w-full z-50 border-b transition-all duration-300 ${
                 isDiningPage && !scrolled
                   ? 'bg-black/40 backdrop-blur-md border-white/10'
@@ -729,9 +730,9 @@ export default function RootLayout({
                 </div>
               </nav>
             )}
-          <main className={!isAdminOrBusiness && !isLandingPage ? "pt-20" : ""}>
+          <main className={!isAdminOrBusiness && !isLandingPage && !isEventsPublicPage ? "pt-20" : ""}>
             {children}
-            {!isAdminOrBusiness && !isLandingPage && <Footer />}
+            {!isAdminOrBusiness && !isLandingPage && !isEventsPublicPage && <Footer />}
           </main>
           <Toaster position="top-center" richColors />
         </StoreProvider>

@@ -117,7 +117,7 @@ export default function HeroSection({ city, onCityChange }: HeroSectionProps) {
             </div>
           </form>
 
-          <div className="mt-5 flex flex-col sm:flex-row gap-3">
+          {/* <div className="mt-5 flex flex-col sm:flex-row gap-3">
             <button
               type="button"
               onClick={goToEvents}
@@ -134,7 +134,7 @@ export default function HeroSection({ city, onCityChange }: HeroSectionProps) {
               <FaUtensils size={16} />
               Explore Dining
             </button>
-          </div>
+          </div> */}
         </div>
 
         <EventDiningCardsSection />

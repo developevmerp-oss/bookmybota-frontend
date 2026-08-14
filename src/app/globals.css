@@ -230,6 +230,75 @@
   .animate-fadeIn {
     animation: fadeIn 0.25s ease-out forwards;
   }
+
+  /* Dining hero animations */
+  @keyframes diningHeroFadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes diningHeroFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-7px);
+    }
+  }
+
+  @keyframes diningHeroBgDrift {
+    0%,
+    100% {
+      transform: scale(1.05);
+    }
+    50% {
+      transform: scale(1.09);
+    }
+  }
+
+  .dining-hero-fade-up {
+    opacity: 0;
+    animation: diningHeroFadeUp 0.7s ease-out forwards;
+  }
+
+  .dining-hero-delay-1 {
+    animation-delay: 0.15s;
+  }
+
+  .dining-hero-delay-2 {
+    animation-delay: 0.3s;
+  }
+
+  .dining-hero-float {
+    animation: diningHeroFloat 3.2s ease-in-out infinite;
+  }
+
+  .dining-hero-float-delayed {
+    animation: diningHeroFloat 3.2s ease-in-out infinite;
+    animation-delay: 0.8s;
+  }
+
+  .dining-hero-bg {
+    animation: diningHeroBgDrift 18s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dining-hero-fade-up,
+    .dining-hero-float,
+    .dining-hero-float-delayed,
+    .dining-hero-bg {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 /* ─── Admin & Business Portal overrides for white/light theme ─── */

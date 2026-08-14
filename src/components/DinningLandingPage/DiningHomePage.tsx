@@ -1,11 +1,51 @@
 ﻿"use client";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Search, MapPin, Star, ArrowRight, ChevronLeft, ChevronRight, Navigation, Loader2, X, Percent } from "lucide-react";
+import {
+  Search,
+  MapPin,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Navigation,
+  Loader2,
+  X,
+  Percent,
+  Tag,
+  UtensilsCrossed,
+} from "lucide-react";
 import Link from "next/link";
+import { Playfair_Display } from "next/font/google";
+import type { IconType } from "react-icons";
+import { IoRestaurantOutline } from "react-icons/io5";
+import { HiOutlineMicrophone } from "react-icons/hi";
+import {
+  MdOutlineBakeryDining,
+  MdOutlineBrunchDining,
+  MdOutlineCelebration,
+  MdOutlineDeck,
+  MdOutlineDinnerDining,
+  MdOutlineEvent,
+  MdOutlineFamilyRestroom,
+  MdOutlineHotel,
+  MdOutlineLocalCafe,
+  MdOutlineLocalPizza,
+  MdOutlineMusicNote,
+  MdOutlineNightlife,
+  MdOutlineOutdoorGrill,
+  MdOutlineRestaurant,
+  MdOutlineSpa,
+  MdOutlineSportsBar,
+  MdOutlineSportsSoccer,
+  MdOutlineTheaterComedy,
+  MdOutlineTheaters,
+  MdOutlineWineBar,
+} from "react-icons/md";
 import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business, Collection, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
+import { useAppSelector } from "@/lib/hooks";
 import {
   applyDiningFilters,
   DEFAULT_DINING_FILTERS,
@@ -13,7 +53,353 @@ import {
   extractCuisines,
 } from "@/lib/diningFilters";
 
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+});
 
+const HERO_ACCENT = "#E85D04";
+
+type MealOccasion = "lunch" | "breakfast" | "dinner" | "fastfood";
+
+const MEAL_OCCASIONS: {
+  id: MealOccasion;
+  label: string;
+  image: string;
+}[] = [
+  { id: "fastfood", label: "Fast Food", image: "/images/dining/fastfood.png" },
+  { id: "breakfast", label: "Breakfast", image: "/images/dining/breakfast.png" },
+  { id: "dinner", label: "Dinner", image: "/images/dining/dinner.png" },
+  { id: "lunch", label: "Lunch", image: "/images/dining/lunch.png" },
+];
+
+const PROMO_SLIDES = [
+  { src: "/images/dining/promo-rakhi.png", alt: "Rakhi Special Celebrations" },
+  { src: "/images/dining/promo-cafe.png", alt: "Good Food. Great Moments." },
+];
+
+const DINING_OFFER_CARDS = [
+  {
+    id: "weekend",
+    bg: "#FDE8D8",
+    text: "#7A2E08",
+    accent: "#E85D04",
+    pattern: "bolts",
+    badge: "Weekend Special",
+    title: "Save up to 30% Off",
+    subtitle: "on table bookings at selected venues",
+    cta: "Explore Offers",
+    images: [
+      "/images/dining/lunch.png",
+      "/images/dining/dinner.png",
+      "/images/dining/breakfast.png",
+    ],
+  },
+  {
+    id: "flat20",
+    bg: "#E4F3EA",
+    text: "#1F6B4A",
+    accent: "#1F6B4A",
+    pattern: "burst",
+    badge: "Limited Offer",
+    title: "Flat 20% OFF",
+    subtitle: "Up to ₹200 on dining bookings",
+    cta: "View Offers",
+    images: [
+      "/images/dining/fastfood.png",
+      "/images/dining/breakfast.png",
+      "/images/dining/lunch.png",
+    ],
+  },
+  {
+    id: "prime",
+    bg: "#EEE8F8",
+    text: "#5B3A8C",
+    accent: "#5B3A8C",
+    pattern: "arcs",
+    badge: "BookMyBota Prime",
+    title: "Special Offers",
+    subtitle: "Exclusive deals at premium restaurants",
+    cta: "Grab Deal",
+    images: [
+      "/images/dining/dinner.png",
+      "/images/dining/fastfood.png",
+      "/images/dining/breakfast.png",
+    ],
+  },
+] as const;
+
+function timeToMinutes(value?: string): number | null {
+  if (!value) return null;
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function hoursOverlapWindow(
+  hours: Business["operating_hours"],
+  startMin: number,
+  endMin: number
+): boolean {
+  if (!hours) return true;
+  const days = Object.values(hours);
+  if (days.length === 0) return true;
+  return days.some((day) => {
+    if (!day || day.closed) return false;
+    const open = timeToMinutes(day.open);
+    const close = timeToMinutes(day.close);
+    if (open == null || close == null) return true;
+    return open < endMin && close > startMin;
+  });
+}
+
+function matchesMealOccasion(business: Business, meal: MealOccasion | ""): boolean {
+  if (!meal) return true;
+  const hay = `${business.name} ${business.cuisine || ""} ${business.type_name || ""} ${business.description || ""}`.toLowerCase();
+  if (meal === "fastfood") {
+    return /fast\s*food|burger|pizza|fried|snack|quick bite|street food/.test(hay);
+  }
+  if (meal === "breakfast") return hoursOverlapWindow(business.operating_hours, 6 * 60, 11 * 60);
+  if (meal === "lunch") return hoursOverlapWindow(business.operating_hours, 11 * 60, 16 * 60);
+  if (meal === "dinner") return hoursOverlapWindow(business.operating_hours, 17 * 60, 23 * 60);
+  return true;
+}
+
+const EXPLORE_CUISINES = [
+  {
+    name: "Indian",
+    tags: "Spicy • Rich • Flavorful",
+    image: "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=300&q=80",
+    accent: "#E07A3A",
+    blob: "#FDE8D8",
+    icon: "taj",
+  },
+  {
+    name: "Italian",
+    tags: "Classic • Fresh • Comforting",
+    image: "https://images.unsplash.com/photo-1551183053-bf7f1ea6a82a?w=400&q=80",
+    accent: "#5A9A6A",
+    blob: "#E4F3E6",
+    icon: "colosseum",
+  },
+  {
+    name: "Chinese",
+    tags: "Bold • Savory • Aromatic",
+    image: "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300&q=80",
+    accent: "#D97A8C",
+    blob: "#FBE4EA",
+    icon: "takeout",
+  },
+  {
+    name: "Continental",
+    tags: "Global • Delicious • Modern",
+    image: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=300&q=80",
+    accent: "#8B7AC8",
+    blob: "#EEE8F8",
+    icon: "cloche",
+  },
+  {
+    name: "Mexican",
+    tags: "Vibrant • Zesty • Bold",
+    image: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=300&q=80",
+    accent: "#6AA86A",
+    blob: "#D8F3E8",
+    icon: "cactus",
+  },
+  {
+    name: "Thai",
+    tags: "Aromatic • Spicy • Fresh",
+    image: "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=300&q=80",
+    accent: "#C9A227",
+    blob: "#F8EFD0",
+    icon: "temple",
+  },
+  {
+    name: "Japanese",
+    tags: "Light • Fresh • Balanced",
+    image: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300&q=80",
+    accent: "#5B8FD4",
+    blob: "#E4EEF8",
+    icon: "torii",
+  },
+  {
+    name: "Middle Eastern",
+    tags: "Warm • Rich • Authentic",
+    image: "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=300&q=80",
+    accent: "#C4A06A",
+    blob: "#F3E9D8",
+    icon: "lantern",
+  },
+] as const;
+
+function getDiningTypeVisual(label: string): {
+  Icon: IconType;
+  bg: string;
+  accent: string;
+} {
+  const lower = label.trim().toLowerCase();
+
+  let Icon: IconType = MdOutlineRestaurant;
+  if (lower === "all" || lower.includes("all dining")) Icon = MdOutlineDinnerDining;
+  else if (lower.includes("comedy") || lower.includes("stand up") || lower.includes("stand-up")) Icon = MdOutlineTheaterComedy;
+  else if (lower.includes("concert") || lower.includes("live show") || lower.includes("gig")) Icon = HiOutlineMicrophone;
+  else if (lower.includes("music") || lower.includes("dj") || lower.includes("band")) Icon = MdOutlineMusicNote;
+  else if (lower.includes("theatre") || lower.includes("theater") || lower.includes("drama")) Icon = MdOutlineTheaters;
+  else if (lower.includes("party") || lower.includes("celebration")) Icon = MdOutlineCelebration;
+  else if (lower.includes("sport")) Icon = MdOutlineSportsSoccer;
+  else if (lower.includes("spa") || lower.includes("wellness")) Icon = MdOutlineSpa;
+  else if (lower.includes("hotel") || lower.includes("stay")) Icon = MdOutlineHotel;
+  else if (lower.includes("pizza")) Icon = MdOutlineLocalPizza;
+  else if (lower.includes("nightclub") || lower.includes("nightlife")) Icon = MdOutlineNightlife;
+  else if (lower.includes("event")) Icon = MdOutlineEvent;
+  else if (lower.includes("grill")) Icon = MdOutlineOutdoorGrill;
+  else if (lower === "bar") Icon = MdOutlineSportsBar;
+  else if (lower.includes("pub")) Icon = MdOutlineWineBar;
+  else if (lower.includes("lounge") || lower.includes("club")) Icon = MdOutlineNightlife;
+  else if (lower.includes("cafe") || lower.includes("coffee")) Icon = MdOutlineLocalCafe;
+  else if (lower.includes("fine")) Icon = MdOutlineBrunchDining;
+  else if (lower.includes("general")) Icon = IoRestaurantOutline;
+  else if (lower.includes("dessert") || lower.includes("sweet") || lower.includes("bakery")) Icon = MdOutlineBakeryDining;
+  else if (lower.includes("family")) Icon = MdOutlineFamilyRestroom;
+  else if (lower.includes("rooftop") || lower.includes("outdoor")) Icon = MdOutlineDeck;
+  else if (lower.includes("karaoke") || lower.includes("open mic")) Icon = HiOutlineMicrophone;
+  else if (lower.includes("bar")) Icon = MdOutlineSportsBar;
+  else if (lower.includes("restaurant") || lower.includes("dining")) Icon = MdOutlineRestaurant;
+
+  return { Icon, bg: "rgba(232,93,4,0.12)", accent: HERO_ACCENT };
+}
+
+function CuisineLandmarkIcon({
+  type,
+  color,
+}: {
+  type: string;
+  color: string;
+}) {
+  const common = {
+    fill: "none",
+    stroke: color,
+    strokeWidth: 1.7,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
+  if (type === "taj") {
+    return (
+      <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+        <path {...common} d="M12 3.2c0 1.4-.9 2.4-2 2.8" />
+        <circle cx="12" cy="2.6" r="0.7" fill={color} stroke="none" />
+        <path {...common} d="M12 6.2v2.2M7 10.2c1.4-1.8 3-2.6 5-2.6s3.6.8 5 2.6" />
+        <path {...common} d="M6.2 10.2h11.6v8.6H6.2z" />
+        <path {...common} d="M10.2 18.8v-3.2a1.8 1.8 0 0 1 3.6 0v3.2" />
+        <path {...common} d="M4.4 18.8h15.2M4.8 10.2v-1.4M19.2 10.2V8.8" />
+        <circle cx="4.8" cy="6.8" r="0.5" fill={color} stroke="none" />
+        <circle cx="19.2" cy="6.8" r="0.5" fill={color} stroke="none" />
+      </svg>
+    );
+  }
+  if (type === "colosseum") {
+    return (
+      <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+        <ellipse {...common} cx="12" cy="8" rx="7.2" ry="3.2" />
+        <path {...common} d="M4.8 8v7.2c0 1.8 3.2 3.2 7.2 3.2s7.2-1.4 7.2-3.2V8" />
+        <path {...common} d="M4.8 11.4c1.6 1.1 4.2 1.8 7.2 1.8s5.6-.7 7.2-1.8" />
+        <path {...common} d="M8.2 8v10.2M12 8v11.2M15.8 8v10.2" />
+      </svg>
+    );
+  }
+  if (type === "takeout") {
+    return (
+      <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+        <path {...common} d="M7 9.2h10l-1.1 9.2H8.1z" />
+        <path {...common} d="M6.4 9.2h11.2l-1.4-2.4H7.8z" />
+        <path {...common} d="M9 6.8 7.4 3.8M15 6.8l1.6-3M10.6 6.8 9.6 4.2M13.4 6.8l1-2.6" />
+      </svg>
+    );
+  }
+  if (type === "cloche") {
+    return (
+      <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+        <path {...common} d="M5 16.6c0-4.4 3.1-8 7-8s7 3.6 7 8" />
+        <path {...common} d="M4.2 16.6h15.6M6 19h12" />
+        <circle cx="12" cy="7.4" r="1" {...common} />
+      </svg>
+    );
+  }
+  if (type === "cactus") {
+    return (
+      <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+        <path {...common} d="M12 20.2V7.4a2.4 2.4 0 0 1 4.8 0v3.2" />
+        <path {...common} d="M12 12.4H8.4a2 2 0 0 1 0-4" />
+        <path {...common} d="M9.4 20.2h5.2" />
+      </svg>
+    );
+  }
+  if (type === "temple") {
+    return (
+      <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+        <path {...common} d="M12 3.4 6.4 8.2h11.2z" />
+        <path {...common} d="M8.2 8.2 5.6 11h12.8L15.8 8.2" />
+        <path {...common} d="M7.2 11v7.4h9.6V11" />
+        <path {...common} d="M5.2 18.4h13.6M12 3.4v-1" />
+        <path {...common} d="M10.4 18.4v-3.2h3.2v3.2" />
+      </svg>
+    );
+  }
+  if (type === "torii") {
+    return (
+      <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+        <path {...common} d="M4.6 6.2h14.8" />
+        <path {...common} d="M5.6 9h12.8" />
+        <path {...common} d="M7.4 6.2v13.2M16.6 6.2v13.2" />
+        <path {...common} d="M4.2 5.4c2.4.8 5.1 1.2 7.8 1.2s5.4-.4 7.8-1.2" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" className="w-[70%] h-[70%]" aria-hidden>
+      <path {...common} d="M8.2 9.2c0-2.4 1.7-4.4 3.8-4.4s3.8 2 3.8 4.4v7.2c0 1.5-1.7 2.6-3.8 2.6s-3.8-1.1-3.8-2.6z" />
+      <path {...common} d="M8.2 11.4h7.6M8.2 14.4h7.6" />
+      <path {...common} d="M12 4.8V3.4" />
+    </svg>
+  );
+}
+
+const CUISINE_THEME_FALLBACKS = [
+  { accent: "#E07A3A", blob: "#FDE8D8", icon: "taj" },
+  { accent: "#5A9A6A", blob: "#E4F3E6", icon: "colosseum" },
+  { accent: "#D97A8C", blob: "#FBE4EA", icon: "takeout" },
+  { accent: "#8B7AC8", blob: "#EEE8F8", icon: "cloche" },
+] as const;
+
+const CUISINE_IMAGE_FALLBACK =
+  "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=400&q=80";
+
+const CARD_COLOR_PALETTE = [
+  { blob: "#F8D4BC", accent: "#E07A3A" },
+  { blob: "#C5E8CE", accent: "#4F9A62" },
+  { blob: "#F5C9D6", accent: "#D97A8C" },
+  { blob: "#D4C8F0", accent: "#8B7AC8" },
+  { blob: "#BFE8DC", accent: "#3D9A84" },
+  { blob: "#F0E0A0", accent: "#C9A227" },
+  { blob: "#BFD8F4", accent: "#5B8FD4" },
+  { blob: "#E5CFAF", accent: "#C4A06A" },
+] as const;
+
+function assignCardColors(count: number) {
+  const assigned: (typeof CARD_COLOR_PALETTE)[number][] = [];
+  for (let i = 0; i < count; i += 1) {
+    const forbidden = new Set<string>();
+    if (i > 0) forbidden.add(assigned[i - 1].blob);
+    if (i >= 2) forbidden.add(assigned[i - 2].blob);
+    if (i >= 4) forbidden.add(assigned[i - 4].blob);
+    const next =
+      CARD_COLOR_PALETTE.find((c) => !forbidden.has(c.blob)) ||
+      CARD_COLOR_PALETTE[i % CARD_COLOR_PALETTE.length];
+    assigned.push(next);
+  }
+  return assigned;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,7 +519,10 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
         )}
 
         {hasDiscount && (
-          <div className="absolute bottom-3 left-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md shadow-blue-900/10">
+          <div
+            className="absolute bottom-3 left-0 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md"
+            style={{ backgroundColor: HERO_ACCENT, boxShadow: "0 6px 14px rgba(232,93,4,0.28)" }}
+          >
             <Percent size={11} className="text-white shrink-0" />
             <span>Flat 10% OFF</span>
           </div>
@@ -327,8 +716,15 @@ export default function Home() {
   const [searchInput, setSearchInput] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
+  const [mealOccasion, setMealOccasion] = useState<MealOccasion | "">("");
+  const authUser = useAppSelector((state) => state.auth.user);
+  const foodieName = authUser?.name?.trim().split(/\s+/)[0] || "Foodie";
+  const [promoIndex, setPromoIndex] = useState(0);
+  const [offerSlide, setOfferSlide] = useState(0);
+  const [offerImageIndex, setOfferImageIndex] = useState([0, 0, 0]);
 
   const collectionsRef = useRef<HTMLDivElement>(null);
+  const cuisinesRef = useRef<HTMLDivElement>(null);
 
   const scrollCollections = (direction: 'left' | 'right') => {
     if (collectionsRef.current) {
@@ -342,6 +738,15 @@ export default function Home() {
     }
   };
 
+  const scrollCuisines = (direction: "left" | "right") => {
+    if (!cuisinesRef.current) return;
+    const amount = Math.max(cuisinesRef.current.clientWidth * 0.7, 160);
+    cuisinesRef.current.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
+
   const handleSearchSubmit = () => {
     setSearchQuery(searchInput);
   };
@@ -353,6 +758,22 @@ export default function Home() {
       params.set("city", locationCity);
     }
     router.push(`/search?${params.toString()}`);
+  };
+
+  const handleCuisineSelect = (cuisine: string) => {
+    setDiningFilters((prev) => ({ ...prev, cuisine }));
+    document.getElementById("restaurant-listings")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const handleExploreRestaurants = () => {
+    setDiningFilters(DEFAULT_DINING_FILTERS);
+    document.getElementById("restaurant-listings")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
   // Read initial search/filter/city from URL query params.
@@ -501,6 +922,66 @@ export default function Home() {
   // ── Filtering ──
   const cuisineOptions = useMemo(() => extractCuisines(businesses), [businesses]);
 
+  const cuisineCards = useMemo(() => {
+    const used = new Set<string>();
+    const cards: {
+      name: string;
+      tags: string;
+      image: string;
+      accent: string;
+      blob: string;
+      icon: string;
+    }[] = [];
+
+    const coverForCuisine = (name: string) => {
+      const match = businesses.find((b) =>
+        (b.cuisine || "").toLowerCase().includes(name.toLowerCase())
+      );
+      return match?.cover_image_url || "";
+    };
+
+    const pushKnown = (known: (typeof EXPLORE_CUISINES)[number], displayName?: string) => {
+      const name = displayName || known.name;
+      if (used.has(name.toLowerCase())) return;
+      used.add(name.toLowerCase());
+      used.add(known.name.toLowerCase());
+      cards.push({
+        name,
+        tags: known.tags,
+        image: coverForCuisine(known.name) || known.image,
+        accent: known.accent,
+        blob: known.blob,
+        icon: "icon" in known ? known.icon : "cloche",
+      });
+    };
+
+    cuisineOptions.forEach((opt, idx) => {
+      const known = EXPLORE_CUISINES.find(
+        (c) =>
+          opt.toLowerCase().includes(c.name.toLowerCase()) ||
+          c.name.toLowerCase().includes(opt.toLowerCase())
+      );
+      if (known) {
+        pushKnown(known);
+        return;
+      }
+      if (used.has(opt.toLowerCase())) return;
+      used.add(opt.toLowerCase());
+      const theme = CUISINE_THEME_FALLBACKS[idx % CUISINE_THEME_FALLBACKS.length];
+      cards.push({
+        name: opt,
+        tags: "Fresh • Tasty • Popular",
+        image: coverForCuisine(opt) || CUISINE_IMAGE_FALLBACK,
+        accent: theme.accent,
+        blob: theme.blob,
+        icon: theme.icon,
+      });
+    });
+
+    EXPLORE_CUISINES.forEach((known) => pushKnown(known));
+    return cards;
+  }, [businesses, cuisineOptions]);
+
   const filteredRestaurants = useMemo(() => {
     const base = businesses.filter((r) => {
       const name = r.name || "";
@@ -518,8 +999,9 @@ export default function Home() {
         address.toLowerCase().includes(locationCity.toLowerCase());
       return matchesSearch && matchesFilter && matchesLocation;
     });
-    return applyDiningFilters(base, diningFilters);
-  }, [businesses, searchQuery, activeFilter, locationCity, diningFilters]);
+    const filtered = applyDiningFilters(base, diningFilters);
+    return filtered.filter((r) => matchesMealOccasion(r, mealOccasion));
+  }, [businesses, searchQuery, activeFilter, locationCity, diningFilters, mealOccasion]);
 
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
@@ -527,6 +1009,10 @@ export default function Home() {
 
   const getFilteredSectionTitle = () => {
     const city = locationCity;
+    if (mealOccasion) {
+      const mealLabel = MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label || "Dining";
+      return (city && city !== "All Cities") ? `${mealLabel} in ${city}` : `${mealLabel} Near You`;
+    }
     if (activeFilter === "All") {
       return (city && city !== "All Cities") ? `Restaurants in ${city}` : "Restaurants Near You";
     }
@@ -541,166 +1027,305 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-white">
+      {/* ── Promo banner slider (full width, above hero) ─────────────────── */}
+      <section className="relative w-full bg-[#F8E6D4] overflow-hidden">
+        <div className="relative w-full h-[148px] sm:h-[190px] md:h-[230px] lg:h-[280px]">
+          {PROMO_SLIDES.map((slide, i) => (
+            <img
+              key={slide.src}
+              src={slide.src}
+              alt={slide.alt}
+              className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-500 ${
+                i === promoIndex ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          aria-label="Previous offer"
+          onClick={() =>
+            setPromoIndex((prev) => (prev === 0 ? PROMO_SLIDES.length - 1 : prev - 1))
+          }
+          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
+        >
+          <ChevronLeft size={22} />
+        </button>
+        <button
+          type="button"
+          aria-label="Next offer"
+          onClick={() =>
+            setPromoIndex((prev) => (prev === PROMO_SLIDES.length - 1 ? 0 : prev + 1))
+          }
+          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
+        >
+          <ChevronRight size={22} />
+        </button>
+      </section>
+
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5">
+
+      {cuisineCards.length > 0 && (
+        <section className="bg-white px-0 sm:px-1 py-4 sm:py-5 md:py-6 mb-3 sm:mb-5">
+          <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
+            <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
+              Explore Cuisines
+            </h2>
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <button
+                type="button"
+                aria-label="Previous cuisines"
+                onClick={() => scrollCuisines("left")}
+                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next cuisines"
+                onClick={() => scrollCuisines("right")}
+                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              </button>
+            </div>
+          </div>
+          <div
+            ref={cuisinesRef}
+            className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 -mx-1 px-1"
+          >
+            {cuisineCards.map((item) => {
+              const isActive = diningFilters.cuisine.toLowerCase() === item.name.toLowerCase();
+              return (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => handleCuisineSelect(item.name)}
+                  className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
+                >
+                  <span
+                    className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
+                      isActive ? "ring-2 ring-[#E85D04] ring-offset-1 sm:ring-offset-2" : ""
+                    }`}
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const el = e.target as HTMLImageElement;
+                        if (el.src !== CUISINE_IMAGE_FALLBACK) {
+                          el.src = CUISINE_IMAGE_FALLBACK;
+                        }
+                      }}
+                    />
+                  </span>
+                  <span className="mt-1.5 sm:mt-3 text-[11px] sm:text-[13px] lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
+                    {item.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── 1. Hero Search Banner ──────────────────────────────────────────── */}
       <div
-        className={`relative ${showLocationDropdown ? "z-40" : ""}`}
-        style={{ background: "linear-gradient(135deg, #091e2b 0%, #14496b 50%, #091e2b 100%)" }}
+        className={`relative ${
+          showLocationDropdown ? "z-40" : "z-0"
+        }`}
       >
-        {/* Background food image */}
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-25"
-          style={{ backgroundImage: "url(https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&q=80)" }}
-        />
-        {/* Radial glow */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_120%,rgba(27,107,147,0.3),transparent_70%)]" />
+        {/* Background only — clipped to rounded corners (dropdown can overflow like old UI) */}
+        <div className="absolute inset-0 rounded-[22px] sm:rounded-[28px] overflow-hidden pointer-events-none">
+          <div
+            className="absolute inset-0 bg-cover bg-center scale-105 dining-hero-bg"
+            style={{
+              backgroundImage: "url(/images/dining-hero.png)",
+            }}
+          />
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-black/30" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_15%,rgba(232,93,4,0.1),transparent_50%)]" />
+        </div>
 
-        <div className="relative z-10 max-w-5xl mx-auto px-4 pt-20 pb-16">
-          {/* Headline */}
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-3 leading-tight tracking-tight">
-            What are you in the <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-amber-400">
-              mood for?
-            </span>
-          </h1>
-          <p className="text-white/60 text-lg mb-8">
-            Discover top restaurants, cafes & bars — book your table in seconds.
-          </p>
-
-          {/* ── Combined Location + Search Bar ── */}
-          <div ref={locationRef} className="relative max-w-4xl">
-            <div className="flex flex-col sm:flex-row items-stretch bg-white rounded-2xl shadow-2xl overflow-hidden">
-
-              {/* LEFT: Location Picker */}
-              <button
-                id="location-picker-btn"
-                onClick={() => setShowLocationDropdown((v) => !v)}
-                className={`flex items-center gap-2 px-4 py-4 shrink-0 border-b sm:border-b-0 sm:border-r border-slate-100 hover:bg-slate-50 transition-colors w-full sm:w-auto sm:min-w-[220px] sm:max-w-[260px] ${showLocationDropdown ? "bg-rose-50 border-rose-100" : ""
-                  }`}
+        {/* Title lower + tight gap to search bar */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-5 lg:px-8 min-h-[360px] sm:min-h-[400px] lg:min-h-[440px] flex flex-col justify-end  pb-6 sm:pb-8 gap-4 sm:gap-5">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 sm:gap-6">
+            <div className="max-w-xl dining-hero-fade-up">
+              <h1
+                className={`${playfair.className} text-[28px] sm:text-4xl lg:text-[52px] font-semibold text-white leading-[1.15] tracking-tight`}
               >
-                {locationLoading ? (
-                  <Loader2 size={17} className="text-rose-500 shrink-0 animate-spin" />
-                ) : (
-                  <MapPin
-                    size={17}
-                    className={`shrink-0 ${locationError ? "text-slate-400" : "text-rose-500"}`}
-                  />
-                )}
-                <span
-                  className={`text-sm font-semibold truncate ${locationLoading
-                    ? "text-slate-400"
-                    : locationError
-                      ? "text-slate-500"
-                      : "text-slate-800"
-                    }`}
-                >
-                  {locationLabel}
-                </span>
-                <svg
-                  className={`ml-auto shrink-0 w-4 h-4 text-slate-400 transition-transform duration-200 ${showLocationDropdown ? "rotate-180" : ""
-                    }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {/* RIGHT: Restaurant Search */}
-              <div className="flex-1 flex items-center gap-2 px-4 border-b sm:border-b-0 border-slate-100">
-                <Search size={18} className="text-slate-400 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Search restaurants, cuisines or dishes..."
-                  className="flex-1 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none bg-transparent py-4"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleSearchSubmit();
-                    }
-                  }}
-                />
-                {searchInput && (
-                  <button
-                    onClick={() => {
-                      setSearchInput("");
-                      setSearchQuery("");
-                    }}
-                    className="text-slate-300 hover:text-slate-500 transition-colors"
-                  >
-                    <X size={15} />
-                  </button>
-                )}
-              </div>
-
-              {/* Search CTA */}
-              <button
-                onClick={handleSearchSubmit}
-                className="bg-rose-600 hover:bg-rose-700 text-white px-7 py-4 sm:py-0 font-semibold text-sm transition-colors shadow-lg shadow-rose-600/30 whitespace-nowrap w-full sm:w-auto"
-              >
-                Search
-              </button>
+                Book Your Perfect Dining Experience
+              </h1>
+              <p className="mt-2 text-white/90 text-sm sm:text-base lg:text-lg font-medium max-w-md">
+                Discover the best restaurants, cafes, bars and more.
+              </p>
             </div>
 
-            {/* Location Dropdown */}
-            {showLocationDropdown && (
-              <LocationDropdown
-                onSelect={(city) => {
-                  setLocationLabel(city);
-                  setLocationCity(city);
-                  localStorage.setItem('selected_city', city);
-                  window.dispatchEvent(new Event('selected_city_changed'));
-                }}
-                onDetect={() => {
-                  setShowLocationDropdown(false);
-                  detectCurrentLocation();
-                }}
-                detecting={locationLoading}
-                onClose={() => setShowLocationDropdown(false)}
-              />
-            )}
+            <div className="relative w-full max-w-[300px] sm:max-w-[320px] sm:shrink-0 dining-hero-fade-up dining-hero-delay-1">
+              <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-black/35 backdrop-blur-md px-4 py-3.5 sm:px-5 sm:py-4 shadow-2xl">
+                <div className="relative z-10 pr-14 sm:pr-16">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Tag size={13} style={{ color: HERO_ACCENT }} />
+                    <span className="text-[10px] sm:text-[11px] font-bold tracking-[0.18em] text-white/90 uppercase">
+                      Offer
+                    </span>
+                  </div>
+                  <p className={`${playfair.className} text-xl sm:text-2xl font-bold text-white leading-tight`}>
+                    Flat 20% OFF
+                  </p>
+                  <p className="mt-0.5 text-xs text-white/75">Up to ₹200 on dining bookings</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      document.getElementById("dining-offers")?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
+                    }}
+                    className="mt-2.5 inline-flex items-center rounded-md bg-white hover:bg-slate-100 text-slate-900 text-[11px] sm:text-xs font-bold px-3 py-1.5 transition-all hover:scale-[1.03] active:scale-[0.98]"
+                  >
+                    View Offers
+                  </button>
+                </div>
+                <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-16 h-20">
+                  <div className="dining-hero-float absolute right-1 top-0 w-9 h-9 rounded-full bg-gradient-to-br from-[#c45a1a] to-[#7a2e08] border border-amber-200/30 shadow-lg flex items-center justify-center">
+                    <Percent size={14} className="text-white/90" />
+                  </div>
+                  <div className="dining-hero-float-delayed absolute right-8 top-8 w-7 h-7 rounded-full bg-gradient-to-br from-[#a84812] to-[#5c2206] border border-amber-200/20 shadow-md flex items-center justify-center">
+                    <Percent size={11} className="text-white/80" />
+                  </div>
+                  <div className="dining-hero-float absolute right-0 bottom-1 w-6 h-6 rounded-full bg-gradient-to-br from-[#d97706] to-[#92400e] border border-amber-100/25 shadow flex items-center justify-center">
+                    <Percent size={9} className="text-white/85" />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Location status hint */}
-          {locationError && (
-            <p className="mt-3 text-white/40 text-xs flex items-center gap-1.5">
-              <Navigation size={12} />
-              Location access denied —{" "}
-              <button
-                onClick={() => setShowLocationDropdown(true)}
-                className="underline underline-offset-2 hover:text-white/60 transition-colors"
-              >
-                select city manually
-              </button>
-            </p>
-          )}
-          {!locationError && locationCity && (
-            <p className="mt-3 text-white/40 text-xs flex items-center gap-1.5">
-              <Navigation size={12} />
-              Showing restaurants in{" "}
-              <span className="text-white/60 font-medium">{locationCity}</span>
-              <button
-                onClick={() => setShowLocationDropdown(true)}
-                className="ml-1 underline underline-offset-2 hover:text-white/60 transition-colors"
-              >
-                change
-              </button>
-            </p>
-          )}
+          {/* Previous location + search bar with orange accents */}
+          <div className="w-full dining-hero-fade-up dining-hero-delay-2">
+            <div ref={locationRef} className="relative z-50">
+              <div className="flex flex-col sm:flex-row items-stretch bg-white rounded-2xl sm:rounded-full shadow-2xl shadow-black/25 border border-white/50 overflow-hidden">
+                <button
+                  id="location-picker-btn"
+                  type="button"
+                  onClick={() => setShowLocationDropdown((v) => !v)}
+                  className={`flex items-center gap-2 px-4 py-3.5 sm:py-0 sm:min-h-[52px] shrink-0 border-b sm:border-b-0 sm:border-r border-slate-100 hover:bg-slate-50 transition-colors w-full sm:w-auto sm:min-w-[170px] md:min-w-[200px] sm:max-w-[240px] ${
+                    showLocationDropdown ? "bg-orange-50" : ""
+                  }`}
+                >
+                  {locationLoading ? (
+                    <Loader2 size={17} className="shrink-0 animate-spin" style={{ color: HERO_ACCENT }} />
+                  ) : (
+                    <MapPin
+                      size={17}
+                      className="shrink-0"
+                      style={{ color: locationError ? "#94a3b8" : HERO_ACCENT }}
+                    />
+                  )}
+                  <span
+                    className={`text-sm font-semibold truncate ${
+                      locationLoading ? "text-slate-400" : "text-slate-800"
+                    }`}
+                  >
+                    {locationLabel}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`ml-auto shrink-0 text-slate-400 transition-transform duration-200 ${
+                      showLocationDropdown ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
 
-          {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-4 sm:flex sm:items-center sm:gap-8 mt-8 border-t border-white/10 pt-6">
-            {[["5,000+", "Restaurants"], ["1M+", "Happy Diners"], ["50+", "Cities"]].map(
-              ([val, label]) => (
-                <div key={label} className="text-white/80 flex flex-col sm:flex-row sm:items-center">
-                  <span className="font-bold text-white text-base sm:text-lg leading-none">{val}</span>
-                  <span className="text-xs sm:text-sm text-white/60 sm:ml-2 mt-1 sm:mt-0 font-medium leading-none">{label}</span>
+                <div className="flex-1 flex items-center gap-2 px-4 min-w-0 border-b sm:border-b-0 border-slate-100">
+                  <Search size={17} className="text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search restaurants, cuisines or dishes..."
+                    className="flex-1 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none bg-transparent py-3.5 sm:py-0 min-w-0"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSearchSubmit();
+                    }}
+                  />
+                  {searchInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchInput("");
+                        setSearchQuery("");
+                      }}
+                      className="text-slate-300 hover:text-slate-500 transition-colors shrink-0"
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
                 </div>
-              )
+
+                <button
+                  type="button"
+                  onClick={handleSearchSubmit}
+                  className="inline-flex items-center justify-center gap-2 text-white px-6 sm:px-7 py-3.5 sm:py-0 sm:min-h-[52px] font-bold text-sm transition-all hover:brightness-110 active:scale-[0.99] whitespace-nowrap w-full sm:w-auto sm:rounded-full sm:m-1"
+                  style={{
+                    backgroundColor: HERO_ACCENT,
+                    boxShadow: "0 8px 20px rgba(232,93,4,0.3)",
+                  }}
+                >
+                  Find a Table
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+
+              {showLocationDropdown && (
+                <LocationDropdown
+                  onSelect={(city) => {
+                    setLocationLabel(city);
+                    setLocationCity(city);
+                    localStorage.setItem("selected_city", city);
+                    window.dispatchEvent(new Event("selected_city_changed"));
+                  }}
+                  onDetect={() => {
+                    setShowLocationDropdown(false);
+                    detectCurrentLocation();
+                  }}
+                  detecting={locationLoading}
+                  onClose={() => setShowLocationDropdown(false)}
+                />
+              )}
+            </div>
+
+            {locationError && (
+              <p className="mt-2.5 text-white/65 text-xs flex items-center gap-1.5 px-1">
+                <Navigation size={12} />
+                Location access denied —{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowLocationDropdown(true)}
+                  className="underline underline-offset-2 hover:text-white/85 transition-colors"
+                >
+                  select city manually
+                </button>
+              </p>
+            )}
+            {!locationError && locationCity && (
+              <p className="mt-2.5 text-white/65 text-xs flex items-center gap-1.5 px-1">
+                <Navigation size={12} />
+                Showing restaurants in{" "}
+                <span className="text-white/90 font-medium">{locationCity}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowLocationDropdown(true)}
+                  className="ml-1 underline underline-offset-2 hover:text-white/85 transition-colors"
+                >
+                  change
+                </button>
+              </p>
             )}
           </div>
         </div>
@@ -760,44 +1385,125 @@ export default function Home() {
 
         {/* ── 4. Promotional Banner ────────────────────────────────────────── */}
         {!searchQuery && activeFilter === "All" && (
-          <section className="py-6">
-            <div
-              className="relative rounded-3xl overflow-hidden shadow-lg"
-              style={{ background: "linear-gradient(135deg, #0a1e2d 0%, #17547d 50%, #0a1e2d 100%)" }}
-            >
-              <div
-                className="absolute inset-0 opacity-20 bg-cover bg-center"
-                style={{
-                  backgroundImage:
-                    "url(https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&q=80)",
-                }}
-              />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_50%,rgba(56,189,248,0.15),transparent_60%)]" />
-              <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 p-8 md:p-10">
-                <div>
-                  <div className="inline-flex items-center gap-2 bg-amber-400/20 border border-amber-400/30 rounded-full px-3 py-1 mb-4">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                    <span className="text-amber-300 text-xs font-bold uppercase tracking-widest">
-                      Weekend Special
-                    </span>
-                  </div>
-                  <h3 className="text-white text-3xl md:text-4xl font-extrabold leading-tight mb-3">
-                    Up to <span className="text-amber-400">30% OFF</span> on{" "}
-                    <br className="hidden md:block" />
-                    table bookings
-                  </h3>
-                  <p className="text-white/60 text-sm max-w-md">
-                    Exclusive deals at premium venues
-                    {locationCity ? ` across ${locationCity}` : " near you"}. This weekend only —
-                    grab your table before it's gone.
-                  </p>
-                </div>
-                <div className="shrink-0">
-                  <button className="bg-white hover:bg-slate-50 text-rose-700 font-bold px-8 py-4 rounded-2xl text-sm flex items-center gap-2 shadow-2xl transition-all hover:scale-105 whitespace-nowrap">
-                    Explore Offers <ArrowRight size={18} />
-                  </button>
+          <section id="dining-offers" className="py-6 scroll-mt-24">
+            <div className="relative">
+              <div className="overflow-hidden rounded-[24px] sm:rounded-[28px]">
+                <div
+                  className="flex transition-transform duration-500 ease-out"
+                  style={{ transform: `translateX(-${offerSlide * 100}%)` }}
+                >
+                  {DINING_OFFER_CARDS.map((card, cardIdx) => {
+                    const imgIdx = offerImageIndex[cardIdx] ?? 0;
+                    return (
+                      <div key={card.id} className="min-w-full w-full shrink-0">
+                        <div
+                          className="relative overflow-hidden rounded-[24px] sm:rounded-[28px] min-h-[200px] sm:min-h-[220px] md:min-h-[240px] px-5 sm:px-8 py-6 sm:py-7 flex items-center"
+                          style={{ backgroundColor: card.bg, color: card.text }}
+                        >
+                          {card.pattern === "bolts" && (
+                            <div className="pointer-events-none absolute inset-0 opacity-[0.12]"
+                              style={{
+                                backgroundImage:
+                                  "repeating-linear-gradient(115deg, transparent, transparent 40px, currentColor 40px, currentColor 52px)",
+                              }}
+                            />
+                          )}
+                          {card.pattern === "burst" && (
+                            <div className="pointer-events-none absolute -right-10 -top-16 w-64 h-64 rounded-full border-[18px] opacity-[0.12]"
+                              style={{ borderColor: card.text }}
+                            />
+                          )}
+                          {card.pattern === "arcs" && (
+                            <div className="pointer-events-none absolute -right-8 bottom-[-40%] w-72 h-72 rounded-full border-[16px] opacity-[0.12]"
+                              style={{ borderColor: card.text }}
+                            />
+                          )}
+
+                          <div className="relative z-10 flex-1 min-w-0 pr-2 sm:pr-6">
+                            <span
+                              className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2"
+                              style={{ color: card.accent }}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: card.accent }} />
+                              {card.badge}
+                            </span>
+                            <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">
+                              {card.title}
+                            </h3>
+                            <p className="mt-1.5 text-sm sm:text-base opacity-80 max-w-md">
+                              {card.subtitle}
+                              {card.id === "weekend" && locationCity ? ` across ${locationCity}.` : "."}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                document.getElementById("restaurant-listings")?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "start",
+                                })
+                              }
+                              className="mt-4 inline-flex items-center gap-1.5 bg-white rounded-full px-4 sm:px-5 py-2 text-sm font-bold shadow-sm hover:shadow-md transition-shadow"
+                              style={{ color: card.accent }}
+                            >
+                              {card.cta} <ChevronRight size={16} />
+                            </button>
+                          </div>
+
+                          <div className="relative z-10 shrink-0 flex flex-col items-center">
+                            <img
+                              src={card.images[imgIdx]}
+                              alt={card.title}
+                              className="w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] md:w-[180px] md:h-[180px] object-contain drop-shadow-lg"
+                            />
+                            <div className="flex items-center gap-1.5 mt-2">
+                              {card.images.map((_, dotIdx) => (
+                                <button
+                                  key={dotIdx}
+                                  type="button"
+                                  aria-label={`Offer image ${dotIdx + 1}`}
+                                  onClick={() =>
+                                    setOfferImageIndex((prev) => {
+                                      const next = [...prev];
+                                      next[cardIdx] = dotIdx;
+                                      return next;
+                                    })
+                                  }
+                                  className="w-2 h-2 rounded-full transition-all"
+                                  style={{
+                                    backgroundColor: imgIdx === dotIdx ? card.accent : "rgba(0,0,0,0.2)",
+                                    transform: imgIdx === dotIdx ? "scale(1.2)" : "scale(1)",
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              <button
+                type="button"
+                aria-label="Previous offer"
+                onClick={() =>
+                  setOfferSlide((prev) => (prev === 0 ? DINING_OFFER_CARDS.length - 1 : prev - 1))
+                }
+                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                type="button"
+                aria-label="Next offer"
+                onClick={() =>
+                  setOfferSlide((prev) => (prev === DINING_OFFER_CARDS.length - 1 ? 0 : prev + 1))
+                }
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
+              >
+                <ChevronRight size={18} />
+              </button>
             </div>
           </section>
         )}
@@ -873,17 +1579,56 @@ export default function Home() {
           </section>
         )}
 
+        {/* ── 4.6. Can't decide ───────────────────────────────────────────── */}
+        {!searchQuery && activeFilter === "All" && (
+          <section className="py-8 sm:py-10">
+            <div className="relative overflow-hidden rounded-[22px] sm:rounded-[28px] bg-[#F6EDE4] px-5 py-5 sm:px-8 sm:py-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0">
+                <UtensilsCrossed size={22} className="text-[#E85D04]" />
+              </div>
+              <div className="flex-1 text-center sm:text-left min-w-0">
+                <p className="font-bold text-[#1A2744] text-base sm:text-lg">Can&apos;t decide?</p>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Explore restaurants near you and try something new.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleExploreRestaurants}
+                className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#E85D04] hover:bg-[#d45303] text-white font-bold text-sm px-5 sm:px-6 py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md w-full sm:w-auto"
+              >
+                Explore Restaurants
+                <ArrowRight size={16} />
+              </button>
+              <div className="pointer-events-none absolute right-3 top-0 bottom-0 w-16 hidden md:block opacity-25"
+                style={{
+                  backgroundImage: "radial-gradient(#9ca3af 1.2px, transparent 1.2px)",
+                  backgroundSize: "10px 10px",
+                }}
+              />
+            </div>
+          </section>
+        )}
+
       </div>
 
-      {/* ── 4.8. Business Type Filter (Cuisine Filter Pills) ─────────────────── */}
-      <div className="sticky top-[146px] md:top-[80px] z-30 bg-white transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 py-3.5 overflow-x-auto scrollbar-hide">
+      {/* ── 4.8. What are you looking for ─────────────────────────────────── */}
+      <div className="bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <h2 className={`${playfair.className} text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-5 sm:mb-6`}>
+            What are you looking for?
+          </h2>
+          <div className="relative">
+            <div className="flex flex-nowrap items-start gap-5 sm:gap-6 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pt-3 pb-4 px-1 pr-8">
             {filters.map((f) => {
               const isActive = activeFilter.toLowerCase() === f.label.toLowerCase();
+              const theme = getDiningTypeVisual(f.label);
+              const displayName = f.label.toLowerCase() === "all" ? "All Dining" : f.label;
+              const TypeIcon = theme.Icon;
               return (
                 <button
                   key={f.label}
+                  type="button"
                   onClick={() => {
                     setActiveFilter(f.label);
                     const element = document.getElementById("restaurant-listings");
@@ -891,17 +1636,24 @@ export default function Home() {
                       element.scrollIntoView({ behavior: "smooth" });
                     }
                   }}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all border cursor-pointer ${
-                    isActive
-                      ? "bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-600/10 hover:bg-rose-700"
-                      : "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-300"
-                  }`}
+                  className="shrink-0 snap-start flex flex-col items-center w-[84px] sm:w-[92px] cursor-pointer group"
                 >
-                  <span className="text-base">{f.emoji}</span>
-                  <span>{f.label}</span>
+                  <span
+                    className="w-[48px] h-[48px] sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center"
+                    style={{
+                      backgroundColor: theme.bg,
+                      boxShadow: isActive ? `0 0 0 2px ${HERO_ACCENT}` : undefined,
+                    }}
+                  >
+                    <TypeIcon size={22} color={theme.accent} />
+                  </span>
+                  <span className="mt-2 text-[11px] sm:text-[12px] font-semibold text-[#1A1A1A] text-center leading-tight">
+                    {displayName}
+                  </span>
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       </div>
@@ -946,6 +1698,19 @@ export default function Home() {
                 </div>
               )}
 
+              {diningFilters.cuisine && (
+                <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-100 text-[#E85D04] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <span>Cuisine: {diningFilters.cuisine}</span>
+                  <button
+                    onClick={() => setDiningFilters({ ...diningFilters, cuisine: "" })}
+                    className="hover:bg-orange-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                    aria-label="Clear cuisine filter"
+                  >
+                    <X size={12} className="text-[#E85D04]" />
+                  </button>
+                </div>
+              )}
+
               {activeFilter !== "All" && (
                 <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-650 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
                   <span>Category: {activeFilter}</span>
@@ -959,13 +1724,27 @@ export default function Home() {
                 </div>
               )}
 
-              {(activeFilter !== "All" || searchQuery || diningFilters.cuisine || diningFilters.minRating > 0 || diningFilters.offersOnly) && (
+              {mealOccasion && (
+                <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-100 text-[#E85D04] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <span>{MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label}</span>
+                  <button
+                    onClick={() => setMealOccasion("")}
+                    className="hover:bg-orange-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                    aria-label="Clear meal filter"
+                  >
+                    <X size={12} className="text-[#E85D04]" />
+                  </button>
+                </div>
+              )}
+
+              {(activeFilter !== "All" || searchQuery || diningFilters.cuisine || diningFilters.minRating > 0 || diningFilters.offersOnly || mealOccasion) && (
                 <button
                   onClick={() => {
                     setSearchInput("");
                     setSearchQuery("");
                     setActiveFilter("All");
                     setDiningFilters(DEFAULT_DINING_FILTERS);
+                    setMealOccasion("");
                   }}
                   className="text-xs text-rose-600 hover:text-rose-700 font-bold px-2 py-1.5 transition-colors cursor-pointer"
                 >
@@ -981,6 +1760,47 @@ export default function Home() {
             onChange={setDiningFilters}
             onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
           />
+
+          <section className="mb-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-5">
+              Hi {foodieName}, Dine Anytime!
+            </h2>
+            <div className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-hide scroll-smooth pt-2 pb-2">
+              {MEAL_OCCASIONS.map((meal) => {
+                const isActive = mealOccasion === meal.id;
+                return (
+                  <button
+                    key={meal.id}
+                    type="button"
+                    onClick={() => {
+                      setMealOccasion((prev) => (prev === meal.id ? "" : meal.id));
+                      document.getElementById("restaurant-listings")?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
+                    }}
+                    className={`shrink-0 overflow-visible flex items-center gap-4 bg-white rounded-2xl px-5 py-2 min-w-[220px] sm:min-w-[240px] transition-all cursor-pointer ${
+                      isActive
+                        ? "shadow-[0_8px_22px_rgba(232,93,4,0.2)] ring-2 ring-[#E85D04]"
+                        : "shadow-[0_4px_16px_rgba(15,23,42,0.08)] hover:shadow-[0_8px_22px_rgba(15,23,42,0.12)]"
+                    }`}
+                  >
+                    <span className="relative w-[76px] h-[76px] sm:w-[84px] sm:h-[84px] shrink-0 overflow-visible">
+                      <span className="absolute left-0 bottom-0 w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-[#F8E7B8]" />
+                      <img
+                        src={meal.image}
+                        alt={meal.label}
+                        className="absolute -top-1 -right-0.5 z-10 w-[78px] h-[78px] sm:w-[86px] sm:h-[86px] object-contain drop-shadow-md"
+                      />
+                    </span>
+                    <span className="text-[16px] sm:text-[17px] font-bold text-[#1A1A1A] whitespace-nowrap">
+                      {meal.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
           {businessesLoading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
@@ -1025,6 +1845,7 @@ export default function Home() {
           )}
         </section>
         </div>
+      </div>
       </div>
     </div>
   );

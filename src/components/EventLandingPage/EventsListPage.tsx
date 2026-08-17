@@ -20,6 +20,7 @@ import {
 } from "react-icons/fa";
 import {
   useGetBusinessTypesQuery,
+  useGetPublicEventFiltersQuery,
   useGetPublicEventsQuery,
   type PublicEvent,
 } from "@/services/api";
@@ -64,10 +65,6 @@ function categoryStyle(name: string): {
   return { Icon: FaCalendarAlt, color: "text-[#1B5E3B]" };
 }
 
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
 function dateBadge(value?: string) {
   if (!value) return null;
   const d = new Date(value);
@@ -76,63 +73,6 @@ function dateBadge(value?: string) {
     month: d.toLocaleString("en-US", { month: "short" }).toUpperCase(),
     day: String(d.getDate()).padStart(2, "0"),
   };
-}
-
-function matchesDateFilter(iso: string | undefined, filter: string, from: string, to: string) {
-  if (!iso) return filter === "" && !from && !to;
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return false;
-  const now = new Date();
-  const today = startOfDay(now);
-  const tomorrow = today + 86400000;
-  const dow = now.getDay();
-  const saturday = today + ((6 - dow + 7) % 7) * 86400000;
-  const sunday = saturday + 86400000;
-
-  if (filter === "today") return t >= today && t < tomorrow;
-  if (filter === "tomorrow") return t >= tomorrow && t < tomorrow + 86400000;
-  if (filter === "weekend") return t >= saturday && t < sunday + 86400000;
-  if (from) {
-    const f = new Date(from).getTime();
-    if (t < f) return false;
-  }
-  if (to) {
-    const end = new Date(to).getTime() + 86400000;
-    if (t >= end) return false;
-  }
-  return true;
-}
-
-function eventMatchesLanguage(event: PublicEvent, lang: string) {
-  const raw = (event.language || "").toLowerCase();
-  if (lang === "English") return /english|\ben\b/.test(raw);
-  if (lang === "Amharic") return /amharic|amhara|\bam\b|አማርኛ/.test(raw);
-  return raw.includes(lang.toLowerCase());
-}
-
-function eventMatchesPriceBand(event: PublicEvent, band: string) {
-  const n = Number(event.min_price);
-  const price = Number.isFinite(n) ? n : 0;
-  if (band === "free") return price === 0;
-  if (band === "0-500") return price > 0 && price <= 500;
-  if (band === "501-2000") return price >= 501 && price <= 2000;
-  if (band === "2000+") return price > 2000;
-  return false;
-}
-
-function eventMatchesMoreFilter(event: PublicEvent, id: string) {
-  const text = `${event.name} ${event.about_event || ""}`.toLowerCase();
-  const age = (event.age_group || "").toLowerCase();
-  const rating = Number(event.rating) || 0;
-  if (id === "outdoor") return text.includes("outdoor");
-  if (id === "fast") return event.status === "LIVE";
-  if (id === "must") return rating >= 4;
-  if (id === "unmissable") return (event.reviews_count || 0) > 0 || rating >= 4;
-  if (id === "online") return /online|stream|virtual/.test(text);
-  if (id === "kids-allowed") return /kid|child|family|all age/.test(age) || /kid|child|family/.test(text);
-  if (id === "kids-activities") return /kid|child/.test(age) || /kid|child/.test(text);
-  if (id === "new-year") return /new year|newyear/.test(text);
-  return false;
 }
 
 function toIsoDate(year: number, month: number, day: number) {
@@ -271,12 +211,34 @@ export default function PublicEventsPage() {
   const heroCityRef = useRef<HTMLDivElement>(null);
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
+  const { data: filterOptions } = useGetPublicEventFiltersQuery();
   const queryArg = useMemo(
     () => ({
       ...(search.trim() ? { q: search.trim() } : {}),
       ...(city ? { city } : {}),
+      ...(selectedSlugs.length ? { category: selectedSlugs.join(",") } : {}),
+      ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
+      ...(datePreset ? { date_preset: datePreset } : {}),
+      ...(!datePreset && dateFrom ? { date_from: dateFrom } : {}),
+      ...(!datePreset && dateTo ? { date_to: dateTo } : {}),
+      ...(priceBands.length ? { price: priceBands.join(",") } : {}),
+      ...(moreFilters.length ? { more: moreFilters.join(",") } : {}),
+      ...(venueFilter ? { organizer: venueFilter } : {}),
+      ...(sort && sort !== "recommended" ? { sort } : {}),
     }),
-    [search, city]
+    [
+      search,
+      city,
+      selectedSlugs,
+      selectedLanguages,
+      datePreset,
+      dateFrom,
+      dateTo,
+      priceBands,
+      moreFilters,
+      venueFilter,
+      sort,
+    ]
   );
   const { data: events = [], isLoading } = useGetPublicEventsQuery(queryArg);
 
@@ -310,61 +272,34 @@ export default function PublicEventsPage() {
     [businessTypes]
   );
 
-  const venues = useMemo(() => {
-    const set = new Set<string>();
-    events.forEach((e) => {
-      if (e.organizer_name) set.add(e.organizer_name);
-    });
-    return Array.from(set).sort();
-  }, [events]);
+  const venues = useMemo(() => filterOptions?.organizers || [], [filterOptions?.organizers]);
 
   const cityOptions = useMemo(() => {
-    const opts = ["All Cities"];
+    const opts = ["All Cities", ...(filterOptions?.cities || [])];
     if (city && !opts.includes(city)) opts.push(city);
-    return opts;
-  }, [city]);
+    return Array.from(new Set(opts));
+  }, [city, filterOptions?.cities]);
 
-  const filtered = useMemo(() => {
-    let list = [...events];
-    if (selectedSlugs.length) {
-      list = list.filter((e) => e.category_slug && selectedSlugs.includes(e.category_slug));
-    }
-    if (selectedLanguages.length) {
-      list = list.filter((e) => selectedLanguages.some((lang) => eventMatchesLanguage(e, lang)));
-    }
-    if (datePreset || dateFrom || dateTo) {
-      list = list.filter((e) => matchesDateFilter(e.next_showtime, datePreset, dateFrom, dateTo));
-    }
-    if (priceBands.length) {
-      list = list.filter((e) => priceBands.some((band) => eventMatchesPriceBand(e, band)));
-    }
-    if (moreFilters.length) {
-      list = list.filter((e) => moreFilters.some((id) => eventMatchesMoreFilter(e, id)));
-    }
-    if (venueFilter) {
-      list = list.filter((e) => e.organizer_name === venueFilter);
-    }
-    if (sort === "date") {
-      list.sort((a, b) => new Date(a.next_showtime || 0).getTime() - new Date(b.next_showtime || 0).getTime());
-    } else if (sort === "price-asc") {
-      list.sort((a, b) => Number(a.min_price || 0) - Number(b.min_price || 0));
-    } else if (sort === "price-desc") {
-      list.sort((a, b) => Number(b.min_price || 0) - Number(a.min_price || 0));
-    }
-    return list;
-  }, [
-    events,
-    selectedSlugs,
-    selectedLanguages,
-    datePreset,
-    dateFrom,
-    dateTo,
-    priceBands,
-    moreFilters,
-    venueFilter,
-    sort,
-  ]);
+  const languageOptions = useMemo(() => {
+    const fromApi = filterOptions?.languages || [];
+    const merged = [...fromApi];
+    LANG_OPTIONS.forEach((l) => {
+      if (!merged.some((x) => x.toLowerCase() === l.toLowerCase())) merged.push(l);
+    });
+    return merged;
+  }, [filterOptions?.languages]);
 
+  const datePresets = filterOptions?.date_presets?.length
+    ? filterOptions.date_presets
+    : [
+        { id: "today", label: "Today" },
+        { id: "tomorrow", label: "Tomorrow" },
+        { id: "weekend", label: "This Weekend" },
+      ];
+  const priceOptions = filterOptions?.price_bands?.length ? filterOptions.price_bands : [...PRICE_BANDS];
+  const moreOptions = filterOptions?.more?.length ? filterOptions.more : [...MORE_FILTERS];
+
+  const filtered = events;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
@@ -602,11 +537,7 @@ export default function PublicEventsPage() {
                 }}
               >
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: "today", label: "Today" },
-                    { id: "tomorrow", label: "Tomorrow" },
-                    { id: "weekend", label: "This Weekend" },
-                  ].map((d) => (
+                  {datePresets.map((d) => (
                     <button
                       key={d.id}
                       type="button"
@@ -748,7 +679,7 @@ export default function PublicEventsPage() {
                 onClear={() => setSelectedLanguages([])}
               >
                 <div className="flex flex-wrap gap-2">
-                  {LANG_OPTIONS.map((lang) => (
+                  {languageOptions.map((lang) => (
                     <FilterTag
                       key={lang}
                       label={lang}
@@ -766,7 +697,7 @@ export default function PublicEventsPage() {
                 onClear={() => setMoreFilters([])}
               >
                 <div className="flex flex-wrap gap-2">
-                  {MORE_FILTERS.map((f) => (
+                  {moreOptions.map((f) => (
                     <FilterTag
                       key={f.id}
                       label={f.label}
@@ -784,7 +715,7 @@ export default function PublicEventsPage() {
                 onClear={() => setPriceBands([])}
               >
                 <div className="flex flex-wrap gap-2">
-                  {PRICE_BANDS.map((band) => (
+                  {priceOptions.map((band) => (
                     <FilterTag
                       key={band.id}
                       label={band.label}

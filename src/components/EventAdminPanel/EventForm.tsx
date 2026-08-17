@@ -43,6 +43,31 @@ function normalizeFormDocuments(docs?: EventDocumentUpload[] | string[]): EventD
   return docs as EventDocumentUpload[];
 }
 
+function parseEventTerms(raw?: OrganizerEvent["terms_points"]): {
+  selected: Array<{ id: number; text: string }>;
+  custom: string[];
+} {
+  const selected: Array<{ id: number; text: string }> = [];
+  const custom: string[] = [];
+  if (!raw) return { selected, custom };
+  for (const item of raw.selected || []) {
+    if (typeof item === "string") {
+      const text = item.trim();
+      if (text) custom.push(text);
+      continue;
+    }
+    const id = Number(item.id);
+    const text = String(item.text || "").trim();
+    if (Number.isFinite(id) && id > 0 && text) selected.push({ id, text });
+    else if (text) custom.push(text);
+  }
+  for (const line of raw.custom || []) {
+    const text = String(line || "").trim();
+    if (text) custom.push(text);
+  }
+  return { selected, custom };
+}
+
 function ticketsForShow(
   event: OrganizerEvent,
   showId: string,
@@ -305,6 +330,10 @@ export default function EventForm({
   const [documents, setDocuments] = useState<EventDocumentUpload[]>(() =>
     normalizeFormDocuments(event?.documents)
   );
+  const initialTerms = parseEventTerms(event?.terms_points);
+  const [selectedTerms, setSelectedTerms] = useState(initialTerms.selected);
+  const [customTerms, setCustomTerms] = useState<string[]>(initialTerms.custom);
+  const [customTermDraft, setCustomTermDraft] = useState("");
 
   const categories = useMemo(
     () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
@@ -348,6 +377,9 @@ export default function EventForm({
     if (event) {
       reset(eventToValues(event));
       setDocuments(normalizeFormDocuments(event.documents));
+      const terms = parseEventTerms(event.terms_points);
+      setSelectedTerms(terms.selected);
+      setCustomTerms(terms.custom);
     }
   }, [event?.id, event?.updated_at, reset, event]);
 
@@ -391,9 +423,34 @@ export default function EventForm({
       about_event: values.about_event.trim(),
       age_group: values.age_group || "",
       duration_minutes: values.duration_minutes,
+      terms_points: {
+        selected: selectedTerms,
+        custom: customTerms.map((t) => t.trim()).filter(Boolean),
+      },
       ticket_types,
       showtimes,
     };
+  };
+
+  const toggleMasterTerm = (term: { id: number; text: string }) => {
+    setSelectedTerms((prev) => {
+      if (prev.some((t) => t.id === term.id)) return prev.filter((t) => t.id !== term.id);
+      return [...prev, { id: term.id, text: term.text }];
+    });
+  };
+
+  const addCustomTerm = () => {
+    const text = customTermDraft.trim();
+    if (!text) {
+      toast.error("Enter a terms & conditions point");
+      return;
+    }
+    if (customTerms.some((t) => t.toLowerCase() === text.toLowerCase())) {
+      toast.error("That point is already added");
+      return;
+    }
+    setCustomTerms((prev) => [...prev, text]);
+    setCustomTermDraft("");
   };
 
   const validateMasters = (forSubmit: boolean) => {
@@ -769,6 +826,115 @@ export default function EventForm({
             </div>
           ) : (
             <p className="text-amber-700 text-sm">No document types configured yet.</p>
+          )}
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div>
+            <h3 className="portal-heading text-lg font-semibold">Customer terms &amp; conditions</h3>
+            <p className="portal-muted text-sm mt-1">
+              Tick Super Admin master points to show on this event. Extra points you add here stay on this event only — they are not saved to the Super Admin master list.
+            </p>
+          </div>
+          {!categoryTypeId ? (
+            <p className="portal-muted text-sm">Select a category to load the T&amp;C checklist.</p>
+          ) : mastersLoading ? (
+            <p className="portal-muted text-sm">Loading terms &amp; conditions...</p>
+          ) : (
+            <div className="space-y-4">
+              {(masters?.terms?.length || selectedTerms.length) ? (
+                <div className="space-y-2">
+                  {(masters?.terms || []).map((term) => {
+                    const checked = selectedTerms.some((t) => t.id === term.id);
+                    return (
+                      <label
+                        key={term.id}
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${
+                          checked ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-slate-50"
+                        } ${readOnly ? "cursor-default" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1 rounded border-slate-300"
+                          checked={checked}
+                          disabled={readOnly}
+                          onChange={() => toggleMasterTerm({ id: term.id, text: term.text })}
+                        />
+                        <span className="text-sm text-slate-800 leading-relaxed">{term.text}</span>
+                      </label>
+                    );
+                  })}
+                  {selectedTerms
+                    .filter((t) => !(masters?.terms || []).some((m) => m.id === t.id))
+                    .map((term) => (
+                      <label
+                        key={`kept-${term.id}`}
+                        className="flex items-start gap-3 p-3 rounded-xl border border-violet-300 bg-violet-50"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1 rounded border-slate-300"
+                          checked
+                          disabled={readOnly}
+                          onChange={() => toggleMasterTerm(term)}
+                        />
+                        <span className="text-sm text-slate-800 leading-relaxed">{term.text}</span>
+                      </label>
+                    ))}
+                </div>
+              ) : (
+                <p className="portal-muted text-sm">No master T&amp;C points yet. You can still add event-specific points below.</p>
+              )}
+
+              <div className="pt-2 border-t border-slate-200 space-y-3">
+                <p className="text-sm font-medium text-slate-700">Event-only T&amp;C points</p>
+                {customTerms.length > 0 && (
+                  <ul className="space-y-2">
+                    {customTerms.map((line, idx) => (
+                      <li
+                        key={`${line}-${idx}`}
+                        className="flex items-start gap-2 p-3 rounded-xl bg-white border border-slate-200"
+                      >
+                        <span className="flex-1 text-sm text-slate-800 leading-relaxed">{line}</span>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomTerms((prev) => prev.filter((_, i) => i !== idx))}
+                            className="text-slate-400 hover:text-rose-600"
+                            aria-label="Remove custom T&C"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!readOnly && (
+                  <div className="flex gap-2">
+                    <input
+                      value={customTermDraft}
+                      onChange={(e) => setCustomTermDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addCustomTerm();
+                        }
+                      }}
+                      placeholder="Add a point for this event only"
+                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCustomTerm}
+                      className="px-3 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 inline-flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Add
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </section>
 

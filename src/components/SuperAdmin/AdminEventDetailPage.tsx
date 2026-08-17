@@ -18,6 +18,7 @@ import {
   type EventDocumentUpload,
 } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
+import { parseEventLanguages } from "@/lib/eventValidation";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 
@@ -136,6 +137,8 @@ export default function AdminEventDetailPage({
   }
 
   const genres = parseGenres(event.genres);
+  const languages = parseEventLanguages(event.language);
+  const gallery = event.gallery_images || [];
   const documents = parseDocuments(event.documents);
   const ticketsSold = (event.ticket_types || []).reduce(
     (sum, t) => sum + Math.max(0, Number(t.total_count || 0) - Number(t.available_count || 0)),
@@ -175,6 +178,16 @@ export default function AdminEventDetailPage({
               />
             </div>
           )}
+        </div>
+      )}
+
+      {gallery.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {gallery.map((url, i) => (
+            <div key={`${url}-${i}`} className="rounded-xl overflow-hidden h-28 border border-white/10">
+              <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+            </div>
+          ))}
         </div>
       )}
 
@@ -278,7 +291,7 @@ export default function AdminEventDetailPage({
             </div>
             <div className="flex justify-between gap-4">
               <dt className="portal-muted">Language</dt>
-              <dd className="text-slate-800">{event.language || "—"}</dd>
+              <dd className="text-slate-800 text-right">{languages.join(", ") || "—"}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="portal-muted">Age group</dt>
@@ -459,6 +472,7 @@ export default function AdminEventDetailPage({
               <thead className="text-zinc-500 border-b border-slate-200">
                 <tr>
                   <th className="py-2 font-medium">Type</th>
+                  <th className="py-2 font-medium">Venue</th>
                   <th className="py-2 font-medium">Price</th>
                   <th className="py-2 font-medium">Available</th>
                   <th className="py-2 font-medium">Total</th>
@@ -474,6 +488,7 @@ export default function AdminEventDetailPage({
                   return (
                     <tr key={t.id}>
                       <td className="py-3 font-medium">{t.ticket_type}</td>
+                      <td className="py-3 portal-muted">{t.venue_name || "—"}</td>
                       <td className="py-3">{formatMoney(t.price)}</td>
                       <td className="py-3">{t.available_count}</td>
                       <td className="py-3">{t.total_count}</td>
@@ -506,6 +521,11 @@ export default function AdminEventDetailPage({
                   {formatDateTime12h(s.starts_at)}
                   {s.ends_at ? ` → ${formatDateTime12h(s.ends_at)}` : ""}
                 </div>
+                {s.ticket_types && s.ticket_types.length > 0 && (
+                  <p className="text-xs portal-muted mt-1">
+                    Tickets: {s.ticket_types.map((t) => `${t.ticket_type} (${formatMoney(t.price)})`).join(" · ")}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

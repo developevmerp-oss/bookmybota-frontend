@@ -26,6 +26,7 @@ import {
   type PublicEvent,
 } from "@/services/api";
 import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
+import { parseEventLanguages } from "@/lib/eventValidation";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 import EventCheckout from "@/components/EventLandingPage/EventCheckout";
 import EventReviewsSection from "@/components/EventLandingPage/EventReviewsSection";
@@ -147,6 +148,9 @@ export default function PublicEventDetailPage({
   }, [id]);
 
   const genres = useMemo(() => parseGenres(event?.genres), [event?.genres]);
+  const languages = useMemo(() => parseEventLanguages(event?.language), [event?.language]);
+  const languageLabel = languages.join(", ") || "—";
+  const gallery = event?.gallery_images || [];
   const showtimes = event?.showtimes || [];
   const ticketTypes = event?.ticket_types || [];
   const nextShowtime =
@@ -377,6 +381,9 @@ export default function PublicEventDetailPage({
                       className="rounded-xl border border-slate-100 px-3 py-3 text-center"
                     >
                       <p className="font-semibold text-slate-900 text-sm">{t.ticket_type}</p>
+                      {t.venue_name && (
+                        <p className="text-[11px] text-slate-500 mt-0.5">{t.venue_name}</p>
+                      )}
                       <p className={`text-xs font-medium mt-0.5 ${status.className}`}>{status.label}</p>
                       <p className="font-bold text-slate-900 mt-2 text-sm">
                         {formatMoney(Number(t.price) || 0, { compact: true })}
@@ -394,6 +401,19 @@ export default function PublicEventDetailPage({
               Book Tickets
             </button>
           </section>
+
+          {gallery.length > 0 && (
+            <section className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-3">Gallery</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {gallery.map((url, i) => (
+                  <div key={`${url}-${i}`} className="rounded-xl overflow-hidden h-32 border border-slate-100">
+                    <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="border-b border-slate-200 flex gap-6 overflow-x-auto">
             {tabs.map((t) => (
@@ -413,7 +433,7 @@ export default function PublicEventDetailPage({
           </div>
 
           {tab === "about" && (
-            <div className="grid md:grid-cols-2 gap-8">
+            <div className="grid md:grid-cols-2 gap-8 bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 shadow-sm">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 mb-3">About Event</h3>
                 {displayAbout ? (
@@ -431,14 +451,40 @@ export default function PublicEventDetailPage({
                     <FaChevronDown className={aboutExpanded ? "rotate-180" : ""} size={11} />
                   </button>
                 )}
+                <dl className="grid sm:grid-cols-2 gap-3 mt-5 pt-5 border-t border-slate-100 text-sm">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-400 mb-1">Language</dt>
+                    <dd className="text-slate-800 font-medium">{languageLabel}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-400 mb-1">Age group</dt>
+                    <dd className="text-slate-800 font-medium">{event.age_group || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-400 mb-1">Duration</dt>
+                    <dd className="text-slate-800 font-medium">{durationLabel || "—"}</dd>
+                  </div>
+                </dl>
+                {genres.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {genres.map((g) => (
+                      <span
+                        key={g}
+                        className="px-3 py-1 rounded-full bg-violet-50 text-violet-700 text-sm font-medium"
+                      >
+                        {g}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               {highlights.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">Event Highlights</h3>
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">Highlights</h3>
                   <ul className="space-y-2">
                     {highlights.map((h) => (
                       <li key={h} className="flex items-start gap-2 text-sm text-slate-700">
-                        <FaCheck size={12} className="text-[#1B5E3B] mt-1 shrink-0" />
+                        <FaCheck className="text-[#1B5E3B] mt-0.5 shrink-0" size={12} />
                         {h}
                       </li>
                     ))}
@@ -449,55 +495,85 @@ export default function PublicEventDetailPage({
           )}
 
           {tab === "schedule" && (
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Schedule</h3>
-              {showtimes.length === 0 ? (
-                <p className="text-sm text-slate-500">Showtimes coming soon.</p>
-              ) : (
-                <ul className="space-y-3">
+            <section className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-4">Showtimes & venues</h2>
+              {showtimes.length > 0 ? (
+                <ul className="space-y-4">
                   {showtimes.map((s) => {
                     const mapsQuery = [s.venue_name, s.venue_address].filter(Boolean).join(", ");
                     const mapsUrl = mapsQuery
                       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
                       : null;
+                    const isPast = new Date(s.starts_at).getTime() < Date.now();
+                    const venueTickets =
+                      s.ticket_types?.length
+                        ? s.ticket_types
+                        : ticketTypes.filter((t) => !t.showtime_id || t.showtime_id === s.id);
                     return (
-                      <li key={s.id} className="bg-white rounded-xl border border-slate-100 p-4">
-                        <p className="font-semibold text-slate-900">{s.venue_name || "Venue TBA"}</p>
-                        {s.venue_address && (
-                          <p className="text-sm text-slate-500 mt-1 flex items-start gap-1.5">
-                            <FaMapMarkerAlt className="mt-0.5 shrink-0" />
-                            {s.venue_address}
-                          </p>
-                        )}
-                        <p className="text-sm text-slate-600 mt-1">
-                          {formatDateTime12h(s.starts_at)}
-                          {s.ends_at ? ` → ${formatDateTime12h(s.ends_at)}` : ""}
-                        </p>
-                        <div className="mt-3 flex items-center gap-4">
-                          <button
-                            type="button"
-                            onClick={() => openCheckout(s.id)}
-                            className="text-sm font-semibold text-[#1B5E3B] cursor-pointer"
-                          >
-                            Book this show
-                          </button>
-                          {mapsUrl && (
-                            <a
-                              href={mapsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-semibold text-[#1B5E3B]"
-                            >
-                              Get Directions
-                            </a>
-                          )}
+                      <li
+                        key={s.id}
+                        className={`border border-slate-100 rounded-xl p-4 ${isPast ? "opacity-60" : "bg-slate-50/60"}`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">{s.venue_name || "Venue TBA"}</p>
+                            {s.venue_address && (
+                              <p className="text-sm text-slate-500 mt-0.5 flex items-start gap-1.5">
+                                <FaMapMarkerAlt className="mt-0.5 shrink-0" />
+                                {s.venue_address}
+                              </p>
+                            )}
+                            <p className="text-sm text-slate-700 mt-2 flex items-center gap-1.5">
+                              <FaCalendarAlt className="text-slate-400" />
+                              {formatDateTime12h(s.starts_at)}
+                              {s.ends_at ? ` → ${formatDateTime12h(s.ends_at)}` : ""}
+                            </p>
+                            {venueTickets.length > 0 && (
+                              <ul className="mt-2 flex flex-wrap gap-1.5">
+                                {venueTickets.map((t) => (
+                                  <li
+                                    key={`${s.id}-${t.ticket_type}-${t.price}`}
+                                    className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700"
+                                  >
+                                    {t.ticket_type} · {formatMoney(t.price, { compact: true })}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {isPast && (
+                              <p className="text-xs text-slate-400 mt-1">This show has ended</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {mapsUrl && (
+                              <a
+                                href={mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-semibold text-[#1B5E3B]"
+                              >
+                                Get Directions
+                              </a>
+                            )}
+                            {!isPast && (
+                              <button
+                                type="button"
+                                onClick={() => openCheckout(s.id)}
+                                className="px-3 py-1.5 rounded-lg bg-[#1B5E3B] text-white text-xs font-bold cursor-pointer"
+                              >
+                                Book this show
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </li>
                     );
                   })}
                 </ul>
+              ) : (
+                <p className="text-slate-500 text-sm">Showtimes coming soon.</p>
               )}
-            </div>
+            </section>
           )}
 
           {tab === "reviews" && (
@@ -634,9 +710,7 @@ export default function PublicEventDetailPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           {event.organizer_name && (
             <section className="pb-10">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-extrabold text-slate-900">Artists Performing</h2>
-              </div>
+              <h2 className="text-xl font-extrabold text-slate-900 mb-6">Artists Performing</h2>
               <div className="flex flex-wrap gap-8">
                 <div className="flex flex-col items-center w-24">
                   {event.poster_vertical_url || event.poster_horizontal_url ? (

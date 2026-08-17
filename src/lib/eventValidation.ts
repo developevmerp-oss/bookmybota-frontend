@@ -13,6 +13,15 @@ export const LANGUAGE_OPTIONS = [
   'Multi-language',
 ];
 
+export function parseEventLanguages(raw?: string | string[] | null): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(String).map((s) => s.trim()).filter(Boolean);
+  return String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export function validateEventForm(
   body: EventFormPayload,
   forSubmit: boolean,
@@ -28,7 +37,9 @@ export function validateEventForm(
   if (!body.name?.trim()) return 'Event name is required.';
   if (!body.category_type_id) return 'Event category is required.';
   if (!body.about_event?.trim()) return 'About event is required.';
-  if (!body.language?.trim()) return 'Language is required.';
+  if (!body.language?.trim() && !(body as { languages?: string[] }).languages?.length) {
+    return 'Language is required.';
+  }
   if (!body.age_group?.trim()) return 'Age group is required.';
   if (!body.duration_minutes || body.duration_minutes <= 0) {
     return 'Duration (minutes) is required and must be greater than 0.';

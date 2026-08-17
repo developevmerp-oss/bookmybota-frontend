@@ -220,6 +220,7 @@ export default function OrganizerTicketStatsPage() {
                         <thead>
                           <tr className="text-left border-t border-slate-200/80">
                             <th className="px-5 py-3 font-medium portal-table-head">Ticket type</th>
+                            <th className="px-5 py-3 font-medium portal-table-head">Venue</th>
                             <th className="px-5 py-3 font-medium portal-table-head">Price</th>
                             <th className="px-5 py-3 font-medium portal-table-head">Total</th>
                             <th className="px-5 py-3 font-medium portal-table-head text-green-600">Sold</th>
@@ -232,6 +233,7 @@ export default function OrganizerTicketStatsPage() {
                           {ev.ticket_types.map((t) => (
                             <tr key={t.id} className="hover:bg-slate-50/80">
                               <td className="px-5 py-3 portal-table-strong">{t.ticket_type}</td>
+                              <td className="px-5 py-3 portal-table-cell">{t.venue_name || "—"}</td>
                               <td className="px-5 py-3 portal-table-cell">{formatPrice(t.price)}</td>
                               <td className="px-5 py-3 portal-table-cell">{t.total_count}</td>
                               <td className="px-5 py-3 text-green-600 font-semibold">{t.sold}</td>

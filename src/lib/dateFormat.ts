@@ -56,6 +56,35 @@ export function fromDatetimeLocal(val: string): string {
   return new Date(val).toISOString();
 }
 
+export function fromDateAndTime(dateYmd: string, timeHm: string): string {
+  if (!dateYmd || !timeHm) return '';
+  return fromDatetimeLocal(`${dateYmd}T${timeHm}`);
+}
+
+export function toDateInput(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function toTimeInput(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function inferDurationType(startsAt?: string | null, endsAt?: string | null): 'ONE_DAY' | 'MULTI_DAY' {
+  if (!startsAt || !endsAt) return 'ONE_DAY';
+  const a = new Date(startsAt);
+  const b = new Date(endsAt);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 'ONE_DAY';
+  return a.toDateString() === b.toDateString() ? 'ONE_DAY' : 'MULTI_DAY';
+}
+
 export type ShowtimeEndValidation = 'ok' | 'missing_start' | 'before_start' | 'same_as_start';
 
 /** Validate end vs start for a single showtime row */

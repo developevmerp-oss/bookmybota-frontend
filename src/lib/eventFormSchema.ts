@@ -1,5 +1,10 @@
 import * as yup from 'yup';
-import { showtimeEndErrorMessage, validateShowtimeEnd } from './dateFormat';
+import {
+  fromDateAndTime,
+  fromDatetimeLocal,
+  showtimeEndErrorMessage,
+  validateShowtimeEnd,
+} from './dateFormat';
 
 const ticketSchema = yup.object({
   ticket_type: yup.string().trim().required('Ticket type name is required'),
@@ -19,18 +24,34 @@ const ticketSchema = yup.object({
 const showtimeSchema = yup.object({
   venue_name: yup.string().trim().required('Venue name is required'),
   venue_address: yup.string().trim().default(''),
-  starts_at: yup.string().required('Show start date & time is required'),
-  ends_at: yup
-    .string()
-    .default('')
-    .test('end-after-start', function (endsAt) {
-      const { starts_at: startsAt } = this.parent as { starts_at: string };
-      const result = validateShowtimeEnd(startsAt, endsAt || '');
-      const msg = showtimeEndErrorMessage(result);
-      if (msg) return this.createError({ message: msg });
-      return true;
-    }),
+  duration_type: yup.string().oneOf(['ONE_DAY', 'MULTI_DAY']).default('ONE_DAY'),
+  event_date: yup.string().default(''),
+  start_time: yup.string().default(''),
+  end_time: yup.string().default(''),
+  starts_at: yup.string().default(''),
+  ends_at: yup.string().default(''),
+  ticket_types: yup.array().of(ticketSchema).default([]),
 });
+
+function showtimeRangeIso(s: {
+  duration_type?: string;
+  event_date?: string;
+  start_time?: string;
+  end_time?: string;
+  starts_at?: string;
+  ends_at?: string;
+}): { start: string; end: string } {
+  if (s.duration_type === 'MULTI_DAY') {
+    return {
+      start: s.starts_at ? fromDatetimeLocal(s.starts_at) : '',
+      end: s.ends_at ? fromDatetimeLocal(s.ends_at) : '',
+    };
+  }
+  return {
+    start: fromDateAndTime(s.event_date || '', s.start_time || ''),
+    end: fromDateAndTime(s.event_date || '', s.end_time || ''),
+  };
+}
 
 export const eventDraftSchema = yup.object({
   name: yup.string().trim().required('Event name is required'),
@@ -38,11 +59,11 @@ export const eventDraftSchema = yup.object({
   genres: yup.array().of(yup.string().required()).default([]),
   poster_horizontal_url: yup.string().default(''),
   poster_vertical_url: yup.string().default(''),
-  language: yup.string().default(''),
+  gallery_images: yup.array().of(yup.string().required()).default([]),
+  languages: yup.array().of(yup.string().required()).default([]),
   about_event: yup.string().default(''),
   age_group: yup.string().default(''),
   duration_minutes: yup.number().nullable().default(null),
-  ticket_types: yup.array().of(ticketSchema).default([]),
   showtimes: yup.array().of(showtimeSchema).default([]),
 });
 
@@ -50,7 +71,7 @@ export const eventSubmitSchema = eventDraftSchema.shape({
   category_type_id: yup.number().required('Event category is required'),
   genres: yup.array().of(yup.string().required()).min(1, 'Select at least one genre'),
   poster_horizontal_url: yup.string().trim().required('Horizontal poster is required'),
-  language: yup.string().trim().required('Language is required'),
+  languages: yup.array().of(yup.string().required()).min(1, 'Select at least one language'),
   about_event: yup.string().trim().required('About event is required'),
   age_group: yup.string().trim().required('Age group is required'),
   duration_minutes: yup
@@ -58,19 +79,50 @@ export const eventSubmitSchema = eventDraftSchema.shape({
     .typeError('Duration is required')
     .min(1, 'Duration must be greater than 0')
     .required('Duration is required'),
-  ticket_types: yup
-    .array()
-    .of(ticketSchema)
-    .min(1, 'At least one ticket type is required')
-    .required(),
   showtimes: yup
     .array()
     .of(showtimeSchema)
     .min(1, 'At least one venue / showtime is required')
-    .required(),
+    .required()
+    .test('venue-tickets-dates', function (showtimes) {
+      if (!showtimes?.length) return true;
+      for (const s of showtimes) {
+        if (!s.ticket_types?.length) {
+          return this.createError({
+            message: `Add at least one ticket type for venue "${s.venue_name || 'this venue'}".`,
+          });
+        }
+        const { start, end } = showtimeRangeIso(s);
+        if (!start) {
+          return this.createError({
+            message: `Set start date and time for venue "${s.venue_name || 'this venue'}".`,
+          });
+        }
+        if (!end) {
+          return this.createError({
+            message: `Set end time for venue "${s.venue_name || 'this venue'}".`,
+          });
+        }
+        const msg = showtimeEndErrorMessage(validateShowtimeEnd(start, end));
+        if (msg) return this.createError({ message: msg });
+      }
+      return true;
+    }),
 });
 
 export type EventFormValues = yup.InferType<typeof eventDraftSchema>;
+
+export const defaultVenue = (): EventFormValues['showtimes'][number] => ({
+  venue_name: '',
+  venue_address: '',
+  duration_type: 'ONE_DAY',
+  event_date: '',
+  start_time: '',
+  end_time: '',
+  starts_at: '',
+  ends_at: '',
+  ticket_types: [{ ticket_type: '', total_count: 100, price: 0 }],
+});
 
 export function defaultEventFormValues(): EventFormValues {
   return {
@@ -79,13 +131,18 @@ export function defaultEventFormValues(): EventFormValues {
     genres: [],
     poster_horizontal_url: '',
     poster_vertical_url: '',
-    language: '',
+    gallery_images: [],
+    languages: [],
     about_event: '',
     age_group: '',
     duration_minutes: null,
-    ticket_types: [{ ticket_type: '', total_count: 100, price: 0 }],
-    showtimes: [{ venue_name: '', venue_address: '', starts_at: '', ends_at: '' }],
+    showtimes: [defaultVenue()],
   };
+}
+
+export function showtimeToIso(s: EventFormValues['showtimes'][number]): { starts_at: string; ends_at: string } {
+  const { start, end } = showtimeRangeIso(s);
+  return { starts_at: start, ends_at: end };
 }
 
 export function validateRequiredDocuments(

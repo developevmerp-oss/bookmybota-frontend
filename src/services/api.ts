@@ -123,6 +123,8 @@ export interface AdminEvent {
     total_count: number;
     available_count: number;
     price: number | string;
+    showtime_id?: string | null;
+    venue_name?: string | null;
   }>;
   showtimes?: Array<{
     id: string;
@@ -130,14 +132,23 @@ export interface AdminEvent {
     venue_address?: string;
     starts_at: string;
     ends_at?: string;
+    duration_type?: 'ONE_DAY' | 'MULTI_DAY';
     latitude?: number | string | null;
     longitude?: number | string | null;
+    ticket_types?: Array<{
+      id?: string;
+      ticket_type: string;
+      total_count: number;
+      available_count?: number;
+      price: number | string;
+    }>;
   }>;
   bookings?: Array<Record<string, unknown>>;
   rejection_reason?: string;
   genres?: string[];
   poster_horizontal_url?: string;
   poster_vertical_url?: string;
+  gallery_images?: string[];
   documents?: EventDocumentUpload[] | string[];
 }
 
@@ -231,6 +242,7 @@ export interface OrganizerEvent extends AdminEvent {
   genres?: string[];
   poster_horizontal_url?: string;
   poster_vertical_url?: string;
+  gallery_images?: string[];
   documents?: EventDocumentUpload[] | string[];
   rejection_reason?: string;
   terms_points?: { selected?: Array<{ id?: number; text?: string } | string>; custom?: string[] };
@@ -245,8 +257,10 @@ export interface EventFormPayload {
   genres: string[];
   poster_horizontal_url: string;
   poster_vertical_url: string;
+  gallery_images?: string[];
   documents: EventDocumentUpload[];
   language: string;
+  languages?: string[];
   about_event: string;
   age_group: string;
   duration_minutes: number | null;
@@ -256,6 +270,8 @@ export interface EventFormPayload {
     venue_address: string;
     starts_at: string;
     ends_at: string;
+    duration_type?: 'ONE_DAY' | 'MULTI_DAY';
+    ticket_types?: Array<{ ticket_type: string; total_count: number; price: number }>;
   }>;
 }
 
@@ -266,6 +282,7 @@ export interface PublicEvent {
   poster_vertical_url?: string;
   language?: string;
   about_event?: string;
+  gallery_images?: string[];
   age_group?: string;
   duration_minutes?: number;
   category_name?: string;
@@ -281,6 +298,8 @@ export interface PublicEvent {
 export interface EventTicketTypeStats {
   id: string;
   ticket_type: string;
+  venue_name?: string | null;
+  showtime_id?: string | null;
   price: number;
   total_count: number;
   available_count: number;
@@ -754,6 +773,7 @@ export const api = createApi({
         admin_password?: string;
         partner_type?: 'dining' | 'event';
         documents?: PartnerDocumentUpload[];
+        cover_image_url?: string;
       }
     >({
       query: (body) => ({
@@ -776,6 +796,7 @@ export const api = createApi({
         admin_email?: string;
         admin_password?: string;
         documents?: PartnerDocumentUpload[];
+        cover_image_url?: string;
       }
     >({
       query: ({ id, ...body }) => ({

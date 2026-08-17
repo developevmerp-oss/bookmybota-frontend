@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ImagePlus, Plus, Trash2, Upload, FileText, X, AlertCircle } from "lucide-react";
+import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetBusinessTypesQuery,
@@ -13,22 +13,27 @@ import {
   type EventFormPayload,
   type OrganizerEvent,
 } from "@/services/api";
-import { AGE_GROUP_OPTIONS, LANGUAGE_OPTIONS } from "@/lib/eventValidation";
+import { AGE_GROUP_OPTIONS, LANGUAGE_OPTIONS, parseEventLanguages } from "@/lib/eventValidation";
 import {
   eventDraftSchema,
   eventSubmitSchema,
   validateRequiredDocuments,
   type EventFormValues,
   defaultEventFormValues,
+  defaultVenue,
+  showtimeToIso,
 } from "@/lib/eventFormSchema";
 import {
+  formatDate,
   formatDateTime12h,
-  fromDatetimeLocal,
+  formatTime12h,
+  inferDurationType,
+  toDateInput,
   toDatetimeLocal,
-  validateShowtimeEnd,
-  showtimeEndErrorMessage,
+  toTimeInput,
 } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import ImageCropPicker, { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 
 function normalizeFormDocuments(docs?: EventDocumentUpload[] | string[]): EventDocumentUpload[] {
   if (!docs?.length) return [];
@@ -38,32 +43,242 @@ function normalizeFormDocuments(docs?: EventDocumentUpload[] | string[]): EventD
   return docs as EventDocumentUpload[];
 }
 
+function ticketsForShow(
+  event: OrganizerEvent,
+  showId: string,
+  showIndex: number
+): EventFormValues["showtimes"][number]["ticket_types"] {
+  const all = event.ticket_types || [];
+  const nested = (event.showtimes?.find((s) => s.id === showId)?.ticket_types || []).map((t) => ({
+    ticket_type: t.ticket_type,
+    total_count: Number(t.total_count),
+    price: Number(t.price),
+  }));
+  if (nested.length) return nested;
+  const scoped = all.filter((t) => t.showtime_id === showId).map((t) => ({
+    ticket_type: t.ticket_type,
+    total_count: Number(t.total_count),
+    price: Number(t.price),
+  }));
+  if (scoped.length) return scoped;
+  const unscoped = all.filter((t) => !t.showtime_id).map((t) => ({
+    ticket_type: t.ticket_type,
+    total_count: Number(t.total_count),
+    price: Number(t.price),
+  }));
+  if (showIndex === 0 && unscoped.length) return unscoped;
+  return [{ ticket_type: "", total_count: 100, price: 0 }];
+}
+
 function eventToValues(event?: OrganizerEvent | null): EventFormValues {
   if (!event) return defaultEventFormValues();
+  const gallery = Array.isArray(event.gallery_images) ? event.gallery_images : [];
   return {
     name: event.name || "",
     category_type_id: event.category_type_id ?? null,
     genres: event.genres || [],
     poster_horizontal_url: event.poster_horizontal_url || "",
     poster_vertical_url: event.poster_vertical_url || "",
-    language: event.language || "",
+    gallery_images: gallery,
+    languages: parseEventLanguages(event.language),
     about_event: event.about_event || "",
     age_group: event.age_group || "",
     duration_minutes: event.duration_minutes ?? null,
-    ticket_types:
-      event.ticket_types?.map((t) => ({
-        ticket_type: t.ticket_type,
-        total_count: Number(t.total_count),
-        price: Number(t.price),
-      })) || [{ ticket_type: "", total_count: 100, price: 0 }],
     showtimes:
-      event.showtimes?.map((s) => ({
-        venue_name: s.venue_name || "",
-        venue_address: s.venue_address || "",
-        starts_at: toDatetimeLocal(s.starts_at),
-        ends_at: toDatetimeLocal(s.ends_at),
-      })) || [{ venue_name: "", venue_address: "", starts_at: "", ends_at: "" }],
+      event.showtimes?.map((s, i) => {
+        const durationType =
+          s.duration_type || inferDurationType(s.starts_at, s.ends_at || s.starts_at);
+        return {
+          venue_name: s.venue_name || "",
+          venue_address: s.venue_address || "",
+          duration_type: durationType,
+          event_date: toDateInput(s.starts_at),
+          start_time: toTimeInput(s.starts_at),
+          end_time: toTimeInput(s.ends_at || s.starts_at),
+          starts_at: toDatetimeLocal(s.starts_at),
+          ends_at: toDatetimeLocal(s.ends_at),
+          ticket_types: ticketsForShow(event, s.id, i),
+        };
+      }) || [defaultVenue()],
   };
+}
+
+function VenueBlock({
+  index,
+  readOnly,
+  canRemove,
+  onRemove,
+}: {
+  index: number;
+  readOnly: boolean;
+  canRemove: boolean;
+  onRemove: () => void;
+}) {
+  const {
+    register,
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<EventFormValues>();
+  const {
+    fields: ticketFields,
+    append,
+    remove,
+  } = useFieldArray({ control, name: `showtimes.${index}.ticket_types` });
+
+  const durationType = watch(`showtimes.${index}.duration_type`) || "ONE_DAY";
+  const eventDate = watch(`showtimes.${index}.event_date`);
+  const startTime = watch(`showtimes.${index}.start_time`);
+  const endTime = watch(`showtimes.${index}.end_time`);
+  const startsAt = watch(`showtimes.${index}.starts_at`);
+  const endsAt = watch(`showtimes.${index}.ends_at`);
+  const labelClass = "portal-label block text-sm font-semibold mb-1.5";
+  const errorClass = "text-rose-600 text-xs mt-1";
+  const inputClass = "input-field w-full";
+
+  return (
+    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-800">Venue {index + 1}</p>
+        {!readOnly && canRemove && (
+          <button type="button" onClick={onRemove} className="p-1.5 text-slate-400 hover:text-rose-600">
+            <Trash2 size={16} />
+          </button>
+        )}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Venue name</label>
+          <input disabled={readOnly} className={inputClass} {...register(`showtimes.${index}.venue_name`)} placeholder="City Auditorium" />
+          {errors.showtimes?.[index]?.venue_name && (
+            <p className={errorClass}>{errors.showtimes[index]?.venue_name?.message}</p>
+          )}
+        </div>
+        <div>
+          <label className={labelClass}>Venue address</label>
+          <input disabled={readOnly} className={inputClass} {...register(`showtimes.${index}.venue_address`)} placeholder="Full address" />
+        </div>
+      </div>
+
+      <div>
+        <p className={labelClass}>Event duration</p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              disabled={readOnly}
+              checked={durationType === "ONE_DAY"}
+              onChange={() => setValue(`showtimes.${index}.duration_type`, "ONE_DAY", { shouldDirty: true })}
+            />
+            One day event
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              disabled={readOnly}
+              checked={durationType === "MULTI_DAY"}
+              onChange={() => setValue(`showtimes.${index}.duration_type`, "MULTI_DAY", { shouldDirty: true })}
+            />
+            Multiple day event
+          </label>
+        </div>
+      </div>
+
+      {durationType === "ONE_DAY" ? (
+        <div className="grid sm:grid-cols-3 gap-3">
+          <div>
+            <label className={labelClass}>Date (mm-dd-yyyy)</label>
+            <input disabled={readOnly} type="date" className={inputClass} {...register(`showtimes.${index}.event_date`)} />
+            {eventDate && <p className="text-xs text-slate-600 mt-1">{formatDate(eventDate)}</p>}
+          </div>
+          <div>
+            <label className={labelClass}>Start time</label>
+            <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.start_time`)} />
+            {startTime && eventDate && (
+              <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${startTime}`)}</p>
+            )}
+          </div>
+          <div>
+            <label className={labelClass}>End time</label>
+            <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.end_time`)} />
+            {endTime && eventDate && (
+              <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${endTime}`)}</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>Start date & time</label>
+            <input disabled={readOnly} type="datetime-local" className={inputClass} {...register(`showtimes.${index}.starts_at`)} />
+            {startsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(startsAt)}</p>}
+          </div>
+          <div>
+            <label className={labelClass}>End date & time</label>
+            <input disabled={readOnly} type="datetime-local" className={inputClass} {...register(`showtimes.${index}.ends_at`)} />
+            {endsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(endsAt)}</p>}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3 pt-2 border-t border-slate-200">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-slate-800">Ticket types for this venue</p>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => append({ ticket_type: "", total_count: 100, price: 0 })}
+              className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
+            >
+              <Plus size={14} /> Add type
+            </button>
+          )}
+        </div>
+        {ticketFields.map((field, ti) => (
+          <div key={field.id} className="grid sm:grid-cols-4 gap-3 items-start">
+            <div className="sm:col-span-2">
+              <label className={labelClass}>Type name</label>
+              <input
+                disabled={readOnly}
+                className={inputClass}
+                {...register(`showtimes.${index}.ticket_types.${ti}.ticket_type`)}
+                placeholder="General, VIP..."
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Total seats</label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={1}
+                className={inputClass}
+                {...register(`showtimes.${index}.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
+              />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className={labelClass}>Price (ETB)</label>
+                <input
+                  disabled={readOnly}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className={inputClass}
+                  {...register(`showtimes.${index}.ticket_types.${ti}.price`, { valueAsNumber: true })}
+                />
+              </div>
+              {!readOnly && ticketFields.length > 1 && (
+                <button type="button" onClick={() => remove(ti)} className="p-2.5 text-slate-400 hover:text-rose-600 self-end">
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 interface EventFormProps {
@@ -96,6 +311,11 @@ export default function EventForm({
     [businessTypes]
   );
 
+  const methods = useForm<EventFormValues>({
+    defaultValues: eventToValues(event),
+    resolver: yupResolver(eventDraftSchema),
+    mode: "onBlur",
+  });
   const {
     register,
     control,
@@ -105,27 +325,18 @@ export default function EventForm({
     reset,
     getValues,
     formState: { errors },
-  } = useForm<EventFormValues>({
-    defaultValues: eventToValues(event),
-    resolver: yupResolver(eventDraftSchema),
-    mode: "onBlur",
-  });
+  } = methods;
 
   const categoryTypeId = watch("category_type_id");
   const genres = watch("genres") || [];
+  const languages = watch("languages") || [];
   const posterHorizontal = watch("poster_horizontal_url");
   const posterVertical = watch("poster_vertical_url");
-  const showtimes = watch("showtimes") || [];
+  const galleryImages = watch("gallery_images") || [];
 
   const { data: masters, isLoading: mastersLoading } = useGetEventMastersQuery(categoryTypeId!, {
     skip: !categoryTypeId,
   });
-
-  const {
-    fields: ticketFields,
-    append: appendTicket,
-    remove: removeTicket,
-  } = useFieldArray({ control, name: "ticket_types" });
 
   const {
     fields: showtimeFields,
@@ -150,29 +361,40 @@ export default function EventForm({
     }
   }, [categoryTypeId, masters?.genres, getValues, setValue]);
 
-  const buildPayload = (values: EventFormValues): EventFormPayload => ({
-    name: values.name.trim(),
-    category_type_id: values.category_type_id,
-    genres: values.genres || [],
-    poster_horizontal_url: values.poster_horizontal_url || "",
-    poster_vertical_url: values.poster_vertical_url || "",
-    documents: documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
-    language: values.language || "",
-    about_event: values.about_event.trim(),
-    age_group: values.age_group || "",
-    duration_minutes: values.duration_minutes,
-    ticket_types: (values.ticket_types || []).map((t) => ({
-      ticket_type: t.ticket_type.trim(),
-      total_count: Number(t.total_count),
-      price: Number(t.price),
-    })),
-    showtimes: (values.showtimes || []).map((s) => ({
-      venue_name: s.venue_name.trim(),
-      venue_address: s.venue_address?.trim() || "",
-      starts_at: fromDatetimeLocal(s.starts_at),
-      ends_at: s.ends_at ? fromDatetimeLocal(s.ends_at) : "",
-    })),
-  });
+  const buildPayload = (values: EventFormValues): EventFormPayload => {
+    const showtimes = (values.showtimes || []).map((s) => {
+      const range = showtimeToIso(s);
+      return {
+        venue_name: s.venue_name.trim(),
+        venue_address: s.venue_address?.trim() || "",
+        starts_at: range.starts_at,
+        ends_at: range.ends_at,
+        duration_type: (s.duration_type === "MULTI_DAY" ? "MULTI_DAY" : "ONE_DAY") as "ONE_DAY" | "MULTI_DAY",
+        ticket_types: (s.ticket_types || []).map((t) => ({
+          ticket_type: t.ticket_type.trim(),
+          total_count: Number(t.total_count),
+          price: Number(t.price),
+        })),
+      };
+    });
+    const ticket_types = showtimes.flatMap((s) => s.ticket_types);
+    return {
+      name: values.name.trim(),
+      category_type_id: values.category_type_id,
+      genres: values.genres || [],
+      poster_horizontal_url: values.poster_horizontal_url || "",
+      poster_vertical_url: values.poster_vertical_url || "",
+      gallery_images: values.gallery_images || [],
+      documents: documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
+      languages: values.languages || [],
+      language: (values.languages || []).join(", "),
+      about_event: values.about_event.trim(),
+      age_group: values.age_group || "",
+      duration_minutes: values.duration_minutes,
+      ticket_types,
+      showtimes,
+    };
+  };
 
   const validateMasters = (forSubmit: boolean) => {
     if (!forSubmit || !masters) return null;
@@ -217,27 +439,18 @@ export default function EventForm({
     }
   };
 
-  const handlePosterUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: "poster_horizontal_url" | "poster_vertical_url"
-  ) => {
-    if (!e.target.files?.length || readOnly) return;
-    const file = e.target.files[0];
+  const uploadCropped = async (file: File, onUrl: (url: string) => void) => {
     const formData = new FormData();
     formData.append("image", file);
     try {
       const res = await uploadImage(formData).unwrap();
-      if (res.url) setValue(field, res.url, { shouldDirty: true });
+      if (res.url) onUrl(res.url);
     } catch {
       toast.error(`Failed to upload ${file.name}`);
     }
-    e.target.value = "";
   };
 
-  const handleDocumentUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    documentTypeId: number
-  ) => {
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => {
     if (!e.target.files?.length || readOnly) return;
     const file = e.target.files[0];
     const formData = new FormData();
@@ -262,13 +475,10 @@ export default function EventForm({
     setValue("genres", next, { shouldDirty: true });
   };
 
-  const onShowtimeEndChange = (index: number, startsAt: string, endsAt: string) => {
-    const result = validateShowtimeEnd(startsAt, endsAt);
-    if (result === "same_as_start") {
-      toast.warning("End date & time cannot be the same as start. Please pick a later end time.");
-    } else if (result === "before_start") {
-      toast.warning("End date & time cannot be before the start date & time.");
-    }
+  const toggleLanguage = (name: string) => {
+    if (readOnly) return;
+    const next = languages.includes(name) ? languages.filter((l) => l !== name) : [...languages, name];
+    setValue("languages", next, { shouldDirty: true });
   };
 
   const statusBanner = () => {
@@ -310,326 +520,307 @@ export default function EventForm({
   const inputClass = "input-field w-full";
 
   return (
-    <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
-      {statusBanner()}
+    <FormProvider {...methods}>
+      <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
+        {statusBanner()}
 
-      <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
-        <h3 className="portal-heading text-lg font-semibold">Basic details</h3>
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+          <h3 className="portal-heading text-lg font-semibold">Basic details</h3>
 
-        <div>
-          <label className={labelClass}>Event name <span className="text-rose-500">*</span></label>
-          <input disabled={readOnly} {...register("name")} placeholder="e.g. Stand-up Comedy Night" className={inputClass} />
-          {errors.name && <p className={errorClass}>{errors.name.message}</p>}
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Category <span className="text-rose-500">*</span></label>
-            <select
-              disabled={readOnly}
-              className={inputClass}
-              value={categoryTypeId ?? ""}
-              onChange={(e) => {
-                const val = e.target.value ? Number(e.target.value) : null;
-                setValue("category_type_id", val, { shouldDirty: true });
-                setValue("genres", []);
-                setDocuments([]);
-              }}
-            >
-              <option value="">Select category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            {errors.category_type_id && <p className={errorClass}>{errors.category_type_id.message}</p>}
+            <label className={labelClass}>Event name <span className="text-rose-500">*</span></label>
+            <input disabled={readOnly} {...register("name")} placeholder="e.g. Stand-up Comedy Night" className={inputClass} />
+            {errors.name && <p className={errorClass}>{errors.name.message}</p>}
           </div>
-          <div>
-            <label className={labelClass}>Duration (minutes) <span className="text-rose-500">*</span></label>
-            <input disabled={readOnly} type="number" min={1} className={inputClass} {...register("duration_minutes", { valueAsNumber: true })} />
-            {errors.duration_minutes && <p className={errorClass}>{errors.duration_minutes.message}</p>}
-          </div>
-        </div>
 
-        <div>
-          <label className={labelClass}>
-            Genres {masters?.genres?.length ? <span className="text-rose-500">*</span> : null}
-          </label>
-          {!categoryTypeId ? (
-            <p className="portal-muted text-sm">Select a category to see available genres.</p>
-          ) : mastersLoading ? (
-            <p className="portal-muted text-sm">Loading genres...</p>
-          ) : masters?.genres?.length ? (
-            <div className="flex flex-wrap gap-2">
-              {masters.genres.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() => toggleGenre(g.name)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    genres.includes(g.name)
-                      ? "bg-violet-500/20 text-violet-700 border-violet-500/40"
-                      : "portal-muted border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  {g.name}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-amber-700 text-sm">No genres configured. Ask Super Admin to add genres.</p>
-          )}
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>Language <span className="text-rose-500">*</span></label>
-            <select disabled={readOnly} className={inputClass} {...register("language")}>
-              <option value="">Select language</option>
-              {LANGUAGE_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
-            {errors.language && <p className={errorClass}>{errors.language.message}</p>}
-          </div>
-          <div>
-            <label className={labelClass}>Age group <span className="text-rose-500">*</span></label>
-            <select disabled={readOnly} className={inputClass} {...register("age_group")}>
-              <option value="">Select age group</option>
-              {AGE_GROUP_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-            {errors.age_group && <p className={errorClass}>{errors.age_group.message}</p>}
-          </div>
-        </div>
-
-        <div>
-          <label className={labelClass}>About event <span className="text-rose-500">*</span></label>
-          <textarea disabled={readOnly} rows={4} className={`${inputClass} resize-y min-h-[100px]`} {...register("about_event")} placeholder="Describe the event..." />
-          {errors.about_event && <p className={errorClass}>{errors.about_event.message}</p>}
-        </div>
-      </section>
-
-      <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
-        <h3 className="portal-heading text-lg font-semibold">Posters</h3>
-        <div className="grid sm:grid-cols-2 gap-6">
-          <div>
-            <label className={labelClass}>Horizontal poster <span className="text-rose-500">*</span></label>
-            {posterHorizontal ? (
-              <div className="relative rounded-xl overflow-hidden border border-slate-200 mb-2">
-                <img src={posterHorizontal} alt="Horizontal poster" className="w-full h-36 object-cover" />
-                {!readOnly && (
-                  <button type="button" onClick={() => setValue("poster_horizontal_url", "")} className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center h-36 rounded-xl border border-dashed border-slate-300 hover:border-violet-400 cursor-pointer">
-                <ImagePlus className="text-slate-400 mb-2" size={28} />
-                <span className="text-xs portal-muted">Upload landscape poster</span>
-                <input type="file" accept="image/*" className="hidden" disabled={readOnly || uploading} onChange={(e) => handlePosterUpload(e, "poster_horizontal_url")} />
-              </label>
-            )}
-          </div>
-          <div>
-            <label className={labelClass}>Vertical poster</label>
-            {posterVertical ? (
-              <div className="relative rounded-xl overflow-hidden border border-slate-200 mb-2 max-w-[200px]">
-                <img src={posterVertical} alt="Vertical poster" className="w-full h-48 object-cover" />
-                {!readOnly && (
-                  <button type="button" onClick={() => setValue("poster_vertical_url", "")} className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center h-36 rounded-xl border border-dashed border-slate-300 hover:border-violet-400 cursor-pointer max-w-[200px]">
-                <ImagePlus className="text-slate-400 mb-2" size={28} />
-                <span className="text-xs portal-muted">Upload portrait poster</span>
-                <input type="file" accept="image/*" className="hidden" disabled={readOnly || uploading} onChange={(e) => handlePosterUpload(e, "poster_vertical_url")} />
-              </label>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
-        <div>
-          <h3 className="portal-heading text-lg font-semibold">Event-specific documents</h3>
-          <p className="portal-muted text-sm mt-1">Upload documents required by Super Admin for each event.</p>
-        </div>
-        {!categoryTypeId ? (
-          <p className="portal-muted text-sm">Select a category to see the document checklist.</p>
-        ) : mastersLoading ? (
-          <p className="portal-muted text-sm">Loading document requirements...</p>
-        ) : masters?.documents?.length ? (
-          <div className="space-y-4">
-            {masters.documents.map((doc) => {
-              const uploadedUrl = documents.find((d) => d.document_type_id === doc.id)?.url;
-              return (
-                <div key={doc.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="portal-heading font-semibold">{doc.name}</span>
-                      {doc.is_required && (
-                        <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Required</span>
-                      )}
-                    </div>
-                    {doc.description && <p className="portal-muted text-sm mt-1.5 leading-relaxed">{doc.description}</p>}
-                  </div>
-                  {uploadedUrl ? (
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-slate-200">
-                      <FileText size={16} className="text-violet-600 shrink-0" />
-                      <a href={uploadedUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-800 truncate flex-1 hover:text-violet-700">View uploaded file</a>
-                      {!readOnly && (
-                        <button type="button" onClick={() => setDocuments((p) => p.filter((d) => d.document_type_id !== doc.id))} className="text-slate-400 hover:text-rose-600">
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    !readOnly && (
-                      <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-violet-400 cursor-pointer">
-                        <Upload size={16} /> Upload PDF or image
-                        <input type="file" accept="image/*,.pdf" className="hidden" disabled={uploading} onChange={(e) => handleDocumentUpload(e, doc.id)} />
-                      </label>
-                    )
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-amber-700 text-sm">No document types configured yet.</p>
-        )}
-      </section>
-
-      <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="portal-heading text-lg font-semibold">Ticket types <span className="text-rose-500 text-sm">*</span></h3>
-          {!readOnly && (
-            <button type="button" onClick={() => appendTicket({ ticket_type: "", total_count: 100, price: 0 })} className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1">
-              <Plus size={14} /> Add type
-            </button>
-          )}
-        </div>
-        {ticketFields.map((field, i) => (
-          <div key={field.id} className="grid sm:grid-cols-4 gap-3 items-start">
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Type name</label>
-              <input disabled={readOnly} className={inputClass} {...register(`ticket_types.${i}.ticket_type`)} placeholder="General, VIP..." />
-              {errors.ticket_types?.[i]?.ticket_type && <p className={errorClass}>{errors.ticket_types[i]?.ticket_type?.message}</p>}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Category <span className="text-rose-500">*</span></label>
+              <select
+                disabled={readOnly}
+                className={inputClass}
+                value={categoryTypeId ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : null;
+                  setValue("category_type_id", val, { shouldDirty: true });
+                  setValue("genres", []);
+                  setDocuments([]);
+                }}
+              >
+                <option value="">Select category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              {errors.category_type_id && <p className={errorClass}>{errors.category_type_id.message}</p>}
             </div>
             <div>
-              <label className={labelClass}>Total seats</label>
-              <input disabled={readOnly} type="number" min={1} className={inputClass} {...register(`ticket_types.${i}.total_count`, { valueAsNumber: true })} />
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className={labelClass}>Price (ETB)</label>
-                <input disabled={readOnly} type="number" min={0} step="0.01" className={inputClass} {...register(`ticket_types.${i}.price`, { valueAsNumber: true })} />
-              </div>
-              {!readOnly && ticketFields.length > 1 && (
-                <button type="button" onClick={() => removeTicket(i)} className="p-2.5 text-slate-400 hover:text-rose-600 self-end"><Trash2 size={16} /></button>
-              )}
+              <label className={labelClass}>Duration (minutes) <span className="text-rose-500">*</span></label>
+              <input disabled={readOnly} type="number" min={1} className={inputClass} {...register("duration_minutes", { valueAsNumber: true })} />
+              {errors.duration_minutes && <p className={errorClass}>{errors.duration_minutes.message}</p>}
             </div>
           </div>
-        ))}
-        {errors.ticket_types && typeof errors.ticket_types.message === "string" && (
-          <p className={errorClass}>{errors.ticket_types.message}</p>
-        )}
-      </section>
 
-      <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="portal-heading text-lg font-semibold">Venue & showtimes <span className="text-rose-500 text-sm">*</span></h3>
-          {!readOnly && (
-            <button type="button" onClick={() => appendShowtime({ venue_name: "", venue_address: "", starts_at: "", ends_at: "" })} className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1">
-              <Plus size={14} /> Add showtime
-            </button>
-          )}
-        </div>
-        <p className="portal-muted text-xs">Dates shown as MM-DD-YYYY, 12-hour time. End must be after start.</p>
-        {showtimeFields.map((field, i) => {
-          const startsAt = showtimes[i]?.starts_at || "";
-          const endsAt = showtimes[i]?.ends_at || "";
-          return (
-            <div key={field.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Venue name</label>
-                  <input disabled={readOnly} className={inputClass} {...register(`showtimes.${i}.venue_name`)} placeholder="City Auditorium" />
-                  {errors.showtimes?.[i]?.venue_name && <p className={errorClass}>{errors.showtimes[i]?.venue_name?.message}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>Venue address</label>
-                  <input disabled={readOnly} className={inputClass} {...register(`showtimes.${i}.venue_address`)} placeholder="Full address" />
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Starts at</label>
-                  <input
+          <div>
+            <label className={labelClass}>
+              Genres {masters?.genres?.length ? <span className="text-rose-500">*</span> : null}
+            </label>
+            {!categoryTypeId ? (
+              <p className="portal-muted text-sm">Select a category to see available genres.</p>
+            ) : mastersLoading ? (
+              <p className="portal-muted text-sm">Loading genres...</p>
+            ) : masters?.genres?.length ? (
+              <div className="flex flex-wrap gap-2">
+                {masters.genres.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
                     disabled={readOnly}
-                    type="datetime-local"
-                    className={inputClass}
-                    {...register(`showtimes.${i}.starts_at`, {
-                      onChange: (e) => {
-                        if (endsAt) onShowtimeEndChange(i, e.target.value, endsAt);
-                      },
-                    })}
-                  />
-                  {startsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(startsAt)}</p>}
-                  {errors.showtimes?.[i]?.starts_at && <p className={errorClass}>{errors.showtimes[i]?.starts_at?.message}</p>}
-                </div>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className={labelClass}>Ends at (optional)</label>
-                    <input
-                      disabled={readOnly}
-                      type="datetime-local"
-                      min={startsAt || undefined}
-                      className={inputClass}
-                      {...register(`showtimes.${i}.ends_at`, {
-                        onChange: (e) => onShowtimeEndChange(i, startsAt, e.target.value),
-                      })}
-                    />
-                    {endsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(endsAt)}</p>}
-                    {errors.showtimes?.[i]?.ends_at && <p className={errorClass}>{errors.showtimes[i]?.ends_at?.message}</p>}
-                  </div>
-                  {!readOnly && showtimeFields.length > 1 && (
-                    <button type="button" onClick={() => removeShowtime(i)} className="p-2.5 text-slate-400 hover:text-rose-600 self-end"><Trash2 size={16} /></button>
-                  )}
-                </div>
+                    onClick={() => toggleGenre(g.name)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      genres.includes(g.name)
+                        ? "bg-violet-500/20 text-violet-700 border-violet-500/40"
+                        : "portal-muted border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                ))}
               </div>
-            </div>
-          );
-        })}
-        {errors.showtimes && typeof errors.showtimes.message === "string" && (
-          <p className={errorClass}>{errors.showtimes.message}</p>
-        )}
-      </section>
+            ) : (
+              <p className="text-amber-700 text-sm">No genres configured. Ask Super Admin to add genres.</p>
+            )}
+          </div>
 
-      {!readOnly && (
-        <div className="flex flex-wrap gap-3 pt-2">
-          <button
-            type="button"
-            disabled={saving || submitting}
-            onClick={runSaveDraft}
-            className="btn-secondary px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save draft"}
-          </button>
-          {canSubmit && (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Languages <span className="text-rose-500">*</span></label>
+              <div className="flex flex-wrap gap-2">
+                {LANGUAGE_OPTIONS.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => toggleLanguage(l)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      languages.includes(l)
+                        ? "bg-violet-500/20 text-violet-700 border-violet-500/40"
+                        : "portal-muted border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {errors.languages && <p className={errorClass}>{errors.languages.message as string}</p>}
+            </div>
+            <div>
+              <label className={labelClass}>Age group <span className="text-rose-500">*</span></label>
+              <select disabled={readOnly} className={inputClass} {...register("age_group")}>
+                <option value="">Select age group</option>
+                {AGE_GROUP_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+              {errors.age_group && <p className={errorClass}>{errors.age_group.message}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>About event <span className="text-rose-500">*</span></label>
+            <textarea disabled={readOnly} rows={4} className={`${inputClass} resize-y min-h-[100px]`} {...register("about_event")} placeholder="Describe the event..." />
+            {errors.about_event && <p className={errorClass}>{errors.about_event.message}</p>}
+          </div>
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+          <h3 className="portal-heading text-lg font-semibold">Posters</h3>
+          <p className="portal-muted text-xs">Drag a crop box on the photo, then save. You can edit or remove any image later.</p>
+          <div className="grid sm:grid-cols-2 gap-6">
+            <div>
+              <label className={labelClass}>Horizontal poster <span className="text-rose-500">*</span></label>
+              <CroppedImageField
+                value={posterHorizontal}
+                aspect={16 / 9}
+                disabled={readOnly || uploading}
+                previewClassName="w-full h-36 rounded-xl"
+                emptyClassName="flex flex-col items-center justify-center h-36 w-full rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+                onRemove={() => setValue("poster_horizontal_url", "", { shouldDirty: true })}
+                onCroppedFile={(file) => uploadCropped(file, (url) => setValue("poster_horizontal_url", url, { shouldDirty: true }))}
+                emptyContent={
+                  <>
+                    <ImagePlus className="text-slate-400 mb-2" size={28} />
+                    <span className="text-xs portal-muted">Add landscape poster</span>
+                  </>
+                }
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Vertical poster</label>
+              <CroppedImageField
+                value={posterVertical}
+                aspect={2 / 3}
+                disabled={readOnly || uploading}
+                previewClassName="w-[200px] h-48 rounded-xl"
+                emptyClassName="flex flex-col items-center justify-center h-36 w-full max-w-[200px] rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+                onRemove={() => setValue("poster_vertical_url", "", { shouldDirty: true })}
+                onCroppedFile={(file) => uploadCropped(file, (url) => setValue("poster_vertical_url", url, { shouldDirty: true }))}
+                emptyContent={
+                  <>
+                    <ImagePlus className="text-slate-400 mb-2" size={28} />
+                    <span className="text-xs portal-muted">Add portrait poster</span>
+                  </>
+                }
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <h3 className="portal-heading text-lg font-semibold">Gallery</h3>
+          <p className="portal-muted text-sm">Photos customers will see on the event details page.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {galleryImages.map((url, i) => (
+              <CroppedImageField
+                key={`${url}-${i}`}
+                value={url}
+                aspect={4 / 3}
+                disabled={readOnly || uploading}
+                previewClassName="h-28 rounded-xl w-full"
+                onRemove={() =>
+                  setValue(
+                    "gallery_images",
+                    galleryImages.filter((_, idx) => idx !== i),
+                    { shouldDirty: true }
+                  )
+                }
+                onCroppedFile={(file) =>
+                  uploadCropped(file, (next) =>
+                    setValue(
+                      "gallery_images",
+                      galleryImages.map((u, idx) => (idx === i ? next : u)),
+                      { shouldDirty: true }
+                    )
+                  )
+                }
+              />
+            ))}
+            {!readOnly && (
+              <ImageCropPicker
+                aspect={4 / 3}
+                disabled={uploading}
+                className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+                onCroppedFile={(file) =>
+                  uploadCropped(file, (url) =>
+                    setValue("gallery_images", [...galleryImages, url], { shouldDirty: true })
+                  )
+                }
+              >
+                <ImagePlus className="text-slate-400 mb-1" size={22} />
+                <span className="text-[11px] portal-muted">Add photo</span>
+              </ImageCropPicker>
+            )}
+          </div>
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div>
+            <h3 className="portal-heading text-lg font-semibold">Event-specific documents</h3>
+            <p className="portal-muted text-sm mt-1">Upload documents required by Super Admin for each event.</p>
+          </div>
+          {!categoryTypeId ? (
+            <p className="portal-muted text-sm">Select a category to see the document checklist.</p>
+          ) : mastersLoading ? (
+            <p className="portal-muted text-sm">Loading document requirements...</p>
+          ) : masters?.documents?.length ? (
+            <div className="space-y-4">
+              {masters.documents.map((doc) => {
+                const uploadedUrl = documents.find((d) => d.document_type_id === doc.id)?.url;
+                return (
+                  <div key={doc.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="portal-heading font-semibold">{doc.name}</span>
+                        {doc.is_required && (
+                          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Required</span>
+                        )}
+                      </div>
+                      {doc.description && <p className="portal-muted text-sm mt-1.5 leading-relaxed">{doc.description}</p>}
+                    </div>
+                    {uploadedUrl ? (
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-slate-200">
+                        <FileText size={16} className="text-violet-600 shrink-0" />
+                        <a href={uploadedUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-800 truncate flex-1 hover:text-violet-700">View uploaded file</a>
+                        {!readOnly && (
+                          <button type="button" onClick={() => setDocuments((p) => p.filter((d) => d.document_type_id !== doc.id))} className="text-slate-400 hover:text-rose-600">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      !readOnly && (
+                        <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-violet-400 cursor-pointer">
+                          <Upload size={16} /> Upload PDF or image
+                          <input type="file" accept="image/*,.pdf" className="hidden" disabled={uploading} onChange={(e) => handleDocumentUpload(e, doc.id)} />
+                        </label>
+                      )
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-amber-700 text-sm">No document types configured yet.</p>
+          )}
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="portal-heading text-lg font-semibold">Venues, timings & tickets <span className="text-rose-500 text-sm">*</span></h3>
+            {!readOnly && (
+              <button type="button" onClick={() => appendShowtime(defaultVenue())} className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1">
+                <Plus size={14} /> Add venue
+              </button>
+            )}
+          </div>
+          <p className="portal-muted text-xs">
+            Each venue has its own ticket types and show times. Dates display as MM-DD-YYYY.
+          </p>
+          {showtimeFields.map((field, i) => (
+            <VenueBlock
+              key={field.id}
+              index={i}
+              readOnly={readOnly}
+              canRemove={showtimeFields.length > 1}
+              onRemove={() => removeShowtime(i)}
+            />
+          ))}
+          {errors.showtimes && typeof errors.showtimes.message === "string" && (
+            <p className={errorClass}>{errors.showtimes.message}</p>
+          )}
+        </section>
+
+        {!readOnly && (
+          <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="button"
               disabled={saving || submitting}
-              onClick={handleSubmit(runSubmit)}
-              className="btn-primary disabled:opacity-50"
+              onClick={runSaveDraft}
+              className="btn-secondary px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
             >
-              {submitting ? "Submitting..." : "Submit for approval"}
+              {saving ? "Saving..." : "Save draft"}
             </button>
-          )}
-        </div>
-      )}
-    </form>
+            {canSubmit && (
+              <button
+                type="button"
+                disabled={saving || submitting}
+                onClick={handleSubmit(runSubmit)}
+                className="btn-primary disabled:opacity-50"
+              >
+                {submitting ? "Submitting..." : "Submit for approval"}
+              </button>
+            )}
+          </div>
+        )}
+      </form>
+    </FormProvider>
   );
 }

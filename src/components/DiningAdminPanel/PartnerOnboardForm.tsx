@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, CheckCircle, Loader2, Plus, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import PartnerTypeFields, {
   resolvePartnerFromParentId,
@@ -16,11 +16,13 @@ import PhoneInput from "@/components/Shared/PhoneInput";
 import PasswordInput from "@/components/Shared/PasswordInput";
 import { isValidPhone, isValidPassword } from "@/lib/validation";
 import { extractApiError } from "@/lib/apiErrors";
+import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import {
   useGetBusinessTypesQuery,
   useGetPartnerDocumentMastersQuery,
   useRegisterBusinessMutation,
   useUpdateAdminBusinessMutation,
+  useUploadImageMutation,
   type Business,
   type PartnerDocumentUpload,
 } from "@/services/api";
@@ -53,6 +55,7 @@ export default function PartnerOnboardForm({
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const [registerBusiness, { isLoading: isOnboarding }] = useRegisterBusinessMutation();
   const [updateAdminBusiness, { isLoading: isUpdating }] = useUpdateAdminBusinessMutation();
+  const [uploadImage, { isLoading: uploadingImage }] = useUploadImageMutation();
 
   const [businessName, setBusinessName] = useState("");
   const [address, setAddress] = useState("");
@@ -63,6 +66,7 @@ export default function PartnerOnboardForm({
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
+  const [coverImageUrl, setCoverImageUrl] = useState("");
   const [phoneValid, setPhoneValid] = useState(false);
   const [passwordValid, setPasswordValid] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
@@ -86,6 +90,7 @@ export default function PartnerOnboardForm({
     setAddress(editingBusiness.address || "");
     setPhone(editingBusiness.phone || "");
     setDescription(editingBusiness.description || "");
+    setCoverImageUrl(editingBusiness.cover_image_url || "");
     setAdminEmail(editingBusiness.admin_email || "");
     setDocuments(
       Array.isArray(editingBusiness.documents)
@@ -164,6 +169,7 @@ export default function PartnerOnboardForm({
         admin_email: adminEmail,
         partner_type: eventPartner ? "event" : "dining",
         documents,
+        cover_image_url: coverImageUrl || undefined,
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
@@ -198,6 +204,7 @@ export default function PartnerOnboardForm({
         ...(adminEmail ? { admin_email: adminEmail } : {}),
         ...(adminPassword ? { admin_password: adminPassword } : {}),
         documents,
+        cover_image_url: coverImageUrl || undefined,
       }).unwrap();
       toast.success(isDining ? "Dining business updated" : "Event organizer updated");
       router.push(backHref);
@@ -295,6 +302,33 @@ export default function PartnerOnboardForm({
               placeholder="9876543210"
               helperText={!isDark ? "9–12 digits, numbers only" : undefined}
             />
+            <div className={isDark ? "" : "md:col-span-2"}>
+              <label className={labelClass}>Profile image</label>
+              <CroppedImageField
+                value={coverImageUrl}
+                aspect={1}
+                disabled={uploadingImage}
+                previewClassName="w-32 h-32 rounded-2xl"
+                emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-rose-400"
+                onRemove={() => setCoverImageUrl("")}
+                onCroppedFile={async (file) => {
+                  const formData = new FormData();
+                  formData.append("image", file);
+                  try {
+                    const res = await uploadImage(formData).unwrap();
+                    if (res.url) setCoverImageUrl(res.url);
+                  } catch {
+                    toast.error("Failed to upload profile image");
+                  }
+                }}
+                emptyContent={
+                  <>
+                    <ImagePlus className="text-slate-400 mb-1" size={20} />
+                    <span className="text-[10px] portal-muted">Add photo</span>
+                  </>
+                }
+              />
+            </div>
             <div className={isDark ? "" : "md:col-span-2"}>
               <label className={labelClass}>Description</label>
               <textarea

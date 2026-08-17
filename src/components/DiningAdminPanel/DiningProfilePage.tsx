@@ -6,7 +6,7 @@ import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUplo
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import PhoneInput from '@/components/Shared/PhoneInput';
-import { isValidPhone } from '@/lib/validation';
+import ImageCropPicker, { CroppedImageField } from '@/components/Shared/ImageCropPicker';
 
 export default function ProfilePage() {
   const dispatch = useAppDispatch();
@@ -93,29 +93,18 @@ export default function ProfilePage() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'gallery' | 'menu' | 'cover') => {
-    if (!e.target.files) return;
-    const files = Array.from(e.target.files);
-
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append('image', file);
-
-      try {
-        const res = await uploadImage(formData).unwrap();
-        if (res.url) {
-          if (type === 'gallery') {
-            setGalleryImages(prev => [...prev, res.url]);
-          } else if (type === 'menu') {
-            setMenuImages(prev => [...prev, res.url]);
-          } else if (type === 'cover') {
-            setCoverUrl(res.url);
-          }
-        }
-      } catch (err) {
-        console.error('Upload failed:', err);
-        toast.error('Failed to upload ' + file.name);
+  const uploadCropped = async (file: File, type: 'gallery' | 'menu' | 'cover') => {
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const res = await uploadImage(formData).unwrap();
+      if (res.url) {
+        if (type === 'gallery') setGalleryImages((prev) => [...prev, res.url]);
+        else if (type === 'menu') setMenuImages((prev) => [...prev, res.url]);
+        else setCoverUrl(res.url);
       }
+    } catch {
+      toast.error('Failed to upload ' + file.name);
     }
   };
 
@@ -202,29 +191,21 @@ export default function ProfilePage() {
 
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Cover Image</label>
-                {coverUrl ? (
-                  <div className="relative mt-2 w-full h-48 rounded-xl overflow-hidden border border-white/10 group">
-                    <img src={coverUrl} alt="Cover Preview" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => setCoverUrl('')}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Remove Cover Image"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-2 flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-zinc-700 border-dashed rounded-xl cursor-pointer bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <ImagePlus className="w-8 h-8 mb-3 text-zinc-400" />
-                        <p className="mb-2 text-sm text-zinc-400"><span className="font-semibold text-rose-500">Click to upload</span> a cover image</p>
-                        <p className="text-xs text-zinc-500">PNG, JPG up to 10MB</p>
-                      </div>
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'cover')} />
-                    </label>
-                  </div>
-                )}
+                <CroppedImageField
+                  value={coverUrl}
+                  aspect={16 / 9}
+                  previewClassName="mt-2 w-full h-48 rounded-xl border border-white/10"
+                  emptyClassName="flex flex-col items-center justify-center w-full h-48 border-2 border-zinc-700 border-dashed rounded-xl bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+                  onRemove={() => setCoverUrl('')}
+                  onCroppedFile={(file) => uploadCropped(file, 'cover')}
+                  emptyContent={
+                    <>
+                      <ImagePlus className="w-8 h-8 mb-3 text-zinc-400" />
+                      <p className="mb-2 text-sm text-zinc-400"><span className="font-semibold text-rose-500">Click to add</span> a cover image</p>
+                      <p className="text-xs text-zinc-500">Drag a box to crop, then save</p>
+                    </>
+                  }
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Average Cost for Two (ETB)</label>
@@ -358,52 +339,72 @@ export default function ProfilePage() {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Upload Photo Gallery Images</label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(e) => handleFileUpload(e, 'gallery')}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-zinc-300 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100"
-                />
+                <ImageCropPicker
+                  aspect={4 / 3}
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-zinc-300 text-sm text-left"
+                  onCroppedFile={(file) => uploadCropped(file, 'gallery')}
+                >
+                  Crop & add gallery photo
+                </ImageCropPicker>
                 <p className="text-xs text-zinc-500 mt-2 mb-4">These images will appear in the photo grid on your restaurant's booking page.</p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                   {galleryImages.map((url, idx) => (
-                    <div key={idx} className="relative group rounded-xl overflow-hidden h-24 border border-white/10">
-                      <img src={url} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => removeImage(idx, 'gallery')}
-                        className="absolute top-1 right-1 bg-black/60 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        &times;
-                      </button>
-                    </div>
+                    <CroppedImageField
+                      key={`${url}-${idx}`}
+                      value={url}
+                      aspect={4 / 3}
+                      previewClassName="h-24 rounded-xl w-full border border-white/10"
+                      onRemove={() => removeImage(idx, 'gallery')}
+                      onCroppedFile={async (file) => {
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        try {
+                          const res = await uploadImage(formData).unwrap();
+                          if (res.url) {
+                            setGalleryImages((prev) => prev.map((u, i) => (i === idx ? res.url : u)));
+                          }
+                        } catch {
+                          toast.error('Failed to upload ' + file.name);
+                        }
+                      }}
+                    />
                   ))}
                 </div>
               </div>
 
               <div className="pt-4 border-t border-white/5">
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Upload Menu Images</label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(e) => handleFileUpload(e, 'menu')}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-zinc-300 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100"
-                />
+                <ImageCropPicker
+                  aspect={3 / 4}
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-zinc-300 text-sm text-left"
+                  onCroppedFile={(file) => uploadCropped(file, 'menu')}
+                >
+                  Crop & add menu photo
+                </ImageCropPicker>
                 <p className="text-xs text-zinc-500 mt-2 mb-4">Upload images of your food and beverage menus.</p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                   {menuImages.map((url, idx) => (
-                    <div key={idx} className="relative group rounded-xl overflow-hidden h-32 border border-white/10">
-                      <img src={url} alt={`Menu ${idx}`} className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => removeImage(idx, 'menu')}
-                        className="absolute top-1 right-1 bg-black/60 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        &times;
-                      </button>
-                    </div>
+                    <CroppedImageField
+                      key={`${url}-${idx}`}
+                      value={url}
+                      aspect={3 / 4}
+                      previewClassName="h-32 rounded-xl w-full border border-white/10"
+                      onRemove={() => removeImage(idx, 'menu')}
+                      onCroppedFile={async (file) => {
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        try {
+                          const res = await uploadImage(formData).unwrap();
+                          if (res.url) {
+                            setMenuImages((prev) => prev.map((u, i) => (i === idx ? res.url : u)));
+                          }
+                        } catch {
+                          toast.error('Failed to upload ' + file.name);
+                        }
+                      }}
+                    />
                   ))}
                 </div>
               </div>

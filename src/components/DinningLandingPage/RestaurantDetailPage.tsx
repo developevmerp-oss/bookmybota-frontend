@@ -4,7 +4,7 @@ import {
   MapPin, Phone, CheckCircle, Calendar, Users, Clock,
   Star, Share2, Compass, MessageSquare, Image as ImageIcon,
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
-  ChevronLeft, X, Sun, Moon
+  ChevronLeft, X, Sun, Moon, Navigation
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -755,7 +755,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const { city, country } = parseAddressLocation(profile.address);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-700">
+    <div className="min-h-screen bg-white text-slate-700">
 
       {/* ── 1. Breadcrumbs ── */}
       <div className="bg-white border-b border-slate-100 py-3">
@@ -883,9 +883,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
               }
             }}
-            className="text-xs bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg border border-rose-100 font-bold hover:bg-rose-100 transition-all flex items-center gap-1 cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-slate-800 text-xs font-bold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
           >
-            <Compass size={13} className="text-rose-500" />
+            <Compass size={13} className="text-[#E85D04]" />
             {copied ? "Copied!" : "Direction"}
           </button>
           <button
@@ -897,21 +897,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 toast.success("Link copied to clipboard!");
               }
             }}
-            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-600 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-slate-800 text-xs font-bold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
           >
-            <Share2 size={13} className="text-rose-500" />
+            <Share2 size={13} className="text-[#E85D04]" />
             Share
           </button>
           <button
             onClick={() => setActiveTab("Reviews")}
-            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-bold text-slate-600 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-slate-800 text-xs font-bold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
           >
-            <MessageSquare size={13} className="text-rose-500" />
+            <MessageSquare size={13} className="text-[#E85D04]" />
             Reviews
           </button>
           <button
             onClick={handleQuickBook}
-            className="flex items-center gap-1.5 px-4.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-200 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-black text-white text-xs font-bold hover:bg-zinc-800 transition-all cursor-pointer"
           >
             <Calendar size={13} />
             Book a Table
@@ -921,7 +921,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         {/* ── 5. Navigation Tabs ── */}
         <div className="bg-white border-b border-slate-200 sticky top-[72px] z-30 mb-8 -mx-4 px-4">
           <div className="max-w-7xl mx-auto flex gap-6 overflow-x-auto scrollbar-hide">
-            {["Overview", "Menu", "Photos", "Reviews"].map((tab) => (
+            {["Overview", "Offers", "Menu", "Photos", "Reviews"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -946,102 +946,42 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {activeTab === "Overview" && (
               <div className="space-y-8">
 
-                {/* Dining Offers */}
-                {profile.dining_offers && profile.dining_offers.length > 0 && (
-                  <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                    <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5">
-                      <Sparkles size={16} className="text-rose-500" /> Dining Offers
-                    </h3>
-                    <div className="w-full space-y-3">
-                      {profile.dining_offers.map((offer: any, idx: number) => (
-                        <div key={idx} className="p-5 rounded-2xl border border-dashed border-rose-200 bg-gradient-to-r from-rose-50/70 to-rose-50/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all hover:bg-rose-50/80">
-                          <div className="space-y-1.5">
-                            <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-rose-600 bg-rose-100/80 px-2.5 py-0.5 rounded-full">
-                              {offer.type || 'Offer'}
-                            </span>
-                            <p className="text-base font-extrabold text-slate-800">{offer.title}</p>
-                            <p className="text-xs text-slate-400 font-medium">{offer.validity}</p>
-                          </div>
-                          <button
-                            onClick={handleQuickBook}
-                            className="self-start sm:self-center shrink-0 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm shadow-rose-200"
-                          >
-                            Book table to unlock
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* About Venue */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-800 mb-3">About the Venue</h3>
+                {/* About Venue, Average Cost & Cuisines */}
+                <section>
+                  <h3 className="text-xl font-bold text-black mb-3">About the Venue</h3>
                   <p className="text-slate-500 text-sm leading-relaxed whitespace-pre-wrap">
                     {profile.description || 'This venue has not provided a description yet. Enjoy a curated dining experience with premium seats, lovely ambiance, and delicious gourmet specialties.'}
                   </p>
-                </section>
 
-                {/* Cuisines */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-800 mb-3">Cuisines</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {cuisines.split(/·|,/).map((c) => (
-                      <span key={c} className="bg-slate-50 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-semibold border border-slate-100">
-                        {c.trim()}
-                      </span>
-                    ))}
-                  </div>
-                </section>
+                  <h4 className="text-base font-bold text-black mt-6 mb-1">Average Cost</h4>
+                  <p className="text-sm text-slate-500">{costText}</p>
+                  <p className="text-xs text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any.</p>
 
-                {/* Average Cost */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-800 mb-2">Average Cost</h3>
-                  <p className="text-sm text-slate-600 font-medium">{costText}</p>
-                  <p className="text-xs text-slate-400 mt-1.5">Exclusive of applicable taxes and charges, if any.</p>
-                </section>
+                  <h4 className="text-base font-bold text-black mt-6 mb-1">Cuisines</h4>
+                  <p className="text-sm text-slate-500">
+                    {cuisines.replace(/·/g, ',').split(',').map((c) => c.trim()).filter(Boolean).join(', ')}
+                  </p>
 
-                {/* More Info checklist */}
-                {profile.amenities && profile.amenities.length > 0 && (
-                  <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                    <h3 className="text-base font-bold text-slate-800 mb-4">Venue Amenities</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {profile.amenities.map((info: string) => (
-                        <div key={info} className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                          <CheckCircle size={15} className="text-emerald-500 shrink-0" />
-                          <span>{info}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                  {profile.amenities && profile.amenities.length > 0 && (
+                    <>
+                      <h4 className="text-base font-bold text-black mt-6 mb-3">Venue Amenities</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+                        {profile.amenities.map((info: string) => (
+                          <div key={info} className="flex items-center gap-2 text-sm text-slate-500">
+                            <span className="text-slate-400 text-[11px] shrink-0">❖</span>
+                            <span>{info}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </section>
 
                 {/* OpenStreetMap Address Block */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-800 mb-4">Direction & Contact</h3>
-                  <div className="flex flex-col md:flex-row gap-5 items-stretch">
-                    <div className="flex-1 bg-slate-50 rounded-xl p-4 flex flex-col justify-between border border-slate-100">
-                      <div>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Address</p>
-                        <p className="text-xs text-slate-600 font-semibold leading-relaxed">{profile.address || 'Address hidden'}</p>
-                      </div>
-                      <div className="flex gap-2 mt-4">
-                        <button onClick={handleCopyAddress} className="text-xs bg-white text-slate-600 px-3 py-1.5 rounded-lg border border-slate-200 font-bold hover:bg-slate-50 transition-all flex items-center gap-1">
-                          <Copy size={11} /> {copied ? "Copied" : "Copy"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (profile.address) {
-                              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
-                            }
-                          }}
-                          className="text-xs bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg border border-rose-100 font-bold hover:bg-rose-100 transition-all flex items-center gap-1 cursor-pointer"
-                        >
-                          <Compass size={11} /> Get Directions
-                        </button>
-                      </div>
-                    </div>
-                    <div className="w-full md:w-64 h-44 bg-slate-200 rounded-xl relative overflow-hidden border border-slate-200 shrink-0">
+                <section>
+                  <h3 className="text-xl font-bold text-black mb-3">Direction & Contact</h3>
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="w-full h-48 sm:h-56 bg-slate-100 relative">
                       {profile.address ? (
                         <iframe
                           title={`Map of ${profile.name}`}
@@ -1056,9 +996,68 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </div>
                       )}
                     </div>
+
+                    <div className="px-4 py-3.5">
+                      <p className="text-base font-bold text-black">{profile.name}</p>
+                      <p className="text-sm text-slate-600 mt-1 leading-relaxed">{profile.address || 'Address hidden'}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (profile.address) {
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 border-t border-slate-200 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <Navigation size={16} className="text-black shrink-0" />
+                      <span className="text-sm font-bold text-black">Get Directions</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyAddress}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 border-t border-slate-200 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      <Copy size={16} className="text-black shrink-0" />
+                      <span className="text-sm font-bold text-black">{copied ? "Copied" : "Copy"}</span>
+                    </button>
                   </div>
                 </section>
               </div>
+            )}
+
+            {/* Offers Tab Content */}
+            {activeTab === "Offers" && (
+              <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5">
+                  <Sparkles size={16} className="text-rose-500" /> Dining Offers
+                </h3>
+                {profile.dining_offers && profile.dining_offers.length > 0 ? (
+                  <div className="w-full space-y-3">
+                    {profile.dining_offers.map((offer: any, idx: number) => (
+                      <div key={idx} className="p-5 rounded-2xl border border-dashed border-rose-200 bg-gradient-to-r from-rose-50/70 to-rose-50/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all hover:bg-rose-50/80">
+                        <div className="space-y-1.5">
+                          <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-rose-600 bg-rose-100/80 px-2.5 py-0.5 rounded-full">
+                            {offer.type || 'Offer'}
+                          </span>
+                          <p className="text-base font-extrabold text-slate-800">{offer.title}</p>
+                          <p className="text-xs text-slate-400 font-medium">{offer.validity}</p>
+                        </div>
+                        <button
+                          onClick={handleQuickBook}
+                          className="self-start sm:self-center shrink-0 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm shadow-rose-200"
+                        >
+                          Book table to unlock
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">No dining offers available for this venue yet.</p>
+                )}
+              </section>
             )}
 
             {/* Menu Tab Content */}
@@ -1505,7 +1504,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       setIsDrawerOpen(true);
                       setDrawerStep(1);
                     }}
-                    className="bg-rose-500 hover:bg-rose-600 text-white rounded-xl w-full py-2.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer flex items-center justify-center gap-1.5"
+                    className="bg-black hover:bg-zinc-800 text-white rounded-xl w-full py-2.5 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     Book a table
                   </button>
@@ -1518,7 +1517,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Call Venue</p>
                   <a href={`tel:${profile.phone || '9737315326'}`} className="text-sm font-bold text-slate-700 hover:text-rose-600 transition-colors flex items-center gap-1">
-                    <Phone size={14} className="text-rose-500" />
+                    <Phone size={14} className="text-purple-600" />
                     {profile.phone || '+91 97373 15326'}
                   </a>
                 </div>
@@ -1552,9 +1551,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       const isToday = todayName === day;
 
                       return (
-                        <p key={day} className={`flex justify-between ${isToday ? 'text-rose-600 font-bold' : 'text-slate-500'}`}>
+                        <p key={day} className={`flex justify-between ${isToday ? 'text-purple-600 font-bold' : 'text-slate-500'}`}>
                           <span>{dayName}:</span>
-                          <span className={isToday ? 'text-rose-600' : 'text-slate-605'}>{timeStr}</span>
+                          <span className={isToday ? 'text-purple-600' : 'text-slate-605'}>{timeStr}</span>
                         </p>
                       );
                     })}
@@ -1780,7 +1779,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto p-5 bg-slate-50/50">
+            <div className="flex-1 overflow-y-auto p-5 bg-white">
               {drawerStep === 1 && (() => {
                 const mealsConfig = (profile.operating_hours as any)?.meals || {
                   breakfast: { open: '08:00', close: '11:00', active: true },
@@ -1815,8 +1814,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               type="button"
                               onClick={() => setGuests(num.toString())}
                               className={`w-10 h-10 shrink-0 rounded-full border text-sm font-extrabold flex items-center justify-center transition-all cursor-pointer ${active
-                                ? 'border-orange-500 bg-orange-50 text-orange-600 font-black shadow-sm ring-1 ring-orange-400'
-                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                ? 'border-black bg-black text-white'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                                 }`}
                             >
                               {num}
@@ -1829,7 +1828,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     {/* 2. Date selection */}
                     <div>
                       <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-tight">When are you visiting?</h4>
-                      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                      <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
                         {bookingDates.map((d, idx) => {
                           const lbl = formatDateLabel(d, idx);
                           const active = selectedDateIndex === idx;
@@ -1842,16 +1841,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               key={idx}
                               type="button"
                               onClick={() => handleDateSelect(idx)}
-                              className={`shrink-0 flex flex-col items-center py-2.5 px-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer min-w-[68px] ${active
-                                ? 'border-orange-500 bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-400'
-                                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                              className={`shrink-0 flex flex-col items-center py-3 px-3.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer min-w-[76px] ${active
+                                ? 'border-black bg-white text-slate-900'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                                 }`}
                             >
-                              <span className={`text-[9px] uppercase font-bold tracking-wider ${active ? 'text-orange-500' : 'text-slate-400'}`}>
+                              <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">
                                 {lbl.top}
                               </span>
-                              <span className="text-sm font-extrabold mt-0.5">{lbl.bottom}</span>
-                              <span className="inline-block mt-1.5 text-[8px] font-black uppercase bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md">
+                              <span className="text-sm font-extrabold mt-0.5 text-slate-900">{lbl.bottom}</span>
+                              <span className="mt-1.5 text-[9px] font-black uppercase tracking-wide text-purple-600">
                                 {promoText}
                               </span>
                             </button>
@@ -1882,7 +1881,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <button
                                 type="button"
                                 onClick={() => setActiveMealSection(prev => prev === 'breakfast' ? null : 'breakfast')}
-                                className={`w-full flex items-center justify-between p-3 border rounded-2xl text-left cursor-pointer transition-all ${activeMealSection === 'breakfast' ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200 hover:bg-slate-50/50'
+                                className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left cursor-pointer transition-all ${activeMealSection === 'breakfast' ? 'border border-black bg-white' : 'border border-slate-200 bg-white hover:border-slate-300'
                                   }`}
                               >
                                 <div className="flex items-center gap-3">
@@ -1910,12 +1909,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                         type="button"
                                         onClick={() => handleTimeSelect(slot)}
                                         className={`py-3 px-2 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${isSelected
-                                          ? 'border-orange-500 bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-400'
-                                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                                          ? 'border-black bg-white text-slate-900'
+                                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                                           }`}
                                       >
                                         <span className="text-[11px] font-extrabold">{formatSlotLabel(slot)}</span>
-                                        <span className="text-[8px] font-black text-emerald-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
                                       </button>
                                     );
                                   })}
@@ -1930,7 +1929,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <button
                                 type="button"
                                 onClick={() => setActiveMealSection(prev => prev === 'lunch' ? null : 'lunch')}
-                                className={`w-full flex items-center justify-between p-3 border rounded-2xl text-left cursor-pointer transition-all ${activeMealSection === 'lunch' ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200 hover:bg-slate-50/50'
+                                className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left cursor-pointer transition-all ${activeMealSection === 'lunch' ? 'border border-black bg-white' : 'border border-slate-200 bg-white hover:border-slate-300'
                                   }`}
                               >
                                 <div className="flex items-center gap-3">
@@ -1958,12 +1957,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                         type="button"
                                         onClick={() => handleTimeSelect(slot)}
                                         className={`py-3 px-2 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${isSelected
-                                          ? 'border-orange-500 bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-400'
-                                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                                          ? 'border-black bg-white text-slate-900'
+                                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                                           }`}
                                       >
                                         <span className="text-[11px] font-extrabold">{formatSlotLabel(slot)}</span>
-                                        <span className="text-[8px] font-black text-emerald-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
                                       </button>
                                     );
                                   })}
@@ -1978,7 +1977,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <button
                                 type="button"
                                 onClick={() => setActiveMealSection(prev => prev === 'dinner' ? null : 'dinner')}
-                                className={`w-full flex items-center justify-between p-3 border rounded-2xl text-left cursor-pointer transition-all ${activeMealSection === 'dinner' ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50/50'
+                                className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left cursor-pointer transition-all ${activeMealSection === 'dinner' ? 'border border-black bg-white' : 'border border-slate-200 bg-white hover:border-slate-300'
                                   }`}
                               >
                                 <div className="flex items-center gap-3">
@@ -2006,12 +2005,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                         type="button"
                                         onClick={() => handleTimeSelect(slot)}
                                         className={`py-3 px-2 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${isSelected
-                                          ? 'border-orange-500 bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-400'
-                                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                                          ? 'border-black bg-white text-slate-900'
+                                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                                           }`}
                                       >
                                         <span className="text-[11px] font-extrabold">{formatSlotLabel(slot)}</span>
-                                        <span className="text-[8px] font-black text-emerald-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
                                       </button>
                                     );
                                   })}
@@ -2305,63 +2304,63 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               )}
 
               {drawerStep === 4 && (
-                <div className="text-center py-12 px-2 space-y-6">
-                  <div className="w-16 h-16 bg-emerald-500/15 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-                    <CheckCircle size={32} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 mb-1.5">Booking Confirmed!</h3>
-                    <p className="text-slate-500 text-xs leading-relaxed max-w-xs mx-auto font-medium">
-                      Your table at <strong>{profile.name}</strong> is successfully reserved. See you soon!
+                <div className="flex flex-col items-center py-8 px-3">
+                  <div className="w-full max-w-sm bg-white rounded-[28px] shadow-[0_12px_40px_rgba(15,23,42,0.08)] border border-slate-100 px-5 pt-8 pb-6">
+                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5">
+                      <CheckCircle size={32} />
+                    </div>
+                    <h3 className="text-xl font-black text-black text-center mb-2 leading-snug">Booking Confirmed!</h3>
+                    <p className="text-slate-500 text-xs leading-relaxed text-center font-medium mb-5">
+                      Your table at <strong className="text-black">{profile.name}</strong> is successfully reserved. See you soon!
                     </p>
-                  </div>
 
-                  <div className="bg-white border border-slate-200 rounded-2xl p-4 text-left max-w-sm mx-auto space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400 font-semibold">Guests:</span>
-                      <span className="text-slate-800 font-bold">{guests} {Number(guests) === 1 ? 'Guest' : 'Guests'}</span>
+                    <div className="bg-slate-50 rounded-2xl px-4 py-1 text-left mb-6">
+                      <div className="flex justify-between text-xs py-3 border-b border-slate-200/80">
+                        <span className="text-slate-400 font-medium">Guests:</span>
+                        <span className="text-black font-bold">{guests} {Number(guests) === 1 ? 'Guest' : 'Guests'}</span>
+                      </div>
+                      <div className="flex justify-between text-xs py-3 border-b border-slate-200/80">
+                        <span className="text-slate-400 font-medium">Date:</span>
+                        <span className="text-black font-bold">
+                          {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs py-3 border-b border-slate-200/80">
+                        <span className="text-slate-400 font-medium">Time:</span>
+                        <span className="text-black font-bold">{formatSlotLabel(selectedTime)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs py-3">
+                        <span className="text-slate-400 font-medium">Arrival:</span>
+                        <span className="text-black font-bold">{arrivalTime}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400 font-semibold">Date:</span>
-                      <span className="text-slate-800 font-bold">
-                        {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400 font-semibold">Time:</span>
-                      <span className="text-slate-800 font-bold">{formatSlotLabel(selectedTime)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400 font-semibold">Arrival:</span>
-                      <span className="text-slate-800 font-bold">{arrivalTime}</span>
-                    </div>
-                  </div>
 
-                  <div className="pt-6 max-w-xs mx-auto space-y-3">
-                    {lastBookingId && (
+                    <div className="space-y-3">
+                      {lastBookingId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDrawerOpen(false);
+                            const params = new URLSearchParams({ id: lastBookingId });
+                            if (arrivalTime) params.set('arrival', arrivalTime);
+                            router.push(`/customer/bookings/confirmation?${params.toString()}`);
+                          }}
+                          className="w-full rounded-full px-6 py-3 text-xs font-bold bg-white text-black border-2 border-purple-200 hover:bg-purple-50/40 transition-all cursor-pointer"
+                        >
+                          View Confirmation
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
                           setIsDrawerOpen(false);
-                          const params = new URLSearchParams({ id: lastBookingId });
-                          if (arrivalTime) params.set('arrival', arrivalTime);
-                          router.push(`/customer/bookings/confirmation?${params.toString()}`);
+                          handleResetBooking();
                         }}
-                        className="bg-rose-600 hover:bg-rose-700 text-white rounded-2xl px-6 py-3 text-xs font-bold transition-all shadow-md w-full cursor-pointer"
+                        className="w-full rounded-full px-6 py-3 text-xs font-bold bg-black hover:bg-zinc-800 text-white transition-all cursor-pointer"
                       >
-                        View Confirmation
+                        Done
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsDrawerOpen(false);
-                        handleResetBooking();
-                      }}
-                      className="bg-slate-800 hover:bg-slate-900 text-white rounded-2xl px-6 py-3 text-xs font-bold transition-all shadow-md w-full cursor-pointer"
-                    >
-                      Done
-                    </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2385,7 +2384,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         handles the toggle via the hidden <input onChange>.
                         Having both causes a double-toggle (net effect = no change). */}
                       <div
-                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${acceptedTerms ? 'bg-rose-600 border-rose-600' : 'bg-white border-slate-300 hover:border-rose-400'
+                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${acceptedTerms ? 'bg-black border-black' : 'bg-white border-slate-300 hover:border-slate-400'
                           }`}
                       >
                         {acceptedTerms && (
@@ -2397,9 +2396,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </div>
                     <span className="text-[11px] text-slate-500 font-medium leading-relaxed">
                       I agree to the{' '}
-                      <a href="#" className="text-rose-600 font-bold hover:underline" onClick={e => e.preventDefault()}>Terms &amp; Conditions</a>
+                      <a href="#" className="text-purple-600 font-bold hover:underline" onClick={e => e.preventDefault()}>Terms &amp; Conditions</a>
                       {' '}and{' '}
-                      <a href="#" className="text-rose-600 font-bold hover:underline" onClick={e => e.preventDefault()}>Cancellation Policy</a>
+                      <a href="#" className="text-purple-600 font-bold hover:underline" onClick={e => e.preventDefault()}>Cancellation Policy</a>
                     </span>
                   </label>
                 </div>
@@ -2430,12 +2429,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         setPhone(authUser.phone || '');
                       }
                     }}
-                    className={`w-full py-3.5 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-md ${selectedTime && acceptedTerms
-                      ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-200 cursor-pointer'
-                      : 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed'
+                    className={`w-full py-3.5 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${selectedTime && acceptedTerms
+                      ? 'bg-black hover:bg-zinc-800 text-white cursor-pointer'
+                      : 'bg-slate-200 text-white cursor-not-allowed'
                       }`}
                   >
                     Proceed
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               </div>

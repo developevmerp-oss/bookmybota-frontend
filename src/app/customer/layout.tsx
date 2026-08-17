@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import AuthGate from "@/components/Shared/AuthGate";
+import SessionGuard from "@/components/Shared/SessionGuard";
 
 /** Booking confirmation stays reachable without login (post-checkout). */
 const PUBLIC_CUSTOMER_PREFIXES = [
@@ -19,7 +20,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
 
   return (
     <AuthGate mode="require" roles={["customer"]}>
-      {children}
+      <SessionGuard>{children}</SessionGuard>
     </AuthGate>
   );
 }

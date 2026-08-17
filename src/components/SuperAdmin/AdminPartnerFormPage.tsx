@@ -23,7 +23,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
 
   if (mode === "create") {
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <PartnerOnboardForm
           partnerType={module}
           variant="dark"
@@ -59,7 +59,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <PartnerOnboardForm
         partnerType={module}
         variant="dark"
@@ -67,7 +67,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
         editingBusiness={biz}
         backHref={detailHref}
         title={isDining ? "Edit Dining Partner" : "Edit Event Organizer"}
-        subtitle="Update partner details. Leave password blank to keep the current one."
+        subtitle="Update partner details. Login email cannot be changed from this page."
       />
     </div>
   );

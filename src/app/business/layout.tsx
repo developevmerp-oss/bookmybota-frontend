@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
+import SessionGuard from "@/components/Shared/SessionGuard";
 import {
   clearSessionForRole,
   getActiveSession,
@@ -95,6 +96,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   }
 
   return (
+    <SessionGuard>
     <div className="min-h-screen flex bg-background admin-dashboard-layout">
       <aside className="w-64 glass-panel border-r border-white/5 fixed h-full z-40 hidden md:flex flex-col">
         <div className="p-6 border-b border-white/5">
@@ -206,5 +208,6 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
         <div className="p-4 sm:p-8">{children}</div>
       </main>
     </div>
+    </SessionGuard>
   );
 }

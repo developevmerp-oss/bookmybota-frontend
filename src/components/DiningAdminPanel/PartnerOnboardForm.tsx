@@ -13,8 +13,7 @@ import PartnerDocumentsFields, {
   validateRequiredPartnerDocuments,
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import PhoneInput from "@/components/Shared/PhoneInput";
-import PasswordInput from "@/components/Shared/PasswordInput";
-import { isValidPhone, isValidPassword } from "@/lib/validation";
+import { isValidPhone } from "@/lib/validation";
 import { extractApiError } from "@/lib/apiErrors";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import {
@@ -64,11 +63,9 @@ export default function PartnerOnboardForm({
   const [parentTypeId, setParentTypeId] = useState("");
   const [venueTypeId, setVenueTypeId] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [phoneValid, setPhoneValid] = useState(false);
-  const [passwordValid, setPasswordValid] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [formReady, setFormReady] = useState(false);
@@ -140,8 +137,7 @@ export default function PartnerOnboardForm({
     !!businessName &&
     phoneValid &&
     !!parentTypeId &&
-    (isDining ? !!venueTypeId : true) &&
-    (!adminPassword || passwordValid);
+    (isDining ? !!venueTypeId : true);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,7 +181,6 @@ export default function PartnerOnboardForm({
     e.preventDefault();
     if (!editingBusiness) return;
     if (phone && !isValidPhone(phone)) return;
-    if (adminPassword && !isValidPassword(adminPassword)) return;
     const docsErr = validateRequiredPartnerDocuments(partnerDocMasters, documents);
     if (docsErr) {
       toast.error(docsErr);
@@ -201,8 +196,6 @@ export default function PartnerOnboardForm({
         ...(isDining
           ? { type_id: parseInt(venueTypeId, 10) }
           : { type_id: parseInt(parentTypeId, 10) }),
-        ...(adminEmail ? { admin_email: adminEmail } : {}),
-        ...(adminPassword ? { admin_password: adminPassword } : {}),
         documents,
         cover_image_url: coverImageUrl || undefined,
       }).unwrap();
@@ -215,93 +208,59 @@ export default function PartnerOnboardForm({
 
   const busy = isOnboarding || isUpdating;
 
-  return (
-    <div className={panelClass}>
-      <Link
-        href={backHref}
-        className={`inline-flex items-center gap-1.5 text-sm font-semibold mb-6 ${
-          isDark ? "text-zinc-400 hover:text-white" : "text-slate-500 hover:text-slate-800"
-        }`}
-      >
-        <ArrowLeft size={16} /> Back
-      </Link>
+  const fieldsGrid = (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <PartnerTypeFields
+        partnerType={partnerType}
+        businessTypes={businessTypes}
+        parentTypeId={parentTypeId}
+        venueTypeId={venueTypeId}
+        onParentTypeIdChange={(id) => {
+          setParentTypeId(id);
+          if (partnerType === "combined") setDocuments([]);
+        }}
+        onVenueTypeIdChange={setVenueTypeId}
+        variant={variant}
+      />
 
-      <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${headingClass}`}>{title}</h1>
-      <p className={`${mutedClass} text-sm mb-8`}>{subtitle}</p>
-
-      {onboardStatus === "success" ? (
-        <div className="text-center py-10">
-          <div
-            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              isDark ? "bg-green-500/20 text-green-500" : "bg-green-100 text-green-500"
-            }`}
-          >
-            <CheckCircle size={32} />
-          </div>
-          <h3 className={`text-xl font-bold mb-2 ${headingClass}`}>
-            {mode === "create" ? "Registration received" : "Partner updated"}
-          </h3>
-          <p className={mutedClass}>
-            {successDetail ||
-              (mode === "create"
-                ? "A temporary password is emailed when the account is enabled. Redirecting…"
-                : "Redirecting back to the list…")}
-          </p>
-        </div>
-      ) : (
-        <form onSubmit={mode === "edit" ? handleUpdate : handleRegister} className="space-y-6">
-          <div className={isDark ? "space-y-4" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
-            <PartnerTypeFields
-              partnerType={partnerType}
-              businessTypes={businessTypes}
-              parentTypeId={parentTypeId}
-              venueTypeId={venueTypeId}
-              onParentTypeIdChange={(id) => {
-                setParentTypeId(id);
-                if (partnerType === "combined") setDocuments([]);
-              }}
-              onVenueTypeIdChange={setVenueTypeId}
-              variant={variant}
-            />
-
-            <div>
-              <label className={labelClass}>
-                {partnerType === "event" ? "Organizer Name" : "Business Name"}{" "}
-                <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                className={inputClass}
-                placeholder={isDining ? "E.g., The Sapphire Room" : "E.g., LiveWire Productions"}
-                required
-              />
-            </div>
-            <div>
-              <label className={labelClass}>
-                Address <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className={inputClass}
-                placeholder="City / area"
-                required
-              />
-            </div>
-            <PhoneInput
-              label="Phone Number"
-              labelClassName={labelClass}
-              variant={isDark ? "dark" : "light"}
-              value={phone}
-              onChange={setPhone}
-              onValidChange={setPhoneValid}
-              required
-              placeholder="9876543210"
-              helperText={!isDark ? "9–12 digits, numbers only" : undefined}
-            />
+      <div>
+        <label className={labelClass}>
+          {partnerType === "event" ? "Organizer Name" : "Business Name"}{" "}
+          <span className="text-rose-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={businessName}
+          onChange={(e) => setBusinessName(e.target.value)}
+          className={inputClass}
+          placeholder={isDining ? "E.g., The Sapphire Room" : "E.g., LiveWire Productions"}
+          required
+        />
+      </div>
+      <div>
+        <label className={labelClass}>
+          Address <span className="text-rose-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className={inputClass}
+          placeholder="City / area"
+          required
+        />
+      </div>
+      <PhoneInput
+        label="Phone Number"
+        labelClassName={labelClass}
+        variant={isDark ? "dark" : "light"}
+        value={phone}
+        onChange={setPhone}
+        onValidChange={setPhoneValid}
+        required
+        placeholder="9876543210"
+        helperText={!isDark ? "9–12 digits, numbers only" : undefined}
+      />
             <div className={isDark ? "" : "md:col-span-2"}>
               <label className={labelClass}>Profile image</label>
               <CroppedImageField
@@ -329,97 +288,164 @@ export default function PartnerOnboardForm({
                 }
               />
             </div>
-            <div className={isDark ? "" : "md:col-span-2"}>
-              <label className={labelClass}>Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className={textareaClass}
-                placeholder="Brief description..."
-                rows={3}
-              />
-            </div>
-            {(partnerType !== "combined" || parentTypeId) && (
-              <div className={isDark ? "" : "md:col-span-2"}>
-                <PartnerDocumentsFields
-                  module={resolvedModule}
-                  value={documents}
-                  onChange={setDocuments}
-                  variant={variant}
-                />
-              </div>
+      <div>
+        <label className={labelClass}>
+          Admin Login Email <span className="text-rose-500">*</span>
+        </label>
+        <input
+          type="email"
+          value={adminEmail}
+          onChange={(e) => setAdminEmail(e.target.value)}
+          className={`${inputClass} ${mode === "edit" ? "opacity-60 cursor-not-allowed" : ""}`}
+          placeholder="admin@example.com"
+          required={mode === "create"}
+          disabled={mode === "edit"}
+          readOnly={mode === "edit"}
+        />
+        <p className={`mt-1 text-xs ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
+          {mode === "create"
+            ? "Password is auto-generated and emailed after onboarding."
+            : "Login email cannot be changed from this page."}
+        </p>
+      </div>
+      <div className="md:col-span-2">
+        <label className={labelClass}>Description</label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className={textareaClass}
+          placeholder="Brief description..."
+          rows={3}
+        />
+      </div>
+    </div>
+  );
+
+  const documentsBlock =
+    partnerType !== "combined" || parentTypeId ? (
+      <PartnerDocumentsFields
+        module={resolvedModule}
+        value={documents}
+        onChange={setDocuments}
+        variant={variant}
+      />
+    ) : null;
+
+  const submitButton = (
+    <button
+      type="submit"
+      disabled={busy || (mode === "create" ? !canSubmitCreate : !canSubmitEdit)}
+      className={
+        isDark
+          ? "btn-primary disabled:opacity-50 inline-flex items-center justify-center gap-2 min-w-48"
+          : "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 transition-colors"
+      }
+    >
+      {busy ? (
+        <>
+          <Loader2 size={18} className="animate-spin" />
+          {mode === "create" ? (isDark ? "Creating..." : "Registering...") : "Saving..."}
+        </>
+      ) : (
+        <>
+          {mode === "create" && <Plus size={18} />}
+          {mode === "create"
+            ? isDark
+              ? isDining
+                ? "Create Dining Business"
+                : "Create Event Organizer"
+              : "Register Business"
+            : "Save Changes"}
+        </>
+      )}
+    </button>
+  );
+
+  const successBlock = (
+    <div className={`text-center py-10 ${isDark ? panelClass : ""}`}>
+      <div
+        className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+          isDark ? "bg-green-500/20 text-green-500" : "bg-green-100 text-green-500"
+        }`}
+      >
+        <CheckCircle size={32} />
+      </div>
+      <h3 className={`text-xl font-bold mb-2 ${headingClass}`}>
+        {mode === "create" ? "Registration received" : "Partner updated"}
+      </h3>
+      <p className={mutedClass}>
+        {successDetail ||
+          (mode === "create"
+            ? "A temporary password is emailed when the account is enabled. Redirecting…"
+            : "Redirecting back to the list…")}
+      </p>
+    </div>
+  );
+
+  if (!isDark) {
+    return (
+      <div className={panelClass}>
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold mb-6 text-slate-500 hover:text-slate-800"
+        >
+          <ArrowLeft size={16} /> Back
+        </Link>
+        <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${headingClass}`}>{title}</h1>
+        <p className={`${mutedClass} text-sm mb-8`}>{subtitle}</p>
+        {onboardStatus === "success" ? (
+          successBlock
+        ) : (
+          <form onSubmit={mode === "edit" ? handleUpdate : handleRegister} className="space-y-6">
+            {fieldsGrid}
+            {documentsBlock}
+            {registerError && (
+              <p className="text-sm font-semibold text-rose-500 text-center">{registerError}</p>
             )}
+            {submitButton}
+          </form>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold mb-4 text-zinc-400 hover:text-white"
+        >
+          <ArrowLeft size={16} /> Back
+        </Link>
+        <h1 className="text-2xl md:text-3xl font-bold text-white">{title}</h1>
+        <p className="text-zinc-400 text-sm mt-1">{subtitle}</p>
+      </div>
+
+      {onboardStatus === "success" ? (
+        successBlock
+      ) : (
+        <form onSubmit={mode === "edit" ? handleUpdate : handleRegister} className="space-y-6">
+          <div className="glass-panel rounded-2xl border border-white/10 p-6 md:p-8">
+            <h2 className="text-lg font-semibold text-white mb-5">Partner details</h2>
+            {fieldsGrid}
           </div>
 
-          <hr className={isDark ? "border-white/10" : "border-slate-200"} />
-
-          <div>
-            <h3 className={`text-lg font-semibold mb-1 ${headingClass}`}>Admin credentials</h3>
-            <p className={`text-xs mb-4 ${mutedClass}`}>
-              {mode === "create"
-                ? "Password is auto-generated and emailed after onboarding / approval."
-                : "Leave password blank to keep the current one."}
-            </p>
-            <div>
-              <label className={labelClass}>
-                Admin Login Email <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="email"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                className={inputClass}
-                placeholder="admin@example.com"
-                required={mode === "create"}
-              />
-            </div>
-            {mode === "edit" && (
-              <div className="mt-4">
-                <PasswordInput
-                  label="New Password (optional)"
-                  labelClassName={labelClass}
-                  variant={isDark ? "dark" : "light"}
-                  mode="create"
-                  value={adminPassword}
-                  onChange={setAdminPassword}
-                  onValidChange={setPasswordValid}
-                  placeholder="Leave blank to keep current password"
-                />
-              </div>
-            )}
-          </div>
+          {documentsBlock}
 
           {registerError && (
-            <p className="text-sm font-semibold text-rose-500 text-center">{registerError}</p>
+            <p className="text-sm font-semibold text-rose-500">{registerError}</p>
           )}
 
-          <button
-            type="submit"
-            disabled={busy || (mode === "create" ? !canSubmitCreate : !canSubmitEdit)}
-            className={
-              isDark
-                ? "btn-primary w-full disabled:opacity-50 flex items-center justify-center gap-2"
-                : "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 transition-colors"
-            }
-          >
-            {busy ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                {mode === "create" ? (isDark ? "Creating..." : "Registering...") : "Saving..."}
-              </>
-            ) : (
-              <>
-                {mode === "create" && <Plus size={18} />}
-                {mode === "create"
-                  ? isDark
-                    ? isDining
-                      ? "Create Dining Business"
-                      : "Create Event Organizer"
-                    : "Register Business"
-                  : "Save Changes"}
-              </>
-            )}
-          </button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
+            <Link
+              href={backHref}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/10 text-center"
+            >
+              Cancel
+            </Link>
+            {submitButton}
+          </div>
         </form>
       )}
     </div>

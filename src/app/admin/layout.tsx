@@ -43,7 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Subscription & Billing', href: '/admin/billing', icon: CreditCard },
     { name: 'Marketing Plans', href: '/admin/marketing', icon: Megaphone },
     { name: 'Content Management', href: '/admin/content', icon: FileText },
-    { name: 'User Management', href: '/admin/users', icon: Users },
+    { name: 'Customers', href: '/admin/customers', icon: Users },
     { name: 'Change Password', href: '/admin/change-password', icon: KeyRound },
   ];
 

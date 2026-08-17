@@ -186,6 +186,10 @@ export interface AdminEvent {
   poster_vertical_url?: string;
   gallery_images?: string[];
   documents?: EventDocumentUpload[] | string[];
+  terms_points?: {
+    selected?: Array<{ id?: number; text?: string } | string>;
+    custom?: string[];
+  };
 }
 
 export interface EventDocumentUpload {
@@ -216,9 +220,42 @@ export interface EventDocumentMaster {
   category_name?: string;
 }
 
+export interface EventTermsMaster {
+  id: number;
+  text: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
 export interface EventMastersResponse {
   genres: EventGenreMaster[];
   documents: EventDocumentMaster[];
+  terms?: EventTermsMaster[];
+}
+
+export interface PublicEventFilters {
+  languages: string[];
+  cities: string[];
+  organizers: string[];
+  categories: Array<{ slug: string; name: string }>;
+  date_presets: Array<{ id: string; label: string }>;
+  price_bands: Array<{ id: string; label: string }>;
+  more: Array<{ id: string; label: string }>;
+}
+
+export interface PublicEventsQuery {
+  q?: string;
+  category?: string;
+  city?: string;
+  language?: string;
+  date_preset?: string;
+  date_from?: string;
+  date_to?: string;
+  price?: string;
+  more?: string;
+  organizer?: string;
+  sort?: string;
 }
 
 export interface EventContract {
@@ -300,6 +337,10 @@ export interface EventFormPayload {
   about_event: string;
   age_group: string;
   duration_minutes: number | null;
+  terms_points?: {
+    selected: Array<{ id: number; text: string }>;
+    custom: string[];
+  };
   ticket_types: Array<{ ticket_type: string; total_count: number; price: number }>;
   showtimes: Array<{
     venue_name: string;
@@ -1823,16 +1864,30 @@ export const api = createApi({
       invalidatesTags: ['OrganizerEvents', 'PublicEvents'],
     }),
 
-    getPublicEvents: builder.query<PublicEvent[], { q?: string; category?: string; city?: string } | void>({
+    getPublicEvents: builder.query<PublicEvent[], PublicEventsQuery | void>({
       query: (params) => {
         const sp = new URLSearchParams();
         if (params?.q) sp.append('q', params.q);
         if (params?.category) sp.append('category', params.category);
         if (params?.city) sp.append('city', params.city);
+        if (params?.language) sp.append('language', params.language);
+        if (params?.date_preset) sp.append('date_preset', params.date_preset);
+        if (params?.date_from) sp.append('date_from', params.date_from);
+        if (params?.date_to) sp.append('date_to', params.date_to);
+        if (params?.price) sp.append('price', params.price);
+        if (params?.more) sp.append('more', params.more);
+        if (params?.organizer) sp.append('organizer', params.organizer);
+        if (params?.sort) sp.append('sort', params.sort);
         const qs = sp.toString();
         return `/events/public${qs ? `?${qs}` : ''}`;
       },
       transformResponse: (res: { data: PublicEvent[] }) => res.data || [],
+      providesTags: ['PublicEvents'],
+    }),
+
+    getPublicEventFilters: builder.query<PublicEventFilters, void>({
+      query: () => '/events/public/filters',
+      transformResponse: (res: { data: PublicEventFilters }) => res.data,
       providesTags: ['PublicEvents'],
     }),
 
@@ -2017,6 +2072,45 @@ export const api = createApi({
       invalidatesTags: [{ type: 'EventMasters', id: 'DOC_LIST' }, 'EventMasters'],
     }),
 
+    getAdminEventTerms: builder.query<EventTermsMaster[], void>({
+      query: () => '/admin/event-terms',
+      transformResponse: (res: { data?: EventTermsMaster[] }) => res?.data ?? [],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((t) => ({ type: 'EventMasters' as const, id: `term-${t.id}` })),
+              { type: 'EventMasters', id: 'TERM_LIST' },
+            ]
+          : [{ type: 'EventMasters', id: 'TERM_LIST' }],
+    }),
+
+    createAdminEventTerm: builder.mutation<EventTermsMaster, { text: string; is_active?: boolean; sort_order?: number }>({
+      query: (body) => ({ url: '/admin/event-terms', method: 'POST', body: { is_active: true, ...body } }),
+      transformResponse: (res: { data?: EventTermsMaster }) => res?.data ?? ({} as EventTermsMaster),
+      invalidatesTags: [{ type: 'EventMasters', id: 'TERM_LIST' }, 'EventMasters'],
+    }),
+
+    updateAdminEventTerm: builder.mutation<
+      EventTermsMaster,
+      { id: number; body: Partial<EventTermsMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/event-terms/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: EventTermsMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'EventMasters', id: `term-${id}` },
+        { type: 'EventMasters', id: 'TERM_LIST' },
+        'EventMasters',
+      ],
+    }),
+
+    deleteAdminEventTerm: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/event-terms/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'EventMasters', id: 'TERM_LIST' }, 'EventMasters'],
+    }),
+
     // ── Upload ────────────────────────────────────────────────────────────────
 
     uploadImage: builder.mutation<{ url: string }, FormData>({
@@ -2129,6 +2223,7 @@ export const {
   useToggleOrganizerEventVisibilityMutation,
   useCloseOrganizerEventMutation,
   useGetPublicEventsQuery,
+  useGetPublicEventFiltersQuery,
   useGetPublicEventQuery,
   useGetPublicEventLayoutQuery,
   useCreateEventBookingMutation,
@@ -2144,4 +2239,8 @@ export const {
   useCreateAdminEventDocumentMutation,
   useUpdateAdminEventDocumentMutation,
   useDeleteAdminEventDocumentMutation,
+  useGetAdminEventTermsQuery,
+  useCreateAdminEventTermMutation,
+  useUpdateAdminEventTermMutation,
+  useDeleteAdminEventTermMutation,
 } = api;

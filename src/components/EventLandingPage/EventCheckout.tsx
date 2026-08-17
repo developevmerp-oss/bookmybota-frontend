@@ -135,6 +135,10 @@ export default function EventCheckout({
 
   const showtimes = event.showtimes || [];
   const ticketTypes = event.ticket_types || [];
+  const termLines = [
+    ...(event.terms_points?.selected || []).map((t) => (typeof t === "string" ? t : t.text || "").trim()).filter(Boolean),
+    ...(event.terms_points?.custom || []).map((t) => String(t).trim()).filter(Boolean),
+  ];
 
   const dateOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -690,6 +694,13 @@ export default function EventCheckout({
                       />
                       Send me updates about this event.
                     </label>
+                    {termLines.length > 0 && (
+                      <ul className="max-h-28 overflow-y-auto text-xs text-slate-600 space-y-1.5 pl-1 border border-slate-100 rounded-lg p-2 bg-slate-50">
+                        {termLines.map((line, i) => (
+                          <li key={i} className="leading-relaxed">• {line}</li>
+                        ))}
+                      </ul>
+                    )}
                     <label className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
                       <input
                         type="checkbox"

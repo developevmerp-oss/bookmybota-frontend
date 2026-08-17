@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ListChecks, Plus, Trash2, Tags } from "lucide-react";
+import { ListChecks, Plus, Trash2, Tags, FileText } from "lucide-react";
 import {
   useGetBusinessTypesQuery,
   useGetAdminEventGenresQuery,
@@ -13,8 +13,13 @@ import {
   useCreateAdminEventDocumentMutation,
   useUpdateAdminEventDocumentMutation,
   useDeleteAdminEventDocumentMutation,
+  useGetAdminEventTermsQuery,
+  useCreateAdminEventTermMutation,
+  useUpdateAdminEventTermMutation,
+  useDeleteAdminEventTermMutation,
   type EventDocumentMaster,
   type EventGenreMaster,
+  type EventTermsMaster,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 
@@ -49,7 +54,7 @@ function ActiveToggle({
 }
 
 export default function AdminEventMastersPage() {
-  const [tab, setTab] = useState<"genres" | "documents">("genres");
+  const [tab, setTab] = useState<"genres" | "documents" | "terms">("genres");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
@@ -88,6 +93,19 @@ export default function AdminEventMastersPage() {
   const [createDocument, { isLoading: creatingDoc }] = useCreateAdminEventDocumentMutation();
   const [updateDocument] = useUpdateAdminEventDocumentMutation();
   const [deleteDocument] = useDeleteAdminEventDocumentMutation();
+
+  const {
+    data: terms = [],
+    isLoading: termsLoading,
+    isFetching: termsFetching,
+    isError: termsError,
+    error: termsErrorData,
+    refetch: refetchTerms,
+  } = useGetAdminEventTermsQuery();
+  const [createTerm, { isLoading: creatingTerm }] = useCreateAdminEventTermMutation();
+  const [updateTerm] = useUpdateAdminEventTermMutation();
+  const [deleteTerm] = useDeleteAdminEventTermMutation();
+  const [newTermText, setNewTermText] = useState("");
 
   const [newGenre, setNewGenre] = useState({ category_type_id: "", name: "" });
   const [newDoc, setNewDoc] = useState({
@@ -193,6 +211,35 @@ export default function AdminEventMastersPage() {
     }
   };
 
+  const handleAddTerm = async () => {
+    const text = newTermText.trim();
+    if (!text) {
+      toast.error("Enter a terms & conditions point");
+      return;
+    }
+    try {
+      await createTerm({ text, is_active: true }).unwrap();
+      toast.success("Terms & conditions point added");
+      setNewTermText("");
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Failed to add T&C point"));
+    }
+  };
+
+  const toggleTermActive = async (term: EventTermsMaster) => {
+    const next = !term.is_active;
+    try {
+      await updateTerm({ id: term.id, body: { is_active: next } }).unwrap();
+      toast.success(
+        next
+          ? "T&C point is active — organizers can select it"
+          : "T&C point is inactive — hidden from organizers"
+      );
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Failed to update T&C status"));
+    }
+  };
+
   const genreListLoading = genresLoading && genres.length === 0;
   const docListLoading = docsLoading && documents.length === 0;
 
@@ -206,7 +253,7 @@ export default function AdminEventMastersPage() {
           Event Masters
         </h1>
         <p className="text-zinc-400 mt-2">
-          Manage category-linked genres and required event documents. Only <strong className="text-green-400/90">active</strong> items appear in the event organizer form.
+          Manage category-linked genres, required event documents, and customer-facing terms & conditions. Only <strong className="text-green-400/90">active</strong> items appear in the event organizer form.
         </p>
       </div>
 
@@ -230,6 +277,16 @@ export default function AdminEventMastersPage() {
           }`}
         >
           <ListChecks size={16} /> Document Master
+        </button>
+        <button
+          onClick={() => setTab("terms")}
+          className={`px-4 py-3 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 ${
+            tab === "terms"
+              ? "border-rose-500 text-rose-400"
+              : "border-transparent text-zinc-400 hover:text-white"
+          }`}
+        >
+          <FileText size={16} /> Customer Event T&C
         </button>
       </div>
 
@@ -503,6 +560,87 @@ export default function AdminEventMastersPage() {
                           <Trash2 size={16} />
                         </button>
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "terms" && (
+        <div className="space-y-6">
+          <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6">
+            <h3 className="text-white font-bold mb-1">Add customer event T&C</h3>
+            <p className="text-zinc-500 text-sm mb-4">
+              Super admin master points. Event organizers can tick these on their event. Custom points they type themselves are stored only on that event — never here.
+            </p>
+            <div className="flex gap-3">
+              <input
+                value={newTermText}
+                onChange={(e) => setNewTermText(e.target.value)}
+                placeholder="e.g. Tickets are non-refundable after purchase"
+                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                onKeyDown={(e) => e.key === "Enter" && handleAddTerm()}
+              />
+              <button
+                type="button"
+                onClick={handleAddTerm}
+                disabled={creatingTerm}
+                className="px-5 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center gap-2"
+              >
+                <Plus size={16} /> Add
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/50 border border-white/10 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-white font-bold">Master T&C points</h3>
+              <button type="button" onClick={() => refetchTerms()} className="text-xs text-zinc-400 hover:text-white">
+                Refresh
+              </button>
+            </div>
+            {termsError ? (
+              <div className="p-8 text-center space-y-3">
+                <p className="text-rose-400">{extractApiError(termsErrorData, "Could not load T&C master")}</p>
+                <button type="button" onClick={() => refetchTerms()} className="text-sm text-rose-300 underline">
+                  Retry
+                </button>
+              </div>
+            ) : termsLoading && terms.length === 0 ? (
+              <p className="p-8 text-zinc-500 text-center">Loading…</p>
+            ) : terms.length === 0 ? (
+              <p className="p-8 text-zinc-500 text-center">No T&C points yet. Add the first one above.</p>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {termsFetching && terms.length > 0 && (
+                  <p className="px-6 py-2 text-xs text-zinc-500">Refreshing…</p>
+                )}
+                {terms.map((term) => (
+                  <div key={term.id} className="px-6 py-4 flex items-start justify-between gap-4">
+                    <p className="text-white text-sm leading-relaxed">{term.text}</p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <ActiveToggle active={term.is_active} onToggle={() => toggleTermActive(term)} />
+                      <span className={`text-xs ${term.is_active ? "text-green-400" : "text-zinc-500"}`}>
+                        {term.is_active ? "Active" : "Inactive"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!confirm("Delete this T&C point from the master list?")) return;
+                          try {
+                            await deleteTerm(term.id).unwrap();
+                            toast.success("T&C point deleted");
+                          } catch (err: unknown) {
+                            toast.error(extractApiError(err, "Delete failed"));
+                          }
+                        }}
+                        className="text-zinc-500 hover:text-rose-400 p-1"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
                 ))}

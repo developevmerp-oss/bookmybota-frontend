@@ -115,6 +115,11 @@ export default function AdminEventDetailPage({
   const languages = parseEventLanguages(event.language);
   const gallery = event.gallery_images || [];
   const documents = parseDocuments(event.documents);
+  const termSelected = (event.terms_points?.selected || [])
+    .map((t) => (typeof t === "string" ? t : t.text || ""))
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const termCustom = (event.terms_points?.custom || []).map((t) => String(t).trim()).filter(Boolean);
   const ticketsSold = (event.ticket_types || []).reduce(
     (sum, t) => sum + Math.max(0, Number(t.total_count || 0) - Number(t.available_count || 0)),
     0
@@ -324,6 +329,31 @@ export default function AdminEventDetailPage({
               <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                 {event.about_event}
               </p>
+            </div>
+          )}
+
+          {(termSelected.length > 0 || termCustom.length > 0) && (
+            <div className="pt-3 border-t border-slate-200">
+              <p className="text-xs font-semibold uppercase tracking-wider portal-muted mb-2">
+                Customer terms &amp; conditions
+              </p>
+              <ul className="space-y-2">
+                {termSelected.map((line, i) => (
+                  <li key={`m-${i}`} className="text-sm text-slate-700 leading-relaxed flex gap-2">
+                    <span className="text-violet-500 mt-0.5">•</span>
+                    <span>{line}</span>
+                  </li>
+                ))}
+                {termCustom.map((line, i) => (
+                  <li key={`c-${i}`} className="text-sm text-slate-700 leading-relaxed flex gap-2">
+                    <span className="text-violet-500 mt-0.5">•</span>
+                    <span>
+                      {line}{" "}
+                      <span className="text-[10px] uppercase tracking-wide text-zinc-400">(event-only)</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

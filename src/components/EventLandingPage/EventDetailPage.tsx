@@ -153,6 +153,17 @@ export default function PublicEventDetailPage({
   const gallery = event?.gallery_images || [];
   const showtimes = event?.showtimes || [];
   const ticketTypes = event?.ticket_types || [];
+  const conveniencePct = Number(event?.convenience_fee_percent) || 0;
+  const minPrice = ticketTypes.length
+    ? Math.min(...ticketTypes.map((t) => Number(t.price) || 0))
+    : null;
+  const termsPoints = (
+    event as { terms_points?: { selected?: Array<{ text?: string }>; custom?: string[] } } | undefined
+  )?.terms_points;
+  const termLines = [
+    ...(termsPoints?.selected || []).map((t) => String(t.text || "").trim()).filter(Boolean),
+    ...(termsPoints?.custom || []).map((t) => String(t).trim()).filter(Boolean),
+  ];
   const nextShowtime =
     showtimes.find((s) => new Date(s.starts_at).getTime() >= Date.now()) || showtimes[0];
 
@@ -261,6 +272,10 @@ export default function PublicEventDetailPage({
   const aboutLong = aboutText.length > 280;
   const displayAbout = aboutExpanded || !aboutLong ? aboutText : `${aboutText.slice(0, 280)}...`;
   const durationLabel = formatDuration(event.duration_minutes);
+  const isLive = event.status === "LIVE";
+  const hasShowtimes = showtimes.length > 0;
+  const hasTickets = ticketTypes.some((t) => Number(t.available_count) > 0);
+  const canBook = (isLive || event.status === "APPROVED") && hasShowtimes && hasTickets;
   const cityOptions = city === "All Cities" ? ["All Cities"] : ["All Cities", city];
   const handleCityChange = (next: string) => {
     setCity(next);
@@ -395,11 +410,27 @@ export default function PublicEventDetailPage({
             )}
             <button
               type="button"
+              disabled={!canBook}
               onClick={() => openCheckout()}
-              className="mt-4 w-full py-3 rounded-xl bg-[#1B5E3B] hover:bg-[#164e31] text-white font-semibold text-sm cursor-pointer"
+              className={`mt-4 w-full py-3 rounded-xl font-semibold text-sm ${
+                canBook
+                  ? "bg-[#1B5E3B] hover:bg-[#164e31] text-white cursor-pointer"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
+              }`}
             >
-              Book Tickets
+              {canBook
+                ? "Book Tickets"
+                : !hasShowtimes
+                  ? "Showtimes coming soon"
+                  : !hasTickets
+                    ? "Sold out"
+                    : "Booking unavailable"}
             </button>
+            <p className="mt-3 text-xs text-slate-500">
+              {conveniencePct > 0
+                ? `${conveniencePct}% convenience fee is added at checkout.`
+                : "No convenience fee is charged for this event."}
+            </p>
           </section>
 
           {gallery.length > 0 && (
@@ -555,7 +586,7 @@ export default function PublicEventDetailPage({
                                 Get Directions
                               </a>
                             )}
-                            {!isPast && (
+                            {!isPast && canBook && (
                               <button
                                 type="button"
                                 onClick={() => openCheckout(s.id)}
@@ -603,9 +634,28 @@ export default function PublicEventDetailPage({
               </ul>
             </section>
           )}
+          {termLines.length > 0 && (
+            <section className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-3">Terms & conditions</h2>
+              <ul className="list-disc pl-5 space-y-1.5 text-sm text-slate-600">
+                {termLines.map((line, i) => (
+                  <li key={`${i}-${line.slice(0, 24)}`}>{line}</li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-24 self-start h-fit">
+          {minPrice !== null && (
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Starting from</p>
+              <p className="text-2xl font-black text-slate-900">{formatMoney(minPrice, { compact: true })}</p>
+              {conveniencePct > 0 && (
+                <p className="text-xs text-slate-500 mt-1">+ {conveniencePct}% convenience fee at checkout</p>
+              )}
+            </div>
+          )}
           {event.organizer_name && (
             <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
               <h3 className="font-bold text-slate-900 mb-3">Organized by</h3>

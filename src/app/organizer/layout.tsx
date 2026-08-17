@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAppSelector } from "@/lib/hooks";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import AuthGate from "@/components/Shared/AuthGate";
+import SessionGuard from "@/components/Shared/SessionGuard";
 import { clearSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,
@@ -196,7 +197,9 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate mode="require" roles={["event_admin"]}>
-      <OrganizerShell>{children}</OrganizerShell>
+      <SessionGuard>
+        <OrganizerShell>{children}</OrganizerShell>
+      </SessionGuard>
     </AuthGate>
   );
 }

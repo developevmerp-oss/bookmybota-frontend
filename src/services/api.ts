@@ -7,6 +7,9 @@
  */
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
+import { clearCredentials } from '@/features/auth/authSlice';
+import { clearSessionForRole, type UserRole } from '@/lib/authStorage';
 
 const BASE_URL = 'http://localhost:5000/api';
 
@@ -33,6 +36,8 @@ export interface Business {
   price_range?: string;
   is_open?: boolean;
   is_enabled?: boolean;
+  credentials_sent_at?: string | null;
+  live_event_count?: number;
   owner_id?: string;
   operating_hours?: Record<string, { open: string; close: string; closed: boolean }>;
   gallery_images?: string[];
@@ -43,6 +48,37 @@ export interface Business {
   is_promoted?: boolean;
   collection_slugs?: string[];
   documents?: PartnerDocumentUpload[];
+}
+
+export interface AdminCustomer {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  user_email?: string | null;
+  is_registered_user?: boolean;
+  is_enabled?: boolean;
+  created_at?: string;
+  dining_bookings_count?: number;
+  event_bookings_count?: number;
+  live_event_booking_count?: number;
+  dining_bookings?: Array<{
+    id: string;
+    status: string;
+    booking_time: string;
+    guests?: number;
+    booking_source?: string;
+    venue_name?: string;
+  }>;
+  event_bookings?: Array<{
+    id: string;
+    status: string;
+    created_at: string;
+    ticket_qty?: number;
+    grand_total?: number;
+    event_name?: string;
+    event_status?: string;
+  }>;
 }
 
 export interface PartnerDocumentUpload {
@@ -672,30 +708,59 @@ export interface AuthUser {
 
 // ─── RTK Query API ────────────────────────────────────────────────────────────
 
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: BASE_URL,
+  prepareHeaders: (headers) => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      let tokenKey = 'token_customer';
+      if (pathname.startsWith('/admin')) {
+        tokenKey = 'token_super_admin';
+      } else if (pathname.startsWith('/organizer')) {
+        tokenKey = 'token_event_admin';
+      } else if (pathname.startsWith('/business')) {
+        tokenKey = 'token_business_admin';
+      }
+      const token = localStorage.getItem(tokenKey);
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+    }
+    return headers;
+  },
+});
+
+const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
+  args,
+  api,
+  extraOptions
+) => {
+  const result = await rawBaseQuery(args, api, extraOptions);
+  if (result.error && typeof window !== 'undefined') {
+    const path = window.location.pathname;
+    const onManagedPanel =
+      path.startsWith('/business') || path.startsWith('/organizer') || path.startsWith('/customer');
+    const data = result.error.data as { code?: string } | undefined;
+    if (onManagedPanel && data?.code === 'ACCOUNT_DISABLED') {
+      const role = (
+        path.startsWith('/organizer')
+          ? 'event_admin'
+          : path.startsWith('/business')
+            ? 'business_admin'
+            : 'customer'
+      ) as UserRole;
+      clearSessionForRole(role);
+      api.dispatch(clearCredentials());
+      window.location.replace('/login');
+    }
+  }
+  return result;
+};
+
 export const api = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
-    baseUrl: BASE_URL,
-    prepareHeaders: (headers) => {
-      if (typeof window !== 'undefined') {
-        const pathname = window.location.pathname;
-        let tokenKey = 'token_customer';
-        if (pathname.startsWith('/admin')) {
-          tokenKey = 'token_super_admin';
-        } else if (pathname.startsWith('/organizer')) {
-          tokenKey = 'token_event_admin';
-        } else if (pathname.startsWith('/business')) {
-          tokenKey = 'token_business_admin';
-        }
-        const token = localStorage.getItem(tokenKey);
-        if (token) {
-          headers.set('Authorization', `Bearer ${token}`);
-        }
-      }
-      return headers;
-    },
-  }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments'],
+  baseQuery,
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -742,6 +807,12 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: [],
+    }),
+
+    getMe: builder.query<{ id: string; role: string; business_id?: string; customer_id?: string; email?: string }, void>({
+      query: () => '/auth/me',
+      transformResponse: (res: { data: { id: string; role: string; business_id?: string; customer_id?: string; email?: string } }) =>
+        res.data,
     }),
 
     registerCustomer: builder.mutation<
@@ -825,6 +896,53 @@ export const api = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['Businesses', 'AdminStats'],
+    }),
+
+    getAdminCustomers: builder.query<AdminCustomer[], { q?: string } | void>({
+      query: (params) => {
+        const q = params?.q?.trim();
+        return q ? `/admin/customers?q=${encodeURIComponent(q)}` : '/admin/customers';
+      },
+      transformResponse: (res: { data: AdminCustomer[] }) => res.data || [],
+      providesTags: ['AdminCustomers'],
+    }),
+
+    getAdminCustomer: builder.query<AdminCustomer, string>({
+      query: (id) => `/admin/customers/${id}`,
+      transformResponse: (res: { data: AdminCustomer }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'AdminCustomers', id }],
+    }),
+
+    updateAdminCustomer: builder.mutation<
+      { message?: string; data?: AdminCustomer },
+      { id: string; name: string; phone?: string; email?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/customers/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['AdminCustomers'],
+    }),
+
+    setAdminCustomerEnabled: builder.mutation<
+      { message?: string },
+      { id: string; is_enabled: boolean }
+    >({
+      query: ({ id, is_enabled }) => ({
+        url: `/admin/customers/${id}/status`,
+        method: 'PATCH',
+        body: { is_enabled },
+      }),
+      invalidatesTags: ['AdminCustomers'],
+    }),
+
+    softDeleteAdminCustomer: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/customers/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['AdminCustomers'],
     }),
 
     // ── Businesses (Public) ───────────────────────────────────────────────────
@@ -1918,12 +2036,18 @@ export const {
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useChangePasswordMutation,
+  useGetMeQuery,
   useRegisterCustomerMutation,
   useRegisterBusinessMutation,
   useGetBusinessesQuery,
   useUpdateAdminBusinessMutation,
   useSetBusinessEnabledMutation,
   useSoftDeleteBusinessMutation,
+  useGetAdminCustomersQuery,
+  useGetAdminCustomerQuery,
+  useUpdateAdminCustomerMutation,
+  useSetAdminCustomerEnabledMutation,
+  useSoftDeleteAdminCustomerMutation,
   useGetCollectionsQuery,
   useGetMoodsQuery,
   useGetBusinessTypesQuery,

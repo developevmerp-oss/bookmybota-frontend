@@ -53,3 +53,36 @@ export function isValidPassword(password: string): boolean {
 export function getPasswordValidationErrors(password: string): string[] {
   return PASSWORD_RULES.filter((rule) => !rule.test(password)).map((rule) => rule.label);
 }
+
+export const PERCENT_MIN = 0;
+export const PERCENT_MAX = 100;
+
+export function sanitizePercentInput(raw: string): string {
+  let s = String(raw).replace(/[^\d.]/g, '');
+  const firstDot = s.indexOf('.');
+  if (firstDot !== -1) {
+    s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, '');
+    const [intPart, dec = ''] = s.split('.');
+    s = `${intPart}.${dec.slice(0, 2)}`;
+  }
+  return s;
+}
+
+export function getPercentValidationError(raw: string, label = 'Percentage'): string | null {
+  const s = String(raw).trim();
+  if (s === '') return `${label} is required.`;
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) {
+    return `${label} must be a number with up to 2 decimal places.`;
+  }
+  const n = Number(s);
+  if (!Number.isFinite(n)) return `${label} must be a valid number.`;
+  if (n < PERCENT_MIN || n > PERCENT_MAX) {
+    return `${label} must be between ${PERCENT_MIN} and ${PERCENT_MAX}.`;
+  }
+  return null;
+}
+
+export function parsePercent(raw: string): number | null {
+  if (getPercentValidationError(raw)) return null;
+  return Number(String(raw).trim());
+}

@@ -15,6 +15,11 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { htmlWithMergedValues } from "@/lib/contractPlaceholdersShared";
+import {
+  getPercentValidationError,
+  parsePercent,
+  sanitizePercentInput,
+} from "@/lib/validation";
 
 export default function CreateEventContractPage() {
   const router = useRouter();
@@ -41,8 +46,8 @@ export default function CreateEventContractPage() {
 
   useEffect(() => {
     if (!prefill?.suggested) return;
-    setConvenienceFee(String(prefill.suggested.convenience_fee_percent ?? 0));
-    setCommission(String(prefill.suggested.commission_percent ?? 0));
+    setConvenienceFee(sanitizePercentInput(String(prefill.suggested.convenience_fee_percent ?? 0)));
+    setCommission(sanitizePercentInput(String(prefill.suggested.commission_percent ?? 0)));
     setTerms(prefill.suggested.terms_and_conditions ?? "");
     setBodyHtml(prefill.suggested.body_html ?? "");
   }, [prefill?.suggested?.contract_number, prefill?.event?.id]);
@@ -51,14 +56,28 @@ export default function CreateEventContractPage() {
     if (!prefill?.suggested) return {};
     return {
       ...prefill.suggested.dynamic_data,
-      convenienceFeePercent: Number(convenienceFee) || 0,
-      commissionPercent: Number(commission) || 0,
+      convenienceFeePercent: parsePercent(convenienceFee) ?? 0,
+      commissionPercent: parsePercent(commission) ?? 0,
     };
   }, [prefill, convenienceFee, commission]);
+
+  const convenienceError = getPercentValidationError(convenienceFee, "Convenience fee (%)");
+  const commissionError = getPercentValidationError(commission, "Commission (%)");
+  const feesValid = !convenienceError && !commissionError;
 
   const handleCreate = async () => {
     if (!eventId || !bodyHtml.trim()) {
       toast.error("Select an event and enter contract content.");
+      return;
+    }
+    if (!feesValid) {
+      toast.error(convenienceError || commissionError || "Enter valid fee percentages.");
+      return;
+    }
+    const conv = parsePercent(convenienceFee);
+    const comm = parsePercent(commission);
+    if (conv === null || comm === null) {
+      toast.error("Enter valid fee percentages between 0 and 100.");
       return;
     }
     try {
@@ -66,8 +85,8 @@ export default function CreateEventContractPage() {
         event_id: eventId,
         body_html: bodyHtml,
         terms_and_conditions: terms,
-        convenience_fee_percent: Number(convenienceFee) || 0,
-        commission_percent: Number(commission) || 0,
+        convenience_fee_percent: conv,
+        commission_percent: comm,
       }).unwrap();
       toast.success("Contract created. Sign with signature + OTP, then ask the organizer to sign.");
       router.push(`/admin/event-contracts/${eventId}`);
@@ -85,8 +104,8 @@ export default function CreateEventContractPage() {
       body_html: bodyHtml,
       terms_and_conditions: terms,
       status: "PENDING_SIGNATURES",
-      convenience_fee_percent: Number(convenienceFee) || 0,
-      commission_percent: Number(commission) || 0,
+      convenience_fee_percent: parsePercent(convenienceFee) ?? 0,
+      commission_percent: parsePercent(commission) ?? 0,
       dynamic_data: dynamicPreview,
       event_name: prefill.event.name,
       organizer_name: prefill.event.organizer_name,
@@ -156,26 +175,38 @@ export default function CreateEventContractPage() {
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Convenience fee (%)</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1">
+                Convenience fee (%) <span className="text-rose-500">*</span>
+              </label>
               <input
-                type="number"
-                min={0}
-                step={0.01}
-                className="input-field w-full"
+                type="text"
+                inputMode="decimal"
+                className={`input-field w-full ${convenienceError ? "border-rose-500" : ""}`}
                 value={convenienceFee}
-                onChange={(e) => setConvenienceFee(e.target.value)}
+                onChange={(e) => setConvenienceFee(sanitizePercentInput(e.target.value))}
+                placeholder="0–100"
               />
+              <p className="text-xs text-zinc-500 mt-1">Charged to the customer on ticket amount.</p>
+              {convenienceError && (
+                <p className="text-xs text-rose-400 font-medium mt-1">{convenienceError}</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Commission (%)</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1">
+                Commission (%) <span className="text-rose-500">*</span>
+              </label>
               <input
-                type="number"
-                min={0}
-                step={0.01}
-                className="input-field w-full"
+                type="text"
+                inputMode="decimal"
+                className={`input-field w-full ${commissionError ? "border-rose-500" : ""}`}
                 value={commission}
-                onChange={(e) => setCommission(e.target.value)}
+                onChange={(e) => setCommission(sanitizePercentInput(e.target.value))}
+                placeholder="0–100"
               />
+              <p className="text-xs text-zinc-500 mt-1">Taken from the organizer on ticket amount.</p>
+              {commissionError && (
+                <p className="text-xs text-rose-400 font-medium mt-1">{commissionError}</p>
+              )}
             </div>
           </div>
 
@@ -235,7 +266,7 @@ export default function CreateEventContractPage() {
         </Link>
         <button
           type="button"
-          disabled={creating || !eventId}
+          disabled={creating || !eventId || !feesValid}
           onClick={handleCreate}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
         >

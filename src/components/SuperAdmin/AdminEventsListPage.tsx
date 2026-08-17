@@ -33,8 +33,6 @@ function statusBadge(status: string) {
 export default function AdminEventsPage() {
   const [statusFilter, setStatusFilter] = useState('PENDING_APPROVAL');
   const [selected, setSelected] = useState<AdminEvent | null>(null);
-  const [convenienceFee, setConvenienceFee] = useState('0');
-  const [commissionPercent, setCommissionPercent] = useState('0');
   const [rejectionReason, setRejectionReason] = useState('');
 
   const queryArg = statusFilter ? { status: statusFilter } : undefined;
@@ -48,15 +46,8 @@ export default function AdminEventsPage() {
 
   const openDetail = (event: AdminEvent) => {
     setSelected(event);
-    setConvenienceFee(String(event.convenience_fee_percent ?? 0));
-    setCommissionPercent(String(event.commission_percent ?? 0));
     setRejectionReason('');
   };
-
-  const feePayload = () => ({
-    convenience_fee_percent: Number(convenienceFee) || 0,
-    commission_percent: Number(commissionPercent) || 0,
-  });
 
   const handleAction = async (
     action: 'approve' | 'reject' | 'go_live' | 'close',
@@ -68,13 +59,8 @@ export default function AdminEventsPage() {
       const body: {
         id: string;
         action: typeof action;
-        convenience_fee_percent?: number;
-        commission_percent?: number;
         rejection_reason?: string;
       } = { id, action };
-      if (action === 'approve') {
-        Object.assign(body, feePayload());
-      }
       if (action === 'reject') {
         body.rejection_reason = rejectionReason.trim() || undefined;
       }
@@ -91,19 +77,6 @@ export default function AdminEventsPage() {
       if (selected?.id === id) setSelected(null);
     } catch {
       toast.error('Failed to update event');
-    }
-  };
-
-  const saveFees = async () => {
-    if (!selected) return;
-    try {
-      await updateEvent({
-        id: selected.id,
-        ...feePayload(),
-      }).unwrap();
-      toast.success('Fees updated');
-    } catch {
-      toast.error('Failed to update fees');
     }
   };
 
@@ -252,42 +225,6 @@ export default function AdminEventsPage() {
               {selected.organizer_name || 'Organizer'} · {selected.status}
             </p>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Convenience fee (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={convenienceFee}
-                onChange={(e) => setConvenienceFee(e.target.value)}
-                className="input-field"
-              />
-              <p className="text-xs text-zinc-500 mt-1">
-                Charged to the <span className="text-zinc-300">customer</span> as % of ticket amount.
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Commission (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={commissionPercent}
-                onChange={(e) => setCommissionPercent(e.target.value)}
-                className="input-field"
-              />
-              <p className="text-xs text-zinc-500 mt-1">
-                Taken from the <span className="text-zinc-300">organizer</span> as % of ticket amount.
-              </p>
-            </div>
-
             {selected.status === 'PENDING_APPROVAL' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-zinc-400 mb-2">
@@ -324,13 +261,6 @@ export default function AdminEventsPage() {
               )}
               {(selected.status === 'APPROVED' || selected.status === 'LIVE') && (
                 <>
-                  <button
-                    disabled={isUpdating}
-                    onClick={saveFees}
-                    className="btn-primary disabled:opacity-50"
-                  >
-                    Save fees
-                  </button>
                   {selected.status === 'APPROVED' && (
                     <button
                       disabled={isUpdating}

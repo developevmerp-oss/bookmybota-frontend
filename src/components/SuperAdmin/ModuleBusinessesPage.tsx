@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { extractApiError } from "@/lib/apiErrors";
 import { type PartnerModule } from "@/components/DiningAdminPanel/PartnerTypeFields";
 import {
   useGetBusinessesQuery,
@@ -72,12 +73,21 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
         const next = action === "enable";
         await setBusinessEnabled({ id: business.id, is_enabled: next }).unwrap();
         toast.success(
-          next ? "Partner enabled — they can log in now" : "Partner disabled — login blocked"
+          next
+            ? confirmState.business.credentials_sent_at
+              ? "Partner enabled — they can log in with their existing password"
+              : "Partner enabled — login credentials were emailed"
+            : "Partner disabled — login blocked"
         );
       }
       setConfirmState(null);
-    } catch {
-      toast.error(action === "delete" ? "Failed to delete" : "Failed to update status");
+    } catch (err) {
+      toast.error(
+        extractApiError(
+          err,
+          action === "delete" ? "Failed to delete" : "Failed to update status"
+        )
+      );
     } finally {
       setConfirmBusy(false);
     }
@@ -87,9 +97,14 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
     if (!confirmState) return { title: "", body: "", confirmLabel: "", danger: false };
     const name = confirmState.business.name;
     if (confirmState.action === "enable") {
+      const firstCredentials = !confirmState.business.credentials_sent_at;
       return {
         title: "Enable partner?",
-        body: `Enable "${name}"? They will be able to log in and appear on the public marketplace.`,
+        body: firstCredentials
+          ? `Enable "${name}"? They will get a one-time email with login email and password.`
+          : isDining
+            ? `Enable "${name}"? They can log in with their existing password and appear on the public marketplace.`
+            : `Enable "${name}"? They can log in with their existing password. Live events stay as they are. Upcoming listings stay hidden until they are made visible again.`,
         confirmLabel: "Enable",
         danger: false,
       };
@@ -97,14 +112,18 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
     if (confirmState.action === "disable") {
       return {
         title: "Disable partner?",
-        body: `Disable "${name}"? They will not be able to log in until you enable them again.`,
+        body: isDining
+          ? `Disable "${name}"? They will not be able to log in until you enable them again.`
+          : `Disable "${name}"? They cannot log in. Live events stay on the site so customers can still book. Upcoming (approved) listings will be hidden until you enable them again and make those events visible.`,
         confirmLabel: "Disable",
         danger: false,
       };
     }
     return {
       title: "Delete partner?",
-      body: `Soft-delete "${name}"? They will be removed from lists and cannot log in.`,
+      body: isDining
+        ? `Soft-delete "${name}"? They will be removed from lists and cannot log in.`
+        : `You cannot delete this organizer if any event is still LIVE. Close live events first. After delete, "${name}" cannot log in and will be removed from lists. Booking and fee history is kept.`,
       confirmLabel: "Delete",
       danger: true,
     };
@@ -228,9 +247,17 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
                     <button
                       type="button"
                       onClick={() => requestSoftDelete(biz)}
-                      disabled={isDeleting || confirmBusy}
+                      disabled={
+                        isDeleting ||
+                        confirmBusy ||
+                        (!isDining && (biz.live_event_count ?? 0) > 0)
+                      }
                       className="p-2 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
-                      title="Soft delete"
+                      title={
+                        !isDining && (biz.live_event_count ?? 0) > 0
+                          ? "Close live events first"
+                          : "Soft delete"
+                      }
                     >
                       <Trash2 size={16} />
                     </button>

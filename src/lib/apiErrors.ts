@@ -15,8 +15,18 @@ export function extractApiError(error: unknown, fallback = 'Something went wrong
   }
 
   if ('data' in err && err.data) {
-    const data = err.data as { error?: string; message?: string };
-    if (typeof data.error === 'string' && data.error.trim()) return data.error;
+    const data = err.data as {
+      error?: string;
+      message?: string;
+      live_events?: Array<{ name?: string }>;
+    };
+    if (typeof data.error === 'string' && data.error.trim()) {
+      const names = (data.live_events || [])
+        .map((e) => e.name)
+        .filter((n): n is string => Boolean(n && n.trim()));
+      if (names.length > 0) return `${data.error} Live: ${names.join(', ')}`;
+      return data.error;
+    }
     if (typeof data.message === 'string' && data.message.trim()) return data.message;
     if (typeof data === 'string') return data;
   }

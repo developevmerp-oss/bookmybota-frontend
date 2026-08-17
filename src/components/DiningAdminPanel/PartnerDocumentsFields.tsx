@@ -124,7 +124,7 @@ export default function PartnerDocumentsFields({
           No document types configured yet.
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {masters.map((doc) => {
             const uploadedUrl = value.find((d) => d.document_type_id === doc.id)?.url;
             return (

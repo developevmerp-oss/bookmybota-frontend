@@ -66,26 +66,13 @@ export default function AdminEventDetailPage({
   const { id } = use(params);
   const { data: event, isLoading } = useGetAdminEventDetailQuery(id);
   const [updateEvent, { isLoading: isUpdating }] = useUpdateAdminEventMutation();
-  const [convenienceFee, setConvenienceFee] = useState<string | null>(null);
-  const [commissionPercent, setCommissionPercent] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-
-  const convenienceValue =
-    convenienceFee ?? String(event?.convenience_fee_percent ?? 0);
-  const commissionValue =
-    commissionPercent ?? String(event?.commission_percent ?? 0);
-
-  const feePayload = () => ({
-    convenience_fee_percent: Number(convenienceValue) || 0,
-    commission_percent: Number(commissionValue) || 0,
-  });
 
   const handleAction = async (action: "approve" | "reject" | "go_live" | "close") => {
     try {
       await updateEvent({
         id,
         action,
-        ...(action === "approve" ? feePayload() : {}),
         ...(action === "reject"
           ? { rejection_reason: rejectionReason.trim() || undefined }
           : {}),
@@ -93,18 +80,6 @@ export default function AdminEventDetailPage({
       toast.success("Event updated");
     } catch (err) {
       toast.error(extractApiError(err, "Update failed"));
-    }
-  };
-
-  const saveFees = async () => {
-    try {
-      await updateEvent({
-        id,
-        ...feePayload(),
-      }).unwrap();
-      toast.success("Fees saved");
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to save fees"));
     }
   };
 
@@ -384,49 +359,26 @@ export default function AdminEventDetailPage({
             )}
           </div>
 
-          <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-3">
             <h3 className="portal-heading text-lg font-semibold">Fees</h3>
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Convenience fee (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={convenienceValue}
-                onChange={(e) => setConvenienceFee(e.target.value)}
-                className="input-field"
-              />
-              <p className="text-xs text-zinc-500 mt-1">
-                Paid by the customer as % of ticket amount.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Commission (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={commissionValue}
-                onChange={(e) => setCommissionPercent(e.target.value)}
-                className="input-field"
-              />
-              <p className="text-xs text-zinc-500 mt-1">
-                Taken from the organizer on ticket amount.
-              </p>
-            </div>
-            <button
-              disabled={isUpdating}
-              onClick={saveFees}
-              className="btn-primary w-full disabled:opacity-50"
-            >
-              Save fees
-            </button>
+            <p className="text-xs text-zinc-500">Set on the event contract. Read-only here.</p>
+            <dl className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="portal-muted">Convenience fee</dt>
+                <dd className="text-slate-800 font-semibold">
+                  {Number(event.convenience_fee_percent || 0).toFixed(2)}%
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="portal-muted">Commission</dt>
+                <dd className="text-slate-800 font-semibold">
+                  {Number(event.commission_percent || 0).toFixed(2)}%
+                </dd>
+              </div>
+            </dl>
+            <p className="text-xs text-zinc-500">
+              Convenience fee is charged to the customer. Commission is taken from the organizer.
+            </p>
           </div>
         </div>
       </div>

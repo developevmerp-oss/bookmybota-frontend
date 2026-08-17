@@ -126,11 +126,7 @@ export default function PartnerTypeFields({
     : "e.g. Restaurant → Cafe";
 
   return (
-    <div
-      className={
-        variant === "light" ? "grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2" : "space-y-4"
-      }
-    >
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
       <div>
         <label className={labelClass[variant]}>
           {parentLabel} <span className="text-rose-500">*</span>

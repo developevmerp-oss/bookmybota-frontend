@@ -1,15 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import {
-  FaEnvelope,
-  FaFacebookF,
-  FaInstagram,
-  FaMapMarkerAlt,
-  FaPhoneAlt,
-  FaTelegramPlane,
-} from "react-icons/fa";
-import { FaTiktok } from "react-icons/fa6";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { FaFacebookF, FaInstagram } from "react-icons/fa";
+import { useGetPublicEventFiltersQuery } from "@/services/api";
 
 const COLUMNS = [
   {
@@ -18,28 +12,21 @@ const COLUMNS = [
       { label: "Home", href: "/" },
       { label: "About Us", href: "#about" },
       { label: "Contact Us", href: "#contact" },
-      { label: "Careers", href: "#contact" },
-      { label: "Blog", href: "/" },
+      { label: "Help Centre", href: "/customer/help" },
     ],
   },
   {
     title: "Events",
     links: [
       { label: "Discover Events", href: "/events" },
-      { label: "Categories", href: "/events" },
-      { label: "Venues", href: "/events" },
-      { label: "Organizers", href: "/organizer" },
-      { label: "Event Guide", href: "/events" },
+      { label: "List your event", href: "/organizer" },
     ],
   },
   {
     title: "Dining",
     links: [
       { label: "Restaurants", href: "/dining" },
-      { label: "Cafés", href: "/dining" },
-      { label: "Bars", href: "/dining" },
-      { label: "Offers", href: "/dining" },
-      { label: "Dining Guide", href: "/dining" },
+      { label: "List restaurant", href: "/business/register" },
     ],
   },
   {
@@ -47,78 +34,82 @@ const COLUMNS = [
     links: [
       { label: "Help Center", href: "/customer/help" },
       { label: "FAQs", href: "/customer/help" },
-      { label: "Terms & Conditions", href: "/customer/help" },
-      { label: "Privacy Policy", href: "/customer/help" },
-      { label: "Contact Support", href: "#contact" },
+      { label: "My Bookings", href: "/customer/dashboard" },
+      { label: "My Account", href: "/customer/settings" },
     ],
   },
 ];
 
 export default function Footer() {
+  const { data: filters } = useGetPublicEventFiltersQuery();
+  const cities = filters?.cities || [];
+
   return (
-    <footer id="contact" className="bg-black text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-10">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-8 lg:gap-6">
+    <footer id="contact" className="bg-[#111111] text-white">
+      <div className="border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+          <div>
+            <p className="text-lg font-semibold">List your event or restaurant</p>
+            <p className="text-sm text-[#B0B0B0] mt-1">
+              Reach more guests across events and dining.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/organizer"
+              className="inline-flex items-center h-10 px-4 rounded-lg bg-[#7C5CFF] hover:bg-[#6B4EFF] text-sm font-medium text-white"
+            >
+              List your event
+            </Link>
+            <Link
+              href="/business/register"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#7C5CFF] text-sm font-medium text-white hover:bg-white/5"
+            >
+              List restaurant
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-8">
           <div id="about" className="col-span-2 sm:col-span-3 lg:col-span-1">
-            <p className="text-xl font-extrabold leading-tight">
-              <span className="text-[#2ea44f]">Book My </span>
-              <span className="text-[#C9A227]">Bota</span>
+            <p className="text-lg font-extrabold">
+              <span className="text-white">Book My </span>
+              <span className="text-[#7C5CFF]">Bota</span>
             </p>
-            <p className="text-xs font-medium text-white mt-1">Events &amp; Dining</p>
-            <p className="mt-4 text-sm text-white/80 leading-relaxed">
-              Your ultimate platform to discover amazing events and dining experiences across
-              Ethiopia.
+            <p className="mt-3 text-sm text-[#B0B0B0] leading-relaxed">
+              Discover events and dining experiences near you.
             </p>
-            <div className="flex items-center gap-2.5 mt-5">
+            <div className="flex items-center gap-3 mt-5">
               <a
                 href="https://facebook.com"
                 target="_blank"
                 rel="noreferrer"
-                className="w-8 h-8 rounded-full bg-[#1877F2] flex items-center justify-center hover:opacity-90"
+                className="text-[#B0B0B0] hover:text-white"
                 aria-label="Facebook"
               >
-                <FaFacebookF size={14} />
+                <FaFacebookF size={16} />
               </a>
               <a
                 href="https://instagram.com"
                 target="_blank"
                 rel="noreferrer"
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center hover:opacity-90"
+                className="text-[#B0B0B0] hover:text-white"
                 aria-label="Instagram"
               >
-                <FaInstagram size={14} />
-              </a>
-              <a
-                href="https://www.tiktok.com"
-                target="_blank"
-                rel="noreferrer"
-                className="w-8 h-8 rounded-full bg-zinc-900 border border-white/20 flex items-center justify-center hover:opacity-90"
-                aria-label="TikTok"
-              >
-                <FaTiktok size={13} />
-              </a>
-              <a
-                href="https://t.me"
-                target="_blank"
-                rel="noreferrer"
-                className="w-8 h-8 rounded-full bg-[#229ED9] flex items-center justify-center hover:opacity-90"
-                aria-label="Telegram"
-              >
-                <FaTelegramPlane size={14} />
+                <FaInstagram size={18} />
               </a>
             </div>
           </div>
 
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h4 className="text-sm font-bold text-white mb-4">{col.title}</h4>
+              <h4 className="text-sm font-semibold text-white mb-4">{col.title}</h4>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-white/80 hover:text-white transition-colors"
-                    >
+                    <Link href={link.href} className="text-sm text-[#B0B0B0] hover:text-white">
                       {link.label}
                     </Link>
                   </li>
@@ -128,27 +119,46 @@ export default function Footer() {
           ))}
 
           <div>
-            <h4 className="text-sm font-bold text-white mb-4">Contact</h4>
-            <ul className="space-y-3 text-sm text-white/80">
+            <h4 className="text-sm font-semibold text-white mb-4">Contact</h4>
+            <ul className="space-y-3 text-sm text-[#B0B0B0]">
               <li className="flex items-start gap-2.5">
-                <FaPhoneAlt size={13} className="mt-0.5 shrink-0 text-white" />
+                <Phone size={14} className="mt-0.5 shrink-0" />
                 +251 9XX XXX XXX
               </li>
               <li className="flex items-start gap-2.5">
-                <FaEnvelope size={13} className="mt-0.5 shrink-0 text-white" />
+                <Mail size={14} className="mt-0.5 shrink-0" />
                 info@bookmybota.com
               </li>
               <li className="flex items-start gap-2.5">
-                <FaMapMarkerAlt size={13} className="mt-0.5 shrink-0 text-white" />
+                <MapPin size={14} className="mt-0.5 shrink-0" />
                 Addis Ababa, Ethiopia
               </li>
             </ul>
           </div>
         </div>
+
+        {cities.length > 0 && (
+          <div className="mt-10 pt-8 border-t border-white/10">
+            <h4 className="text-sm font-semibold text-white mb-3">Cities</h4>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {cities.map((city) => (
+                <span key={city} className="text-sm text-[#B0B0B0]">
+                  <Link href={`/events?city=${encodeURIComponent(city)}`} className="hover:text-white">
+                    {city} events
+                  </Link>
+                  <span className="mx-1.5 text-white/20">·</span>
+                  <Link href={`/dining?city=${encodeURIComponent(city)}`} className="hover:text-white">
+                    dining
+                  </Link>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="border-t border-white/10">
-        <p className="max-w-7xl mx-auto px-4 py-5 text-center text-xs text-white/50">
+        <p className="max-w-7xl mx-auto px-4 py-5 text-center text-xs text-[#B0B0B0]">
           © {new Date().getFullYear()} Book My Bota. All rights reserved.
         </p>
       </div>

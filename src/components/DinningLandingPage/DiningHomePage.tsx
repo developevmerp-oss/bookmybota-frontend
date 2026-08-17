@@ -992,7 +992,10 @@ export default function Home() {
         name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
         address.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesFilter = activeFilter === "All" || (r.type_name && r.type_name.toLowerCase() === activeFilter.toLowerCase());
+      const matchesFilter =
+        activeFilter === "All" ||
+        (r.type_name && r.type_name.toLowerCase() === activeFilter.toLowerCase()) ||
+        (r.parent_type_name && r.parent_type_name.toLowerCase() === activeFilter.toLowerCase());
       const matchesLocation =
         !locationCity ||
         locationCity === "All Cities" ||

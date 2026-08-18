@@ -5,12 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar,
+  Check,
   ChevronRight,
   Clock,
+  Copy,
+  CheckCheck,
   Filter,
+  LayoutGrid,
   MapPin,
   MoreVertical,
   Ticket,
+  User,
+  Users,
   UtensilsCrossed,
   XCircle,
 } from "lucide-react";
@@ -27,7 +33,6 @@ import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
-import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 
 type KindTab = "all" | "dining" | "event";
 type StatusTab = "all" | "upcoming" | "past" | "cancelled";
@@ -43,6 +48,8 @@ type UnifiedBooking = {
   extra?: string;
   image?: string;
   canCancel: boolean;
+  guests?: number;
+  ticketQty?: number;
 };
 
 function diningUpcoming(b: Booking) {
@@ -70,10 +77,16 @@ function formatTimeLine(iso: string) {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+function formatWeekday(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-GB", { weekday: "long" });
+}
+
 function statusStyles(status: string) {
   switch (status) {
     case "CONFIRMED":
-      return "bg-[#F7E9FF] text-[#6900AA]";
+      return "bg-emerald-50 text-emerald-700";
     case "CANCELLED":
       return "bg-red-50 text-red-600";
     default:
@@ -116,6 +129,7 @@ export default function CustomerDashboard() {
   const [cancelEvent] = useCancelEventBookingMutation();
   const [pendingCancel, setPendingCancel] = useState<UnifiedBooking | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const unified = useMemo<UnifiedBooking[]>(() => {
     const dining: UnifiedBooking[] = diningBookings.map((b) => ({
@@ -129,6 +143,7 @@ export default function CustomerDashboard() {
       extra: b.guests != null ? `${b.guests} guests` : undefined,
       image: b.business_cover_image,
       canCancel: diningUpcoming(b),
+      guests: b.guests,
     }));
     const events: UnifiedBooking[] = eventBookings.map((b) => ({
       kind: "event",
@@ -141,6 +156,7 @@ export default function CustomerDashboard() {
       extra: b.ticket_qty ? `${b.ticket_qty} ticket${b.ticket_qty === 1 ? "" : "s"}` : undefined,
       image: b.poster_horizontal_url || b.poster_vertical_url,
       canCancel: eventUpcoming(b),
+      ticketQty: b.ticket_qty,
     }));
     return [...dining, ...events].sort(
       (a, b) => new Date(b.when).getTime() - new Date(a.when).getTime()
@@ -186,6 +202,17 @@ export default function CustomerDashboard() {
     setPendingCancel(b);
   };
 
+  const copyBookingCode = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(shortBookingCode(id));
+      setCopiedId(id);
+      toast.success("Booking ID copied");
+      setTimeout(() => setCopiedId(null), 1600);
+    } catch {
+      toast.error("Could not copy Booking ID");
+    }
+  };
+
   if (diningLoading || eventsLoading || !user) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
@@ -205,47 +232,64 @@ export default function CustomerDashboard() {
     { key: "past", label: "Past" },
     { key: "cancelled", label: "Cancelled" },
   ];
+  const welcomeName = user.name || user.email?.split("@")[0] || "there";
 
   return (
-    <CustomerAccountLayout>
-        <div className="mb-8">
-          <h1 className="text-[32px] leading-tight font-extrabold text-[#111111] mb-1">
-            My Orders / Reservations
-          </h1>
-          <p className="text-slate-500">Manage your table reservations and event tickets.</p>
+    <div className="min-h-screen bg-[#F7F6FB] pt-10 pb-16">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-black mb-2">
+              Welcome back, {welcomeName}! 👋
+            </h1>
+            <p className="text-slate-500 text-sm sm:text-base">Manage your table reservations and event tickets.</p>
+          </div>
+          <Link
+            href="/customer/profile"
+            className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 self-start sm:self-auto"
+          >
+            <User size={16} /> Edit Profile
+          </Link>
         </div>
 
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-          {kindTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => {
-                setKind(tab.key);
-                if (tab.key === "all") setFilter("all");
-              }}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border ${
-                kind === tab.key
-                  ? "bg-[#6900AA] text-white border-[#6900AA]"
-                  : "bg-white text-slate-500 border-slate-200 hover:border-[#6900AA]/40"
-              }`}
-            >
-              {tab.label} ({tab.count})
-            </button>
-          ))}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+          {kindTabs.map((tab) => {
+            const active = kind === tab.key;
+            const Icon = tab.key === "dining" ? UtensilsCrossed : tab.key === "event" ? Ticket : LayoutGrid;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  setKind(tab.key);
+                  if (tab.key === "all") setFilter("all");
+                }}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border transition-colors ${
+                  active
+                    ? "bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-300/40"
+                    : "bg-white text-violet-700 border-violet-200 hover:bg-violet-50"
+                }`}
+              >
+                <Icon size={15} />
+                {tab.label} ({tab.count})
+              </button>
+            );
+          })}
         </div>
 
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
-          <Filter size={16} className="text-slate-400 shrink-0" />
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+          <span className="shrink-0 w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-400">
+            <Filter size={15} />
+          </span>
           {statusTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setFilter(tab.key)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border ${
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border transition-colors ${
                 filter === tab.key
-                  ? "bg-[#F7E9FF] text-[#6900AA] border-[#6900AA]/30"
-                  : "bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200"
+                  ? "bg-violet-100 text-violet-700 border-violet-200"
+                  : "bg-white text-slate-500 border-slate-200 hover:border-violet-200 hover:text-violet-700"
               }`}
             >
               {tab.label} ({counts[tab.key]})
@@ -254,7 +298,7 @@ export default function CustomerDashboard() {
         </div>
 
         {filteredBookings.length === 0 ? (
-          <div className="p-8 rounded-2xl text-center border border-slate-100 bg-slate-50">
+          <div className="p-8 rounded-2xl text-center border border-slate-100 bg-white">
             <Calendar className="mx-auto text-slate-400 mb-3" size={32} />
             <p className="text-slate-500 mb-4">
               {kind === "all" ? `No ${filter} bookings.` : `No ${filter} ${kind} bookings.`}
@@ -263,7 +307,7 @@ export default function CustomerDashboard() {
               <button
                 type="button"
                 onClick={() => router.push("/")}
-                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold"
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold"
               >
                 Find a Table
               </button>
@@ -278,83 +322,133 @@ export default function CustomerDashboard() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {filteredBookings.map((b) => (
-              <div
-                key={`${b.kind}-${b.id}`}
-                className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center gap-4"
-              >
-                {b.image ? (
-                  <img
-                    src={b.image}
-                    alt=""
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-[#6900AA]">
-                    {b.kind === "event" ? <Ticket size={22} /> : <UtensilsCrossed size={22} />}
+            {filteredBookings.map((b) => {
+              const isEvent = b.kind === "event";
+              const KindIcon = isEvent ? Ticket : UtensilsCrossed;
+              return (
+                <div
+                  key={`${b.kind}-${b.id}`}
+                  className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgba(88,28,180,0.06)] flex flex-col lg:flex-row gap-4"
+                >
+                  <div className="relative w-full h-40 sm:h-44 lg:w-40 lg:h-40 xl:w-44 xl:h-44 shrink-0">
+                    {b.image ? (
+                      <img
+                        src={b.image}
+                        alt=""
+                        className="w-full h-full rounded-2xl object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-2xl bg-violet-50 flex items-center justify-center text-violet-500">
+                        <KindIcon size={28} />
+                      </div>
+                    )}
+                    <span className="absolute bottom-2.5 left-2.5 w-8 h-8 rounded-lg bg-white/75 backdrop-blur-[2px] text-violet-600 flex items-center justify-center shadow-sm">
+                      <KindIcon size={15} />
+                    </span>
                   </div>
-                )}
 
-                <div className="flex-1 min-w-0">
-                  <p className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#6900AA]">
-                    {b.kind === "event" ? <Ticket size={12} /> : <UtensilsCrossed size={12} />}
-                    {b.kind === "event" ? "Event" : "Dining"}
-                  </p>
-                  <h3 className="text-lg font-extrabold text-slate-900 mt-0.5">{b.title}</h3>
-                  <div className="mt-2 space-y-1 text-sm text-slate-500">
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <span className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[10px] font-bold uppercase tracking-wider">
+                      <KindIcon size={11} />
+                      {isEvent ? "Event" : "Dining"}
+                    </span>
+                    <h3 className="text-lg sm:text-xl font-extrabold text-black mt-1.5 truncate">{b.title}</h3>
                     {b.address && (
-                      <p className="flex items-center gap-1.5">
-                        <MapPin size={13} className="shrink-0" /> {b.address}
+                      <p className="mt-1 text-sm text-slate-500 flex items-start gap-1.5">
+                        <MapPin size={14} className="shrink-0 mt-0.5 text-violet-500" />
+                        <span className="line-clamp-1">{b.address}</span>
                       </p>
                     )}
-                    {b.when && (
-                      <p className="flex items-center gap-1.5">
-                        <Calendar size={13} className="shrink-0" /> {formatDateLine(b.when)}
-                      </p>
-                    )}
-                    {b.when && (
-                      <p className="flex items-center gap-1.5">
-                        <Clock size={13} className="shrink-0" /> {formatTimeLine(b.when)}
-                      </p>
-                    )}
-                    {b.extra && (
-                      <p className="flex items-center gap-1.5">
-                        <Ticket size={13} className="shrink-0" /> {b.extra}
-                      </p>
-                    )}
+
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                      {b.when && (
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Calendar size={16} className="text-violet-600 mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900">{formatDateLine(b.when)}</p>
+                            <p className="text-xs text-slate-400">{formatWeekday(b.when)}</p>
+                          </div>
+                        </div>
+                      )}
+                      {b.when && (
+                        <div className="flex items-start gap-2 min-w-0">
+                          <Clock size={16} className="text-violet-600 mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900">{formatTimeLine(b.when)}</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-start gap-2 min-w-0">
+                        {isEvent ? (
+                          <Ticket size={16} className="text-violet-600 mt-0.5 shrink-0" />
+                        ) : (
+                          <Users size={16} className="text-violet-600 mt-0.5 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 capitalize">{b.extra || "—"}</p>
+                          <p className="text-xs text-slate-400">
+                            {isEvent
+                              ? "Tickets"
+                              : b.guests != null
+                                ? `Table for ${b.guests}`
+                                : "Table"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full lg:w-[260px] xl:w-[280px] shrink-0 lg:border-l lg:border-slate-100 lg:pl-5 flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase ${statusStyles(b.status)}`}>
+                        {b.status === "CONFIRMED" && <Check size={12} strokeWidth={3} />}
+                        {b.status}
+                      </span>
+                      <span className="text-slate-300 p-1" aria-hidden>
+                        <MoreVertical size={16} />
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] text-slate-400 font-medium">Booking ID</p>
+                      <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{shortBookingCode(b.id)}</p>
+                        <button
+                          type="button"
+                          onClick={() => copyBookingCode(b.id)}
+                          className="text-slate-400 hover:text-violet-600 cursor-pointer shrink-0"
+                          aria-label="Copy booking ID"
+                        >
+                          {copiedId === b.id ? <CheckCheck size={14} /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-auto">
+                      {b.canCancel && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancel(b)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg border border-red-200 bg-white text-sm font-semibold text-red-500 hover:bg-red-50 cursor-pointer"
+                        >
+                          <XCircle size={14} /> Cancel
+                        </button>
+                      )}
+                      <Link
+                        href={b.href}
+                        className="flex-1 inline-flex items-center justify-center gap-1 h-10 px-4 rounded-lg border border-violet-200 bg-white text-sm font-semibold text-violet-700 hover:bg-violet-50 whitespace-nowrap"
+                      >
+                        View Details <ChevronRight size={14} />
+                      </Link>
+                    </div>
                   </div>
                 </div>
-
-                <div className="flex flex-col items-start md:items-center gap-1 shrink-0 md:min-w-[140px]">
-                  <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold ${statusStyles(b.status)}`}>
-                    {b.status}
-                  </span>
-                  <p className="text-[10px] text-slate-400 mt-1">Booking ID</p>
-                  <p className="text-xs font-semibold text-slate-600">{shortBookingCode(b.id)}</p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
-                  {b.canCancel && (
-                    <button
-                      type="button"
-                      onClick={() => handleCancel(b)}
-                      className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer"
-                    >
-                      <XCircle size={14} /> Cancel
-                    </button>
-                  )}
-                  <Link
-                    href={b.href}
-                    className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-                  >
-                    View Details <ChevronRight size={14} />
-                  </Link>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             <p className="text-center text-slate-400 text-sm pt-4">That&apos;s all your bookings! 🎉</p>
           </div>
         )}
+      </div>
       <ConfirmDialog
         open={!!pendingCancel}
         title={pendingCancel?.kind === "event" ? "Cancel ticket booking?" : "Cancel reservation?"}
@@ -387,6 +481,6 @@ export default function CustomerDashboard() {
           }
         }}
       />
-    </CustomerAccountLayout>
+    </div>
   );
 }

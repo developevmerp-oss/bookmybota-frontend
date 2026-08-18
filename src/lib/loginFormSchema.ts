@@ -47,7 +47,23 @@ export const businessLoginSchema = yup.object({
   password: yup.string().required('Password is required.'),
 });
 
+export const confirmBookingSchema = yup.object({
+  name: yup
+    .string()
+    .trim()
+    .required('Full name is required.')
+    .matches(/^[\p{L}\s]+$/u, 'Name can only contain letters.'),
+  phone: yup
+    .string()
+    .required('Phone number is required.')
+    .matches(/^\d+$/, 'Only numbers are allowed — no letters or special characters.')
+    .min(PHONE_MIN_DIGITS, `Phone must be ${PHONE_MIN_DIGITS}–${PHONE_MAX_DIGITS} digits.`)
+    .max(PHONE_MAX_DIGITS, `Phone must be ${PHONE_MIN_DIGITS}–${PHONE_MAX_DIGITS} digits.`),
+  arrivalTime: yup.string().trim().required('Arrival time is required.'),
+});
+
 export type PhoneLoginValues = yup.InferType<typeof phoneLoginSchema>;
 export type OtpVerifyValues = yup.InferType<typeof otpVerifySchema>;
 export type CustomerRegisterValues = yup.InferType<typeof customerRegisterSchema>;
 export type BusinessLoginValues = yup.InferType<typeof businessLoginSchema>;
+export type ConfirmBookingValues = yup.InferType<typeof confirmBookingSchema>;

@@ -4,10 +4,13 @@ import {
   MapPin, Phone, CheckCircle, Calendar, Users, Clock,
   Star, Share2, Compass, MessageSquare, Image as ImageIcon,
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
-  ChevronLeft, X, Sun, Moon, Navigation
+  ChevronLeft, X, Sun, Moon, Navigation, User,
+  Send, ShieldCheck, ArrowRight, Check, ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
 import { useRouter } from 'next/navigation';
 import {
@@ -24,6 +27,11 @@ import {
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
+import GuestTableAnimation from './GuestTableAnimation';
+import {
+  confirmBookingSchema,
+  type ConfirmBookingValues,
+} from '@/lib/loginFormSchema';
 
 // ─── Helpers & Fallback Datasets ──────────────────────────────────────────────
 
@@ -329,6 +337,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [arrivalTime, setArrivalTime] = useState('On time');
+  const [arrivalDropdownOpen, setArrivalDropdownOpen] = useState(false);
+  const arrivalFieldRef = useRef<HTMLDivElement>(null);
   const [lastBookingId, setLastBookingId] = useState<string | null>(null);
   const [availabilityStatus, setAvailabilityStatus] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
@@ -352,6 +362,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [phoneLogin, { isLoading: isPhoneLoggingIn }] = usePhoneLoginMutation();
   const [registerCustomer, { isLoading: isRegistering }] = useRegisterCustomerMutation();
 
+  const {
+    control,
+    handleSubmit: handleConfirmSubmit,
+    setValue: setConfirmValue,
+    setFocus: setConfirmFocus,
+    reset: resetConfirmForm,
+    formState: { errors: confirmErrors },
+  } = useForm<ConfirmBookingValues>({
+    resolver: yupResolver(confirmBookingSchema),
+    defaultValues: { name: '', phone: '', arrivalTime: 'On time' },
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
+    shouldFocusError: true,
+  });
+
   // Pre-fill Name & Phone when authUser changes
   useEffect(() => {
     if (authUser && authUser.role === 'customer') {
@@ -359,6 +384,24 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       setPhone(authUser.phone || '');
     }
   }, [authUser]);
+
+  useEffect(() => {
+    if (drawerStep !== 3) return;
+    resetConfirmForm({ name, phone, arrivalTime });
+    // Sync once when opening confirm step so typing is not reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerStep]);
+
+  useEffect(() => {
+    if (!arrivalDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (arrivalFieldRef.current && !arrivalFieldRef.current.contains(e.target as Node)) {
+        setArrivalDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [arrivalDropdownOpen]);
 
   // Handle phone login submission
   const handlePhoneLoginSubmit = async (e: React.FormEvent) => {
@@ -535,10 +578,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const handleBook = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitBooking = async (customerName: string, customerPhone: string, approxArrival: string) => {
     if (availabilityStatus !== 'available') return;
-    const phoneErr = getPhoneValidationError(phone);
+    const phoneErr = getPhoneValidationError(customerPhone);
     if (phoneErr) {
       toast.error(phoneErr);
       return;
@@ -555,12 +597,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
       const result = await createBooking({
         business_id: resolvedParams.id,
-        customer_name: name,
-        customer_phone: phone,
+        customer_name: customerName,
+        customer_phone: customerPhone,
         booking_time: bookingDateTime,
         booking_source: 'ONLINE',
         guests: Number(guests),
-        approx_arrival: arrivalTime,
+        approx_arrival: approxArrival,
         ...(customerIdPayload ? { customer_id: customerIdPayload } : {}),
       }).unwrap();
       setBookingSuccess(true);
@@ -574,6 +616,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const handleBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitBooking(name, phone, arrivalTime);
+  };
+
+  const onConfirmBooking = async (data: ConfirmBookingValues) => {
+    setName(data.name);
+    setPhone(data.phone);
+    setArrivalTime(data.arrivalTime);
+    await submitBooking(data.name, data.phone, data.arrivalTime);
+  };
+
   const handleResetBooking = () => {
     setBookingSuccess(false);
     setAvailabilityStatus(null);
@@ -581,6 +635,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setName('');
     setPhone('');
     setArrivalTime('On time');
+    resetConfirmForm({ name: '', phone: '', arrivalTime: 'On time' });
     setLastBookingId(null);
     setDrawerStep(1);
   };
@@ -1749,7 +1804,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               }`}
           >
             {/* Drawer Header */}
-            <div className="p-4 border-b border-slate-100 flex items-center gap-3 shrink-0 bg-white">
+            <div className={`p-4 border-b border-slate-100 flex items-center shrink-0 bg-white ${drawerStep === 3 ? 'gap-2' : 'gap-3'}`}>
               <button
                 onClick={() => {
                   if (drawerStep > 1 && drawerStep !== 4) {
@@ -1758,29 +1813,33 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     setIsDrawerOpen(false);
                   }
                 }}
-                className="p-1 hover:bg-slate-100 rounded-full transition-colors cursor-pointer text-slate-500"
+                className={drawerStep === 3
+                  ? 'w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors cursor-pointer text-slate-500 shrink-0'
+                  : 'p-1 hover:bg-slate-100 rounded-full transition-colors cursor-pointer text-slate-500'}
               >
                 <ChevronLeft size={20} />
               </button>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-800">
+              <div className={drawerStep === 3 ? 'flex-1 text-center min-w-0 px-1' : ''}>
+                <h3 className={`font-extrabold text-slate-800 ${drawerStep === 3 ? 'text-sm sm:text-base truncate' : 'text-base'}`}>
                   {drawerStep === 1 && 'Book Table'}
                   {drawerStep === 2 && (isRegisterMode ? 'Create Account' : loginStep === 2 ? 'Verify OTP' : 'Verify Mobile Number')}
                   {drawerStep === 3 && 'Confirm Booking'}
                   {drawerStep === 4 && 'Booking Confirmed'}
                 </h3>
-                <p className="text-[11px] text-slate-500 font-semibold">{profile.name}{profile.address ? `, ${profile.address.split(',')[0]}` : ''}</p>
+                <p className={`text-slate-500 font-semibold ${drawerStep === 3 ? 'text-[10px] sm:text-[11px] truncate' : 'text-[11px]'}`}>{profile.name}{profile.address ? `, ${profile.address.split(',')[0]}` : ''}</p>
               </div>
               <button
                 onClick={() => setIsDrawerOpen(false)}
-                className="ml-auto p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 cursor-pointer"
+                className={drawerStep === 3
+                  ? 'w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-slate-400 cursor-pointer shrink-0'
+                  : 'ml-auto p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 cursor-pointer'}
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto p-5 bg-white">
+            <div className={`flex-1 overflow-y-auto ${drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : 'p-5 bg-white'}`}>
               {drawerStep === 1 && (() => {
                 const mealsConfig = (profile.operating_hours as any)?.meals || {
                   breakfast: { open: '08:00', close: '11:00', active: true },
@@ -1806,6 +1865,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     {/* 1. Guests selection */}
                     <div>
                       <h4 className="text-sm font-bold text-slate-800 mb-3 tracking-tight">Number of guest(s)</h4>
+                      <GuestTableAnimation count={Number(guests)} />
                       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
                           const active = Number(guests) === num;
@@ -2194,42 +2254,59 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               )}
 
               {drawerStep === 3 && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-5">
                   <div>
-                    <h4 className="text-lg font-black text-slate-850 mb-1 tracking-tight">Confirm Booking</h4>
-                    <p className="text-xs text-slate-400 mb-6 font-semibold">Check details and complete your reservation.</p>
+                    <h4 className="text-xl sm:text-2xl font-black font-bold text-slate-900 mb-1 tracking-tight">Confirm Booking</h4>
+                    <p className="text-xs sm:text-sm text-slate-400 font-medium leading-relaxed">Check details and complete your reservation.</p>
                   </div>
 
-                  {/* Booking Summary Box */}
-                  <div className="bg-white border border-slate-205 rounded-2xl p-4 shadow-sm space-y-3">
-                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-rose-500" /> Summary
-                    </h5>
-                    <div className="grid grid-cols-2 gap-3.5">
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Date</span>
-                        <p className="text-xs font-extrabold text-slate-800">
-                          {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </p>
+                  {/* Booking Summary — 2x2 on all screens */}
+                  <div className="bg-white border border-slate-100 rounded-2xl shadow-[0_4px_20px_rgba(15,23,42,0.06)] overflow-hidden">
+                    <div className="grid grid-cols-2">
+                      <div className="flex items-center gap-2.5 sm:gap-3 p-3.5 sm:p-4 border-slate-100 border-r border-b">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                          <Calendar size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Date</span>
+                          <p className="text-xs sm:text-sm font-extrabold text-slate-800 truncate">
+                            {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Time</span>
-                        <p className="text-xs font-extrabold text-slate-800">{formatSlotLabel(selectedTime)}</p>
+                      <div className="flex items-center gap-2.5 sm:gap-3 p-3.5 sm:p-4 border-slate-100 border-b">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                          <Clock size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Time</span>
+                          <p className="text-xs sm:text-sm font-extrabold text-slate-800 truncate">{formatSlotLabel(selectedTime)}</p>
+                        </div>
                       </div>
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Party Size</span>
-                        <p className="text-xs font-extrabold text-slate-800">{guests} {Number(guests) === 1 ? 'Guest' : 'Guests'}</p>
+                      <div className="flex items-center gap-2.5 sm:gap-3 p-3.5 sm:p-4 border-slate-100 border-r">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                          <Users size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Party Size</span>
+                          <p className="text-xs sm:text-sm font-extrabold text-slate-800 truncate">{guests} {Number(guests) === 1 ? 'Guest' : 'Guests'}</p>
+                        </div>
                       </div>
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Arrival</span>
-                        <p className="text-xs font-extrabold text-slate-800">{arrivalTime}</p>
+                      <div className="flex items-center gap-2.5 sm:gap-3 p-3.5 sm:p-4">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                          <Send size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Arrival</span>
+                          <p className="text-xs sm:text-sm font-extrabold text-slate-800 truncate">{arrivalTime}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {availabilityStatus === 'loading' && (
-                    <div className="flex flex-col items-center justify-center gap-2.5 py-8 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                      <Loader2 size={24} className="animate-spin text-rose-600" />
+                    <div className="flex flex-col items-center justify-center gap-2.5 py-8 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                      <Loader2 size={24} className="animate-spin text-indigo-600" />
                       <span className="text-slate-400 text-xs font-bold">Verifying seat availability...</span>
                     </div>
                   )}
@@ -2248,57 +2325,165 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   )}
 
                   {availabilityStatus === 'available' && (
-                    <form onSubmit={handleBook} className="space-y-4">
-                      <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-750 text-xs flex items-center justify-center gap-2 font-bold shadow-sm">
-                        <CheckCircle size={15} className="text-emerald-650 shrink-0" />
-                        <span>Seats available! Complete details below.</span>
+                    <form
+                      onSubmit={handleConfirmSubmit(onConfirmBooking, (formErrors) => {
+                        if (formErrors.name) setConfirmFocus('name');
+                        else if (formErrors.phone) setConfirmFocus('phone');
+                        else if (formErrors.arrivalTime) {
+                          arrivalFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      })}
+                      noValidate
+                      className="space-y-4"
+                    >
+                      <div className="relative overflow-hidden p-3 sm:p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 text-xs sm:text-sm flex items-center gap-2.5 font-semibold">
+                        <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                          <Check size={13} className="text-white" strokeWidth={3} />
+                        </div>
+                        <span className="flex-1 min-w-0">Seats available! Complete details below.</span>
+                        <Sparkles size={16} className="text-emerald-700 shrink-0" />
                       </div>
 
-                      <div className="space-y-4 pt-1">
+                      <div className="bg-slate-100/80 rounded-2xl p-3 sm:p-4 space-y-3 overflow-visible">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Full Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                            placeholder="John Doe"
-                          />
+                          <label className={`bg-white rounded-2xl border shadow-sm px-3 py-2.5 sm:px-3.5 sm:py-3 flex items-center gap-3 cursor-text ${confirmErrors.name ? 'border-red-400' : 'border-slate-100'}`}>
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                              <User size={16} />
+                            </div>
+                            <Controller
+                              name="name"
+                              control={control}
+                              render={({ field }) => (
+                                <input
+                                  {...field}
+                                  type="text"
+                                  autoComplete="name"
+                                  aria-label="Full Name"
+                                  aria-invalid={!!confirmErrors.name}
+                                  className="w-full bg-transparent border-none p-0 text-sm font-bold text-slate-800 focus:outline-none placeholder:text-slate-300 placeholder:font-medium cursor-text"
+                                  placeholder="John Doe"
+                                  onChange={(e) => {
+                                    const cleaned = e.target.value.replace(/[^\p{L}\s]/gu, '');
+                                    field.onChange(cleaned);
+                                    setName(cleaned);
+                                  }}
+                                />
+                              )}
+                            />
+                          </label>
+                          {confirmErrors.name && (
+                            <p className="text-red-500 text-[11px] sm:text-xs font-semibold mt-1.5 px-1">{confirmErrors.name.message}</p>
+                          )}
                         </div>
+
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Phone Number</label>
-                          <input
-                            type="tel"
-                            required
-                            value={phone}
-                            onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
-                            inputMode="numeric"
-                            maxLength={12}
-                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                            placeholder="+91 99000-00000"
-                          />
+                          <label className={`bg-white rounded-2xl border shadow-sm px-3 py-2.5 sm:px-3.5 sm:py-3 flex items-center gap-3 cursor-text ${confirmErrors.phone ? 'border-red-400' : 'border-slate-100'}`}>
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                              <Phone size={16} />
+                            </div>
+                            <Controller
+                              name="phone"
+                              control={control}
+                              render={({ field }) => (
+                                <input
+                                  {...field}
+                                  type="tel"
+                                  inputMode="numeric"
+                                  maxLength={12}
+                                  autoComplete="tel"
+                                  aria-label="Phone Number"
+                                  aria-invalid={!!confirmErrors.phone}
+                                  className="w-full bg-transparent border-none p-0 text-sm font-bold text-slate-800 focus:outline-none placeholder:text-slate-300 placeholder:font-medium cursor-text"
+                                  placeholder="+91 99000-00000"
+                                  onChange={(e) => {
+                                    const cleaned = sanitizePhoneInput(e.target.value);
+                                    field.onChange(cleaned);
+                                    setPhone(cleaned);
+                                  }}
+                                />
+                              )}
+                            />
+                          </label>
+                          {confirmErrors.phone && (
+                            <p className="text-red-500 text-[11px] sm:text-xs font-semibold mt-1.5 px-1">{confirmErrors.phone.message}</p>
+                          )}
                         </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Approx. Arrival</label>
-                          <select
-                            value={arrivalTime}
-                            onChange={(e) => setArrivalTime(e.target.value)}
-                            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                          >
-                            <option value="On time">On time</option>
-                            <option value="15 min early">15 min early</option>
-                            <option value="10 min late">Up to 10 min late</option>
-                            <option value="15 min late">Up to 15 min late</option>
-                          </select>
+
+                        <div ref={arrivalFieldRef} className="relative">
+                          <div className={`bg-white rounded-2xl border shadow-sm px-3 py-2.5 sm:px-3.5 sm:py-3 flex items-center gap-3 ${confirmErrors.arrivalTime ? 'border-red-400' : 'border-slate-100'}`}>
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                              <Clock size={16} />
+                            </div>
+                            <button
+                              type="button"
+                              aria-label="Approx. Arrival"
+                              aria-expanded={arrivalDropdownOpen}
+                              onClick={() => setArrivalDropdownOpen((open) => !open)}
+                              className="flex-1 min-w-0 flex items-center justify-between gap-2 bg-transparent p-0 text-left cursor-pointer"
+                            >
+                              <span className="text-sm font-bold text-slate-800 truncate">
+                                {arrivalTime === '10 min late' ? 'Up to 10 min late' : arrivalTime === '15 min late' ? 'Up to 15 min late' : arrivalTime}
+                              </span>
+                              <ChevronDown
+                                size={16}
+                                className={`shrink-0 text-slate-500 transition-transform duration-200 ${arrivalDropdownOpen ? 'rotate-180' : ''}`}
+                              />
+                            </button>
+                          </div>
+
+                          {arrivalDropdownOpen && (
+                            <ul
+                              role="listbox"
+                              aria-label="Approx. Arrival"
+                              className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-xl shadow-[0_8px_24px_rgba(15,23,42,0.12)] p-1.5"
+                            >
+                              {[
+                                { value: 'On time', label: 'On time' },
+                                { value: '15 min early', label: '15 min early' },
+                                { value: '10 min late', label: 'Up to 10 min late' },
+                                { value: '15 min late', label: 'Up to 15 min late' },
+                              ].map((opt) => {
+                                const selected = arrivalTime === opt.value;
+                                return (
+                                  <li key={opt.value} role="option" aria-selected={selected}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setArrivalTime(opt.value);
+                                        setConfirmValue('arrivalTime', opt.value, { shouldValidate: true, shouldDirty: true });
+                                        setArrivalDropdownOpen(false);
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer ${
+                                        selected
+                                          ? 'bg-indigo-600 text-white font-semibold'
+                                          : 'text-slate-700 font-medium hover:bg-indigo-50'
+                                      }`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                          {confirmErrors.arrivalTime && (
+                            <p className="text-red-500 text-[11px] sm:text-xs font-semibold mt-1.5 px-1">{confirmErrors.arrivalTime.message}</p>
+                          )}
                         </div>
-                        <button
-                          type="submit"
-                          className="bg-rose-600 hover:bg-rose-700 text-white rounded-2xl w-full py-3.5 text-xs font-bold shadow-md shadow-rose-600/10 hover-lift transition-all cursor-pointer mt-2"
-                        >
-                          Confirm Booking
-                        </button>
                       </div>
+
+                      <button
+                        type="submit"
+                        className="relative bg-indigo-700 hover:bg-indigo-800 text-white rounded-2xl w-full py-3.5 sm:py-4 text-sm font-bold shadow-md shadow-indigo-700/20 transition-all cursor-pointer mt-1 flex items-center justify-center gap-2"
+                      >
+                        <ShieldCheck size={18} className="shrink-0" />
+                        <span>Confirm Booking</span>
+                        <ArrowRight size={18} className="absolute right-4 sm:right-5 shrink-0" />
+                      </button>
+                      <p className="flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-slate-400 font-medium pt-0.5">
+                        <ShieldCheck size={13} className="text-indigo-400 shrink-0" />
+                        Your reservation is secure and confirmed instantly.
+                      </p>
                     </form>
                   )}
                 </div>

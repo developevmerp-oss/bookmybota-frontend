@@ -10,13 +10,23 @@ import {
 } from "@/services/api";
 import { formatDate } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import SearchInput from "@/components/Shared/SearchInput";
+import Pagination from "@/components/Shared/Pagination";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 export default function OrganizerReviewsPage() {
   const [eventFilter, setEventFilter] = useState("");
-  const { data: events = [] } = useGetOrganizerEventsQuery();
-  const { data: reviews = [], isLoading } = useGetOrganizerEventReviewsQuery(
-    eventFilter ? { event_id: eventFilter } : undefined
-  );
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const { data: eventsData } = useGetOrganizerEventsQuery();
+  const events = eventsData?.items ?? [];
+  const { data: reviewsData, isLoading } = useGetOrganizerEventReviewsQuery({
+    page,
+    limit: PAGE_SIZE,
+    ...(eventFilter ? { event_id: eventFilter } : {}),
+    ...(q.trim() ? { q: q.trim() } : {}),
+  });
+  const reviews = reviewsData?.items ?? [];
   const [createReply, { isLoading: replying }] = useCreateEventReviewReplyMutation();
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -61,7 +71,10 @@ export default function OrganizerReviewsPage() {
           </label>
           <select
             value={eventFilter}
-            onChange={(e) => setEventFilter(e.target.value)}
+            onChange={(e) => {
+              setEventFilter(e.target.value);
+              setPage(1);
+            }}
             className="portal-select"
           >
             <option value="">All events</option>
@@ -72,9 +85,17 @@ export default function OrganizerReviewsPage() {
             ))}
           </select>
         </div>
+        <SearchInput
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search reviewer, text, event"
+        />
         <div className="text-center px-4">
           <p className="text-3xl font-black portal-heading">{avg}</p>
-          <p className="text-xs portal-muted">{reviews.length} reviews</p>
+          <p className="text-xs portal-muted">{reviewsData?.meta?.total ?? reviews.length} reviews</p>
         </div>
       </div>
 
@@ -162,6 +183,7 @@ export default function OrganizerReviewsPage() {
           ))}
         </ul>
       )}
+      {reviewsData?.meta && <Pagination meta={reviewsData.meta} onPageChange={setPage} />}
     </div>
   );
 }

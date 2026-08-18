@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, use } from "react";
+import { useEffect, use, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useGetBookingByIdQuery, useCancelBookingMutation } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
 
 function statusStyles(status: string) {
@@ -62,16 +63,12 @@ export default function BookingDetailPage({
 
   const { data: booking, isLoading, error } = useGetBookingByIdQuery(id, { skip: !id });
   const [cancelBooking, { isLoading: isCancelling }] = useCancelBookingMutation();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (!booking) return;
-    if (!confirm("Are you sure you want to cancel this reservation?")) return;
-    try {
-      await cancelBooking({ id: booking.id }).unwrap();
-      toast.success("Reservation cancelled");
-    } catch {
-      toast.error("Failed to cancel reservation");
-    }
+    setConfirmOpen(true);
   };
 
   if (!user || isLoading) {
@@ -292,6 +289,28 @@ export default function BookingDetailPage({
           </button>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Cancel reservation?"
+        body="Are you sure you want to cancel this reservation?"
+        confirmLabel="Cancel reservation"
+        danger
+        busy={confirmBusy || isCancelling}
+        onCancel={() => !confirmBusy && setConfirmOpen(false)}
+        onConfirm={async () => {
+          if (!booking) return;
+          setConfirmBusy(true);
+          try {
+            await cancelBooking({ id: booking.id }).unwrap();
+            toast.success("Reservation cancelled");
+            setConfirmOpen(false);
+          } catch {
+            toast.error("Failed to cancel reservation");
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CheckCircle, Pencil, XCircle } from "lucide-react";
-import { useGetAdminCustomerQuery } from "@/services/api";
+import { Archive, ArrowLeft, CheckCircle, Pencil, Undo2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { extractApiError } from "@/lib/apiErrors";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import {
+  useArchiveAdminCustomerMutation,
+  useGetAdminCustomerQuery,
+  useUnarchiveAdminCustomerMutation,
+} from "@/services/api";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -20,6 +28,10 @@ export default function AdminCustomerDetailPage() {
   const params = useParams();
   const id = String(params.id ?? "");
   const { data: c, isLoading } = useGetAdminCustomerQuery(id, { skip: !id });
+  const [archiveCustomer, { isLoading: isArchiving }] = useArchiveAdminCustomerMutation();
+  const [unarchiveCustomer, { isLoading: isUnarchiving }] = useUnarchiveAdminCustomerMutation();
+  const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   if (isLoading) {
     return <div className="text-white p-10 text-center">Loading customer...</div>;
@@ -36,6 +48,44 @@ export default function AdminCustomerDetailPage() {
     );
   }
 
+  const isArchived = !!c.deleted_at;
+  const liveCount = c.live_event_booking_count ?? 0;
+  const actionBusy = isArchiving || isUnarchiving || confirmBusy;
+
+  const runConfirmed = async () => {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction === "archive") {
+        await archiveCustomer(c.id).unwrap();
+        toast.success("Customer archived");
+      } else {
+        await unarchiveCustomer(c.id).unwrap();
+        toast.success("Customer unarchived — they can log in with their existing password");
+      }
+      setConfirmAction(null);
+    } catch (err) {
+      toast.error(extractApiError(err, confirmAction === "archive" ? "Failed to archive" : "Failed to unarchive"));
+    } finally {
+      setConfirmBusy(false);
+    }
+  };
+
+  const confirmCopy =
+    confirmAction === "unarchive"
+      ? {
+          title: "Unarchive customer?",
+          body: `Unarchive "${c.name}"? They return to the Active list and can log in with their existing password. No new credentials email is sent.`,
+          confirmLabel: "Unarchive",
+          danger: false,
+        }
+      : {
+          title: "Archive customer?",
+          body: `You cannot archive this customer if they have confirmed tickets on a LIVE event. After archive, "${c.name}" cannot log in. Booking history is kept.`,
+          confirmLabel: "Archive",
+          danger: true,
+        };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <Link
@@ -49,7 +99,11 @@ export default function AdminCustomerDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              {c.is_enabled ? (
+              {isArchived ? (
+                <span className="flex items-center gap-1 text-zinc-400 text-sm">
+                  <Archive size={14} /> Archived
+                </span>
+              ) : c.is_enabled ? (
                 <span className="flex items-center gap-1 text-green-400 text-sm">
                   <CheckCircle size={14} /> Enabled
                 </span>
@@ -64,12 +118,37 @@ export default function AdminCustomerDetailPage() {
             </div>
             <h1 className="text-2xl font-bold text-white">{c.name}</h1>
           </div>
-          <Link
-            href={`/admin/customers/${c.id}/edit`}
-            className="btn-primary inline-flex items-center gap-2"
-          >
-            <Pencil size={16} /> Edit
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isArchived && (
+              <>
+                <Link
+                  href={`/admin/customers/${c.id}/edit`}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <Pencil size={16} /> Edit
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction("archive")}
+                  disabled={actionBusy || liveCount > 0}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-50 inline-flex items-center gap-2"
+                  title={liveCount > 0 ? "Close live event bookings first" : "Archive"}
+                >
+                  <Archive size={16} /> Archive
+                </button>
+              </>
+            )}
+            {isArchived && (
+              <button
+                type="button"
+                onClick={() => setConfirmAction("unarchive")}
+                disabled={actionBusy}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Undo2 size={16} /> Unarchive
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -143,6 +222,18 @@ export default function AdminCustomerDetailPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmCopy.title}
+        body={confirmCopy.body}
+        confirmLabel={confirmCopy.confirmLabel}
+        danger={confirmCopy.danger}
+        variant={confirmAction === "unarchive" ? "success" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={runConfirmed}
+      />
     </div>
   );
 }

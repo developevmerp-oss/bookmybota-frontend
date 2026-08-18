@@ -49,7 +49,8 @@ function FillBar({ percent }: { percent: number }) {
 
 export default function OrganizerTicketStatsPage() {
   const [eventFilter, setEventFilter] = useState("");
-  const { data: events = [] } = useGetOrganizerEventsQuery();
+  const { data: eventsData } = useGetOrganizerEventsQuery();
+  const events = eventsData?.items ?? [];
   const { data, isLoading, isError } = useGetOrganizerTicketStatsQuery(
     eventFilter ? { event_id: eventFilter } : undefined
   );

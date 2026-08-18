@@ -1,18 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import {
+  Archive,
   ArrowLeft,
   CheckCircle,
   Mail,
   MapPin,
   Pencil,
   Phone,
+  Undo2,
   XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import PartnerDocumentsFields from "@/components/DiningAdminPanel/PartnerDocumentsFields";
-import { useGetBusinessesQuery, type PartnerDocumentUpload } from "@/services/api";
+import { extractApiError } from "@/lib/apiErrors";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import {
+  useArchiveBusinessMutation,
+  useGetAdminBusinessQuery,
+  useUnarchiveBusinessMutation,
+  type PartnerDocumentUpload,
+} from "@/services/api";
 
 interface AdminPartnerDetailPageProps {
   module: "dining" | "event";
@@ -32,8 +43,11 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const id = String(params.id ?? "");
   const isDining = module === "dining";
   const listHref = `/admin/businesses/${module}`;
-  const { data: businesses = [], isLoading } = useGetBusinessesQuery({ module });
-  const biz = businesses.find((b) => String(b.id) === id);
+  const { data: biz, isLoading } = useGetAdminBusinessQuery(id, { skip: !id });
+  const [archiveBusiness, { isLoading: isArchiving }] = useArchiveBusinessMutation();
+  const [unarchiveBusiness, { isLoading: isUnarchiving }] = useUnarchiveBusinessMutation();
+  const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   if (isLoading) {
     return <div className="text-white p-10 text-center">Loading partner...</div>;
@@ -53,6 +67,53 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const documents: PartnerDocumentUpload[] = Array.isArray(biz.documents)
     ? biz.documents.filter((d) => d.document_type_id > 0 && d.url)
     : [];
+  const isArchived = !!biz.deleted_at;
+  const archiveBlocked = isDining
+    ? (biz.upcoming_booking_count ?? 0) > 0
+    : (biz.live_event_count ?? 0) > 0;
+  const actionBusy = isArchiving || isUnarchiving || confirmBusy;
+
+  const runConfirmed = async () => {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmAction === "archive") {
+        await archiveBusiness(biz.id).unwrap();
+        toast.success("Partner archived");
+      } else {
+        await unarchiveBusiness(biz.id).unwrap();
+        toast.success(
+          biz.credentials_sent_at
+            ? "Partner unarchived — they can log in with their existing password"
+            : "Partner unarchived — login credentials were emailed"
+        );
+      }
+      setConfirmAction(null);
+    } catch (err) {
+      toast.error(extractApiError(err, confirmAction === "archive" ? "Failed to archive" : "Failed to unarchive"));
+    } finally {
+      setConfirmBusy(false);
+    }
+  };
+
+  const confirmCopy =
+    confirmAction === "unarchive"
+      ? {
+          title: "Unarchive partner?",
+          body: biz.credentials_sent_at
+            ? `Unarchive "${biz.name}"? They return to the Active list and can log in with their existing password. No new credentials email is sent.`
+            : `Unarchive "${biz.name}"? They return to the Active list. Login credentials will be emailed once because they were never sent.`,
+          confirmLabel: "Unarchive",
+          danger: false,
+        }
+      : {
+          title: "Archive partner?",
+          body: isDining
+            ? `You cannot archive this dining partner while they have upcoming or in-progress reservations. After archive, "${biz.name}" cannot log in. Booking history is kept.`
+            : `You cannot archive this organizer if any event is still LIVE. Close live events first. After archive, "${biz.name}" cannot log in. Booking and fee history is kept.`,
+          confirmLabel: "Archive",
+          danger: true,
+        };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -77,7 +138,11 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              {biz.is_enabled ? (
+              {isArchived ? (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border bg-zinc-500/10 text-zinc-300 border-white/10">
+                  <Archive size={12} /> Archived
+                </span>
+              ) : biz.is_enabled ? (
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
                   <CheckCircle size={12} /> Enabled
                 </span>
@@ -105,12 +170,43 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
               </p>
             )}
           </div>
-          <Link
-            href={`${listHref}/${biz.id}/edit`}
-            className="btn-primary inline-flex items-center justify-center gap-2 shrink-0"
-          >
-            <Pencil size={16} /> Edit partner
-          </Link>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {!isArchived && (
+              <>
+                <Link
+                  href={`${listHref}/${biz.id}/edit`}
+                  className="btn-primary inline-flex items-center justify-center gap-2"
+                >
+                  <Pencil size={16} /> Edit partner
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction("archive")}
+                  disabled={actionBusy || archiveBlocked}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-50 inline-flex items-center gap-2"
+                  title={
+                    archiveBlocked
+                      ? isDining
+                        ? "Wait until reservations finish"
+                        : "Close live events first"
+                      : "Archive"
+                  }
+                >
+                  <Archive size={16} /> Archive
+                </button>
+              </>
+            )}
+            {isArchived && (
+              <button
+                type="button"
+                onClick={() => setConfirmAction("unarchive")}
+                disabled={actionBusy}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Undo2 size={16} /> Unarchive
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -148,6 +244,18 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         onChange={() => {}}
         variant="dark"
         editable={false}
+      />
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmCopy.title}
+        body={confirmCopy.body}
+        confirmLabel={confirmCopy.confirmLabel}
+        danger={confirmCopy.danger}
+        variant={confirmAction === "unarchive" ? "success" : "warning"}
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={runConfirmed}
       />
     </div>
   );

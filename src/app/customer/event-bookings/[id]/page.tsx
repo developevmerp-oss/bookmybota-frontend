@@ -23,6 +23,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatMoney } from "@/lib/currencyFormat";
 
 function shortBookingCode(id: string) {
@@ -99,6 +100,8 @@ export default function EventBookingDetailPage({
 
   const { data: booking, isLoading, error } = useGetEventBookingByIdQuery(id, { skip: !id });
   const [cancelBooking, { isLoading: isCancelling }] = useCancelEventBookingMutation();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const displayCode = useMemo(
     () => (booking ? shortBookingCode(booking.id) : ""),
@@ -109,18 +112,9 @@ export default function EventBookingDetailPage({
   const ticketTypeLabel = booking?.items?.[0]?.ticket_type || "Ticket";
   const ticketCount = booking?.ticket_qty || 0;
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (!booking) return;
-    if (!confirm("Cancel this ticket booking? Seats will be released.")) return;
-    try {
-      await cancelBooking({
-        id: booking.id,
-        customerId: user?.customer_id,
-      }).unwrap();
-      toast.success("Booking cancelled");
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to cancel booking"));
-    }
+    setConfirmOpen(true);
   };
 
   const handleShare = async () => {
@@ -436,6 +430,31 @@ export default function EventBookingDetailPage({
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Cancel ticket booking?"
+        body="Cancel this ticket booking? Seats will be released."
+        confirmLabel="Cancel booking"
+        danger
+        busy={confirmBusy || isCancelling}
+        onCancel={() => !confirmBusy && setConfirmOpen(false)}
+        onConfirm={async () => {
+          if (!booking) return;
+          setConfirmBusy(true);
+          try {
+            await cancelBooking({
+              id: booking.id,
+              customerId: user?.customer_id,
+            }).unwrap();
+            toast.success("Booking cancelled");
+            setConfirmOpen(false);
+          } catch (err) {
+            toast.error(extractApiError(err, "Failed to cancel booking"));
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

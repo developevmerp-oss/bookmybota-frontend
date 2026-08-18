@@ -13,6 +13,10 @@ import {
   type OfferEligibleEvent,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import SearchInput from "@/components/Shared/SearchInput";
+import Pagination from "@/components/Shared/Pagination";
+import { PAGE_SIZE } from "@/lib/pagination";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 
 /** YYYY-MM-DD for the day before a given date string */
@@ -38,11 +42,20 @@ const EMPTY_FORM = {
 };
 
 export default function OrganizerOffersPage() {
-  const { data: offers = [], isLoading } = useGetOrganizerOffersQuery();
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const { data: offersData, isLoading } = useGetOrganizerOffersQuery({
+    page,
+    limit: PAGE_SIZE,
+    ...(q.trim() ? { q: q.trim() } : {}),
+  });
+  const offers = offersData?.items ?? [];
   const { data: eligibleEvents = [] } = useGetOfferEligibleEventsQuery();
   const [createOffer, { isLoading: creating }] = useCreateEventOfferMutation();
   const [updateOffer, { isLoading: updating }] = useUpdateEventOfferMutation();
   const [deleteOffer] = useDeleteEventOfferMutation();
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EventOffer | null>(null);
@@ -142,14 +155,8 @@ export default function OrganizerOffersPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this offer?")) return;
-    try {
-      await deleteOffer(id).unwrap();
-      toast.success("Offer deleted.");
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to delete"));
-    }
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
   };
 
   const discountLabel = (o: EventOffer) => formatOfferDiscount(o.discount_type, o.discount_value);
@@ -166,14 +173,24 @@ export default function OrganizerOffersPage() {
             Closed or rejected events cannot have offers.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          disabled={eligibleEvents.length === 0}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50"
-        >
-          <Plus size={16} /> New offer
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <SearchInput
+            value={q}
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search offer or event"
+          />
+          <button
+            type="button"
+            onClick={openCreate}
+            disabled={eligibleEvents.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50"
+          >
+            <Plus size={16} /> New offer
+          </button>
+        </div>
       </div>
 
       {eligibleEvents.length === 0 && (
@@ -367,6 +384,29 @@ export default function OrganizerOffersPage() {
           ))}
         </div>
       )}
+      {offersData?.meta && <Pagination meta={offersData.meta} onPageChange={setPage} />}
+      <ConfirmDialog
+        open={!!pendingDeleteId}
+        title="Delete offer?"
+        body="Delete this offer?"
+        confirmLabel="Delete"
+        danger
+        busy={confirmBusy}
+        onCancel={() => !confirmBusy && setPendingDeleteId(null)}
+        onConfirm={async () => {
+          if (!pendingDeleteId) return;
+          setConfirmBusy(true);
+          try {
+            await deleteOffer(pendingDeleteId).unwrap();
+            toast.success("Offer deleted.");
+            setPendingDeleteId(null);
+          } catch (err) {
+            toast.error(extractApiError(err, "Failed to delete"));
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

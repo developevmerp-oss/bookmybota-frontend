@@ -1051,7 +1051,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* ── Promo banner slider (full width, above hero) ─────────────────── */}
-      <section className="relative w-full bg-[#F8E6D4] overflow-hidden">
+      {/* <section className="relative w-full bg-[#F8E6D4] overflow-hidden">
         <div className="relative w-full h-[148px] sm:h-[190px] md:h-[230px] lg:h-[280px]">
           {PROMO_SLIDES.map((slide, i) => (
             <img
@@ -1085,74 +1085,11 @@ export default function Home() {
         >
           <ChevronRight size={22} />
         </button>
-      </section>
+      </section> */}
 
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5">
 
-      {cuisineCards.length > 0 && (
-        <section className="bg-white px-0 sm:px-1 py-4 sm:py-5 md:py-6 mb-3 sm:mb-5">
-          <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
-            <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
-              Explore Cuisines
-            </h2>
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <button
-                type="button"
-                aria-label="Previous cuisines"
-                onClick={() => scrollCuisines("left")}
-                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-              >
-                <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              </button>
-              <button
-                type="button"
-                aria-label="Next cuisines"
-                onClick={() => scrollCuisines("right")}
-                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-              >
-                <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              </button>
-            </div>
-          </div>
-          <div
-            ref={cuisinesRef}
-            className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 -mx-1 px-1"
-          >
-            {cuisineCards.map((item) => {
-              const isActive = diningFilters.cuisine.toLowerCase() === item.name.toLowerCase();
-              return (
-                <button
-                  key={item.name}
-                  type="button"
-                  onClick={() => handleCuisineSelect(item.name)}
-                  className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
-                >
-                  <span
-                    className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
-                      isActive ? "ring-2 ring-[#E85D04] ring-offset-1 sm:ring-offset-2" : ""
-                    }`}
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        const el = e.target as HTMLImageElement;
-                        if (el.src !== CUISINE_IMAGE_FALLBACK) {
-                          el.src = CUISINE_IMAGE_FALLBACK;
-                        }
-                      }}
-                    />
-                  </span>
-                  <span className="mt-1.5 sm:mt-3 text-[11px] sm:text-[13px] lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
-                    {item.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
+     
 
       {/* ── 1. Hero Search Banner ──────────────────────────────────────────── */}
       <div
@@ -1352,6 +1289,71 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {cuisineCards.length > 0 && (
+        <section className="bg-white container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-4 sm:py-5 md:py-6 mb-3 sm:mb-5">
+          <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
+            <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
+              Explore Cuisines
+            </h2>
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <button
+                type="button"
+                aria-label="Previous cuisines"
+                onClick={() => scrollCuisines("left")}
+                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next cuisines"
+                onClick={() => scrollCuisines("right")}
+                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+              >
+                <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+              </button>
+            </div>
+          </div>
+          <div
+            ref={cuisinesRef}
+            className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 -mx-1 px-1"
+          >
+            {cuisineCards.map((item) => {
+              const isActive = diningFilters.cuisine.toLowerCase() === item.name.toLowerCase();
+              return (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => handleCuisineSelect(item.name)}
+                  className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
+                >
+                  <span
+                    className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
+                      isActive ? "ring-2 ring-[#E85D04] ring-offset-1 sm:ring-offset-2" : ""
+                    }`}
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const el = e.target as HTMLImageElement;
+                        if (el.src !== CUISINE_IMAGE_FALLBACK) {
+                          el.src = CUISINE_IMAGE_FALLBACK;
+                        }
+                      }}
+                    />
+                  </span>
+                  <span className="mt-1.5 sm:mt-3 text-[11px] sm:text-[13px] lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
+                    {item.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── Page Body Part 1 (Collections, Promotions, Moods) ───────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1601,36 +1603,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* ── 4.6. Can't decide ───────────────────────────────────────────── */}
-        {!searchQuery && activeFilter === "All" && (
-          <section className="py-8 sm:py-10">
-            <div className="relative overflow-hidden rounded-[22px] sm:rounded-[28px] bg-[#F6EDE4] px-5 py-5 sm:px-8 sm:py-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0">
-                <UtensilsCrossed size={22} className="text-[#E85D04]" />
-              </div>
-              <div className="flex-1 text-center sm:text-left min-w-0">
-                <p className="font-bold text-[#1A2744] text-base sm:text-lg">Can&apos;t decide?</p>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  Explore restaurants near you and try something new.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleExploreRestaurants}
-                className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#E85D04] hover:bg-[#d45303] text-white font-bold text-sm px-5 sm:px-6 py-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md w-full sm:w-auto"
-              >
-                Explore Restaurants
-                <ArrowRight size={16} />
-              </button>
-              <div className="pointer-events-none absolute right-3 top-0 bottom-0 w-16 hidden md:block opacity-25"
-                style={{
-                  backgroundImage: "radial-gradient(#9ca3af 1.2px, transparent 1.2px)",
-                  backgroundSize: "10px 10px",
-                }}
-              />
-            </div>
-          </section>
-        )}
+        
 
       </div>
 
@@ -1783,7 +1756,7 @@ export default function Home() {
             onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
           />
 
-          <section className="mb-8">
+          {/* <section className="mb-8">
             <h2 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-5">
               Hi {foodieName}, Dine Anytime!
             </h2>
@@ -1822,7 +1795,7 @@ export default function Home() {
                 );
               })}
             </div>
-          </section>
+          </section> */}
 
           {businessesLoading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">

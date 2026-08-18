@@ -14,6 +14,7 @@ import {
   FaLink,
   FaMapMarkerAlt,
   FaShareAlt,
+  FaTimes,
   FaWhatsapp,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
@@ -30,7 +31,6 @@ import { parseEventLanguages } from "@/lib/eventValidation";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 import EventCheckout from "@/components/EventLandingPage/EventCheckout";
 import EventReviewsSection from "@/components/EventLandingPage/EventReviewsSection";
-import EventsNavbar from "@/components/EventLandingPage/EventsNavbar";
 import Footer from "@/components/LandingPage/Footer";
 
 type TabId = "about" | "schedule" | "reviews";
@@ -75,6 +75,15 @@ function formatHostingSince(iso?: string | null) {
   return `${years}y ${rem}m`;
 }
 
+const DEFAULT_EVENT_TERMS = [
+  "Age Limit: 16+",
+  "Tickets once booked cannot be exchanged or refunded.",
+  "Seating is on a first-come-first-serve basis unless a seat is assigned.",
+  "Please carry a valid ID for verification at the venue.",
+  "The organizer reserves the right of admission.",
+  "Recording or photography may be restricted as per venue policy.",
+];
+
 function formatLongDate(value?: string) {
   if (!value) return "";
   const d = new Date(value);
@@ -91,7 +100,7 @@ function ticketStatus(available: number, total: number) {
   if (available <= 0) return { label: "Sold Out", className: "text-slate-400" };
   if (total > 0 && available / total <= 0.15) return { label: "Few Left", className: "text-red-500" };
   if (available <= 10) return { label: "Few Left", className: "text-red-500" };
-  return { label: "Available", className: "text-[#1B5E3B]" };
+  return { label: "Available", className: "text-[#6900AA]" };
 }
 
 function RelatedCard({ event }: { event: PublicEvent }) {
@@ -130,12 +139,10 @@ export default function PublicEventDetailPage({
   const [tab, setTab] = useState<TabId>("about");
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [city, setCity] = useState("All Cities");
+  const [termsOpen, setTermsOpen] = useState(false);
   const relatedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("selected_city");
-    if (stored) setCity(stored);
     const raw = localStorage.getItem("saved_events");
     if (raw) {
       try {
@@ -164,6 +171,21 @@ export default function PublicEventDetailPage({
     ...(termsPoints?.selected || []).map((t) => String(t.text || "").trim()).filter(Boolean),
     ...(termsPoints?.custom || []).map((t) => String(t).trim()).filter(Boolean),
   ];
+  const displayTerms = termLines.length > 0 ? termLines : DEFAULT_EVENT_TERMS;
+
+  useEffect(() => {
+    if (!termsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setTermsOpen(false);
+    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [termsOpen]);
   const nextShowtime =
     showtimes.find((s) => new Date(s.starts_at).getTime() >= Date.now()) || showtimes[0];
 
@@ -259,7 +281,7 @@ export default function PublicEventDetailPage({
     return (
       <div className="text-center py-20">
         <p className="text-slate-600 mb-4">Event not found or not available.</p>
-        <Link href="/events" className="text-[#1B5E3B] font-medium">
+        <Link href="/events" className="text-[#6900AA] font-medium">
           Browse all events
         </Link>
       </div>
@@ -276,12 +298,6 @@ export default function PublicEventDetailPage({
   const hasShowtimes = showtimes.length > 0;
   const hasTickets = ticketTypes.some((t) => Number(t.available_count) > 0);
   const canBook = (isLive || event.status === "APPROVED") && hasShowtimes && hasTickets;
-  const cityOptions = city === "All Cities" ? ["All Cities"] : ["All Cities", city];
-  const handleCityChange = (next: string) => {
-    setCity(next);
-    if (next && next !== "All Cities") localStorage.setItem("selected_city", next);
-    else localStorage.removeItem("selected_city");
-  };
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "about", label: "About" },
@@ -291,8 +307,6 @@ export default function PublicEventDetailPage({
 
   return (
     <div className="min-h-screen bg-[#f4f5f7]">
-      <EventsNavbar city={city} cityOptions={cityOptions} onCityChange={handleCityChange} />
-
       <section className="relative overflow-hidden">
         {heroBg && (
           <img src={heroBg} alt="" className="absolute inset-0 w-full h-full object-cover scale-110 blur-md" />
@@ -376,7 +390,7 @@ export default function PublicEventDetailPage({
                 <button
                   type="button"
                   onClick={() => openCheckout()}
-                  className="text-sm font-semibold text-[#1B5E3B] hover:underline cursor-pointer"
+                  className="text-sm font-semibold text-[#6900AA] hover:underline cursor-pointer"
                 >
                   View Seating Plan
                 </button>
@@ -414,7 +428,7 @@ export default function PublicEventDetailPage({
               onClick={() => openCheckout()}
               className={`mt-4 w-full py-3 rounded-xl font-semibold text-sm ${
                 canBook
-                  ? "bg-[#1B5E3B] hover:bg-[#164e31] text-white cursor-pointer"
+                  ? "bg-[#6900AA] hover:bg-[#57008E] text-white cursor-pointer"
                   : "bg-slate-200 text-slate-500 cursor-not-allowed"
               }`}
             >
@@ -454,7 +468,7 @@ export default function PublicEventDetailPage({
                 onClick={() => setTab(t.id)}
                 className={`pb-3 text-sm font-semibold whitespace-nowrap cursor-pointer ${
                   tab === t.id
-                    ? "text-[#1B5E3B] border-b-2 border-[#1B5E3B]"
+                    ? "text-[#6900AA] border-b-2 border-[#6900AA]"
                     : "text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -476,7 +490,7 @@ export default function PublicEventDetailPage({
                   <button
                     type="button"
                     onClick={() => setAboutExpanded((v) => !v)}
-                    className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#1B5E3B] cursor-pointer"
+                    className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#6900AA] cursor-pointer"
                   >
                     {aboutExpanded ? "Show Less" : "Show More"}
                     <FaChevronDown className={aboutExpanded ? "rotate-180" : ""} size={11} />
@@ -515,7 +529,7 @@ export default function PublicEventDetailPage({
                   <ul className="space-y-2">
                     {highlights.map((h) => (
                       <li key={h} className="flex items-start gap-2 text-sm text-slate-700">
-                        <FaCheck className="text-[#1B5E3B] mt-0.5 shrink-0" size={12} />
+                        <FaCheck className="text-[#6900AA] mt-0.5 shrink-0" size={12} />
                         {h}
                       </li>
                     ))}
@@ -581,7 +595,7 @@ export default function PublicEventDetailPage({
                                 href={mapsUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm font-semibold text-[#1B5E3B]"
+                                className="text-sm font-semibold text-[#6900AA]"
                               >
                                 Get Directions
                               </a>
@@ -590,7 +604,7 @@ export default function PublicEventDetailPage({
                               <button
                                 type="button"
                                 onClick={() => openCheckout(s.id)}
-                                className="px-3 py-1.5 rounded-lg bg-[#1B5E3B] text-white text-xs font-bold cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-[#6900AA] text-white text-xs font-bold cursor-pointer"
                               >
                                 Book this show
                               </button>
@@ -620,26 +634,16 @@ export default function PublicEventDetailPage({
               <h2 className="text-lg font-bold text-slate-900 mb-4">Offers</h2>
               <ul className="space-y-3">
                 {offers.map((o) => (
-                  <li key={o.id} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+                  <li key={o.id} className="rounded-xl border border-[#E3BCFF] bg-[#F7E9FF] p-4">
                     <p className="font-semibold text-slate-900">{o.title}</p>
                     {o.description && <p className="text-sm text-slate-600 mt-1">{o.description}</p>}
-                    <p className="text-sm font-bold text-[#1B5E3B] mt-2">
+                    <p className="text-sm font-bold text-[#6900AA] mt-2">
                       {o.discount_type === "PERCENT"
                         ? `${o.discount_value}% off`
                         : formatOfferDiscount(o.discount_type, o.discount_value)}
                       {o.promo_code ? ` · Use code ${o.promo_code}` : ""}
                     </p>
                   </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {termLines.length > 0 && (
-            <section className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 mb-3">Terms & conditions</h2>
-              <ul className="list-disc pl-5 space-y-1.5 text-sm text-slate-600">
-                {termLines.map((line, i) => (
-                  <li key={`${i}-${line.slice(0, 24)}`}>{line}</li>
                 ))}
               </ul>
             </section>
@@ -668,7 +672,7 @@ export default function PublicEventDetailPage({
                       className="h-10 w-auto max-w-[88px] object-contain"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-lg bg-[#1B5E3B] text-white flex items-center justify-center font-bold text-sm">
+                    <div className="w-10 h-10 rounded-lg bg-[#6900AA] text-white flex items-center justify-center font-bold text-sm">
                       {event.organizer_name.slice(0, 1).toUpperCase()}
                     </div>
                   )}
@@ -747,7 +751,7 @@ export default function PublicEventDetailPage({
               <button
                 type="button"
                 onClick={addGoogleCalendar}
-                className="text-sm font-semibold text-[#1B5E3B] cursor-pointer"
+                className="text-sm font-semibold text-[#6900AA] cursor-pointer"
               >
                 Google Calendar
               </button>
@@ -770,7 +774,7 @@ export default function PublicEventDetailPage({
                       className="w-20 h-20 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-[#1B5E3B] text-white flex items-center justify-center text-xl font-bold">
+                    <div className="w-20 h-20 rounded-full bg-[#6900AA] text-white flex items-center justify-center text-xl font-bold">
                       {event.organizer_name.slice(0, 1).toUpperCase()}
                     </div>
                   )}
@@ -780,11 +784,22 @@ export default function PublicEventDetailPage({
             </section>
           )}
 
+          <section className={event.organizer_name ? "border-t border-slate-200 pt-6 pb-6" : "pb-6"}>
+            <button
+              type="button"
+              onClick={() => setTermsOpen(true)}
+              className="flex w-full items-center justify-between gap-4 py-2 text-left cursor-pointer"
+            >
+              <span className="text-base font-semibold text-[#6900AA]">Terms & Conditions</span>
+              <FaChevronRight size={14} className="text-[#6900AA] shrink-0" />
+            </button>
+          </section>
+
           {related.length > 0 && (
-            <section className={event.organizer_name ? "border-t border-slate-200 pt-10" : ""}>
+            <section className="border-t border-slate-200 pt-10 pb-4">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-extrabold text-slate-900">You May Also Like</h2>
-                <Link href="/events" className="text-sm font-medium text-[#1B5E3B]">
+                <Link href="/events" className="text-sm font-medium text-[#6900AA]">
                   View All
                 </Link>
               </div>
@@ -812,6 +827,52 @@ export default function PublicEventDetailPage({
           )}
         </div>
       </div>
+
+      {termsOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setTermsOpen(false)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="event-terms-title"
+            className="relative w-full max-w-lg max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-3">
+              <h2 id="event-terms-title" className="text-2xl font-bold text-slate-900">
+                Terms & Conditions
+              </h2>
+              <button
+                type="button"
+                aria-label="Close terms"
+                onClick={() => setTermsOpen(false)}
+                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 cursor-pointer"
+              >
+                <FaTimes size={12} />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-6 pb-4 max-h-[50vh] space-y-4">
+              {displayTerms.map((line, i) => (
+                <p key={`${i}-${line.slice(0, 24)}`} className="text-[15px] leading-relaxed text-slate-600">
+                  {line}
+                </p>
+              ))}
+            </div>
+            <div className="px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setTermsOpen(false)}
+                className="w-full rounded-xl bg-[#6900AA] py-3 text-sm font-bold text-white hover:bg-[#57008E] cursor-pointer"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
 

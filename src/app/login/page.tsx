@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { UtensilsCrossed, Phone, Mail, Lock, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Phone, Mail, Lock, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm, Controller } from 'react-hook-form';
@@ -32,7 +32,7 @@ const fieldErrorClass =
   'mt-1.5 text-[11px] font-semibold text-rose-500';
 const inputBase =
   'w-full bg-slate-50 border rounded-2xl py-3.5 text-sm focus:outline-none focus:bg-white text-slate-800 font-semibold transition-all';
-const inputOk = 'border-slate-200 focus:border-rose-400';
+const inputOk = 'border-slate-200 focus:border-[#6900AA]';
 const inputErr = 'border-rose-300 focus:border-rose-400';
 const labelClass =
   'text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block';
@@ -116,7 +116,7 @@ function LoginForm() {
       dispatch(setCredentials({ user: data.user, token: data.token }));
       window.dispatchEvent(new Event('auth_changed'));
       toast.success(extractApiSuccessMessage(data, 'Login successful'));
-      router.push('/customer/dashboard');
+      router.push('/');
     } catch (err: unknown) {
       toast.error(extractApiError(err, 'Login failed. Please try again.'));
     }
@@ -133,7 +133,7 @@ function LoginForm() {
       dispatch(setCredentials({ user: data.user, token: data.token }));
       window.dispatchEvent(new Event('auth_changed'));
       toast.success(extractApiSuccessMessage(data, 'Customer registered successfully'));
-      router.push('/customer/dashboard');
+      router.push('/');
     } catch (err: unknown) {
       toast.error(extractApiError(err, 'Registration failed. Please try again.'));
     }
@@ -155,19 +155,10 @@ function LoginForm() {
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-50 via-white to-rose-50/30">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-10 bg-[#F7F7F7]">
       <div className="w-full max-w-md">
-        <div className="flex justify-center mb-8">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="bg-rose-600 p-2.5 rounded-xl group-hover:scale-105 transition-transform shadow-md shadow-rose-200">
-              <UtensilsCrossed size={26} className="text-white" />
-            </div>
-            <span className="text-2xl font-bold text-slate-800 tracking-tight">Book My Bota</span>
-          </Link>
-        </div>
-
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-100/50 overflow-hidden">
-          <div className="flex border-b border-slate-100">
+        <div className="bg-white rounded-3xl border border-[#EDEDED] shadow-sm overflow-hidden">
+          <div className="flex border-b border-[#EDEDED]">
             <button
               type="button"
               onClick={() => {
@@ -176,7 +167,7 @@ function LoginForm() {
               }}
               className={`flex-1 py-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
                 activeTab === 'customer'
-                  ? 'text-rose-600 border-b-2 border-rose-500 bg-rose-50/50'
+                  ? 'text-[#6900AA] border-b-2 border-[#6900AA] bg-[#F7E9FF]'
                   : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
               }`}
             >
@@ -242,7 +233,7 @@ function LoginForm() {
                       <button
                         type="submit"
                         disabled={isPhoneLoading}
-                        className="w-full bg-rose-500 hover:bg-rose-600 text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-md shadow-rose-200 cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
+                        className="w-full bg-[#6900AA] hover:bg-[#57008E] text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-sm cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
                       >
                         Send OTP <ChevronRight size={16} />
                       </button>
@@ -261,7 +252,7 @@ function LoginForm() {
                             phone: sanitizePhoneInput(phone || ''),
                           });
                         }}
-                        className="text-rose-600 font-bold hover:underline cursor-pointer"
+                        className="text-[#6900AA] font-bold hover:underline cursor-pointer"
                       >
                         Create an account
                       </button>
@@ -312,7 +303,7 @@ function LoginForm() {
                       <button
                         type="submit"
                         disabled={isPhoneLoading}
-                        className="w-full bg-rose-500 hover:bg-rose-600 text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-md shadow-rose-200 cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
+                        className="w-full bg-[#6900AA] hover:bg-[#57008E] text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-sm cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
                       >
                         {isPhoneLoading ? 'Verifying...' : 'Verify & Login'}
                       </button>
@@ -401,7 +392,7 @@ function LoginForm() {
                       <button
                         type="submit"
                         disabled={isRegistering}
-                        className="w-full bg-rose-500 hover:bg-rose-600 text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-md shadow-rose-200 cursor-pointer flex justify-center items-center gap-2 mt-2 disabled:opacity-60"
+                        className="w-full bg-[#6900AA] hover:bg-[#57008E] text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-sm cursor-pointer flex justify-center items-center gap-2 mt-2 disabled:opacity-60"
                       >
                         {isRegistering ? 'Creating account...' : 'Create Account'}
                       </button>
@@ -449,7 +440,7 @@ function LoginForm() {
                       </FormLabel>
                       <Link
                         href="/forgot-password"
-                        className="text-[11px] font-semibold text-rose-500 hover:text-rose-600"
+                        className="text-[11px] font-semibold text-[#6900AA] hover:text-[#57008E]"
                       >
                         Forgot password?
                       </Link>

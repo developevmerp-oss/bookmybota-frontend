@@ -67,7 +67,7 @@ async function urlToDataUrl(url: string): Promise<string | null> {
 }
 
 function statusStyles(status: string) {
-  if (status === "CONFIRMED") return "bg-[#D4EDDA] text-[#1B5E3B]";
+  if (status === "CONFIRMED") return "bg-[#F7E9FF] text-[#6900AA]";
   if (status === "CANCELLED") return "bg-red-50 text-red-600";
   return "bg-slate-100 text-slate-600";
 }
@@ -207,7 +207,7 @@ export default function EventBookingDetailPage({
         icon: "success",
         title: "Download successfully",
         text: "Your ticket has been downloaded.",
-        confirmButtonColor: "#1B5E3B",
+        confirmButtonColor: "#6900AA",
       });
     } catch {
       toast.error("Could not download the ticket PDF.");
@@ -226,7 +226,7 @@ export default function EventBookingDetailPage({
     return (
       <div className="min-h-screen bg-[#f4f5f7] pt-24 text-center px-4">
         <p className="text-slate-500 mb-4">Booking not found.</p>
-        <Link href="/customer/dashboard" className="text-[#1B5E3B] font-semibold">
+        <Link href="/customer/dashboard" className="text-[#6900AA] font-semibold">
           Back to My Bookings
         </Link>
       </div>
@@ -247,7 +247,7 @@ export default function EventBookingDetailPage({
       <div className="max-w-5xl mx-auto px-4">
         <Link
           href="/customer/dashboard"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-[#1B5E3B] mb-6"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-[#6900AA] mb-6"
         >
           <ArrowLeft size={16} /> Back to My Bookings
         </Link>
@@ -303,7 +303,7 @@ export default function EventBookingDetailPage({
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-slate-100 shrink-0" />
             )}
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#1B5E3B]">Event</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#6900AA]">Event</p>
               <h2 className="text-xl font-extrabold text-slate-900 mt-0.5">{booking.event_name}</h2>
               {venue && (
                 <p className="text-sm text-slate-500 mt-1 flex items-start gap-1.5">
@@ -314,7 +314,7 @@ export default function EventBookingDetailPage({
                 {booking.event_id && (
                   <Link
                     href={`/events/${booking.event_id}`}
-                    className="text-sm font-semibold text-[#1B5E3B] inline-flex items-center gap-1"
+                    className="text-sm font-semibold text-[#6900AA] inline-flex items-center gap-1"
                   >
                     View event details <ExternalLink size={13} />
                   </Link>
@@ -324,7 +324,7 @@ export default function EventBookingDetailPage({
                     href={mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-semibold text-[#1B5E3B] inline-flex items-center gap-1"
+                    className="text-sm font-semibold text-[#6900AA] inline-flex items-center gap-1"
                   >
                     Get directions <ExternalLink size={13} />
                   </a>
@@ -335,24 +335,24 @@ export default function EventBookingDetailPage({
 
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
             <div className="sm:border-r border-slate-100">
-              <Calendar size={16} className="text-[#1B5E3B] mb-1" />
+              <Calendar size={16} className="text-[#6900AA] mb-1" />
               <p className="text-sm font-bold text-slate-900">{formatDateLine(booking.starts_at)}</p>
               <p className="text-xs text-slate-400">{formatWeekday(booking.starts_at)}</p>
             </div>
             <div className="sm:border-r border-slate-100">
-              <Clock size={16} className="text-[#1B5E3B] mb-1" />
+              <Clock size={16} className="text-[#6900AA] mb-1" />
               <p className="text-sm font-bold text-slate-900">{formatTime12h(booking.starts_at)}</p>
               <p className="text-xs text-slate-400">Onwards</p>
             </div>
             <div className="sm:border-r border-slate-100">
-              <Clock size={16} className="text-[#1B5E3B] mb-1" />
+              <Clock size={16} className="text-[#6900AA] mb-1" />
               <p className="text-sm font-bold text-slate-900">
                 {booking.ends_at ? formatTime12h(booking.ends_at) : "—"}
               </p>
               <p className="text-xs text-slate-400">Onwards</p>
             </div>
             <div>
-              <Ticket size={16} className="text-[#1B5E3B] mb-1" />
+              <Ticket size={16} className="text-[#6900AA] mb-1" />
               <p className="text-sm font-bold text-slate-900">{ticketCount} Tickets</p>
               <p className="text-xs text-slate-400">{ticketTypeLabel}</p>
             </div>
@@ -380,18 +380,18 @@ export default function EventBookingDetailPage({
               <span>{formatMoney(booking.convenience_fee_total)}</span>
             </div>
             {Number(booking.discount_amount || 0) > 0 && (
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-[#6900AA]">
                 <span>Promo discount</span>
                 <span>−{formatMoney(booking.discount_amount)}</span>
               </div>
             )}
             <div className="flex justify-between items-baseline pt-3 border-t border-slate-100">
               <span className="font-semibold text-slate-800">Total Payable</span>
-              <span className="text-lg font-extrabold text-[#1B5E3B]">{formatMoney(booking.grand_total)}</span>
+              <span className="text-lg font-extrabold text-[#6900AA]">{formatMoney(booking.grand_total)}</span>
             </div>
           </div>
-          <div className="mt-4 rounded-xl bg-[#D4EDDA] px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm text-slate-700">
-            <Printer size={16} className="text-[#1B5E3B] shrink-0" />
+          <div className="mt-4 rounded-xl bg-[#F7E9FF] px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm text-slate-700">
+            <Printer size={16} className="text-[#6900AA] shrink-0" />
             <p>
               <span className="text-slate-800">Guest Name: </span>
               <span className="font-semibold">{booking.guest_name || user.name || "Guest"}</span>

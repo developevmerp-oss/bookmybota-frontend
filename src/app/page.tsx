@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import HomeHeader from "@/components/LandingPage/HomeHeader";
 import CategoryNavBar from "@/components/LandingPage/CategoryNavBar";
 import PromoBannerCarousel from "@/components/LandingPage/PromoBannerCarousel";
 import PopularDiningRail from "@/components/LandingPage/PopularDiningRail";
@@ -18,20 +17,17 @@ export default function Home() {
   const [city, setCity] = useState("");
 
   useEffect(() => {
-    const stored = localStorage.getItem("selected_city");
-    if (stored && stored !== "All Cities") setCity(stored);
+    const syncCity = () => {
+      const stored = localStorage.getItem("selected_city");
+      setCity(stored && stored !== "All Cities" ? stored : "");
+    };
+    syncCity();
+    window.addEventListener("selected_city_changed", syncCity);
+    return () => window.removeEventListener("selected_city_changed", syncCity);
   }, []);
-
-  const handleCityChange = (next: string) => {
-    setCity(next);
-    if (next && next !== "All Cities") localStorage.setItem("selected_city", next);
-    else localStorage.removeItem("selected_city");
-    window.dispatchEvent(new Event("selected_city_changed"));
-  };
 
   return (
     <div className="min-h-screen bg-white text-[#111111]">
-      <HomeHeader city={city} onCityChange={handleCityChange} />
       <CategoryNavBar />
       <PromoBannerCarousel city={city} />
       <PopularDiningRail city={city} />

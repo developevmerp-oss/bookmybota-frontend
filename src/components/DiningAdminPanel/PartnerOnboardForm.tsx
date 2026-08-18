@@ -116,15 +116,15 @@ export default function PartnerOnboardForm({
     : "block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2";
   const inputClass = isDark
     ? "input-field"
-    : "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 text-sm";
+    : "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#6900AA] focus:border-[#6900AA] text-sm";
   const textareaClass = isDark
     ? "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 transition-all"
-    : "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 text-sm";
+    : "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#6900AA] focus:border-[#6900AA] text-sm";
   const headingClass = isDark ? "text-white" : "text-slate-800";
   const mutedClass = isDark ? "text-zinc-400" : "text-slate-500";
   const panelClass = isDark
     ? "glass-panel rounded-2xl border border-white/10 p-6 md:p-8"
-    : "bg-white rounded-3xl border border-slate-100 shadow-xl p-6 md:p-8";
+    : "bg-white rounded-2xl border border-slate-100 shadow-xl p-6 md:p-8 w-full";
 
   const canSubmitCreate =
     !!businessName &&
@@ -254,6 +254,7 @@ export default function PartnerOnboardForm({
         label="Phone Number"
         labelClassName={labelClass}
         variant={isDark ? "dark" : "light"}
+        className={isDark ? undefined : "md:col-span-2"}
         value={phone}
         onChange={setPhone}
         onValidChange={setPhoneValid}
@@ -268,7 +269,7 @@ export default function PartnerOnboardForm({
                 aspect={1}
                 disabled={uploadingImage}
                 previewClassName="w-32 h-32 rounded-2xl"
-                emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-rose-400"
+                emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
                 onRemove={() => setCoverImageUrl("")}
                 onCroppedFile={async (file) => {
                   const formData = new FormData();
@@ -338,7 +339,7 @@ export default function PartnerOnboardForm({
       className={
         isDark
           ? "btn-primary disabled:opacity-50 inline-flex items-center justify-center gap-2 min-w-48"
-          : "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 transition-colors"
+          : "w-full bg-[#6900AA] hover:bg-[#57008E] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 transition-colors"
       }
     >
       {busy ? (
@@ -391,7 +392,7 @@ export default function PartnerOnboardForm({
         >
           <ArrowLeft size={16} /> Back
         </Link>
-        <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${headingClass}`}>{title}</h1>
+        <h1 className={`text-2xl font-bold mb-2 ${headingClass}`}>{title}</h1>
         <p className={`${mutedClass} text-sm mb-8`}>{subtitle}</p>
         {onboardStatus === "success" ? (
           successBlock

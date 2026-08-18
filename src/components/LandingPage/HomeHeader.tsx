@@ -106,6 +106,14 @@ export default function HomeHeader() {
             <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
           </button>
 
+          <Link
+            href="/business"
+            className="inline-flex h-9 items-center px-3 sm:px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-semibold hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors"
+          >
+            <span className="sm:hidden">Partner</span>
+            <span className="hidden sm:inline">Partner with Us</span>
+          </Link>
+
           {!authReady ? (
             <span className="w-[132px] h-9" />
           ) : customer ? (

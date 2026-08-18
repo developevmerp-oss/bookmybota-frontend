@@ -26,7 +26,7 @@ const COLUMNS = [
     title: "Dining",
     links: [
       { label: "Restaurants", href: "/dining" },
-      { label: "List restaurant", href: "/business/register" },
+      { label: "List restaurant", href: "/business" },
     ],
   },
   {
@@ -62,7 +62,7 @@ export default function Footer() {
               List your event
             </Link>
             <Link
-              href="/business/register"
+              href="/business"
               className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
             >
               List restaurant

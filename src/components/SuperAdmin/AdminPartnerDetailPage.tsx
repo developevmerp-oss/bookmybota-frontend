@@ -231,6 +231,18 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
               <p className="text-xs text-zinc-500 mt-1">{biz.admin_role}</p>
             )}
           </div>
+          {isDining && (
+            <div className="md:col-span-2">
+              <Field
+                label="Collections"
+                value={
+                  Array.isArray(biz.collection_titles) && biz.collection_titles.length > 0
+                    ? biz.collection_titles.join(", ")
+                    : "—"
+                }
+              />
+            </div>
+          )}
           {isDining && <Field label="Cuisine" value={biz.cuisine} />}
           <div className="md:col-span-2">
             <Field label="Description" value={biz.description} />

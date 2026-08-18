@@ -19,6 +19,7 @@ import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import {
   useGetBusinessTypesQuery,
   useGetPartnerDocumentMastersQuery,
+  useGetAdminDiningCollectionsQuery,
   useRegisterBusinessMutation,
   useUpdateAdminBusinessMutation,
   useUploadImageMutation,
@@ -65,6 +66,7 @@ export default function PartnerOnboardForm({
   const [adminEmail, setAdminEmail] = useState("");
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [collectionIds, setCollectionIds] = useState<number[]>([]);
   const [phoneValid, setPhoneValid] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -79,6 +81,11 @@ export default function PartnerOnboardForm({
   const { data: partnerDocMasters = [] } = useGetPartnerDocumentMastersQuery(resolvedModule, {
     skip: partnerType === "combined" && !parentTypeId,
   });
+  const { data: collectionsData } = useGetAdminDiningCollectionsQuery(
+    { limit: 100 },
+    { skip: !isDining || variant !== "dark" }
+  );
+  const collectionOptions = collectionsData?.items ?? [];
 
   useEffect(() => {
     if (mode !== "edit" || !editingBusiness || formReady) return;
@@ -88,6 +95,11 @@ export default function PartnerOnboardForm({
     setPhone(editingBusiness.phone || "");
     setDescription(editingBusiness.description || "");
     setCoverImageUrl(editingBusiness.cover_image_url || "");
+    setCollectionIds(
+      Array.isArray(editingBusiness.collection_ids)
+        ? editingBusiness.collection_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+        : []
+    );
     setAdminEmail(editingBusiness.admin_email || "");
     setDocuments(
       Array.isArray(editingBusiness.documents)
@@ -166,6 +178,7 @@ export default function PartnerOnboardForm({
         partner_type: eventPartner ? "event" : "dining",
         documents,
         cover_image_url: coverImageUrl || undefined,
+        ...(eventPartner || variant !== "dark" ? {} : { collection_ids: collectionIds }),
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
@@ -194,7 +207,7 @@ export default function PartnerOnboardForm({
         phone,
         description,
         ...(isDining
-          ? { type_id: parseInt(venueTypeId, 10) }
+          ? { type_id: parseInt(venueTypeId, 10), collection_ids: collectionIds }
           : { type_id: parseInt(parentTypeId, 10) }),
         documents,
         cover_image_url: coverImageUrl || undefined,
@@ -222,6 +235,48 @@ export default function PartnerOnboardForm({
         onVenueTypeIdChange={setVenueTypeId}
         variant={variant}
       />
+
+      {isDining && isDark && (
+        <div className="md:col-span-2">
+          <label className={labelClass}>Collections</label>
+          {collectionOptions.length === 0 ? (
+            <p className={`text-xs ${mutedClass}`}>
+              No collections yet. Add them in Dining Masters, then assign restaurants here.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {collectionOptions.map((c) => {
+                const selected = collectionIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() =>
+                      setCollectionIds((prev) =>
+                        selected ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                      )
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      selected
+                        ? isDark
+                          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                          : "bg-rose-50 text-rose-700 border-rose-200"
+                        : isDark
+                          ? "text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white"
+                          : "text-slate-600 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {c.title}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <p className={`text-xs mt-1.5 ${mutedClass}`}>
+            Super Admin curated lists shown on the dining homepage. Partners cannot change this from their profile.
+          </p>
+        </div>
+      )}
 
       <div>
         <label className={labelClass}>

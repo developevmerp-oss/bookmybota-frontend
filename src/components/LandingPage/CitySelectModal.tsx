@@ -129,7 +129,7 @@ export default function CitySelectModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for your city"
-            className="w-full h-11 pl-10 pr-4 rounded-lg bg-[#F7F7F7] text-sm text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#7C5CFF]"
+            className="w-full h-11 pl-10 pr-4 rounded-lg bg-[#F7F7F7] text-sm text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#6900AA]"
           />
         </div>
 
@@ -137,7 +137,7 @@ export default function CitySelectModal({
           type="button"
           onClick={detectLocation}
           disabled={detecting}
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#7C5CFF] hover:text-[#6B4EFF] mb-6 cursor-pointer disabled:opacity-60"
+          className="inline-flex items-center gap-2 text-sm font-medium text-[#6900AA] hover:text-[#57008E] mb-6 cursor-pointer disabled:opacity-60"
         >
           <Locate size={16} />
           {detecting ? "Detecting..." : "Detect my location"}
@@ -165,8 +165,8 @@ export default function CitySelectModal({
                     }}
                     className={`rounded-xl border px-2 py-4 text-sm font-medium cursor-pointer ${
                       active
-                        ? "border-[#7C5CFF] bg-[#F3EEFF] text-[#7C5CFF]"
-                        : "border-[#EDEDED] bg-white text-[#111111] hover:border-[#E0D7FF] hover:bg-[#F3EEFF]"
+                        ? "border-[#6900AA] bg-[#F7E9FF] text-[#6900AA]"
+                        : "border-[#EDEDED] bg-white text-[#111111] hover:border-[#E3BCFF] hover:bg-[#F7E9FF]"
                     }`}
                   >
                     {c}
@@ -189,8 +189,8 @@ export default function CitySelectModal({
                         onSelect(c);
                         onClose();
                       }}
-                      className={`text-sm cursor-pointer hover:text-[#7C5CFF] ${
-                        c === selected ? "text-[#7C5CFF] font-semibold" : "text-[#111111]"
+                      className={`text-sm cursor-pointer hover:text-[#6900AA] ${
+                        c === selected ? "text-[#6900AA] font-semibold" : "text-[#111111]"
                       }`}
                     >
                       {c}

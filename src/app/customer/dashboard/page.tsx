@@ -11,7 +11,6 @@ import {
   MapPin,
   MoreVertical,
   Ticket,
-  User,
   UtensilsCrossed,
   XCircle,
 } from "lucide-react";
@@ -28,6 +27,7 @@ import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 
 type KindTab = "all" | "dining" | "event";
 type StatusTab = "all" | "upcoming" | "past" | "cancelled";
@@ -73,7 +73,7 @@ function formatTimeLine(iso: string) {
 function statusStyles(status: string) {
   switch (status) {
     case "CONFIRMED":
-      return "bg-emerald-50 text-[#1B5E3B]";
+      return "bg-[#F7E9FF] text-[#6900AA]";
     case "CANCELLED":
       return "bg-red-50 text-red-600";
     default:
@@ -188,11 +188,12 @@ export default function CustomerDashboard() {
 
   if (diningLoading || eventsLoading || !user) {
     return (
-      <div className="min-h-screen bg-[#f4f5f7] pt-24 text-center text-slate-500">Loading Dashboard...</div>
+      <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
+        Loading Dashboard...
+      </div>
     );
   }
 
-  const welcomeName = user.name || user.email?.split("@")[0] || "there";
   const kindTabs: { key: KindTab; label: string; count: number }[] = [
     { key: "all", label: "All", count: kindCounts.all },
     { key: "dining", label: "Dining", count: kindCounts.dining },
@@ -206,21 +207,12 @@ export default function CustomerDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-white pt-10 pb-16">
-      <div className="max-w-5xl mx-auto px-4">
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 mb-2">
-              Welcome back, {welcomeName}! 👋
-            </h1>
-            <p className="text-slate-500">Manage your table reservations and event tickets.</p>
-          </div>
-          <Link
-            href="/customer/profile"
-            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800"
-          >
-            <User size={16} /> Edit Profile
-          </Link>
+    <CustomerAccountLayout>
+        <div className="mb-8">
+          <h1 className="text-[32px] leading-tight font-extrabold text-[#111111] mb-1">
+            My Orders / Reservations
+          </h1>
+          <p className="text-slate-500">Manage your table reservations and event tickets.</p>
         </div>
 
         <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
@@ -234,8 +226,8 @@ export default function CustomerDashboard() {
               }}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border ${
                 kind === tab.key
-                  ? "bg-[#1B5E3B] text-white border-[#1B5E3B]"
-                  : "bg-white text-slate-500 border-slate-200 hover:border-[#1B5E3B]/40"
+                  ? "bg-[#6900AA] text-white border-[#6900AA]"
+                  : "bg-white text-slate-500 border-slate-200 hover:border-[#6900AA]/40"
               }`}
             >
               {tab.label} ({tab.count})
@@ -252,7 +244,7 @@ export default function CustomerDashboard() {
               onClick={() => setFilter(tab.key)}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border ${
                 filter === tab.key
-                  ? "bg-emerald-50 text-[#1B5E3B] border-[#1B5E3B]/30"
+                  ? "bg-[#F7E9FF] text-[#6900AA] border-[#6900AA]/30"
                   : "bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200"
               }`}
             >
@@ -271,7 +263,7 @@ export default function CustomerDashboard() {
               <button
                 type="button"
                 onClick={() => router.push("/")}
-                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#1B5E3B] text-white text-sm font-semibold"
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold"
               >
                 Find a Table
               </button>
@@ -298,13 +290,13 @@ export default function CustomerDashboard() {
                     className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shrink-0"
                   />
                 ) : (
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-[#1B5E3B]">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-[#6900AA]">
                     {b.kind === "event" ? <Ticket size={22} /> : <UtensilsCrossed size={22} />}
                   </div>
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <p className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#1B5E3B]">
+                  <p className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#6900AA]">
                     {b.kind === "event" ? <Ticket size={12} /> : <UtensilsCrossed size={12} />}
                     {b.kind === "event" ? "Event" : "Dining"}
                   </p>
@@ -363,7 +355,6 @@ export default function CustomerDashboard() {
             <p className="text-center text-slate-400 text-sm pt-4">That&apos;s all your bookings! 🎉</p>
           </div>
         )}
-      </div>
       <ConfirmDialog
         open={!!pendingCancel}
         title={pendingCancel?.kind === "event" ? "Cancel ticket booking?" : "Cancel reservation?"}
@@ -396,6 +387,6 @@ export default function CustomerDashboard() {
           }
         }}
       />
-    </div>
+    </CustomerAccountLayout>
   );
 }

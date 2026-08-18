@@ -270,7 +270,7 @@ function ConfirmationContent() {
         icon: "success",
         title: "Download successfully",
         text: "Your ticket has been downloaded.",
-        confirmButtonColor: "#1B5E3B",
+        confirmButtonColor: "#6900AA",
       });
     } catch {
       toast.error("Could not download the ticket PDF.");
@@ -283,7 +283,7 @@ function ConfirmationContent() {
     return (
       <div className=" bg-[#f4f5f7] pt-24 text-center px-4">
         <p className="text-slate-500 mb-4">No booking ID provided.</p>
-        <Link href="/events" className="text-[#1B5E3B] font-semibold">
+        <Link href="/events" className="text-[#6900AA] font-semibold">
           Browse events
         </Link>
       </div>
@@ -293,7 +293,7 @@ function ConfirmationContent() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#f4f5f7] pt-24 flex flex-col items-center gap-3 text-slate-500">
-        <Loader2 className="animate-spin text-[#1B5E3B]" size={32} />
+        <Loader2 className="animate-spin text-[#6900AA]" size={32} />
         Loading confirmation...
       </div>
     );
@@ -303,7 +303,7 @@ function ConfirmationContent() {
     return (
       <div className="min-h-screen bg-[#f4f5f7] pt-24 text-center px-4">
         <p className="text-slate-500 mb-4">Could not load booking details.</p>
-        <Link href="/customer/dashboard" className="text-[#1B5E3B] font-semibold">
+        <Link href="/customer/dashboard" className="text-[#6900AA] font-semibold">
           My Bookings
         </Link>
       </div>
@@ -314,14 +314,14 @@ function ConfirmationContent() {
 
   return (
     <div className="min-h-screen bg-[#f4f5f7]">
-      <section className="relative overflow-hidden bg-[#1B5E3B] text-white">
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,#C9A227_0,transparent_40%),radial-gradient(circle_at_80%_0%,#ffffff_0,transparent_35%)]" />
-        <div className="absolute top-6 left-[12%] w-2 h-2 rounded-full bg-[#C9A227]" />
-        <div className="absolute top-16 right-[18%] w-1.5 h-1.5 rounded-full bg-[#C9A227]/80" />
+      <section className="relative overflow-hidden bg-[#6900AA] text-white">
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,#9D00FF_0,transparent_40%),radial-gradient(circle_at_80%_0%,#ffffff_0,transparent_35%)]" />
+        <div className="absolute top-6 left-[12%] w-2 h-2 rounded-full bg-[#9D00FF]" />
+        <div className="absolute top-16 right-[18%] w-1.5 h-1.5 rounded-full bg-[#8C00E3]/80" />
         <div className="absolute bottom-8 left-[40%] w-2 h-2 rounded-full bg-white/40" />
         <div className="relative max-w-6xl mx-auto px-4 py-5 text-center">
           <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center mx-auto mb-4">
-            <Check size={32} className="text-[#1B5E3B]" strokeWidth={3} />
+            <Check size={32} className="text-[#6900AA]" strokeWidth={3} />
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold">You&apos;re all set!</h1>
           <p className="mt-3 text-white/90 max-w-xl mx-auto">
@@ -348,7 +348,7 @@ function ConfirmationContent() {
                 <div className="w-24 sm:w-28 aspect-[3/4] rounded-xl bg-slate-200 shrink-0" />
               )}
               <div className="min-w-0 flex-1">
-                <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#1B5E3B]">
+                <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6900AA]">
                   <Ticket size={12} /> Event
                 </p>
                 <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">
@@ -360,7 +360,7 @@ function ConfirmationContent() {
                     {venue}
                   </p>
                 )}
-                <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#1B5E3B] text-white text-xs font-semibold px-2.5 py-1">
+                <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#6900AA] text-white text-xs font-semibold px-2.5 py-1">
                   <Check size={12} strokeWidth={3} /> Confirmed
                 </span>
               </div>
@@ -368,14 +368,14 @@ function ConfirmationContent() {
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex items-start gap-2.5">
-                <Calendar size={16} className="text-[#1B5E3B] mt-0.5" />
+                <Calendar size={16} className="text-[#6900AA] mt-0.5" />
                 <div>
                   <p className="text-[11px] text-slate-400 font-medium">Date</p>
                   <p className="text-sm font-semibold text-slate-900">{formatLongDate(booking.starts_at)}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2.5">
-                <Clock size={16} className="text-[#1B5E3B] mt-0.5" />
+                <Clock size={16} className="text-[#6900AA] mt-0.5" />
                 <div>
                   <p className="text-[11px] text-slate-400 font-medium">Time</p>
                   <p className="text-sm font-semibold text-slate-900">
@@ -384,7 +384,7 @@ function ConfirmationContent() {
                 </div>
               </div>
               <div className="flex items-start gap-2.5">
-                <Ticket size={16} className="text-[#1B5E3B] mt-0.5" />
+                <Ticket size={16} className="text-[#6900AA] mt-0.5" />
                 <div>
                   <p className="text-[11px] text-slate-400 font-medium">Tickets</p>
                   <p className="text-sm font-semibold text-slate-900">{ticketLabel}</p>
@@ -411,7 +411,7 @@ function ConfirmationContent() {
               </div>
               <div className="flex justify-between items-baseline pt-2">
                 <span className="font-semibold text-slate-800">Total Paid</span>
-                <span className="text-xl font-extrabold text-[#1B5E3B]">
+                <span className="text-xl font-extrabold text-[#6900AA]">
                   {formatMoney(booking.grand_total)}
                 </span>
               </div>
@@ -440,7 +440,7 @@ function ConfirmationContent() {
           </div>
 
           <aside className="space-y-4">
-            <div className="rounded-2xl bg-[#1B5E3B] text-white p-5">
+            <div className="rounded-2xl bg-[#6900AA] text-white p-5">
               <div className="flex items-start gap-3">
                 <span className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center shrink-0">
                   <Mail size={18} />
@@ -466,7 +466,7 @@ function ConfirmationContent() {
 
             <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 flex gap-3">
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-[#1B5E3B] flex items-center gap-1.5">
+                <p className="font-bold text-[#6900AA] flex items-center gap-1.5">
                   <Ticket size={15} />
                   Your Ticket
                 </p>
@@ -477,7 +477,7 @@ function ConfirmationContent() {
                   type="button"
                   onClick={downloadTickets}
                   disabled={downloading}
-                  className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#1B5E3B] text-[#1B5E3B] text-xs font-semibold cursor-pointer disabled:opacity-60"
+                  className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#6900AA] text-[#6900AA] text-xs font-semibold cursor-pointer disabled:opacity-60"
                 >
                   <Download size={14} />
                   {downloading ? "Downloading..." : "Download Ticket (PDF)"}
@@ -501,7 +501,7 @@ function ConfirmationContent() {
                     <div className="w-7 h-1 rounded bg-slate-200" />
                   </div>
                 </div>
-                <span className="absolute -bottom-1 -right-0 w-7 h-7 rounded-full bg-[#1B5E3B] text-white flex items-center justify-center shadow">
+                <span className="absolute -bottom-1 -right-0 w-7 h-7 rounded-full bg-[#6900AA] text-white flex items-center justify-center shadow">
                   <Download size={12} />
                 </span>
               </div>
@@ -520,7 +520,7 @@ function ConfirmationContent() {
                     className="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-50 border-b border-slate-100 last:border-0"
                   >
                     <span className="inline-flex items-center gap-2">
-                      <item.icon size={15} className="text-[#1B5E3B]" />
+                      <item.icon size={15} className="text-[#6900AA]" />
                       {item.label}
                     </span>
                     <ChevronRight size={14} className="text-slate-400" />
@@ -533,7 +533,7 @@ function ConfirmationContent() {
                     className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-50 border-b border-slate-100 last:border-0 cursor-pointer"
                   >
                     <span className="inline-flex items-center gap-2">
-                      <item.icon size={15} className="text-[#1B5E3B]" />
+                      <item.icon size={15} className="text-[#6900AA]" />
                       {item.label}
                     </span>
                     <ChevronRight size={14} className="text-slate-400" />
@@ -544,7 +544,7 @@ function ConfirmationContent() {
 
             <Link
               href="/events"
-              className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-[#1B5E3B] hover:bg-[#164e31] text-white font-semibold text-sm"
+              className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white font-semibold text-sm"
             >
               <Sparkles size={16} />
               Explore More Events
@@ -568,7 +568,7 @@ export default function EventBookingConfirmationPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[#f4f5f7] pt-24 flex justify-center text-slate-500">
-          <Loader2 className="animate-spin text-[#1B5E3B]" size={32} />
+          <Loader2 className="animate-spin text-[#6900AA]" size={32} />
         </div>
       }
     >

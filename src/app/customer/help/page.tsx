@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, HelpCircle, Search, Ticket, ChevronRight } from "lucide-react";
+import { Search, Ticket, ChevronRight } from "lucide-react";
 import { useGetCustomerBookingsQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 
 const FAQ_CATEGORIES = [
   {
@@ -80,30 +81,20 @@ export default function CustomerHelpPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background pt-24 text-center text-muted-foreground">
+      <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pt-10 pb-16">
-      <div className="max-w-2xl mx-auto px-4">
-        <Link
-          href="/customer/settings"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-        >
-          <ArrowLeft size={16} /> Back to settings
-        </Link>
+    <CustomerAccountLayout>
+      <div className="mb-6">
+        <h1 className="text-[32px] leading-tight font-extrabold text-[#111111]">Help Centre</h1>
+        <p className="text-slate-500 mt-1">Find answers or look up your reservation.</p>
+      </div>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
-            <HelpCircle size={28} className="text-rose-600" /> Help Centre
-          </h1>
-          <p className="text-muted-foreground">Find answers or look up your reservation.</p>
-        </div>
-
-        <div className="glass-panel rounded-2xl border border-border p-5 mb-8">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-8">
           <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
             <Ticket size={18} className="text-rose-600" /> Find your ticket
           </h2>
@@ -168,7 +159,6 @@ export default function CustomerHelpPage() {
             </section>
           ))}
         </div>
-      </div>
-    </div>
+    </CustomerAccountLayout>
   );
 }

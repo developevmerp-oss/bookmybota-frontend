@@ -57,13 +57,13 @@ export default function Footer() {
           <div className="flex flex-wrap gap-3">
             <Link
               href="/organizer"
-              className="inline-flex items-center h-10 px-4 rounded-lg bg-[#7C5CFF] hover:bg-[#6B4EFF] text-sm font-medium text-white"
+              className="inline-flex items-center h-10 px-4 rounded-lg bg-[#6900AA] hover:bg-[#57008E] text-sm font-medium text-white"
             >
               List your event
             </Link>
             <Link
               href="/business/register"
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#7C5CFF] text-sm font-medium text-white hover:bg-white/5"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
             >
               List restaurant
             </Link>
@@ -76,7 +76,7 @@ export default function Footer() {
           <div id="about" className="col-span-2 sm:col-span-3 lg:col-span-1">
             <p className="text-lg font-extrabold">
               <span className="text-white">Book My </span>
-              <span className="text-[#7C5CFF]">Bota</span>
+              <span className="text-[#6900AA]">Bota</span>
             </p>
             <p className="mt-3 text-sm text-[#B0B0B0] leading-relaxed">
               Discover events and dining experiences near you.

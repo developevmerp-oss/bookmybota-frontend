@@ -222,6 +222,20 @@ export interface EventGenreMaster {
   category_name?: string;
 }
 
+export interface DiningCuisineMaster {
+  id: number;
+  name: string;
+  slug?: string;
+  image_url?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
+export interface DiningMastersResponse {
+  cuisines: DiningCuisineMaster[];
+}
+
 export interface EventDocumentMaster {
   id: number;
   name: string;
@@ -815,7 +829,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1086,6 +1100,12 @@ export const api = createApi({
     getMoods: builder.query<Mood[], void>({
       query: () => '/businesses/moods',
       transformResponse: (res: { data: Mood[] }) => res.data || [],
+    }),
+
+    getDiningCuisines: builder.query<DiningCuisineMaster[], void>({
+      query: () => '/businesses/cuisines',
+      transformResponse: (res: { data?: DiningCuisineMaster[] }) => res?.data ?? [],
+      providesTags: [{ type: 'DiningMasters', id: 'PUBLIC_LIST' }],
     }),
 
     getBusinessTypes: builder.query<BusinessType[], void>({
@@ -2103,6 +2123,71 @@ export const api = createApi({
       invalidatesTags: [{ type: 'EventMasters', id: 'GENRE_LIST' }, 'EventMasters'],
     }),
 
+    // ── Admin Dining Masters ──────────────────────────────────────────────────
+
+    getAdminDiningCuisines: builder.query<
+      PaginatedList<DiningCuisineMaster>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/dining-cuisines${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: DiningCuisineMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+            ...result.items.map((c) => ({ type: 'DiningMasters' as const, id: `cuisine-${c.id}` })),
+            { type: 'DiningMasters', id: 'CUISINE_LIST' },
+          ]
+          : [{ type: 'DiningMasters', id: 'CUISINE_LIST' }],
+    }),
+
+    createAdminDiningCuisine: builder.mutation<
+      DiningCuisineMaster,
+      { name: string; image_url: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({
+        url: '/admin/dining-cuisines',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: DiningCuisineMaster }) =>
+        res?.data ?? ({} as DiningCuisineMaster),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'CUISINE_LIST' },
+        { type: 'DiningMasters', id: 'PUBLIC_LIST' },
+        'DiningMasters',
+      ],
+    }),
+
+    updateAdminDiningCuisine: builder.mutation<
+      DiningCuisineMaster,
+      { id: number; body: Partial<DiningCuisineMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/dining-cuisines/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: DiningCuisineMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'DiningMasters', id: `cuisine-${id}` },
+        { type: 'DiningMasters', id: 'CUISINE_LIST' },
+        { type: 'DiningMasters', id: 'PUBLIC_LIST' },
+      ],
+    }),
+
+    deleteAdminDiningCuisine: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/dining-cuisines/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'CUISINE_LIST' },
+        { type: 'DiningMasters', id: 'PUBLIC_LIST' },
+        'DiningMasters',
+      ],
+    }),
+
     getAdminEventDocuments: builder.query<
       PaginatedList<EventDocumentMaster>,
       { category_type_id?: number | 'global'; q?: string; page?: number; limit?: number } | void
@@ -2242,6 +2327,7 @@ export const {
   useUnarchiveAdminCustomerMutation,
   useGetCollectionsQuery,
   useGetMoodsQuery,
+  useGetDiningCuisinesQuery,
   useGetBusinessTypesQuery,
   useGetPartnerDocumentMastersQuery,
   useGetAdminPartnerDocumentsQuery,
@@ -2333,6 +2419,10 @@ export const {
   useCreateAdminEventGenreMutation,
   useUpdateAdminEventGenreMutation,
   useDeleteAdminEventGenreMutation,
+  useGetAdminDiningCuisinesQuery,
+  useCreateAdminDiningCuisineMutation,
+  useUpdateAdminDiningCuisineMutation,
+  useDeleteAdminDiningCuisineMutation,
   useGetAdminEventDocumentsQuery,
   useCreateAdminEventDocumentMutation,
   useUpdateAdminEventDocumentMutation,

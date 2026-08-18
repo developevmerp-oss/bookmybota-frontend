@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react';
 import { Save, ImagePlus, X, Upload, Info, Tag, Wifi, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation } from '@/services/api';
+import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
+import { isValidPhone } from '@/lib/validation';
 import PhoneInput from '@/components/Shared/PhoneInput';
 import ImageCropPicker, { CroppedImageField } from '@/components/Shared/ImageCropPicker';
 
@@ -15,6 +16,7 @@ export default function ProfilePage() {
 
   const bizId = user?.business_id ?? '';
   const { data: settings, isLoading } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
+  const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
 
   const [phone, setPhone] = useState('');
@@ -108,6 +110,19 @@ export default function ProfilePage() {
     }
   };
 
+  const selectedCuisines = cuisine
+    .split(/[,·|]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const toggleCuisine = (name: string) => {
+    const exists = selectedCuisines.some((c) => c.toLowerCase() === name.toLowerCase());
+    const next = exists
+      ? selectedCuisines.filter((c) => c.toLowerCase() !== name.toLowerCase())
+      : [...selectedCuisines, name];
+    setCuisine(next.join(', '));
+  };
+
   const removeImage = (index: number, type: 'gallery' | 'menu') => {
     if (type === 'gallery') {
       setGalleryImages(prev => prev.filter((_, i) => i !== index));
@@ -173,12 +188,38 @@ export default function ProfilePage() {
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all" placeholder="Enter complete address..." rows={2} />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-2">Cuisines</label>
-                  <input type="text" value={cuisine} onChange={(e) => setCuisine(e.target.value)} className="input-field" placeholder="e.g. Italian, Mexican" />
-                  <p className="text-xs text-zinc-500 mt-1">Comma separated</p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Cuisines</label>
+                {cuisineMasters.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {cuisineMasters.map((c) => {
+                      const selected = selectedCuisines.some(
+                        (name) => name.toLowerCase() === c.name.toLowerCase()
+                      );
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => toggleCuisine(c.name)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                            selected
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                              : 'text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <>
+                    <input type="text" value={cuisine} onChange={(e) => setCuisine(e.target.value)} className="input-field" placeholder="e.g. Italian, Mexican" />
+                    <p className="text-xs text-zinc-500 mt-1">Comma separated</p>
+                  </>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Open Time</label>
                   <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="input-field" />

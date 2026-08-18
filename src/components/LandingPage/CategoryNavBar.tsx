@@ -63,7 +63,7 @@ export default function CategoryNavBar() {
               <Link key={item.label} href={href} className={linkClass(active)}>
                 {item.label}
                 {active && (
-                  <span className="absolute left-0 right-0 -bottom-1.5 h-[2px] bg-[#7C5CFF]" />
+                  <span className="absolute left-0 right-0 -bottom-1.5 h-[2px] bg-[#6900AA]" />
                 )}
               </Link>
             );

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, User, Mail, Save, Loader2, MapPin } from "lucide-react";
+import { User, Mail, Save, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetCustomerProfileQuery,
@@ -13,6 +12,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, updateUser } from "@/features/auth/authSlice";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { isValidPhone } from "@/lib/validation";
+import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 
 export default function CustomerProfilePage() {
   const router = useRouter();
@@ -103,7 +103,7 @@ export default function CustomerProfilePage() {
 
   if (!user || isLoading) {
     return (
-      <div className="min-h-screen bg-background pt-24 text-center text-muted-foreground">
+      <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
         Loading profile...
       </div>
     );
@@ -112,21 +112,13 @@ export default function CustomerProfilePage() {
   const displayName = name || user.name || user.email?.split("@")[0] || "Guest";
 
   return (
-    <div className="min-h-screen bg-background pt-10 pb-16">
-      <div className="max-w-2xl mx-auto px-4">
-        <Link
-          href="/customer/dashboard"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-        >
-          <ArrowLeft size={16} /> Back to reservations
-        </Link>
+    <CustomerAccountLayout>
+      <div className="mb-6">
+        <h1 className="text-[32px] leading-tight font-extrabold text-[#111111]">Edit Profile</h1>
+        <p className="text-slate-500 mt-1">Update your personal and contact details.</p>
+      </div>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Edit Profile</h1>
-          <p className="text-muted-foreground">Update your personal and contact details.</p>
-        </div>
-
-        <div className="glass-panel rounded-2xl border border-border p-6 sm:p-8">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
           <div className="flex items-center gap-4 mb-8 pb-6 border-b border-border">
             <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center text-2xl font-bold">
               {displayName.charAt(0).toUpperCase()}
@@ -225,7 +217,6 @@ export default function CustomerProfilePage() {
             </button>
           </form>
         </div>
-      </div>
-    </div>
+    </CustomerAccountLayout>
   );
 }

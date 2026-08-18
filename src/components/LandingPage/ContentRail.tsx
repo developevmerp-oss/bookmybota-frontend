@@ -64,7 +64,7 @@ export default function ContentRail({
           {seeAllHref && (
             <Link
               href={seeAllHref}
-              className="shrink-0 text-sm font-medium text-[#7C5CFF] hover:text-[#6B4EFF]"
+              className="shrink-0 text-sm font-medium text-[#6900AA] hover:text-[#57008E]"
             >
               {seeAllLabel} ›
             </Link>
@@ -104,7 +104,7 @@ export default function ContentRail({
               className={`hidden md:flex absolute -left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
                 dark
                   ? "bg-white/10 text-white hover:bg-white/20"
-                  : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F3EEFF]"
+                  : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
               }`}
             >
               <ChevronLeft size={18} />
@@ -122,7 +122,7 @@ export default function ContentRail({
               className={`hidden md:flex absolute -right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
                 dark
                   ? "bg-white/10 text-white hover:bg-white/20"
-                  : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F3EEFF]"
+                  : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
               }`}
             >
               <ChevronRight size={18} />

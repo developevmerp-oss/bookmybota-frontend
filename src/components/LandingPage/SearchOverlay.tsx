@@ -150,7 +150,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search for events, dining, plays, sports..."
-              className="w-full h-12 sm:h-[52px] pl-12 pr-5 rounded-full bg-[#EEEEEE] text-[15px] text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#7C5CFF]"
+              className="w-full h-12 sm:h-[52px] pl-12 pr-5 rounded-full bg-[#EEEEEE] text-[15px] text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#6900AA]"
             />
           </div>
         </form>

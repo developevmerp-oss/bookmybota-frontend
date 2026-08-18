@@ -8,31 +8,72 @@ import { useGetPublicEventFiltersQuery } from "@/services/api";
 import CitySelectModal from "./CitySelectModal";
 import SearchOverlay from "./SearchOverlay";
 
-type HomeHeaderProps = {
-  city: string;
-  onCityChange: (city: string) => void;
+type StoredCustomer = {
+  name?: string;
+  email?: string;
 };
 
-export default function HomeHeader({ city, onCityChange }: HomeHeaderProps) {
+function readCustomer(): StoredCustomer | null {
+  try {
+    const token = localStorage.getItem("token_customer");
+    const raw = localStorage.getItem("user_customer");
+    if (!token || !raw) return null;
+    return JSON.parse(raw) as StoredCustomer;
+  } catch {
+    return null;
+  }
+}
+
+function readCity() {
+  const stored = localStorage.getItem("selected_city");
+  return stored && stored !== "All Cities" ? stored : "";
+}
+
+export default function HomeHeader() {
   const pathname = usePathname();
   const { data: filters } = useGetPublicEventFiltersQuery();
+  const [city, setCity] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [customer, setCustomer] = useState<StoredCustomer | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const cities = filters?.cities || [];
+  const isAuthPage = pathname === "/login" || pathname === "/register";
 
   useEffect(() => {
-    setIsLoggedIn(Boolean(localStorage.getItem("user_customer")));
+    const syncCity = () => setCity(readCity());
+    const syncAuth = () => setCustomer(readCustomer());
+    syncCity();
+    syncAuth();
+    setAuthReady(true);
+    window.addEventListener("selected_city_changed", syncCity);
+    window.addEventListener("auth_changed", syncAuth);
+    window.addEventListener("storage", syncAuth);
+    return () => {
+      window.removeEventListener("selected_city_changed", syncCity);
+      window.removeEventListener("auth_changed", syncAuth);
+      window.removeEventListener("storage", syncAuth);
+    };
   }, [pathname]);
 
-  const cityLabel = city && city !== "All Cities" ? city : "Select city";
+  const handleCityChange = (next: string) => {
+    const value = next && next !== "All Cities" ? next : "";
+    setCity(value);
+    if (value) localStorage.setItem("selected_city", value);
+    else localStorage.removeItem("selected_city");
+    window.dispatchEvent(new Event("selected_city_changed"));
+  };
+
+  const cityLabel = city || "Select city";
+  const displayName = customer?.name || customer?.email?.split("@")[0] || "Account";
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[#EDEDED]">
       <div className="max-w-7xl mx-auto h-16 px-4 sm:px-6 lg:px-8 flex items-center gap-3 sm:gap-4">
         <Link href="/" className="shrink-0 text-[20px] sm:text-[22px] font-extrabold tracking-tight">
           <span className="text-[#111111]">Book My </span>
-          <span className="text-[#7C5CFF]">Bota</span>
+          <span className="text-[#6900AA]">Bota</span>
         </Link>
 
         <button
@@ -49,7 +90,7 @@ export default function HomeHeader({ city, onCityChange }: HomeHeaderProps) {
         <div className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0">
           <button
             type="button"
-            className="md:hidden w-9 h-9 rounded-full hover:bg-[#F3EEFF] flex items-center justify-center cursor-pointer"
+            className="md:hidden w-9 h-9 rounded-full hover:bg-[#F7E9FF] flex items-center justify-center cursor-pointer"
             aria-label="Search"
             onClick={() => setSearchOpen(true)}
           >
@@ -59,18 +100,42 @@ export default function HomeHeader({ city, onCityChange }: HomeHeaderProps) {
           <button
             type="button"
             onClick={() => setCityOpen(true)}
-            className="flex items-center gap-1 text-sm font-medium text-[#111111] cursor-pointer hover:text-[#7C5CFF] max-w-[120px] sm:max-w-[160px]"
+            className="flex items-center gap-1 text-sm font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] max-w-[120px] sm:max-w-[160px]"
           >
             <span className="truncate">{cityLabel}</span>
             <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
           </button>
 
           <Link
-            href={isLoggedIn ? "/customer/dashboard" : "/login"}
-            className="inline-flex h-9 items-center px-3.5 rounded-lg border border-[#7C5CFF] bg-white text-sm font-medium text-[#111111] hover:bg-[#F3EEFF]"
+            href="/business"
+            className="inline-flex h-9 items-center px-3 sm:px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-semibold hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors"
           >
-            {isLoggedIn ? "My Account" : "Customer Login"}
+            <span className="sm:hidden">Partner</span>
+            <span className="hidden sm:inline">Partner with Us</span>
           </Link>
+
+          {!authReady ? (
+            <span className="w-[132px] h-9" />
+          ) : customer ? (
+            <Link
+              href="/customer/settings"
+              className="inline-flex h-9 items-center gap-2 pl-1 pr-3 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors"
+            >
+              <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-[13px] font-semibold flex items-center justify-center">
+                {initial}
+              </span>
+              <span className="hidden sm:inline text-sm font-medium text-[#111111] max-w-[110px] truncate">
+                My Account
+              </span>
+            </Link>
+          ) : isAuthPage ? null : (
+            <Link
+              href="/login"
+              className="inline-flex h-9 items-center px-4 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] shadow-[0_1px_2px_rgba(105,0,170,0.35)] transition-colors"
+            >
+              Customer Login
+            </Link>
+          )}
         </div>
       </div>
 
@@ -79,7 +144,7 @@ export default function HomeHeader({ city, onCityChange }: HomeHeaderProps) {
         cities={cities}
         selected={city}
         onClose={() => setCityOpen(false)}
-        onSelect={onCityChange}
+        onSelect={handleCityChange}
       />
 
       <SearchOverlay open={searchOpen} city={city} onClose={() => setSearchOpen(false)} />

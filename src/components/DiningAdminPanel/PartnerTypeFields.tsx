@@ -23,7 +23,7 @@ const labelClass = {
 
 const selectClass = {
   light:
-    "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500 text-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed",
+    "w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#6900AA] focus:border-[#6900AA] text-sm disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed",
   dark: "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 appearance-none disabled:opacity-50 disabled:cursor-not-allowed",
 };
 

@@ -28,8 +28,9 @@ function RegisterForm() {
     try {
       const data = await registerCustomer({ name, email, phone, password }).unwrap();
       dispatch(setCredentials({ user: data.user, token: data.token }));
+      window.dispatchEvent(new Event('auth_changed'));
       toast.success('Registration successful! Welcome.');
-      router.push('/customer/dashboard');
+      router.push('/');
     } catch (err: any) {
       toast.error(err?.data?.error || 'Registration failed.');
     }

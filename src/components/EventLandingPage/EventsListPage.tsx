@@ -19,6 +19,7 @@ import {
   FaSmile,
 } from "react-icons/fa";
 import {
+  api,
   useGetBusinessTypesQuery,
   useGetPublicEventFiltersQuery,
   useGetPublicEventsQuery,
@@ -26,8 +27,8 @@ import {
 } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
 import images from "@/Images";
-import EventsNavbar from "@/components/EventLandingPage/EventsNavbar";
 import Footer from "@/components/LandingPage/Footer";
+import { useAppDispatch } from "@/lib/hooks";
 
 const PAGE_SIZE = 8;
 const LANG_OPTIONS = ["English", "Amharic"] as const;
@@ -37,6 +38,7 @@ const PRICE_BANDS = [
   { id: "501-2000", label: "501 - 2000" },
   { id: "2000+", label: "Above 2000" },
 ] as const;
+const PRICE_SLIDER_MAX = 2500;
 const MORE_FILTERS = [
   { id: "outdoor", label: "Outdoor Events" },
   { id: "fast", label: "Fast Filling" },
@@ -53,16 +55,16 @@ function categoryStyle(name: string): {
   color: string;
 } {
   const n = name.toLowerCase();
-  if (n.includes("comedy")) return { Icon: FaSmile, color: "text-[#1B5E3B]" };
-  if (n.includes("music") || n.includes("concert")) return { Icon: FaMusic, color: "text-[#1B5E3B]" };
+  if (n.includes("comedy")) return { Icon: FaSmile, color: "text-[#6900AA]" };
+  if (n.includes("music") || n.includes("concert")) return { Icon: FaMusic, color: "text-[#6900AA]" };
   if (n.includes("conference")) return { Icon: FaBuilding, color: "text-[#c47a3a]" };
-  if (n.includes("festival")) return { Icon: FaLeaf, color: "text-[#1B5E3B]" };
-  if (n.includes("sport")) return { Icon: FaFutbol, color: "text-[#1B5E3B]" };
+  if (n.includes("festival")) return { Icon: FaLeaf, color: "text-[#6900AA]" };
+  if (n.includes("sport")) return { Icon: FaFutbol, color: "text-[#6900AA]" };
   if (n.includes("exhibit")) return { Icon: FaImage, color: "text-slate-800" };
   if (n.includes("talk") || n.includes("theatre") || n.includes("theater")) {
     return { Icon: FaBullhorn, color: "text-[#c47a3a]" };
   }
-  return { Icon: FaCalendarAlt, color: "text-[#1B5E3B]" };
+  return { Icon: FaCalendarAlt, color: "text-[#6900AA]" };
 }
 
 function dateBadge(value?: string) {
@@ -77,6 +79,33 @@ function dateBadge(value?: string) {
 
 function toIsoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function sliderValueFromBands(bands: string[]) {
+  const band = bands[0];
+  if (band === "free") return 0;
+  if (band === "0-500") return 500;
+  if (band === "501-2000") return 2000;
+  if (band === "2000+") return PRICE_SLIDER_MAX;
+  return PRICE_SLIDER_MAX;
+}
+
+function bandFromSliderValue(value: number) {
+  if (value <= 0) return "free";
+  if (value <= 500) return "0-500";
+  if (value <= 2000) return "501-2000";
+  return "2000+";
+}
+
+function priceLabelFromSlider(value: number) {
+  if (value <= 0) return "Free";
+  if (value >= PRICE_SLIDER_MAX) return `${formatMoney(2000, { compact: true })}+`;
+  return formatMoney(value, { compact: true });
+}
+
+function eventPriceValue(event: PublicEvent) {
+  const raw = Number(event.min_price ?? 0);
+  return Number.isFinite(raw) ? raw : 0;
 }
 
 function FilterTag({
@@ -94,8 +123,8 @@ function FilterTag({
       onClick={onClick}
       className={`px-2.5 py-1.5 text-[11px] rounded-md border cursor-pointer transition-colors ${
         active
-          ? "border-[#1B5E3B] bg-[#1B5E3B] text-white"
-          : "border-slate-200 bg-white text-[#1B5E3B]"
+          ? "border-[#6900AA] bg-[#6900AA] text-white"
+          : "border-slate-200 bg-white text-[#6900AA]"
       }`}
     >
       {label}
@@ -126,9 +155,9 @@ function FilterCard({
         >
           <FaChevronDown
             size={11}
-            className={`shrink-0 transition-transform ${open ? "rotate-180 text-[#1B5E3B]" : "text-slate-400"}`}
+            className={`shrink-0 transition-transform ${open ? "rotate-180 text-[#6900AA]" : "text-slate-400"}`}
           />
-          <span className={`text-sm font-medium ${open ? "text-[#1B5E3B]" : "text-slate-800"}`}>{title}</span>
+          <span className={`text-sm font-medium ${open ? "text-[#6900AA]" : "text-slate-800"}`}>{title}</span>
         </button>
         <button type="button" onClick={onClear} className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer">
           Clear
@@ -156,15 +185,15 @@ function EventCard({ event }: { event: PublicEvent }) {
             <FaCalendarAlt size={28} />
           </div>
         )}
-        {badge && (
-          <div className="absolute bottom-2 left-2 bg-[#1B5E3B] text-white rounded-md px-2 py-1 leading-none">
-            <span className="block text-[9px] font-bold tracking-wider">{badge.month}</span>
-            <span className="block text-sm font-extrabold mt-0.5">{badge.day}</span>
-          </div>
-        )}
       </div>
       <div className="p-3">
-        <h3 className="font-bold text-slate-900 text-sm line-clamp-2 min-h-[40px]">{event.name}</h3>
+        {badge && (
+          <div className="inline-flex flex-col rounded-md bg-[#6900AA] px-2 py-1 leading-none text-white mb-3">
+            <span className="text-[9px] font-bold tracking-wider">{badge.month}</span>
+            <span className="text-sm font-extrabold mt-0.5">{badge.day}</span>
+          </div>
+        )}
+        <h3 className="font-bold text-slate-900 text-sm line-clamp-2">{event.name}</h3>
         {event.organizer_name && (
           <p className="mt-1.5 text-xs text-slate-500 line-clamp-1">{event.organizer_name}</p>
         )}
@@ -172,7 +201,7 @@ function EventCard({ event }: { event: PublicEvent }) {
           <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{event.category_name}</p>
         )}
         {event.min_price != null && (
-          <p className="mt-2 text-sm font-semibold text-[#1B5E3B]">
+          <p className="mt-2 text-sm font-semibold text-[#6900AA]">
             {formatMoney(event.min_price, { compact: true })} onwards
           </p>
         )}
@@ -182,7 +211,7 @@ function EventCard({ event }: { event: PublicEvent }) {
 }
 
 export default function PublicEventsPage() {
-  const [searchInput, setSearchInput] = useState("");
+  const dispatch = useAppDispatch();
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -194,7 +223,6 @@ export default function PublicEventsPage() {
   const [calMonth, setCalMonth] = useState(() => new Date());
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [moreFilters, setMoreFilters] = useState<string[]>([]);
-  const [priceBands, setPriceBands] = useState<string[]>([]);
   const [openFilters, setOpenFilters] = useState({
     categories: true,
     date: false,
@@ -207,8 +235,9 @@ export default function PublicEventsPage() {
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [venueFilter, setVenueFilter] = useState("");
   const [browseVenues, setBrowseVenues] = useState(false);
-  const [heroCityOpen, setHeroCityOpen] = useState(false);
-  const heroCityRef = useRef<HTMLDivElement>(null);
+  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
+  const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
+  const [priceSliderValue, setPriceSliderValue] = useState(PRICE_SLIDER_MAX);
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
@@ -221,7 +250,6 @@ export default function PublicEventsPage() {
       ...(datePreset ? { date_preset: datePreset } : {}),
       ...(!datePreset && dateFrom ? { date_from: dateFrom } : {}),
       ...(!datePreset && dateTo ? { date_to: dateTo } : {}),
-      ...(priceBands.length ? { price: priceBands.join(",") } : {}),
       ...(moreFilters.length ? { more: moreFilters.join(",") } : {}),
       ...(venueFilter ? { organizer: venueFilter } : {}),
       ...(sort && sort !== "recommended" ? { sort } : {}),
@@ -234,7 +262,6 @@ export default function PublicEventsPage() {
       datePreset,
       dateFrom,
       dateTo,
-      priceBands,
       moreFilters,
       venueFilter,
       sort,
@@ -243,29 +270,71 @@ export default function PublicEventsPage() {
   const { data: events = [], isLoading } = useGetPublicEventsQuery(queryArg);
 
   useEffect(() => {
-    const stored = localStorage.getItem("selected_city");
-    if (stored && stored !== "All Cities") setCity(stored);
+    const applyCity = () => {
+      const stored = localStorage.getItem("selected_city");
+      const params = new URLSearchParams(window.location.search);
+      const cityParam = params.get("city");
+      if (cityParam && cityParam !== "All Cities") setCity(cityParam);
+      else if (stored && stored !== "All Cities") setCity(stored);
+      else setCity("");
+    };
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q");
     const cat = params.get("category");
-    const cityParam = params.get("city");
-    if (q) {
-      setSearchInput(q);
-      setSearch(q);
-    }
+    if (q) setSearch(q);
     if (cat) setSelectedSlugs([cat]);
-    if (cityParam && cityParam !== "All Cities") setCity(cityParam);
+    applyCity();
+    window.addEventListener("selected_city_changed", applyCity);
+    return () => window.removeEventListener("selected_city_changed", applyCity);
   }, []);
 
   useEffect(() => {
-    const onPointerDown = (e: MouseEvent) => {
-      if (heroCityRef.current && !heroCityRef.current.contains(e.target as Node)) {
-        setHeroCityOpen(false);
+    let cancelled = false;
+
+    const loadOfferEvents = async () => {
+      const candidates = events
+        .filter((e) => e.poster_horizontal_url || e.poster_vertical_url)
+        .slice(0, 8);
+
+      if (candidates.length === 0) {
+        setOfferHeroEvents([]);
+        setHeroSlideIndex(0);
+        return;
       }
+
+      const checks = await Promise.all(
+        candidates.map(async (event) => {
+          const req = dispatch(api.endpoints.getPublicEventOffers.initiate(event.id));
+          try {
+            const offers = await req.unwrap();
+            return Array.isArray(offers) && offers.length > 0 ? event : null;
+          } catch {
+            return null;
+          } finally {
+            req.unsubscribe();
+          }
+        })
+      );
+
+      if (cancelled) return;
+      const matched = checks.filter((e): e is PublicEvent => Boolean(e));
+      setOfferHeroEvents(matched);
+      setHeroSlideIndex(0);
     };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, []);
+
+    loadOfferEvents();
+    return () => {
+      cancelled = true;
+    };
+  }, [events, dispatch]);
+
+  useEffect(() => {
+    if (offerHeroEvents.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setHeroSlideIndex((prev) => (prev + 1) % offerHeroEvents.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [offerHeroEvents]);
 
   const categories = useMemo(
     () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
@@ -274,20 +343,9 @@ export default function PublicEventsPage() {
 
   const venues = useMemo(() => filterOptions?.organizers || [], [filterOptions?.organizers]);
 
-  const cityOptions = useMemo(() => {
-    const opts = ["All Cities", ...(filterOptions?.cities || [])];
-    if (city && !opts.includes(city)) opts.push(city);
-    return Array.from(new Set(opts));
-  }, [city, filterOptions?.cities]);
-
   const languageOptions = useMemo(() => {
-    const fromApi = filterOptions?.languages || [];
-    const merged = [...fromApi];
-    LANG_OPTIONS.forEach((l) => {
-      if (!merged.some((x) => x.toLowerCase() === l.toLowerCase())) merged.push(l);
-    });
-    return merged;
-  }, [filterOptions?.languages]);
+    return [...LANG_OPTIONS];
+  }, []);
 
   const datePresets = filterOptions?.date_presets?.length
     ? filterOptions.date_presets
@@ -296,25 +354,19 @@ export default function PublicEventsPage() {
         { id: "tomorrow", label: "Tomorrow" },
         { id: "weekend", label: "This Weekend" },
       ];
-  const priceOptions = filterOptions?.price_bands?.length ? filterOptions.price_bands : [...PRICE_BANDS];
   const moreOptions = filterOptions?.more?.length ? filterOptions.more : [...MORE_FILTERS];
 
-  const filtered = events;
+  const filtered = useMemo(() => {
+    if (priceSliderValue >= PRICE_SLIDER_MAX) return events;
+    return events.filter((event) => eventPriceValue(event) <= priceSliderValue);
+  }, [events, priceSliderValue]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   useEffect(() => {
     setPage(1);
-  }, [search, city, selectedSlugs, selectedLanguages, datePreset, dateFrom, dateTo, priceBands, moreFilters, venueFilter, sort]);
-
-  const handleCityChange = (next: string) => {
-    const value = next === "All Cities" ? "" : next;
-    setCity(value);
-    if (value) localStorage.setItem("selected_city", value);
-    else localStorage.removeItem("selected_city");
-    window.dispatchEvent(new Event("selected_city_changed"));
-  };
+  }, [search, city, selectedSlugs, selectedLanguages, datePreset, dateFrom, dateTo, priceSliderValue, moreFilters, venueFilter, sort]);
 
   const selectSlug = (slug?: string) => {
     if (!slug) return;
@@ -359,98 +411,37 @@ export default function PublicEventsPage() {
   const popular = showAllCategories ? categories : categories.slice(0, 7);
   const headingCity = city || "Ethiopia";
 
-  const submitSearch = () => setSearch(searchInput.trim());
   const heroSrc = typeof images.heroEvent === "string" ? images.heroEvent : images.heroEvent.src;
+  const hasOfferHero = offerHeroEvents.length > 0;
+  const activeHeroEvent = hasOfferHero ? offerHeroEvents[heroSlideIndex] : null;
+  const activeHeroSrc =
+    activeHeroEvent?.poster_horizontal_url ||
+    activeHeroEvent?.poster_vertical_url ||
+    heroSrc;
 
   return (
     <div className="min-h-screen bg-[#f6f7f8]">
-      <EventsNavbar city={city || "All Cities"} cityOptions={cityOptions} onCityChange={handleCityChange} />
-
       <section className="relative min-h-[380px] sm:min-h-[440px] overflow-hidden">
         <img
-          src={heroSrc}
+          src={activeHeroSrc}
           alt="Discover amazing events in Ethiopia"
-          className="absolute inset-0 w-full h-full object-cover object-center"
+          className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-black/20" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
-          <div className="max-w-xl text-left">
-            <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-extrabold text-white tracking-tight leading-[1.15]">
-              Discover Amazing Events
-              <br />
-              in Ethiopia
-            </h1>
-            <p className="mt-3 text-white/90 text-base sm:text-lg">
-              Find concerts, festivals, conferences, exhibitions and more.
-            </p>
-            <form
-              className="mt-8 flex items-center bg-white rounded-lg overflow-hidden shadow-lg"
-              onSubmit={(e) => {
-                e.preventDefault();
-                submitSearch();
-              }}
-            >
-              <input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search events, artists, venues..."
-                className="flex-1 min-w-0 px-4 py-3.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="w-12 h-12 sm:w-[52px] sm:h-[52px] bg-[#1B5E3B] text-white flex items-center justify-center cursor-pointer hover:bg-[#164e31] shrink-0"
-                aria-label="Search"
-              >
-                <FaSearch size={16} />
-              </button>
-            </form>
-            <div className="relative mt-3 inline-block" ref={heroCityRef}>
-              <button
-                type="button"
-                onClick={() => setHeroCityOpen((v) => !v)}
-                className="inline-flex items-center gap-2 bg-white text-slate-800 text-sm font-semibold px-3.5 py-2.5 rounded-lg shadow cursor-pointer"
-              >
-                <FaMapMarkerAlt size={13} className="text-[#E67E22]" />
-                {city || "All Cities"}
-                <FaChevronDown size={10} className="text-slate-500" />
-              </button>
-              {heroCityOpen && (
-                <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-20 max-h-56 overflow-y-auto">
-                  {cityOptions.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => {
-                        handleCityChange(c);
-                        setHeroCityOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 text-sm cursor-pointer hover:bg-emerald-50 ${
-                        c === (city || "All Cities") ? "text-[#1B5E3B] font-semibold" : "text-slate-700"
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </section>
 
       <section id="categories" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">Popular Categories</h2>
-          <button
+          {/* <button
             type="button"
             onClick={() => {
               setShowAllCategories(true);
               document.getElementById("city-filter")?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="text-sm text-[#1B5E3B] hover:underline cursor-pointer"
+            className="text-sm text-[#6900AA] hover:underline cursor-pointer"
           >
             View All Categories
-          </button>
+          </button> */}
         </div>
         {categories.length === 0 ? (
           <p className="text-sm text-slate-400">Categories load from the event catalog.</p>
@@ -468,14 +459,14 @@ export default function PublicEventsPage() {
                 >
                   <span
                     className={`w-[68px] h-[68px] rounded-full flex items-center justify-center transition-colors ${
-                      active ? "bg-[#1B5E3B] text-white" : `bg-[#eef0f2] ${color}`
+                      active ? "bg-[#6900AA] text-white" : `bg-[#eef0f2] ${color}`
                     }`}
                   >
                     <Icon size={22} />
                   </span>
                   <span
                     className={`text-[13px] text-center leading-tight ${
-                      active ? "font-semibold text-[#1B5E3B]" : "text-slate-800"
+                      active ? "font-semibold text-[#6900AA]" : "text-slate-800"
                     }`}
                   >
                     {cat.name}
@@ -549,8 +540,8 @@ export default function PublicEventsPage() {
                       }}
                       className={`px-3 py-1.5 text-[11px] rounded-md border cursor-pointer ${
                         datePreset === d.id
-                          ? "border-[#1B5E3B] bg-[#1B5E3B] text-white"
-                          : "border-slate-200 bg-white text-[#1B5E3B]"
+                          ? "border-[#6900AA] bg-[#6900AA] text-white"
+                          : "border-slate-200 bg-white text-[#6900AA]"
                       }`}
                     >
                       {d.label}
@@ -565,7 +556,7 @@ export default function PublicEventsPage() {
                       setUseDateRange(e.target.checked);
                       if (e.target.checked) setDatePreset("");
                     }}
-                    className="accent-[#1B5E3B]"
+                    className="accent-[#6900AA]"
                   />
                   Date Range
                 </label>
@@ -577,7 +568,7 @@ export default function PublicEventsPage() {
                         onClick={() => setCalTab("start")}
                         className={`pb-1 cursor-pointer ${
                           calTab === "start"
-                            ? "text-[#1B5E3B] border-b-2 border-[#1B5E3B] font-semibold"
+                            ? "text-[#6900AA] border-b-2 border-[#6900AA] font-semibold"
                             : "text-slate-400"
                         }`}
                       >
@@ -588,7 +579,7 @@ export default function PublicEventsPage() {
                         onClick={() => setCalTab("end")}
                         className={`pb-1 cursor-pointer ${
                           calTab === "end"
-                            ? "text-[#1B5E3B] border-b-2 border-[#1B5E3B] font-semibold"
+                            ? "text-[#6900AA] border-b-2 border-[#6900AA] font-semibold"
                             : "text-slate-400"
                         }`}
                       >
@@ -634,7 +625,7 @@ export default function PublicEventsPage() {
                             type="button"
                             onClick={() => pickCalendarDay(day)}
                             className={`h-7 text-xs rounded cursor-pointer ${
-                              selected ? "text-[#1B5E3B] font-bold" : "text-slate-700 hover:bg-slate-100"
+                              selected ? "text-[#6900AA] font-bold" : "text-slate-700 hover:bg-slate-100"
                             }`}
                           >
                             {day}
@@ -646,7 +637,7 @@ export default function PublicEventsPage() {
                       <button
                         type="button"
                         onClick={() => setUseDateRange(false)}
-                        className="flex-1 text-xs py-1.5 border border-slate-200 rounded text-[#1B5E3B] cursor-pointer"
+                        className="flex-1 text-xs py-1.5 border border-slate-200 rounded text-[#6900AA] cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -656,14 +647,14 @@ export default function PublicEventsPage() {
                           setDateFrom("");
                           setDateTo("");
                         }}
-                        className="flex-1 text-xs py-1.5 border border-slate-200 rounded text-[#1B5E3B] cursor-pointer"
+                        className="flex-1 text-xs py-1.5 border border-slate-200 rounded text-[#6900AA] cursor-pointer"
                       >
                         Clear
                       </button>
                       <button
                         type="button"
                         onClick={() => setUseDateRange(true)}
-                        className="flex-1 text-xs py-1.5 rounded bg-[#1B5E3B] text-white cursor-pointer"
+                        className="flex-1 text-xs py-1.5 rounded bg-[#6900AA] text-white cursor-pointer"
                       >
                         Apply
                       </button>
@@ -712,17 +703,26 @@ export default function PublicEventsPage() {
                 title="Price"
                 open={openFilters.price}
                 onToggle={() => toggleOpen("price")}
-                onClear={() => setPriceBands([])}
+                onClear={() => {
+                  setPriceSliderValue(PRICE_SLIDER_MAX);
+                }}
               >
-                <div className="flex flex-wrap gap-2">
-                  {priceOptions.map((band) => (
-                    <FilterTag
-                      key={band.id}
-                      label={band.label}
-                      active={priceBands.includes(band.id)}
-                      onClick={() => toggleIn(priceBands, band.id, setPriceBands)}
-                    />
-                  ))}
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-400">Price</span>
+                    <span className="text-sm font-semibold text-slate-700">{priceLabelFromSlider(priceSliderValue)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={PRICE_SLIDER_MAX}
+                    step={50}
+                    value={priceSliderValue}
+                    onChange={(e) => {
+                      setPriceSliderValue(Number(e.target.value));
+                    }}
+                    className="mt-4 h-2 w-full cursor-pointer accent-[#7A00C6]"
+                  />
                 </div>
               </FilterCard>
             </div>
@@ -730,7 +730,7 @@ export default function PublicEventsPage() {
             <button
               type="button"
               onClick={() => setBrowseVenues((v) => !v)}
-              className="mt-3 w-full border border-[#1B5E3B] rounded-lg py-2.5 text-sm font-semibold text-[#1B5E3B] bg-white cursor-pointer"
+              className="mt-3 w-full border border-[#6900AA] rounded-lg py-2.5 text-sm font-semibold text-[#6900AA] bg-white cursor-pointer"
             >
               Browse by Venues
             </button>
@@ -742,7 +742,7 @@ export default function PublicEventsPage() {
                       type="button"
                       onClick={() => setVenueFilter((cur) => (cur === v ? "" : v))}
                       className={`text-left text-sm w-full cursor-pointer ${
-                        venueFilter === v ? "text-[#1B5E3B] font-semibold" : "text-slate-600"
+                        venueFilter === v ? "text-[#6900AA] font-semibold" : "text-slate-600"
                       }`}
                     >
                       {v}
@@ -758,7 +758,7 @@ export default function PublicEventsPage() {
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
                 Events in {headingCity}
               </h2>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              {/* <label className="flex items-center gap-2 text-sm text-slate-600">
                 Sort by:
                 <select
                   value={sort}
@@ -770,7 +770,7 @@ export default function PublicEventsPage() {
                   <option value="price-asc">Price: Low to High</option>
                   <option value="price-desc">Price: High to Low</option>
                 </select>
-              </label>
+              </label> */}
             </div>
 
             {isLoading ? (
@@ -797,7 +797,7 @@ export default function PublicEventsPage() {
                     type="button"
                     onClick={() => setPage(n)}
                     className={`w-9 h-9 rounded-full text-sm font-semibold cursor-pointer ${
-                      n === pageSafe ? "bg-[#1B5E3B] text-white" : "bg-white border border-slate-200 text-slate-700"
+                      n === pageSafe ? "bg-[#6900AA] text-white" : "bg-white border border-slate-200 text-slate-700"
                     }`}
                   >
                     {n}

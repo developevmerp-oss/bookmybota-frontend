@@ -215,11 +215,12 @@ export default function CustomerDashboard() {
 
   if (diningLoading || eventsLoading || !user) {
     return (
-      <div className="min-h-screen bg-[#f4f5f7] pt-24 text-center text-slate-500">Loading Dashboard...</div>
+      <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
+        Loading Dashboard...
+      </div>
     );
   }
 
-  const welcomeName = user.name || user.email?.split("@")[0] || "there";
   const kindTabs: { key: KindTab; label: string; count: number }[] = [
     { key: "all", label: "All", count: kindCounts.all },
     { key: "dining", label: "Dining", count: kindCounts.dining },
@@ -231,6 +232,7 @@ export default function CustomerDashboard() {
     { key: "past", label: "Past" },
     { key: "cancelled", label: "Cancelled" },
   ];
+  const welcomeName = user.name || user.email?.split("@")[0] || "there";
 
   return (
     <div className="min-h-screen bg-[#F7F6FB] pt-10 pb-16">

@@ -41,7 +41,7 @@ import {
   MdOutlineTheaters,
   MdOutlineWineBar,
 } from "react-icons/md";
-import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business, Collection, Mood } from "@/services/api";
+import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, useGetDiningCuisinesQuery, Business, Collection, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
@@ -811,6 +811,7 @@ export default function Home() {
   const { data: businesses = [], isLoading: businessesLoading } = useGetBusinessesQuery();
   const { data: collections = [] } = useGetCollectionsQuery();
   const { data: moods = [] } = useGetMoodsQuery();
+  const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
 
   const getEmojiForBusinessType = (name: string) => {
     const lower = name.toLowerCase();
@@ -955,6 +956,22 @@ export default function Home() {
       });
     };
 
+    cuisineMasters.forEach((master, idx) => {
+      const key = master.name.toLowerCase();
+      if (used.has(key)) return;
+      used.add(key);
+      const known = EXPLORE_CUISINES.find((c) => c.name.toLowerCase() === key);
+      const theme = known || CUISINE_THEME_FALLBACKS[idx % CUISINE_THEME_FALLBACKS.length];
+      cards.push({
+        name: master.name,
+        tags: known?.tags || "Fresh • Tasty • Popular",
+        image: master.image_url || coverForCuisine(master.name) || known?.image || CUISINE_IMAGE_FALLBACK,
+        accent: theme.accent,
+        blob: theme.blob,
+        icon: known?.icon || theme.icon,
+      });
+    });
+
     cuisineOptions.forEach((opt, idx) => {
       const known = EXPLORE_CUISINES.find(
         (c) =>
@@ -978,9 +995,11 @@ export default function Home() {
       });
     });
 
-    EXPLORE_CUISINES.forEach((known) => pushKnown(known));
+    if (cuisineMasters.length === 0) {
+      EXPLORE_CUISINES.forEach((known) => pushKnown(known));
+    }
     return cards;
-  }, [businesses, cuisineOptions]);
+  }, [businesses, cuisineOptions, cuisineMasters]);
 
   const filteredRestaurants = useMemo(() => {
     const base = businesses.filter((r) => {

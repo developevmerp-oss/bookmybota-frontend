@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import type { DiningFilterState, SortOption } from "@/lib/diningFilters";
 import { extractCuisines } from "@/lib/diningFilters";
-import { useGetBusinessesQuery } from "@/services/api";
+import { useGetBusinessesQuery, useGetDiningCuisinesQuery } from "@/services/api";
 
 interface DiningFiltersBarProps {
   cuisines: string[];
@@ -102,10 +102,21 @@ export default function DiningFiltersBar({
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const [sortPos, setSortPos] = useState({ top: 0, left: 0 });
   const { data: businesses = [] } = useGetBusinessesQuery({ module: "dining" });
+  const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
   const cuisineList = useMemo(() => {
-    const fromApi = extractCuisines(businesses);
-    return fromApi.length > 0 ? fromApi : cuisines;
-  }, [businesses, cuisines]);
+    const fromBiz = extractCuisines(businesses);
+    const fromMaster = cuisineMasters.map((c) => c.name);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    [...fromMaster, ...fromBiz, ...cuisines].forEach((name) => {
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(name);
+    });
+    return out;
+  }, [businesses, cuisineMasters, cuisines]);
 
   useEffect(() => {
     if (showFilter) {

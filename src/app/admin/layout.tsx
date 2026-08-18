@@ -17,6 +17,7 @@ import {
   Percent,
   UtensilsCrossed,
   ListChecks,
+  ChefHat,
   FileSignature,
   KeyRound,
   Wallet,
@@ -33,6 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navigation = [
     { name: 'Global Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Dining Businesses', href: '/admin/businesses/dining', icon: UtensilsCrossed },
+    { name: 'Dining Masters', href: '/admin/dining-masters', icon: ChefHat },
     { name: 'Event Organizers', href: '/admin/businesses/event', icon: Store },
     { name: 'Events', href: '/admin/events', icon: CalendarDays },
     { name: 'Event Contracts', href: '/admin/event-contracts', icon: FileSignature },

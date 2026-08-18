@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle, Eye, EyeOff, XCircle, Radio, FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,6 +9,9 @@ import {
   useUpdateAdminEventMutation,
   type AdminEvent,
 } from '@/services/api';
+import SearchInput from '@/components/Shared/SearchInput';
+import Pagination from '@/components/Shared/Pagination';
+import { PAGE_SIZE } from '@/lib/pagination';
 
 const STATUS_FILTERS = [
   { label: 'All', value: '' },
@@ -34,15 +37,19 @@ export default function AdminEventsPage() {
   const [statusFilter, setStatusFilter] = useState('PENDING_APPROVAL');
   const [selected, setSelected] = useState<AdminEvent | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
 
-  const queryArg = statusFilter ? { status: statusFilter } : undefined;
-  const { data: events = [], isLoading } = useGetAdminEventsQuery(queryArg);
+  const { data, isLoading } = useGetAdminEventsQuery({
+    page,
+    limit: PAGE_SIZE,
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(q.trim() ? { q: q.trim() } : {}),
+  });
+  const events = data?.items ?? [];
   const [updateEvent, { isLoading: isUpdating }] = useUpdateAdminEventMutation();
 
-  const pendingCount = useMemo(
-    () => events.filter((e) => e.status === 'PENDING_APPROVAL').length,
-    [events]
-  );
+  const pendingCount = data?.meta?.total ?? 0;
 
   const openDetail = (event: AdminEvent) => {
     setSelected(event);
@@ -108,11 +115,23 @@ export default function AdminEventsPage() {
               : ''}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-3">
+          <SearchInput
+            value={q}
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search event or organizer"
+          />
+          <div className="flex flex-wrap gap-2">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.value || 'all'}
-              onClick={() => setStatusFilter(f.value)}
+              onClick={() => {
+                setStatusFilter(f.value);
+                setPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 statusFilter === f.value
                   ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
@@ -122,6 +141,7 @@ export default function AdminEventsPage() {
               {f.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
@@ -209,6 +229,7 @@ export default function AdminEventsPage() {
             )}
           </tbody>
         </table>
+        {data?.meta && <Pagination meta={data.meta} onPageChange={setPage} />}
       </div>
 
       {selected && (

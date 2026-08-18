@@ -17,7 +17,8 @@ function BusinessDashboard() {
   const bizId = user?.business_id ?? '';
 
   const { data: settings, isLoading: settingsLoading } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
-  const { data: allBookings = [], isLoading: bookingsLoading } = useGetBusinessBookingsQuery(bizId, { skip: !bizId });
+  const { data: bookingsData, isLoading: bookingsLoading } = useGetBusinessBookingsQuery(bizId, { skip: !bizId });
+  const allBookings = bookingsData?.items ?? [];
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
 
   const [graceTime, setGraceTime] = useState<number | ''>(120);

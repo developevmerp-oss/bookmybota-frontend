@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useGetOrganizerEventsQuery } from "@/services/api";
 import { contractStatusLabel, organizerWorkflowLabel } from "@/lib/contractPlaceholders";
+import SearchInput from "@/components/Shared/SearchInput";
+import Pagination from "@/components/Shared/Pagination";
+import { PAGE_SIZE } from "@/lib/pagination";
 const STATUS_FILTERS = [
   { label: "All", value: "" },
   { label: "Draft", value: "DRAFT" },
@@ -28,14 +31,18 @@ function statusBadge(status: string) {
 export default function OrganizerEventsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
   const queryArg = useMemo(
     () => ({
+      page,
+      limit: PAGE_SIZE,
       ...(search.trim() ? { q: search.trim() } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
     }),
-    [search, statusFilter]
+    [search, statusFilter, page]
   );
-  const { data: events = [], isLoading } = useGetOrganizerEventsQuery(queryArg);
+  const { data, isLoading } = useGetOrganizerEventsQuery(queryArg);
+  const events = data?.items ?? [];
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -52,20 +59,23 @@ export default function OrganizerEventsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by event name..."
-            className="input-field pl-9 w-full"
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          placeholder="Search by event name..."
+          className="flex-1"
+        />
         <div className="flex flex-wrap gap-2">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.value || "all"}
-              onClick={() => setStatusFilter(f.value)}
+              onClick={() => {
+                setStatusFilter(f.value);
+                setPage(1);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 statusFilter === f.value
                   ? "bg-violet-500/10 text-violet-400 border-violet-500/30"
@@ -155,6 +165,7 @@ export default function OrganizerEventsPage() {
             </tbody>
           </table>
         )}
+        {data?.meta && <Pagination meta={data.meta} onPageChange={setPage} />}
       </div>
     </div>
   );

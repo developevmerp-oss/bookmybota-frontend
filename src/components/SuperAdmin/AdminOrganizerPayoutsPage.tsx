@@ -12,6 +12,9 @@ import {
 import { formatDate } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
+import SearchInput from "@/components/Shared/SearchInput";
+import Pagination from "@/components/Shared/Pagination";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 const money = formatMoney;
 
@@ -28,12 +31,19 @@ export default function AdminOrganizerPayoutsPage() {
   const [organizerFilter, setOrganizerFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
 
   const { data: organizers = [] } = useGetBusinessesQuery({ module: "event" });
-  const { data: events = [] } = useGetAdminEventsQuery();
-  const { data: payouts = [], isLoading } = useGetOrganizerPayoutsQuery(
-    organizerFilter ? { business_id: organizerFilter } : undefined
-  );
+  const { data: eventsData } = useGetAdminEventsQuery();
+  const events = eventsData?.items ?? [];
+  const { data: payoutsData, isLoading } = useGetOrganizerPayoutsQuery({
+    page,
+    limit: PAGE_SIZE,
+    ...(organizerFilter ? { business_id: organizerFilter } : {}),
+    ...(q.trim() ? { q: q.trim() } : {}),
+  });
+  const payouts = payoutsData?.items ?? [];
   const [createPayout, { isLoading: saving }] = useCreateOrganizerPayoutMutation();
 
   const organizerEvents = useMemo(() => {
@@ -229,20 +239,33 @@ export default function AdminOrganizerPayoutsPage() {
         </form>
       )}
 
-      <div className="glass-panel rounded-2xl border border-white/5 p-4">
-        <label className="block text-xs text-zinc-500 mb-1">Filter by organizer</label>
-        <select
-          value={organizerFilter}
-          onChange={(e) => setOrganizerFilter(e.target.value)}
-          className="bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm max-w-md"
-        >
-          <option value="">All organizers</option>
-          {organizers.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
+      <div className="glass-panel rounded-2xl border border-white/5 p-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+        <div className="flex-1">
+          <label className="block text-xs text-zinc-500 mb-1">Filter by organizer</label>
+          <select
+            value={organizerFilter}
+            onChange={(e) => {
+              setOrganizerFilter(e.target.value);
+              setPage(1);
+            }}
+            className="bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm w-full max-w-md"
+          >
+            <option value="">All organizers</option>
+            {organizers.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <SearchInput
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search organizer or event"
+        />
       </div>
 
       <div className="glass-panel rounded-2xl border border-white/5 overflow-x-auto">
@@ -302,6 +325,7 @@ export default function AdminOrganizerPayoutsPage() {
             </tbody>
           </table>
         )}
+        {payoutsData?.meta && <Pagination meta={payoutsData.meta} onPageChange={setPage} />}
       </div>
     </div>
   );

@@ -12,7 +12,8 @@ export default function AnalyticsPage() {
 
   const bizId = user?.business_id ?? '';
   const { data: stats, isLoading } = useGetAnalyticsQuery(bizId, { skip: !bizId });
-  const { data: allBookings = [] } = useGetBusinessBookingsQuery(bizId, { skip: !bizId });
+  const { data: bookingsData } = useGetBusinessBookingsQuery(bizId, { skip: !bizId });
+  const allBookings = bookingsData?.items ?? [];
 
   if (isLoading || !user) return <div className="text-white p-10 text-center">Loading Analytics...</div>;
 

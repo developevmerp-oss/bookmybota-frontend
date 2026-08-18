@@ -7,6 +7,9 @@ import { loadFromStorage } from '@/features/auth/authSlice';
 import { Star, StarHalf, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/dateFormat';
+import SearchInput from '@/components/Shared/SearchInput';
+import Pagination from '@/components/Shared/Pagination';
+import { PAGE_SIZE } from '@/lib/pagination';
 
 export default function BusinessReviewsPage() {
   const dispatch = useAppDispatch();
@@ -17,9 +20,17 @@ export default function BusinessReviewsPage() {
   }, [dispatch]);
 
   const bizId = user?.business_id || "";
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
 
   const { data: profile } = useGetBusinessPublicQuery(bizId, { skip: !bizId });
-  const { data: reviews = [], isLoading } = useGetReviewsQuery(bizId, { skip: !bizId });
+  const { data: statsData } = useGetReviewsQuery(bizId, { skip: !bizId });
+  const { data: reviewsData, isLoading } = useGetReviewsQuery(
+    { bizId, page, limit: PAGE_SIZE, ...(q.trim() ? { q: q.trim() } : {}) },
+    { skip: !bizId }
+  );
+  const reviews = reviewsData?.items ?? [];
+  const statsReviews = statsData?.items ?? [];
   const [createReply] = useCreateReviewReplyMutation();
 
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
@@ -55,13 +66,13 @@ export default function BusinessReviewsPage() {
     );
   }
 
-  const totalReviews = reviews.length;
+  const totalReviews = statsReviews.length;
   const averageRating = totalReviews > 0 
-    ? (reviews.reduce((acc: number, r: any) => acc + Number(r.rating), 0) / totalReviews).toFixed(1)
+    ? (statsReviews.reduce((acc: number, r: any) => acc + Number(r.rating), 0) / totalReviews).toFixed(1)
     : "0.0";
   
   const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-  reviews.forEach((r: any) => {
+  statsReviews.forEach((r: any) => {
     const rounded = Math.round(Number(r.rating));
     if (rounded >= 1 && rounded <= 5) {
       ratingCounts[rounded as keyof typeof ratingCounts]++;
@@ -77,6 +88,16 @@ export default function BusinessReviewsPage() {
         <p className="text-zinc-400">
           Manage your reputation. Reply to customer reviews publicly as the venue owner.
         </p>
+        <div className="mt-4">
+          <SearchInput
+            value={q}
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search reviewer or review text"
+          />
+        </div>
       </div>
 
       {reviews.length === 0 ? (
@@ -260,6 +281,7 @@ export default function BusinessReviewsPage() {
           </div>
         </div>
       )}
+      {reviewsData?.meta && <Pagination meta={reviewsData.meta} onPageChange={setPage} />}
     </div>
   );
 }

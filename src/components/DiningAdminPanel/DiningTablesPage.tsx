@@ -5,6 +5,10 @@ import { toast } from 'sonner';
 import { useGetTablesQuery, useAddTableMutation, useUpdateTableMutation, useDeleteTableMutation } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
+import ConfirmDialog from '@/components/Shared/ConfirmDialog';
+import SearchInput from '@/components/Shared/SearchInput';
+import Pagination from '@/components/Shared/Pagination';
+import { PAGE_SIZE } from '@/lib/pagination';
 
 export default function TableManager() {
   const dispatch = useAppDispatch();
@@ -12,12 +16,20 @@ export default function TableManager() {
   useEffect(() => { dispatch(loadFromStorage()); }, [dispatch]);
 
   const bizId = user?.business_id ?? '';
-  const { data: tables = [], isLoading } = useGetTablesQuery(bizId, { skip: !bizId });
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const { data: tablesData, isLoading } = useGetTablesQuery(
+    { bizId, page, limit: PAGE_SIZE, ...(q.trim() ? { q: q.trim() } : {}) },
+    { skip: !bizId }
+  );
+  const tables = tablesData?.items ?? [];
   const [addTable] = useAddTableMutation();
   const [updateTable] = useUpdateTableMutation();
   const [deleteTable] = useDeleteTableMutation();
 
   const [showModal, setShowModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const [tableNumber, setTableNumber] = useState('');
   const [capacity, setCapacity] = useState('4');
 
@@ -38,19 +50,29 @@ export default function TableManager() {
     try { await updateTable({ bizId, tableId, is_active: !currentStatus }).unwrap(); } catch (err) { console.error(err); }
   };
 
-  const handleDeleteTable = async (tableId: string) => {
-    if (!bizId || !confirm('Are you sure you want to delete this table?')) return;
-    try { await deleteTable({ bizId, tableId }).unwrap(); } catch (err) { console.error(err); }
+  const handleDeleteTable = (tableId: string) => {
+    if (!bizId) return;
+    setPendingDeleteId(tableId);
   };
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold text-white">Interactive Table Management</h2>
           <p className="text-zinc-400">Add physical tables and toggle them active/inactive.</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary">Add Table</button>
+        <div className="flex gap-3 items-center">
+          <SearchInput
+            value={q}
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search table number"
+          />
+          <button onClick={() => setShowModal(true)} className="btn-primary">Add Table</button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -73,6 +95,7 @@ export default function TableManager() {
           {tables.length === 0 && <div className="col-span-4 text-center py-10 text-zinc-500">No tables configured. Add one!</div>}
         </div>
       )}
+      {tablesData?.meta && <Pagination meta={tablesData.meta} onPageChange={setPage} />}
 
       {showModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -89,6 +112,27 @@ export default function TableManager() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!pendingDeleteId}
+        title="Delete table?"
+        body="Are you sure you want to delete this table?"
+        confirmLabel="Delete"
+        danger
+        busy={confirmBusy}
+        onCancel={() => !confirmBusy && setPendingDeleteId(null)}
+        onConfirm={async () => {
+          if (!bizId || !pendingDeleteId) return;
+          setConfirmBusy(true);
+          try {
+            await deleteTable({ bizId, tableId: pendingDeleteId }).unwrap();
+            setPendingDeleteId(null);
+          } catch (err) {
+            console.error(err);
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

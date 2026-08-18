@@ -3,11 +3,14 @@
 import { useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CalendarCheck, Plus, Search } from "lucide-react";
+import { CalendarCheck, Plus } from "lucide-react";
 import OrganizerTicketPurchase from "@/components/EventAdminPanel/OrganizerTicketPurchase";
 import { useGetOrganizerBookingsQuery, useGetOrganizerEventsQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
+import SearchInput from "@/components/Shared/SearchInput";
+import Pagination from "@/components/Shared/Pagination";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 const formatPrice = (n: number | string) => formatMoney(n, { compact: true });
 
@@ -41,29 +44,23 @@ function OrganizerBookingsContent() {
   const [eventFilter, setEventFilter] = useState(initialEvent);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
 
-  const { data: events = [] } = useGetOrganizerEventsQuery();
-  const { data: bookings = [], isLoading } = useGetOrganizerBookingsQuery({
+  const { data: eventsData } = useGetOrganizerEventsQuery();
+  const events = eventsData?.items ?? [];
+  const { data: bookingsData, isLoading } = useGetOrganizerBookingsQuery({
+    page,
+    limit: PAGE_SIZE,
     event_id: eventFilter || undefined,
     status: statusFilter || undefined,
+    ...(search.trim() ? { q: search.trim() } : {}),
   });
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return bookings;
-    return bookings.filter(
-      (b) =>
-        (b.guest_name || "").toLowerCase().includes(q) ||
-        (b.guest_phone || "").includes(q) ||
-        (b.event_name || "").toLowerCase().includes(q) ||
-        (b.qr_code || "").toLowerCase().includes(q)
-    );
-  }, [bookings, search]);
+  const bookings = bookingsData?.items ?? [];
 
   const totals = useMemo(
     () =>
-      filtered.reduce(
+      bookings.reduce(
         (acc, b) => {
           if (b.status === "CONFIRMED" || b.status === "USED") {
             acc.tickets += b.ticket_qty || 0;
@@ -73,7 +70,7 @@ function OrganizerBookingsContent() {
         },
         { tickets: 0, revenue: 0 }
       ),
-    [filtered]
+    [bookings]
   );
 
   return (
@@ -115,7 +112,7 @@ function OrganizerBookingsContent() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="glass-panel rounded-xl p-4">
           <p className="text-[10px] portal-stat-label uppercase tracking-wide">Bookings shown</p>
-          <p className="text-2xl font-bold portal-heading mt-1">{filtered.length}</p>
+          <p className="text-2xl font-bold portal-heading mt-1">{bookingsData?.meta?.total ?? bookings.length}</p>
         </div>
         <div className="glass-panel rounded-xl border border-green-200 p-4">
           <p className="text-[10px] text-green-700 uppercase tracking-wide font-semibold">Tickets (confirmed)</p>
@@ -130,12 +127,14 @@ function OrganizerBookingsContent() {
       <div className="portal-toolbar glass-panel rounded-2xl p-4 sm:p-5">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="relative flex-1 min-w-0">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(value) => {
+                setSearch(value);
+                setPage(1);
+              }}
               placeholder="Search guest, phone, event, QR…"
-              className="input-field pl-9 w-full"
+              className="w-full"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:min-w-[320px]">
@@ -146,7 +145,10 @@ function OrganizerBookingsContent() {
               <select
                 id="booking-event-filter"
                 value={eventFilter}
-                onChange={(e) => setEventFilter(e.target.value)}
+                onChange={(e) => {
+                  setEventFilter(e.target.value);
+                  setPage(1);
+                }}
                 className="portal-select"
               >
                 <option value="">All events</option>
@@ -164,7 +166,10 @@ function OrganizerBookingsContent() {
               <select
                 id="booking-status-filter"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
                 className="portal-select"
               >
                 {STATUS_FILTERS.map((f) => (
@@ -181,7 +186,7 @@ function OrganizerBookingsContent() {
       <div className="glass-panel rounded-2xl overflow-hidden">
         {isLoading ? (
           <div className="p-10 text-center portal-muted">Loading bookings…</div>
-        ) : filtered.length === 0 ? (
+        ) : bookings.length === 0 ? (
           <div className="p-10 text-center portal-muted">
             No bookings yet for this filter. They will appear when customers complete checkout on your
             live events.
@@ -200,7 +205,7 @@ function OrganizerBookingsContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/60">
-                {filtered.map((b) => (
+                {bookings.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50/80">
                     <td className="px-5 py-4">
                       <p className="font-medium portal-table-strong">{b.guest_name || "Guest"}</p>
@@ -250,6 +255,7 @@ function OrganizerBookingsContent() {
             </table>
           </div>
         )}
+        {bookingsData?.meta && <Pagination meta={bookingsData.meta} onPageChange={setPage} />}
       </div>
     </div>
   );

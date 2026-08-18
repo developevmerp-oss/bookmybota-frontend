@@ -5,6 +5,9 @@ import { useGetBusinessCampaignsQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import { formatDate } from '@/lib/dateFormat';
+import SearchInput from '@/components/Shared/SearchInput';
+import Pagination from '@/components/Shared/Pagination';
+import { PAGE_SIZE } from '@/lib/pagination';
 
 export default function BusinessPromotionsPage() {
   const dispatch = useAppDispatch();
@@ -15,8 +18,14 @@ export default function BusinessPromotionsPage() {
   }, [dispatch]);
 
   const bizId = user?.business_id?.toString() || '';
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
 
-  const { data: campaigns = [], isLoading } = useGetBusinessCampaignsQuery(bizId, { skip: !bizId });
+  const { data: campaignsData, isLoading } = useGetBusinessCampaignsQuery(
+    { bizId, page, limit: PAGE_SIZE, ...(q.trim() ? { q: q.trim() } : {}) },
+    { skip: !bizId }
+  );
+  const campaigns = campaignsData?.items ?? [];
 
   if (!bizId) return null;
 
@@ -33,9 +42,19 @@ export default function BusinessPromotionsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-800">Marketing Promotions</h2>
-        <p className="text-slate-500">View your active and past marketing campaigns assigned by the platform admin.</p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Marketing Promotions</h2>
+          <p className="text-slate-500">View your active and past marketing campaigns assigned by the platform admin.</p>
+        </div>
+        <SearchInput
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search campaign or plan"
+        />
       </div>
 
       {activeCampaigns.length === 0 && pastCampaigns.length === 0 && (
@@ -119,6 +138,7 @@ export default function BusinessPromotionsPage() {
           </div>
         </div>
       )}
+      {campaignsData?.meta && <Pagination meta={campaignsData.meta} onPageChange={setPage} />}
     </div>
   );
 }

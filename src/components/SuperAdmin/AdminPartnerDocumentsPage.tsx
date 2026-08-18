@@ -10,6 +10,10 @@ import {
   useDeleteAdminPartnerDocumentMutation,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import SearchInput from "@/components/Shared/SearchInput";
+import Pagination from "@/components/Shared/Pagination";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 function ActiveToggle({
   active,
@@ -47,20 +51,34 @@ const MODULE_LABEL: Record<string, string> = {
 
 export default function AdminPartnerDocumentsPage() {
   const [moduleFilter, setModuleFilter] = useState<"" | "dining" | "event" | "both">("");
-  const queryArg = moduleFilter ? { module: moduleFilter } : undefined;
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const queryArg = {
+    page,
+    limit: PAGE_SIZE,
+    ...(moduleFilter ? { module: moduleFilter } : {}),
+    ...(q.trim() ? { q: q.trim() } : {}),
+  };
 
   const {
-    data: documents = [],
+    data: documentsData,
     isLoading,
     isFetching,
     isError,
     error,
     refetch,
   } = useGetAdminPartnerDocumentsQuery(queryArg);
+  const documents = documentsData?.items ?? [];
 
   const [createDocument, { isLoading: creating }] = useCreateAdminPartnerDocumentMutation();
   const [updateDocument] = useUpdateAdminPartnerDocumentMutation();
   const [deleteDocument] = useDeleteAdminPartnerDocumentMutation();
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string;
+    body: string;
+    run: () => Promise<void>;
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [newDoc, setNewDoc] = useState({
     name: "",
@@ -174,9 +192,10 @@ export default function AdminPartnerDocumentsPage() {
               <span className="text-sm text-zinc-400">Filter:</span>
               <select
                 value={moduleFilter}
-                onChange={(e) =>
-                  setModuleFilter(e.target.value as "" | "dining" | "event" | "both")
-                }
+                onChange={(e) => {
+                  setModuleFilter(e.target.value as "" | "dining" | "event" | "both");
+                  setPage(1);
+                }}
                 className="input-field text-sm py-2 w-auto min-w-[160px]"
               >
                 <option value="">All modules</option>
@@ -184,6 +203,14 @@ export default function AdminPartnerDocumentsPage() {
                 <option value="dining">Dining only</option>
                 <option value="event">Event only</option>
               </select>
+              <SearchInput
+                value={q}
+                onChange={(value) => {
+                  setQ(value);
+                  setPage(1);
+                }}
+                placeholder="Search documents"
+              />
             </div>
             <span className="text-xs text-zinc-500">
               {documents.length} type{documents.length !== 1 ? "s" : ""}
@@ -274,15 +301,16 @@ export default function AdminPartnerDocumentsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!confirm(`Delete "${doc.name}"?`)) return;
-                          try {
-                            await deleteDocument(doc.id).unwrap();
-                            toast.success(`"${doc.name}" deleted`);
-                          } catch (err: unknown) {
-                            toast.error(extractApiError(err, "Delete failed"));
-                          }
-                        }}
+                        onClick={() =>
+                          setPendingConfirm({
+                            title: "Delete document type?",
+                            body: `Delete "${doc.name}"?`,
+                            run: async () => {
+                              await deleteDocument(doc.id).unwrap();
+                              toast.success(`"${doc.name}" deleted`);
+                            },
+                          })
+                        }
                         className="text-zinc-500 hover:text-rose-400 p-1"
                       >
                         <Trash2 size={16} />
@@ -293,8 +321,30 @@ export default function AdminPartnerDocumentsPage() {
               ))}
             </div>
           )}
+          {documentsData?.meta && <Pagination meta={documentsData.meta} onPageChange={setPage} />}
         </div>
       </div>
+      <ConfirmDialog
+        open={!!pendingConfirm}
+        title={pendingConfirm?.title || ""}
+        body={pendingConfirm?.body || ""}
+        confirmLabel="Delete"
+        danger
+        busy={confirmBusy}
+        onCancel={() => !confirmBusy && setPendingConfirm(null)}
+        onConfirm={async () => {
+          if (!pendingConfirm) return;
+          setConfirmBusy(true);
+          try {
+            await pendingConfirm.run();
+            setPendingConfirm(null);
+          } catch (err: unknown) {
+            toast.error(extractApiError(err, "Delete failed"));
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

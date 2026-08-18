@@ -281,7 +281,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const { data: profile, isLoading } = useGetBusinessPublicQuery(resolvedParams.id);
   const [createBooking] = useCreateBookingMutation();
-  const { data: reviews = [] } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
+  const { data: reviewsData } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
+  const reviews = reviewsData?.items ?? [];
   const [createReview] = useCreateReviewMutation();
   const [createReviewReply] = useCreateReviewReplyMutation();
 

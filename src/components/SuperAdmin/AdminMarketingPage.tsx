@@ -13,23 +13,39 @@ import {
 import { Megaphone, Plus, Trash2, Calendar, Target, Loader2, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/dateFormat';
+import ConfirmDialog from '@/components/Shared/ConfirmDialog';
+import SearchInput from '@/components/Shared/SearchInput';
+import Pagination from '@/components/Shared/Pagination';
+import { PAGE_SIZE } from '@/lib/pagination';
 
 export default function AdminMarketingPage() {
   const [activeTab, setActiveTab] = useState<'plans' | 'campaigns'>('plans');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
 
-  // Plans State
-  const { data: plans = [], isLoading: plansLoading } = useGetMarketingPlansQuery();
+  const listArg = {
+    page,
+    limit: PAGE_SIZE,
+    ...(q.trim() ? { q: q.trim() } : {}),
+  };
+  const { data: plansData, isLoading: plansLoading } = useGetMarketingPlansQuery(listArg);
+  const { data: allPlansData } = useGetMarketingPlansQuery();
+  const plans = plansData?.items ?? [];
+  const planOptions = allPlansData?.items ?? [];
   const [createPlan, { isLoading: isCreating }] = useCreateMarketingPlanMutation();
   const [deletePlan] = useDeleteMarketingPlanMutation();
   
   const [newPlan, setNewPlan] = useState({ name: '', duration_days: 30, price: 0 });
 
   // Campaigns State
-  const { data: campaigns = [], isLoading: campaignsLoading } = useGetMarketingCampaignsQuery();
+  const { data: campaignsData, isLoading: campaignsLoading } = useGetMarketingCampaignsQuery(listArg);
+  const campaigns = campaignsData?.items ?? [];
   const { data: businesses = [] } = useGetBusinessesQuery();
   const [assignCampaign, { isLoading: isAssigning }] = useAssignMarketingCampaignMutation();
 
   const [newCampaign, setNewCampaign] = useState({ businessId: '', plan_id: '' });
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,22 +58,15 @@ export default function AdminMarketingPage() {
     }
   };
 
-  const handleDeletePlan = async (id: number) => {
-    if (confirm('Are you sure you want to delete this plan?')) {
-      try {
-        await deletePlan(id).unwrap();
-        toast.success('Plan deleted');
-      } catch (error: any) {
-        toast.error('Failed to delete plan. It might be in use.');
-      }
-    }
+  const handleDeletePlan = (id: number) => {
+    setPendingDeleteId(id);
   };
 
   const handleAssignCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCampaign.businessId || !newCampaign.plan_id) return toast.error('Please select both a business and a plan');
     
-    const selectedPlan = plans.find(p => p.id.toString() === newCampaign.plan_id);
+    const selectedPlan = planOptions.find(p => p.id.toString() === newCampaign.plan_id);
     if (!selectedPlan) return;
 
     const endDate = new Date();
@@ -88,11 +97,22 @@ export default function AdminMarketingPage() {
           </h1>
           <p className="text-zinc-400 mt-2">Manage advertising plans and promoted businesses</p>
         </div>
+        <SearchInput
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search plans or campaigns"
+        />
       </div>
 
       <div className="flex gap-2 border-b border-white/10 mb-6">
         <button
-          onClick={() => setActiveTab('plans')}
+          onClick={() => {
+            setActiveTab('plans');
+            setPage(1);
+          }}
           className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
             activeTab === 'plans' 
               ? 'border-rose-500 text-rose-500 bg-rose-500/5' 
@@ -102,7 +122,10 @@ export default function AdminMarketingPage() {
           Marketing Plans
         </button>
         <button
-          onClick={() => setActiveTab('campaigns')}
+          onClick={() => {
+            setActiveTab('campaigns');
+            setPage(1);
+          }}
           className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
             activeTab === 'campaigns' 
               ? 'border-rose-500 text-rose-500 bg-rose-500/5' 
@@ -207,6 +230,7 @@ export default function AdminMarketingPage() {
                   )}
                 </tbody>
               </table>
+              {plansData?.meta && <Pagination meta={plansData.meta} onPageChange={setPage} />}
             </div>
           </div>
         </div>
@@ -243,7 +267,7 @@ export default function AdminMarketingPage() {
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
                   >
                     <option value="">-- Choose Plan --</option>
-                    {plans.map((p: any) => (
+                    {planOptions.map((p: any) => (
                       <option key={p.id} value={p.id}>{p.name} ({p.duration_days} days)</option>
                     ))}
                   </select>
@@ -303,11 +327,34 @@ export default function AdminMarketingPage() {
                   )}
                 </tbody>
               </table>
+              {campaignsData?.meta && <Pagination meta={campaignsData.meta} onPageChange={setPage} />}
             </div>
           </div>
         </div>
       )}
 
+      <ConfirmDialog
+        open={pendingDeleteId != null}
+        title="Delete plan?"
+        body="Are you sure you want to delete this plan?"
+        confirmLabel="Delete"
+        danger
+        busy={confirmBusy}
+        onCancel={() => !confirmBusy && setPendingDeleteId(null)}
+        onConfirm={async () => {
+          if (pendingDeleteId == null) return;
+          setConfirmBusy(true);
+          try {
+            await deletePlan(pendingDeleteId).unwrap();
+            toast.success('Plan deleted');
+            setPendingDeleteId(null);
+          } catch {
+            toast.error('Failed to delete plan. It might be in use.');
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 
 type KindTab = "all" | "dining" | "event";
 type StatusTab = "all" | "upcoming" | "past" | "cancelled";
@@ -113,6 +114,8 @@ export default function CustomerDashboard() {
   );
   const [cancelDining] = useCancelBookingMutation();
   const [cancelEvent] = useCancelEventBookingMutation();
+  const [pendingCancel, setPendingCancel] = useState<UnifiedBooking | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const unified = useMemo<UnifiedBooking[]>(() => {
     const dining: UnifiedBooking[] = diningBookings.map((b) => ({
@@ -179,19 +182,8 @@ export default function CustomerDashboard() {
     }
   }, [byKind, filter]);
 
-  const handleCancel = async (b: UnifiedBooking) => {
-    const label = b.kind === "event" ? "ticket booking" : "reservation";
-    if (!confirm(`Are you sure you want to cancel this ${label}?`)) return;
-    try {
-      if (b.kind === "event") {
-        await cancelEvent({ id: b.id, customerId }).unwrap();
-      } else {
-        await cancelDining({ id: b.id }).unwrap();
-      }
-      toast.success(b.kind === "event" ? "Tickets cancelled" : "Reservation cancelled");
-    } catch (err) {
-      toast.error(extractApiError(err, `Failed to cancel ${label}`));
-    }
+  const handleCancel = (b: UnifiedBooking) => {
+    setPendingCancel(b);
   };
 
   if (diningLoading || eventsLoading || !user) {
@@ -372,6 +364,38 @@ export default function CustomerDashboard() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={!!pendingCancel}
+        title={pendingCancel?.kind === "event" ? "Cancel ticket booking?" : "Cancel reservation?"}
+        body={
+          pendingCancel
+            ? `Are you sure you want to cancel this ${pendingCancel.kind === "event" ? "ticket booking" : "reservation"}?`
+            : ""
+        }
+        confirmLabel="Cancel booking"
+        danger
+        busy={confirmBusy}
+        onCancel={() => !confirmBusy && setPendingCancel(null)}
+        onConfirm={async () => {
+          if (!pendingCancel) return;
+          const b = pendingCancel;
+          const label = b.kind === "event" ? "ticket booking" : "reservation";
+          setConfirmBusy(true);
+          try {
+            if (b.kind === "event") {
+              await cancelEvent({ id: b.id, customerId }).unwrap();
+            } else {
+              await cancelDining({ id: b.id }).unwrap();
+            }
+            toast.success(b.kind === "event" ? "Tickets cancelled" : "Reservation cancelled");
+            setPendingCancel(null);
+          } catch (err) {
+            toast.error(extractApiError(err, `Failed to cancel ${label}`));
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

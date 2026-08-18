@@ -10,6 +10,17 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { clearCredentials } from '@/features/auth/authSlice';
 import { clearSessionForRole, type UserRole } from '@/lib/authStorage';
+import {
+  unwrapPaginated,
+  toListQuery,
+  bizIdOf,
+  pagedBizQuery,
+  type PaginatedList,
+  type PagedQuery,
+  type PagedBizQuery,
+} from '@/lib/pagination';
+
+export type { PaginationMeta, PaginatedList, PagedQuery } from '@/lib/pagination';
 
 const BASE_URL = 'http://localhost:5000/api';
 
@@ -37,7 +48,9 @@ export interface Business {
   is_open?: boolean;
   is_enabled?: boolean;
   credentials_sent_at?: string | null;
+  deleted_at?: string | null;
   live_event_count?: number;
+  upcoming_booking_count?: number;
   owner_id?: string;
   operating_hours?: Record<string, { open: string; close: string; closed: boolean }>;
   gallery_images?: string[];
@@ -59,6 +72,7 @@ export interface AdminCustomer {
   is_registered_user?: boolean;
   is_enabled?: boolean;
   created_at?: string;
+  deleted_at?: string | null;
   dining_bookings_count?: number;
   event_bookings_count?: number;
   live_event_booking_count?: number;
@@ -931,7 +945,29 @@ export const api = createApi({
       invalidatesTags: ['Businesses', 'AdminStats'],
     }),
 
-    softDeleteBusiness: builder.mutation<{ message?: string }, string>({
+    getAdminBusinesses: builder.query<
+      PaginatedList<Business>,
+      { module?: 'dining' | 'event'; tab?: 'active' | 'archived'; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/businesses${toListQuery({
+          module: params?.module,
+          tab: params?.tab === 'archived' ? 'archived' : 'active',
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: Business[] }) => unwrapPaginated(res),
+      providesTags: ['Businesses'],
+    }),
+
+    getAdminBusiness: builder.query<Business, string>({
+      query: (id) => `/admin/businesses/${id}`,
+      transformResponse: (res: { data: Business }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'Businesses', id }],
+    }),
+
+    archiveBusiness: builder.mutation<{ message?: string }, string>({
       query: (id) => ({
         url: `/admin/businesses/${id}`,
         method: 'DELETE',
@@ -939,12 +975,26 @@ export const api = createApi({
       invalidatesTags: ['Businesses', 'AdminStats'],
     }),
 
-    getAdminCustomers: builder.query<AdminCustomer[], { q?: string } | void>({
-      query: (params) => {
-        const q = params?.q?.trim();
-        return q ? `/admin/customers?q=${encodeURIComponent(q)}` : '/admin/customers';
-      },
-      transformResponse: (res: { data: AdminCustomer[] }) => res.data || [],
+    unarchiveBusiness: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/businesses/${id}/unarchive`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Businesses', 'AdminStats'],
+    }),
+
+    getAdminCustomers: builder.query<
+      PaginatedList<AdminCustomer>,
+      { q?: string; tab?: 'active' | 'archived'; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/customers${toListQuery({
+          tab: params?.tab === 'archived' ? 'archived' : 'active',
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: AdminCustomer[] }) => unwrapPaginated(res),
       providesTags: ['AdminCustomers'],
     }),
 
@@ -952,6 +1002,18 @@ export const api = createApi({
       query: (id) => `/admin/customers/${id}`,
       transformResponse: (res: { data: AdminCustomer }) => res.data,
       providesTags: (_r, _e, id) => [{ type: 'AdminCustomers', id }],
+    }),
+
+    createAdminCustomer: builder.mutation<
+      { message?: string; data?: AdminCustomer },
+      { name: string; phone: string; email: string }
+    >({
+      query: (body) => ({
+        url: '/admin/customers',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['AdminCustomers'],
     }),
 
     updateAdminCustomer: builder.mutation<
@@ -978,10 +1040,18 @@ export const api = createApi({
       invalidatesTags: ['AdminCustomers'],
     }),
 
-    softDeleteAdminCustomer: builder.mutation<{ message?: string }, string>({
+    archiveAdminCustomer: builder.mutation<{ message?: string }, string>({
       query: (id) => ({
         url: `/admin/customers/${id}`,
         method: 'DELETE',
+      }),
+      invalidatesTags: ['AdminCustomers'],
+    }),
+
+    unarchiveAdminCustomer: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/customers/${id}/unarchive`,
+        method: 'PATCH',
       }),
       invalidatesTags: ['AdminCustomers'],
     }),
@@ -1036,18 +1106,21 @@ export const api = createApi({
     }),
 
     getAdminPartnerDocuments: builder.query<
-      PartnerDocumentMaster[],
-      { module?: 'dining' | 'event' | 'both' } | void
+      PaginatedList<PartnerDocumentMaster>,
+      { module?: 'dining' | 'event' | 'both'; q?: string; page?: number; limit?: number } | void
     >({
-      query: (params) => {
-        const qs = params?.module ? `?module=${params.module}` : '';
-        return `/admin/partner-documents${qs}`;
-      },
-      transformResponse: (res: { data?: PartnerDocumentMaster[] }) => res?.data ?? [],
+      query: (params) =>
+        `/admin/partner-documents${toListQuery({
+          module: params?.module,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: PartnerDocumentMaster[] }) => unwrapPaginated(res),
       providesTags: (result) =>
-        result
+        result?.items
           ? [
-            ...result.map((d) => ({ type: 'PartnerDocuments' as const, id: d.id })),
+            ...result.items.map((d) => ({ type: 'PartnerDocuments' as const, id: d.id })),
             { type: 'PartnerDocuments', id: 'LIST' },
             'PartnerDocuments',
           ]
@@ -1123,10 +1196,10 @@ export const api = createApi({
 
     // ── Tables ────────────────────────────────────────────────────────────────
 
-    getTables: builder.query<Table[], string>({
-      query: (bizId) => `/businesses/${bizId}/tables`,
-      transformResponse: (res: { data: Table[] }) => res.data || [],
-      providesTags: (_result, _error, bizId) => [{ type: 'Tables', id: bizId }],
+    getTables: builder.query<PaginatedList<Table>, PagedBizQuery>({
+      query: (arg) => `/businesses/${bizIdOf(arg)}/tables${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: Table[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'Tables', id: bizIdOf(arg) }],
     }),
 
     addTable: builder.mutation<
@@ -1163,10 +1236,10 @@ export const api = createApi({
 
     // ── Bookings ──────────────────────────────────────────────────────────────
 
-    getBusinessBookings: builder.query<Booking[], string>({
-      query: (bizId) => `/bookings/${bizId}`,
-      transformResponse: (res: { data: Booking[] }) => res.data || [],
-      providesTags: (_result, _error, bizId) => [{ type: 'Bookings', id: bizId }],
+    getBusinessBookings: builder.query<PaginatedList<Booking>, PagedBizQuery>({
+      query: (arg) => `/bookings/${bizIdOf(arg)}${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: Booking[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'Bookings', id: bizIdOf(arg) }],
     }),
 
     getCustomerBookings: builder.query<Booking[], string>({
@@ -1258,10 +1331,10 @@ export const api = createApi({
 
     // ── Reviews ──────────────────────────────────────────────────────────────
 
-    getReviews: builder.query<Review[], string>({
-      query: (bizId) => `/reviews/${bizId}`,
-      transformResponse: (res: { data: Review[] }) => res.data || [],
-      providesTags: (_result, _error, bizId) => [{ type: 'Reviews', id: bizId }],
+    getReviews: builder.query<PaginatedList<Review>, PagedBizQuery>({
+      query: (arg) => `/reviews/${bizIdOf(arg)}${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: Review[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'Reviews', id: bizIdOf(arg) }],
     }),
 
     createReview: builder.mutation<
@@ -1314,9 +1387,9 @@ export const api = createApi({
       invalidatesTags: ['Businesses'],
     }),
 
-    getMarketingPlans: builder.query<any[], void>({
-      query: () => '/admin/marketing-plans',
-      transformResponse: (res: { data: any[] }) => res.data,
+    getMarketingPlans: builder.query<PaginatedList<any>, PagedQuery | void>({
+      query: (params) => `/admin/marketing-plans${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
       providesTags: ['MarketingPlans'],
     }),
 
@@ -1346,9 +1419,9 @@ export const api = createApi({
       invalidatesTags: ['MarketingPlans'],
     }),
 
-    getMarketingCampaigns: builder.query<any[], void>({
-      query: () => '/admin/marketing-campaigns',
-      transformResponse: (res: { data: any[] }) => res.data,
+    getMarketingCampaigns: builder.query<PaginatedList<any>, PagedQuery | void>({
+      query: (params) => `/admin/marketing-campaigns${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
       providesTags: ['MarketingCampaigns'],
     }),
 
@@ -1363,13 +1436,18 @@ export const api = createApi({
 
     // ── Admin Events & Commission ─────────────────────────────────────────────
 
-    getAdminEvents: builder.query<AdminEvent[], { status?: string } | void>({
-      query: (params) => {
-        let url = '/admin/events';
-        if (params?.status) url += `?status=${encodeURIComponent(params.status)}`;
-        return url;
-      },
-      transformResponse: (res: { data: AdminEvent[] }) => res.data || [],
+    getAdminEvents: builder.query<
+      PaginatedList<AdminEvent>,
+      { status?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/events${toListQuery({
+          status: params?.status,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: AdminEvent[] }) => unwrapPaginated(res),
       providesTags: ['AdminEvents'],
     }),
 
@@ -1442,9 +1520,9 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'EventContracts', id: `prefill-${id}` }],
     }),
 
-    getEventContracts: builder.query<EventContract[], void>({
-      query: () => '/admin/event-contracts',
-      transformResponse: (res: { data: EventContract[] }) => res.data || [],
+    getEventContracts: builder.query<PaginatedList<EventContract>, PagedQuery | void>({
+      query: (params) => `/admin/event-contracts${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: EventContract[] }) => unwrapPaginated(res),
       providesTags: ['EventContracts'],
     }),
 
@@ -1559,14 +1637,18 @@ export const api = createApi({
       ],
     }),
 
-    getOrganizerEventReviews: builder.query<EventReview[], { event_id?: string } | void>({
-      query: (params) => {
-        const sp = new URLSearchParams();
-        if (params?.event_id) sp.set('event_id', params.event_id);
-        const qs = sp.toString();
-        return `/events/organizer/reviews${qs ? `?${qs}` : ''}`;
-      },
-      transformResponse: (res: { data: EventReview[] }) => res.data || [],
+    getOrganizerEventReviews: builder.query<
+      PaginatedList<EventReview>,
+      { event_id?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/events/organizer/reviews${toListQuery({
+          event_id: params?.event_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: EventReview[] }) => unwrapPaginated(res),
       providesTags: ['EventReviews'],
     }),
 
@@ -1584,9 +1666,9 @@ export const api = createApi({
 
     // ── Event offers ──────────────────────────────────────────────────────────
 
-    getOrganizerOffers: builder.query<EventOffer[], void>({
-      query: () => '/events/organizer/offers',
-      transformResponse: (res: { data: EventOffer[] }) => res.data || [],
+    getOrganizerOffers: builder.query<PaginatedList<EventOffer>, PagedQuery | void>({
+      query: (params) => `/events/organizer/offers${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: EventOffer[] }) => unwrapPaginated(res),
       providesTags: ['EventOffers'],
     }),
 
@@ -1736,14 +1818,18 @@ export const api = createApi({
       invalidatesTags: ['OrganizerLedger', 'OrganizerLedgerCustomers', 'AdminCommission', 'OrganizerPayouts'],
     }),
 
-    getOrganizerPayouts: builder.query<OrganizerPayout[], { business_id?: string } | void>({
-      query: (params) => {
-        const qs = params?.business_id
-          ? `?business_id=${encodeURIComponent(params.business_id)}`
-          : '';
-        return `/admin/organizer-payouts${qs}`;
-      },
-      transformResponse: (res: { data: OrganizerPayout[] }) => res.data,
+    getOrganizerPayouts: builder.query<
+      PaginatedList<OrganizerPayout>,
+      { business_id?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/organizer-payouts${toListQuery({
+          business_id: params?.business_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerPayout[] }) => unwrapPaginated(res),
       providesTags: ['OrganizerPayouts'],
     }),
 
@@ -1755,23 +1841,26 @@ export const api = createApi({
       providesTags: (_result, _error, bizId) => [{ type: 'Analytics', id: bizId }],
     }),
 
-    getBusinessCampaigns: builder.query<any[], string>({
-      query: (bizId) => `/businesses/${bizId}/campaigns`,
-      transformResponse: (res: { data: any[] }) => res.data,
-      providesTags: (_result, _error, bizId) => [{ type: 'MarketingCampaigns', id: bizId }],
+    getBusinessCampaigns: builder.query<PaginatedList<any>, PagedBizQuery>({
+      query: (arg) => `/businesses/${bizIdOf(arg)}/campaigns${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'MarketingCampaigns', id: bizIdOf(arg) }],
     }),
 
     // ── Organizer Events ──────────────────────────────────────────────────────
 
-    getOrganizerEvents: builder.query<OrganizerEvent[], { q?: string; status?: string } | void>({
-      query: (params) => {
-        const sp = new URLSearchParams();
-        if (params?.q) sp.append('q', params.q);
-        if (params?.status) sp.append('status', params.status);
-        const qs = sp.toString();
-        return `/events/organizer${qs ? `?${qs}` : ''}`;
-      },
-      transformResponse: (res: { data: OrganizerEvent[] }) => res.data || [],
+    getOrganizerEvents: builder.query<
+      PaginatedList<OrganizerEvent>,
+      { q?: string; status?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/events/organizer${toListQuery({
+          q: params?.q,
+          status: params?.status,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerEvent[] }) => unwrapPaginated(res),
       providesTags: ['OrganizerEvents'],
     }),
 
@@ -1810,17 +1899,18 @@ export const api = createApi({
     }),
 
     getOrganizerBookings: builder.query<
-      OrganizerEventBooking[],
-      { event_id?: string; status?: string } | void
+      PaginatedList<OrganizerEventBooking>,
+      { event_id?: string; status?: string; q?: string; page?: number; limit?: number } | void
     >({
-      query: (params) => {
-        const sp = new URLSearchParams();
-        if (params?.event_id) sp.set('event_id', params.event_id);
-        if (params?.status) sp.set('status', params.status);
-        const qs = sp.toString();
-        return `/events/organizer/bookings${qs ? `?${qs}` : ''}`;
-      },
-      transformResponse: (res: { data: OrganizerEventBooking[] }) => res.data || [],
+      query: (params) =>
+        `/events/organizer/bookings${toListQuery({
+          event_id: params?.event_id,
+          status: params?.status,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerEventBooking[] }) => unwrapPaginated(res),
       providesTags: ['OrganizerBookings'],
     }),
 
@@ -1959,18 +2049,22 @@ export const api = createApi({
 
     // ── Admin Event Masters ───────────────────────────────────────────────────
 
-    getAdminEventGenres: builder.query<EventGenreMaster[], { category_type_id?: number }>({
-      query: (params = {}) => {
-        const sp = new URLSearchParams();
-        if (params.category_type_id) sp.set('category_type_id', String(params.category_type_id));
-        const qs = sp.toString();
-        return `/admin/event-genres${qs ? `?${qs}` : ''}`;
-      },
-      transformResponse: (res: { data?: EventGenreMaster[] }) => res?.data ?? [],
+    getAdminEventGenres: builder.query<
+      PaginatedList<EventGenreMaster>,
+      { category_type_id?: number; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/event-genres${toListQuery({
+          category_type_id: params?.category_type_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: EventGenreMaster[] }) => unwrapPaginated(res),
       providesTags: (result) =>
-        result
+        result?.items
           ? [
-            ...result.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
+            ...result.items.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
             { type: 'EventMasters', id: 'GENRE_LIST' },
           ]
           : [{ type: 'EventMasters', id: 'GENRE_LIST' }],
@@ -2010,22 +2104,21 @@ export const api = createApi({
     }),
 
     getAdminEventDocuments: builder.query<
-      EventDocumentMaster[],
-      { category_type_id?: number | 'global' }
+      PaginatedList<EventDocumentMaster>,
+      { category_type_id?: number | 'global'; q?: string; page?: number; limit?: number } | void
     >({
-      query: (params = {}) => {
-        const sp = new URLSearchParams();
-        if (params.category_type_id !== undefined) {
-          sp.set('category_type_id', String(params.category_type_id));
-        }
-        const qs = sp.toString();
-        return `/admin/event-documents${qs ? `?${qs}` : ''}`;
-      },
-      transformResponse: (res: { data?: EventDocumentMaster[] }) => res?.data ?? [],
+      query: (params) =>
+        `/admin/event-documents${toListQuery({
+          category_type_id: params?.category_type_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: EventDocumentMaster[] }) => unwrapPaginated(res),
       providesTags: (result) =>
-        result
+        result?.items
           ? [
-            ...result.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
+            ...result.items.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
             { type: 'EventMasters', id: 'DOC_LIST' },
           ]
           : [{ type: 'EventMasters', id: 'DOC_LIST' }],
@@ -2072,13 +2165,13 @@ export const api = createApi({
       invalidatesTags: [{ type: 'EventMasters', id: 'DOC_LIST' }, 'EventMasters'],
     }),
 
-    getAdminEventTerms: builder.query<EventTermsMaster[], void>({
-      query: () => '/admin/event-terms',
-      transformResponse: (res: { data?: EventTermsMaster[] }) => res?.data ?? [],
+    getAdminEventTerms: builder.query<PaginatedList<EventTermsMaster>, PagedQuery | void>({
+      query: (params) => `/admin/event-terms${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data?: EventTermsMaster[] }) => unwrapPaginated(res),
       providesTags: (result) =>
-        result
+        result?.items
           ? [
-              ...result.map((t) => ({ type: 'EventMasters' as const, id: `term-${t.id}` })),
+              ...result.items.map((t) => ({ type: 'EventMasters' as const, id: `term-${t.id}` })),
               { type: 'EventMasters', id: 'TERM_LIST' },
             ]
           : [{ type: 'EventMasters', id: 'TERM_LIST' }],
@@ -2134,14 +2227,19 @@ export const {
   useRegisterCustomerMutation,
   useRegisterBusinessMutation,
   useGetBusinessesQuery,
+  useGetAdminBusinessesQuery,
+  useGetAdminBusinessQuery,
   useUpdateAdminBusinessMutation,
   useSetBusinessEnabledMutation,
-  useSoftDeleteBusinessMutation,
+  useArchiveBusinessMutation,
+  useUnarchiveBusinessMutation,
   useGetAdminCustomersQuery,
   useGetAdminCustomerQuery,
+  useCreateAdminCustomerMutation,
   useUpdateAdminCustomerMutation,
   useSetAdminCustomerEnabledMutation,
-  useSoftDeleteAdminCustomerMutation,
+  useArchiveAdminCustomerMutation,
+  useUnarchiveAdminCustomerMutation,
   useGetCollectionsQuery,
   useGetMoodsQuery,
   useGetBusinessTypesQuery,

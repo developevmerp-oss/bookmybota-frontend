@@ -1,11 +1,15 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { Plus, ArrowUpDown, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { Plus, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGetBusinessBookingsQuery, useCancelBookingMutation, useCreateBookingMutation } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import PhoneInput from '@/components/Shared/PhoneInput';
+import ConfirmDialog from '@/components/Shared/ConfirmDialog';
+import SearchInput from '@/components/Shared/SearchInput';
+import Pagination from '@/components/Shared/Pagination';
+import { PAGE_SIZE } from '@/lib/pagination';
 import { isValidPhone } from '@/lib/validation';
 import { formatDate, formatTime12h } from '@/lib/dateFormat';
 
@@ -15,7 +19,21 @@ export default function BookingsManager() {
   useEffect(() => { dispatch(loadFromStorage()); }, [dispatch]);
 
   const bizId = user?.business_id ?? '';
-  const { data: bookings = [], isLoading } = useGetBusinessBookingsQuery(bizId, { skip: !bizId });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortColumn, setSortColumn] = useState<string>('booking_time');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const { data: bookingsData, isLoading } = useGetBusinessBookingsQuery(
+    {
+      bizId,
+      page: currentPage,
+      limit: pageSize,
+      ...(searchTerm.trim() ? { q: searchTerm.trim() } : {}),
+    },
+    { skip: !bizId }
+  );
+  const bookings = bookingsData?.items ?? [];
   const [cancelBooking] = useCancelBookingMutation();
   const [createBooking, { isLoading: isAddingWalkIn }] = useCreateBookingMutation();
 
@@ -25,16 +43,11 @@ export default function BookingsManager() {
   const [walkInPhoneValid, setWalkInPhoneValid] = useState(true);
   const [walkInGuests, setWalkInGuests] = useState('2');
 
-  // DataTable States
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortColumn, setSortColumn] = useState<string>('booking_time');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
-  const handleCancelBooking = async (id: string) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
-    try { await cancelBooking({ id }).unwrap(); } catch (err) { console.error(err); }
+  const handleCancelBooking = (id: string) => {
+    setPendingCancelId(id);
   };
 
   const handleAddWalkIn = async () => {
@@ -87,20 +100,7 @@ export default function BookingsManager() {
     );
   };
 
-  // 1. Filter bookings based on search
-  const filteredBookings = bookings.filter((b) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      (b.customer_name || '').toLowerCase().includes(term) ||
-      (b.customer_phone || '').toLowerCase().includes(term) ||
-      (b.status || '').toLowerCase().includes(term) ||
-      (b.booking_source || '').toLowerCase().includes(term) ||
-      (b.table_number || '').toString().includes(term)
-    );
-  });
-
-  // 2. Sort bookings
-  const sortedBookings = [...filteredBookings].sort((a, b) => {
+  const sortedBookings = [...bookings].sort((a, b) => {
     let aVal: any = a[sortColumn as keyof typeof a];
     let bVal: any = b[sortColumn as keyof typeof b];
 
@@ -120,11 +120,8 @@ export default function BookingsManager() {
     return 0;
   });
 
-  // 3. Paginate bookings
-  const totalEntries = sortedBookings.length;
-  const totalPages = Math.ceil(totalEntries / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedBookings = sortedBookings.slice(startIndex, startIndex + pageSize);
+  const paginatedBookings = sortedBookings;
+  const startIndex = ((bookingsData?.meta?.page ?? currentPage) - 1) * (bookingsData?.meta?.limit ?? pageSize);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -161,19 +158,15 @@ export default function BookingsManager() {
           </select>
           <span>entries</span>
         </div>
-        <div className="relative w-full md:max-w-xs">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-          <input 
-            type="text" 
-            placeholder="Search bookings..." 
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all"
-          />
-        </div>
+        <SearchInput
+          value={searchTerm}
+          onChange={(value) => {
+            setSearchTerm(value);
+            setCurrentPage(1);
+          }}
+          placeholder="Search bookings..."
+          className="w-full md:max-w-xs"
+        />
       </div>
 
       {/* DataTable Container */}
@@ -269,56 +262,7 @@ export default function BookingsManager() {
           </table>
         </div>
 
-        {/* DataTable Footer / Pagination */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 px-6 py-4 border-t border-white/5 bg-white/[0.01]">
-          <div className="text-xs text-zinc-400 font-medium">
-            {totalEntries > 0 ? (
-              <span>
-                Showing <span className="text-white font-semibold">{startIndex + 1}</span> to{' '}
-                <span className="text-white font-semibold">{Math.min(startIndex + pageSize, totalEntries)}</span> of{' '}
-                <span className="text-white font-semibold">{totalEntries}</span> entries
-              </span>
-            ) : (
-              <span>Showing 0 to 0 of 0 entries</span>
-            )}
-          </div>
-          
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1.5">
-              <button 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                className="bg-zinc-900/60 border border-white/5 rounded-xl px-3.5 py-2 text-xs font-bold text-zinc-400 hover:text-white hover:border-white/20 transition-all disabled:opacity-40 disabled:hover:text-zinc-400 disabled:hover:border-white/5 cursor-pointer disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }).map((_, i) => {
-                  const pageNum = i + 1;
-                  const active = currentPage === pageNum;
-                  return (
-                    <button 
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`w-8 h-8 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${active 
-                        ? 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-600/10'
-                        : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-white hover:border-white/20'}`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-              <button 
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                className="bg-zinc-900/60 border border-white/5 rounded-xl px-3.5 py-2 text-xs font-bold text-zinc-400 hover:text-white hover:border-white/20 transition-all disabled:opacity-40 disabled:hover:text-zinc-400 disabled:hover:border-white/5 cursor-pointer disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
+        {bookingsData?.meta && <Pagination meta={bookingsData.meta} onPageChange={setCurrentPage} />}
       </div>
 
       {showModal && (
@@ -375,6 +319,27 @@ export default function BookingsManager() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!pendingCancelId}
+        title="Cancel booking?"
+        body="Are you sure you want to cancel this booking?"
+        confirmLabel="Cancel booking"
+        danger
+        busy={confirmBusy}
+        onCancel={() => !confirmBusy && setPendingCancelId(null)}
+        onConfirm={async () => {
+          if (!pendingCancelId) return;
+          setConfirmBusy(true);
+          try {
+            await cancelBooking({ id: pendingCancelId }).unwrap();
+            setPendingCancelId(null);
+          } catch (err) {
+            console.error(err);
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

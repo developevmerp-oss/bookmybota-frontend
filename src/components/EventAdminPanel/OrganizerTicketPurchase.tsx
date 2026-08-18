@@ -25,7 +25,8 @@ export default function OrganizerTicketPurchase({
   const [pickedEventId, setPickedEventId] = useState(preselectedEventId || "");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  const { data: events = [] } = useGetOrganizerEventsQuery(undefined, { skip: !open });
+  const { data: eventsData } = useGetOrganizerEventsQuery(undefined, { skip: !open });
+  const events = eventsData?.items ?? [];
   const liveEvents = useMemo(
     () => events.filter((e) => e.status === "LIVE"),
     [events]

@@ -20,7 +20,8 @@ export default function OrganizerLedgerPage() {
   const [toDate, setToDate] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data: events = [] } = useGetOrganizerEventsQuery();
+  const { data: eventsData } = useGetOrganizerEventsQuery();
+  const events = eventsData?.items ?? [];
 
   const filterParams = useMemo(
     () => ({

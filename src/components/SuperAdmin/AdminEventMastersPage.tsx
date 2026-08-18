@@ -22,6 +22,10 @@ import {
   type EventTermsMaster,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import SearchInput from "@/components/Shared/SearchInput";
+import Pagination from "@/components/Shared/Pagination";
+import { PAGE_SIZE } from "@/lib/pagination";
 
 function ActiveToggle({
   active,
@@ -56,6 +60,8 @@ function ActiveToggle({
 export default function AdminEventMastersPage() {
   const [tab, setTab] = useState<"genres" | "documents" | "terms">("genres");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const eventCategories = useMemo(
@@ -64,48 +70,70 @@ export default function AdminEventMastersPage() {
   );
 
   const genreQueryArg = useMemo(
-    () => (categoryFilter ? { category_type_id: Number(categoryFilter) } : {}),
-    [categoryFilter]
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      ...(q.trim() ? { q: q.trim() } : {}),
+      ...(categoryFilter ? { category_type_id: Number(categoryFilter) } : {}),
+    }),
+    [categoryFilter, q, page]
   );
 
   const {
-    data: genres = [],
+    data: genresData,
     isLoading: genresLoading,
     isFetching: genresFetching,
     isError: genresError,
     error: genresErrorData,
     refetch: refetchGenres,
   } = useGetAdminEventGenresQuery(genreQueryArg);
+  const genres = genresData?.items ?? [];
 
   const [createGenre, { isLoading: creatingGenre }] = useCreateAdminEventGenreMutation();
   const [updateGenre] = useUpdateAdminEventGenreMutation();
   const [deleteGenre] = useDeleteAdminEventGenreMutation();
 
   const {
-    data: documents = [],
+    data: documentsData,
     isLoading: docsLoading,
     isFetching: docsFetching,
     isError: docsError,
     error: docsErrorData,
     refetch: refetchDocs,
-  } = useGetAdminEventDocumentsQuery({});
+  } = useGetAdminEventDocumentsQuery({
+    page,
+    limit: PAGE_SIZE,
+    ...(q.trim() ? { q: q.trim() } : {}),
+  });
+  const documents = documentsData?.items ?? [];
 
   const [createDocument, { isLoading: creatingDoc }] = useCreateAdminEventDocumentMutation();
   const [updateDocument] = useUpdateAdminEventDocumentMutation();
   const [deleteDocument] = useDeleteAdminEventDocumentMutation();
 
   const {
-    data: terms = [],
+    data: termsData,
     isLoading: termsLoading,
     isFetching: termsFetching,
     isError: termsError,
     error: termsErrorData,
     refetch: refetchTerms,
-  } = useGetAdminEventTermsQuery();
+  } = useGetAdminEventTermsQuery({
+    page,
+    limit: PAGE_SIZE,
+    ...(q.trim() ? { q: q.trim() } : {}),
+  });
+  const terms = termsData?.items ?? [];
   const [createTerm, { isLoading: creatingTerm }] = useCreateAdminEventTermMutation();
   const [updateTerm] = useUpdateAdminEventTermMutation();
   const [deleteTerm] = useDeleteAdminEventTermMutation();
   const [newTermText, setNewTermText] = useState("");
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string;
+    body: string;
+    run: () => Promise<void>;
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [newGenre, setNewGenre] = useState({ category_type_id: "", name: "" });
   const [newDoc, setNewDoc] = useState({
@@ -255,11 +283,24 @@ export default function AdminEventMastersPage() {
         <p className="text-zinc-400 mt-2">
           Manage category-linked genres, required event documents, and customer-facing terms & conditions. Only <strong className="text-green-400/90">active</strong> items appear in the event organizer form.
         </p>
+        <div className="mt-4">
+          <SearchInput
+            value={q}
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search this list"
+          />
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-white/10">
         <button
-          onClick={() => setTab("genres")}
+          onClick={() => {
+            setTab("genres");
+            setPage(1);
+          }}
           className={`px-4 py-3 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 ${
             tab === "genres"
               ? "border-rose-500 text-rose-400"
@@ -269,7 +310,10 @@ export default function AdminEventMastersPage() {
           <Tags size={16} /> Genre Master
         </button>
         <button
-          onClick={() => setTab("documents")}
+          onClick={() => {
+            setTab("documents");
+            setPage(1);
+          }}
           className={`px-4 py-3 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 ${
             tab === "documents"
               ? "border-rose-500 text-rose-400"
@@ -279,7 +323,10 @@ export default function AdminEventMastersPage() {
           <ListChecks size={16} /> Document Master
         </button>
         <button
-          onClick={() => setTab("terms")}
+          onClick={() => {
+            setTab("terms");
+            setPage(1);
+          }}
           className={`px-4 py-3 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 ${
             tab === "terms"
               ? "border-rose-500 text-rose-400"
@@ -336,7 +383,10 @@ export default function AdminEventMastersPage() {
                 <span className="text-sm text-zinc-400">Filter by category:</span>
                 <select
                   value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  onChange={(e) => {
+                    setCategoryFilter(e.target.value);
+                    setPage(1);
+                  }}
                   className="input-field text-sm py-2 w-auto min-w-[160px]"
                 >
                   <option value="">All categories</option>
@@ -392,15 +442,16 @@ export default function AdminEventMastersPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={async () => {
-                            if (!confirm(`Delete genre "${g.name}"?`)) return;
-                            try {
-                              await deleteGenre(g.id).unwrap();
-                              toast.success(`Genre "${g.name}" deleted`);
-                            } catch (err: unknown) {
-                              toast.error(extractApiError(err, "Delete failed"));
-                            }
-                          }}
+                          onClick={() =>
+                            setPendingConfirm({
+                              title: "Delete genre?",
+                              body: `Delete genre "${g.name}"?`,
+                              run: async () => {
+                                await deleteGenre(g.id).unwrap();
+                                toast.success(`Genre "${g.name}" deleted`);
+                              },
+                            })
+                          }
                           className="text-zinc-500 hover:text-rose-400 p-1"
                         >
                           <Trash2 size={16} />
@@ -411,6 +462,7 @@ export default function AdminEventMastersPage() {
                 </tbody>
               </table>
             )}
+            {genresData?.meta && <Pagination meta={genresData.meta} onPageChange={setPage} />}
           </div>
         </div>
       )}
@@ -546,15 +598,16 @@ export default function AdminEventMastersPage() {
                           {doc.is_required ? "Make optional" : "Make required"}
                         </button>
                         <button
-                          onClick={async () => {
-                            if (!confirm(`Delete "${doc.name}"?`)) return;
-                            try {
-                              await deleteDocument(doc.id).unwrap();
-                              toast.success(`"${doc.name}" deleted`);
-                            } catch (err: unknown) {
-                              toast.error(extractApiError(err, "Delete failed"));
-                            }
-                          }}
+                          onClick={() =>
+                            setPendingConfirm({
+                              title: "Delete document type?",
+                              body: `Delete "${doc.name}"?`,
+                              run: async () => {
+                                await deleteDocument(doc.id).unwrap();
+                                toast.success(`"${doc.name}" deleted`);
+                              },
+                            })
+                          }
                           className="text-zinc-500 hover:text-rose-400 p-1"
                         >
                           <Trash2 size={16} />
@@ -565,6 +618,7 @@ export default function AdminEventMastersPage() {
                 ))}
               </div>
             )}
+            {documentsData?.meta && <Pagination meta={documentsData.meta} onPageChange={setPage} />}
           </div>
         </div>
       )}
@@ -628,15 +682,16 @@ export default function AdminEventMastersPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (!confirm("Delete this T&C point from the master list?")) return;
-                          try {
-                            await deleteTerm(term.id).unwrap();
-                            toast.success("T&C point deleted");
-                          } catch (err: unknown) {
-                            toast.error(extractApiError(err, "Delete failed"));
-                          }
-                        }}
+                        onClick={() =>
+                          setPendingConfirm({
+                            title: "Delete T&C point?",
+                            body: "Delete this T&C point from the master list?",
+                            run: async () => {
+                              await deleteTerm(term.id).unwrap();
+                              toast.success("T&C point deleted");
+                            },
+                          })
+                        }
                         className="text-zinc-500 hover:text-rose-400 p-1"
                       >
                         <Trash2 size={16} />
@@ -646,9 +701,31 @@ export default function AdminEventMastersPage() {
                 ))}
               </div>
             )}
+            {termsData?.meta && <Pagination meta={termsData.meta} onPageChange={setPage} />}
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!pendingConfirm}
+        title={pendingConfirm?.title || ""}
+        body={pendingConfirm?.body || ""}
+        confirmLabel="Delete"
+        danger
+        busy={confirmBusy}
+        onCancel={() => !confirmBusy && setPendingConfirm(null)}
+        onConfirm={async () => {
+          if (!pendingConfirm) return;
+          setConfirmBusy(true);
+          try {
+            await pendingConfirm.run();
+            setPendingConfirm(null);
+          } catch (err: unknown) {
+            toast.error(extractApiError(err, "Delete failed"));
+          } finally {
+            setConfirmBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }

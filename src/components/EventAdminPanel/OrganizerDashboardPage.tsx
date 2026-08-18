@@ -9,7 +9,8 @@ export default function OrganizerDashboardPage() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
-  const { data: events = [] } = useGetOrganizerEventsQuery();
+  const { data: eventsData } = useGetOrganizerEventsQuery();
+  const events = eventsData?.items ?? [];
   const { data: ticketStats } = useGetOrganizerTicketStatsQuery();
 
   const pending = events.filter((e) => e.status === "PENDING_APPROVAL").length;

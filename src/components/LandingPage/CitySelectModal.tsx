@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Locate, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,19 +34,57 @@ function matchCity(detected: string, cities: string[]) {
   );
 }
 
+const ALL_ETHIOPIA_CITIES = [
+  "Addis Ababa", "Dire Dawa", "Mekelle", "Adama", "Hawassa", "Bahir Dar",
+  "Gondar", "Dessie", "Jimma", "Jijiga", "Shashamane", "Bishoftu", "Sodo",
+  "Arba Minch", "Hosaena", "Harar", "Dilla", "Nekemte", "Debre Birhan",
+  "Debre Markos", "Asella", "Debre Tabor", "Kombolcha", "Adigrat", "Weldiya",
+  "Shire Inda Selassie", "Burayu", "Aksum", "Adwa", "Alamata", "Wukro",
+  "Ambo", "Sebeta", "Fiche", "Mojo", "Batu", "Meki", "Waliso", "Arsi Negele",
+  "Bale Robe", "Goba", "Negele Borana", "Bule Hora", "Yirgalem", "Aleta Wendo",
+  "Areka", "Boditi", "Butajira", "Welkite", "Durame", "Alaba Kulito", "Jinka",
+  "Sawla", "Tepi", "Mizan Teferi", "Bonga", "Metu", "Dembi Dolo", "Gimbi",
+  "Agaro", "Dangila", "Finote Selam", "Mota", "Kobo", "Degehabur", "Gode",
+  "Haramaya", "Chiro", "Assosa", "Gambela",
+];
+
+const POPULAR_CITIES = [
+  "Addis Ababa", "Dire Dawa", "Mekelle", "Adama", "Hawassa", "Bahir Dar",
+  "Gondar", "Dessie", "Jimma", "Jijiga", "Harar", "Bishoftu",
+];
+
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+const CITY_ICON: Record<string, string> = {
+  "Addis Ababa": "🏛️",
+  "Dire Dawa": "🕌",
+  "Mekelle": "⛪",
+  "Adama": "🏙️",
+  "Hawassa": "🌊",
+  "Bahir Dar": "🌅",
+  "Gondar": "🏰",
+  "Dessie": "⛰️",
+  "Jimma": "☕",
+  "Jijiga": "🐪",
+  "Harar": "🏚️",
+  "Bishoftu": "🌿",
+};
+
 export default function CitySelectModal({
   open,
-  cities,
   selected,
   onClose,
   onSelect,
 }: CitySelectModalProps) {
   const [query, setQuery] = useState("");
   const [detecting, setDetecting] = useState(false);
+  const [activeLetter, setActiveLetter] = useState<string | null>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    setActiveLetter(null);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
@@ -59,14 +97,37 @@ export default function CitySelectModal({
     };
   }, [open, onClose]);
 
-  const filtered = useMemo(() => {
+  const filteredCities = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return cities;
-    return cities.filter((c) => c.toLowerCase().includes(q));
-  }, [cities, query]);
+    if (!q) return ALL_ETHIOPIA_CITIES;
+    return ALL_ETHIOPIA_CITIES.filter((c) => c.toLowerCase().includes(q));
+  }, [query]);
 
-  const popular = filtered.slice(0, 9);
-  const others = filtered.slice(9);
+  const grouped = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    filteredCities.forEach((city) => {
+      const letter = city.charAt(0).toUpperCase();
+      if (!map[letter]) map[letter] = [];
+      if (!map[letter].includes(city)) map[letter].push(city);
+    });
+    Object.values(map).forEach((arr) => arr.sort((a, b) => a.localeCompare(b)));
+    return map;
+  }, [filteredCities]);
+
+  const visibleLetters = useMemo(() => {
+    if (activeLetter && grouped[activeLetter]) return [activeLetter];
+    return ALPHABET.filter((l) => grouped[l]?.length);
+  }, [grouped, activeLetter]);
+
+  const lettersWithCities = useMemo(
+    () => new Set(ALPHABET.filter((l) => grouped[l]?.length)),
+    [grouped]
+  );
+
+  const handleLetterClick = (letter: string) => {
+    setActiveLetter(activeLetter === letter ? null : letter);
+    rightPanelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const detectLocation = () => {
     if (!navigator.geolocation) {
@@ -78,7 +139,7 @@ export default function CitySelectModal({
       async (pos) => {
         try {
           const detected = await reverseGeocodeCity(pos.coords.latitude, pos.coords.longitude);
-          const match = matchCity(detected, cities);
+          const match = matchCity(detected, ALL_ETHIOPIA_CITIES);
           if (match) {
             onSelect(match);
             onClose();
@@ -100,107 +161,192 @@ export default function CitySelectModal({
     );
   };
 
+  const pickCity = (city: string) => {
+    onSelect(city);
+    onClose();
+  };
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-16 sm:pt-20">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center">
       <button
         type="button"
         aria-label="Close city picker"
         className="absolute inset-0 bg-black/50 cursor-pointer"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-5 sm:p-7">
-        <div className="flex items-start justify-between gap-4 mb-5">
-          <h2 className="text-xl font-semibold text-[#111111]">Select your city</h2>
+
+      <div className="relative w-full max-w-[1020px] mt-6 sm:mt-10 mx-4 max-h-[88vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="w-9 h-9 rounded-full border-2 border-[#6900AA] flex items-center justify-center text-[#6900AA]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Select City</h2>
+              <p className="text-xs text-slate-500">Choose your city in Ethiopia</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-[#F7F7F7] flex items-center justify-center cursor-pointer"
+            className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center cursor-pointer text-slate-500"
             aria-label="Close"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="relative mb-4">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9A9A]" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search for your city"
-            className="w-full h-11 pl-10 pr-4 rounded-lg bg-[#F7F7F7] text-sm text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#6900AA]"
-          />
-        </div>
+        <div className="border-t border-slate-100" />
 
-        <button
-          type="button"
-          onClick={detectLocation}
-          disabled={detecting}
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#6900AA] hover:text-[#57008E] mb-6 cursor-pointer disabled:opacity-60"
-        >
-          <Locate size={16} />
-          {detecting ? "Detecting..." : "Detect my location"}
-        </button>
-
-        {cities.length === 0 ? (
-          <p className="text-sm text-[#6B6B6B]">No cities available yet.</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-sm text-[#6B6B6B]">No cities match “{query}”.</p>
-        ) : (
-          <>
-            <p className="text-xs font-semibold tracking-wide text-[#6B6B6B] uppercase mb-3">
-              Popular cities
-            </p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-8">
-              {popular.map((c) => {
-                const active = c === selected;
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => {
-                      onSelect(c);
-                      onClose();
-                    }}
-                    className={`rounded-xl border px-2 py-4 text-sm font-medium cursor-pointer ${
-                      active
-                        ? "border-[#6900AA] bg-[#F7E9FF] text-[#6900AA]"
-                        : "border-[#EDEDED] bg-white text-[#111111] hover:border-[#E3BCFF] hover:bg-[#F7E9FF]"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
+        {/* Body: two panels */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Left Panel */}
+          <div className="w-full sm:w-[350px] shrink-0 border-r border-slate-100 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+            {/* Search */}
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setActiveLetter(null);
+                }}
+                placeholder="Search for your city"
+                className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]"
+              />
             </div>
 
-            {others.length > 0 && (
-              <>
-                <p className="text-xs font-semibold tracking-wide text-[#6B6B6B] uppercase mb-3">
-                  Other cities
-                </p>
-                <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {others.map((c) => (
+            {/* Detect location */}
+            <button
+              type="button"
+              onClick={detectLocation}
+              disabled={detecting}
+              className="inline-flex items-center gap-2 text-sm font-medium text-[#6900AA] hover:text-[#57008E] cursor-pointer disabled:opacity-60"
+            >
+              <Locate size={16} />
+              {detecting ? "Detecting..." : "Detect my location"}
+            </button>
+
+            {/* Popular Cities */}
+            <div>
+              <p className="text-sm font-bold text-slate-900 mb-3">Popular Cities</p>
+              <div className="grid grid-cols-3 gap-3">
+                {POPULAR_CITIES.map((city) => {
+                  const active = city === selected;
+                  return (
                     <button
-                      key={c}
+                      key={city}
                       type="button"
-                      onClick={() => {
-                        onSelect(c);
-                        onClose();
-                      }}
-                      className={`text-sm cursor-pointer hover:text-[#6900AA] ${
-                        c === selected ? "text-[#6900AA] font-semibold" : "text-[#111111]"
+                      onClick={() => pickCity(city)}
+                      className={`flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 cursor-pointer transition-colors ${
+                        active
+                          ? "border-[#6900AA] bg-[#F3EEFF] text-[#6900AA]"
+                          : "border-slate-200 bg-[#F8F6FF] text-slate-800 hover:border-[#E3BCFF] hover:bg-[#F3EEFF]"
                       }`}
                     >
-                      {c}
+                      <span className="text-2xl leading-none">{CITY_ICON[city] || "🏙️"}</span>
+                      <span className="text-[11px] font-semibold text-center leading-tight">{city}</span>
                     </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel */}
+          <div className="hidden sm:flex flex-1 flex-col min-h-0 overflow-hidden">
+            {/* A-Z Bar */}
+            <div className="px-5 pt-4 pb-2 shrink-0">
+              <p className="text-sm font-bold text-slate-900 mb-3">All Cities in Ethiopia</p>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setActiveLetter(null); rightPanelRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  className={`w-8 h-8 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                    activeLetter === null
+                      ? "bg-[#6900AA] text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-[#F3EEFF] hover:text-[#6900AA]"
+                  }`}
+                >
+                  All
+                </button>
+                {ALPHABET.map((letter) => {
+                  const hasItems = lettersWithCities.has(letter);
+                  const isActive = activeLetter === letter;
+                  return (
+                    <button
+                      key={letter}
+                      type="button"
+                      disabled={!hasItems}
+                      onClick={() => handleLetterClick(letter)}
+                      className={`w-8 h-8 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                        isActive
+                          ? "bg-[#6900AA] text-white"
+                          : hasItems
+                            ? "bg-slate-100 text-slate-600 hover:bg-[#F3EEFF] hover:text-[#6900AA]"
+                            : "bg-white text-slate-300 cursor-not-allowed"
+                      }`}
+                    >
+                      {letter}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* City List */}
+            <div ref={rightPanelRef} className="flex-1 overflow-y-auto px-5 pb-4">
+              {visibleLetters.length === 0 ? (
+                <p className="text-sm text-slate-400 mt-6">
+                  {query ? `No cities match "${query}".` : "No cities available."}
+                </p>
+              ) : (
+                visibleLetters.map((letter) => (
+                  <div key={letter} className="mt-4 first:mt-2">
+                    <p className="text-sm font-bold text-[#6900AA] mb-2">{letter}</p>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1">
+                      {grouped[letter].map((city) => (
+                        <button
+                          key={city}
+                          type="button"
+                          onClick={() => pickCity(city)}
+                          className={`text-left text-sm py-1 cursor-pointer rounded hover:text-[#6900AA] transition-colors ${
+                            city === selected
+                              ? "text-[#6900AA] font-semibold"
+                              : "text-slate-700"
+                          }`}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-slate-100 px-6 py-3 flex justify-between shrink-0">
+          <button
+            type="button"
+            onClick={() => { onSelect(""); }}
+            className="px-5 py-2 rounded-lg text-sm font-semibold text-[#6900AA] hover:bg-[#F3EEFF] cursor-pointer"
+          >
+            Clear All
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );

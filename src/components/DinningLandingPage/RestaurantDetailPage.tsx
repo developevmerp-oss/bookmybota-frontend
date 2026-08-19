@@ -568,8 +568,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setAvailabilityStatus('loading');
     try {
       const bookingDateTime = getBookingISO();
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
       const res = await fetch(
-        `http://localhost:5000/api/bookings/availability?business_id=${resolvedParams.id}&date=${bookingDateTime}&guests=${guests}`
+        `${baseUrl}/bookings/availability?business_id=${resolvedParams.id}&date=${bookingDateTime}&guests=${guests}`
       );
       const data = await res.json();
       setAvailabilityStatus(data.available === true ? 'available' : 'unavailable');

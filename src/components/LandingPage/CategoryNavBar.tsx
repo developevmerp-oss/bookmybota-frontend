@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useGetPublicEventFiltersQuery } from "@/services/api";
@@ -36,7 +37,8 @@ function linkClass(active: boolean) {
   }`;
 }
 
-export default function CategoryNavBar() {
+// Inner component uses useSearchParams — must be inside <Suspense>
+function CategoryNavBarInner() {
   const pathname = usePathname() || "";
   const searchParams = useSearchParams();
   const { data: filters } = useGetPublicEventFiltersQuery();
@@ -80,5 +82,14 @@ export default function CategoryNavBar() {
         </div>
       </div>
     </nav>
+  );
+}
+
+// Outer component wraps inner in Suspense to satisfy Next.js static generation
+export default function CategoryNavBar() {
+  return (
+    <Suspense fallback={<nav className="sticky top-16 z-40 bg-[#1F1F1F] h-11" />}>
+      <CategoryNavBarInner />
+    </Suspense>
   );
 }

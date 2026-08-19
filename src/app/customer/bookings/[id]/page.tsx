@@ -244,10 +244,15 @@ export default function BookingDetailPage({
                 </p>
               </div>
             )}
-            {booking.approx_arrival && (
-              <div>
-                <p className="text-muted-foreground text-xs mb-0.5">Approx. arrival</p>
-                <p className="font-medium text-foreground">{booking.approx_arrival}</p>
+            {booking.applied_offer?.title && (
+              <div className="sm:col-span-2">
+                <p className="text-muted-foreground text-xs mb-0.5">Dining offer</p>
+                <p className="font-medium text-foreground">{booking.applied_offer.title}</p>
+                {(booking.applied_offer.type || booking.applied_offer.validity) && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {[booking.applied_offer.type, booking.applied_offer.validity].filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -262,7 +267,7 @@ export default function BookingDetailPage({
                 className="w-40 h-40 mx-auto mb-3 rounded-xl border border-slate-200 bg-white p-2"
               />
               <p className="text-sm text-muted-foreground mb-1">
-                Show this QR at the restaurant for check-in.
+                Show this QR at the restaurant. Staff will see your dining offer and apply it on the food bill.
               </p>
               <p className="text-[11px] text-slate-400 font-mono break-all">{booking.qr_token}</p>
             </>

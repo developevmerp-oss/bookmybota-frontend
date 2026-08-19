@@ -12,6 +12,12 @@ import Link from 'next/link';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
+import {
+  bookingWidgetOfferLabel,
+  normalizeDiningOffers,
+  snapshotDiningOffer,
+  type DiningOffer,
+} from '@/lib/diningOffers';
 import { useRouter } from 'next/navigation';
 import {
   useGetBusinessPublicQuery,
@@ -340,6 +346,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [arrivalDropdownOpen, setArrivalDropdownOpen] = useState(false);
   const arrivalFieldRef = useRef<HTMLDivElement>(null);
   const [lastBookingId, setLastBookingId] = useState<string | null>(null);
+  const [selectedOffer, setSelectedOffer] = useState<DiningOffer | null>(null);
+  const diningOffers = normalizeDiningOffers(profile?.dining_offers);
+  const appliedOffer = snapshotDiningOffer(diningOffers, selectedOffer);
+  const widgetOfferLabel = bookingWidgetOfferLabel(diningOffers);
+  const offerChipLabel = appliedOffer?.title || '';
   const [availabilityStatus, setAvailabilityStatus] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
@@ -603,6 +614,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         booking_source: 'ONLINE',
         guests: Number(guests),
         approx_arrival: approxArrival,
+        ...(appliedOffer ? { applied_offer: appliedOffer } : {}),
         ...(customerIdPayload ? { customer_id: customerIdPayload } : {}),
       }).unwrap();
       setBookingSuccess(true);
@@ -693,7 +705,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleQuickBook = () => {
+  const handleQuickBook = (offer?: DiningOffer) => {
+    if (offer) setSelectedOffer(offer);
     setIsDrawerOpen(true);
     setDrawerStep(1);
   };
@@ -1102,7 +1115,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           <p className="text-xs text-slate-400 font-medium">{offer.validity}</p>
                         </div>
                         <button
-                          onClick={handleQuickBook}
+                          onClick={() => handleQuickBook(offer)}
                           className="self-start sm:self-center shrink-0 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm shadow-rose-200"
                         >
                           Book table to unlock
@@ -1503,10 +1516,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {/* Lavender / Pale blue/indigo Header */}
                 <div className="bg-indigo-50/60 p-4 border-b border-indigo-100/50">
                   <h3 className="text-sm font-bold text-slate-800 tracking-wide uppercase">Table reservation</h3>
-                  <div className="flex items-center gap-1.5 text-xs text-indigo-700 font-bold mt-1">
-                    <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-black shrink-0 shadow-sm">%</span>
-                    <span>Flat 10% OFF + 2 more offers</span>
-                  </div>
+                  {widgetOfferLabel ? (
+                    <div className="flex items-center gap-1.5 text-xs text-indigo-700 font-bold mt-1">
+                      <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-black shrink-0 shadow-sm">%</span>
+                      <span>{widgetOfferLabel}</span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 font-medium mt-1">Reserve a table at this venue</p>
+                  )}
                 </div>
 
                 <div className="p-4 space-y-4">
@@ -1894,8 +1911,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           const lbl = formatDateLabel(d, idx);
                           const active = selectedDateIndex === idx;
 
-                          const day = d.getDay();
-                          const promoText = (day === 5 || day === 6 || day === 0) ? '15% off' : '20% off';
+                          const promoText = offerChipLabel;
 
                           return (
                             <button
@@ -1911,9 +1927,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 {lbl.top}
                               </span>
                               <span className="text-sm font-extrabold mt-0.5 text-slate-900">{lbl.bottom}</span>
-                              <span className="mt-1.5 text-[9px] font-black uppercase tracking-wide text-purple-600">
-                                {promoText}
-                              </span>
+                              {promoText ? (
+                                <span className="mt-1.5 text-[9px] font-black uppercase tracking-wide text-purple-600">
+                                  {promoText}
+                                </span>
+                              ) : null}
                             </button>
                           );
                         })}
@@ -1922,7 +1940,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                     {/* 3. Time selection */}
                     <div className="space-y-3">
-                      <h4 className="text-sm font-bold text-slate-800 tracking-tight">Select the time of day to see the offers</h4>
+                      <h4 className="text-sm font-bold text-slate-800 tracking-tight">
+                        {offerChipLabel ? 'Select the time of day to see the offers' : 'Select the time of day'}
+                      </h4>
 
                       {isSelectedDayClosed ? (
                         <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
@@ -1962,8 +1982,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 <div className="grid grid-cols-3 gap-2 pt-1">
                                   {breakfastSlots.map((slot) => {
                                     const isSelected = selectedTime === slot;
-                                    const day = bookingDates[selectedDateIndex].getDay();
-                                    const promoText = (day === 5 || day === 6 || day === 0) ? '15% off' : '20% off';
+                                    const promoText = offerChipLabel;
                                     return (
                                       <button
                                         key={slot}
@@ -1975,7 +1994,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                           }`}
                                       >
                                         <span className="text-[11px] font-extrabold">{formatSlotLabel(slot)}</span>
-                                        <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        {promoText ? (
+                                          <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        ) : null}
                                       </button>
                                     );
                                   })}
@@ -2010,8 +2031,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 <div className="grid grid-cols-3 gap-2 pt-1">
                                   {lunchSlots.map((slot) => {
                                     const isSelected = selectedTime === slot;
-                                    const day = bookingDates[selectedDateIndex].getDay();
-                                    const promoText = (day === 5 || day === 6 || day === 0) ? '15% off' : '20% off';
+                                    const promoText = offerChipLabel;
                                     return (
                                       <button
                                         key={slot}
@@ -2023,7 +2043,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                           }`}
                                       >
                                         <span className="text-[11px] font-extrabold">{formatSlotLabel(slot)}</span>
-                                        <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        {promoText ? (
+                                          <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        ) : null}
                                       </button>
                                     );
                                   })}
@@ -2058,8 +2080,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 <div className="grid grid-cols-3 gap-2 pt-1">
                                   {dinnerSlots.map((slot) => {
                                     const isSelected = selectedTime === slot;
-                                    const day = bookingDates[selectedDateIndex].getDay();
-                                    const promoText = (day === 5 || day === 6 || day === 0) ? '15% off' : '20% off';
+                                    const promoText = offerChipLabel;
                                     return (
                                       <button
                                         key={slot}
@@ -2071,7 +2092,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                           }`}
                                       >
                                         <span className="text-[11px] font-extrabold">{formatSlotLabel(slot)}</span>
-                                        <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        {promoText ? (
+                                          <span className="text-[8px] font-black text-purple-600 mt-0.5 uppercase tracking-wide">{promoText}</span>
+                                        ) : null}
                                       </button>
                                     );
                                   })}
@@ -2519,6 +2542,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <span className="text-slate-400 font-medium">Arrival:</span>
                         <span className="text-black font-bold">{arrivalTime}</span>
                       </div>
+                      {appliedOffer?.title && (
+                        <div className="flex justify-between text-xs py-3 border-t border-slate-200/80">
+                          <span className="text-slate-400 font-medium">Dining offer:</span>
+                          <span className="text-black font-bold text-right">{appliedOffer.title}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3">

@@ -8,6 +8,10 @@ import {
   useCreateAdminPartnerDocumentMutation,
   useUpdateAdminPartnerDocumentMutation,
   useDeleteAdminPartnerDocumentMutation,
+  useGetAdminPartnerOnboardingTermsQuery,
+  useCreateAdminPartnerOnboardingTermMutation,
+  useUpdateAdminPartnerOnboardingTermMutation,
+  useDeleteAdminPartnerOnboardingTermMutation,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
@@ -44,13 +48,14 @@ function ActiveToggle({
 }
 
 const MODULE_LABEL: Record<string, string> = {
-  both: "Dining + Event",
+  both: "All modules",
   dining: "Dining only",
   event: "Event only",
+  venue: "Venue only",
 };
 
 export default function AdminPartnerDocumentsPage() {
-  const [moduleFilter, setModuleFilter] = useState<"" | "dining" | "event" | "both">("");
+  const [moduleFilter, setModuleFilter] = useState<"" | "dining" | "event" | "venue" | "both">("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const queryArg = {
@@ -73,6 +78,10 @@ export default function AdminPartnerDocumentsPage() {
   const [createDocument, { isLoading: creating }] = useCreateAdminPartnerDocumentMutation();
   const [updateDocument] = useUpdateAdminPartnerDocumentMutation();
   const [deleteDocument] = useDeleteAdminPartnerDocumentMutation();
+  const { data: terms = [] } = useGetAdminPartnerOnboardingTermsQuery(moduleFilter ? { module: moduleFilter } : undefined);
+  const [createTerm, { isLoading: creatingTerm }] = useCreateAdminPartnerOnboardingTermMutation();
+  const [updateTerm] = useUpdateAdminPartnerOnboardingTermMutation();
+  const [deleteTerm] = useDeleteAdminPartnerOnboardingTermMutation();
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
@@ -83,8 +92,12 @@ export default function AdminPartnerDocumentsPage() {
   const [newDoc, setNewDoc] = useState({
     name: "",
     description: "",
-    module: "both" as "dining" | "event" | "both",
+    module: "both" as "dining" | "event" | "venue" | "both",
     is_required: false,
+  });
+  const [newTerm, setNewTerm] = useState({
+    text: "",
+    module: "both" as "dining" | "event" | "venue" | "both",
   });
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -160,14 +173,15 @@ export default function AdminPartnerDocumentsPage() {
                 onChange={(e) =>
                   setNewDoc((p) => ({
                     ...p,
-                    module: e.target.value as "dining" | "event" | "both",
+                    module: e.target.value as "dining" | "event" | "venue" | "both",
                   }))
                 }
                 className="input-field w-full"
               >
-                <option value="both">Dining + Event</option>
+                <option value="both">All modules</option>
                 <option value="dining">Dining only</option>
                 <option value="event">Event only</option>
+                <option value="venue">Venue only</option>
               </select>
             </div>
             <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
@@ -193,15 +207,16 @@ export default function AdminPartnerDocumentsPage() {
               <select
                 value={moduleFilter}
                 onChange={(e) => {
-                  setModuleFilter(e.target.value as "" | "dining" | "event" | "both");
+                  setModuleFilter(e.target.value as "" | "dining" | "event" | "venue" | "both");
                   setPage(1);
                 }}
                 className="input-field text-sm py-2 w-auto min-w-[160px]"
               >
                 <option value="">All modules</option>
-                <option value="both">Dining + Event</option>
+                <option value="both">All modules</option>
                 <option value="dining">Dining only</option>
                 <option value="event">Event only</option>
+                <option value="venue">Venue only</option>
               </select>
               <SearchInput
                 value={q}
@@ -322,6 +337,87 @@ export default function AdminPartnerDocumentsPage() {
             </div>
           )}
           {documentsData?.meta && <Pagination meta={documentsData.meta} onPageChange={setPage} />}
+        </div>
+      </div>
+
+      <div className="glass-panel border border-white/5 rounded-2xl p-6">
+        <h3 className="text-lg font-bold text-white mb-4">Onboarding Terms Master (Popup Content)</h3>
+        <p className="text-zinc-400 text-sm mb-4">
+          These terms are shown in the registration popup before partner submission.
+        </p>
+        <div className="grid md:grid-cols-[1fr_180px_auto] gap-3 mb-4">
+          <input
+            value={newTerm.text}
+            onChange={(e) => setNewTerm((p) => ({ ...p, text: e.target.value }))}
+            placeholder="e.g. I confirm all uploaded documents are valid."
+            className="input-field"
+          />
+          <select
+            value={newTerm.module}
+            onChange={(e) => setNewTerm((p) => ({ ...p, module: e.target.value as "dining" | "event" | "venue" | "both" }))}
+            className="input-field"
+          >
+            <option value="both">All modules</option>
+            <option value="dining">Dining only</option>
+            <option value="event">Event only</option>
+            <option value="venue">Venue only</option>
+          </select>
+          <button
+            type="button"
+            disabled={creatingTerm}
+            onClick={async () => {
+              const text = newTerm.text.trim();
+              if (!text) return toast.error("Term text is required");
+              try {
+                await createTerm({ text, module: newTerm.module, is_active: true }).unwrap();
+                setNewTerm((p) => ({ ...p, text: "" }));
+                toast.success("Onboarding term added");
+              } catch (err: unknown) {
+                toast.error(extractApiError(err, "Failed to add onboarding term"));
+              }
+            }}
+            className="btn-primary disabled:opacity-50"
+          >
+            Add term
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {terms.map((term) => (
+            <div key={term.id} className="p-3 rounded-xl border border-white/10 bg-black/10 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-zinc-100">{term.text}</p>
+                <p className="text-xs text-zinc-500 mt-1">{MODULE_LABEL[term.module] || term.module}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <ActiveToggle
+                  active={!!term.is_active}
+                  onToggle={async () => {
+                    try {
+                      await updateTerm({ id: term.id, body: { is_active: !term.is_active } }).unwrap();
+                    } catch (err: unknown) {
+                      toast.error(extractApiError(err, "Failed to update term"));
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await deleteTerm(term.id).unwrap();
+                      toast.success("Term deleted");
+                    } catch (err: unknown) {
+                      toast.error(extractApiError(err, "Failed to delete term"));
+                    }
+                  }}
+                  className="text-zinc-500 hover:text-rose-400 p-1"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {terms.length === 0 && <p className="text-sm text-zinc-500">No onboarding terms yet.</p>}
         </div>
       </div>
       <ConfirmDialog

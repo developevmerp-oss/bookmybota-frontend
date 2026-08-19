@@ -6,7 +6,7 @@ import PartnerOnboardForm from "@/components/DiningAdminPanel/PartnerOnboardForm
 import { useGetAdminBusinessQuery } from "@/services/api";
 
 interface AdminPartnerFormPageProps {
-  module: "dining" | "event";
+  module: "dining" | "event" | "venue";
   mode: "create" | "edit";
 }
 
@@ -14,6 +14,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
   const params = useParams();
   const id = String(params.id ?? "");
   const isDining = module === "dining";
+  const isVenue = module === "venue";
   const listHref = `/admin/businesses/${module}`;
   const detailHref = id ? `${listHref}/${id}` : listHref;
   const { data: biz, isLoading } = useGetAdminBusinessQuery(id, {
@@ -28,10 +29,12 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
           variant="dark"
           mode="create"
           backHref={listHref}
-          title={isDining ? "Onboard Dining Partner" : "Onboard Event Organizer"}
+          title={isDining ? "Onboard Dining Partner" : isVenue ? "Onboard Venue Partner" : "Onboard Event Organizer"}
           subtitle={
             isDining
               ? "Select parent category and venue type. A temporary password is auto-generated and emailed to the admin."
+              : isVenue
+                ? "Select the Venue parent and a venue type. A temporary password is auto-generated and emailed to the venue admin."
               : "Select the Event parent — venue type stays disabled. A temporary password is auto-generated and emailed to the organizer."
           }
           successDetail="Partner onboarded. Login details are emailed after the account is enabled. Redirecting…"
@@ -74,7 +77,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
         mode="edit"
         editingBusiness={biz}
         backHref={detailHref}
-        title={isDining ? "Edit Dining Partner" : "Edit Event Organizer"}
+        title={isDining ? "Edit Dining Partner" : isVenue ? "Edit Venue Partner" : "Edit Event Organizer"}
         subtitle="Update partner details. Login email cannot be changed from this page."
       />
     </div>

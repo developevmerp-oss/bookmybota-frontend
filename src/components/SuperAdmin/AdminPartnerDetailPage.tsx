@@ -26,7 +26,7 @@ import {
 } from "@/services/api";
 
 interface AdminPartnerDetailPageProps {
-  module: "dining" | "event";
+  module: "dining" | "event" | "venue";
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
@@ -42,6 +42,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const params = useParams();
   const id = String(params.id ?? "");
   const isDining = module === "dining";
+  const isVenue = module === "venue";
   const listHref = `/admin/businesses/${module}`;
   const { data: biz, isLoading } = useGetAdminBusinessQuery(id, { skip: !id });
   const [archiveBusiness, { isLoading: isArchiving }] = useArchiveBusinessMutation();
@@ -70,7 +71,9 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const isArchived = !!biz.deleted_at;
   const archiveBlocked = isDining
     ? (biz.upcoming_booking_count ?? 0) > 0
-    : (biz.live_event_count ?? 0) > 0;
+    : isVenue
+      ? false
+      : (biz.live_event_count ?? 0) > 0;
   const actionBusy = isArchiving || isUnarchiving || confirmBusy;
 
   const runConfirmed = async () => {
@@ -110,7 +113,9 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
           title: "Archive partner?",
           body: isDining
             ? `You cannot archive this dining partner while they have upcoming or in-progress reservations. After archive, "${biz.name}" cannot log in. Booking history is kept.`
-            : `You cannot archive this organizer if any event is still LIVE. Close live events first. After archive, "${biz.name}" cannot log in. Booking and fee history is kept.`,
+            : isVenue
+              ? `Archive "${biz.name}"? After archive, they cannot log in. Layout request history is kept.`
+              : `You cannot archive this organizer if any event is still LIVE. Close live events first. After archive, "${biz.name}" cannot log in. Booking and fee history is kept.`,
           confirmLabel: "Archive",
           danger: true,
         };
@@ -121,8 +126,15 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         href={listHref}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-400 hover:text-white"
       >
-        <ArrowLeft size={16} /> Back to {isDining ? "dining businesses" : "event organizers"}
+        <ArrowLeft size={16} /> Back to {isDining ? "dining businesses" : isVenue ? "venue partners" : "event organizers"}
       </Link>
+      {isVenue && (
+        <div>
+          <Link href={`/admin/venue-layouts?business_id=${biz.id}`} className="btn-secondary inline-flex items-center gap-2">
+            Review venue layouts
+          </Link>
+        </div>
+      )}
 
       {biz.cover_image_url && (
         <div className="rounded-2xl overflow-hidden border border-white/10 h-52 bg-zinc-900">
@@ -151,7 +163,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
                   <XCircle size={12} /> Disabled
                 </span>
               )}
-              {isDining ? (
+              {isDining || isVenue ? (
                 biz.type_name && (
                   <span className="px-2 py-1 rounded-md text-xs font-semibold bg-white/5 text-zinc-300 border border-white/10">
                     {biz.type_name}
@@ -210,9 +222,9 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {isDining && <Field label="Parent category" value={biz.parent_type_name} />}
-          <Field label={isDining ? "Venue type" : "Module"} value={isDining ? biz.type_name : "Event"} />
-          <Field label={isDining ? "Business name" : "Organizer name"} value={biz.name} />
+          {(isDining || isVenue) && <Field label="Parent category" value={biz.parent_type_name} />}
+          <Field label={isDining || isVenue ? "Venue type" : "Module"} value={isDining || isVenue ? biz.type_name : "Event"} />
+          <Field label={isDining ? "Business name" : isVenue ? "Venue name" : "Organizer name"} value={biz.name} />
           <Field label="Address" value={biz.address} />
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">Phone</p>

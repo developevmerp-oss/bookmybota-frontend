@@ -24,6 +24,7 @@ import {
   Star,
   Megaphone,
   KeyRound,
+  QrCode,
 } from "lucide-react";
 
 export default function BusinessLayout({ children }: { children: React.ReactNode }) {
@@ -70,6 +71,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const navigation = [
     { name: "Global Settings", href: "/business", icon: LayoutDashboard },
     { name: "Bookings Manager", href: "/business/bookings", icon: CalendarCheck },
+    { name: "Scan guest QR", href: "/business/scan", icon: QrCode },
     { name: "Table Management", href: "/business/tables", icon: LayoutGrid },
     { name: "Analytics", href: "/business/analytics", icon: Clock },
     { name: "Profile Editor", href: "/business/profile", icon: Settings },

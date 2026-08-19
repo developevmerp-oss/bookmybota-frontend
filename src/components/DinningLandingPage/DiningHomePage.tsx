@@ -43,6 +43,7 @@ import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
+import { listingOfferLabel } from "@/lib/diningOffers";
 import { useAppSelector } from "@/lib/hooks";
 import {
   applyDiningFilters,
@@ -603,7 +604,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
   };
 
   const isPromoted = !!restaurant.is_promoted;
-  const hasDiscount = idHash % 3 === 0 || idHash % 5 === 0;
+  const offerLabel = listingOfferLabel(restaurant.dining_offers);
 
   return (
     <Link
@@ -628,13 +629,13 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
           </span>
         )}
 
-        {hasDiscount && (
+        {offerLabel && (
           <div
             className="absolute bottom-3 left-0 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md"
             style={{ backgroundColor: HERO_ACCENT, boxShadow: "0 6px 14px rgba(105,0,170,0.28)" }}
           >
             <Percent size={11} className="text-white shrink-0" />
-            <span>Flat 10% OFF</span>
+            <span>{offerLabel}</span>
           </div>
         )}
       </div>

@@ -740,6 +740,8 @@ export interface Booking {
   created_at?: string;
   approx_arrival?: string;
   qr_token?: string;
+  applied_offer?: { type?: string; title?: string; validity?: string } | null;
+  checked_out_at?: string | null;
 }
 
 export interface CustomerProfile {
@@ -1288,7 +1290,7 @@ export const api = createApi({
     }),
 
     createBooking: builder.mutation<
-      { message?: string; booking_id?: string; table_assigned?: string; qr_token?: string },
+      { message?: string; booking_id?: string; table_assigned?: string; qr_token?: string; applied_offer?: Booking['applied_offer'] },
       {
         business_id: string;
         customer_name: string;
@@ -1298,6 +1300,7 @@ export const api = createApi({
         guests: number;
         customer_id?: string;
         approx_arrival?: string;
+        applied_offer?: { type?: string; title?: string; validity?: string } | null;
       }
     >({
       query: (body) => ({
@@ -1358,6 +1361,22 @@ export const api = createApi({
       query: (id) => `/bookings/detail/${id}`,
       transformResponse: (res: { data: Booking }) => res.data,
       providesTags: (_result, _error, id) => [{ type: 'Bookings', id }],
+    }),
+
+    scanDiningBookingQr: builder.mutation<{ data: Booking }, { qr_token: string }>({
+      query: (body) => ({
+        url: '/bookings/scan',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    checkoutDiningBooking: builder.mutation<{ message?: string; data: Booking }, string>({
+      query: (id) => ({
+        url: `/bookings/${id}/checkout`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['Bookings'],
     }),
 
     // ── Reviews ──────────────────────────────────────────────────────────────
@@ -2423,6 +2442,8 @@ export const {
   useGetCustomerProfileQuery,
   useUpdateCustomerProfileMutation,
   useCancelBookingMutation,
+  useScanDiningBookingQrMutation,
+  useCheckoutDiningBookingMutation,
   useGetAdminStatsQuery,
   useUpdateSubscriptionMutation,
   useGetAnalyticsQuery,

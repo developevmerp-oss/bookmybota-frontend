@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
+import { listingOfferLabel } from "@/lib/diningOffers";
 import {
   applyDiningFilters,
   DEFAULT_DINING_FILTERS,
@@ -49,8 +50,8 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
     return `${dists[id % dists.length]} km`;
   };
 
-  const isPromoted = idHash % 2 === 0;
-  const hasDiscount = idHash % 3 === 0 || idHash % 5 === 0;
+  const isPromoted = !!restaurant.is_promoted;
+  const offerLabel = listingOfferLabel(restaurant.dining_offers);
 
   return (
     <Link
@@ -75,10 +76,10 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
           </span>
         )}
 
-        {hasDiscount && (
+        {offerLabel && (
           <div className="absolute bottom-3 left-0 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md" style={{ backgroundColor: "#E85D04" }}>
             <Percent size={11} className="text-white shrink-0" />
-            <span>Flat 10% OFF</span>
+            <span>{offerLabel}</span>
           </div>
         )}
       </div>

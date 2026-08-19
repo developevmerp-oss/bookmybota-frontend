@@ -7,6 +7,20 @@
  */
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
+import { clearCredentials } from '@/features/auth/authSlice';
+import { clearSessionForRole, type UserRole } from '@/lib/authStorage';
+import {
+  unwrapPaginated,
+  toListQuery,
+  bizIdOf,
+  pagedBizQuery,
+  type PaginatedList,
+  type PagedQuery,
+  type PagedBizQuery,
+} from '@/lib/pagination';
+
+export type { PaginationMeta, PaginatedList, PagedQuery } from '@/lib/pagination';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -18,7 +32,13 @@ export interface Business {
   address: string;
   phone?: string;
   description?: string;
+  type_id?: number;
   type_name?: string;
+  parent_type_name?: string;
+  module_key?: string;
+  module_name?: string;
+  admin_role?: string;
+  admin_email?: string;
   cover_image_url?: string;
   subscription_plan?: string;
   cuisine?: string;
@@ -26,6 +46,11 @@ export interface Business {
   reviews_count?: number;
   price_range?: string;
   is_open?: boolean;
+  is_enabled?: boolean;
+  credentials_sent_at?: string | null;
+  deleted_at?: string | null;
+  live_event_count?: number;
+  upcoming_booking_count?: number;
   owner_id?: string;
   operating_hours?: Record<string, { open: string; close: string; closed: boolean }>;
   gallery_images?: string[];
@@ -35,6 +60,60 @@ export interface Business {
   average_cost?: number;
   is_promoted?: boolean;
   collection_slugs?: string[];
+  collection_ids?: number[];
+  collection_titles?: string[];
+  documents?: PartnerDocumentUpload[];
+}
+
+export interface AdminCustomer {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  user_email?: string | null;
+  is_registered_user?: boolean;
+  is_enabled?: boolean;
+  created_at?: string;
+  deleted_at?: string | null;
+  dining_bookings_count?: number;
+  event_bookings_count?: number;
+  live_event_booking_count?: number;
+  dining_bookings?: Array<{
+    id: string;
+    status: string;
+    booking_time: string;
+    guests?: number;
+    booking_source?: string;
+    venue_name?: string;
+  }>;
+  event_bookings?: Array<{
+    id: string;
+    status: string;
+    created_at: string;
+    ticket_qty?: number;
+    grand_total?: number;
+    event_name?: string;
+    event_status?: string;
+  }>;
+}
+
+export interface PartnerDocumentUpload {
+  document_type_id: number;
+  url: string;
+  document_name?: string;
+  uploaded_at?: string;
+}
+
+export interface PartnerDocumentMaster {
+  id: number;
+  name: string;
+  slug: string;
+  module: 'dining' | 'event' | 'both';
+  description?: string | null;
+  is_required: boolean;
+  accept?: string;
+  is_active?: boolean;
+  sort_order?: number;
 }
 
 export interface BusinessSettings {
@@ -53,11 +132,424 @@ export interface BusinessSettings {
   dining_offers?: Array<{ type: string; title: string; validity: string }>;
   amenities?: string[];
   average_cost?: number;
+  collection_ids?: number[];
 }
 
 export interface BusinessType {
   id: number;
   name: string;
+  module_id?: number;
+  module_key?: string;
+  module_name?: string;
+  parent_type_id?: number | null;
+  parent_name?: string;
+  slug?: string;
+}
+
+export interface AdminEvent {
+  id: string;
+  business_id: string;
+  name: string;
+  status: string;
+  is_visible: boolean;
+  convenience_fee_percent: number | string;
+  commission_percent: number | string;
+  organizer_name?: string;
+  organizer_phone?: string;
+  organizer_address?: string;
+  organizer_email?: string;
+  category_name?: string;
+  category_type_id?: number | null;
+  language?: string;
+  about_event?: string;
+  age_group?: string;
+  duration_minutes?: number;
+  tickets_sold?: number;
+  convenience_fee_earned?: number | string;
+  commission_earned?: number | string;
+  platform_earned?: number | string;
+  created_at?: string;
+  updated_at?: string;
+  ticket_types?: Array<{
+    id: string;
+    ticket_type: string;
+    total_count: number;
+    available_count: number;
+    price: number | string;
+    showtime_id?: string | null;
+    venue_name?: string | null;
+  }>;
+  showtimes?: Array<{
+    id: string;
+    venue_name?: string;
+    venue_address?: string;
+    starts_at: string;
+    ends_at?: string;
+    duration_type?: 'ONE_DAY' | 'MULTI_DAY';
+    latitude?: number | string | null;
+    longitude?: number | string | null;
+    ticket_types?: Array<{
+      id?: string;
+      ticket_type: string;
+      total_count: number;
+      available_count?: number;
+      price: number | string;
+    }>;
+  }>;
+  bookings?: Array<Record<string, unknown>>;
+  rejection_reason?: string;
+  genres?: string[];
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  gallery_images?: string[];
+  documents?: EventDocumentUpload[] | string[];
+  terms_points?: {
+    selected?: Array<{ id?: number; text?: string } | string>;
+    custom?: string[];
+  };
+}
+
+export interface EventDocumentUpload {
+  document_type_id: number;
+  url: string;
+  document_name?: string;
+}
+
+export interface EventGenreMaster {
+  id: number;
+  category_type_id: number;
+  name: string;
+  slug?: string;
+  is_active: boolean;
+  sort_order: number;
+  category_name?: string;
+}
+
+export interface DiningCuisineMaster {
+  id: number;
+  name: string;
+  slug?: string;
+  image_url?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
+export interface DiningMastersResponse {
+  cuisines: DiningCuisineMaster[];
+}
+
+export interface EventDocumentMaster {
+  id: number;
+  name: string;
+  description?: string;
+  category_type_id?: number | null;
+  is_required: boolean;
+  importance_level: number;
+  is_active: boolean;
+  sort_order: number;
+  category_name?: string;
+}
+
+export interface EventTermsMaster {
+  id: number;
+  text: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
+export interface EventMastersResponse {
+  genres: EventGenreMaster[];
+  documents: EventDocumentMaster[];
+  terms?: EventTermsMaster[];
+}
+
+export interface PublicEventFilters {
+  languages: string[];
+  cities: string[];
+  organizers: string[];
+  categories: Array<{ slug: string; name: string }>;
+  date_presets: Array<{ id: string; label: string }>;
+  price_bands: Array<{ id: string; label: string }>;
+  more: Array<{ id: string; label: string }>;
+}
+
+export interface PublicEventsQuery {
+  q?: string;
+  category?: string;
+  city?: string;
+  language?: string;
+  date_preset?: string;
+  date_from?: string;
+  date_to?: string;
+  price?: string;
+  more?: string;
+  organizer?: string;
+  sort?: string;
+}
+
+export interface EventContract {
+  id: string;
+  event_id: string;
+  contract_number: string;
+  body_html: string;
+  terms_and_conditions?: string | null;
+  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
+  convenience_fee_percent: number | string;
+  commission_percent: number | string;
+  dynamic_data?: Record<string, string | number> | null;
+  admin_signed_at?: string | null;
+  organizer_signed_at?: string | null;
+  admin_signature_url?: string | null;
+  organizer_signature_url?: string | null;
+  rejection_reason?: string | null;
+  event_name?: string;
+  organizer_name?: string;
+  created_at?: string;
+}
+
+export interface EligibleContractEvent {
+  id: string;
+  name: string;
+  status: string;
+  organizer_name?: string;
+  category_name?: string;
+  contract_id?: string;
+  contract_status?: string;
+}
+
+export interface OfferEligibleEvent {
+  id: string;
+  name: string;
+  status: string;
+  starts_on?: string | null;
+  ends_on?: string | null;
+}
+
+export interface ContractPrefill {
+  event: AdminEvent & { organizer_name?: string; category_name?: string };
+  showtimes: AdminEvent['showtimes'];
+  ticket_types: AdminEvent['ticket_types'];
+  existing_contract: EventContract | null;
+  suggested: {
+    contract_number: string;
+    convenience_fee_percent: number;
+    commission_percent: number;
+    terms_and_conditions: string;
+    body_html: string;
+    dynamic_data: Record<string, string | number>;
+  };
+}
+
+export interface OrganizerEvent extends AdminEvent {
+  genres?: string[];
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  gallery_images?: string[];
+  documents?: EventDocumentUpload[] | string[];
+  rejection_reason?: string;
+  terms_points?: { selected?: Array<{ id?: number; text?: string } | string>; custom?: string[] };
+  contract?: EventContract | null;
+  rating?: number | string;
+  reviews_count?: number;
+}
+
+export interface EventFormPayload {
+  name: string;
+  category_type_id: number | null;
+  genres: string[];
+  poster_horizontal_url: string;
+  poster_vertical_url: string;
+  gallery_images?: string[];
+  documents: EventDocumentUpload[];
+  language: string;
+  languages?: string[];
+  about_event: string;
+  age_group: string;
+  duration_minutes: number | null;
+  terms_points?: {
+    selected: Array<{ id: number; text: string }>;
+    custom: string[];
+  };
+  ticket_types: Array<{ ticket_type: string; total_count: number; price: number }>;
+  showtimes: Array<{
+    venue_name: string;
+    venue_address: string;
+    starts_at: string;
+    ends_at: string;
+    duration_type?: 'ONE_DAY' | 'MULTI_DAY';
+    ticket_types?: Array<{ ticket_type: string; total_count: number; price: number }>;
+  }>;
+}
+
+export interface PublicEvent {
+  id: string;
+  name: string;
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  language?: string;
+  about_event?: string;
+  gallery_images?: string[];
+  age_group?: string;
+  duration_minutes?: number;
+  category_name?: string;
+  category_slug?: string;
+  organizer_name?: string;
+  next_showtime?: string;
+  min_price?: number | string;
+  status?: string;
+  rating?: number | string;
+  reviews_count?: number;
+}
+
+export interface EventTicketTypeStats {
+  id: string;
+  ticket_type: string;
+  venue_name?: string | null;
+  showtime_id?: string | null;
+  price: number;
+  total_count: number;
+  available_count: number;
+  sold: number;
+  sold_from_bookings: number;
+  confirmed_sold: number;
+  cancelled_qty: number;
+  remaining: number;
+  revenue: number;
+  fill_percent: number;
+}
+
+export interface EventTicketStatsSummary {
+  total_capacity: number;
+  total_remaining: number;
+  total_sold: number;
+  tickets_sold_bookings: number;
+  bookings_count: number;
+  cancelled_bookings: number;
+  ticket_revenue: number;
+  organizer_payout: number;
+  fill_percent: number;
+}
+
+export interface OrganizerEventTicketStats {
+  event_id: string;
+  event_name: string;
+  status: string;
+  is_visible?: boolean;
+  summary: EventTicketStatsSummary;
+  ticket_types: EventTicketTypeStats[];
+}
+
+export interface OrganizerTicketStatsResponse {
+  overall: EventTicketStatsSummary & { events_count: number };
+  events: OrganizerEventTicketStats[];
+}
+
+export interface OrganizerEventBooking {
+  id: string;
+  event_id: string;
+  showtime_id?: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  status: string;
+  ticket_amount: number;
+  grand_total: number;
+  ticket_qty: number;
+  organizer_payout?: number;
+  qr_code?: string;
+  booking_source?: string;
+  created_at?: string;
+  event_name?: string;
+  venue_name?: string;
+  starts_at?: string;
+  items?: EventBookingItem[];
+}
+
+export interface EventBookingItem {
+  id: string;
+  ticket_type_id: string;
+  ticket_type?: string;
+  qty: number;
+  unit_price: number | string;
+}
+
+export interface EventBooking {
+  id: string;
+  event_id: string;
+  showtime_id?: string;
+  customer_id?: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'USED' | 'REFUNDED' | string;
+  ticket_amount: number | string;
+  convenience_fee_percent?: number | string;
+  convenience_fee_total?: number | string;
+  grand_total: number | string;
+  ticket_qty: number;
+  qr_code?: string;
+  qr_payload?: string;
+  booking_source?: string;
+  created_at?: string;
+  updated_at?: string;
+  event_name?: string;
+  event_status?: string;
+  poster_horizontal_url?: string;
+  poster_vertical_url?: string;
+  language?: string;
+  category_name?: string;
+  organizer_name?: string;
+  venue_name?: string;
+  venue_address?: string;
+  starts_at?: string;
+  ends_at?: string;
+  items?: EventBookingItem[];
+  promo_code?: string | null;
+  discount_amount?: number | string;
+}
+
+export interface AppliedPromoOffer {
+  offer_id: string;
+  title: string;
+  promo_code: string;
+  discount_type: 'PERCENT' | 'FLAT';
+  discount_value: number;
+  discount_amount: number;
+}
+
+export interface CommissionLedgerRow {
+  event_id?: string;
+  event_name?: string;
+  business_id?: string;
+  organizer_name?: string;
+  booking_date?: string;
+  convenience_fee_percent?: number | string;
+  commission_percent?: number | string;
+  bookings_count: number;
+  tickets_sold: number;
+  ticket_amount: number | string;
+  convenience_fee_total: number | string;
+  commission_total: number | string;
+  platform_earned: number | string;
+  organizer_payout: number | string;
+  grand_total: number | string;
+}
+
+export interface CommissionLedger {
+  group_by: string;
+  rows: CommissionLedgerRow[];
+  totals: {
+    bookings_count: number;
+    tickets_sold: number;
+    ticket_amount: number | string;
+    convenience_fee_total: number | string;
+    commission_total: number | string;
+    platform_earned: number | string;
+    organizer_payout: number | string;
+    grand_total: number | string;
+  };
 }
 
 export interface Collection {
@@ -68,6 +560,7 @@ export interface Collection {
   color_gradient?: string;
   slug: string;
   places_count?: number;
+  is_active?: boolean;
 }
 
 export interface Mood {
@@ -96,6 +589,129 @@ export interface Review {
   replies?: ReviewReply[];
 }
 
+export interface EventReviewReply {
+  id: number;
+  review_id: number;
+  user_name: string;
+  user_type: string;
+  text: string;
+  created_at: string;
+}
+
+export interface EventReview {
+  id: number;
+  event_id: string;
+  customer_id?: string | null;
+  user_name: string;
+  rating: number | string;
+  text: string;
+  created_at: string;
+  event_name?: string;
+  replies?: EventReviewReply[];
+}
+
+export interface EventOffer {
+  id: string;
+  event_id: string;
+  business_id: string;
+  title: string;
+  description?: string | null;
+  discount_type: 'PERCENT' | 'FLAT';
+  discount_value: number | string;
+  promo_code?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  is_active: boolean;
+  event_name?: string;
+  event_status?: string;
+  created_at?: string;
+}
+
+export interface OrganizerLedgerRow {
+  event_id: string;
+  event_name: string;
+  event_status: string;
+  bookings_count: number;
+  tickets_sold: number;
+  ticket_amount: number | string;
+  commission_total: number | string;
+  organizer_earned: number | string;
+  paid_amount: number | string;
+  pending_amount: number | string;
+}
+
+export interface OrganizerLedgerCustomerEntry {
+  booking_id: string;
+  event_id: string;
+  event_name: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string;
+  customer_id?: string | null;
+  ticket_qty: number;
+  ticket_amount: number | string;
+  discount_amount?: number | string;
+  commission_total: number | string;
+  organizer_earned: number | string;
+  grand_total: number | string;
+  promo_code?: string | null;
+  status: string;
+  booking_source?: string;
+  created_at?: string;
+}
+
+export interface OrganizerLedger {
+  summary: {
+    bookings_count: number;
+    tickets_sold: number;
+    ticket_amount: number;
+    discount_total?: number;
+    commission_total: number;
+    organizer_earned: number;
+    customer_paid_total?: number;
+    paid_amount: number;
+    pending_amount: number;
+    total_paid: number;
+    admin_pending_payments: number;
+    events_count: number;
+  };
+  rows: OrganizerLedgerRow[];
+  recent_payouts: Array<{
+    id: string;
+    amount: number | string;
+    status: string;
+    payment_reference?: string;
+    event_name?: string;
+    paid_at?: string;
+    created_at?: string;
+  }>;
+}
+
+export interface OrganizerLedgerCustomersResponse {
+  items: OrganizerLedgerCustomerEntry[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+    has_prev: boolean;
+    has_next: boolean;
+  };
+}
+
+export interface OrganizerPayout {
+  id: string;
+  business_id: string;
+  event_id?: string | null;
+  amount: number | string;
+  status: 'PENDING' | 'PAID';
+  payment_reference?: string | null;
+  notes?: string | null;
+  paid_at?: string | null;
+  created_at?: string;
+  organizer_name?: string;
+  event_name?: string;
+}
 
 export interface Table {
   id: string;
@@ -106,14 +722,38 @@ export interface Table {
 
 export interface Booking {
   id: string;
+  business_id?: string;
   business_name?: string;
   business_address?: string;
-  customer_name: string;
-  customer_phone: string;
+  business_cover_image?: string;
+  business_phone?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  guest_name?: string;
+  guest_phone?: string;
+  guests?: number;
   booking_time: string;
+  end_time?: string;
   booking_source: 'ONLINE' | 'WALK_IN';
-  status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+  status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'ARRIVED';
   table_number?: string;
+  created_at?: string;
+  approx_arrival?: string;
+  qr_token?: string;
+}
+
+export interface CustomerProfile {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  profile_image_url?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  is_registered_user?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface AdminStats {
@@ -132,7 +772,7 @@ export interface Analytics {
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'super_admin' | 'business_admin' | 'customer';
+  role: 'super_admin' | 'business_admin' | 'event_admin' | 'customer';
   business_id?: string;
   customer_id?: string;
   name?: string;
@@ -141,33 +781,67 @@ export interface AuthUser {
 
 // ─── RTK Query API ────────────────────────────────────────────────────────────
 
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: BASE_URL,
+  prepareHeaders: (headers) => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      let tokenKey = 'token_customer';
+      if (pathname.startsWith('/admin')) {
+        tokenKey = 'token_super_admin';
+      } else if (pathname.startsWith('/organizer')) {
+        tokenKey = 'token_event_admin';
+      } else if (pathname.startsWith('/business')) {
+        tokenKey = 'token_business_admin';
+      }
+      const token = localStorage.getItem(tokenKey);
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+    }
+    return headers;
+  },
+});
+
+const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
+  args,
+  api,
+  extraOptions
+) => {
+  const result = await rawBaseQuery(args, api, extraOptions);
+  if (result.error && typeof window !== 'undefined') {
+    const path = window.location.pathname;
+    const onManagedPanel =
+      path.startsWith('/business') || path.startsWith('/organizer') || path.startsWith('/customer');
+    const data = result.error.data as { code?: string } | undefined;
+    if (onManagedPanel && data?.code === 'ACCOUNT_DISABLED') {
+      const role = (
+        path.startsWith('/organizer')
+          ? 'event_admin'
+          : path.startsWith('/business')
+            ? 'business_admin'
+            : 'customer'
+      ) as UserRole;
+      clearSessionForRole(role);
+      api.dispatch(clearCredentials());
+      window.location.replace('/login');
+    }
+  }
+  return result;
+};
+
 export const api = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
-    baseUrl: BASE_URL,
-    prepareHeaders: (headers) => {
-      if (typeof window !== 'undefined') {
-        const pathname = window.location.pathname;
-        let tokenKey = 'token_customer';
-        if (pathname.startsWith('/admin')) {
-          tokenKey = 'token_super_admin';
-        } else if (pathname.startsWith('/business')) {
-          tokenKey = 'token_business_admin';
-        }
-        const token = localStorage.getItem(tokenKey);
-        if (token) {
-          headers.set('Authorization', `Bearer ${token}`);
-        }
-      }
-      return headers;
-    },
-  }),
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns'],
+  baseQuery,
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
 
-    login: builder.mutation<{ token: string; user: AuthUser }, { email: string; password: string }>({
+    login: builder.mutation<
+      { token: string; user: AuthUser; message?: string },
+      { email: string; password: string }
+    >({
       query: (credentials) => ({
         url: '/auth/login',
         method: 'POST',
@@ -175,9 +849,54 @@ export const api = createApi({
       }),
     }),
 
+    forgotPassword: builder.mutation<{ message?: string; email_hint?: string }, { email: string }>({
+      query: (body) => ({
+        url: '/auth/forgot-password',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [],
+    }),
+
+    resetPassword: builder.mutation<
+      { message?: string },
+      { token: string; new_password: string; confirm_password: string }
+    >({
+      query: (body) => ({
+        url: '/auth/reset-password',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [],
+    }),
+
+    changePassword: builder.mutation<
+      { message?: string },
+      { current_password: string; new_password: string; confirm_password: string }
+    >({
+      query: (body) => ({
+        url: '/auth/change-password',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [],
+    }),
+
+    getMe: builder.query<{ id: string; role: string; business_id?: string; customer_id?: string; email?: string }, void>({
+      query: () => '/auth/me',
+      transformResponse: (res: { data: { id: string; role: string; business_id?: string; customer_id?: string; email?: string } }) =>
+        res.data,
+    }),
+
     registerCustomer: builder.mutation<
-      { token: string; user: AuthUser },
-      { name: string; email: string; phone: string; password: string }
+      { token: string; user: AuthUser; message?: string },
+      {
+        name: string;
+        email: string;
+        phone: string;
+        password?: string;
+        auto_generate_password?: boolean;
+      }
     >({
       query: (body) => ({
         url: '/auth/register-customer',
@@ -187,15 +906,19 @@ export const api = createApi({
     }),
 
     registerBusiness: builder.mutation<
-      { success: boolean },
+      { success?: boolean; business_id?: string; role?: string; message?: string; is_enabled?: boolean },
       {
         business_name: string;
         address: string;
         phone: string;
         description: string;
-        type_id: number;
+        type_id?: number;
         admin_email: string;
-        admin_password: string;
+        admin_password?: string;
+        partner_type?: 'dining' | 'event';
+        documents?: PartnerDocumentUpload[];
+        cover_image_url?: string;
+        collection_ids?: number[];
       }
     >({
       query: (body) => ({
@@ -203,18 +926,169 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Businesses'],
+      invalidatesTags: ['Businesses', 'DiningMasters'],
+    }),
+
+    updateAdminBusiness: builder.mutation<
+      { message?: string; data?: Business },
+      {
+        id: string;
+        name?: string;
+        address?: string;
+        phone?: string;
+        description?: string;
+        type_id?: number;
+        admin_email?: string;
+        admin_password?: string;
+        documents?: PartnerDocumentUpload[];
+        cover_image_url?: string;
+        collection_ids?: number[];
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/businesses/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Businesses', 'DiningMasters'],
+    }),
+
+    setBusinessEnabled: builder.mutation<
+      { message?: string; data?: Business },
+      { id: string; is_enabled: boolean }
+    >({
+      query: ({ id, is_enabled }) => ({
+        url: `/admin/businesses/${id}/status`,
+        method: 'PATCH',
+        body: { is_enabled },
+      }),
+      invalidatesTags: ['Businesses', 'AdminStats'],
+    }),
+
+    getAdminBusinesses: builder.query<
+      PaginatedList<Business>,
+      { module?: 'dining' | 'event'; tab?: 'active' | 'archived'; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/businesses${toListQuery({
+          module: params?.module,
+          tab: params?.tab === 'archived' ? 'archived' : 'active',
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: Business[] }) => unwrapPaginated(res),
+      providesTags: ['Businesses'],
+    }),
+
+    getAdminBusiness: builder.query<Business, string>({
+      query: (id) => `/admin/businesses/${id}`,
+      transformResponse: (res: { data: Business }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'Businesses', id }],
+    }),
+
+    archiveBusiness: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/businesses/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Businesses', 'AdminStats'],
+    }),
+
+    unarchiveBusiness: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/businesses/${id}/unarchive`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Businesses', 'AdminStats'],
+    }),
+
+    getAdminCustomers: builder.query<
+      PaginatedList<AdminCustomer>,
+      { q?: string; tab?: 'active' | 'archived'; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/customers${toListQuery({
+          tab: params?.tab === 'archived' ? 'archived' : 'active',
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: AdminCustomer[] }) => unwrapPaginated(res),
+      providesTags: ['AdminCustomers'],
+    }),
+
+    getAdminCustomer: builder.query<AdminCustomer, string>({
+      query: (id) => `/admin/customers/${id}`,
+      transformResponse: (res: { data: AdminCustomer }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'AdminCustomers', id }],
+    }),
+
+    createAdminCustomer: builder.mutation<
+      { message?: string; data?: AdminCustomer },
+      { name: string; phone: string; email: string }
+    >({
+      query: (body) => ({
+        url: '/admin/customers',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['AdminCustomers'],
+    }),
+
+    updateAdminCustomer: builder.mutation<
+      { message?: string; data?: AdminCustomer },
+      { id: string; name: string; phone?: string; email?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/customers/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['AdminCustomers'],
+    }),
+
+    setAdminCustomerEnabled: builder.mutation<
+      { message?: string },
+      { id: string; is_enabled: boolean }
+    >({
+      query: ({ id, is_enabled }) => ({
+        url: `/admin/customers/${id}/status`,
+        method: 'PATCH',
+        body: { is_enabled },
+      }),
+      invalidatesTags: ['AdminCustomers'],
+    }),
+
+    archiveAdminCustomer: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/customers/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['AdminCustomers'],
+    }),
+
+    unarchiveAdminCustomer: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/customers/${id}/unarchive`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['AdminCustomers'],
     }),
 
     // ── Businesses (Public) ───────────────────────────────────────────────────
 
-    getBusinesses: builder.query<Business[], { collection?: string; mood?: string } | void>({
+    getBusinesses: builder.query<
+      Business[],
+      { collection?: string; mood?: string; module?: 'dining' | 'event' } | void
+    >({
       query: (params) => {
         let url = '/businesses';
         if (params) {
           const searchParams = new URLSearchParams();
           if (params.collection) searchParams.append('collection', params.collection);
           if (params.mood) searchParams.append('mood', params.mood);
+          if (params.module) searchParams.append('module', params.module);
           const queryString = searchParams.toString();
           if (queryString) url += `?${queryString}`;
         }
@@ -227,6 +1101,7 @@ export const api = createApi({
     getCollections: builder.query<Collection[], void>({
       query: () => '/businesses/collections',
       transformResponse: (res: { data: Collection[] }) => res.data || [],
+      providesTags: [{ type: 'DiningMasters', id: 'COLLECTION_PUBLIC' }],
     }),
 
     getMoods: builder.query<Mood[], void>({
@@ -234,9 +1109,91 @@ export const api = createApi({
       transformResponse: (res: { data: Mood[] }) => res.data || [],
     }),
 
+    getDiningCuisines: builder.query<DiningCuisineMaster[], void>({
+      query: () => '/businesses/cuisines',
+      transformResponse: (res: { data?: DiningCuisineMaster[] }) => res?.data ?? [],
+      providesTags: [{ type: 'DiningMasters', id: 'PUBLIC_LIST' }],
+    }),
+
     getBusinessTypes: builder.query<BusinessType[], void>({
       query: () => '/businesses/types',
       transformResponse: (res: { data: BusinessType[] }) => res.data || [],
+    }),
+
+    getPartnerDocumentMasters: builder.query<
+      PartnerDocumentMaster[],
+      'dining' | 'event' | void
+    >({
+      query: (module) => {
+        const qs = module ? `?module=${module}` : '';
+        return `/businesses/partner-documents${qs}`;
+      },
+      transformResponse: (res: { data?: PartnerDocumentMaster[] }) => res?.data ?? [],
+      providesTags: ['PartnerDocuments'],
+    }),
+
+    getAdminPartnerDocuments: builder.query<
+      PaginatedList<PartnerDocumentMaster>,
+      { module?: 'dining' | 'event' | 'both'; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/partner-documents${toListQuery({
+          module: params?.module,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: PartnerDocumentMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+            ...result.items.map((d) => ({ type: 'PartnerDocuments' as const, id: d.id })),
+            { type: 'PartnerDocuments', id: 'LIST' },
+            'PartnerDocuments',
+          ]
+          : [{ type: 'PartnerDocuments', id: 'LIST' }, 'PartnerDocuments'],
+    }),
+
+    createAdminPartnerDocument: builder.mutation<
+      PartnerDocumentMaster,
+      {
+        name: string;
+        description?: string;
+        module?: 'dining' | 'event' | 'both';
+        is_required?: boolean;
+        is_active?: boolean;
+        sort_order?: number;
+      }
+    >({
+      query: (body) => ({
+        url: '/admin/partner-documents',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: PartnerDocumentMaster }) =>
+        res?.data ?? ({} as PartnerDocumentMaster),
+      invalidatesTags: [{ type: 'PartnerDocuments', id: 'LIST' }, 'PartnerDocuments'],
+    }),
+
+    updateAdminPartnerDocument: builder.mutation<
+      PartnerDocumentMaster,
+      { id: number; body: Partial<PartnerDocumentMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/partner-documents/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: PartnerDocumentMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'PartnerDocuments', id },
+        { type: 'PartnerDocuments', id: 'LIST' },
+        'PartnerDocuments',
+      ],
+    }),
+
+    deleteAdminPartnerDocument: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/partner-documents/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'PartnerDocuments', id: 'LIST' }, 'PartnerDocuments'],
     }),
 
     getBusinessPublic: builder.query<Business, string>({
@@ -261,15 +1218,19 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: (_result, _error, { bizId }) => [{ type: 'BusinessSettings', id: bizId }],
+      invalidatesTags: (_result, _error, { bizId }) => [
+        { type: 'BusinessSettings', id: bizId },
+        'Businesses',
+        'DiningMasters',
+      ],
     }),
 
     // ── Tables ────────────────────────────────────────────────────────────────
 
-    getTables: builder.query<Table[], string>({
-      query: (bizId) => `/businesses/${bizId}/tables`,
-      transformResponse: (res: { data: Table[] }) => res.data || [],
-      providesTags: (_result, _error, bizId) => [{ type: 'Tables', id: bizId }],
+    getTables: builder.query<PaginatedList<Table>, PagedBizQuery>({
+      query: (arg) => `/businesses/${bizIdOf(arg)}/tables${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: Table[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'Tables', id: bizIdOf(arg) }],
     }),
 
     addTable: builder.mutation<
@@ -306,10 +1267,10 @@ export const api = createApi({
 
     // ── Bookings ──────────────────────────────────────────────────────────────
 
-    getBusinessBookings: builder.query<Booking[], string>({
-      query: (bizId) => `/bookings/${bizId}`,
-      transformResponse: (res: { data: Booking[] }) => res.data || [],
-      providesTags: (_result, _error, bizId) => [{ type: 'Bookings', id: bizId }],
+    getBusinessBookings: builder.query<PaginatedList<Booking>, PagedBizQuery>({
+      query: (arg) => `/bookings/${bizIdOf(arg)}${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: Booking[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'Bookings', id: bizIdOf(arg) }],
     }),
 
     getCustomerBookings: builder.query<Booking[], string>({
@@ -327,7 +1288,7 @@ export const api = createApi({
     }),
 
     createBooking: builder.mutation<
-      { success: boolean },
+      { message?: string; booking_id?: string; table_assigned?: string; qr_token?: string },
       {
         business_id: string;
         customer_name: string;
@@ -336,6 +1297,7 @@ export const api = createApi({
         booking_source: 'ONLINE' | 'WALK_IN';
         guests: number;
         customer_id?: string;
+        approx_arrival?: string;
       }
     >({
       query: (body) => ({
@@ -343,11 +1305,11 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: (_result, _error, { business_id }) => [{ type: 'Bookings', id: business_id }],
+      invalidatesTags: ['Bookings'],
     }),
 
     phoneLogin: builder.mutation<
-      { token: string; user: AuthUser },
+      { token: string; user: AuthUser; message?: string },
       { phone: string; otp: string }
     >({
       query: (body) => ({
@@ -355,6 +1317,33 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
+    }),
+
+    getCustomerProfile: builder.query<CustomerProfile, string>({
+      query: (customerId) => `/auth/customer-profile/${customerId}`,
+      transformResponse: (res: { data: CustomerProfile }) => res.data,
+      providesTags: (_result, _error, customerId) => [{ type: 'CustomerProfile', id: customerId }],
+    }),
+
+    updateCustomerProfile: builder.mutation<
+      { message: string; data: CustomerProfile },
+      {
+        customerId: string;
+        name: string;
+        phone?: string;
+        email?: string;
+        profile_image_url?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+      }
+    >({
+      query: ({ customerId, ...body }) => ({
+        url: `/auth/customer-profile/${customerId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { customerId }) => [{ type: 'CustomerProfile', id: customerId }],
     }),
 
     cancelBooking: builder.mutation<{ success: boolean }, { id: string; refetchId?: string }>({
@@ -365,12 +1354,18 @@ export const api = createApi({
       invalidatesTags: ['Bookings'],
     }),
 
+    getBookingById: builder.query<Booking, string>({
+      query: (id) => `/bookings/detail/${id}`,
+      transformResponse: (res: { data: Booking }) => res.data,
+      providesTags: (_result, _error, id) => [{ type: 'Bookings', id }],
+    }),
+
     // ── Reviews ──────────────────────────────────────────────────────────────
 
-    getReviews: builder.query<Review[], string>({
-      query: (bizId) => `/reviews/${bizId}`,
-      transformResponse: (res: { data: Review[] }) => res.data || [],
-      providesTags: (_result, _error, bizId) => [{ type: 'Reviews', id: bizId }],
+    getReviews: builder.query<PaginatedList<Review>, PagedBizQuery>({
+      query: (arg) => `/reviews/${bizIdOf(arg)}${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: Review[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'Reviews', id: bizIdOf(arg) }],
     }),
 
     createReview: builder.mutation<
@@ -423,9 +1418,9 @@ export const api = createApi({
       invalidatesTags: ['Businesses'],
     }),
 
-    getMarketingPlans: builder.query<any[], void>({
-      query: () => '/admin/marketing-plans',
-      transformResponse: (res: { data: any[] }) => res.data,
+    getMarketingPlans: builder.query<PaginatedList<any>, PagedQuery | void>({
+      query: (params) => `/admin/marketing-plans${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
       providesTags: ['MarketingPlans'],
     }),
 
@@ -455,9 +1450,9 @@ export const api = createApi({
       invalidatesTags: ['MarketingPlans'],
     }),
 
-    getMarketingCampaigns: builder.query<any[], void>({
-      query: () => '/admin/marketing-campaigns',
-      transformResponse: (res: { data: any[] }) => res.data,
+    getMarketingCampaigns: builder.query<PaginatedList<any>, PagedQuery | void>({
+      query: (params) => `/admin/marketing-campaigns${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
       providesTags: ['MarketingCampaigns'],
     }),
 
@@ -470,6 +1465,405 @@ export const api = createApi({
       invalidatesTags: ['MarketingCampaigns', 'Businesses'],
     }),
 
+    // ── Admin Events & Commission ─────────────────────────────────────────────
+
+    getAdminEvents: builder.query<
+      PaginatedList<AdminEvent>,
+      { status?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/events${toListQuery({
+          status: params?.status,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: AdminEvent[] }) => unwrapPaginated(res),
+      providesTags: ['AdminEvents'],
+    }),
+
+    getAdminEventDetail: builder.query<AdminEvent, string>({
+      query: (id) => `/admin/events/${id}`,
+      transformResponse: (res: { data: AdminEvent }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'AdminEvents', id }],
+    }),
+
+    updateAdminEvent: builder.mutation<
+      AdminEvent,
+      {
+        id: string;
+        action?: 'approve' | 'reject' | 'go_live' | 'close';
+        status?: string;
+        is_visible?: boolean;
+        convenience_fee_percent?: number;
+        commission_percent?: number;
+        rejection_reason?: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/events/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: AdminEvent }) => res.data,
+      invalidatesTags: ['AdminEvents', 'AdminCommission', 'PublicEvents', 'OrganizerEvents'],
+    }),
+
+    getCommissionLedger: builder.query<
+      CommissionLedger,
+      { from?: string; to?: string; group_by?: 'event' | 'business' | 'date' } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.from) searchParams.append('from', params.from);
+        if (params?.to) searchParams.append('to', params.to);
+        if (params?.group_by) searchParams.append('group_by', params.group_by);
+        const qs = searchParams.toString();
+        return `/admin/commission${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: CommissionLedger }) => res.data,
+      providesTags: ['AdminCommission'],
+    }),
+
+    getAdminEventBookings: builder.query<any[], { event_id?: string; business_id?: string } | void>({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+        if (params?.event_id) searchParams.append('event_id', params.event_id);
+        if (params?.business_id) searchParams.append('business_id', params.business_id);
+        const qs = searchParams.toString();
+        return `/admin/event-bookings${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: any[] }) => res.data || [],
+      providesTags: ['AdminEvents'],
+    }),
+
+    // ── Event Contracts ───────────────────────────────────────────────────────
+
+    getEligibleContractEvents: builder.query<EligibleContractEvent[], void>({
+      query: () => '/admin/event-contracts/eligible-events',
+      transformResponse: (res: { data: EligibleContractEvent[] }) => res.data || [],
+      providesTags: ['EventContracts'],
+    }),
+
+    getContractPrefill: builder.query<ContractPrefill, string>({
+      query: (eventId) => `/admin/event-contracts/prefill/${eventId}`,
+      transformResponse: (res: { data: ContractPrefill }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventContracts', id: `prefill-${id}` }],
+    }),
+
+    getEventContracts: builder.query<PaginatedList<EventContract>, PagedQuery | void>({
+      query: (params) => `/admin/event-contracts${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: EventContract[] }) => unwrapPaginated(res),
+      providesTags: ['EventContracts'],
+    }),
+
+    getAdminEventContract: builder.query<EventContract, string>({
+      query: (eventId) => `/admin/event-contracts/event/${eventId}`,
+      transformResponse: (res: { data: EventContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventContracts', id }],
+    }),
+
+    createEventContract: builder.mutation<
+      EventContract,
+      {
+        event_id: string;
+        body_html: string;
+        terms_and_conditions?: string;
+        convenience_fee_percent?: number;
+        commission_percent?: number;
+        sign_as_admin?: boolean;
+      }
+    >({
+      query: (body) => ({ url: '/admin/event-contracts', method: 'POST', body }),
+      transformResponse: (res: { data: EventContract }) => res.data,
+      invalidatesTags: ['EventContracts', 'AdminEvents', 'OrganizerEvents', 'PublicEvents'],
+    }),
+
+    requestAdminContractOtp: builder.mutation<
+      { message?: string; email_hint?: string; expires_in_seconds?: number },
+      string
+    >({
+      query: (eventId) => ({
+        url: `/admin/event-contracts/event/${eventId}/request-otp-admin`,
+        method: 'POST',
+      }),
+      invalidatesTags: [],
+    }),
+
+    signAdminEventContract: builder.mutation<
+      EventContract,
+      { eventId: string; signature_url: string; otp: string }
+    >({
+      query: ({ eventId, signature_url, otp }) => ({
+        url: `/admin/event-contracts/event/${eventId}/sign-admin`,
+        method: 'POST',
+        body: { signature_url, otp },
+      }),
+      transformResponse: (res: { data: EventContract }) => res.data,
+      invalidatesTags: ['EventContracts', 'AdminEvents', 'PublicEvents', 'OrganizerEvents'],
+    }),
+
+    getOrganizerEventContract: builder.query<EventContract, string>({
+      query: (eventId) => `/events/organizer/${eventId}/contract`,
+      transformResponse: (res: { data: EventContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id: `${id}-contract` }],
+    }),
+
+    requestOrganizerContractOtp: builder.mutation<
+      { message?: string; email_hint?: string; expires_in_seconds?: number },
+      string
+    >({
+      query: (eventId) => ({
+        url: `/events/organizer/${eventId}/contract/request-otp`,
+        method: 'POST',
+      }),
+      invalidatesTags: [],
+    }),
+
+    signOrganizerEventContract: builder.mutation<
+      EventContract,
+      { eventId: string; signature_url: string; otp: string }
+    >({
+      query: ({ eventId, signature_url, otp }) => ({
+        url: `/events/organizer/${eventId}/contract/sign`,
+        method: 'POST',
+        body: { signature_url, otp },
+      }),
+      transformResponse: (res: { data: EventContract }) => res.data,
+      invalidatesTags: ['OrganizerEvents', 'EventContracts', 'PublicEvents'],
+    }),
+
+    rejectOrganizerEventContract: builder.mutation<
+      { message?: string },
+      { eventId: string; rejection_reason?: string }
+    >({
+      query: ({ eventId, rejection_reason }) => ({
+        url: `/events/organizer/${eventId}/contract/reject`,
+        method: 'POST',
+        body: { rejection_reason },
+      }),
+      invalidatesTags: ['OrganizerEvents', 'EventContracts'],
+    }),
+
+    // ── Event reviews ─────────────────────────────────────────────────────────
+
+    getPublicEventReviews: builder.query<EventReview[], string>({
+      query: (eventId) => `/events/public/${eventId}/reviews`,
+      transformResponse: (res: { data: EventReview[] }) => res.data || [],
+      providesTags: (_r, _e, id) => [{ type: 'EventReviews', id }],
+    }),
+
+    createEventReview: builder.mutation<
+      { data: EventReview; newStats?: { rating: string; reviews_count: number } },
+      { eventId: string; user_name: string; rating: number; text: string }
+    >({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/public/${eventId}/reviews`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { eventId }) => [
+        { type: 'EventReviews', id: eventId },
+        'PublicEvents',
+      ],
+    }),
+
+    getOrganizerEventReviews: builder.query<
+      PaginatedList<EventReview>,
+      { event_id?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/events/organizer/reviews${toListQuery({
+          event_id: params?.event_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: EventReview[] }) => unwrapPaginated(res),
+      providesTags: ['EventReviews'],
+    }),
+
+    createEventReviewReply: builder.mutation<
+      { data: EventReviewReply },
+      { reviewId: number; user_name: string; text: string }
+    >({
+      query: ({ reviewId, ...body }) => ({
+        url: `/events/organizer/reviews/${reviewId}/reply`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['EventReviews'],
+    }),
+
+    // ── Event offers ──────────────────────────────────────────────────────────
+
+    getOrganizerOffers: builder.query<PaginatedList<EventOffer>, PagedQuery | void>({
+      query: (params) => `/events/organizer/offers${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: EventOffer[] }) => unwrapPaginated(res),
+      providesTags: ['EventOffers'],
+    }),
+
+    getOfferEligibleEvents: builder.query<
+      OfferEligibleEvent[],
+      void
+    >({
+      query: () => '/events/organizer/offers/eligible-events',
+      transformResponse: (res: { data: OfferEligibleEvent[] }) =>
+        res.data || [],
+    }),
+
+    getPublicEventOffers: builder.query<EventOffer[], string>({
+      query: (eventId) => `/events/public/${eventId}/offers`,
+      transformResponse: (res: { data: EventOffer[] }) => res.data || [],
+    }),
+
+    validateEventPromoCode: builder.mutation<
+      AppliedPromoOffer,
+      { eventId: string; promo_code: string; ticket_amount: number }
+    >({
+      query: ({ eventId, promo_code, ticket_amount }) => ({
+        url: `/events/public/${eventId}/validate-promo`,
+        method: 'POST',
+        body: { promo_code, ticket_amount },
+      }),
+      transformResponse: (res: { data: AppliedPromoOffer }) => res.data,
+    }),
+
+    createEventOffer: builder.mutation<
+      EventOffer,
+      {
+        eventId: string;
+        title: string;
+        description?: string;
+        discount_type: 'PERCENT' | 'FLAT';
+        discount_value: number;
+        promo_code?: string;
+        valid_from?: string;
+        valid_until?: string;
+        is_active?: boolean;
+      }
+    >({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/organizer/${eventId}/offers`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: EventOffer }) => res.data,
+      invalidatesTags: ['EventOffers'],
+    }),
+
+    updateEventOffer: builder.mutation<
+      EventOffer,
+      {
+        offerId: string;
+        title: string;
+        description?: string;
+        discount_type: 'PERCENT' | 'FLAT';
+        discount_value: number;
+        promo_code?: string;
+        valid_from?: string;
+        valid_until?: string;
+        is_active?: boolean;
+      }
+    >({
+      query: ({ offerId, ...body }) => ({
+        url: `/events/organizer/offers/${offerId}`,
+        method: 'PUT',
+        body,
+      }),
+      transformResponse: (res: { data: EventOffer }) => res.data,
+      invalidatesTags: ['EventOffers'],
+    }),
+
+    deleteEventOffer: builder.mutation<{ message?: string }, string>({
+      query: (offerId) => ({
+        url: `/events/organizer/offers/${offerId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['EventOffers'],
+    }),
+
+    // ── Organizer ledger ──────────────────────────────────────────────────────
+
+    getOrganizerLedger: builder.query<
+      OrganizerLedger,
+      {
+        event_id?: string;
+        q?: string;
+        from?: string;
+        to?: string;
+      } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.event_id) sp.set('event_id', params.event_id);
+        if (params?.q) sp.set('q', params.q);
+        if (params?.from) sp.set('from', params.from);
+        if (params?.to) sp.set('to', params.to);
+        const qs = sp.toString();
+        return `/events/organizer/ledger${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: OrganizerLedger }) => res.data,
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getOrganizerLedgerCustomers: builder.query<
+      OrganizerLedgerCustomersResponse,
+      {
+        event_id?: string;
+        q?: string;
+        from?: string;
+        to?: string;
+        page: number;
+      }
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        sp.set('page', String(params.page));
+        if (params.event_id) sp.set('event_id', params.event_id);
+        if (params.q) sp.set('q', params.q);
+        if (params.from) sp.set('from', params.from);
+        if (params.to) sp.set('to', params.to);
+        return `/events/organizer/ledger/customers?${sp.toString()}`;
+      },
+      transformResponse: (res: { data: OrganizerLedgerCustomersResponse }) => res.data,
+      providesTags: ['OrganizerLedgerCustomers'],
+    }),
+
+    createOrganizerPayout: builder.mutation<
+      { data: OrganizerPayout },
+      {
+        business_id: string;
+        event_id?: string;
+        amount: number;
+        status?: 'PENDING' | 'PAID';
+        payment_reference?: string;
+        notes?: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/admin/organizer-payouts',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['OrganizerLedger', 'OrganizerLedgerCustomers', 'AdminCommission', 'OrganizerPayouts'],
+    }),
+
+    getOrganizerPayouts: builder.query<
+      PaginatedList<OrganizerPayout>,
+      { business_id?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/organizer-payouts${toListQuery({
+          business_id: params?.business_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerPayout[] }) => unwrapPaginated(res),
+      providesTags: ['OrganizerPayouts'],
+    }),
+
     // ── Analytics ─────────────────────────────────────────────────────────────
 
     getAnalytics: builder.query<Analytics, string>({
@@ -478,10 +1872,494 @@ export const api = createApi({
       providesTags: (_result, _error, bizId) => [{ type: 'Analytics', id: bizId }],
     }),
 
-    getBusinessCampaigns: builder.query<any[], string>({
-      query: (bizId) => `/businesses/${bizId}/campaigns`,
-      transformResponse: (res: { data: any[] }) => res.data,
-      providesTags: (_result, _error, bizId) => [{ type: 'MarketingCampaigns', id: bizId }],
+    getBusinessCampaigns: builder.query<PaginatedList<any>, PagedBizQuery>({
+      query: (arg) => `/businesses/${bizIdOf(arg)}/campaigns${pagedBizQuery(arg)}`,
+      transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
+      providesTags: (_result, _error, arg) => [{ type: 'MarketingCampaigns', id: bizIdOf(arg) }],
+    }),
+
+    // ── Organizer Events ──────────────────────────────────────────────────────
+
+    getOrganizerEvents: builder.query<
+      PaginatedList<OrganizerEvent>,
+      { q?: string; status?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/events/organizer${toListQuery({
+          q: params?.q,
+          status: params?.status,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerEvent[] }) => unwrapPaginated(res),
+      providesTags: ['OrganizerEvents'],
+    }),
+
+    getOrganizerEvent: builder.query<OrganizerEvent, string>({
+      query: (id) => `/events/organizer/${id}`,
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id }],
+    }),
+
+    getEventLayout: builder.query<any, string>({
+      query: (id) => `/events/organizer/${id}/layout`,
+      providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id }],
+    }),
+
+    updateEventLayout: builder.mutation<any, { eventId: string; seating_config: any; seats: any[] }>({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/organizer/${eventId}/layout`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { eventId }) => [{ type: 'EventLayouts', id: eventId }],
+    }),
+
+    getOrganizerTicketStats: builder.query<
+      OrganizerTicketStatsResponse,
+      { event_id?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.event_id) sp.set('event_id', params.event_id);
+        const qs = sp.toString();
+        return `/events/organizer/ticket-stats${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: OrganizerTicketStatsResponse }) => res.data,
+      providesTags: ['OrganizerTicketStats'],
+    }),
+
+    getOrganizerBookings: builder.query<
+      PaginatedList<OrganizerEventBooking>,
+      { event_id?: string; status?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/events/organizer/bookings${toListQuery({
+          event_id: params?.event_id,
+          status: params?.status,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerEventBooking[] }) => unwrapPaginated(res),
+      providesTags: ['OrganizerBookings'],
+    }),
+
+    createOrganizerEvent: builder.mutation<OrganizerEvent, EventFormPayload>({
+      query: (body) => ({ url: '/events/organizer', method: 'POST', body }),
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      invalidatesTags: ['OrganizerEvents'],
+    }),
+
+    updateOrganizerEvent: builder.mutation<
+      { data: OrganizerEvent; message?: string },
+      { id: string; body: EventFormPayload }
+    >({
+      query: ({ id, body }) => ({ url: `/events/organizer/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['OrganizerEvents'],
+    }),
+
+    submitOrganizerEvent: builder.mutation<
+      { data: OrganizerEvent; message?: string },
+      { id: string; body: EventFormPayload }
+    >({
+      query: ({ id, body }) => ({ url: `/events/organizer/${id}/submit`, method: 'POST', body }),
+      invalidatesTags: ['OrganizerEvents', 'AdminEvents', 'PublicEvents'],
+    }),
+
+    toggleOrganizerEventVisibility: builder.mutation<
+      OrganizerEvent,
+      { id: string; is_visible?: boolean }
+    >({
+      query: ({ id, is_visible }) => ({
+        url: `/events/organizer/${id}/visibility`,
+        method: 'PATCH',
+        body: is_visible !== undefined ? { is_visible } : {},
+      }),
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      invalidatesTags: ['OrganizerEvents', 'PublicEvents'],
+    }),
+
+    closeOrganizerEvent: builder.mutation<{ data: OrganizerEvent }, string>({
+      query: (id) => ({ url: `/events/organizer/${id}/close`, method: 'POST' }),
+      invalidatesTags: ['OrganizerEvents', 'PublicEvents'],
+    }),
+
+    getPublicEvents: builder.query<PublicEvent[], PublicEventsQuery | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.append('q', params.q);
+        if (params?.category) sp.append('category', params.category);
+        if (params?.city) sp.append('city', params.city);
+        if (params?.language) sp.append('language', params.language);
+        if (params?.date_preset) sp.append('date_preset', params.date_preset);
+        if (params?.date_from) sp.append('date_from', params.date_from);
+        if (params?.date_to) sp.append('date_to', params.date_to);
+        if (params?.price) sp.append('price', params.price);
+        if (params?.more) sp.append('more', params.more);
+        if (params?.organizer) sp.append('organizer', params.organizer);
+        if (params?.sort) sp.append('sort', params.sort);
+        const qs = sp.toString();
+        return `/events/public${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: PublicEvent[] }) => res.data || [],
+      providesTags: ['PublicEvents'],
+    }),
+
+    getPublicEventFilters: builder.query<PublicEventFilters, void>({
+      query: () => '/events/public/filters',
+      transformResponse: (res: { data: PublicEventFilters }) => res.data,
+      providesTags: ['PublicEvents'],
+    }),
+
+    getPublicEvent: builder.query<OrganizerEvent, string>({
+      query: (id) => `/events/public/${id}`,
+      transformResponse: (res: { data: OrganizerEvent }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'PublicEvents', id }],
+    }),
+
+    getPublicEventLayout: builder.query<any, string>({
+      query: (id) => `/events/public/${id}/layout`,
+      providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id: `public-${id}` }],
+    }),
+
+    createEventBooking: builder.mutation<
+      { message?: string; booking_id?: string; qr_code?: string; grand_total?: number; ticket_qty?: number },
+      {
+        event_id: string;
+        showtime_id: string;
+        items: Array<{ ticket_type_id: string; qty: number }>;
+        guest_name: string;
+        guest_phone: string;
+        guest_email?: string;
+        customer_id?: string;
+        booking_source?: 'ONLINE' | 'WALK_IN' | 'CASH' | 'ORGANIZER';
+        promo_code?: string;
+        /** When true, POST to organizer booking API (event_admin selling for a customer) */
+        for_organizer?: boolean;
+      }
+    >({
+      query: ({ for_organizer, ...body }) => ({
+        url: for_organizer ? '/events/organizer/bookings' : '/events/bookings',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'OrganizerEvents'],
+    }),
+
+    getCustomerEventBookings: builder.query<EventBooking[], string>({
+      query: (customerId) => `/events/bookings/customer/${customerId}`,
+      transformResponse: (res: { data: EventBooking[] }) => res.data || [],
+      providesTags: (_result, _error, customerId) => [{ type: 'EventBookings', id: customerId }],
+    }),
+
+    getEventBookingById: builder.query<EventBooking, string>({
+      query: (id) => `/events/bookings/detail/${id}`,
+      transformResponse: (res: { data: EventBooking }) => res.data,
+      providesTags: (_result, _error, id) => [{ type: 'EventBookings', id }],
+    }),
+
+    cancelEventBooking: builder.mutation<{ message?: string }, { id: string; customerId?: string }>({
+      query: ({ id }) => ({
+        url: `/events/bookings/${id}/cancel`,
+        method: 'PUT',
+      }),
+      invalidatesTags: (_result, _error, { id, customerId }) => [
+        { type: 'EventBookings', id },
+        ...(customerId ? [{ type: 'EventBookings' as const, id: customerId }] : []),
+        'EventBookings',
+        'PublicEvents',
+      ],
+    }),
+
+    getEventMasters: builder.query<EventMastersResponse, number>({
+      query: (categoryTypeId) => `/events/masters?category_type_id=${categoryTypeId}`,
+      transformResponse: (res: { data: EventMastersResponse }) => res.data,
+      providesTags: ['EventMasters'],
+    }),
+
+    // ── Admin Event Masters ───────────────────────────────────────────────────
+
+    getAdminEventGenres: builder.query<
+      PaginatedList<EventGenreMaster>,
+      { category_type_id?: number; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/event-genres${toListQuery({
+          category_type_id: params?.category_type_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: EventGenreMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+            ...result.items.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
+            { type: 'EventMasters', id: 'GENRE_LIST' },
+          ]
+          : [{ type: 'EventMasters', id: 'GENRE_LIST' }],
+    }),
+
+    createAdminEventGenre: builder.mutation<
+      EventGenreMaster,
+      { category_type_id: number; name: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({
+        url: '/admin/event-genres',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: EventGenreMaster }) => res?.data ?? ({} as EventGenreMaster),
+      invalidatesTags: [{ type: 'EventMasters', id: 'GENRE_LIST' }, 'EventMasters'],
+    }),
+
+    updateAdminEventGenre: builder.mutation<
+      EventGenreMaster,
+      { id: number; body: Partial<EventGenreMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/event-genres/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: EventGenreMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'EventMasters', id: `genre-${id}` },
+        { type: 'EventMasters', id: 'GENRE_LIST' },
+      ],
+    }),
+
+    deleteAdminEventGenre: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/event-genres/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'EventMasters', id: 'GENRE_LIST' }, 'EventMasters'],
+    }),
+
+    // ── Admin Dining Masters ──────────────────────────────────────────────────
+
+    getAdminDiningCuisines: builder.query<
+      PaginatedList<DiningCuisineMaster>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/dining-cuisines${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: DiningCuisineMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+            ...result.items.map((c) => ({ type: 'DiningMasters' as const, id: `cuisine-${c.id}` })),
+            { type: 'DiningMasters', id: 'CUISINE_LIST' },
+          ]
+          : [{ type: 'DiningMasters', id: 'CUISINE_LIST' }],
+    }),
+
+    createAdminDiningCuisine: builder.mutation<
+      DiningCuisineMaster,
+      { name: string; image_url: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({
+        url: '/admin/dining-cuisines',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: DiningCuisineMaster }) =>
+        res?.data ?? ({} as DiningCuisineMaster),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'CUISINE_LIST' },
+        { type: 'DiningMasters', id: 'PUBLIC_LIST' },
+        'DiningMasters',
+      ],
+    }),
+
+    updateAdminDiningCuisine: builder.mutation<
+      DiningCuisineMaster,
+      { id: number; body: Partial<DiningCuisineMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/dining-cuisines/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: DiningCuisineMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'DiningMasters', id: `cuisine-${id}` },
+        { type: 'DiningMasters', id: 'CUISINE_LIST' },
+        { type: 'DiningMasters', id: 'PUBLIC_LIST' },
+      ],
+    }),
+
+    deleteAdminDiningCuisine: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/dining-cuisines/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'CUISINE_LIST' },
+        { type: 'DiningMasters', id: 'PUBLIC_LIST' },
+        'DiningMasters',
+      ],
+    }),
+
+    getAdminDiningCollections: builder.query<
+      PaginatedList<Collection>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/dining-collections${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: Collection[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+            ...result.items.map((c) => ({ type: 'DiningMasters' as const, id: `collection-${c.id}` })),
+            { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+          ]
+          : [{ type: 'DiningMasters', id: 'COLLECTION_LIST' }],
+    }),
+
+    createAdminDiningCollection: builder.mutation<
+      Collection,
+      { title: string; image_url: string; subtitle?: string; slug?: string; is_active?: boolean; color_gradient?: string }
+    >({
+      query: (body) => ({
+        url: '/admin/dining-collections',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: Collection }) => res?.data ?? ({} as Collection),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+        { type: 'DiningMasters', id: 'COLLECTION_PUBLIC' },
+        'DiningMasters',
+      ],
+    }),
+
+    updateAdminDiningCollection: builder.mutation<
+      Collection,
+      { id: number; body: Partial<Collection> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/dining-collections/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: Collection }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'DiningMasters', id: `collection-${id}` },
+        { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+        { type: 'DiningMasters', id: 'COLLECTION_PUBLIC' },
+      ],
+    }),
+
+    deleteAdminDiningCollection: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/dining-collections/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+        { type: 'DiningMasters', id: 'COLLECTION_PUBLIC' },
+        'DiningMasters',
+      ],
+    }),
+
+    getAdminEventDocuments: builder.query<
+      PaginatedList<EventDocumentMaster>,
+      { category_type_id?: number | 'global'; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/event-documents${toListQuery({
+          category_type_id: params?.category_type_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: EventDocumentMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+            ...result.items.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
+            { type: 'EventMasters', id: 'DOC_LIST' },
+          ]
+          : [{ type: 'EventMasters', id: 'DOC_LIST' }],
+    }),
+
+    createAdminEventDocument: builder.mutation<
+      EventDocumentMaster,
+      {
+        name: string;
+        description?: string;
+        category_type_id?: number | null;
+        is_required?: boolean;
+        importance_level?: number;
+        is_active?: boolean;
+        sort_order?: number;
+      }
+    >({
+      query: (body) => ({
+        url: '/admin/event-documents',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: EventDocumentMaster }) => res?.data ?? ({} as EventDocumentMaster),
+      invalidatesTags: [{ type: 'EventMasters', id: 'DOC_LIST' }, 'EventMasters'],
+    }),
+
+    updateAdminEventDocument: builder.mutation<
+      EventDocumentMaster,
+      { id: number; body: Partial<EventDocumentMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/event-documents/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: EventDocumentMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'EventMasters', id: `doc-${id}` },
+        { type: 'EventMasters', id: 'DOC_LIST' },
+      ],
+    }),
+
+    deleteAdminEventDocument: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/event-documents/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'EventMasters', id: 'DOC_LIST' }, 'EventMasters'],
+    }),
+
+    getAdminEventTerms: builder.query<PaginatedList<EventTermsMaster>, PagedQuery | void>({
+      query: (params) => `/admin/event-terms${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data?: EventTermsMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+              ...result.items.map((t) => ({ type: 'EventMasters' as const, id: `term-${t.id}` })),
+              { type: 'EventMasters', id: 'TERM_LIST' },
+            ]
+          : [{ type: 'EventMasters', id: 'TERM_LIST' }],
+    }),
+
+    createAdminEventTerm: builder.mutation<EventTermsMaster, { text: string; is_active?: boolean; sort_order?: number }>({
+      query: (body) => ({ url: '/admin/event-terms', method: 'POST', body: { is_active: true, ...body } }),
+      transformResponse: (res: { data?: EventTermsMaster }) => res?.data ?? ({} as EventTermsMaster),
+      invalidatesTags: [{ type: 'EventMasters', id: 'TERM_LIST' }, 'EventMasters'],
+    }),
+
+    updateAdminEventTerm: builder.mutation<
+      EventTermsMaster,
+      { id: number; body: Partial<EventTermsMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/event-terms/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: EventTermsMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'EventMasters', id: `term-${id}` },
+        { type: 'EventMasters', id: 'TERM_LIST' },
+        'EventMasters',
+      ],
+    }),
+
+    deleteAdminEventTerm: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/event-terms/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'EventMasters', id: 'TERM_LIST' }, 'EventMasters'],
     }),
 
     // ── Upload ────────────────────────────────────────────────────────────────
@@ -500,12 +2378,35 @@ export const api = createApi({
 // Export auto-generated hooks
 export const {
   useLoginMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useChangePasswordMutation,
+  useGetMeQuery,
   useRegisterCustomerMutation,
   useRegisterBusinessMutation,
   useGetBusinessesQuery,
+  useGetAdminBusinessesQuery,
+  useGetAdminBusinessQuery,
+  useUpdateAdminBusinessMutation,
+  useSetBusinessEnabledMutation,
+  useArchiveBusinessMutation,
+  useUnarchiveBusinessMutation,
+  useGetAdminCustomersQuery,
+  useGetAdminCustomerQuery,
+  useCreateAdminCustomerMutation,
+  useUpdateAdminCustomerMutation,
+  useSetAdminCustomerEnabledMutation,
+  useArchiveAdminCustomerMutation,
+  useUnarchiveAdminCustomerMutation,
   useGetCollectionsQuery,
   useGetMoodsQuery,
+  useGetDiningCuisinesQuery,
   useGetBusinessTypesQuery,
+  useGetPartnerDocumentMastersQuery,
+  useGetAdminPartnerDocumentsQuery,
+  useCreateAdminPartnerDocumentMutation,
+  useUpdateAdminPartnerDocumentMutation,
+  useDeleteAdminPartnerDocumentMutation,
   useGetBusinessPublicQuery,
   useGetBusinessSettingsQuery,
   useUpdateBusinessSettingsMutation,
@@ -515,9 +2416,12 @@ export const {
   useDeleteTableMutation,
   useGetBusinessBookingsQuery,
   useGetCustomerBookingsQuery,
+  useGetBookingByIdQuery,
   useCheckAvailabilityQuery,
   useCreateBookingMutation,
   usePhoneLoginMutation,
+  useGetCustomerProfileQuery,
+  useUpdateCustomerProfileMutation,
   useCancelBookingMutation,
   useGetAdminStatsQuery,
   useUpdateSubscriptionMutation,
@@ -533,4 +2437,75 @@ export const {
   useGetMarketingCampaignsQuery,
   useAssignMarketingCampaignMutation,
   useGetBusinessCampaignsQuery,
+  useGetAdminEventsQuery,
+  useGetAdminEventDetailQuery,
+  useUpdateAdminEventMutation,
+  useGetCommissionLedgerQuery,
+  useGetAdminEventBookingsQuery,
+  useGetEligibleContractEventsQuery,
+  useGetContractPrefillQuery,
+  useGetEventContractsQuery,
+  useGetAdminEventContractQuery,
+  useCreateEventContractMutation,
+  useRequestAdminContractOtpMutation,
+  useSignAdminEventContractMutation,
+  useGetOrganizerEventContractQuery,
+  useRequestOrganizerContractOtpMutation,
+  useSignOrganizerEventContractMutation,
+  useRejectOrganizerEventContractMutation,
+  useGetPublicEventReviewsQuery,
+  useCreateEventReviewMutation,
+  useGetOrganizerEventReviewsQuery,
+  useCreateEventReviewReplyMutation,
+  useGetOrganizerOffersQuery,
+  useGetOfferEligibleEventsQuery,
+  useGetPublicEventOffersQuery,
+  useValidateEventPromoCodeMutation,
+  useCreateEventOfferMutation,
+  useUpdateEventOfferMutation,
+  useDeleteEventOfferMutation,
+  useGetOrganizerLedgerQuery,
+  useGetOrganizerLedgerCustomersQuery,
+  useCreateOrganizerPayoutMutation,
+  useGetOrganizerPayoutsQuery,
+  useGetOrganizerEventsQuery,
+  useGetOrganizerEventQuery,
+  useGetEventLayoutQuery,
+  useUpdateEventLayoutMutation,
+  useGetOrganizerTicketStatsQuery,
+  useGetOrganizerBookingsQuery,
+  useCreateOrganizerEventMutation,
+  useUpdateOrganizerEventMutation,
+  useSubmitOrganizerEventMutation,
+  useToggleOrganizerEventVisibilityMutation,
+  useCloseOrganizerEventMutation,
+  useGetPublicEventsQuery,
+  useGetPublicEventFiltersQuery,
+  useGetPublicEventQuery,
+  useGetPublicEventLayoutQuery,
+  useCreateEventBookingMutation,
+  useGetCustomerEventBookingsQuery,
+  useGetEventBookingByIdQuery,
+  useCancelEventBookingMutation,
+  useGetEventMastersQuery,
+  useGetAdminEventGenresQuery,
+  useCreateAdminEventGenreMutation,
+  useUpdateAdminEventGenreMutation,
+  useDeleteAdminEventGenreMutation,
+  useGetAdminDiningCuisinesQuery,
+  useCreateAdminDiningCuisineMutation,
+  useUpdateAdminDiningCuisineMutation,
+  useDeleteAdminDiningCuisineMutation,
+  useGetAdminDiningCollectionsQuery,
+  useCreateAdminDiningCollectionMutation,
+  useUpdateAdminDiningCollectionMutation,
+  useDeleteAdminDiningCollectionMutation,
+  useGetAdminEventDocumentsQuery,
+  useCreateAdminEventDocumentMutation,
+  useUpdateAdminEventDocumentMutation,
+  useDeleteAdminEventDocumentMutation,
+  useGetAdminEventTermsQuery,
+  useCreateAdminEventTermMutation,
+  useUpdateAdminEventTermMutation,
+  useDeleteAdminEventTermMutation,
 } = api;

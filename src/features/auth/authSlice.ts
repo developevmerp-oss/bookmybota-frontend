@@ -1,9 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { homePathForRole, storageKeysForPath, storageKeysForRole, type UserRole } from '@/lib/authStorage';
 
 interface AuthUser {
   id: string;
   email: string;
-  role: 'super_admin' | 'business_admin' | 'customer';
+  role: UserRole;
   business_id?: string;
   customer_id?: string;
   name?: string;
@@ -27,17 +28,8 @@ const authSlice = createSlice({
     setCredentials: (state, action: PayloadAction<{ user: AuthUser; token: string }>) => {
       state.user = action.payload.user;
       state.token = action.payload.token;
-      // Persist to role-specific keys in localStorage
       if (typeof window !== 'undefined') {
-        let tokenKey = 'token_customer';
-        let userKey = 'user_customer';
-        if (action.payload.user.role === 'super_admin') {
-          tokenKey = 'token_super_admin';
-          userKey = 'user_super_admin';
-        } else if (action.payload.user.role === 'business_admin') {
-          tokenKey = 'token_business_admin';
-          userKey = 'user_business_admin';
-        }
+        const { tokenKey, userKey } = storageKeysForRole(action.payload.user.role);
         localStorage.setItem(tokenKey, action.payload.token);
         localStorage.setItem(userKey, JSON.stringify(action.payload.user));
       }
@@ -46,32 +38,14 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       if (typeof window !== 'undefined') {
-        const pathname = window.location.pathname;
-        let tokenKey = 'token_customer';
-        let userKey = 'user_customer';
-        if (pathname.startsWith('/admin')) {
-          tokenKey = 'token_super_admin';
-          userKey = 'user_super_admin';
-        } else if (pathname.startsWith('/business')) {
-          tokenKey = 'token_business_admin';
-          userKey = 'user_business_admin';
-        }
+        const { tokenKey, userKey } = storageKeysForPath(window.location.pathname);
         localStorage.removeItem(tokenKey);
         localStorage.removeItem(userKey);
       }
     },
     loadFromStorage: (state) => {
       if (typeof window !== 'undefined') {
-        const pathname = window.location.pathname;
-        let tokenKey = 'token_customer';
-        let userKey = 'user_customer';
-        if (pathname.startsWith('/admin')) {
-          tokenKey = 'token_super_admin';
-          userKey = 'user_super_admin';
-        } else if (pathname.startsWith('/business')) {
-          tokenKey = 'token_business_admin';
-          userKey = 'user_business_admin';
-        }
+        const { tokenKey, userKey } = storageKeysForPath(window.location.pathname);
         const token = localStorage.getItem(tokenKey);
         const userStr = localStorage.getItem(userKey);
         if (token && userStr) {
@@ -83,8 +57,17 @@ const authSlice = createSlice({
         }
       }
     },
+    updateUser: (state, action: PayloadAction<Partial<AuthUser>>) => {
+      if (!state.user) return;
+      state.user = { ...state.user, ...action.payload };
+      if (typeof window !== 'undefined') {
+        const { userKey } = storageKeysForRole(state.user.role);
+        localStorage.setItem(userKey, JSON.stringify(state.user));
+      }
+    },
   },
 });
 
-export const { setCredentials, clearCredentials, loadFromStorage } = authSlice.actions;
+export const { setCredentials, clearCredentials, loadFromStorage, updateUser } = authSlice.actions;
+export { homePathForRole };
 export default authSlice.reducer;

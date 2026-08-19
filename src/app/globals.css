@@ -21,6 +21,15 @@
   --color-rose-700: var(--rose-700);
   --color-rose-800: var(--rose-800);
   --color-rose-900: var(--rose-900);
+
+  --color-brand-1: var(--brand-1);
+  --color-brand-2: var(--brand-2);
+  --color-brand-3: var(--brand-3);
+  --color-brand-4: var(--brand-4);
+  --color-brand-5: var(--brand-5);
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
 }
 
 @layer base {
@@ -28,7 +37,7 @@
   .customer-theme {
     --background: #f8fafc;
     --foreground: #0f172a;
-    --primary: #1b6b93;
+    --primary: #6900aa;
     --primary-foreground: #ffffff;
     --card: #ffffff;
     --card-foreground: #0f172a;
@@ -36,18 +45,27 @@
     --accent: #f1f5f9;
     --muted-foreground: #475569;
 
-    --rose-50: #f0f9ff;
-    --rose-100: #e0f2fe;
-    --rose-200: #bae6fd;
-    --rose-300: #7dd3fc;
-    --rose-400: #38bdf8;
-    --rose-500: #0ea5e9;
-    --rose-600: #1b6b93;
-    --rose-700: #155575;
-    --rose-800: #0f3d56;
-    --rose-900: #0a293a;
+    --brand-1: #9d00ff;
+    --brand-2: #8c00e3;
+    --brand-3: #7a00c6;
+    --brand-4: #6900aa;
+    --brand-5: #57008e;
+    --brand-50: #f7e9ff;
+    --brand-100: #efd7ff;
+    --brand-200: #e3bcff;
 
-    --primary-glow: rgba(27, 107, 147, 0.25);
+    --rose-50: #f7e9ff;
+    --rose-100: #efd7ff;
+    --rose-200: #e3bcff;
+    --rose-300: #cd8dff;
+    --rose-400: #b65fff;
+    --rose-500: #9d00ff;
+    --rose-600: #6900aa;
+    --rose-700: #57008e;
+    --rose-800: #460071;
+    --rose-900: #340055;
+
+    --primary-glow: rgba(105, 0, 170, 0.28);
   }
   
   .admin-theme {
@@ -230,6 +248,75 @@
   .animate-fadeIn {
     animation: fadeIn 0.25s ease-out forwards;
   }
+
+  /* Dining hero animations */
+  @keyframes diningHeroFadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes diningHeroFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-7px);
+    }
+  }
+
+  @keyframes diningHeroBgDrift {
+    0%,
+    100% {
+      transform: scale(1.05);
+    }
+    50% {
+      transform: scale(1.09);
+    }
+  }
+
+  .dining-hero-fade-up {
+    opacity: 0;
+    animation: diningHeroFadeUp 0.7s ease-out forwards;
+  }
+
+  .dining-hero-delay-1 {
+    animation-delay: 0.15s;
+  }
+
+  .dining-hero-delay-2 {
+    animation-delay: 0.3s;
+  }
+
+  .dining-hero-float {
+    animation: diningHeroFloat 3.2s ease-in-out infinite;
+  }
+
+  .dining-hero-float-delayed {
+    animation: diningHeroFloat 3.2s ease-in-out infinite;
+    animation-delay: 0.8s;
+  }
+
+  .dining-hero-bg {
+    animation: diningHeroBgDrift 18s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dining-hero-fade-up,
+    .dining-hero-float,
+    .dining-hero-float-delayed,
+    .dining-hero-bg {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 /* ─── Admin & Business Portal overrides for white/light theme ─── */
@@ -318,10 +405,167 @@ html.admin-theme .admin-dashboard-layout .input-field:focus {
   border-color: #e11d48 !important;
 }
 
+/* Select / dropdown — match input-field (fixes black box on light organizer portal) */
+html.admin-theme .admin-dashboard-layout .portal-select,
+html.admin-theme .admin-dashboard-layout select.portal-select {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 2.5rem 0.625rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 0.75rem;
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-select:focus,
+html.admin-theme .admin-dashboard-layout select.portal-select:focus {
+  outline: none;
+  border-color: #7c3aed !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+}
+
+html.admin-theme .admin-dashboard-layout .portal-select option {
+  color: #111827;
+  background: #ffffff;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-progress-track {
+  background-color: #e5e7eb !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-stat-label {
+  color: #6b7280 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-stat-sub {
+  color: #9ca3af !important;
+}
+
+html.admin-theme .admin-dashboard-layout table th.portal-table-head {
+  color: #6b7280 !important;
+}
+
+html.admin-theme .admin-dashboard-layout table td.portal-table-cell {
+  color: #374151 !important;
+}
+
+html.admin-theme .admin-dashboard-layout table td.portal-table-strong {
+  color: #111827 !important;
+  font-weight: 600;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-toolbar {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
 /* Sidebar active items */
 html.admin-theme .admin-dashboard-layout .bg-rose-500\/10 {
   background-color: rgba(225, 29, 72, 0.08) !important;
   color: #e11d48 !important;
 }
 
+/* Status banners — readable on light admin/organizer panels */
+html.admin-theme .admin-dashboard-layout .portal-banner-warning {
+  background-color: #fffbeb !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-warning p,
+html.admin-theme .admin-dashboard-layout .portal-banner-warning svg {
+  color: #92400e !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-banner-error {
+  background-color: #fff1f2 !important;
+  border-color: #fda4af !important;
+  color: #9f1239 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-error p,
+html.admin-theme .admin-dashboard-layout .portal-banner-error svg {
+  color: #9f1239 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-banner-success {
+  background-color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+  color: #065f46 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-success p {
+  color: #065f46 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-label {
+  color: #374151 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-muted {
+  color: #6b7280 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-heading {
+  color: #111827 !important;
+}
+
+/* Table text — readable on light panels (override button.text-white in tables) */
+html.admin-theme .admin-dashboard-layout table button.text-white,
+html.admin-theme .admin-dashboard-layout table .portal-table-link {
+  color: #111827 !important;
+}
+html.admin-theme .admin-dashboard-layout table button.text-white:hover {
+  color: #e11d48 !important;
+}
+html.admin-theme .admin-dashboard-layout table a.portal-table-link:hover {
+  color: #7c3aed !important;
+}
+html.admin-theme .admin-dashboard-layout table td.portal-table-muted,
+html.admin-theme .admin-dashboard-layout table .portal-table-muted {
+  color: #4b5563 !important;
+}
+
+/* Dynamic contract editor — chip placeholders (EVM-style, not raw {{tags}}) */
+.contract-token-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 2px;
+  border-radius: 6px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid #93c5fd;
+  vertical-align: baseline;
+}
+
+.contract-value-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 2px;
+  border-radius: 6px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid #6ee7b7;
+}
+
+.contract-editor-body:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.contract-document-body .contract-value-chip,
+.contract-document-body .contract-token-chip {
+  font-weight: 600;
+}
 

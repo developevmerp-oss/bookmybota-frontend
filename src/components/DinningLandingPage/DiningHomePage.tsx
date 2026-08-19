@@ -41,7 +41,8 @@ import {
   MdOutlineTheaters,
   MdOutlineWineBar,
 } from "react-icons/md";
-import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, useGetDiningCuisinesQuery, Business, Collection, Mood } from "@/services/api";
+import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, Business, Collection } from "@/services/api";
+// import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
@@ -751,14 +752,15 @@ export default function Home() {
     setSearchQuery(searchInput);
   };
 
-  const handleMoodSelect = (query: string) => {
-    const params = new URLSearchParams();
-    params.set("mood", query);
-    if (locationCity) {
-      params.set("city", locationCity);
-    }
-    router.push(`/search?${params.toString()}`);
-  };
+  // Restore with In The Mood For section below.
+  // const handleMoodSelect = (query: string) => {
+  //   const params = new URLSearchParams();
+  //   params.set("mood", query);
+  //   if (locationCity) {
+  //     params.set("city", locationCity);
+  //   }
+  //   router.push(`/search?${params.toString()}`);
+  // };
 
   const handleCuisineSelect = (cuisine: string) => {
     setDiningFilters((prev) => ({ ...prev, cuisine }));
@@ -810,7 +812,7 @@ export default function Home() {
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const { data: businesses = [], isLoading: businessesLoading } = useGetBusinessesQuery();
   const { data: collections = [] } = useGetCollectionsQuery();
-  const { data: moods = [] } = useGetMoodsQuery();
+  // const { data: moods = [] } = useGetMoodsQuery();
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
 
   const getEmojiForBusinessType = (name: string) => {
@@ -1532,7 +1534,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* ── 4.5. In The Mood For Section ────────────────────────────────── */}
+        {/* Restore In The Mood For by uncommenting this section and the mood helpers above.
         {!searchQuery && activeFilter === "All" && (
           <section className="py-8">
             <div className="flex items-center gap-4 text-center mb-8">
@@ -1543,7 +1545,6 @@ export default function Home() {
               <div className="flex-1 h-px bg-slate-200" />
             </div>
 
-            {/* Mobile Layout: 2-row horizontal scroll of tall cards (title at top, image at bottom) */}
             <div className="flex md:hidden overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 scroll-smooth">
               <div className="grid grid-rows-2 grid-flow-col gap-4">
                 {moods.map((mood) => (
@@ -1571,7 +1572,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Desktop Layout: Premium Circular Category Bubbles in exactly 1 line across full width (no left/right extra margins) */}
             <div className="hidden md:flex justify-between items-center w-full py-2">
               {moods.map((mood) => (
                 <button
@@ -1579,7 +1579,6 @@ export default function Home() {
                   onClick={() => handleMoodSelect(mood.query_tag)}
                   className="group flex flex-col items-center text-center cursor-pointer w-28 lg:w-32 focus:outline-none shrink-0"
                 >
-                  {/* Circular Wrapper */}
                   <div className="relative w-24 h-24 lg:w-28 lg:h-28 rounded-full overflow-hidden border-2 border-slate-100 group-hover:border-rose-600 group-hover:scale-105 transition-all duration-300 shadow-sm bg-slate-50 flex items-center justify-center">
                     <img
                       src={mood.image_url}
@@ -1590,10 +1589,8 @@ export default function Home() {
                           "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
                       }}
                     />
-                    {/* Ring highlight on hover */}
                     <div className="absolute inset-0 ring-4 ring-rose-500/15 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   </div>
-                  {/* Category Title */}
                   <span className="text-[12px] lg:text-[13px] font-bold text-slate-700 mt-3 group-hover:text-rose-600 transition-colors tracking-wide leading-tight">
                     {mood.title}
                   </span>
@@ -1602,6 +1599,7 @@ export default function Home() {
             </div>
           </section>
         )}
+        */}
 
         
 

@@ -2,12 +2,31 @@
 import { useState, useEffect } from 'react';
 import { Save, ImagePlus, X, Upload, Info, Tag, Wifi, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery } from '@/services/api';
+import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery, useGetCollectionsQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import { isValidPhone } from '@/lib/validation';
 import PhoneInput from '@/components/Shared/PhoneInput';
 import ImageCropPicker, { CroppedImageField } from '@/components/Shared/ImageCropPicker';
+
+function normalizeImageList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 export default function ProfilePage() {
   const dispatch = useAppDispatch();
@@ -17,6 +36,7 @@ export default function ProfilePage() {
   const bizId = user?.business_id ?? '';
   const { data: settings, isLoading } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
+  const { data: collections = [] } = useGetCollectionsQuery();
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
 
   const [phone, setPhone] = useState('');
@@ -32,6 +52,7 @@ export default function ProfilePage() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [cuisine, setCuisine] = useState('');
+  const [collectionIds, setCollectionIds] = useState<number[]>([]);
   const [openTime, setOpenTime] = useState('08:00');
   const [closeTime, setCloseTime] = useState('23:30');
   const [uploadImage] = useUploadImageMutation();
@@ -41,14 +62,19 @@ export default function ProfilePage() {
       setPhone(settings.phone || '');
       setDescription(settings.description || '');
       setCoverUrl(settings.cover_image_url || '');
-      setGalleryImages(settings.gallery_images || []);
-      setMenuImages(settings.menu_images || []);
+      setGalleryImages(normalizeImageList(settings.gallery_images));
+      setMenuImages(normalizeImageList(settings.menu_images));
       setDiningOffers(settings.dining_offers || []);
       setAmenities(settings.amenities || []);
       if (settings.average_cost) setAverageCost(settings.average_cost.toString());
       if (settings.name) setName(settings.name);
       if (settings.address) setAddress(settings.address);
       if (settings.cuisine) setCuisine(settings.cuisine);
+      setCollectionIds(
+        Array.isArray(settings.collection_ids)
+          ? settings.collection_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+          : []
+      );
 
       if (settings.operating_hours && settings.operating_hours['monday']) {
         setOpenTime(settings.operating_hours['monday'].open || '08:00');
@@ -78,6 +104,7 @@ export default function ProfilePage() {
           name,
           address,
           cuisine,
+          collection_ids: collectionIds,
           operating_hours: {
             sunday: { open: openTime, close: closeTime, closed: false },
             monday: { open: openTime, close: closeTime, closed: false },
@@ -218,6 +245,37 @@ export default function ProfilePage() {
                     <p className="text-xs text-zinc-500 mt-1">Comma separated</p>
                   </>
                 )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Collections</label>
+                {collections.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {collections.map((c) => {
+                      const selected = collectionIds.includes(c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() =>
+                            setCollectionIds((prev) =>
+                              selected ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                            )
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                            selected
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                              : 'text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          {c.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-500">No collections available yet. Super Admin can add them in Dining Masters.</p>
+                )}
+                <p className="text-xs text-zinc-500 mt-1">Choose the curated lists this venue should appear in on the dining homepage.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

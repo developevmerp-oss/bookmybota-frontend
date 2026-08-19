@@ -60,6 +60,8 @@ export interface Business {
   average_cost?: number;
   is_promoted?: boolean;
   collection_slugs?: string[];
+  collection_ids?: number[];
+  collection_titles?: string[];
   documents?: PartnerDocumentUpload[];
 }
 
@@ -130,6 +132,7 @@ export interface BusinessSettings {
   dining_offers?: Array<{ type: string; title: string; validity: string }>;
   amenities?: string[];
   average_cost?: number;
+  collection_ids?: number[];
 }
 
 export interface BusinessType {
@@ -557,6 +560,7 @@ export interface Collection {
   color_gradient?: string;
   slug: string;
   places_count?: number;
+  is_active?: boolean;
 }
 
 export interface Mood {
@@ -914,6 +918,7 @@ export const api = createApi({
         partner_type?: 'dining' | 'event';
         documents?: PartnerDocumentUpload[];
         cover_image_url?: string;
+        collection_ids?: number[];
       }
     >({
       query: (body) => ({
@@ -921,7 +926,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Businesses'],
+      invalidatesTags: ['Businesses', 'DiningMasters'],
     }),
 
     updateAdminBusiness: builder.mutation<
@@ -937,6 +942,7 @@ export const api = createApi({
         admin_password?: string;
         documents?: PartnerDocumentUpload[];
         cover_image_url?: string;
+        collection_ids?: number[];
       }
     >({
       query: ({ id, ...body }) => ({
@@ -944,7 +950,7 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: ['Businesses'],
+      invalidatesTags: ['Businesses', 'DiningMasters'],
     }),
 
     setBusinessEnabled: builder.mutation<
@@ -1095,6 +1101,7 @@ export const api = createApi({
     getCollections: builder.query<Collection[], void>({
       query: () => '/businesses/collections',
       transformResponse: (res: { data: Collection[] }) => res.data || [],
+      providesTags: [{ type: 'DiningMasters', id: 'COLLECTION_PUBLIC' }],
     }),
 
     getMoods: builder.query<Mood[], void>({
@@ -1211,7 +1218,11 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: (_result, _error, { bizId }) => [{ type: 'BusinessSettings', id: bizId }],
+      invalidatesTags: (_result, _error, { bizId }) => [
+        { type: 'BusinessSettings', id: bizId },
+        'Businesses',
+        'DiningMasters',
+      ],
     }),
 
     // ── Tables ────────────────────────────────────────────────────────────────
@@ -2188,6 +2199,68 @@ export const api = createApi({
       ],
     }),
 
+    getAdminDiningCollections: builder.query<
+      PaginatedList<Collection>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/dining-collections${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: Collection[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+            ...result.items.map((c) => ({ type: 'DiningMasters' as const, id: `collection-${c.id}` })),
+            { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+          ]
+          : [{ type: 'DiningMasters', id: 'COLLECTION_LIST' }],
+    }),
+
+    createAdminDiningCollection: builder.mutation<
+      Collection,
+      { title: string; image_url: string; subtitle?: string; slug?: string; is_active?: boolean; color_gradient?: string }
+    >({
+      query: (body) => ({
+        url: '/admin/dining-collections',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: Collection }) => res?.data ?? ({} as Collection),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+        { type: 'DiningMasters', id: 'COLLECTION_PUBLIC' },
+        'DiningMasters',
+      ],
+    }),
+
+    updateAdminDiningCollection: builder.mutation<
+      Collection,
+      { id: number; body: Partial<Collection> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/dining-collections/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: Collection }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'DiningMasters', id: `collection-${id}` },
+        { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+        { type: 'DiningMasters', id: 'COLLECTION_PUBLIC' },
+      ],
+    }),
+
+    deleteAdminDiningCollection: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/dining-collections/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'DiningMasters', id: 'COLLECTION_LIST' },
+        { type: 'DiningMasters', id: 'COLLECTION_PUBLIC' },
+        'DiningMasters',
+      ],
+    }),
+
     getAdminEventDocuments: builder.query<
       PaginatedList<EventDocumentMaster>,
       { category_type_id?: number | 'global'; q?: string; page?: number; limit?: number } | void
@@ -2423,6 +2496,10 @@ export const {
   useCreateAdminDiningCuisineMutation,
   useUpdateAdminDiningCuisineMutation,
   useDeleteAdminDiningCuisineMutation,
+  useGetAdminDiningCollectionsQuery,
+  useCreateAdminDiningCollectionMutation,
+  useUpdateAdminDiningCollectionMutation,
+  useDeleteAdminDiningCollectionMutation,
   useGetAdminEventDocumentsQuery,
   useCreateAdminEventDocumentMutation,
   useUpdateAdminEventDocumentMutation,

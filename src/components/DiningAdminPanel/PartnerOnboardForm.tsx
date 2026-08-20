@@ -20,6 +20,7 @@ import {
   useGetBusinessTypesQuery,
   useGetPartnerDocumentMastersQuery,
   useGetAdminDiningCollectionsQuery,
+  useGetPartnerOnboardingTermsQuery,
   useRegisterBusinessMutation,
   useUpdateAdminBusinessMutation,
   useUploadImageMutation,
@@ -68,6 +69,8 @@ export default function PartnerOnboardForm({
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [collectionIds, setCollectionIds] = useState<number[]>([]);
   const [phoneValid, setPhoneValid] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(mode === "edit");
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [formReady, setFormReady] = useState(false);
@@ -75,8 +78,11 @@ export default function PartnerOnboardForm({
   const selectedParent = businessTypes.find((t) => String(t.id) === parentTypeId);
   const isEventParent =
     partnerType === "event" || selectedParent?.module_key === "event";
-  const resolvedModule: "dining" | "event" = isEventParent ? "event" : "dining";
+  const isVenueParent =
+    partnerType === "venue" || selectedParent?.module_key === "venue";
+  const resolvedModule: "dining" | "event" | "venue" = isEventParent ? "event" : isVenueParent ? "venue" : "dining";
   const isDining = resolvedModule === "dining";
+  const isVenue = resolvedModule === "venue";
 
   const { data: partnerDocMasters = [] } = useGetPartnerDocumentMastersQuery(resolvedModule, {
     skip: partnerType === "combined" && !parentTypeId,
@@ -86,6 +92,9 @@ export default function PartnerOnboardForm({
     { skip: !isDining || variant !== "dark" }
   );
   const collectionOptions = collectionsData?.items ?? [];
+  const { data: onboardingTerms = [] } = useGetPartnerOnboardingTermsQuery(resolvedModule, {
+    skip: mode !== "create",
+  });
 
   useEffect(() => {
     if (mode !== "edit" || !editingBusiness || formReady) return;
@@ -114,6 +123,10 @@ export default function PartnerOnboardForm({
         businessTypes.find((t) => t.id === editingBusiness.type_id);
       setParentTypeId(eventParent ? String(eventParent.id) : editingBusiness.type_id ? String(editingBusiness.type_id) : "");
       setVenueTypeId("");
+    } else if (partnerType === "venue") {
+      const venue = businessTypes.find((t) => t.id === editingBusiness.type_id);
+      setParentTypeId(venue?.parent_type_id != null ? String(venue.parent_type_id) : "");
+      setVenueTypeId(venue ? String(venue.id) : "");
     } else {
       const venue = businessTypes.find((t) => t.id === editingBusiness.type_id);
       setParentTypeId(venue?.parent_type_id != null ? String(venue.parent_type_id) : "");
@@ -143,17 +156,24 @@ export default function PartnerOnboardForm({
     !!adminEmail &&
     phoneValid &&
     !!parentTypeId &&
-    (isDining ? !!venueTypeId : true);
+    (isDining || isVenue ? !!venueTypeId : true) &&
+    acceptTerms;
 
   const canSubmitEdit =
     !!businessName &&
     phoneValid &&
     !!parentTypeId &&
-    (isDining ? !!venueTypeId : true);
+    (isDining || isVenue ? !!venueTypeId : true);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValidPhone(phone)) return;
+    if (!acceptTerms) {
+      const message = "You must accept the onboarding terms and conditions.";
+      setRegisterError(message);
+      toast.error(message);
+      return;
+    }
     const docsErr = validateRequiredPartnerDocuments(partnerDocMasters, documents);
     if (docsErr) {
       setRegisterError(docsErr);
@@ -162,23 +182,27 @@ export default function PartnerOnboardForm({
     }
     setRegisterError(null);
     try {
-      const eventPartner =
+      const selectedPartner =
         partnerType === "combined"
           ? resolvePartnerFromParentId(businessTypes, parentTypeId)
           : partnerType === "event"
             ? { partner_type: "event" as const, type_id: parseInt(parentTypeId, 10) }
+            : partnerType === "venue"
+              ? { partner_type: "venue" as const, type_id: parseInt(parentTypeId, 10) }
             : null;
       const data = await registerBusiness({
         business_name: businessName,
         address,
         phone,
         description,
-        type_id: eventPartner ? eventPartner.type_id : parseInt(venueTypeId, 10),
+        type_id: selectedPartner ? (selectedPartner.partner_type === "event" ? selectedPartner.type_id : parseInt(venueTypeId, 10)) : parseInt(venueTypeId, 10),
         admin_email: adminEmail,
-        partner_type: eventPartner ? "event" : "dining",
+        partner_type: selectedPartner ? selectedPartner.partner_type : "dining",
         documents,
         cover_image_url: coverImageUrl || undefined,
-        ...(eventPartner || variant !== "dark" ? {} : { collection_ids: collectionIds }),
+        ...(isDining && variant === "dark" ? { collection_ids: collectionIds } : {}),
+        registration_terms_accepted: true,
+        registration_terms_version: "venue-v1",
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
@@ -212,7 +236,7 @@ export default function PartnerOnboardForm({
         documents,
         cover_image_url: coverImageUrl || undefined,
       }).unwrap();
-      toast.success(isDining ? "Dining business updated" : "Event organizer updated");
+      toast.success(isDining ? "Dining business updated" : isVenue ? "Venue partner updated" : "Event organizer updated");
       router.push(backHref);
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to update"));
@@ -280,7 +304,7 @@ export default function PartnerOnboardForm({
 
       <div>
         <label className={labelClass}>
-          {partnerType === "event" ? "Organizer Name" : "Business Name"}{" "}
+          {partnerType === "event" ? "Organizer Name" : partnerType === "venue" ? "Venue Name" : "Business Name"}{" "}
           <span className="text-rose-500">*</span>
         </label>
         <input
@@ -288,7 +312,7 @@ export default function PartnerOnboardForm({
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
           className={inputClass}
-          placeholder={isDining ? "E.g., The Sapphire Room" : "E.g., LiveWire Productions"}
+          placeholder={isDining ? "E.g., The Sapphire Room" : isVenue ? "E.g., Millennium Hall" : "E.g., LiveWire Productions"}
           required
         />
       </div>
@@ -409,7 +433,9 @@ export default function PartnerOnboardForm({
             ? isDark
               ? isDining
                 ? "Create Dining Business"
-                : "Create Event Organizer"
+                : isVenue
+                  ? "Create Venue Partner"
+                  : "Create Event Organizer"
               : "Register Business"
             : "Save Changes"}
         </>
@@ -455,6 +481,23 @@ export default function PartnerOnboardForm({
           <form onSubmit={mode === "edit" ? handleUpdate : handleRegister} className="space-y-6">
             {fieldsGrid}
             {documentsBlock}
+            {mode === "create" && (
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 text-sm text-slate-600">
+                  <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="mt-1" />
+                  <span>
+                    I confirm the documents are valid and I accept the platform onboarding terms and conditions.
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(true)}
+                  className="text-sm text-blue-600 hover:text-blue-700 underline"
+                >
+                  View terms and conditions
+                </button>
+              </div>
+            )}
             {registerError && (
               <p className="text-sm font-semibold text-rose-500 text-center">{registerError}</p>
             )}
@@ -489,6 +532,22 @@ export default function PartnerOnboardForm({
 
           {documentsBlock}
 
+          {mode === "create" && (
+            <div className="glass-panel rounded-2xl border border-white/10 p-5">
+              <label className="flex items-start gap-3 text-sm text-zinc-300">
+                <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="mt-1" />
+                <span>I confirm the documents are valid and I accept the platform onboarding terms and conditions.</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(true)}
+                className="mt-2 text-sm text-violet-300 hover:text-violet-200 underline"
+              >
+                View terms and conditions
+              </button>
+            </div>
+          )}
+
           {registerError && (
             <p className="text-sm font-semibold text-rose-500">{registerError}</p>
           )}
@@ -503,6 +562,51 @@ export default function PartnerOnboardForm({
             {submitButton}
           </div>
         </form>
+      )}
+
+      {showTermsModal && mode === "create" && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-white/15 bg-zinc-950 shadow-2xl">
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-white font-semibold">Onboarding Terms & Conditions</h3>
+              <button type="button" onClick={() => setShowTermsModal(false)} className="text-zinc-400 hover:text-white">
+                Close
+              </button>
+            </div>
+            <div className="p-5 max-h-[60vh] overflow-y-auto space-y-3">
+              {onboardingTerms.length > 0 ? (
+                onboardingTerms.map((term, idx) => (
+                  <p key={term.id} className="text-sm text-zinc-200 leading-relaxed">
+                    {idx + 1}. {term.text}
+                  </p>
+                ))
+              ) : (
+                <p className="text-sm text-zinc-400">
+                  Platform onboarding terms will appear here when Super Admin adds them.
+                </p>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-white/10 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="px-4 py-2 rounded-xl text-sm text-zinc-300 border border-white/10 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAcceptTerms(true);
+                  setShowTermsModal(false);
+                }}
+                className="btn-primary"
+              >
+                Accept terms
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

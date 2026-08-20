@@ -43,7 +43,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const { data, isLoading } = useGetAdminBusinessesQuery({
-    module: module as "dining" | "event",
+    module: module as "dining" | "event" | "venue",
     tab,
     page,
     limit: PAGE_SIZE,
@@ -58,8 +58,9 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   const isDining = module === "dining";
+  const isVenue = module === "venue";
   const listBase = `/admin/businesses/${module}`;
-  const label = isDining ? "dining business" : "event organizer";
+  const label = isDining ? "dining business" : isVenue ? "venue partner" : "event organizer";
   const actionBusy = isToggling || isArchiving || isUnarchiving || confirmBusy;
 
   const closeConfirm = () => {
@@ -163,7 +164,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-bold text-white">
-            {isDining ? "Dining Businesses" : "Event Organizers"}
+            {isDining ? "Dining Businesses" : isVenue ? "Venue Partners" : "Event Organizers"}
           </h2>
           <p className="text-zinc-400">
             Enable/Disable freezes login. Archive moves them off the Active list; history is kept.
@@ -181,6 +182,11 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
           <Link href={`${listBase}/onboard`} className="btn-primary flex items-center gap-2">
             <Building2 size={18} /> Onboard Partner
           </Link>
+          {isVenue && (
+            <Link href="/admin/venue-layouts" className="btn-secondary flex items-center gap-2">
+              Layout requests
+            </Link>
+          )}
         </div>
       </div>
 
@@ -221,7 +227,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
             <tr>
               <th className="px-6 py-4 font-medium">Business Name</th>
               {isDining && <th className="px-6 py-4 font-medium">Parent</th>}
-              <th className="px-6 py-4 font-medium">{isDining ? "Venue Type" : "Module"}</th>
+              <th className="px-6 py-4 font-medium">{isDining || isVenue ? "Venue Type" : "Module"}</th>
               <th className="px-6 py-4 font-medium">Location</th>
               <th className="px-6 py-4 font-medium">Admin</th>
               <th className="px-6 py-4 font-medium">Docs</th>
@@ -246,7 +252,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
                     <td className="px-6 py-4 text-zinc-400">{biz.parent_type_name || "—"}</td>
                   )}
                   <td className="px-6 py-4">
-                    {isDining ? (
+                    {isDining || isVenue ? (
                       <span className="text-zinc-400">{biz.type_name || "Unspecified"}</span>
                     ) : (
                       <span className="px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border bg-violet-500/10 text-violet-400 border-violet-500/20">
@@ -361,8 +367,8 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
               <tr>
                 <td colSpan={isDining ? 8 : 7} className="text-center py-10 text-zinc-500">
                   {tab === "archived"
-                    ? `No archived ${isDining ? "dining businesses" : "event organizers"}.`
-                    : `No ${isDining ? "dining businesses" : "event organizers"} found.`}
+                    ? `No archived ${isDining ? "dining businesses" : isVenue ? "venue partners" : "event organizers"}.`
+                    : `No ${isDining ? "dining businesses" : isVenue ? "venue partners" : "event organizers"} found.`}
                 </td>
               </tr>
             )}

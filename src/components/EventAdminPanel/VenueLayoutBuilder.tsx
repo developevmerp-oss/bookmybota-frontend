@@ -38,10 +38,29 @@ type Shape = {
   ticket_type_id?: string; // For General Admission / Section zones
 };
 
-export default function VenueLayoutBuilder({ eventId }: { eventId: string }) {
-  const { data: eventDetails, isLoading: eventLoading } = useGetOrganizerEventQuery(eventId);
-  const { data: layoutData, isLoading: layoutLoading, refetch } = useGetEventLayoutQuery(eventId);
-  const [saveLayout, { isLoading: isSaving }] = useUpdateEventLayoutMutation();
+type VenueAdapter = {
+  sections?: Array<{ id: string; name: string; capacity?: number }>;
+  initialSeats?: Seat[];
+  initialConfig?: { labels?: Label[]; shapes?: Shape[] };
+  saving?: boolean;
+  onSave: (
+    payload: { seating_config: { canvasWidth: number; canvasHeight: number; labels: Label[]; shapes: Shape[] }; seats: Seat[] },
+    options?: { publish?: boolean }
+  ) => Promise<void>;
+};
+
+export default function VenueLayoutBuilder({
+  eventId,
+  venueAdapter,
+}: {
+  eventId?: string;
+  venueAdapter?: VenueAdapter;
+}) {
+  const skipEvent = !eventId;
+  const { data: eventDetails, isLoading: eventLoading } = useGetOrganizerEventQuery(eventId || "", { skip: skipEvent });
+  const { data: layoutData, isLoading: layoutLoading, refetch } = useGetEventLayoutQuery(eventId || "", { skip: skipEvent });
+  const [saveLayout, { isLoading: isEventSaving }] = useUpdateEventLayoutMutation();
+  const isSaving = Boolean(venueAdapter?.saving) || isEventSaving;
 
   const [seats, setSeats] = useState<Seat[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
@@ -60,8 +79,27 @@ export default function VenueLayoutBuilder({ eventId }: { eventId: string }) {
   const [bulkRotation, setBulkRotation] = useState(0);
   const [bulkCurveAngle, setBulkCurveAngle] = useState(180);
   const [zoomScale, setZoomScale] = useState(1);
+  const venueHydratedRef = React.useRef(false);
 
   useEffect(() => {
+    if (venueAdapter) {
+      if (venueHydratedRef.current) return;
+      venueHydratedRef.current = true;
+      if (venueAdapter.initialSeats?.length) {
+        setSeats(
+          venueAdapter.initialSeats.map((s: Seat) => ({
+            ...s,
+            internalId: s.internalId || s.id || Math.random().toString(36).substr(2, 9),
+            coordinate_x: Number(s.coordinate_x),
+            coordinate_y: Number(s.coordinate_y),
+            grid_id: s.grid_id || s.section_name,
+          }))
+        );
+      }
+      if (venueAdapter.initialConfig?.labels) setLabels(venueAdapter.initialConfig.labels);
+      if (venueAdapter.initialConfig?.shapes) setShapes(venueAdapter.initialConfig.shapes);
+      return;
+    }
     if (layoutData?.data) {
       if (layoutData.data.seats) {
         setSeats(
@@ -81,12 +119,19 @@ export default function VenueLayoutBuilder({ eventId }: { eventId: string }) {
         setShapes(layoutData.data.seating_config.shapes);
       }
     }
-  }, [layoutData]);
+  }, [layoutData, venueAdapter]);
 
-  if (eventLoading || layoutLoading) return <div className="p-8 text-center text-zinc-400">Loading editor...</div>;
-  if (!eventDetails) return <div className="p-8 text-center text-rose-500">Event not found.</div>;
+  if (!skipEvent && (eventLoading || layoutLoading)) return <div className="p-8 text-center text-zinc-400">Loading editor...</div>;
+  if (!skipEvent && !eventDetails) return <div className="p-8 text-center text-rose-500">Event not found.</div>;
 
-  const ticketTypes = eventDetails.ticket_types || [];
+  const ticketTypes = venueAdapter?.sections?.length
+    ? venueAdapter.sections.map((section) => ({
+        id: section.id,
+        ticket_type: section.name,
+        total_count: section.capacity || 99999,
+        price: 0,
+      }))
+    : eventDetails?.ticket_types || [];
 
   const handleStageClick = (e: any) => {
     const clickedOnEmpty = e.target === e.target.getStage();
@@ -746,29 +791,47 @@ export default function VenueLayoutBuilder({ eventId }: { eventId: string }) {
     toast.success("Generated Fashion Show Template!");
   };
 
-  const handleSave = async () => {
-    // Validation: Check total seats per ticket type
-    for (const tt of ticketTypes) {
-      const assignedSeatsCount = seats.filter(s => s.ticket_type_id === tt.id).length;
-      if (assignedSeatsCount > tt.total_count) {
-        toast.error(`Validation Failed: You assigned ${assignedSeatsCount} seats to '${tt.ticket_type}', but its total capacity is only ${tt.total_count}. Please update the event ticket capacity or remove some seats.`);
-        return;
+  const handleSave = async (publish = false) => {
+    if (!venueAdapter) {
+      for (const tt of ticketTypes) {
+        const assignedSeatsCount = seats.filter(s => s.ticket_type_id === tt.id).length;
+        if (assignedSeatsCount > tt.total_count) {
+          toast.error(`Validation Failed: You assigned ${assignedSeatsCount} seats to '${tt.ticket_type}', but its total capacity is only ${tt.total_count}. Please update the event ticket capacity or remove some seats.`);
+          return;
+        }
       }
     }
 
     try {
+      const payload = {
+        seating_config: { canvasWidth: 3200, canvasHeight: 2400, labels, shapes },
+        seats: seats.map((s) => ({
+          id: typeof s.id === "string" && !s.id.startsWith("0.") ? s.id : undefined,
+          internalId: s.internalId,
+          ticket_type_id: s.ticket_type_id || null,
+          section_name: s.section_name,
+          row_label: s.row_label,
+          seat_label: s.seat_label,
+          coordinate_x: Number(s.coordinate_x) || 0,
+          coordinate_y: Number(s.coordinate_y) || 0,
+          status: s.status || "AVAILABLE",
+          grid_id: s.grid_id || s.section_name,
+        })),
+      };
+      if (venueAdapter) {
+        await venueAdapter.onSave(payload, { publish });
+        toast.success(publish ? "Layout sent to the venue as an option." : "Layout option saved.");
+        return;
+      }
+      if (!eventId) return;
       await saveLayout({
         eventId,
-        seating_config: { canvasWidth: 3200, canvasHeight: 2400, labels, shapes },
-        seats: seats.map(s => ({
-          ...s,
-          id: s.id?.startsWith("0.") ? undefined : s.id 
-        }))
+        ...payload,
       }).unwrap();
       toast.success("Layout saved successfully!");
       refetch();
     } catch (err: any) {
-      toast.error(err.data?.error || "Failed to save layout.");
+      toast.error(err?.data?.error || err?.message || "Failed to save layout.");
     }
   };
 
@@ -841,9 +904,14 @@ export default function VenueLayoutBuilder({ eventId }: { eventId: string }) {
             <span className="text-xs font-semibold text-slate-600 min-w-[40px] text-center">{Math.round(zoomScale * 100)}%</span>
             <button onClick={() => setZoomScale(s => Math.min(3, s + 0.1))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">+</button>
           </div>
-          <button onClick={handleSave} disabled={isSaving} className="btn-primary flex items-center gap-2">
-            <Save size={16} /> {isSaving ? "Saving..." : "Save Layout"}
+          <button onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
+            <Save size={16} /> {isSaving ? "Saving..." : venueAdapter ? "Save layout" : "Save Layout"}
           </button>
+          {venueAdapter && (
+            <button onClick={() => void handleSave(true)} disabled={isSaving} className="btn-primary flex items-center gap-2">
+              {isSaving ? "Submitting..." : "Submit to venue"}
+            </button>
+          )}
         </div>
       </div>
 

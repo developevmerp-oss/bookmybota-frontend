@@ -87,7 +87,8 @@ export default function RootLayout({
   const isAdminOrBusiness =
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/business") ||
-    pathname?.startsWith("/organizer");
+    pathname?.startsWith("/organizer") ||
+    pathname?.startsWith("/venue");
   const isLandingPage = pathname === "/";
   const isEventsPublicPage = pathname === "/events" || Boolean(pathname?.startsWith("/events/"));
   const isAuthPage =
@@ -95,6 +96,9 @@ export default function RootLayout({
     pathname === "/register" ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password";
+  const showPublicHeader = !isAdminOrBusiness;
+  const showLayoutFooter =
+    showPublicHeader && !isLandingPage && !isAuthPage && !isEventsPublicPage;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -104,10 +108,10 @@ export default function RootLayout({
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={roboto.className}>
         <StoreProvider>
-          {!isAdminOrBusiness && <HomeHeader />}
+          {showPublicHeader && <HomeHeader />}
           <main>
             {children}
-            {!isAdminOrBusiness && !isLandingPage && !isEventsPublicPage && !isAuthPage && <Footer />}
+            {showLayoutFooter && <Footer />}
           </main>
           <Toaster position="top-center" richColors />
         </StoreProvider>

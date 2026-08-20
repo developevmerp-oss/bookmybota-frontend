@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import type { BusinessType } from "@/services/api";
 
-export type PartnerModule = "dining" | "event" | "combined";
+export type PartnerModule = "dining" | "event" | "venue" | "combined";
 
 interface PartnerTypeFieldsProps {
   /** dining | event = fixed module; combined = Restaurant, Bar + Event in one parent list */
@@ -42,6 +42,7 @@ export default function PartnerTypeFields({
   variant = "dark",
 }: PartnerTypeFieldsProps) {
   const fixedEvent = partnerType === "event";
+  const fixedVenue = partnerType === "venue";
 
   const diningParents = useMemo(
     () =>
@@ -63,11 +64,22 @@ export default function PartnerTypeFields({
     [businessTypes]
   );
 
+  const venueParents = useMemo(
+    () =>
+      businessTypes.filter(
+        (t) =>
+          t.module_key === "venue" &&
+          (t.parent_type_id === null || t.parent_type_id === undefined)
+      ),
+    [businessTypes]
+  );
+
   const parentOptions = useMemo(() => {
-    if (partnerType === "combined") return [...diningParents, ...eventParents];
+    if (partnerType === "combined") return [...diningParents, ...eventParents, ...venueParents];
     if (partnerType === "event") return eventParents;
+    if (partnerType === "venue") return venueParents;
     return diningParents;
-  }, [partnerType, diningParents, eventParents]);
+  }, [partnerType, diningParents, eventParents, venueParents]);
 
   const selectedParent = useMemo(
     () => parentOptions.find((t) => String(t.id) === parentTypeId),
@@ -75,22 +87,24 @@ export default function PartnerTypeFields({
   );
 
   const isEventSelected = fixedEvent || isEventParentType(selectedParent);
+  const isVenueSelected = fixedVenue || selectedParent?.module_key === "venue";
 
   const venueTypes = useMemo(() => {
-    if (isEventSelected || !parentTypeId) return [];
+    if ((isEventSelected && !isVenueSelected) || !parentTypeId) return [];
     const parentId = parseInt(parentTypeId, 10);
     return businessTypes.filter(
-      (t) => t.module_key === "dining" && t.parent_type_id === parentId
+      (t) => (t.module_key === (isVenueSelected ? "venue" : "dining")) && t.parent_type_id === parentId
     );
-  }, [businessTypes, parentTypeId, isEventSelected]);
+  }, [businessTypes, parentTypeId, isEventSelected, isVenueSelected]);
 
   useEffect(() => {
-    if (!fixedEvent) return;
+    if (!(fixedEvent || fixedVenue)) return;
     onVenueTypeIdChange("");
-    if (eventParents.length === 1 && parentTypeId !== String(eventParents[0].id)) {
-      onParentTypeIdChange(String(eventParents[0].id));
+    const fixedParents = fixedEvent ? eventParents : venueParents;
+    if (fixedParents.length === 1 && parentTypeId !== String(fixedParents[0].id)) {
+      onParentTypeIdChange(String(fixedParents[0].id));
     }
-  }, [fixedEvent, eventParents, parentTypeId, onParentTypeIdChange, onVenueTypeIdChange]);
+  }, [fixedEvent, fixedVenue, eventParents, venueParents, parentTypeId, onParentTypeIdChange, onVenueTypeIdChange]);
 
   useEffect(() => {
     if (isEventSelected) {
@@ -99,7 +113,7 @@ export default function PartnerTypeFields({
   }, [isEventSelected, onVenueTypeIdChange]);
 
   useEffect(() => {
-    if (fixedEvent) return;
+    if (fixedEvent || fixedVenue) return;
     if (parentTypeId && !parentOptions.some((p) => String(p.id) === parentTypeId)) {
       onParentTypeIdChange("");
       onVenueTypeIdChange("");
@@ -114,16 +128,20 @@ export default function PartnerTypeFields({
   }, [isEventSelected, parentTypeId, venueTypeId, venueTypes, onVenueTypeIdChange]);
 
   const parentLabel =
-    partnerType === "event" ? "Event Parent Name" : "Parent Name";
+    partnerType === "event" ? "Event Parent Name" : partnerType === "venue" ? "Venue Parent Name" : "Parent Name";
   const parentHint =
     partnerType === "combined"
       ? "e.g. Restaurant, Bar, Event"
       : partnerType === "event"
         ? "e.g. Event"
+        : partnerType === "venue"
+          ? "e.g. Venue"
         : "e.g. Restaurant, Bar";
   const venueHint = isEventSelected
     ? "Not required — pick Comedy / Music / Concert when creating events"
-    : "e.g. Restaurant → Cafe";
+    : isVenueSelected
+      ? "e.g. Venue → Banquet Hall"
+      : "e.g. Restaurant → Cafe";
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
@@ -196,12 +214,15 @@ export default function PartnerTypeFields({
 export function resolvePartnerFromParentId(
   businessTypes: BusinessType[],
   parentTypeId: string
-): { partner_type: "dining" | "event"; type_id: number } | null {
+): { partner_type: "dining" | "event" | "venue"; type_id: number } | null {
   if (!parentTypeId) return null;
   const parent = businessTypes.find((t) => String(t.id) === parentTypeId);
   if (!parent) return null;
   if (parent.module_key === "event") {
     return { partner_type: "event", type_id: parent.id };
+  }
+  if (parent.module_key === "venue") {
+    return { partner_type: "venue", type_id: parent.id };
   }
   return null;
 }

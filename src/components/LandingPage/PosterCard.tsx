@@ -20,7 +20,7 @@ export function EventPosterCard({
   return (
     <Link
       href={`/events/${event.id}`}
-      className="snap-start shrink-0 w-[180px] sm:w-[200px] group"
+      className="snap-start shrink-0 w-[160px] sm:w-[250px] md:w-[270px] group"
     >
       <div className="aspect-[2/3] rounded-xl overflow-hidden bg-[#F7F7F7] border border-[#EDEDED]">
         {image ? (
@@ -61,7 +61,7 @@ export function MusicEventCard({ event, city }: { event: PublicEvent; city?: str
     .join(": ");
 
   return (
-    <Link href={`/events/${event.id}`} className="snap-start shrink-0 w-[200px] sm:w-[220px] group">
+    <Link href={`/events/${event.id}`} className="snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px] group">
       <div className="rounded-t-xl overflow-hidden bg-[#F7F7F7] relative aspect-[3/4]">
         {image ? (
           <img
@@ -99,8 +99,11 @@ export function DiningPosterCard({ place }: { place: Business }) {
     .filter((v, i, arr) => arr.indexOf(v) === i);
 
   return (
-    <Link href={`/restaurant/${place.id}`} className="snap-start shrink-0 w-[260px] sm:w-[280px] md:w-[300px] group">
-      <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-[#F7F7F7] relative">
+    <Link
+      href={`/restaurant/${place.id}`}
+      className="snap-start shrink-0 w-[240px] sm:w-[340px] md:w-[355px] group"
+    >
+      <div className="aspect-[4/3] rounded-xl sm:rounded-2xl overflow-hidden bg-[#F7F7F7] relative">
         {image ? (
           <img
             src={image}
@@ -118,10 +121,12 @@ export function DiningPosterCard({ place }: { place: Business }) {
           </span>
         )}
       </div>
-      <h3 className="mt-3 text-base font-semibold text-[#111111] line-clamp-1">{place.name}</h3>
-      {locality && <p className="mt-1 text-sm text-[#6B6B6B] line-clamp-1">{locality}</p>}
+      <h3 className="mt-2.5 sm:mt-3 text-sm sm:text-base font-semibold text-[#111111] line-clamp-1">
+        {place.name}
+      </h3>
+      {locality && <p className="mt-1 text-xs sm:text-sm text-[#6B6B6B] line-clamp-1">{locality}</p>}
       {tags.length > 0 && (
-        <p className="mt-0.5 text-sm text-[#9A9A9A] line-clamp-1">{tags.join(" · ")}</p>
+        <p className="mt-0.5 text-xs sm:text-sm text-[#9A9A9A] line-clamp-1">{tags.join(" · ")}</p>
       )}
     </Link>
   );

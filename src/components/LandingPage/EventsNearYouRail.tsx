@@ -16,7 +16,6 @@ export default function EventsNearYouRail({ city }: { city: string }) {
       title="Events Near You"
       seeAllHref="/events"
       label="events near you"
-      alt
       isLoading={isLoadingEvents}
       empty={empty}
     >

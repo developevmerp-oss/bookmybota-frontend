@@ -47,7 +47,7 @@ export default function Footer() {
   return (
     <footer id="contact" className="bg-[#111111] text-white">
       <div className="border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-5 lg:px-8 py-6 sm:py-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
           <div>
             <p className="text-lg font-semibold">List your event or restaurant</p>
             <p className="text-sm text-[#B0B0B0] mt-1">
@@ -71,8 +71,8 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-8">
+      <div className="mx-auto w-full max-w-7xl px-4 md:px-5 lg:px-8 pt-8 sm:pt-10 pb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 sm:gap-8">
           <div id="about" className="col-span-2 sm:col-span-3 lg:col-span-1">
             <p className="text-lg font-extrabold">
               <span className="text-white">Book My </span>
@@ -158,7 +158,7 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-white/10">
-        <p className="max-w-7xl mx-auto px-4 py-5 text-center text-xs text-[#B0B0B0]">
+        <p className="mx-auto w-full max-w-7xl px-4 md:px-5 lg:px-8 py-5 text-center text-xs text-[#B0B0B0]">
           © {new Date().getFullYear()} Book My Bota. All rights reserved.
         </p>
       </div>

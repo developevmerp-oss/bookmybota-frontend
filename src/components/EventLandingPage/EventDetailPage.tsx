@@ -24,7 +24,6 @@ import {
   useGetPublicEventOffersQuery,
   useGetPublicEventQuery,
   useGetPublicEventsQuery,
-  type EventArtist,
   type PublicEvent,
 } from "@/services/api";
 import { formatTime12h } from "@/lib/dateFormat";
@@ -36,6 +35,22 @@ import EventReviewsSection from "@/components/EventLandingPage/EventReviewsSecti
 import Footer from "@/components/LandingPage/Footer";
 
 const BRAND = "#6900AA";
+type StaticArtist = {
+  name: string;
+  role?: string;
+  description?: string;
+  image_url?: string;
+};
+const DEFAULT_ARTISTS: StaticArtist[] = [
+  {
+    name: "Aarav Mehta",
+    role: "Stand-up Comedian & Live Entertainer",
+    description:
+      "Aarav Mehta is known for clean observational humor and energetic live stage presence.",
+    image_url:
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=80",
+  },
+];
 
 function parseGenres(genres?: string[] | string | null): string[] {
   if (!genres) return [];
@@ -129,7 +144,7 @@ export default function PublicEventDetailPage({
   const saved = savedIds.includes(id);
   const [shareOpen, setShareOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
-  const [artistModal, setArtistModal] = useState<EventArtist | null>(null);
+  const [artistModal, setArtistModal] = useState<StaticArtist | null>(null);
   const [venuesOpen, setVenuesOpen] = useState(false);
   const relatedRef = useRef<HTMLDivElement>(null);
 
@@ -468,35 +483,31 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
-            {(event.artists || []).filter((a) => a?.name?.trim()).length > 0 && (
-              <section className="mt-8">
-                <h2 className="text-[20px] font-bold text-[#1A1A1A] mb-3">Artists</h2>
-                <div className="flex gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {(event.artists || [])
-                    .filter((a) => a?.name?.trim())
-                    .map((artist, i) => (
-                      <button
-                        key={`${artist.name}-${i}`}
-                        type="button"
-                        onClick={() => setArtistModal(artist)}
-                        className="w-[140px] shrink-0 text-left cursor-pointer"
-                      >
-                        <div className="relative h-[180px] rounded-xl overflow-hidden bg-slate-200">
-                          {artist.image_url ? (
-                            <img src={artist.image_url} alt={artist.name} className="absolute inset-0 w-full h-full object-cover" />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-2xl font-extrabold text-white bg-[#1B365D]">
-                              {artist.name.slice(0, 1).toUpperCase()}
-                            </div>
-                          )}
+            <section className="mt-8">
+              <h2 className="text-[20px] font-bold text-[#1A1A1A] mb-3">Artists</h2>
+              <div className="flex gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {DEFAULT_ARTISTS.map((artist, i) => (
+                  <button
+                    key={`${artist.name}-${i}`}
+                    type="button"
+                    onClick={() => setArtistModal(artist)}
+                    className="w-[140px] shrink-0 text-left cursor-pointer"
+                  >
+                    <div className="relative h-[180px] rounded-xl overflow-hidden bg-slate-200">
+                      {artist.image_url ? (
+                        <img src={artist.image_url} alt={artist.name} className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-2xl font-extrabold text-white bg-[#1B365D]">
+                          {artist.name.slice(0, 1).toUpperCase()}
                         </div>
-                        <p className="mt-2 font-bold text-[#1A1A1A] text-sm leading-snug">{artist.name}</p>
-                        {artist.role && <p className="mt-0.5 text-xs text-[#8A8A8A]">{artist.role}</p>}
-                      </button>
-                    ))}
-                </div>
-              </section>
-            )}
+                      )}
+                    </div>
+                    <p className="mt-2 font-bold text-[#1A1A1A] text-sm leading-snug">{artist.name}</p>
+                    {artist.role && <p className="mt-0.5 text-xs text-[#8A8A8A]">{artist.role}</p>}
+                  </button>
+                ))}
+              </div>
+            </section>
 
             {offers.length > 0 && (
               <section className="mt-8">

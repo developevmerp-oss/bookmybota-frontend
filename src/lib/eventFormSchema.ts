@@ -68,17 +68,6 @@ export const eventDraftSchema = yup.object({
       if (!value?.trim()) return true;
       return Boolean(parseYouTubeId(value));
     }),
-  artists: yup
-    .array()
-    .of(
-      yup.object({
-        name: yup.string().trim().default(''),
-        role: yup.string().trim().default(''),
-        description: yup.string().trim().default(''),
-        image_url: yup.string().default(''),
-      })
-    )
-    .default([]),
   languages: yup.array().of(yup.string().required()).default([]),
   about_event: yup.string().default(''),
   age_group: yup.string().default(''),
@@ -152,7 +141,6 @@ export function defaultEventFormValues(): EventFormValues {
     poster_vertical_url: '',
     gallery_images: [],
     youtube_url: '',
-    artists: [],
     languages: [],
     about_event: '',
     age_group: '',

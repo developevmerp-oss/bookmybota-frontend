@@ -2,14 +2,23 @@
  * Central API Service — Single source of truth for all backend API calls.
  * Built with RTK Query. Add new endpoints here; never call fetch() directly in pages.
  *
- * Base URL: http://localhost:5000/api
- * To change the backend URL, update BASE_URL below only.
+ * Locked behavior contract (do not change without an explicit product decision):
+ * - Endpoints: URLs, methods, bodies, query params, transformResponse
+ * - Cache: tagTypes / providesTags / invalidatesTags
+ * - Auth tokens: role-scoped keys via authStorage (pathname → token key)
+ * - ACCOUNT_DISABLED on /business|/organizer|/customer: clear session + redirect /login
+ * - SessionGuard: triggers GET /auth/me only; logout stays in baseQuery wrapper
+ *
+ * Base URL:
+ * - Prefer NEXT_PUBLIC_API_BASE_URL when set
+ * - Else development → http://localhost:5000/api
+ * - Else production → https://bookmybota-backend.onrender.com/api
  */
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { clearCredentials } from '@/features/auth/authSlice';
-import { clearSessionForRole, type UserRole } from '@/lib/authStorage';
+import { clearSessionForRole, storageKeysForPath, type UserRole } from '@/lib/authStorage';
 import {
   unwrapPaginated,
   toListQuery,
@@ -22,7 +31,21 @@ import {
 
 export type { PaginationMeta, PaginatedList, PagedQuery } from '@/lib/pagination';
 
-const BASE_URL = 'http://localhost:5000/api';
+const LOCAL_API_BASE_URL = 'http://localhost:5000/api';
+const PRODUCTION_API_BASE_URL = 'https://bookmybota-backend.onrender.com/api';
+
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (process.env.NODE_ENV === 'production' ? PRODUCTION_API_BASE_URL : LOCAL_API_BASE_URL);
+
+if (
+  process.env.NODE_ENV === 'production' &&
+  /localhost|127\.0\.0\.1/i.test(BASE_URL)
+) {
+  console.warn(
+    '[api] NEXT_PUBLIC_API_BASE_URL still points at localhost in production. Set a real API host before deploying.'
+  );
+}
 
 // ─── Type Definitions ────────────────────────────────────────────────────────
 
@@ -146,13 +169,6 @@ export interface BusinessType {
   slug?: string;
 }
 
-export interface EventArtist {
-  name: string;
-  role?: string;
-  description?: string;
-  image_url?: string;
-}
-
 export interface AdminEvent {
   id: string;
   business_id: string;
@@ -210,7 +226,6 @@ export interface AdminEvent {
   poster_vertical_url?: string;
   gallery_images?: string[];
   youtube_url?: string | null;
-  artists?: EventArtist[];
   documents?: EventDocumentUpload[] | string[];
   terms_points?: {
     selected?: Array<{ id?: number; text?: string } | string>;
@@ -372,7 +387,6 @@ export interface EventFormPayload {
   poster_vertical_url: string;
   gallery_images?: string[];
   youtube_url?: string;
-  artists?: EventArtist[];
   documents: EventDocumentUpload[];
   language: string;
   languages?: string[];
@@ -798,15 +812,8 @@ const rawBaseQuery = fetchBaseQuery({
   baseUrl: BASE_URL,
   prepareHeaders: (headers) => {
     if (typeof window !== 'undefined') {
-      const pathname = window.location.pathname;
-      let tokenKey = 'token_customer';
-      if (pathname.startsWith('/admin')) {
-        tokenKey = 'token_super_admin';
-      } else if (pathname.startsWith('/organizer')) {
-        tokenKey = 'token_event_admin';
-      } else if (pathname.startsWith('/business')) {
-        tokenKey = 'token_business_admin';
-      }
+      // Same rules as before: /admin|/organizer|/business|/customer → role token; else customer.
+      const { tokenKey } = storageKeysForPath(window.location.pathname);
       const token = localStorage.getItem(tokenKey);
       if (token) {
         headers.set('Authorization', `Bearer ${token}`);

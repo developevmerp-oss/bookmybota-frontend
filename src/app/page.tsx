@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import CategoryNavBar from "@/components/LandingPage/CategoryNavBar";
 import PromoBannerCarousel from "@/components/LandingPage/PromoBannerCarousel";
 import PopularDiningRail from "@/components/LandingPage/PopularDiningRail";
@@ -28,7 +28,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white text-[#111111]">
-      <CategoryNavBar />
+      <Suspense fallback={<div className="sticky top-16 z-40 h-11 bg-[#1F1F1F]" />}>
+        <CategoryNavBar />
+      </Suspense>
       <PromoBannerCarousel city={city} />
       <PopularDiningRail city={city} />
       <PopularEventsRail city={city} />

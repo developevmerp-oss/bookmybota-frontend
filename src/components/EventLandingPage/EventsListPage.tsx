@@ -19,11 +19,13 @@ import {
   FaSmile,
 } from "react-icons/fa";
 import {
+  api,
   useGetBusinessTypesQuery,
   useGetPublicEventFiltersQuery,
   useGetPublicEventsQuery,
   type PublicEvent,
 } from "@/services/api";
+import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
 import images from "@/Images";
 import Footer from "@/components/LandingPage/Footer";
@@ -223,6 +225,7 @@ function EventCard({ event }: { event: PublicEvent }) {
 }
 
 export default function PublicEventsPage() {
+  const dispatch = useAppDispatch();
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -245,6 +248,8 @@ export default function PublicEventsPage() {
   const [venueFilter, setVenueFilter] = useState("");
   const [browseVenues, setBrowseVenues] = useState(false);
   const [mobileFilterTab, setMobileFilterTab] = useState<"categories" | "date" | "languages" | "price" | null>(null);
+  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
+  const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
   const [priceSliderValue, setPriceSliderValue] = useState(PRICE_SLIDER_MAX);
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
@@ -431,6 +436,12 @@ export default function PublicEventsPage() {
 
   const popular = showAllCategories ? categories : categories.slice(0, 7);
   const headingCity = city || "Ethiopia";
+  const hasOfferHero = offerHeroEvents.length > 0;
+  const activeHeroEvent = hasOfferHero ? offerHeroEvents[heroSlideIndex] : null;
+  const activeHeroSrc =
+    activeHeroEvent?.poster_horizontal_url ||
+    activeHeroEvent?.poster_vertical_url ||
+    "";
 
   const categoriesPanel = () => (
     <div className="flex flex-wrap gap-2">
@@ -652,6 +663,47 @@ export default function PublicEventsPage() {
   return (
     <div className="min-h-screen bg-[#f6f7f8]">
       <EventHeroSlider slides={EVENT_HERO_SLIDES} />
+
+      {hasOfferHero && activeHeroEvent && activeHeroSrc && (
+        <section className="relative min-h-[220px] sm:min-h-[300px] md:min-h-[360px] overflow-hidden">
+          <Link href={`/events/${activeHeroEvent.id}`} className="block relative h-full min-h-[inherit]">
+            <img
+              src={activeHeroSrc}
+              alt={activeHeroEvent.name}
+              className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 lg:p-8">
+              <span className="inline-block rounded-md bg-[#6900AA] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                Exclusive Offer
+              </span>
+              <h2 className="mt-2 text-lg sm:text-2xl lg:text-3xl font-extrabold text-white line-clamp-2">
+                {activeHeroEvent.name}
+              </h2>
+              {activeHeroEvent.min_price != null && (
+                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
+                  From {formatMoney(activeHeroEvent.min_price, { compact: true })}
+                </p>
+              )}
+            </div>
+          </Link>
+          {offerHeroEvents.length > 1 && (
+            <div className="absolute bottom-3 sm:bottom-4 right-4 sm:right-6 flex gap-1.5">
+              {offerHeroEvents.map((event, index) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  aria-label={`Show offer for ${event.name}`}
+                  onClick={() => setHeroSlideIndex(index)}
+                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                    index === heroSlideIndex ? "w-5 bg-white" : "w-2 bg-white/50"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <section id="categories" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12">
         <div className="flex items-center justify-between mb-5 sm:mb-8">

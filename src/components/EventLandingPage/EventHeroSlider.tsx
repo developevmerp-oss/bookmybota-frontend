@@ -49,9 +49,11 @@ export default function EventHeroSlider({ slides }: { slides: HeroSlide[] }) {
             if (!nav || typeof nav === "boolean") return;
             nav.prevEl = prevRef.current;
             nav.nextEl = nextRef.current;
-            swiper.navigation.destroy();
-            swiper.navigation.init();
-            swiper.navigation.update();
+            const navigationApi = swiper.navigation;
+            if (!navigationApi) return;
+            navigationApi.destroy?.();
+            navigationApi.init?.();
+            navigationApi.update?.();
           });
         }}
         className="h-full w-full"

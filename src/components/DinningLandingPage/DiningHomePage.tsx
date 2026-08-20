@@ -150,14 +150,14 @@ function OfferPromoCard({
       />
       <div className="relative z-10">
         <span
-          className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm lg:text-xs font-bold uppercase tracking-widest mb-2"
           style={{ color: theme.accent }}
         >
           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.accent }} />
           {card.badge}
         </span>
         <h3 className="text-xl sm:text-2xl font-extrabold leading-tight">{card.title}</h3>
-        <p className="mt-1.5 text-xs sm:text-sm opacity-80">
+        <p className="mt-1.5 text-sm sm:text-base lg:text-sm opacity-80">
           {card.subtitle}
           {card.id === "weekend" && locationCity ? ` across ${locationCity}.` : "."}
         </p>
@@ -169,7 +169,7 @@ function OfferPromoCard({
               block: "start",
             })
           }
-          className="mt-4 inline-flex items-center gap-1.5 bg-white rounded-full px-4 py-2 text-xs sm:text-sm font-bold shadow-sm hover:shadow-md transition-shadow"
+          className="mt-4 inline-flex items-center gap-1.5 bg-white rounded-full px-4 py-2 text-sm sm:text-base lg:text-sm font-bold shadow-sm hover:shadow-md transition-shadow"
           style={{ color: theme.accent }}
         >
           {card.cta} <ChevronRight size={16} />
@@ -1247,7 +1247,7 @@ export default function Home() {
 
         <div className="relative z-10 w-full mx-auto container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 min-h-[340px] sm:min-h-[380px] lg:min-h-[400px] flex flex-col items-start justify-end pt-10 sm:pt-12 pb-6 sm:pb-7 text-left">
           <div className="w-full max-w-3xl dining-hero-fade-up">
-            <h1 className="text-[32px] sm:text-[42px] lg:text-[52px] font-bold text-white leading-[1.12] tracking-tight">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.12] tracking-tight">
               What are you in the{" "}
               <span
                 className="bg-clip-text text-transparent"
@@ -1258,12 +1258,12 @@ export default function Home() {
                 mood for?
               </span>
             </h1>
-            <p className="mt-3 sm:mt-4 text-white/90 text-sm sm:text-base lg:text-lg font-medium max-w-2xl">
+            <p className="mt-3 sm:mt-4 text-white/90 text-base sm:text-xl font-medium max-w-2xl">
               Discover top restaurants, cafes &amp; bars — book your table in seconds.
             </p>
           </div>
 
-          <div className="w-full max-w-3xl mt-8 sm:mt-10 dining-hero-fade-up dining-hero-delay-1">
+          <div className="w-full max-w-3xl mt-5 sm:mt-8 lg:mt-10 dining-hero-fade-up dining-hero-delay-1">
             <div ref={locationRef} className="relative z-50 text-left">
               <div className="flex flex-col sm:flex-row items-stretch bg-white rounded-2xl sm:rounded-full shadow-2xl shadow-black/25 border border-white/50 overflow-hidden">
                 <button
@@ -1284,7 +1284,7 @@ export default function Home() {
                     />
                   )}
                   <span
-                    className={`text-sm font-semibold truncate ${
+                    className={`text-sm sm:text-base lg:text-sm font-semibold truncate ${
                       locationLoading ? "text-slate-400" : "text-slate-800"
                     }`}
                   >
@@ -1303,7 +1303,7 @@ export default function Home() {
                   <input
                     type="text"
                     placeholder="Search restaurants, cuisines or dishes..."
-                    className="flex-1 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none bg-transparent py-3.5 sm:py-0 min-w-0"
+                    className="flex-1 text-slate-800 placeholder:text-slate-400 text-sm sm:text-base focus:outline-none bg-transparent py-3.5 sm:py-0 min-w-0"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -1394,10 +1394,27 @@ export default function Home() {
 
       {showHomeExtras && (
       <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-5 pb-2">
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-5 pb-2">
         {/* ── 2. Collections (after hero) ──────────────────────────────────── */}
-          <section className="max-w-full">
-            <div className="flex items-center justify-between mb-2">
+          <section className=" w-full mx-auto">
+            {/* Mobile / tablet: title + All collections on one line, subtitle below */}
+            <div className="lg:hidden mb-2">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-xl font-bold text-slate-800 shrink-0">Collections</h2>
+                <Link
+                  href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
+                  className="flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                >
+                  All collections <ChevronRight size={16} />
+                </Link>
+              </div>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Explore curated lists of top restaurants, cafes and bars
+              </p>
+            </div>
+
+            {/* Desktop: title + subtitle left, All collections right */}
+            <div className="hidden lg:flex items-center justify-between mb-2">
               <div>
                 <h2 className="text-xl font-bold text-slate-800">Collections</h2>
                 <p className="text-sm text-slate-500 mt-0.5">
@@ -1411,6 +1428,7 @@ export default function Home() {
                 All collections <ChevronRight size={16} />
               </Link>
             </div>
+
             <div className="relative mt-5">
               <button
                 onClick={() => scrollCollections("left")}
@@ -1422,11 +1440,15 @@ export default function Home() {
 
               <div
                 ref={collectionsRef}
-                className="flex gap-4 overflow-x-auto pt-3 pb-4 scrollbar-hide scroll-smooth"
+                className="overflow-x-auto pt-3 pb-4 scrollbar-hide scroll-smooth"
               >
-                {collections.map((col) => (
-                  <CollectionCard key={col.id} collection={col} />
-                ))}
+                <div className="flex min-w-full justify-center">
+                  <div className="flex gap-4 px-1">
+                    {collections.map((col) => (
+                      <CollectionCard key={col.id} collection={col} />
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button
@@ -1483,10 +1505,10 @@ export default function Home() {
       )}
 
       <div className="w-full bg-white">
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5">
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
         <div >
           {/* ── 4. Filter Section ───────────────────────────────────────────── */}
-          <section className="pb-2">
+          <section>
             <DiningFiltersBar
               cuisines={cuisineOptions}
               filters={diningFilters}
@@ -1500,7 +1522,7 @@ export default function Home() {
 
           {/* ── 5. Offer Section ────────────────────────────────────────────── */}
           {showHomeExtras && (
-            <section id="dining-offers" className="py-3 sm:py-4 scroll-mt-24">
+            <section id="dining-offers" className="py-3 sm:pt-2 scroll-mt-24">
               {DINING_OFFER_CARDS.length > 3 ? (
                 <div className="relative">
                   <button
@@ -1545,13 +1567,13 @@ export default function Home() {
           )}
 
           {/* ── 6. Restaurant section ───────────────────────────────────────── */}
-          <section id="restaurant-listings" className={`pb-10 ${showHomeExtras ? "" : "pt-4"}`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-2"}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-3">
             <div>
-              <h2 className="text-xl font-bold text-slate-800">
+              <h2 className="text-xl sm:text-2xl lgL:text-xl font-bold text-slate-800">
                 {getFilteredSectionTitle()}
               </h2>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
                 {locationLoading ? (
                   <span className="flex items-center gap-1.5">
                     <Loader2 size={12} className="animate-spin" /> Locating restaurants…
@@ -1687,10 +1709,10 @@ export default function Home() {
 
       {showHomeExtras && (
       <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5">
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
           {/* ── 7. Cuisine Section ──────────────────────────────────────────── */}
           {cuisineCards.length > 0 && (
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 md:py-6">
+            <section className="">
               <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
                 <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
                   Explore Cuisines
@@ -1716,7 +1738,7 @@ export default function Home() {
               </div>
               <div
                 ref={cuisinesRef}
-                className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 -mx-1 px-1"
+                className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-0 -mx-1 px-1"
               >
                 {cuisineCards.map((item) => {
                   const isActive = diningFilters.cuisine.toLowerCase() === item.name.toLowerCase();

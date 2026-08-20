@@ -256,7 +256,7 @@ export default function DiningFiltersBar({
         >
           {activeCount > 0 && (
             <span
-              className="w-4 h-4 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
+              className="w-4 h-4 rounded-full text-[0.7rem] font-bold text-white flex items-center justify-center"
               style={{ backgroundColor: ACCENT }}
             >
               {activeCount}
@@ -301,7 +301,7 @@ export default function DiningFiltersBar({
                   <button
                     type="button"
                     onClick={applySort}
-                    className="text-sm font-bold"
+                    className="text-sm sm:text-base lg:text-smfont-bold"
                     style={{ color: ACCENT }}
                   >
                     Apply
@@ -553,7 +553,7 @@ export default function DiningFiltersBar({
                   onCategoryChange?.("All");
                   setShowFilter(false);
                 }}
-                className="text-sm font-bold"
+                className="text-sm sm:text-base lg:text-sm font-bold"
                 style={{ color: ACCENT }}
               >
                 Reset
@@ -561,7 +561,7 @@ export default function DiningFiltersBar({
               <button
                 type="button"
                 onClick={applyDraft}
-                className="text-sm font-bold"
+                className="text-sm sm:text-base lg:text-sm font-bold"
                 style={{ color: ACCENT }}
               >
                 Apply

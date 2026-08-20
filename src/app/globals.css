@@ -10,6 +10,11 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
+
+  /* Custom sizes used by the landing header (h-13, h-15, h-23, pl-13) */
+  --spacing-13: 3.25rem;
+  --spacing-15: 3.75rem;
+  --spacing-23: 5.75rem;
   
   --color-rose-50: var(--rose-50);
   --color-rose-100: var(--rose-100);
@@ -121,7 +126,7 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: 'Inter', sans-serif;
+    font-family: "Roboto", sans-serif;
     background-attachment: fixed;
     min-height: 100vh;
     transition: background-color 0.3s, color 0.3s;

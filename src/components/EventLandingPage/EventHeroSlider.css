@@ -1,0 +1,33 @@
+.event-hero-swiper .swiper {
+  height: 100%;
+}
+
+.event-hero-swiper .swiper-slide {
+  height: 100%;
+}
+
+.event-hero-swiper .swiper-pagination-bullet {
+  background: rgba(255, 255, 255, 0.8);
+  opacity: 1;
+}
+
+.event-hero-swiper .swiper-pagination-bullet-active {
+  background: #6900aa;
+  width: 22px;
+  border-radius: 9999px;
+}
+
+@media (max-width: 640px) {
+  .event-hero-swiper .swiper-pagination {
+    bottom: 8px;
+  }
+
+  .event-hero-swiper .swiper-pagination-bullet {
+    width: 6px;
+    height: 6px;
+  }
+
+  .event-hero-swiper .swiper-pagination-bullet-active {
+    width: 16px;
+  }
+}

@@ -12,13 +12,16 @@ interface DiningFiltersBarProps {
   filters: DiningFilterState;
   onChange: (next: DiningFilterState) => void;
   onReset?: () => void;
+  categories?: string[];
+  category?: string;
+  onCategoryChange?: (category: string) => void;
 }
 
-const ACCENT = "#E85D04";
+const ACCENT = "#6900AA";
 
 type FilterTab =
   | "sort"
-  | "book"
+  | "category"
   | "cuisine"
   | "ratings"
   | "cost"
@@ -76,10 +79,10 @@ function RadioRow({
       </span>
       <span
         className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center shrink-0 ${
-          selected ? "border-[#E85D04]" : "border-slate-300"
+          selected ? "border-[#6900AA]" : "border-slate-300"
         }`}
       >
-        {selected && <span className="w-2 h-2 rounded-full bg-[#E85D04]" />}
+        {selected && <span className="w-2 h-2 rounded-full bg-[#6900AA]" />}
       </span>
     </button>
   );
@@ -90,14 +93,16 @@ export default function DiningFiltersBar({
   filters,
   onChange,
   onReset,
+  categories = [],
+  category = "All",
+  onCategoryChange,
 }: DiningFiltersBarProps) {
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [draft, setDraft] = useState<DiningFilterState>(filters);
+  const [draftCategory, setDraftCategory] = useState(category);
   const [tab, setTab] = useState<FilterTab>("sort");
-  const [draftSort, setDraftSort] = useState<SortOption | null>(
-    filters.sort === "relevance" ? null : filters.sort
-  );
+  const [draftSort, setDraftSort] = useState<SortOption>(filters.sort);
   const sortRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const [sortPos, setSortPos] = useState({ top: 0, left: 0 });
@@ -121,12 +126,13 @@ export default function DiningFiltersBar({
   useEffect(() => {
     if (showFilter) {
       setDraft(filters);
+      setDraftCategory(category);
       setTab("sort");
     }
-  }, [showFilter, filters]);
+  }, [showFilter, filters, category]);
 
   useEffect(() => {
-    if (showSort) setDraftSort(filters.sort === "relevance" ? null : filters.sort);
+    if (showSort) setDraftSort(filters.sort);
   }, [showSort, filters.sort]);
 
   useEffect(() => {
@@ -173,20 +179,51 @@ export default function DiningFiltersBar({
     if (filters.cuisine) n += 1;
     if (filters.minRating > 0) n += 1;
     if (filters.offersOnly) n += 1;
-    if (filters.bookTable) n += 1;
     if (filters.pureVeg) n += 1;
     if (filters.servesAlcohol) n += 1;
     if (filters.maxCost > 0) n += 1;
     if (filters.sort !== "relevance") n += 1;
+    if (category && category !== "All") n += 1;
     return n;
-  }, [filters]);
+  }, [filters, category]);
 
   const sortLabel =
     SORT_OPTIONS.find((o) => o.value === filters.sort)?.label.split(":")[0] || "Sort By";
 
+  const activeChips: { label: string; onClear: () => void }[] = [];
+  if (filters.sort !== "relevance") {
+    const lbl = SORT_OPTIONS.find((o) => o.value === filters.sort)?.label || filters.sort;
+    activeChips.push({ label: lbl, onClear: () => onChange({ ...filters, sort: "relevance" }) });
+  }
+  if (category && category !== "All") {
+    activeChips.push({
+      label: category.toLowerCase() === "all" ? "All Dining" : category,
+      onClear: () => onCategoryChange?.("All"),
+    });
+  }
+  if (filters.cuisine) {
+    activeChips.push({ label: filters.cuisine, onClear: () => onChange({ ...filters, cuisine: "" }) });
+  }
+  if (filters.minRating > 0) {
+    activeChips.push({ label: `Rating ${filters.minRating}+`, onClear: () => onChange({ ...filters, minRating: 0 }) });
+  }
+  if (filters.maxCost > 0) {
+    const costLabel = COST_OPTIONS.find((o) => o.value === filters.maxCost)?.label || `Under ₹${filters.maxCost}`;
+    activeChips.push({ label: costLabel, onClear: () => onChange({ ...filters, maxCost: 0 }) });
+  }
+  if (filters.pureVeg) {
+    activeChips.push({ label: "Pure Veg", onClear: () => onChange({ ...filters, pureVeg: false }) });
+  }
+  if (filters.servesAlcohol) {
+    activeChips.push({ label: "Serves Alcohol", onClear: () => onChange({ ...filters, servesAlcohol: false }) });
+  }
+  if (filters.offersOnly) {
+    activeChips.push({ label: "Offers", onClear: () => onChange({ ...filters, offersOnly: false }) });
+  }
+
   const tabs: { id: FilterTab; label: string }[] = [
     { id: "sort", label: "Sort" },
-    { id: "book", label: "Book a table" },
+    ...(categories.length > 0 ? [{ id: "category" as const, label: "Category" }] : []),
     { id: "cuisine", label: "Cuisine" },
     { id: "ratings", label: "Ratings" },
     { id: "cost", label: "Cost for 2" },
@@ -197,16 +234,17 @@ export default function DiningFiltersBar({
 
   const applyDraft = () => {
     onChange(draft);
+    onCategoryChange?.(draftCategory);
     setShowFilter(false);
   };
 
   const applySort = () => {
-    onChange({ ...filters, sort: draftSort || "relevance" });
+    onChange({ ...filters, sort: draftSort });
     setShowSort(false);
   };
 
   return (
-    <div className="mb-5">
+    <div className="mb-2">
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
         <button
           type="button"
@@ -218,7 +256,7 @@ export default function DiningFiltersBar({
         >
           {activeCount > 0 && (
             <span
-              className="w-4 h-4 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
+              className="w-4 h-4 rounded-full text-[0.7rem] font-bold text-white flex items-center justify-center"
               style={{ backgroundColor: ACCENT }}
             >
               {activeCount}
@@ -263,7 +301,7 @@ export default function DiningFiltersBar({
                   <button
                     type="button"
                     onClick={applySort}
-                    className="text-sm font-bold"
+                    className="text-sm sm:text-base lg:text-smfont-bold"
                     style={{ color: ACCENT }}
                   >
                     Apply
@@ -273,14 +311,6 @@ export default function DiningFiltersBar({
               document.body
             )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => onChange({ ...filters, bookTable: !filters.bookTable })}
-          className={chipClass(filters.bookTable)}
-        >
-          Book a table
-        </button>
 
         <button
           type="button"
@@ -315,6 +345,46 @@ export default function DiningFiltersBar({
         >
           Offers
         </button>
+      </div>
+
+      <div
+        className={`grid transition-[grid-template-rows,margin] duration-300 ease-out ${
+          activeChips.length > 0 ? "grid-rows-[1fr] mt-3" : "grid-rows-[0fr] mt-0"
+        }`}
+      >
+        <div className="overflow-hidden min-h-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {activeChips.map((chip) => (
+              <span
+                key={chip.label}
+                className="inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-full px-3 py-1.5 text-xs font-semibold"
+              >
+                {chip.label}
+                <button
+                  type="button"
+                  onClick={chip.onClear}
+                  className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors"
+                  aria-label={`Remove ${chip.label}`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            {activeChips.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onReset?.();
+                  onCategoryChange?.("All");
+                }}
+                className="text-xs font-bold px-2 py-1.5 transition-colors cursor-pointer hover:underline"
+                style={{ color: ACCENT }}
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {showFilter && (
@@ -375,19 +445,30 @@ export default function DiningFiltersBar({
                       <RadioRow
                         key={opt.value}
                         label={opt.label}
-                        selected={draft.sort === opt.value && draft.sort !== "relevance"}
+                        selected={draft.sort === opt.value}
                         onSelect={() => setDraft({ ...draft, sort: opt.value })}
                       />
                     ))}
                   </div>
                 )}
 
-                {tab === "book" && (
-                  <RadioRow
-                    label="Book a table"
-                    selected={draft.bookTable}
-                    onSelect={() => setDraft({ ...draft, bookTable: !draft.bookTable })}
-                  />
+                {tab === "category" && (
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Category
+                    </p>
+                    {categories.map((c) => {
+                      const label = c.toLowerCase() === "all" ? "All Dining" : c;
+                      return (
+                        <RadioRow
+                          key={c}
+                          label={label}
+                          selected={draftCategory.toLowerCase() === c.toLowerCase()}
+                          onSelect={() => setDraftCategory(c)}
+                        />
+                      );
+                    })}
+                  </div>
                 )}
 
                 {tab === "cuisine" && (
@@ -469,9 +550,10 @@ export default function DiningFiltersBar({
                 type="button"
                 onClick={() => {
                   onReset?.();
+                  onCategoryChange?.("All");
                   setShowFilter(false);
                 }}
-                className="text-sm font-bold"
+                className="text-sm sm:text-base lg:text-sm font-bold"
                 style={{ color: ACCENT }}
               >
                 Reset
@@ -479,7 +561,7 @@ export default function DiningFiltersBar({
               <button
                 type="button"
                 onClick={applyDraft}
-                className="text-sm font-bold"
+                className="text-sm sm:text-base lg:text-sm font-bold"
                 style={{ color: ACCENT }}
               >
                 Apply

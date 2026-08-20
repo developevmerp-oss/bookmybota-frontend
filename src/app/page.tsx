@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import CategoryNavBar from "@/components/LandingPage/CategoryNavBar";
 import PromoBannerCarousel from "@/components/LandingPage/PromoBannerCarousel";
 import PopularDiningRail from "@/components/LandingPage/PopularDiningRail";
 import PopularEventsRail from "@/components/LandingPage/PopularEventsRail";
 import LiveCategoryTiles from "@/components/LandingPage/LiveCategoryTiles";
-import RecommendedEventsRail from "@/components/LandingPage/RecommendedEventsRail";
 import EventsNearYouRail from "@/components/LandingPage/EventsNearYouRail";
-import MusicEventsRail from "@/components/LandingPage/MusicEventsRail";
-import ComedyEventsRail from "@/components/LandingPage/ComedyEventsRail";
-import OutdoorEventsRail from "@/components/LandingPage/OutdoorEventsRail";
 import Footer from "@/components/LandingPage/Footer";
 
 export default function Home() {
@@ -27,17 +22,15 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-[#111111]">
-      <CategoryNavBar />
-      <PromoBannerCarousel city={city} />
+    <div className="min-h-screen bg-white text-[#111111] overflow-x-hidden">
+      {/* Hero + category tiles share one viewport below the sticky header (lg+) */}
+      <div className="flex flex-col lg:h-[calc(100dvh-5.75rem)] xl:h-[calc(100dvh-6.75rem)]">
+        <PromoBannerCarousel city={city} />
+        <LiveCategoryTiles city={city} />
+      </div>
       <PopularDiningRail city={city} />
       <PopularEventsRail city={city} />
-      <LiveCategoryTiles city={city} />
-      <RecommendedEventsRail city={city} />
       <EventsNearYouRail city={city} />
-      <MusicEventsRail city={city} />
-      <ComedyEventsRail city={city} />
-      <OutdoorEventsRail city={city} />
       <Footer />
     </div>
   );

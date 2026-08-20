@@ -200,7 +200,7 @@ export default function PartnerOnboardForm({
         partner_type: selectedPartner ? selectedPartner.partner_type : "dining",
         documents,
         cover_image_url: coverImageUrl || undefined,
-        ...(eventPartner || variant !== "dark" ? {} : { collection_ids: collectionIds }),
+        ...(isDining && variant === "dark" ? { collection_ids: collectionIds } : {}),
         registration_terms_accepted: true,
         registration_terms_version: "venue-v1",
       }).unwrap();

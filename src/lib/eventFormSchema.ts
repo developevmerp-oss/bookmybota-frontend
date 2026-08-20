@@ -5,6 +5,7 @@ import {
   showtimeEndErrorMessage,
   validateShowtimeEnd,
 } from './dateFormat';
+import { parseYouTubeId } from './youtube';
 
 const ticketSchema = yup.object({
   ticket_type: yup.string().trim().required('Ticket type name is required'),
@@ -60,6 +61,13 @@ export const eventDraftSchema = yup.object({
   poster_horizontal_url: yup.string().default(''),
   poster_vertical_url: yup.string().default(''),
   gallery_images: yup.array().of(yup.string().required()).default([]),
+  youtube_url: yup
+    .string()
+    .default('')
+    .test('youtube', 'Enter a valid YouTube video link', (value) => {
+      if (!value?.trim()) return true;
+      return Boolean(parseYouTubeId(value));
+    }),
   languages: yup.array().of(yup.string().required()).default([]),
   about_event: yup.string().default(''),
   age_group: yup.string().default(''),
@@ -132,6 +140,7 @@ export function defaultEventFormValues(): EventFormValues {
     poster_horizontal_url: '',
     poster_vertical_url: '',
     gallery_images: [],
+    youtube_url: '',
     languages: [],
     about_event: '',
     age_group: '',

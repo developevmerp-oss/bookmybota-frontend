@@ -105,6 +105,7 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     poster_horizontal_url: event.poster_horizontal_url || "",
     poster_vertical_url: event.poster_vertical_url || "",
     gallery_images: gallery,
+    youtube_url: event.youtube_url || "",
     languages: parseEventLanguages(event.language),
     about_event: event.about_event || "",
     age_group: event.age_group || "",
@@ -417,6 +418,7 @@ export default function EventForm({
       poster_horizontal_url: values.poster_horizontal_url || "",
       poster_vertical_url: values.poster_vertical_url || "",
       gallery_images: values.gallery_images || [],
+      youtube_url: values.youtube_url?.trim() || "",
       documents: documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
       languages: values.languages || [],
       language: (values.languages || []).join(", "),
@@ -776,6 +778,22 @@ export default function EventForm({
               </ImageCropPicker>
             )}
           </div>
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div>
+            <h3 className="portal-heading text-lg font-semibold">YouTube video</h3>
+            <p className="portal-muted text-sm mt-1">
+              Optional. This plays as the second slide on the customer event page. Paste a YouTube watch, share, or Shorts link.
+            </p>
+          </div>
+          <input
+            disabled={readOnly}
+            className={inputClass}
+            placeholder="https://www.youtube.com/watch?v=..."
+            {...register("youtube_url")}
+          />
+          {errors.youtube_url && <p className={errorClass}>{errors.youtube_url.message}</p>}
         </section>
 
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">

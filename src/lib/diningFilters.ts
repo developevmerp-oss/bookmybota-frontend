@@ -37,11 +37,7 @@ export function extractCuisines(businesses: Business[]): string[] {
 }
 
 export function businessHasOffer(b: Business): boolean {
-  if (b.dining_offers && b.dining_offers.length > 0) return true;
-  const idHash = b.id
-    ? b.id.toString().split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    : 0;
-  return idHash % 3 === 0 || idHash % 5 === 0;
+  return Boolean(b.dining_offers && b.dining_offers.some((offer) => Boolean(offer?.title?.trim())));
 }
 
 function businessText(b: Business): string {
@@ -94,6 +90,10 @@ export function applyDiningFilters(
   } else if (filters.sort === "costDesc") {
     list = [...list].sort(
       (a, b) => Number(b.average_cost || 0) - Number(a.average_cost || 0)
+    );
+  } else {
+    list = [...list].sort(
+      (a, b) => Number(!!b.is_promoted) - Number(!!a.is_promoted)
     );
   }
 

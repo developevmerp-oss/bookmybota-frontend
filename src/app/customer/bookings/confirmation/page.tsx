@@ -90,6 +90,7 @@ function ConfirmationContent() {
 
   const qrData = booking.qr_token || booking.id;
   const windowLabel = checkInWindow(booking.booking_time);
+  const appliedOffer = booking.applied_offer;
 
   const copyBookingId = async () => {
     try {
@@ -230,13 +231,29 @@ function ConfirmationContent() {
                   </div>
                 </div>
               </div>
+              {appliedOffer?.title && (
+                <div className="flex items-start gap-3 pt-4 border-t border-slate-100">
+                  <IconBox>
+                    <UtensilsCrossed size={16} />
+                  </IconBox>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 font-medium">Dining offer (show QR at restaurant)</p>
+                    <p className="text-sm font-bold text-slate-900">{appliedOffer.title}</p>
+                    {(appliedOffer.type || appliedOffer.validity) && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {[appliedOffer.type, appliedOffer.validity].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="hidden md:block w-px bg-slate-100 self-stretch" />
 
             <div className="min-w-0 md:pl-6 flex flex-col items-center text-center pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
               <p className="text-base font-bold text-slate-900">Check-in QR</p>
-              <p className="text-xs text-slate-400 mt-0.5 mb-4">Show this QR at the restaurant</p>
+              <p className="text-xs text-slate-400 mt-0.5 mb-4">Show this QR at the restaurant to claim your offer</p>
 
               {booking.qr_token ? (
                 <div className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] rounded-2xl border border-violet-200 bg-white p-2.5">

@@ -3,7 +3,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Search,
   MapPin,
-  ArrowRight,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -11,11 +10,9 @@ import {
   Loader2,
   X,
   Percent,
-  Tag,
   UtensilsCrossed,
 } from "lucide-react";
 import Link from "next/link";
-import { Playfair_Display } from "next/font/google";
 import type { IconType } from "react-icons";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
@@ -46,6 +43,7 @@ import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
+import { listingOfferLabel } from "@/lib/diningOffers";
 import { useAppSelector } from "@/lib/hooks";
 import {
   applyDiningFilters,
@@ -54,12 +52,8 @@ import {
   extractCuisines,
 } from "@/lib/diningFilters";
 
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["600", "700"],
-});
-
-const HERO_ACCENT = "#E85D04";
+const HERO_ACCENT = "#6900AA";
+const PAGE_MUTED = "#f6f7f8";
 
 type MealOccasion = "lunch" | "breakfast" | "dinner" | "fastfood";
 
@@ -79,56 +73,111 @@ const PROMO_SLIDES = [
   { src: "/images/dining/promo-cafe.png", alt: "Good Food. Great Moments." },
 ];
 
+const OFFER_THEMES = [
+  { bg: "#FDE8E8", text: "#9B1C1C", accent: "#DC2626", shape: "#F5C2C2" },
+  { bg: "#F7E9FF", text: "#57008E", accent: "#6900AA", shape: "#E3BCFF" },
+  { bg: "#FFF6D9", text: "#92400E", accent: "#D97706", shape: "#FDE68A" },
+  { bg: "#E8F1FF", text: "#1E3A8A", accent: "#2563EB", shape: "#BFDBFE" },
+] as const;
+
+const TAB_THEME_COLORS = [
+  "#6900AA",
+  "#9D00FF",
+  "#C026D3",
+  "#DB2777",
+  "#E11D48",
+  "#EA580C",
+  "#D97706",
+  "#F5C542",
+  "#059669",
+  "#0D9488",
+  "#0891B2",
+  "#2563EB",
+  "#4F46E5",
+  "#7C3AED",
+  "#EC4899",
+  "#0EA5E9",
+];
+
 const DINING_OFFER_CARDS = [
   {
     id: "weekend",
-    bg: "#FDE8D8",
-    text: "#7A2E08",
-    accent: "#E85D04",
-    pattern: "bolts",
     badge: "Weekend Special",
     title: "Save up to 30% Off",
     subtitle: "on table bookings at selected venues",
     cta: "Explore Offers",
-    images: [
-      "/images/dining/lunch.png",
-      "/images/dining/dinner.png",
-      "/images/dining/breakfast.png",
-    ],
   },
   {
     id: "flat20",
-    bg: "#E4F3EA",
-    text: "#1F6B4A",
-    accent: "#1F6B4A",
-    pattern: "burst",
     badge: "Limited Offer",
     title: "Flat 20% OFF",
     subtitle: "Up to ₹200 on dining bookings",
     cta: "View Offers",
-    images: [
-      "/images/dining/fastfood.png",
-      "/images/dining/breakfast.png",
-      "/images/dining/lunch.png",
-    ],
   },
   {
     id: "prime",
-    bg: "#EEE8F8",
-    text: "#5B3A8C",
-    accent: "#5B3A8C",
-    pattern: "arcs",
     badge: "BookMyBota Prime",
     title: "Special Offers",
     subtitle: "Exclusive deals at premium restaurants",
     cta: "Grab Deal",
-    images: [
-      "/images/dining/dinner.png",
-      "/images/dining/fastfood.png",
-      "/images/dining/breakfast.png",
-    ],
   },
 ] as const;
+
+function OfferPromoCard({
+  card,
+  locationCity,
+  colorIndex = 0,
+  className = "",
+}: {
+  card: (typeof DINING_OFFER_CARDS)[number];
+  locationCity: string;
+  colorIndex?: number;
+  className?: string;
+}) {
+  const theme = OFFER_THEMES[colorIndex % OFFER_THEMES.length];
+  return (
+    <div
+      className={`relative overflow-hidden rounded-[24px] min-h-[188px] sm:min-h-[200px] px-5 py-5 sm:px-6 sm:py-6 ${className}`}
+      style={{ backgroundColor: theme.bg, color: theme.text }}
+    >
+      <span
+        className="pointer-events-none absolute -top-10 -right-10 w-28 h-28 sm:w-32 sm:h-32 rounded-full"
+        style={{ backgroundColor: theme.shape }}
+      />
+      <span
+        className="pointer-events-none absolute -bottom-10 -left-10 w-28 h-28 sm:w-32 sm:h-32 rounded-full"
+        style={{ backgroundColor: theme.shape }}
+      />
+      <div className="relative z-10">
+        <span
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm lg:text-xs font-bold uppercase tracking-widest mb-2"
+          style={{ color: theme.accent }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.accent }} />
+          {card.badge}
+        </span>
+        <h3 className="text-xl sm:text-2xl font-extrabold leading-tight">{card.title}</h3>
+        <p className="mt-1.5 text-sm sm:text-base lg:text-sm opacity-80">
+          {card.subtitle}
+          {card.id === "weekend" && locationCity ? ` across ${locationCity}.` : "."}
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            document.getElementById("restaurant-listings")?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            })
+          }
+          className="mt-4 inline-flex items-center gap-1.5 bg-white rounded-full px-4 py-2 text-sm sm:text-base lg:text-sm font-bold shadow-sm hover:shadow-md transition-shadow"
+          style={{ color: theme.accent }}
+        >
+          {card.cta} <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function timeToMinutes(value?: string): number | null {
   if (!value) return null;
@@ -233,6 +282,14 @@ const EXPLORE_CUISINES = [
   },
 ] as const;
 
+function themeColorFromLabel(label: string): string {
+  let hash = 0;
+  for (let i = 0; i < label.length; i += 1) {
+    hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
+  }
+  return TAB_THEME_COLORS[hash % TAB_THEME_COLORS.length];
+}
+
 function getDiningTypeVisual(label: string): {
   Icon: IconType;
   bg: string;
@@ -241,33 +298,86 @@ function getDiningTypeVisual(label: string): {
   const lower = label.trim().toLowerCase();
 
   let Icon: IconType = MdOutlineRestaurant;
-  if (lower === "all" || lower.includes("all dining")) Icon = MdOutlineDinnerDining;
-  else if (lower.includes("comedy") || lower.includes("stand up") || lower.includes("stand-up")) Icon = MdOutlineTheaterComedy;
-  else if (lower.includes("concert") || lower.includes("live show") || lower.includes("gig")) Icon = HiOutlineMicrophone;
-  else if (lower.includes("music") || lower.includes("dj") || lower.includes("band")) Icon = MdOutlineMusicNote;
-  else if (lower.includes("theatre") || lower.includes("theater") || lower.includes("drama")) Icon = MdOutlineTheaters;
-  else if (lower.includes("party") || lower.includes("celebration")) Icon = MdOutlineCelebration;
-  else if (lower.includes("sport")) Icon = MdOutlineSportsSoccer;
-  else if (lower.includes("spa") || lower.includes("wellness")) Icon = MdOutlineSpa;
-  else if (lower.includes("hotel") || lower.includes("stay")) Icon = MdOutlineHotel;
-  else if (lower.includes("pizza")) Icon = MdOutlineLocalPizza;
-  else if (lower.includes("nightclub") || lower.includes("nightlife")) Icon = MdOutlineNightlife;
-  else if (lower.includes("event")) Icon = MdOutlineEvent;
-  else if (lower.includes("grill")) Icon = MdOutlineOutdoorGrill;
-  else if (lower === "bar") Icon = MdOutlineSportsBar;
-  else if (lower.includes("pub")) Icon = MdOutlineWineBar;
-  else if (lower.includes("lounge") || lower.includes("club")) Icon = MdOutlineNightlife;
-  else if (lower.includes("cafe") || lower.includes("coffee")) Icon = MdOutlineLocalCafe;
-  else if (lower.includes("fine")) Icon = MdOutlineBrunchDining;
-  else if (lower.includes("general")) Icon = IoRestaurantOutline;
-  else if (lower.includes("dessert") || lower.includes("sweet") || lower.includes("bakery")) Icon = MdOutlineBakeryDining;
-  else if (lower.includes("family")) Icon = MdOutlineFamilyRestroom;
-  else if (lower.includes("rooftop") || lower.includes("outdoor")) Icon = MdOutlineDeck;
-  else if (lower.includes("karaoke") || lower.includes("open mic")) Icon = HiOutlineMicrophone;
-  else if (lower.includes("bar")) Icon = MdOutlineSportsBar;
-  else if (lower.includes("restaurant") || lower.includes("dining")) Icon = MdOutlineRestaurant;
+  let accent = themeColorFromLabel(label);
 
-  return { Icon, bg: "rgba(232,93,4,0.12)", accent: HERO_ACCENT };
+  if (lower === "all" || lower.includes("all dining")) {
+    Icon = MdOutlineDinnerDining;
+    accent = "#6900AA";
+  } else if (lower.includes("comedy") || lower.includes("stand up") || lower.includes("stand-up")) {
+    Icon = MdOutlineTheaterComedy;
+    accent = "#DB2777";
+  } else if (lower.includes("concert") || lower.includes("live show") || lower.includes("gig")) {
+    Icon = HiOutlineMicrophone;
+    accent = "#C026D3";
+  } else if (lower.includes("music") || lower.includes("dj") || lower.includes("band")) {
+    Icon = MdOutlineMusicNote;
+    accent = "#7C3AED";
+  } else if (lower.includes("theatre") || lower.includes("theater") || lower.includes("drama")) {
+    Icon = MdOutlineTheaters;
+    accent = "#4F46E5";
+  } else if (lower.includes("party") || lower.includes("celebration")) {
+    Icon = MdOutlineCelebration;
+    accent = "#E11D48";
+  } else if (lower.includes("sport")) {
+    Icon = MdOutlineSportsSoccer;
+    accent = "#059669";
+  } else if (lower.includes("spa") || lower.includes("wellness")) {
+    Icon = MdOutlineSpa;
+    accent = "#0D9488";
+  } else if (lower.includes("hotel") || lower.includes("stay")) {
+    Icon = MdOutlineHotel;
+    accent = "#0891B2";
+  } else if (lower.includes("pizza")) {
+    Icon = MdOutlineLocalPizza;
+    accent = "#EA580C";
+  } else if (lower.includes("nightclub") || lower.includes("nightlife")) {
+    Icon = MdOutlineNightlife;
+    accent = "#9D00FF";
+  } else if (lower.includes("event")) {
+    Icon = MdOutlineEvent;
+    accent = "#2563EB";
+  } else if (lower.includes("grill")) {
+    Icon = MdOutlineOutdoorGrill;
+    accent = "#D97706";
+  } else if (lower === "bar") {
+    Icon = MdOutlineSportsBar;
+    accent = "#7C3AED";
+  } else if (lower.includes("pub")) {
+    Icon = MdOutlineWineBar;
+    accent = "#9333EA";
+  } else if (lower.includes("lounge") || lower.includes("club")) {
+    Icon = MdOutlineNightlife;
+    accent = "#A21CAF";
+  } else if (lower.includes("cafe") || lower.includes("coffee")) {
+    Icon = MdOutlineLocalCafe;
+    accent = "#C2410C";
+  } else if (lower.includes("fine")) {
+    Icon = MdOutlineBrunchDining;
+    accent = "#6D28D9";
+  } else if (lower.includes("general")) {
+    Icon = IoRestaurantOutline;
+    accent = "#0EA5E9";
+  } else if (lower.includes("dessert") || lower.includes("sweet") || lower.includes("bakery")) {
+    Icon = MdOutlineBakeryDining;
+    accent = "#EC4899";
+  } else if (lower.includes("family")) {
+    Icon = MdOutlineFamilyRestroom;
+    accent = "#16A34A";
+  } else if (lower.includes("rooftop") || lower.includes("outdoor")) {
+    Icon = MdOutlineDeck;
+    accent = "#0284C7";
+  } else if (lower.includes("karaoke") || lower.includes("open mic")) {
+    Icon = HiOutlineMicrophone;
+    accent = "#F59E0B";
+  } else if (lower.includes("bar")) {
+    Icon = MdOutlineSportsBar;
+    accent = "#8B5CF6";
+  } else if (lower.includes("restaurant") || lower.includes("dining")) {
+    Icon = MdOutlineRestaurant;
+    accent = "#E11D48";
+  }
+
+  return { Icon, bg: `${accent}1F`, accent };
 }
 
 function CuisineLandmarkIcon({
@@ -494,7 +604,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
   };
 
   const isPromoted = !!restaurant.is_promoted;
-  const hasDiscount = idHash % 3 === 0 || idHash % 5 === 0;
+  const offerLabel = listingOfferLabel(restaurant.dining_offers);
 
   return (
     <Link
@@ -519,13 +629,13 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
           </span>
         )}
 
-        {hasDiscount && (
+        {offerLabel && (
           <div
             className="absolute bottom-3 left-0 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md"
-            style={{ backgroundColor: HERO_ACCENT, boxShadow: "0 6px 14px rgba(232,93,4,0.28)" }}
+            style={{ backgroundColor: HERO_ACCENT, boxShadow: "0 6px 14px rgba(105,0,170,0.28)" }}
           >
             <Percent size={11} className="text-white shrink-0" />
-            <span>Flat 10% OFF</span>
+            <span>{offerLabel}</span>
           </div>
         )}
       </div>
@@ -721,11 +831,10 @@ export default function Home() {
   const authUser = useAppSelector((state) => state.auth.user);
   const foodieName = authUser?.name?.trim().split(/\s+/)[0] || "Foodie";
   const [promoIndex, setPromoIndex] = useState(0);
-  const [offerSlide, setOfferSlide] = useState(0);
-  const [offerImageIndex, setOfferImageIndex] = useState([0, 0, 0]);
 
   const collectionsRef = useRef<HTMLDivElement>(null);
   const cuisinesRef = useRef<HTMLDivElement>(null);
+  const offersRef = useRef<HTMLDivElement>(null);
 
   const scrollCollections = (direction: 'left' | 'right') => {
     if (collectionsRef.current) {
@@ -743,6 +852,15 @@ export default function Home() {
     if (!cuisinesRef.current) return;
     const amount = Math.max(cuisinesRef.current.clientWidth * 0.7, 160);
     cuisinesRef.current.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
+
+  const scrollOffers = (direction: "left" | "right") => {
+    if (!offersRef.current) return;
+    const amount = Math.max(offersRef.current.clientWidth * 0.8, 280);
+    offersRef.current.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
     });
@@ -1027,6 +1145,20 @@ export default function Home() {
     return filtered.filter((r) => matchesMealOccasion(r, mealOccasion));
   }, [businesses, searchQuery, activeFilter, locationCity, diningFilters, mealOccasion]);
 
+  const hasActiveFilters =
+    Boolean(searchQuery) ||
+    activeFilter !== "All" ||
+    Boolean(mealOccasion) ||
+    diningFilters.cuisine !== "" ||
+    diningFilters.minRating > 0 ||
+    diningFilters.offersOnly ||
+    diningFilters.pureVeg ||
+    diningFilters.servesAlcohol ||
+    diningFilters.maxCost > 0 ||
+    diningFilters.sort !== "relevance" ||
+    diningFilters.bookTable;
+  const showHomeExtras = !hasActiveFilters;
+
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
   const restaurantCountLabel = `${filteredRestaurants.length} restaurant${filteredRestaurants.length !== 1 ? "s" : ""}`;
@@ -1049,6 +1181,13 @@ export default function Home() {
 
     return (city && city !== "All Cities") ? `${name} in ${city}` : `${name} Near You`;
   };
+
+  const heroRestaurantStat =
+    businesses.length >= 1000
+      ? `${Math.floor(businesses.length / 100) * 100}+`
+      : businesses.length > 0
+        ? `${businesses.length}+`
+        : "5,000+";
 
   return (
     <div className="min-h-screen bg-white">
@@ -1089,94 +1228,50 @@ export default function Home() {
         </button>
       </section> */}
 
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5">
-
-     
-
-      {/* ── 1. Hero Search Banner ──────────────────────────────────────────── */}
-      <div
-        className={`relative ${
+      {/* ── 1. Hero Search Banner (centered, reference layout) ─────────────── */}
+      <section
+        className={`relative w-full ${
           showLocationDropdown ? "z-40" : "z-0"
         }`}
       >
-        {/* Background only — clipped to rounded corners (dropdown can overflow like old UI) */}
-        <div className="absolute inset-0 rounded-[22px] sm:rounded-[28px] overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div
             className="absolute inset-0 bg-cover bg-center scale-105 dining-hero-bg"
             style={{
               backgroundImage: "url(/images/dining-hero.png)",
             }}
           />
-          <div className="absolute inset-0 bg-black/35" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-black/30" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_15%,rgba(232,93,4,0.1),transparent_50%)]" />
+          <div className="absolute inset-0 bg-slate-900/55" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/30 via-slate-900/45 to-slate-900/65" />
         </div>
 
-        {/* Title lower + tight gap to search bar */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-5 lg:px-8 min-h-[360px] sm:min-h-[400px] lg:min-h-[440px] flex flex-col justify-end  pb-6 sm:pb-8 gap-4 sm:gap-5">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 sm:gap-6">
-            <div className="max-w-xl dining-hero-fade-up">
-              <h1
-                className={`${playfair.className} text-[28px] sm:text-4xl lg:text-[52px] font-semibold text-white leading-[1.15] tracking-tight`}
+        <div className="relative z-10 w-full mx-auto container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 min-h-[340px] sm:min-h-[380px] lg:min-h-[400px] flex flex-col items-start justify-end pt-10 sm:pt-12 pb-6 sm:pb-7 text-left">
+          <div className="w-full max-w-3xl dining-hero-fade-up">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.12] tracking-tight">
+              What are you in the{" "}
+              <span
+                className="bg-clip-text text-transparent"
+                style={{
+                  backgroundImage: "linear-gradient(90deg, #FB7185, #C084FC, #FCD34D)",
+                }}
               >
-                Book Your Perfect Dining Experience
-              </h1>
-              <p className="mt-2 text-white/90 text-sm sm:text-base lg:text-lg font-medium max-w-md">
-                Discover the best restaurants, cafes, bars and more.
-              </p>
-            </div>
-
-            <div className="relative w-full max-w-[300px] sm:max-w-[320px] sm:shrink-0 dining-hero-fade-up dining-hero-delay-1">
-              <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-black/35 backdrop-blur-md px-4 py-3.5 sm:px-5 sm:py-4 shadow-2xl">
-                <div className="relative z-10 pr-14 sm:pr-16">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Tag size={13} style={{ color: HERO_ACCENT }} />
-                    <span className="text-[10px] sm:text-[11px] font-bold tracking-[0.18em] text-white/90 uppercase">
-                      Offer
-                    </span>
-                  </div>
-                  <p className={`${playfair.className} text-xl sm:text-2xl font-bold text-white leading-tight`}>
-                    Flat 20% OFF
-                  </p>
-                  <p className="mt-0.5 text-xs text-white/75">Up to ₹200 on dining bookings</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      document.getElementById("dining-offers")?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                      });
-                    }}
-                    className="mt-2.5 inline-flex items-center rounded-md bg-white hover:bg-slate-100 text-slate-900 text-[11px] sm:text-xs font-bold px-3 py-1.5 transition-all hover:scale-[1.03] active:scale-[0.98]"
-                  >
-                    View Offers
-                  </button>
-                </div>
-                <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-16 h-20">
-                  <div className="dining-hero-float absolute right-1 top-0 w-9 h-9 rounded-full bg-gradient-to-br from-[#c45a1a] to-[#7a2e08] border border-amber-200/30 shadow-lg flex items-center justify-center">
-                    <Percent size={14} className="text-white/90" />
-                  </div>
-                  <div className="dining-hero-float-delayed absolute right-8 top-8 w-7 h-7 rounded-full bg-gradient-to-br from-[#a84812] to-[#5c2206] border border-amber-200/20 shadow-md flex items-center justify-center">
-                    <Percent size={11} className="text-white/80" />
-                  </div>
-                  <div className="dining-hero-float absolute right-0 bottom-1 w-6 h-6 rounded-full bg-gradient-to-br from-[#d97706] to-[#92400e] border border-amber-100/25 shadow flex items-center justify-center">
-                    <Percent size={9} className="text-white/85" />
-                  </div>
-                </div>
-              </div>
-            </div>
+                mood for?
+              </span>
+            </h1>
+            <p className="mt-3 sm:mt-4 text-white/90 text-base sm:text-xl font-medium max-w-2xl">
+              Discover top restaurants, cafes &amp; bars — book your table in seconds.
+            </p>
           </div>
 
-          {/* Previous location + search bar with orange accents */}
-          <div className="w-full dining-hero-fade-up dining-hero-delay-2">
-            <div ref={locationRef} className="relative z-50">
+          <div className="w-full max-w-3xl mt-5 sm:mt-8 lg:mt-10 dining-hero-fade-up dining-hero-delay-1">
+            <div ref={locationRef} className="relative z-50 text-left">
               <div className="flex flex-col sm:flex-row items-stretch bg-white rounded-2xl sm:rounded-full shadow-2xl shadow-black/25 border border-white/50 overflow-hidden">
                 <button
                   id="location-picker-btn"
                   type="button"
                   onClick={() => setShowLocationDropdown((v) => !v)}
                   className={`flex items-center gap-2 px-4 py-3.5 sm:py-0 sm:min-h-[52px] shrink-0 border-b sm:border-b-0 sm:border-r border-slate-100 hover:bg-slate-50 transition-colors w-full sm:w-auto sm:min-w-[170px] md:min-w-[200px] sm:max-w-[240px] ${
-                    showLocationDropdown ? "bg-orange-50" : ""
+                    showLocationDropdown ? "bg-[#f7e9ff]" : ""
                   }`}
                 >
                   {locationLoading ? (
@@ -1189,7 +1284,7 @@ export default function Home() {
                     />
                   )}
                   <span
-                    className={`text-sm font-semibold truncate ${
+                    className={`text-sm sm:text-base lg:text-sm font-semibold truncate ${
                       locationLoading ? "text-slate-400" : "text-slate-800"
                     }`}
                   >
@@ -1208,7 +1303,7 @@ export default function Home() {
                   <input
                     type="text"
                     placeholder="Search restaurants, cuisines or dishes..."
-                    className="flex-1 text-slate-800 placeholder:text-slate-400 text-sm focus:outline-none bg-transparent py-3.5 sm:py-0 min-w-0"
+                    className="flex-1 text-slate-800 placeholder:text-slate-400 text-sm sm:text-base focus:outline-none bg-transparent py-3.5 sm:py-0 min-w-0"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -1232,14 +1327,13 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleSearchSubmit}
-                  className="inline-flex items-center justify-center gap-2 text-white px-6 sm:px-7 py-3.5 sm:py-0 sm:min-h-[52px] font-bold text-sm transition-all hover:brightness-110 active:scale-[0.99] whitespace-nowrap w-full sm:w-auto sm:rounded-full sm:m-1"
+                  className="inline-flex items-center justify-center text-white px-6 sm:px-8 py-3.5 sm:py-0 sm:min-h-[52px] font-bold text-sm transition-all hover:brightness-110 active:scale-[0.99] whitespace-nowrap w-full sm:w-auto sm:rounded-full sm:m-1"
                   style={{
                     backgroundColor: HERO_ACCENT,
-                    boxShadow: "0 8px 20px rgba(232,93,4,0.3)",
+                    boxShadow: "0 8px 20px rgba(105,0,170,0.3)",
                   }}
                 >
-                  Find a Table
-                  <ArrowRight size={15} />
+                  Search
                 </button>
               </div>
 
@@ -1289,81 +1383,38 @@ export default function Home() {
               </p>
             )}
           </div>
+
+          <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-start gap-x-8 sm:gap-x-12 gap-y-3 text-white/90 text-sm sm:text-base font-medium dining-hero-fade-up dining-hero-delay-2">
+            <span>{heroRestaurantStat} Restaurants</span>
+            <span>1M+ Happy Diners</span>
+            <span>50+ Cities</span>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {cuisineCards.length > 0 && (
-        <section className="bg-white container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-4 sm:py-5 md:py-6 mb-3 sm:mb-5">
-          <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
-            <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
-              Explore Cuisines
-            </h2>
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <button
-                type="button"
-                aria-label="Previous cuisines"
-                onClick={() => scrollCuisines("left")}
-                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-              >
-                <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              </button>
-              <button
-                type="button"
-                aria-label="Next cuisines"
-                onClick={() => scrollCuisines("right")}
-                className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-              >
-                <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              </button>
-            </div>
-          </div>
-          <div
-            ref={cuisinesRef}
-            className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 -mx-1 px-1"
-          >
-            {cuisineCards.map((item) => {
-              const isActive = diningFilters.cuisine.toLowerCase() === item.name.toLowerCase();
-              return (
-                <button
-                  key={item.name}
-                  type="button"
-                  onClick={() => handleCuisineSelect(item.name)}
-                  className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
+      {showHomeExtras && (
+      <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-5 pb-2">
+        {/* ── 2. Collections (after hero) ──────────────────────────────────── */}
+          <section className=" w-full mx-auto">
+            {/* Mobile / tablet: title + All collections on one line, subtitle below */}
+            <div className="lg:hidden mb-2">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-xl font-bold text-slate-800 shrink-0">Collections</h2>
+                <Link
+                  href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
+                  className="flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                 >
-                  <span
-                    className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
-                      isActive ? "ring-2 ring-[#E85D04] ring-offset-1 sm:ring-offset-2" : ""
-                    }`}
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        const el = e.target as HTMLImageElement;
-                        if (el.src !== CUISINE_IMAGE_FALLBACK) {
-                          el.src = CUISINE_IMAGE_FALLBACK;
-                        }
-                      }}
-                    />
-                  </span>
-                  <span className="mt-1.5 sm:mt-3 text-[11px] sm:text-[13px] lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
-                    {item.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                  All collections <ChevronRight size={16} />
+                </Link>
+              </div>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Explore curated lists of top restaurants, cafes and bars
+              </p>
+            </div>
 
-      {/* ── Page Body Part 1 (Collections, Promotions, Moods) ───────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-        {/* ── 3. Collections ──────────────────────────────────────────────── */}
-        {!searchQuery && activeFilter === "All" && (
-          <section className="py-10">
-            <div className="flex items-center justify-between mb-2">
+            {/* Desktop: title + subtitle left, All collections right */}
+            <div className="hidden lg:flex items-center justify-between mb-2">
               <div>
                 <h2 className="text-xl font-bold text-slate-800">Collections</h2>
                 <p className="text-sm text-slate-500 mt-0.5">
@@ -1371,35 +1422,37 @@ export default function Home() {
                 </p>
               </div>
               <Link
-                href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : '/collections'}
-                className="flex items-center gap-1 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
+                href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
+                className="flex items-center gap-1 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer"
               >
                 All collections <ChevronRight size={16} />
               </Link>
             </div>
+
             <div className="relative mt-5">
-              {/* Left Arrow */}
-              <button 
-                onClick={() => scrollCollections('left')}
+              <button
+                onClick={() => scrollCollections("left")}
                 className="absolute left-2 sm:-left-5 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-slate-700 w-10 h-10 rounded-full hidden md:flex items-center justify-center border border-slate-200 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer backdrop-blur-sm"
                 aria-label="Scroll left"
               >
                 <ChevronLeft size={20} />
               </button>
 
-              {/* Scrollable Container */}
-              <div 
+              <div
                 ref={collectionsRef}
-                className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide scroll-smooth"
+                className="overflow-x-auto pt-3 pb-4 scrollbar-hide scroll-smooth"
               >
-                {collections.map((col) => (
-                  <CollectionCard key={col.id} collection={col} />
-                ))}
+                <div className="flex min-w-full justify-center">
+                  <div className="flex gap-4 px-1">
+                    {collections.map((col) => (
+                      <CollectionCard key={col.id} collection={col} />
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Right Arrow */}
-              <button 
-                onClick={() => scrollCollections('right')}
+              <button
+                onClick={() => scrollCollections("right")}
                 className="absolute right-2 sm:-right-5 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-slate-750 w-10 h-10 rounded-full hidden md:flex items-center justify-center border border-slate-200 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer backdrop-blur-sm"
                 aria-label="Scroll right"
               >
@@ -1407,261 +1460,120 @@ export default function Home() {
               </button>
             </div>
           </section>
-        )}
 
-        {/* ── 4. Promotional Banner ────────────────────────────────────────── */}
-        {!searchQuery && activeFilter === "All" && (
-          <section id="dining-offers" className="py-6 scroll-mt-24">
+        {/* ── 3. Tab section (hidden — categories live in Filter popup) ──── */}
+       
+        {/* <div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="relative">
-              <div className="overflow-hidden rounded-[24px] sm:rounded-[28px]">
-                <div
-                  className="flex transition-transform duration-500 ease-out"
-                  style={{ transform: `translateX(-${offerSlide * 100}%)` }}
-                >
-                  {DINING_OFFER_CARDS.map((card, cardIdx) => {
-                    const imgIdx = offerImageIndex[cardIdx] ?? 0;
-                    return (
-                      <div key={card.id} className="min-w-full w-full shrink-0">
-                        <div
-                          className="relative overflow-hidden rounded-[24px] sm:rounded-[28px] min-h-[200px] sm:min-h-[220px] md:min-h-[240px] px-5 sm:px-8 py-6 sm:py-7 flex items-center"
-                          style={{ backgroundColor: card.bg, color: card.text }}
-                        >
-                          {card.pattern === "bolts" && (
-                            <div className="pointer-events-none absolute inset-0 opacity-[0.12]"
-                              style={{
-                                backgroundImage:
-                                  "repeating-linear-gradient(115deg, transparent, transparent 40px, currentColor 40px, currentColor 52px)",
-                              }}
-                            />
-                          )}
-                          {card.pattern === "burst" && (
-                            <div className="pointer-events-none absolute -right-10 -top-16 w-64 h-64 rounded-full border-[18px] opacity-[0.12]"
-                              style={{ borderColor: card.text }}
-                            />
-                          )}
-                          {card.pattern === "arcs" && (
-                            <div className="pointer-events-none absolute -right-8 bottom-[-40%] w-72 h-72 rounded-full border-[16px] opacity-[0.12]"
-                              style={{ borderColor: card.text }}
-                            />
-                          )}
-
-                          <div className="relative z-10 flex-1 min-w-0 pr-2 sm:pr-6">
-                            <span
-                              className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2"
-                              style={{ color: card.accent }}
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: card.accent }} />
-                              {card.badge}
-                            </span>
-                            <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">
-                              {card.title}
-                            </h3>
-                            <p className="mt-1.5 text-sm sm:text-base opacity-80 max-w-md">
-                              {card.subtitle}
-                              {card.id === "weekend" && locationCity ? ` across ${locationCity}.` : "."}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                document.getElementById("restaurant-listings")?.scrollIntoView({
-                                  behavior: "smooth",
-                                  block: "start",
-                                })
-                              }
-                              className="mt-4 inline-flex items-center gap-1.5 bg-white rounded-full px-4 sm:px-5 py-2 text-sm font-bold shadow-sm hover:shadow-md transition-shadow"
-                              style={{ color: card.accent }}
-                            >
-                              {card.cta} <ChevronRight size={16} />
-                            </button>
-                          </div>
-
-                          <div className="relative z-10 shrink-0 flex flex-col items-center">
-                            <img
-                              src={card.images[imgIdx]}
-                              alt={card.title}
-                              className="w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] md:w-[180px] md:h-[180px] object-contain drop-shadow-lg"
-                            />
-                            <div className="flex items-center gap-1.5 mt-2">
-                              {card.images.map((_, dotIdx) => (
-                                <button
-                                  key={dotIdx}
-                                  type="button"
-                                  aria-label={`Offer image ${dotIdx + 1}`}
-                                  onClick={() =>
-                                    setOfferImageIndex((prev) => {
-                                      const next = [...prev];
-                                      next[cardIdx] = dotIdx;
-                                      return next;
-                                    })
-                                  }
-                                  className="w-2 h-2 rounded-full transition-all"
-                                  style={{
-                                    backgroundColor: imgIdx === dotIdx ? card.accent : "rgba(0,0,0,0.2)",
-                                    transform: imgIdx === dotIdx ? "scale(1.2)" : "scale(1)",
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                aria-label="Previous offer"
-                onClick={() =>
-                  setOfferSlide((prev) => (prev === 0 ? DINING_OFFER_CARDS.length - 1 : prev - 1))
-                }
-                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                type="button"
-                aria-label="Next offer"
-                onClick={() =>
-                  setOfferSlide((prev) => (prev === DINING_OFFER_CARDS.length - 1 ? 0 : prev + 1))
-                }
-                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </section>
-        )}
-
-        {/* Restore In The Mood For by uncommenting this section and the mood helpers above.
-        {!searchQuery && activeFilter === "All" && (
-          <section className="py-8">
-            <div className="flex items-center gap-4 text-center mb-8">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-slate-400 font-bold text-xs uppercase tracking-[0.25em] whitespace-nowrap">
-                In The Mood For
-              </span>
-              <div className="flex-1 h-px bg-slate-200" />
-            </div>
-
-            <div className="flex md:hidden overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 scroll-smooth">
-              <div className="grid grid-rows-2 grid-flow-col gap-4">
-                {moods.map((mood) => (
-                  <button
-                    key={mood.id}
-                    onClick={() => handleMoodSelect(mood.query_tag)}
-                    className="group bg-white rounded-2xl border border-slate-100/90 p-3.5 h-38 w-28 flex flex-col justify-between hover:shadow-sm hover:border-slate-200 transition-all cursor-pointer text-left shrink-0 shadow-sm relative overflow-hidden focus:outline-none"
-                  >
-                    <span className="font-bold text-slate-800 text-[12.5px] leading-tight block max-w-full group-hover:text-rose-600 transition-colors">
-                      {mood.title}
-                    </span>
-                    <div className="absolute bottom-0 left-0 right-0 h-22 overflow-hidden rounded-b-2xl flex items-end">
-                      <img
-                        src={mood.image_url}
-                        alt={mood.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
-                        }}
-                      />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="hidden md:flex justify-between items-center w-full py-2">
-              {moods.map((mood) => (
-                <button
-                  key={mood.id}
-                  onClick={() => handleMoodSelect(mood.query_tag)}
-                  className="group flex flex-col items-center text-center cursor-pointer w-28 lg:w-32 focus:outline-none shrink-0"
-                >
-                  <div className="relative w-24 h-24 lg:w-28 lg:h-28 rounded-full overflow-hidden border-2 border-slate-100 group-hover:border-rose-600 group-hover:scale-105 transition-all duration-300 shadow-sm bg-slate-50 flex items-center justify-center">
-                    <img
-                      src={mood.image_url}
-                      alt={mood.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
+              <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory py-1 px-1 pr-4">
+                {filters.map((f) => {
+                  const isActive = activeFilter.toLowerCase() === f.label.toLowerCase();
+                  const theme = getDiningTypeVisual(f.label);
+                  const displayName = f.label.toLowerCase() === "all" ? "All Dining" : f.label;
+                  const TypeIcon = theme.Icon;
+                  return (
+                    <button
+                      key={f.label}
+                      type="button"
+                      onClick={() => {
+                        setActiveFilter(f.label);
+                        const element = document.getElementById("restaurant-listings");
+                        if (element) {
+                          element.scrollIntoView({ behavior: "smooth" });
+                        }
                       }}
-                    />
-                    <div className="absolute inset-0 ring-4 ring-rose-500/15 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  </div>
-                  <span className="text-[12px] lg:text-[13px] font-bold text-slate-700 mt-3 group-hover:text-rose-600 transition-colors tracking-wide leading-tight">
-                    {mood.title}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-        */}
-
-        
-
-      </div>
-
-      {/* ── 4.8. What are you looking for ─────────────────────────────────── */}
-      <div className="bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <h2 className={`${playfair.className} text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-5 sm:mb-6`}>
-            What are you looking for?
-          </h2>
-          <div className="relative">
-            <div className="flex flex-nowrap items-start gap-5 sm:gap-6 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pt-3 pb-4 px-1 pr-8">
-            {filters.map((f) => {
-              const isActive = activeFilter.toLowerCase() === f.label.toLowerCase();
-              const theme = getDiningTypeVisual(f.label);
-              const displayName = f.label.toLowerCase() === "all" ? "All Dining" : f.label;
-              const TypeIcon = theme.Icon;
-              return (
-                <button
-                  key={f.label}
-                  type="button"
-                  onClick={() => {
-                    setActiveFilter(f.label);
-                    const element = document.getElementById("restaurant-listings");
-                    if (element) {
-                      element.scrollIntoView({ behavior: "smooth" });
-                    }
-                  }}
-                  className="shrink-0 snap-start flex flex-col items-center w-[84px] sm:w-[92px] cursor-pointer group"
-                >
-                  <span
-                    className="w-[48px] h-[48px] sm:w-[52px] sm:h-[52px] rounded-full flex items-center justify-center"
-                    style={{
-                      backgroundColor: theme.bg,
-                      boxShadow: isActive ? `0 0 0 2px ${HERO_ACCENT}` : undefined,
-                    }}
-                  >
-                    <TypeIcon size={22} color={theme.accent} />
-                  </span>
-                  <span className="mt-2 text-[11px] sm:text-[12px] font-semibold text-[#1A1A1A] text-center leading-tight">
-                    {displayName}
-                  </span>
-                </button>
-              );
-            })}
+                      className={`shrink-0 snap-start inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[12px] sm:text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                        isActive
+                          ? "text-white"
+                          : "bg-[#eef0f2] text-slate-700 hover:bg-slate-200"
+                      }`}
+                      style={isActive ? { backgroundColor: "#6900AA" } : undefined}
+                    >
+                      <TypeIcon size={16} color={isActive ? "#ffffff" : theme.accent} />
+                      {displayName}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        </div> */}
+        
       </div>
+      </div>
+      )}
 
-      <div className="bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full bg-white">
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
+        <div >
+          {/* ── 4. Filter Section ───────────────────────────────────────────── */}
+          <section>
+            <DiningFiltersBar
+              cuisines={cuisineOptions}
+              filters={diningFilters}
+              onChange={setDiningFilters}
+              onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
+              categories={filters.map((f) => f.label)}
+              category={activeFilter}
+              onCategoryChange={setActiveFilter}
+            />
+          </section>
 
-          {/* ── 5. Restaurant Listing Grid ───────────────────────────────────── */}
-          <section id="restaurant-listings" className={`pb-16 ${(!searchQuery && activeFilter === "All") ? "" : "pt-8"}`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          {/* ── 5. Offer Section ────────────────────────────────────────────── */}
+          {showHomeExtras && (
+            <section id="dining-offers" className="py-3 sm:pt-2 scroll-mt-24">
+              {DINING_OFFER_CARDS.length > 3 ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-label="Previous offers"
+                    onClick={() => scrollOffers("left")}
+                    className="absolute left-0 sm:-left-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md hidden md:flex items-center justify-center text-slate-700"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <div
+                    ref={offersRef}
+                    className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-1"
+                  >
+                    {DINING_OFFER_CARDS.map((card, idx) => (
+                      <OfferPromoCard
+                        key={card.id}
+                        card={card}
+                        locationCity={locationCity}
+                        colorIndex={idx}
+                        className="shrink-0 snap-start w-[min(86vw,340px)] xl:w-[calc((100%-40px)/3)]"
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Next offers"
+                    onClick={() => scrollOffers("right")}
+                    className="absolute right-0 sm:-right-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-white/90 hover:bg-white shadow-md hidden md:flex items-center justify-center text-slate-700"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                  {DINING_OFFER_CARDS.map((card, idx) => (
+                    <OfferPromoCard key={card.id} card={card} locationCity={locationCity} colorIndex={idx} />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── 6. Restaurant section ───────────────────────────────────────── */}
+          <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-2"}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-3">
             <div>
-              <h2 className="text-xl font-bold text-slate-800">
+              <h2 className="text-xl sm:text-2xl lgL:text-xl font-bold text-slate-800">
                 {getFilteredSectionTitle()}
               </h2>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
                 {locationLoading ? (
                   <span className="flex items-center gap-1.5">
                     <Loader2 size={12} className="animate-spin" /> Locating restaurants…
@@ -1676,30 +1588,29 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Active Filters & Search Chips */}
             <div className="flex flex-wrap items-center gap-2">
               {searchQuery && (
-                <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-100 text-rose-600 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                <div className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
                   <span>Search: "{searchQuery}"</span>
                   <button
                     onClick={() => { setSearchInput(""); setSearchQuery(""); }}
-                    className="hover:bg-rose-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                    className="hover:bg-[#efd7ff] p-0.5 rounded-full transition-colors flex items-center justify-center"
                     aria-label="Clear search"
                   >
-                    <X size={12} className="text-rose-600" />
+                    <X size={12} className="text-[#6900AA]" />
                   </button>
                 </div>
               )}
 
               {diningFilters.cuisine && (
-                <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-100 text-[#E85D04] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                <div className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
                   <span>Cuisine: {diningFilters.cuisine}</span>
                   <button
                     onClick={() => setDiningFilters({ ...diningFilters, cuisine: "" })}
-                    className="hover:bg-orange-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                    className="hover:bg-[#efd7ff] p-0.5 rounded-full transition-colors flex items-center justify-center"
                     aria-label="Clear cuisine filter"
                   >
-                    <X size={12} className="text-[#E85D04]" />
+                    <X size={12} className="text-[#6900AA]" />
                   </button>
                 </div>
               )}
@@ -1718,19 +1629,19 @@ export default function Home() {
               )}
 
               {mealOccasion && (
-                <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-100 text-[#E85D04] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                <div className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
                   <span>{MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label}</span>
                   <button
                     onClick={() => setMealOccasion("")}
-                    className="hover:bg-orange-100 p-0.5 rounded-full transition-colors flex items-center justify-center"
+                    className="hover:bg-[#efd7ff] p-0.5 rounded-full transition-colors flex items-center justify-center"
                     aria-label="Clear meal filter"
                   >
-                    <X size={12} className="text-[#E85D04]" />
+                    <X size={12} className="text-[#6900AA]" />
                   </button>
                 </div>
               )}
 
-              {(activeFilter !== "All" || searchQuery || diningFilters.cuisine || diningFilters.minRating > 0 || diningFilters.offersOnly || mealOccasion) && (
+              {hasActiveFilters && (
                 <button
                   onClick={() => {
                     setSearchInput("");
@@ -1739,7 +1650,7 @@ export default function Home() {
                     setDiningFilters(DEFAULT_DINING_FILTERS);
                     setMealOccasion("");
                   }}
-                  className="text-xs text-rose-600 hover:text-rose-700 font-bold px-2 py-1.5 transition-colors cursor-pointer"
+                  className="text-xs text-[#6900AA] hover:text-[#57008E] font-bold px-2 py-1.5 transition-colors cursor-pointer"
                 >
                   Clear All
                 </button>
@@ -1747,57 +1658,9 @@ export default function Home() {
             </div>
           </div>
 
-          <DiningFiltersBar
-            cuisines={cuisineOptions}
-            filters={diningFilters}
-            onChange={setDiningFilters}
-            onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
-          />
-
-          {/* <section className="mb-8">
-            <h2 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-5">
-              Hi {foodieName}, Dine Anytime!
-            </h2>
-            <div className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-hide scroll-smooth pt-2 pb-2">
-              {MEAL_OCCASIONS.map((meal) => {
-                const isActive = mealOccasion === meal.id;
-                return (
-                  <button
-                    key={meal.id}
-                    type="button"
-                    onClick={() => {
-                      setMealOccasion((prev) => (prev === meal.id ? "" : meal.id));
-                      document.getElementById("restaurant-listings")?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                      });
-                    }}
-                    className={`shrink-0 overflow-visible flex items-center gap-4 bg-white rounded-2xl px-5 py-2 min-w-[220px] sm:min-w-[240px] transition-all cursor-pointer ${
-                      isActive
-                        ? "shadow-[0_8px_22px_rgba(232,93,4,0.2)] ring-2 ring-[#E85D04]"
-                        : "shadow-[0_4px_16px_rgba(15,23,42,0.08)] hover:shadow-[0_8px_22px_rgba(15,23,42,0.12)]"
-                    }`}
-                  >
-                    <span className="relative w-[76px] h-[76px] sm:w-[84px] sm:h-[84px] shrink-0 overflow-visible">
-                      <span className="absolute left-0 bottom-0 w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-[#F8E7B8]" />
-                      <img
-                        src={meal.image}
-                        alt={meal.label}
-                        className="absolute -top-1 -right-0.5 z-10 w-[78px] h-[78px] sm:w-[86px] sm:h-[86px] object-contain drop-shadow-md"
-                      />
-                    </span>
-                    <span className="text-[16px] sm:text-[17px] font-bold text-[#1A1A1A] whitespace-nowrap">
-                      {meal.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section> */}
-
           {businessesLoading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
-              <Loader2 size={36} className="animate-spin text-rose-600" />
+              <Loader2 size={36} className="animate-spin text-[#6900AA]" />
               <p className="text-sm font-medium">Loading top restaurants...</p>
             </div>
           ) : filteredRestaurants.length === 0 ? (
@@ -1813,11 +1676,14 @@ export default function Home() {
                 <button
                   onClick={() => {
                     setSearchQuery("");
+                    setSearchInput("");
                     setActiveFilter("All");
+                    setDiningFilters(DEFAULT_DINING_FILTERS);
+                    setMealOccasion("");
                     setLocationCity("");
                     setLocationLabel("All Cities");
                   }}
-                  className="bg-rose-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"
+                  className="bg-[#6900AA] text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-[#57008E] transition-colors"
                 >
                   Show all restaurants
                 </button>
@@ -1836,10 +1702,82 @@ export default function Home() {
               ))}
             </div>
           )}
-        </section>
+          </section>
         </div>
       </div>
       </div>
+
+      {showHomeExtras && (
+      <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
+          {/* ── 7. Cuisine Section ──────────────────────────────────────────── */}
+          {cuisineCards.length > 0 && (
+            <section className="">
+              <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
+                <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
+                  Explore Cuisines
+                </h2>
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  <button
+                    type="button"
+                    aria-label="Previous cuisines"
+                    onClick={() => scrollCuisines("left")}
+                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next cuisines"
+                    onClick={() => scrollCuisines("right")}
+                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                  >
+                    <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                  </button>
+                </div>
+              </div>
+              <div
+                ref={cuisinesRef}
+                className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-0 -mx-1 px-1"
+              >
+                {cuisineCards.map((item) => {
+                  const isActive = diningFilters.cuisine.toLowerCase() === item.name.toLowerCase();
+                  return (
+                    <button
+                      key={item.name}
+                      type="button"
+                      onClick={() => handleCuisineSelect(item.name)}
+                      className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
+                    >
+                      <span
+                        className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
+                          isActive ? "ring-2 ring-[#6900AA] ring-offset-1 sm:ring-offset-2" : ""
+                        }`}
+                      >
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const el = e.target as HTMLImageElement;
+                            if (el.src !== CUISINE_IMAGE_FALLBACK) {
+                              el.src = CUISINE_IMAGE_FALLBACK;
+                            }
+                          }}
+                        />
+                      </span>
+                      <span className="mt-1.5 sm:mt-3 text-[11px] sm:text-[13px] lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
+                        {item.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+      </div>
+      </div>
+      )}
     </div>
   );
 }

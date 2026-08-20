@@ -1,0 +1,27 @@
+.promo-banner-swiper .swiper {
+  height: 100%;
+  width: 100%;
+}
+
+.promo-banner-swiper .swiper-slide {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.promo-banner-swiper .swiper-pagination {
+  bottom: 12px !important;
+}
+
+.promo-banner-swiper .swiper-pagination-bullet {
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 1;
+  margin: 0 3px !important;
+}
+
+.promo-banner-swiper .swiper-pagination-bullet-active {
+  width: 20px;
+  border-radius: 9999px;
+  background: #ffffff;
+}

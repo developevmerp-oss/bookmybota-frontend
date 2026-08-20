@@ -181,6 +181,7 @@ export default function BookingsManager() {
                 {renderSortHeader('booking_source', 'Source')}
                 {renderSortHeader('table_number', 'Assigned Table')}
                 {renderSortHeader('status', 'Status')}
+                <th className="py-4 px-6 text-xs uppercase tracking-wider font-semibold text-zinc-400">Offer</th>
                 <th className="py-4 px-6 text-xs uppercase tracking-wider font-semibold text-zinc-400 text-right">Actions</th>
               </tr>
             </thead>
@@ -226,10 +227,24 @@ export default function BookingsManager() {
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                           : booking.status === 'CANCELLED' 
                           ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+                          : booking.status === 'COMPLETED'
+                          ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
                           : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
                       }`}>
                         {booking.status}
                       </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      {booking.applied_offer?.title ? (
+                        <div>
+                          <p className="text-sm font-semibold text-white">{booking.applied_offer.title}</p>
+                          {booking.applied_offer.validity && (
+                            <p className="text-[11px] text-zinc-500 mt-0.5">{booking.applied_offer.validity}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-zinc-600 text-xs italic font-medium">None</span>
+                      )}
                     </td>
                     <td className="py-4 px-6 text-right">
                       {booking.status === 'CONFIRMED' && (
@@ -246,14 +261,14 @@ export default function BookingsManager() {
               })}
               {paginatedBookings.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-zinc-500 font-medium italic">
+                  <td colSpan={8} className="text-center py-12 text-zinc-500 font-medium italic">
                     No bookings yet.
                   </td>
                 </tr>
               )}
               {isLoading && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-zinc-500 font-medium">
+                  <td colSpan={8} className="text-center py-12 text-zinc-500 font-medium">
                     Loading bookings...
                   </td>
                 </tr>

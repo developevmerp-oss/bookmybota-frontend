@@ -1,5 +1,5 @@
 "use client";
-import { Inter } from "next/font/google";
+import { Roboto } from "next/font/google";
 import { useEffect } from "react";
 import "./globals.css";
 import { usePathname } from "next/navigation";
@@ -7,7 +7,10 @@ import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
 import HomeHeader from "@/components/LandingPage/HomeHeader";
 
-const inter = Inter({ subsets: ["latin"] });
+const roboto = Roboto({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+});
 
 function Footer() {
   return (
@@ -99,7 +102,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
-      <body className={inter.className}>
+      <body className={roboto.className}>
         <StoreProvider>
           {!isAdminOrBusiness && <HomeHeader />}
           <main>

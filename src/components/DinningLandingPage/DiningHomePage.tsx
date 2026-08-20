@@ -111,7 +111,7 @@ const DINING_OFFER_CARDS = [
     id: "flat20",
     badge: "Limited Offer",
     title: "Flat 20% OFF",
-    subtitle: "Up to ₹200 on dining bookings",
+    subtitle: "Up to 200 ETB on dining bookings",
     cta: "View Offers",
   },
   {

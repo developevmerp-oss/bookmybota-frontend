@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState, cloneElement, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   ChevronRight,
@@ -20,18 +21,27 @@ import {
 import { FaFacebookF, FaLink, FaTimes, FaWhatsapp } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import {
+  api,
   useGetPublicEventLayoutQuery,
   useGetPublicEventOffersQuery,
   useGetPublicEventQuery,
   useGetPublicEventsQuery,
+  useGetEventInterestQuery,
+  useToggleEventInterestMutation,
   type PublicEvent,
 } from "@/services/api";
 import { formatTime12h } from "@/lib/dateFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
-import EventCheckout from "@/components/EventLandingPage/EventCheckout";
+import { readSessionForRole } from "@/lib/authStorage";
+import { useAppDispatch, useAppSelector } from "@/lib/hooks";
+import { loadFromStorage } from "@/features/auth/authSlice";
+import { extractApiError } from "@/lib/apiErrors";
+import { toast } from "sonner";
 import EventMediaSlider from "@/components/EventLandingPage/EventMediaSlider";
+import EventGallerySection from "@/components/EventLandingPage/EventGallerySection";
 import EventReviewsSection from "@/components/EventLandingPage/EventReviewsSection";
+import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import Footer from "@/components/LandingPage/Footer";
 
 const BRAND = "#6900AA";
@@ -90,9 +100,11 @@ function formatLongDate(value?: string) {
 function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   if (!children) return null;
   return (
-    <div className="flex items-start gap-3 py-[9px]">
+    <div className="flex items-start gap-2.5 sm:gap-3 py-2 sm:py-2.5">
       <span className="mt-0.5 w-5 shrink-0 text-[#9AA0A6] flex justify-center">{icon}</span>
-      <div className="min-w-0 text-[14.5px] font-medium text-[#1A1A1A] leading-snug">{children}</div>
+      <div className="min-w-0 text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] font-medium text-[#1A1A1A] leading-snug break-words">
+        {children}
+      </div>
     </div>
   );
 }
@@ -101,8 +113,11 @@ function RelatedCard({ event }: { event: PublicEvent }) {
   const image = event.poster_vertical_url || event.poster_horizontal_url;
   const subtitle = event.category_name || formatLongDate(event.next_showtime);
   return (
-    <Link href={`/events/${event.id}`} className="snap-start shrink-0 w-[168px] sm:w-[188px] group">
-      <div className="relative h-[236px] sm:h-[252px] rounded-xl overflow-hidden bg-slate-200">
+    <Link
+      href={`/events/${event.id}`}
+      className="snap-start shrink-0 w-[148px] sm:w-[176px] lg:w-[196px] 2xl:w-[210px] group"
+    >
+      <div className="relative h-[208px] sm:h-[248px] lg:h-[264px] 2xl:h-[280px] rounded-xl overflow-hidden bg-slate-200">
         {image ? (
           <img
             src={image}
@@ -113,8 +128,12 @@ function RelatedCard({ event }: { event: PublicEvent }) {
           <div className="absolute inset-0 bg-slate-700" />
         )}
       </div>
-      <p className="mt-2.5 font-bold text-[#1A1A1A] text-[13.5px] leading-snug line-clamp-2">{event.name}</p>
-      {subtitle && <p className="mt-1 text-xs text-[#6B6B6B] line-clamp-1">{subtitle}</p>}
+      <p className="mt-2 sm:mt-2.5 font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] leading-snug line-clamp-2">
+        {event.name}
+      </p>
+      {subtitle && (
+        <p className="mt-1 text-[0.875rem] sm:text-[1rem] text-[#6B6B6B] line-clamp-1">{subtitle}</p>
+      )}
     </Link>
   );
 }
@@ -125,28 +144,63 @@ export default function PublicEventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const authUser = useAppSelector((s) => s.auth.user);
+  const authToken = useAppSelector((s) => s.auth.token);
+
+  useEffect(() => {
+    dispatch(loadFromStorage());
+  }, [dispatch]);
+
+  const customerSession =
+    authUser?.role === "customer" && authToken
+      ? { user: authUser, token: authToken }
+      : readSessionForRole("customer");
+  const isCustomerLoggedIn = Boolean(customerSession?.token);
+  const customerId = String(
+    customerSession?.user?.customer_id || customerSession?.user?.id || ""
+  );
+
   const { data: event, isLoading, isError } = useGetPublicEventQuery(id);
   const { data: offers = [] } = useGetPublicEventOffersQuery(id);
   const { data: layout } = useGetPublicEventLayoutQuery(id);
   const { data: allEvents = [] } = useGetPublicEventsQuery();
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [selectedShowtimeId, setSelectedShowtimeId] = useState("");
+  const { data: interestData, refetch: refetchInterest } = useGetEventInterestQuery(
+    { eventId: id, customerId },
+    { skip: !isCustomerLoggedIn || !customerId }
+  );
+  const [toggleEventInterest, { isLoading: isTogglingInterest }] = useToggleEventInterestMutation();
+  const [optimisticInterest, setOptimisticInterest] = useState<{
+    eventId: string;
+    customerId: string;
+    interested: boolean;
+  } | null>(null);
   const [aboutExpanded, setAboutExpanded] = useState(false);
-  const [savedIds, setSavedIds] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const parsed = JSON.parse(localStorage.getItem("saved_events") || "[]");
-      return Array.isArray(parsed) ? parsed.map(String) : [];
-    } catch {
-      return [];
-    }
-  });
-  const saved = savedIds.includes(id);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [artistModal, setArtistModal] = useState<StaticArtist | null>(null);
   const [venuesOpen, setVenuesOpen] = useState(false);
+  const pendingInterestAfterAuthRef = useRef(false);
   const relatedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncAuth = () => {
+      dispatch(loadFromStorage());
+      setOptimisticInterest(null);
+      dispatch(api.util.invalidateTags(["EventInterests"]));
+    };
+    window.addEventListener("auth_changed", syncAuth);
+    return () => window.removeEventListener("auth_changed", syncAuth);
+  }, [dispatch]);
+
+  const saved =
+    !isCustomerLoggedIn || !customerId
+      ? false
+      : optimisticInterest?.eventId === id && optimisticInterest.customerId === customerId
+        ? optimisticInterest.interested
+        : Boolean(interestData?.interested);
 
   const genres = useMemo(() => parseGenres(event?.genres), [event?.genres]);
   const languages = useMemo(() => parseEventLanguages(event?.language), [event?.language]);
@@ -219,10 +273,64 @@ export default function PublicEventDetailPage({
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
+  const applyInterestToggle = async () => {
+    if (!customerId) {
+      pendingInterestAfterAuthRef.current = true;
+      setAuthModalOpen(true);
+      return;
+    }
+    try {
+      const result = await toggleEventInterest({ eventId: id, customerId }).unwrap();
+      setOptimisticInterest({ eventId: id, customerId, interested: result.interested });
+      void refetchInterest();
+      toast.success(result.interested ? "Marked as interested" : "Interest removed");
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Could not update interest. Please try again."));
+    }
+  };
+
   const toggleSave = () => {
-    const next = saved ? savedIds.filter((x) => x !== id) : [...savedIds, id];
-    localStorage.setItem("saved_events", JSON.stringify(next));
-    setSavedIds(next);
+    if (isTogglingInterest) return;
+    if (!isCustomerLoggedIn || !customerId) {
+      pendingInterestAfterAuthRef.current = true;
+      setAuthModalOpen(true);
+      return;
+    }
+    void applyInterestToggle();
+  };
+
+  const onAuthSuccess = () => {
+    dispatch(loadFromStorage());
+    setOptimisticInterest(null);
+    dispatch(api.util.invalidateTags(["EventInterests"]));
+    const shouldMark = pendingInterestAfterAuthRef.current;
+    pendingInterestAfterAuthRef.current = false;
+    if (!shouldMark) return;
+    void (async () => {
+      // Re-read session after login — customer id may have just been set.
+      const session = readSessionForRole("customer");
+      const nextCustomerId = String(session?.user?.customer_id || session?.user?.id || "");
+      if (!nextCustomerId) {
+        toast.error("Logged in, but could not resolve your customer account.");
+        return;
+      }
+      try {
+        const result = await toggleEventInterest({
+          eventId: id,
+          customerId: nextCustomerId,
+          interested: true,
+        }).unwrap();
+        setOptimisticInterest({
+          eventId: id,
+          customerId: nextCustomerId,
+          interested: result.interested,
+        });
+        dispatch(api.util.invalidateTags(["EventInterests"]));
+        toast.success(result.interested ? "Marked as interested" : "Interest updated");
+      } catch (err: unknown) {
+        toast.error(extractApiError(err, "Logged in, but could not save interest."));
+      }
+    })();
   };
 
   const copyLink = async () => {
@@ -234,8 +342,8 @@ export default function PublicEventDetailPage({
   };
 
   const openCheckout = (showtimeId?: string) => {
-    setSelectedShowtimeId(showtimeId || "");
-    setCheckoutOpen(true);
+    const qs = showtimeId ? `?showtime=${encodeURIComponent(showtimeId)}` : "";
+    router.push(`/events/${id}/book${qs}`);
   };
 
   if (isLoading) {
@@ -265,8 +373,12 @@ export default function PublicEventDetailPage({
   }
 
   const aboutText = (event.about_event || "").trim();
-  const aboutLong = aboutText.length > 280;
-  const displayAbout = aboutExpanded || !aboutLong ? aboutText : `${aboutText.slice(0, 280).trim()}...`;
+  const ABOUT_PREVIEW_LEN = 160;
+  const aboutLong = aboutText.length > ABOUT_PREVIEW_LEN;
+  const displayAbout =
+    aboutExpanded || !aboutLong
+      ? aboutText
+      : `${aboutText.slice(0, ABOUT_PREVIEW_LEN).replace(/\s+\S*$/, "").trim()}…`;
   const durationLabel = formatDurationLong(event.duration_minutes);
   const isLive = event.status === "LIVE";
   const hasShowtimes = showtimes.length > 0;
@@ -302,7 +414,7 @@ export default function PublicEventDetailPage({
 
   const bookingCard = (
     <div className="bg-white rounded-xl border border-[#E8E8E8] shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
-      <div className="px-5 pt-4 pb-2">
+      <div className="px-3.5 sm:px-5 pt-3.5 sm:pt-4 pb-2">
         {dateLabel && (
           <MetaRow icon={<Calendar size={18} strokeWidth={1.7} />}>{dateLabel}</MetaRow>
         )}
@@ -322,13 +434,16 @@ export default function PublicEventDetailPage({
           <MetaRow icon={<Theater size={18} strokeWidth={1.7} />}>{genres.join(", ")}</MetaRow>
         )}
         {venueLabel && (
-          <MetaRow
-            icon={<MapPin size={18} strokeWidth={1.7} />}
-          >
+          <MetaRow icon={<MapPin size={18} strokeWidth={1.7} />}>
             <span className="inline-flex items-start gap-1.5">
-              <span>{venueLabel}</span>
+              <span className="min-w-0">{venueLabel}</span>
               {mapsUrl && (
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="text-[#2B8CEE] mt-0.5 shrink-0">
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#2B8CEE] mt-0.5 shrink-0"
+                >
                   <Navigation size={14} />
                 </a>
               )}
@@ -337,7 +452,7 @@ export default function PublicEventDetailPage({
               <button
                 type="button"
                 onClick={() => setVenuesOpen((v) => !v)}
-                className="block mt-1.5 text-[13px] font-semibold cursor-pointer"
+                className="block mt-1.5 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer"
                 style={{ color: BRAND }}
               >
                 {venuesOpen
@@ -346,9 +461,9 @@ export default function PublicEventDetailPage({
               </button>
             )}
             {venuesOpen && otherVenues.length > 0 && (
-              <ul className="mt-2 space-y-1.5 text-[13px] font-normal text-[#555]">
+              <ul className="mt-2 space-y-1.5 text-[1rem] sm:text-[1.0625rem] font-normal text-[#555]">
                 {otherVenues.map((v) => (
-                  <li key={`${v.name}-${v.address || ""}`}>
+                  <li key={`${v.name}-${v.address || ""}`} className="break-words">
                     {v.name}
                     {v.address ? `: ${v.address}` : ""}
                   </li>
@@ -361,7 +476,7 @@ export default function PublicEventDetailPage({
           <button
             type="button"
             onClick={() => openCheckout()}
-            className="text-[13px] font-semibold cursor-pointer mb-2"
+            className="text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer mb-2"
             style={{ color: BRAND }}
           >
             View seating plan
@@ -370,27 +485,27 @@ export default function PublicEventDetailPage({
       </div>
 
       {fillingFast && (
-        <div className="mx-4 mb-3 flex items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-[13px] text-[#6B4E16]">
-          <Info size={14} className="shrink-0" />
+        <div className="mx-3 sm:mx-4 mb-3 flex items-start sm:items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-[1rem] sm:text-[1.0625rem] text-[#6B4E16]">
+          <Info size={14} className="shrink-0 mt-0.5 sm:mt-0" />
           <span>Bookings are filling fast{nextShowtime?.venue_name ? ` for ${nextShowtime.venue_name}` : ""}</span>
         </div>
       )}
 
-      <div className="border-t border-[#EEE] px-5 py-4 flex items-center gap-3">
+      <div className="border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-2.5 sm:gap-3">
         <div className="min-w-0 flex-1">
           {minPrice != null && Number.isFinite(minPrice) && (
-            <p className="text-[18px] font-extrabold text-[#1A1A1A] leading-none">
+            <p className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-extrabold text-[#1A1A1A] leading-none">
               {formatMoney(minPrice, { compact: true })} onwards
             </p>
           )}
-          {fillingFast && <p className="mt-1.5 text-[12px] font-semibold text-[#E85D04]">Filling Fast</p>}
-          {soldOut && <p className="mt-1.5 text-[12px] font-semibold text-red-600">Sold out</p>}
+          {fillingFast && <p className="mt-1.5 text-[0.875rem] sm:text-[1rem] font-semibold text-[#E85D04]">Filling Fast</p>}
+          {soldOut && <p className="mt-1.5 text-[0.875rem] sm:text-[1rem] font-semibold text-red-600">Sold out</p>}
         </div>
         <button
           type="button"
           disabled={!canBook}
           onClick={() => openCheckout()}
-          className={`shrink-0 min-w-[128px] px-5 py-2.5 rounded-lg font-bold text-sm ${
+          className={`shrink-0 min-w-[120px] sm:min-w-[140px] px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg font-bold text-[1.125rem] sm:text-[1.25rem] ${
             canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
           }`}
           style={canBook ? { backgroundColor: BRAND } : undefined}
@@ -403,22 +518,22 @@ export default function PublicEventDetailPage({
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[1180px] mx-auto px-4 sm:px-6 pt-5 sm:pt-7 pb-24 lg:pb-10">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <h1 className="text-[26px] sm:text-[32px] font-extrabold text-[#1A1A1A] leading-tight">
+      <div className="max-w-[1180px] 2xl:max-w-[1320px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-10 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+        <div className="flex items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-5">
+          <h1 className="min-w-0 text-[1.75rem] sm:text-[2rem] lg:text-[2.25rem] 2xl:text-[2.5rem] font-extrabold text-[#1A1A1A] leading-tight tracking-tight break-words">
             {event.name}
           </h1>
           <button
             type="button"
             aria-label="Share"
             onClick={() => setShareOpen(true)}
-            className="mt-1.5 shrink-0 h-10 w-10 rounded-full border border-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-50 cursor-pointer"
+            className="mt-0.5 sm:mt-1.5 shrink-0 h-9 w-9 sm:h-10 sm:w-10 rounded-full border border-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-50 cursor-pointer"
           >
             <Share2 size={18} />
           </button>
         </div>
 
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-5 sm:gap-6 lg:gap-8 2xl:gap-10">
           <div className="min-w-0">
             <EventMediaSlider
               eventName={event.name}
@@ -428,26 +543,29 @@ export default function PublicEventDetailPage({
               youtubeUrl={event.youtube_url}
             />
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {categoryBadges.map((badge) => (
-                <span
-                  key={badge}
-                  className="inline-flex items-center rounded-full bg-[#1B365D] text-white text-[12px] font-semibold px-3 py-1.5"
-                >
-                  {badge}
-                </span>
-              ))}
-              <div className="ml-auto flex items-center gap-3">
+            <div className="mt-3 sm:mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+                {categoryBadges.map((badge) => (
+                  <span
+                    key={badge}
+                    className="inline-flex items-center rounded-full bg-[#1B365D] text-white text-[0.875rem] sm:text-[1rem] font-semibold px-3 sm:px-3.5 py-1.5"
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-2.5 sm:gap-3 sm:ml-auto shrink-0">
                 {saved && (
-                  <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#1A1A1A]">
-                    <ThumbsUp size={16} className="text-[#2E7D32]" fill="#2E7D32" />
+                  <span className="inline-flex items-center gap-1.5 text-[1rem] sm:text-[1.0625rem] font-medium text-[#1A1A1A]">
+                    <ThumbsUp size={17} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
                     You&apos;re Interested
                   </span>
                 )}
                 <button
                   type="button"
                   onClick={toggleSave}
-                  className="rounded-lg border px-3.5 py-1.5 text-[13px] font-semibold cursor-pointer"
+                  disabled={isTogglingInterest}
+                  className="rounded-lg border px-3.5 sm:px-4 py-2 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer disabled:opacity-60"
                   style={{
                     color: BRAND,
                     borderColor: BRAND,
@@ -459,12 +577,14 @@ export default function PublicEventDetailPage({
               </div>
             </div>
 
-            <div className="lg:hidden mt-5">{bookingCard}</div>
+            <div className="lg:hidden mt-4 sm:mt-5">{bookingCard}</div>
 
             {aboutText && (
-              <section className="mt-8">
-                <h2 className="text-[20px] font-bold text-[#1A1A1A] mb-3">About The Event</h2>
-                <p className="text-[15px] leading-7 text-[#5A5A5A] whitespace-pre-wrap">
+              <section className="mt-6 sm:mt-8 lg:mt-9">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+                  About The Event
+                </h2>
+                <p className="text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] lg:leading-8 text-[#5A5A5A] whitespace-pre-wrap">
                   {displayAbout}
                   {aboutLong && (
                     <>
@@ -472,7 +592,7 @@ export default function PublicEventDetailPage({
                       <button
                         type="button"
                         onClick={() => setAboutExpanded((v) => !v)}
-                        className="font-semibold cursor-pointer"
+                        className="font-semibold cursor-pointer hover:underline"
                         style={{ color: BRAND }}
                       >
                         {aboutExpanded ? "Read Less" : "Read More"}
@@ -483,41 +603,54 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
-            <section className="mt-8">
-              <h2 className="text-[20px] font-bold text-[#1A1A1A] mb-3">Artists</h2>
-              <div className="flex gap-5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <section className="mt-6 sm:mt-8 lg:mt-9">
+              <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+                Artists
+              </h2>
+              <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {DEFAULT_ARTISTS.map((artist, i) => (
                   <button
                     key={`${artist.name}-${i}`}
                     type="button"
                     onClick={() => setArtistModal(artist)}
-                    className="w-[140px] shrink-0 text-left cursor-pointer"
+                    className="w-[128px] sm:w-[148px] lg:w-[156px] 2xl:w-[164px] shrink-0 text-left cursor-pointer"
                   >
-                    <div className="relative h-[180px] rounded-xl overflow-hidden bg-slate-200">
+                    <div className="relative h-[160px] sm:h-[188px] lg:h-[196px] 2xl:h-[208px] rounded-xl overflow-hidden bg-slate-200">
                       {artist.image_url ? (
                         <img src={artist.image_url} alt={artist.name} className="absolute inset-0 w-full h-full object-cover" />
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-2xl font-extrabold text-white bg-[#1B365D]">
+                        <div className="absolute inset-0 flex items-center justify-center text-[1.375rem] sm:text-[1.625rem] font-extrabold text-white bg-[#1B365D]">
                           {artist.name.slice(0, 1).toUpperCase()}
                         </div>
                       )}
                     </div>
-                    <p className="mt-2 font-bold text-[#1A1A1A] text-sm leading-snug">{artist.name}</p>
-                    {artist.role && <p className="mt-0.5 text-xs text-[#8A8A8A]">{artist.role}</p>}
+                    <p className="mt-1.5 sm:mt-2 font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] leading-snug">
+                      {artist.name}
+                    </p>
+                    {artist.role && (
+                      <p className="mt-0.5 text-[0.875rem] sm:text-[1rem] text-[#8A8A8A]">{artist.role}</p>
+                    )}
                   </button>
                 ))}
               </div>
             </section>
 
             {offers.length > 0 && (
-              <section className="mt-8">
-                <h2 className="text-[20px] font-bold text-[#1A1A1A] mb-3">Offers</h2>
-                <ul className="space-y-3">
+              <section className="mt-6 sm:mt-8 lg:mt-9">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+                  Offers
+                </h2>
+                <ul className="space-y-2.5 sm:space-y-3">
                   {offers.map((o) => (
-                    <li key={o.id} className="rounded-xl border border-dashed border-[#E3BCFF] bg-[#FBF6FF] p-4">
-                      <p className="font-bold text-[#1A1A1A]">{o.title}</p>
-                      {o.description && <p className="text-sm text-slate-600 mt-1">{o.description}</p>}
-                      <p className="text-sm font-bold mt-2" style={{ color: BRAND }}>
+                    <li
+                      key={o.id}
+                      className="rounded-xl border border-dashed border-[#E3BCFF] bg-[#FBF6FF] p-3.5 sm:p-4"
+                    >
+                      <p className="font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem]">{o.title}</p>
+                      {o.description && (
+                        <p className="text-[1rem] sm:text-[1.0625rem] text-slate-600 mt-1">{o.description}</p>
+                      )}
+                      <p className="text-[1rem] sm:text-[1.0625rem] font-bold mt-2" style={{ color: BRAND }}>
                         {o.discount_type === "PERCENT"
                           ? `${o.discount_value}% off`
                           : formatOfferDiscount(o.discount_type, o.discount_value)}
@@ -529,18 +662,20 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
+            <EventGallerySection eventId={id} images={event.gallery_images || []} />
+
             {termLines.length > 0 && (
               <button
                 type="button"
                 onClick={() => setTermsOpen(true)}
-                className="mt-4 flex w-full items-center justify-between py-4 border-t border-slate-200 cursor-pointer"
+                className="mt-3 sm:mt-4 flex w-full items-center justify-between py-3.5 sm:py-4 border-t border-slate-200 cursor-pointer"
               >
-                <span className="text-[16px] font-bold text-[#1A1A1A]">Terms &amp; Conditions</span>
-                <ChevronRight size={18} className="text-slate-400" />
+                <span className="text-[1.125rem] sm:text-[1.25rem] font-bold text-[#1A1A1A]">Terms &amp; Conditions</span>
+                <ChevronRight size={18} className="text-slate-400 shrink-0" />
               </button>
             )}
 
-            <div className="mt-6">
+            <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-200">
               <EventReviewsSection
                 eventId={id}
                 eventRating={event.rating}
@@ -549,24 +684,28 @@ export default function PublicEventDetailPage({
             </div>
 
             {related.length > 0 && (
-              <section className="mt-10 pt-6 border-t border-slate-200">
-                <h2 className="text-[20px] font-bold text-[#1A1A1A]">You May Also Like</h2>
-                <p className="text-sm text-[#6B6B6B] mt-1 mb-4">Events around you, book now.</p>
+              <section className="mt-8 sm:mt-10 pt-5 sm:pt-6 border-t border-slate-200">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A]">
+                  You May Also Like
+                </h2>
+                <p className="text-[1rem] sm:text-[1.0625rem] text-[#6B6B6B] mt-1 mb-3 sm:mb-4">
+                  Events around you, book now.
+                </p>
                 <div className="relative">
                   <div
                     ref={relatedRef}
-                    className="flex gap-4 overflow-x-auto scroll-smooth pb-1 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {related.map((e) => (
                       <RelatedCard key={e.id} event={e} />
                     ))}
                   </div>
-                  {related.length > 4 && (
+                  {related.length > 3 && (
                     <button
                       type="button"
                       aria-label="Next recommendations"
                       onClick={() => relatedRef.current?.scrollBy({ left: 220, behavior: "smooth" })}
-                      className="hidden sm:flex absolute -right-3 top-[110px] -translate-y-1/2 w-10 h-10 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer"
+                      className="hidden lg:flex absolute -right-2 2xl:-right-3 top-[98px] sm:top-[118px] lg:top-[126px] 2xl:top-[134px] -translate-y-1/2 w-9 h-9 2xl:w-10 2xl:h-10 rounded-full bg-[#3A3A3A] text-white items-center justify-center cursor-pointer"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -575,7 +714,7 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
-            <nav className="mt-10 text-[12px] text-[#8A8A8A]">
+            <nav className="mt-8 sm:mt-10 text-[0.875rem] sm:text-[1rem] text-[#8A8A8A] break-words leading-relaxed">
               <Link href="/" className="hover:underline">
                 Home
               </Link>
@@ -599,24 +738,26 @@ export default function PublicEventDetailPage({
             </nav>
           </div>
 
-          <aside className="hidden lg:block lg:sticky lg:top-20 lg:self-start lg:z-20">
+          <aside className="hidden lg:block lg:sticky lg:top-20 2xl:top-24 lg:self-start lg:z-20">
             {cloneElement(bookingCard)}
           </aside>
         </div>
       </div>
 
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-3">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-2.5 sm:gap-3">
         <div className="min-w-0 flex-1">
           {minPrice != null && Number.isFinite(minPrice) && (
-            <p className="font-extrabold text-[#1A1A1A]">{formatMoney(minPrice, { compact: true })} onwards</p>
+            <p className="text-[1.125rem] sm:text-[1.25rem] font-extrabold text-[#1A1A1A] truncate">
+              {formatMoney(minPrice, { compact: true })} onwards
+            </p>
           )}
-          {fillingFast && <p className="text-[11px] font-semibold text-[#E85D04]">Filling Fast</p>}
+          {fillingFast && <p className="text-[0.875rem] sm:text-[1rem] font-semibold text-[#E85D04]">Filling Fast</p>}
         </div>
         <button
           type="button"
           disabled={!canBook}
           onClick={() => openCheckout()}
-          className={`shrink-0 px-6 py-2.5 rounded-lg font-bold text-sm ${
+          className={`shrink-0 px-5 sm:px-6 py-2.5 rounded-lg font-bold text-[1.125rem] sm:text-[1.25rem] ${
             canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
           }`}
           style={canBook ? { backgroundColor: BRAND } : undefined}
@@ -626,13 +767,13 @@ export default function PublicEventDetailPage({
       </div>
 
       {shareOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/40" onClick={() => setShareOpen(false)} role="presentation">
+        <div className="fixed inset-0 z-[70] bg-black/40 p-3 sm:p-4" onClick={() => setShareOpen(false)} role="presentation">
           <div
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(100%,24rem)] rounded-2xl bg-white p-4 sm:p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-[#1A1A1A]">Share this event</h3>
+              <h3 className="font-bold text-[#1A1A1A] text-[1.125rem] sm:text-[1.25rem]">Share this event</h3>
               <button type="button" onClick={() => setShareOpen(false)} className="cursor-pointer text-slate-500">
                 <FaTimes />
               </button>
@@ -676,7 +817,7 @@ export default function PublicEventDetailPage({
 
       {artistModal && (
         <div
-          className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/55"
+          className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/55"
           onClick={() => setArtistModal(null)}
           role="presentation"
         >
@@ -684,7 +825,7 @@ export default function PublicEventDetailPage({
             role="dialog"
             aria-modal="true"
             aria-labelledby="artist-modal-name"
-            className="relative w-full max-w-[380px] max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="relative w-full sm:max-w-[380px] max-h-[92vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -695,24 +836,24 @@ export default function PublicEventDetailPage({
             >
               <X size={16} />
             </button>
-            <div className="overflow-y-auto max-h-[90vh] px-6 pt-6 pb-7">
-              <div className="w-[220px] mx-auto aspect-square rounded-xl overflow-hidden bg-slate-200">
+            <div className="overflow-y-auto max-h-[92vh] sm:max-h-[90vh] px-5 sm:px-6 pt-5 sm:pt-6 pb-6 sm:pb-7">
+              <div className="w-[180px] sm:w-[220px] mx-auto aspect-square rounded-xl overflow-hidden bg-slate-200">
                 {artistModal.image_url ? (
                   <img src={artistModal.image_url} alt={artistModal.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-4xl font-extrabold text-white bg-[#1B365D]">
+                  <div className="w-full h-full flex items-center justify-center text-[1.875rem] sm:text-[2.25rem] font-extrabold text-white bg-[#1B365D]">
                     {artistModal.name.slice(0, 1).toUpperCase()}
                   </div>
                 )}
               </div>
-              <h2 id="artist-modal-name" className="mt-4 text-[22px] font-extrabold text-[#1A1A1A] leading-tight">
+              <h2 id="artist-modal-name" className="mt-4 text-[1.375rem] sm:text-[1.625rem] font-extrabold text-[#1A1A1A] leading-tight">
                 {artistModal.name}
               </h2>
               {artistModal.role && (
-                <p className="mt-1 text-sm text-[#8A8A8A]">{artistModal.role}</p>
+                <p className="mt-1 text-[1rem] sm:text-[1.0625rem] text-[#8A8A8A]">{artistModal.role}</p>
               )}
               {artistModal.description && (
-                <p className="mt-4 text-[15px] leading-7 text-[#333] whitespace-pre-wrap">
+                <p className="mt-3 sm:mt-4 text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] text-[#333] whitespace-pre-wrap">
                   {artistModal.description}
                 </p>
               )}
@@ -723,7 +864,7 @@ export default function PublicEventDetailPage({
 
       {termsOpen && termLines.length > 0 && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6 bg-black/55"
+          className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/55"
           onClick={() => setTermsOpen(false)}
           role="presentation"
         >
@@ -731,25 +872,25 @@ export default function PublicEventDetailPage({
             role="dialog"
             aria-modal="true"
             aria-labelledby="event-terms-title"
-            className="relative w-full max-w-[560px] max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="relative w-full sm:max-w-[560px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4 px-7 sm:px-8 pt-7 pb-2">
-              <h2 id="event-terms-title" className="text-[26px] sm:text-[28px] font-extrabold text-[#333] leading-tight pr-8">
+            <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-5 sm:pt-7 pb-2">
+              <h2 id="event-terms-title" className="text-[1.375rem] sm:text-[1.625rem] lg:text-[1.875rem] font-extrabold text-[#333] leading-tight pr-8">
                 Terms &amp; Conditions
               </h2>
               <button
                 type="button"
                 aria-label="Close terms"
                 onClick={() => setTermsOpen(false)}
-                className="absolute top-6 right-6 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8E8E8] text-[#555] hover:bg-[#ddd] cursor-pointer"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8E8E8] text-[#555] hover:bg-[#ddd] cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
-            <div className="overflow-y-auto px-7 sm:px-8 pb-8 pt-3 max-h-[calc(85vh-5.5rem)] space-y-1.5">
+            <div className="overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8 pt-3 max-h-[calc(90vh-5rem)] sm:max-h-[calc(85vh-5.5rem)] space-y-1.5">
               {termLines.map((line, i) => (
-                <p key={`${i}-${line.slice(0, 24)}`} className="text-[15px] leading-6 text-[#4A4A4A]">
+                <p key={`${i}-${line.slice(0, 24)}`} className="text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] text-[#4A4A4A]">
                   {line}
                 </p>
               ))}
@@ -758,17 +899,16 @@ export default function PublicEventDetailPage({
         </div>
       )}
 
-      <Footer />
-
-      <EventCheckout
-        event={event}
-        open={checkoutOpen}
-        initialShowtimeId={selectedShowtimeId}
+      <CustomerAuthModal
+        open={authModalOpen}
         onClose={() => {
-          setCheckoutOpen(false);
-          setSelectedShowtimeId("");
+          setAuthModalOpen(false);
+          pendingInterestAfterAuthRef.current = false;
         }}
+        onSuccess={onAuthSuccess}
       />
+
+      <Footer />
     </div>
   );
 }

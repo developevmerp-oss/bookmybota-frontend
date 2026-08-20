@@ -46,9 +46,9 @@ const RATING_OPTIONS = [
 
 const COST_OPTIONS = [
   { label: "Any cost", value: 0 },
-  { label: "Under ₹500", value: 500 },
-  { label: "Under ₹1000", value: 1000 },
-  { label: "Under ₹2000", value: 2000 },
+  { label: "Under 500 ETB", value: 500 },
+  { label: "Under 1000 ETB", value: 1000 },
+  { label: "Under 2000 ETB", value: 2000 },
 ];
 
 function chipClass(active: boolean) {
@@ -208,7 +208,7 @@ export default function DiningFiltersBar({
     activeChips.push({ label: `Rating ${filters.minRating}+`, onClear: () => onChange({ ...filters, minRating: 0 }) });
   }
   if (filters.maxCost > 0) {
-    const costLabel = COST_OPTIONS.find((o) => o.value === filters.maxCost)?.label || `Under ₹${filters.maxCost}`;
+    const costLabel = COST_OPTIONS.find((o) => o.value === filters.maxCost)?.label || `Under ${filters.maxCost} ETB`;
     activeChips.push({ label: costLabel, onClear: () => onChange({ ...filters, maxCost: 0 }) });
   }
   if (filters.pureVeg) {

@@ -105,6 +105,15 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     poster_horizontal_url: event.poster_horizontal_url || "",
     poster_vertical_url: event.poster_vertical_url || "",
     gallery_images: gallery,
+    youtube_url: event.youtube_url || "",
+    artists: Array.isArray(event.artists)
+      ? event.artists.map((a) => ({
+          name: a.name || "",
+          role: a.role || "",
+          description: a.description || "",
+          image_url: a.image_url || "",
+        }))
+      : [],
     languages: parseEventLanguages(event.language),
     about_event: event.about_event || "",
     age_group: event.age_group || "",
@@ -373,6 +382,12 @@ export default function EventForm({
     remove: removeShowtime,
   } = useFieldArray({ control, name: "showtimes" });
 
+  const {
+    fields: artistFields,
+    append: appendArtist,
+    remove: removeArtist,
+  } = useFieldArray({ control, name: "artists" });
+
   useEffect(() => {
     if (event) {
       reset(eventToValues(event));
@@ -417,6 +432,15 @@ export default function EventForm({
       poster_horizontal_url: values.poster_horizontal_url || "",
       poster_vertical_url: values.poster_vertical_url || "",
       gallery_images: values.gallery_images || [],
+      youtube_url: values.youtube_url?.trim() || "",
+      artists: (values.artists || [])
+        .map((a) => ({
+          name: (a.name || "").trim(),
+          role: (a.role || "").trim(),
+          description: (a.description || "").trim(),
+          image_url: a.image_url || "",
+        }))
+        .filter((a) => a.name),
       documents: documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
       languages: values.languages || [],
       language: (values.languages || []).join(", "),
@@ -775,6 +799,86 @@ export default function EventForm({
                 <span className="text-[11px] portal-muted">Add photo</span>
               </ImageCropPicker>
             )}
+          </div>
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div>
+            <h3 className="portal-heading text-lg font-semibold">YouTube video</h3>
+            <p className="portal-muted text-sm mt-1">
+              Optional. This plays as the second slide on the customer event page. Paste a YouTube watch, share, or Shorts link.
+            </p>
+          </div>
+          <input
+            disabled={readOnly}
+            className={inputClass}
+            placeholder="https://www.youtube.com/watch?v=..."
+            {...register("youtube_url")}
+          />
+          {errors.youtube_url && <p className={errorClass}>{errors.youtube_url.message}</p>}
+        </section>
+
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="portal-heading text-lg font-semibold">Artists</h3>
+              <p className="portal-muted text-sm mt-1">Shown on the customer event page. Add only real performers for this event.</p>
+            </div>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => appendArtist({ name: "", role: "", description: "", image_url: "" })}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-700"
+              >
+                <Plus size={16} /> Add artist
+              </button>
+            )}
+          </div>
+          {artistFields.length === 0 && (
+            <p className="portal-muted text-sm">No artists added yet.</p>
+          )}
+          <div className="grid sm:grid-cols-2 gap-4">
+            {artistFields.map((field, index) => {
+              const imageUrl = watch(`artists.${index}.image_url`);
+              return (
+                <div key={field.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-800">Artist {index + 1}</p>
+                    {!readOnly && (
+                      <button type="button" onClick={() => removeArtist(index)} className="p-1 text-slate-400 hover:text-rose-600">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  <CroppedImageField
+                    value={imageUrl}
+                    aspect={2 / 3}
+                    disabled={readOnly || uploading}
+                    previewClassName="w-full h-40 rounded-xl"
+                    emptyClassName="flex flex-col items-center justify-center h-36 w-full rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+                    onRemove={() => setValue(`artists.${index}.image_url`, "", { shouldDirty: true })}
+                    onCroppedFile={(file) =>
+                      uploadCropped(file, (url) => setValue(`artists.${index}.image_url`, url, { shouldDirty: true }))
+                    }
+                    emptyContent={
+                      <>
+                        <ImagePlus className="text-slate-400 mb-2" size={24} />
+                        <span className="text-xs portal-muted">Artist photo</span>
+                      </>
+                    }
+                  />
+                  <input disabled={readOnly} className={inputClass} placeholder="Artist name" {...register(`artists.${index}.name`)} />
+                  <input disabled={readOnly} className={inputClass} placeholder="Role (e.g. Actor, Singer)" {...register(`artists.${index}.role`)} />
+                  <textarea
+                    disabled={readOnly}
+                    rows={3}
+                    className={`${inputClass} resize-y min-h-[72px]`}
+                    placeholder="Description"
+                    {...register(`artists.${index}.description`)}
+                  />
+                </div>
+              );
+            })}
           </div>
         </section>
 

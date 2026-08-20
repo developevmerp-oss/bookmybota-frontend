@@ -58,7 +58,11 @@ export function matchesCity(text: string | undefined, city: string) {
 
 export function diningInCity(places: Business[], city: string) {
   if (!hasCityFilter(city)) return places;
-  return places.filter((p) => matchesCity(p.address, city));
+  return places.filter(
+    (p) =>
+      matchesCity(p.city_name || undefined, city) ||
+      matchesCity(p.address, city)
+  );
 }
 
 export function eventsWithImage(events: PublicEvent[]) {

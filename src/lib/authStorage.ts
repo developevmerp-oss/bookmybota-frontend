@@ -61,6 +61,21 @@ export function homePathForRole(role: UserRole | string) {
   }
 }
 
+/** Login URL for a specific role (so other roles can stay logged in). */
+export function loginPathForRole(role: UserRole | string) {
+  switch (role) {
+    case 'super_admin':
+      return '/admin/login';
+    case 'business_admin':
+      return '/business/login';
+    case 'event_admin':
+      return '/organizer/login';
+    case 'customer':
+    default:
+      return '/login';
+  }
+}
+
 /** Read a single role session from localStorage (browser only). */
 export function readSessionForRole(role: UserRole): { user: StoredAuthUser; token: string } | null {
   if (typeof window === 'undefined') return null;

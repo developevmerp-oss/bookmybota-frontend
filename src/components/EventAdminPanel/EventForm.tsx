@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import {
   useGetBusinessTypesQuery,
   useGetEventMastersQuery,
+  useGetCitiesQuery,
   useUploadImageMutation,
   type EventDocumentUpload,
   type EventFormPayload,
@@ -117,6 +118,7 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
         return {
           venue_name: s.venue_name || "",
           venue_address: s.venue_address || "",
+          city_id: s.city_id ?? null,
           duration_type: durationType,
           event_date: toDateInput(s.starts_at),
           start_time: toTimeInput(s.starts_at),
@@ -134,11 +136,13 @@ function VenueBlock({
   readOnly,
   canRemove,
   onRemove,
+  cities,
 }: {
   index: number;
   readOnly: boolean;
   canRemove: boolean;
   onRemove: () => void;
+  cities: Array<{ id: number; name: string; state?: string | null }>;
 }) {
   const {
     register,
@@ -182,6 +186,23 @@ function VenueBlock({
           )}
         </div>
         <div>
+          <label className={labelClass}>City</label>
+          <select
+            disabled={readOnly}
+            className={inputClass}
+            {...register(`showtimes.${index}.city_id`, {
+              setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+            })}
+          >
+            <option value="">Select city</option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}{c.state ? `, ${c.state}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="sm:col-span-2">
           <label className={labelClass}>Venue address</label>
           <input disabled={readOnly} className={inputClass} {...register(`showtimes.${index}.venue_address`)} placeholder="Full address" />
         </div>
@@ -327,6 +348,7 @@ export default function EventForm({
   submitting = false,
 }: EventFormProps) {
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
+  const { data: cities = [] } = useGetCitiesQuery();
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const [documents, setDocuments] = useState<EventDocumentUpload[]>(() =>
     normalizeFormDocuments(event?.documents)
@@ -400,6 +422,7 @@ export default function EventForm({
       return {
         venue_name: s.venue_name.trim(),
         venue_address: s.venue_address?.trim() || "",
+        city_id: s.city_id ?? null,
         starts_at: range.starts_at,
         ends_at: range.ends_at,
         duration_type: (s.duration_type === "MULTI_DAY" ? "MULTI_DAY" : "ONE_DAY") as "ONE_DAY" | "MULTI_DAY",
@@ -975,6 +998,7 @@ export default function EventForm({
               readOnly={readOnly}
               canRemove={showtimeFields.length > 1}
               onRemove={() => removeShowtime(i)}
+              cities={cities}
             />
           ))}
           {errors.showtimes && typeof errors.showtimes.message === "string" && (

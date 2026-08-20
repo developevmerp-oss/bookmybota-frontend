@@ -95,7 +95,10 @@ export default function RootLayout({
     pathname === "/login" ||
     pathname === "/register" ||
     pathname === "/forgot-password" ||
-    pathname === "/reset-password";
+    pathname === "/reset-password" ||
+    pathname === "/admin/login" ||
+    pathname === "/business/login" ||
+    pathname === "/organizer/login";
   const showPublicHeader = !isAdminOrBusiness;
   const showLayoutFooter =
     showPublicHeader && !isLandingPage && !isAuthPage && !isEventsPublicPage;

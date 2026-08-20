@@ -4,7 +4,7 @@ import {
   useGetPublicEventFiltersQuery,
   useGetPublicEventsQuery,
 } from "@/services/api";
-import { diningInCity, eventsWithImage, hasCityFilter } from "./homeUtils";
+import { eventsWithImage, hasCityFilter } from "./homeUtils";
 
 export function useHomeCatalog(city: string) {
   const hasCity = hasCityFilter(city);
@@ -17,13 +17,14 @@ export function useHomeCatalog(city: string) {
   });
   const { data: dining = [], isLoading: diningLoading } = useGetBusinessesQuery({
     module: "dining",
+    ...(hasCity ? { city } : {}),
   });
 
   const cities = filters?.cities || [];
   const categories = filters?.categories || [];
   const events = cityEvents;
   const fallbackEvents = hasCity ? allEvents : cityEvents;
-  const cityDining = useMemo(() => diningInCity(dining, city), [dining, city]);
+  const cityDining = dining;
 
   const bannerEvents = useMemo(() => {
     const fromCity = eventsWithImage(events);

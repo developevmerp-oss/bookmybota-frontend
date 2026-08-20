@@ -102,7 +102,25 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
         image: tile.image,
       };
     });
-  }, [categories, pool, dining]);
+    live.push({
+      key: "dining",
+      href:
+        city && city !== "All Cities"
+          ? `/dining?city=${encodeURIComponent(city)}`
+          : "/dining",
+      title: "Dining",
+      count: dining.length,
+      image: dining.find((d) => d.cover_image_url)?.cover_image_url || "",
+      gradient: "from-[#0F766E] to-[#5EEAD4]",
+    });
+    return live;
+  }, [categories, pool, dining, city]);
+
+  const scrollBy = (dir: -1 | 1) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * 280, behavior: "smooth" });
+  };
 
   return (
     <section className="bg-white py-5 sm:py-6 lg:py-3 lg:pb-4 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">

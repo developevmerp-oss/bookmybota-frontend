@@ -6,12 +6,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
-import {
-  clearSessionForRole,
-  getActiveSession,
-  homePathForRole,
-  readSessionForRole,
-} from "@/lib/authStorage";
+import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -39,10 +34,17 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const businessName = settings?.name || "Venue Admin";
 
-  const isPublicLanding = pathname === "/business" || pathname === "/business/register";
+  const isLoginPage = pathname === "/business/login";
+  const isPublicLanding =
+    pathname === "/business" || pathname === "/business/register" || isLoginPage;
   const isBusinessAdmin = user?.role === "business_admin";
 
   useEffect(() => {
+    if (isLoginPage) {
+      setCheckingAuth(false);
+      return;
+    }
+
     const dining = readSessionForRole("business_admin");
     if (dining) {
       dispatch(setCredentials({ user: dining.user, token: dining.token }));
@@ -50,23 +52,13 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
       dispatch(loadFromStorage());
     }
 
-    if (readSessionForRole("event_admin")) {
-      router.replace("/organizer");
-      return;
-    }
-
     if (!dining && !isPublicLanding) {
-      const any = getActiveSession();
-      if (any) {
-        router.replace(homePathForRole(any.user.role));
-      } else {
-        router.replace("/login");
-      }
+      router.replace("/business/login");
       return;
     }
 
     setCheckingAuth(false);
-  }, [dispatch, router, isPublicLanding, pathname]);
+  }, [dispatch, router, isPublicLanding, isLoginPage, pathname]);
 
   const navigation = [
     { name: "Global Settings", href: "/business", icon: LayoutDashboard },
@@ -82,8 +74,12 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
 
   const handleLogout = () => {
     clearSessionForRole("business_admin");
-    router.push("/login");
+    router.push("/business/login");
   };
+
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (checkingAuth) {
     return (

@@ -3,16 +3,17 @@ import { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Star, MapPin, Loader2, X, Percent, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useGetBusinessesQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
+import { useGetBusinessesPagedQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferLabel } from "@/lib/diningOffers";
 import {
-  applyDiningFilters,
   DEFAULT_DINING_FILTERS,
   DiningFilterState,
   extractCuisines,
 } from "@/lib/diningFilters";
+
+const DINING_LIST_LIMIT = 12;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -133,11 +134,23 @@ function SearchContent() {
   const cityParam = searchParams.get("city") || "";
 
   const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadedRestaurants, setLoadedRestaurants] = useState<Business[]>([]);
 
-  // Dynamic API calls with active filters
-  const { data: businesses = [], isLoading: loadingBusinesses } = useGetBusinessesQuery({
-    collection: collectionParam,
-    mood: moodParam
+  const { data: businessesData, isLoading: loadingBusinesses, isFetching: loadingMore } = useGetBusinessesPagedQuery({
+    collection: collectionParam || undefined,
+    mood: moodParam || undefined,
+    q: queryParam || undefined,
+    city: cityParam && cityParam !== "All Cities" ? cityParam : undefined,
+    cuisines: diningFilters.cuisines.length > 0 ? diningFilters.cuisines : undefined,
+    min_rating: diningFilters.minRating > 0 ? diningFilters.minRating : undefined,
+    offers_only: diningFilters.offersOnly || undefined,
+    pure_veg: diningFilters.pureVeg || undefined,
+    serves_alcohol: diningFilters.servesAlcohol || undefined,
+    max_cost: diningFilters.maxCost > 0 ? diningFilters.maxCost : undefined,
+    sort: diningFilters.sort,
+    page: currentPage,
+    limit: DINING_LIST_LIMIT,
   });
 
   const { data: collections = [] } = useGetCollectionsQuery();
@@ -148,26 +161,34 @@ function SearchContent() {
   // Find the selected Mood metadata for the banner
   const activeMood = moods.find((m) => m.query_tag.toLowerCase() === moodParam.toLowerCase());
 
-  const cuisineOptions = useMemo(() => extractCuisines(businesses), [businesses]);
+  const cuisineOptions = useMemo(
+    () => extractCuisines(loadedRestaurants),
+    [loadedRestaurants]
+  );
 
-  // Client-side filtering for city & search text, then dining filters/sort
-  const filteredRestaurants = useMemo(() => {
-    const base = businesses.filter((r) => {
-      const address = r.address || "";
-      const name = r.name || "";
-      const cuisine = r.cuisine || "";
+  const filteredRestaurants = loadedRestaurants;
 
-      const matchesCity = !cityParam || cityParam === "All Cities" || address.toLowerCase().includes(cityParam.toLowerCase());
-      const matchesQuery =
-        !queryParam ||
-        name.toLowerCase().includes(queryParam.toLowerCase()) ||
-        cuisine.toLowerCase().includes(queryParam.toLowerCase()) ||
-        address.toLowerCase().includes(queryParam.toLowerCase());
+  useEffect(() => {
+    setCurrentPage(1);
+    setLoadedRestaurants([]);
+  }, [collectionParam, moodParam, queryParam, cityParam, diningFilters]);
 
-      return matchesCity && matchesQuery;
+  useEffect(() => {
+    if (!businessesData) return;
+    const pageItems = businessesData.items ?? [];
+    if (currentPage <= 1) {
+      setLoadedRestaurants(pageItems);
+      return;
+    }
+    setLoadedRestaurants((prev) => {
+      const seen = new Set(prev.map((r) => r.id));
+      const next = pageItems.filter((r) => !seen.has(r.id));
+      return next.length ? [...prev, ...next] : prev;
     });
-    return applyDiningFilters(base, diningFilters);
-  }, [businesses, cityParam, queryParam, diningFilters]);
+  }, [businessesData, currentPage]);
+
+  const hasMoreRestaurants = Boolean(businessesData?.meta?.has_next);
+  const isLoadingMore = loadingMore && currentPage > 1;
 
   // Calculate dynamic banner styling
   const getBannerDetails = () => {
@@ -320,7 +341,7 @@ function SearchContent() {
                   <Loader2 size={14} className="animate-spin text-rose-600" /> Finding restaurants...
                 </span>
               ) : (
-                `${filteredRestaurants.length} venue${filteredRestaurants.length !== 1 ? "s" : ""} available`
+                `${businessesData?.meta?.total ?? filteredRestaurants.length} venue${(businessesData?.meta?.total ?? filteredRestaurants.length) !== 1 ? "s" : ""} available`
               )}
             </p>
           </div>
@@ -394,7 +415,7 @@ function SearchContent() {
         />
 
         {/* ── 3. Listings Grid ─────────────────────────────────────────────── */}
-        {loadingBusinesses ? (
+        {loadingBusinesses && loadedRestaurants.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 gap-3 text-slate-400">
             <Loader2 size={36} className="animate-spin text-rose-600" />
             <p className="text-sm font-semibold">Loading top establishments...</p>
@@ -416,11 +437,32 @@ function SearchContent() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredRestaurants.map((restaurant) => (
-              <RestaurantCard key={restaurant.id} restaurant={restaurant} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredRestaurants.map((restaurant) => (
+                <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+              ))}
+            </div>
+            {hasMoreRestaurants && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={isLoadingMore}
+                  className="inline-flex items-center justify-center gap-2 min-w-[160px] px-8 py-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] disabled:opacity-60 transition-colors"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    "Load More"
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

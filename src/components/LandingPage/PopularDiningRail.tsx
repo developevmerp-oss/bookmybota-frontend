@@ -11,11 +11,15 @@ export default function PopularDiningRail({ city }: { city: string }) {
     !isLoadingDining && items.length === 0
       ? `No restaurants in ${city && city !== "All Cities" ? city : "your city"} yet`
       : undefined;
+  const seeAllHref =
+    city && city !== "All Cities"
+      ? `/dining?city=${encodeURIComponent(city)}`
+      : "/dining";
 
   return (
     <ContentRail
       title="Popular Dining"
-      seeAllHref="/dining"
+      seeAllHref={seeAllHref}
       label="dining"
       cardStyle="dining"
       isLoading={isLoadingDining}

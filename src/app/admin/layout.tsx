@@ -21,6 +21,7 @@ import {
   FileSignature,
   KeyRound,
   Wallet,
+  MapPin,
   Map,
 } from "lucide-react";
 import AuthGate from "@/components/Shared/AuthGate";
@@ -36,6 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Global Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Dining Businesses', href: '/admin/businesses/dining', icon: UtensilsCrossed },
     { name: 'Dining Masters', href: '/admin/dining-masters', icon: ChefHat },
+    { name: 'City Masters', href: '/admin/cities', icon: MapPin },
     { name: 'Event Organizers', href: '/admin/businesses/event', icon: Store },
     { name: 'Venue Partners', href: '/admin/businesses/venue', icon: Store },
     { name: 'Venue Layouts', href: '/admin/venue-layouts', icon: Map },
@@ -63,8 +65,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = () => {
     clearSessionForRole('super_admin');
-    router.push('/login');
+    router.push('/admin/login');
   };
+
+  // Login page must not sit behind the require gate (would loop).
+  if (pathname === '/admin/login') {
+    return <>{children}</>;
+  }
 
   return (
     <AuthGate mode="require" roles={['super_admin']}>

@@ -38,7 +38,7 @@ import {
   MdOutlineTheaters,
   MdOutlineWineBar,
 } from "react-icons/md";
-import { useGetBusinessTypesQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, Business, Collection } from "@/services/api";
+import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, Business, Collection } from "@/services/api";
 // import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
@@ -46,7 +46,6 @@ import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferLabel } from "@/lib/diningOffers";
 import { useAppSelector } from "@/lib/hooks";
 import {
-  applyDiningFilters,
   DEFAULT_DINING_FILTERS,
   DiningFilterState,
   extractCuisines,
@@ -54,6 +53,7 @@ import {
 
 const HERO_ACCENT = "#6900AA";
 const PAGE_MUTED = "#f6f7f8";
+const DINING_LIST_LIMIT = 12;
 
 type MealOccasion = "lunch" | "breakfast" | "dinner" | "fastfood";
 
@@ -667,14 +667,23 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
   );
 }
 
-function CollectionCard({ collection }: { collection: Collection }) {
+function CollectionCard({
+  collection,
+  city,
+}: {
+  collection: Collection;
+  city?: string;
+}) {
   const subtitle = collection.places_count !== undefined 
     ? `${collection.places_count} place${collection.places_count !== 1 ? 's' : ''}`
     : collection.subtitle || "0 places";
+  const href = city
+    ? `/search?collection=${encodeURIComponent(collection.slug)}&city=${encodeURIComponent(city)}`
+    : `/search?collection=${encodeURIComponent(collection.slug)}`;
 
   return (
     <Link
-      href={`/search?collection=${collection.slug}`}
+      href={href}
       className="relative shrink-0 w-48 h-56 rounded-2xl overflow-hidden cursor-pointer group shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block"
     >
       <img
@@ -825,8 +834,10 @@ export default function Home() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadedRestaurants, setLoadedRestaurants] = useState<Business[]>([]);
   const [mealOccasion, setMealOccasion] = useState<MealOccasion | "">("");
   const authUser = useAppSelector((state) => state.auth.user);
   const foodieName = authUser?.name?.trim().split(/\s+/)[0] || "Foodie";
@@ -881,7 +892,15 @@ export default function Home() {
   // };
 
   const handleCuisineSelect = (cuisine: string) => {
-    setDiningFilters((prev) => ({ ...prev, cuisine }));
+    setDiningFilters((prev) => {
+      const exists = prev.cuisines.some((c) => c.toLowerCase() === cuisine.toLowerCase());
+      return {
+        ...prev,
+        cuisines: exists
+          ? prev.cuisines.filter((c) => c.toLowerCase() !== cuisine.toLowerCase())
+          : [...prev.cuisines, cuisine],
+      };
+    });
     document.getElementById("restaurant-listings")?.scrollIntoView({
       behavior: "smooth",
       block: "start",
@@ -896,39 +915,94 @@ export default function Home() {
     });
   };
 
-  // Read initial search/filter/city from URL query params.
-  // Default to All Cities so Dining always shows the full discovery UI
-  // (landing page city like Bahir Dar must not hide all restaurants).
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const filterParam = params.get('filter');
-      const cityParam = params.get('city');
-      const searchParam = params.get('search');
+  // ── Location state ──
+  const [locationLabel, setLocationLabel] = useState("All Cities");
+  const [locationCity, setLocationCity] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState(false);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const locationRef = useRef<HTMLDivElement>(null);
 
-      if (filterParam) {
-        setActiveFilter(filterParam);
-      }
-      if (cityParam && cityParam !== "All Cities") {
-        setLocationCity(cityParam);
-        setLocationLabel(cityParam);
-        localStorage.setItem('selected_city', cityParam);
-        window.dispatchEvent(new Event('selected_city_changed'));
-      } else {
-        setLocationCity("");
-        setLocationLabel("All Cities");
-        localStorage.removeItem('selected_city');
-        window.dispatchEvent(new Event('selected_city_changed'));
-      }
-      if (searchParam) {
-        setSearchQuery(searchParam);
-        setSearchInput(searchParam);
-      }
+  // Prefer URL ?city=, else keep the shared top-bar city from localStorage.
+  // Never clear selected_city just because dining opened without a query param.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const filterParam = params.get("filter");
+    const cityParam = params.get("city");
+    const searchParam = params.get("search");
+    const storedCity = localStorage.getItem("selected_city") || "";
+
+    if (filterParam) setActiveCategories([filterParam]);
+
+    const nextCity =
+      cityParam && cityParam !== "All Cities"
+        ? cityParam
+        : storedCity && storedCity !== "All Cities"
+          ? storedCity
+          : "";
+
+    setLocationCity(nextCity);
+    setLocationLabel(nextCity || "All Cities");
+
+    if (cityParam && cityParam !== "All Cities") {
+      localStorage.setItem("selected_city", cityParam);
+      window.dispatchEvent(new Event("selected_city_changed"));
+    }
+
+    if (searchParam) {
+      setSearchQuery(searchParam);
+      setSearchInput(searchParam);
     }
   }, []);
 
+  // Stay in sync when top-bar city changes while on dining.
+  useEffect(() => {
+    const syncCity = () => {
+      const stored = localStorage.getItem("selected_city") || "";
+      const next = stored && stored !== "All Cities" ? stored : "";
+      setLocationCity(next);
+      setLocationLabel(next || "All Cities");
+    };
+    window.addEventListener("selected_city_changed", syncCity);
+    window.addEventListener("storage", syncCity);
+    return () => {
+      window.removeEventListener("selected_city_changed", syncCity);
+      window.removeEventListener("storage", syncCity);
+    };
+  }, []);
+
+  const activeCity =
+    locationCity && locationCity !== "All Cities" ? locationCity : undefined;
+
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
-  const { data: businesses = [], isLoading: businessesLoading } = useGetBusinessesQuery();
+  const {
+    data: businessesData,
+    isLoading: businessesLoading,
+    isFetching: businessesFetching,
+  } = useGetBusinessesPagedQuery({
+    module: "dining",
+    q: searchQuery || undefined,
+    city: activeCity,
+    categories: activeCategories.length > 0 ? activeCategories : undefined,
+    cuisines: diningFilters.cuisines.length > 0 ? diningFilters.cuisines : undefined,
+    min_rating: diningFilters.minRating > 0 ? diningFilters.minRating : undefined,
+    offers_only: diningFilters.offersOnly || undefined,
+    pure_veg: diningFilters.pureVeg || undefined,
+    serves_alcohol: diningFilters.servesAlcohol || undefined,
+    max_cost: diningFilters.maxCost > 0 ? diningFilters.maxCost : undefined,
+    sort: diningFilters.sort,
+    page: currentPage,
+    limit: DINING_LIST_LIMIT,
+  });
+  const businesses = businessesData?.items ?? [];
+
+  // Full city-scoped list for homepage sections (collections covers / cuisine chips).
+  const { data: sectionBusinesses = [] } = useGetBusinessesQuery({
+    module: "dining",
+    ...(activeCity ? { city: activeCity } : {}),
+  });
   const { data: collections = [] } = useGetCollectionsQuery();
   // const { data: moods = [] } = useGetMoodsQuery();
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
@@ -954,14 +1028,6 @@ export default function Home() {
         { label: "Bar", emoji: "🍺" },
       ]),
   ];
-
-  // ── Location state ──
-  const [locationLabel, setLocationLabel] = useState("All Cities");
-  const [locationCity, setLocationCity] = useState("");
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState(false);
-  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
-  const locationRef = useRef<HTMLDivElement>(null);
 
   // ── Auto-detect on mount ──
   const detectCurrentLocation = useCallback(async () => {
@@ -1041,7 +1107,8 @@ export default function Home() {
   }, []);
 
   // ── Filtering ──
-  const cuisineOptions = useMemo(() => extractCuisines(businesses), [businesses]);
+  const sectionPool = sectionBusinesses.length > 0 ? sectionBusinesses : businesses;
+  const cuisineOptions = useMemo(() => extractCuisines(sectionPool), [sectionPool]);
 
   const cuisineCards = useMemo(() => {
     const used = new Set<string>();
@@ -1055,7 +1122,7 @@ export default function Home() {
     }[] = [];
 
     const coverForCuisine = (name: string) => {
-      const match = businesses.find((b) =>
+      const match = sectionPool.find((b) =>
         (b.cuisine || "").toLowerCase().includes(name.toLowerCase())
       );
       return match?.cover_image_url || "";
@@ -1076,9 +1143,21 @@ export default function Home() {
       });
     };
 
+    // When a city is selected, only show cuisines present in that city's restaurants.
+    const cityCuisineSet = activeCity
+      ? new Set(cuisineOptions.map((c) => c.toLowerCase()))
+      : null;
+
     cuisineMasters.forEach((master, idx) => {
       const key = master.name.toLowerCase();
       if (used.has(key)) return;
+      if (
+        cityCuisineSet &&
+        !cityCuisineSet.has(key) &&
+        ![...cityCuisineSet].some((c) => c.includes(key) || key.includes(c))
+      ) {
+        return;
+      }
       used.add(key);
       const known = EXPLORE_CUISINES.find((c) => c.name.toLowerCase() === key);
       const theme = known || CUISINE_THEME_FALLBACKS[idx % CUISINE_THEME_FALLBACKS.length];
@@ -1115,41 +1194,44 @@ export default function Home() {
       });
     });
 
-    if (cuisineMasters.length === 0) {
+    if (cuisineMasters.length === 0 && !activeCity) {
       EXPLORE_CUISINES.forEach((known) => pushKnown(known));
     }
     return cards;
-  }, [businesses, cuisineOptions, cuisineMasters]);
+  }, [sectionPool, cuisineOptions, cuisineMasters, activeCity]);
 
-  const filteredRestaurants = useMemo(() => {
-    const base = businesses.filter((r) => {
-      const name = r.name || "";
-      const cuisine = r.cuisine || "";
-      const address = r.address || "";
+  const filteredRestaurants = useMemo(
+    () => loadedRestaurants.filter((r) => matchesMealOccasion(r, mealOccasion)),
+    [loadedRestaurants, mealOccasion]
+  );
 
-      const matchesSearch =
-        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        address.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesFilter =
-        activeFilter === "All" ||
-        (r.type_name && r.type_name.toLowerCase() === activeFilter.toLowerCase()) ||
-        (r.parent_type_name && r.parent_type_name.toLowerCase() === activeFilter.toLowerCase());
-      const matchesLocation =
-        !locationCity ||
-        locationCity === "All Cities" ||
-        address.toLowerCase().includes(locationCity.toLowerCase());
-      return matchesSearch && matchesFilter && matchesLocation;
+  useEffect(() => {
+    setCurrentPage(1);
+    setLoadedRestaurants([]);
+  }, [searchQuery, locationCity, activeCategories, diningFilters, mealOccasion]);
+
+  useEffect(() => {
+    if (!businessesData) return;
+    const pageItems = businessesData.items ?? [];
+    if (currentPage <= 1) {
+      setLoadedRestaurants(pageItems);
+      return;
+    }
+    setLoadedRestaurants((prev) => {
+      const seen = new Set(prev.map((r) => r.id));
+      const next = pageItems.filter((r) => !seen.has(r.id));
+      return next.length ? [...prev, ...next] : prev;
     });
-    const filtered = applyDiningFilters(base, diningFilters);
-    return filtered.filter((r) => matchesMealOccasion(r, mealOccasion));
-  }, [businesses, searchQuery, activeFilter, locationCity, diningFilters, mealOccasion]);
+  }, [businessesData, currentPage]);
+
+  const hasMoreRestaurants = Boolean(businessesData?.meta?.has_next);
+  const loadingMore = businessesFetching && currentPage > 1;
 
   const hasActiveFilters =
     Boolean(searchQuery) ||
-    activeFilter !== "All" ||
+    activeCategories.length > 0 ||
     Boolean(mealOccasion) ||
-    diningFilters.cuisine !== "" ||
+    diningFilters.cuisines.length > 0 ||
     diningFilters.minRating > 0 ||
     diningFilters.offersOnly ||
     diningFilters.pureVeg ||
@@ -1161,7 +1243,8 @@ export default function Home() {
 
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
-  const restaurantCountLabel = `${filteredRestaurants.length} restaurant${filteredRestaurants.length !== 1 ? "s" : ""}`;
+  const totalRestaurants = businessesData?.meta?.total ?? filteredRestaurants.length;
+  const restaurantCountLabel = `${totalRestaurants} restaurant${totalRestaurants !== 1 ? "s" : ""}`;
 
   const getFilteredSectionTitle = () => {
     const city = locationCity;
@@ -1169,24 +1252,29 @@ export default function Home() {
       const mealLabel = MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label || "Dining";
       return (city && city !== "All Cities") ? `${mealLabel} in ${city}` : `${mealLabel} Near You`;
     }
-    if (activeFilter === "All") {
+    if (activeCategories.length === 0) {
       return (city && city !== "All Cities") ? `Restaurants in ${city}` : "Restaurants Near You";
     }
-    const lower = activeFilter.toLowerCase();
-    let name = activeFilter;
-    if (lower === "bar") name = "Bars";
-    else if (lower === "cafe") name = "Cafes";
-    else if (lower === "restaurant") name = "Restaurants";
-    else if (!name.endsWith("s")) name = name + "s";
-
-    return (city && city !== "All Cities") ? `${name} in ${city}` : `${name} Near You`;
+    if (activeCategories.length === 1) {
+      const label = activeCategories[0];
+      const lower = label.toLowerCase();
+      let name = label;
+      if (lower === "bar") name = "Bars";
+      else if (lower === "cafe") name = "Cafes";
+      else if (lower === "restaurant") name = "Restaurants";
+      else if (!name.endsWith("s")) name = `${name}s`;
+      return (city && city !== "All Cities") ? `${name} in ${city}` : `${name} Near You`;
+    }
+    return (city && city !== "All Cities")
+      ? `${activeCategories.length} categories in ${city}`
+      : `${activeCategories.length} categories Near You`;
   };
 
   const heroRestaurantStat =
-    businesses.length >= 1000
-      ? `${Math.floor(businesses.length / 100) * 100}+`
-      : businesses.length > 0
-        ? `${businesses.length}+`
+    totalRestaurants >= 1000
+      ? `${Math.floor(totalRestaurants / 100) * 100}+`
+      : totalRestaurants > 0
+        ? `${totalRestaurants}+`
         : "5,000+";
 
   return (
@@ -1445,7 +1533,7 @@ export default function Home() {
                 <div className="flex min-w-full justify-center">
                   <div className="flex gap-4 px-1">
                     {collections.map((col) => (
-                      <CollectionCard key={col.id} collection={col} />
+                      <CollectionCard key={col.id} collection={col} city={activeCity} />
                     ))}
                   </div>
                 </div>
@@ -1515,8 +1603,8 @@ export default function Home() {
               onChange={setDiningFilters}
               onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
               categories={filters.map((f) => f.label)}
-              category={activeFilter}
-              onCategoryChange={setActiveFilter}
+              categoriesSelected={activeCategories}
+              onCategoriesChange={setActiveCategories}
             />
           </section>
 
@@ -1602,31 +1690,50 @@ export default function Home() {
                 </div>
               )}
 
-              {diningFilters.cuisine && (
-                <div className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                  <span>Cuisine: {diningFilters.cuisine}</span>
+              {diningFilters.cuisines.map((selectedCuisine) => (
+                <div
+                  key={`cuisine-${selectedCuisine}`}
+                  className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm"
+                >
+                  <span>Cuisine: {selectedCuisine}</span>
                   <button
-                    onClick={() => setDiningFilters({ ...diningFilters, cuisine: "" })}
+                    onClick={() =>
+                      setDiningFilters({
+                        ...diningFilters,
+                        cuisines: diningFilters.cuisines.filter(
+                          (c) => c.toLowerCase() !== selectedCuisine.toLowerCase()
+                        ),
+                      })
+                    }
                     className="hover:bg-[#efd7ff] p-0.5 rounded-full transition-colors flex items-center justify-center"
                     aria-label="Clear cuisine filter"
                   >
                     <X size={12} className="text-[#6900AA]" />
                   </button>
                 </div>
-              )}
+              ))}
 
-              {activeFilter !== "All" && (
-                <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-650 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                  <span>Category: {activeFilter}</span>
+              {activeCategories.map((selectedCategory) => (
+                <div
+                  key={`category-${selectedCategory}`}
+                  className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-650 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm"
+                >
+                  <span>Category: {selectedCategory}</span>
                   <button
-                    onClick={() => setActiveFilter("All")}
+                    onClick={() =>
+                      setActiveCategories(
+                        activeCategories.filter(
+                          (c) => c.toLowerCase() !== selectedCategory.toLowerCase()
+                        )
+                      )
+                    }
                     className="hover:bg-slate-200 p-0.5 rounded-full transition-colors flex items-center justify-center"
                     aria-label="Clear category filter"
                   >
                     <X size={12} className="text-slate-650" />
                   </button>
                 </div>
-              )}
+              ))}
 
               {mealOccasion && (
                 <div className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
@@ -1646,9 +1753,10 @@ export default function Home() {
                   onClick={() => {
                     setSearchInput("");
                     setSearchQuery("");
-                    setActiveFilter("All");
+                    setActiveCategories([]);
                     setDiningFilters(DEFAULT_DINING_FILTERS);
                     setMealOccasion("");
+                    setCurrentPage(1);
                   }}
                   className="text-xs text-[#6900AA] hover:text-[#57008E] font-bold px-2 py-1.5 transition-colors cursor-pointer"
                 >
@@ -1658,7 +1766,7 @@ export default function Home() {
             </div>
           </div>
 
-          {businessesLoading ? (
+          {businessesLoading && loadedRestaurants.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
               <Loader2 size={36} className="animate-spin text-[#6900AA]" />
               <p className="text-sm font-medium">Loading top restaurants...</p>
@@ -1677,11 +1785,15 @@ export default function Home() {
                   onClick={() => {
                     setSearchQuery("");
                     setSearchInput("");
-                    setActiveFilter("All");
+                    setActiveCategories([]);
                     setDiningFilters(DEFAULT_DINING_FILTERS);
                     setMealOccasion("");
                     setLocationCity("");
                     setLocationLabel("All Cities");
+                    localStorage.removeItem("selected_city");
+                    window.dispatchEvent(new Event("selected_city_changed"));
+                    setCurrentPage(1);
+                    setLoadedRestaurants([]);
                   }}
                   className="bg-[#6900AA] text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-[#57008E] transition-colors"
                 >
@@ -1696,11 +1808,32 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRestaurants.map((restaurant) => (
-                <RestaurantCard key={restaurant.id} restaurant={restaurant} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredRestaurants.map((restaurant) => (
+                  <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+                ))}
+              </div>
+              {hasMoreRestaurants && (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => p + 1)}
+                    disabled={loadingMore}
+                    className="inline-flex items-center justify-center gap-2 min-w-[160px] px-8 py-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] disabled:opacity-60 transition-colors"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      "Load More"
+                    )}
+                  </button>
+                </div>
+              )}
+            </>
           )}
           </section>
         </div>
@@ -1741,7 +1874,9 @@ export default function Home() {
                 className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-0 -mx-1 px-1"
               >
                 {cuisineCards.map((item) => {
-                  const isActive = diningFilters.cuisine.toLowerCase() === item.name.toLowerCase();
+                  const isActive = diningFilters.cuisines.some(
+                    (selected) => selected.toLowerCase() === item.name.toLowerCase()
+                  );
                   return (
                     <button
                       key={item.name}

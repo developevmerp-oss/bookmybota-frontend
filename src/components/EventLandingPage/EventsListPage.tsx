@@ -300,68 +300,6 @@ export default function PublicEventsPage() {
     return () => window.removeEventListener("selected_city_changed", applyCity);
   }, []);
 
-  const offerCandidateKey = useMemo(
-    () =>
-      events
-        .filter((e) => e.poster_horizontal_url || e.poster_vertical_url)
-        .slice(0, 8)
-        .map((e) => e.id)
-        .join(","),
-    [events]
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadOfferEvents = async () => {
-      const candidates = events
-        .filter((e) => e.poster_horizontal_url || e.poster_vertical_url)
-        .slice(0, 8);
-
-      if (candidates.length === 0) {
-        setOfferHeroEvents((prev) => (prev.length === 0 ? prev : []));
-        setHeroSlideIndex(0);
-        return;
-      }
-
-      const checks = await Promise.all(
-        candidates.map(async (event) => {
-          const req = dispatch(api.endpoints.getPublicEventOffers.initiate(event.id));
-          try {
-            const offers = await req.unwrap();
-            return Array.isArray(offers) && offers.length > 0 ? event : null;
-          } catch {
-            return null;
-          } finally {
-            req.unsubscribe();
-          }
-        })
-      );
-
-      if (cancelled) return;
-      const matched = checks.filter((e): e is PublicEvent => Boolean(e));
-      setOfferHeroEvents((prev) => {
-        const prevIds = prev.map((e) => e.id).join(",");
-        const nextIds = matched.map((e) => e.id).join(",");
-        return prevIds === nextIds ? prev : matched;
-      });
-      setHeroSlideIndex(0);
-    };
-
-    loadOfferEvents();
-    return () => {
-      cancelled = true;
-    };
-  }, [offerCandidateKey, dispatch, events]);
-
-  useEffect(() => {
-    if (offerHeroEvents.length <= 1) return;
-    const timer = window.setInterval(() => {
-      setHeroSlideIndex((prev) => (prev + 1) % offerHeroEvents.length);
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [offerHeroEvents]);
-
   const categories = useMemo(
     () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
     [businessTypes]

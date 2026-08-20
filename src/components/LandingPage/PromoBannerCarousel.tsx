@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay, Navigation, Pagination } from "swiper/modules";
+import type { Swiper as SwiperType } from "swiper";
+import "swiper/css";
+import "swiper/css/pagination";
 import { useHomeCatalog } from "./useHomeCatalog";
 import { eventLandscape } from "./homeUtils";
+import "./PromoBannerCarousel.css";
 
 type PromoBannerCarouselProps = {
   city: string;
@@ -13,28 +19,14 @@ type PromoBannerCarouselProps = {
 export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) {
   const { bannerEvents, isLoadingEvents, isLoadingFallback } = useHomeCatalog(city);
   const slides = bannerEvents.slice(0, 5);
-  const [index, setIndex] = useState(0);
-  const touchX = useRef<number | null>(null);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [slides.length]);
-
-  useEffect(() => {
-    if (slides.length < 2) return;
-    const t = window.setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length);
-    }, 5000);
-    return () => window.clearInterval(t);
-  }, [slides.length, index]);
+  const prevRef = useRef<HTMLButtonElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
 
   if (isLoadingEvents || (slides.length === 0 && isLoadingFallback)) {
     return (
-      <section className="bg-white pt-5 pb-6 w-full">
-        <div className="relative h-[180px] sm:h-[220px] md:h-[280px] lg:h-[320px] w-full">
-          <div className="absolute left-0 top-0 bottom-0 w-[70px] sm:w-[90px] rounded-xl bg-[#F7F7F7]" />
-          <div className="absolute left-[82px] sm:left-[106px] right-[82px] sm:right-[106px] top-0 bottom-0 rounded-xl bg-[#F7F7F7]" />
-          <div className="absolute right-0 top-0 bottom-0 w-[70px] sm:w-[90px] rounded-xl bg-[#F7F7F7]" />
+      <section className="bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 lg:pt-3 lg:pb-2 w-full lg:flex-[1.15] lg:min-h-0 lg:flex lg:flex-col">
+        <div className="relative h-[200px] sm:h-[280px] md:h-[320px] lg:flex-1 lg:h-auto lg:min-h-0 w-full px-3 sm:px-4">
+          <div className="h-full w-full rounded-xl bg-[#F7F7F7]" />
         </div>
       </section>
     );
@@ -42,102 +34,96 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
 
   if (slides.length === 0) return null;
 
-  const n = slides.length;
-  const go = (dir: -1 | 1) => setIndex((i) => (i + dir + n) % n);
-  const prevSlide = slides[(index - 1 + n) % n];
-  const current = slides[index];
-  const nextSlide = slides[(index + 1) % n];
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchX.current = e.touches[0].clientX;
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchX.current == null || n < 2) return;
-    const dx = e.changedTouches[0].clientX - touchX.current;
-    if (dx > 40) go(-1);
-    if (dx < -40) go(1);
-    touchX.current = null;
-  };
+  const multi = slides.length > 1;
 
   return (
-    <section className="bg-white pt-5 pb-6 w-full overflow-x-hidden">
-      <div
-        className="relative h-[180px] sm:h-[220px] md:h-[280px] lg:h-[320px] w-full"
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        {n > 1 && (
-          <button
-            type="button"
-            onClick={() => go(-1)}
-            className="absolute left-0 top-0 bottom-0 w-[70px] sm:w-[90px] rounded-xl overflow-hidden cursor-pointer"
-            aria-label="Previous banner"
-          >
-            <img
-              src={eventLandscape(prevSlide)}
-              alt=""
-              className="w-full h-full object-cover object-left"
-            />
-          </button>
-        )}
-
-        <Link
-          href={`/events/${current.id}`}
-          className={`absolute top-0 bottom-0 rounded-xl overflow-hidden bg-[#111111] ${
-            n > 1
-              ? "left-[82px] sm:left-[106px] right-[82px] sm:right-[106px]"
-              : "left-4 right-4"
-          }`}
+    <section className="promo-banner-swiper bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 lg:pt-3 lg:pb-2 w-full overflow-hidden lg:flex-[1.15] lg:min-h-0 lg:flex lg:flex-col">
+      <div className="relative h-[200px] sm:h-[280px] md:h-[320px] lg:flex-1 lg:h-auto lg:min-h-0 w-full">
+        <Swiper
+          key={`promo-auto-${slides.map((s) => s.id).join("-")}`}
+          modules={[Autoplay, Navigation, Pagination]}
+          className="h-full w-full"
+          loop={multi}
+          speed={700}
+          grabCursor
+          allowTouchMove
+          slidesPerView={1}
+          spaceBetween={0}
+          autoplay={
+            multi
+              ? {
+                  delay: 4000,
+                  disableOnInteraction: false,
+                  pauseOnMouseEnter: true,
+                  stopOnLastSlide: false,
+                  waitForTransition: true,
+                }
+              : false
+          }
+          pagination={multi ? { clickable: true } : false}
+          navigation={
+            multi
+              ? {
+                  prevEl: prevRef.current,
+                  nextEl: nextRef.current,
+                }
+              : false
+          }
+          onBeforeInit={(swiper: SwiperType) => {
+            if (!multi) return;
+            const nav = swiper.params?.navigation;
+            if (nav && typeof nav !== "boolean") {
+              nav.prevEl = prevRef.current;
+              nav.nextEl = nextRef.current;
+            }
+          }}
+          onSwiper={(swiper) => {
+            if (!multi) return;
+            setTimeout(() => {
+              const nav = swiper.params?.navigation;
+              if (!nav || typeof nav === "boolean") return;
+              nav.prevEl = prevRef.current;
+              nav.nextEl = nextRef.current;
+              swiper.navigation?.destroy?.();
+              swiper.navigation?.init?.();
+              swiper.navigation?.update?.();
+            });
+          }}
         >
-          <img
-            src={eventLandscape(current)}
-            alt={current.name}
-            className="w-full h-full object-cover"
-          />
-          {n > 1 && (
-            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
-              {slides.map((s, i) => (
-                <span
-                  key={s.id}
-                  className={`h-1.5 rounded-full ${
-                    i === index ? "w-5 bg-white" : "w-1.5 bg-white/50"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-        </Link>
+          {slides.map((slide) => (
+            <SwiperSlide key={slide.id} className="h-full">
+              <div className="h-full w-full px-3 sm:px-[82px] md:px-[106px]">
+                <Link
+                  href={`/events/${slide.id}`}
+                  className="block h-full w-full rounded-xl overflow-hidden bg-[#111111]"
+                >
+                  <img
+                    src={eventLandscape(slide)}
+                    alt={slide.name}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </Link>
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
 
-        {n > 1 && (
-          <button
-            type="button"
-            onClick={() => go(1)}
-            className="absolute right-0 top-0 bottom-0 w-[70px] sm:w-[90px] rounded-xl overflow-hidden cursor-pointer"
-            aria-label="Next banner"
-          >
-            <img
-              src={eventLandscape(nextSlide)}
-              alt=""
-              className="w-full h-full object-cover object-right"
-            />
-          </button>
-        )}
-
-        {n > 1 && (
+        {multi && (
           <>
             <button
+              ref={prevRef}
               type="button"
               aria-label="Previous banner"
-              onClick={() => go(-1)}
-              className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/90 text-[#333] shadow flex items-center justify-center cursor-pointer hover:bg-white"
+              className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/90 text-[#333] shadow flex items-center justify-center cursor-pointer hover:bg-white"
             >
               <ChevronLeft size={20} />
             </button>
             <button
+              ref={nextRef}
               type="button"
               aria-label="Next banner"
-              onClick={() => go(1)}
-              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/90 text-[#333] shadow flex items-center justify-center cursor-pointer hover:bg-white"
+              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/90 text-[#333] shadow flex items-center justify-center cursor-pointer hover:bg-white"
             >
               <ChevronRight size={20} />
             </button>

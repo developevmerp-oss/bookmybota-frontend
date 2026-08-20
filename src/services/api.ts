@@ -146,6 +146,13 @@ export interface BusinessType {
   slug?: string;
 }
 
+export interface EventArtist {
+  name: string;
+  role?: string;
+  description?: string;
+  image_url?: string;
+}
+
 export interface AdminEvent {
   id: string;
   business_id: string;
@@ -202,6 +209,8 @@ export interface AdminEvent {
   poster_horizontal_url?: string;
   poster_vertical_url?: string;
   gallery_images?: string[];
+  youtube_url?: string | null;
+  artists?: EventArtist[];
   documents?: EventDocumentUpload[] | string[];
   terms_points?: {
     selected?: Array<{ id?: number; text?: string } | string>;
@@ -362,6 +371,8 @@ export interface EventFormPayload {
   poster_horizontal_url: string;
   poster_vertical_url: string;
   gallery_images?: string[];
+  youtube_url?: string;
+  artists?: EventArtist[];
   documents: EventDocumentUpload[];
   language: string;
   languages?: string[];

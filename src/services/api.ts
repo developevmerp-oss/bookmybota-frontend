@@ -975,7 +975,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'VenueLayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -2125,7 +2125,7 @@ export const api = createApi({
     }),
 
     createEventReview: builder.mutation<
-      { data: EventReview; newStats?: { rating: string; reviews_count: number } },
+      { data: EventReview; newStats?: { rating: string; reviews_count: number }; message?: string },
       { eventId: string; user_name: string; rating: number; text: string }
     >({
       query: ({ eventId, ...body }) => ({
@@ -3002,3 +3002,50 @@ export const {
   useUpdateAdminEventTermMutation,
   useDeleteAdminEventTermMutation,
 } = api;
+
+/** Injected so HMR can re-register with overrideExisting against the same api instance. */
+export const eventInterestApi = api.injectEndpoints({
+  overrideExisting: true,
+  endpoints: (builder) => ({
+    getEventInterest: builder.query<
+      { event_id: string; interested: boolean },
+      { eventId: string; customerId: string }
+    >({
+      query: ({ eventId }) => `/events/public/${eventId}/interest`,
+      transformResponse: (res: { data?: { event_id: string; interested: boolean } }) => ({
+        event_id: res?.data?.event_id || '',
+        interested: Boolean(res?.data?.interested),
+      }),
+      // Cache per customer so switching accounts never reuses another user's interest.
+      providesTags: (_result, _error, arg) => [
+        { type: 'EventInterests', id: `${arg.customerId}:${arg.eventId}` },
+        { type: 'EventInterests', id: arg.customerId },
+      ],
+    }),
+
+    toggleEventInterest: builder.mutation<
+      { event_id: string; interested: boolean; message?: string },
+      { eventId: string; customerId: string; interested?: boolean }
+    >({
+      query: ({ eventId, interested }) => ({
+        url: `/events/public/${eventId}/interest`,
+        method: 'POST',
+        body: typeof interested === 'boolean' ? { interested } : {},
+      }),
+      transformResponse: (res: {
+        data?: { event_id: string; interested: boolean };
+        message?: string;
+      }) => ({
+        event_id: res?.data?.event_id || '',
+        interested: Boolean(res?.data?.interested),
+        message: res?.message,
+      }),
+      invalidatesTags: (_result, _error, arg) => [
+        { type: 'EventInterests', id: `${arg.customerId}:${arg.eventId}` },
+        { type: 'EventInterests', id: arg.customerId },
+      ],
+    }),
+  }),
+});
+
+export const { useGetEventInterestQuery, useToggleEventInterestMutation } = eventInterestApi;

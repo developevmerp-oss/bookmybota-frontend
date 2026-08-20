@@ -36,13 +36,15 @@ export default function EventMediaSlider({
   images.slice(1).forEach((src) => slides.push({ type: "image", src }));
 
   if (slides.length === 0) {
-    return <div className="rounded-xl bg-slate-100 aspect-[16/9]" />;
+    return (
+      <div className="rounded-lg sm:rounded-xl bg-slate-100 aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9]" />
+    );
   }
 
   const showNav = slides.length > 1;
 
   return (
-    <div className="event-media-swiper relative rounded-xl overflow-hidden bg-black aspect-[16/9] sm:aspect-[2/1]">
+    <div className="event-media-swiper relative rounded-lg sm:rounded-xl overflow-hidden bg-black aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9]">
       <Swiper
         modules={[Navigation, Pagination]}
         navigation={showNav}

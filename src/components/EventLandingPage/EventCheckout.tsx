@@ -65,6 +65,8 @@ type Props = {
   initialShowtimeId?: string;
   onClose: () => void;
   mode?: EventCheckoutMode;
+  /** drawer = overlay panel (organizer); page = full booking route */
+  variant?: "drawer" | "page";
   onOrganizerSuccess?: (result: EventCheckoutResult) => void;
 };
 
@@ -123,9 +125,11 @@ export default function EventCheckout({
   initialShowtimeId,
   onClose,
   mode = "customer",
+  variant = "drawer",
   onOrganizerSuccess,
 }: Props) {
   const isOrganizer = mode === "organizer";
+  const isPage = variant === "page";
   const router = useRouter();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
@@ -400,22 +404,21 @@ export default function EventCheckout({
     event.category_name ? { icon: Mic2, value: event.category_name, label: "Category" } : null,
   ].filter(Boolean) as { icon: typeof Clock; value: string; label: string }[];
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <button
-        type="button"
-        className="absolute inset-0 bg-slate-900/40"
-        aria-label="Close checkout"
-        onClick={onClose}
-      />
-      <div className="relative h-full w-full max-w-[420px] bg-white shadow-2xl flex flex-col">
+  const panel = (
+      <div
+        className={
+          isPage
+            ? "relative w-full max-w-[26.25rem] mx-auto bg-white rounded-[1rem] sm:rounded-[1.25rem] shadow-xl border border-slate-100 flex flex-col min-h-[min(40rem,calc(100vh-6rem))] max-h-[calc(100vh-5rem)]"
+            : "relative h-full w-full max-w-[26.25rem] bg-white shadow-2xl flex flex-col"
+        }
+      >
         <div className="px-5 pt-4 pb-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[17px] font-extrabold tracking-tight leading-none">
+            <p className="text-[1.0625rem] font-extrabold tracking-tight leading-none">
               <span className="text-[#111111]">Book My </span>
               <span className="text-[#6900AA]">Bota</span>
             </p>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+            <span className="inline-flex items-center gap-1 text-[0.6875rem] font-medium text-slate-500">
               <Shield size={12} className="text-[#6900AA]" />
               Secure Booking
             </span>
@@ -423,13 +426,13 @@ export default function EventCheckout({
               type="button"
               onClick={onClose}
               className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 cursor-pointer"
-              aria-label="Close"
+              aria-label={isPage ? "Back to event" : "Close"}
             >
-              <X size={14} />
+              {isPage ? <ArrowLeft size={14} /> : <X size={14} />}
             </button>
           </div>
 
-          <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+          <p className="mt-4 text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-slate-400">
             Step {step} of 3{isOrganizer ? " · Organizer sale" : ""}
           </p>
 
@@ -440,7 +443,7 @@ export default function EventCheckout({
               const Icon = s.icon;
               return (
                 <div key={s.n} className={`flex items-start ${i < 2 ? "flex-1" : ""}`}>
-                  <div className="flex flex-col items-center w-[72px]">
+                  <div className="flex flex-col items-center w-[4.5rem]">
                     <span
                       className={`w-9 h-9 rounded-full flex items-center justify-center ${
                         done || active
@@ -451,7 +454,7 @@ export default function EventCheckout({
                       {done ? <Check size={16} strokeWidth={3} /> : <Icon size={16} />}
                     </span>
                     <span
-                      className={`mt-1.5 text-[11px] font-semibold ${
+                      className={`mt-1.5 text-[0.6875rem] font-semibold ${
                         active || done ? "text-slate-900" : "text-slate-400"
                       }`}
                     >
@@ -460,7 +463,7 @@ export default function EventCheckout({
                   </div>
                   {i < 2 && (
                     <div
-                      className={`flex-1 h-0.5 mt-[18px] ${
+                      className={`flex-1 h-0.5 mt-[1.125rem] ${
                         step > s.n ? "bg-[#6900AA]" : "bg-slate-200"
                       }`}
                     />
@@ -473,8 +476,8 @@ export default function EventCheckout({
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
           <div className="mb-5">
-            <h3 className="text-xl font-extrabold text-slate-900">{stepTitle}</h3>
-            <p className="text-sm text-slate-500 mt-1">{stepSubtitle}</p>
+            <h3 className="text-[1.25rem] font-extrabold text-slate-900">{stepTitle}</h3>
+            <p className="text-[0.875rem] text-slate-500 mt-1">{stepSubtitle}</p>
           </div>
           {step === 1 && (
             <div className="space-y-5">
@@ -953,6 +956,25 @@ export default function EventCheckout({
           )}
         </div>
       </div>
+  );
+
+  if (isPage) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-[#F7F7F8] py-4 sm:py-6 px-3 sm:px-4 pb-8">
+        {panel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/40"
+        aria-label="Close checkout"
+        onClick={onClose}
+      />
+      {panel}
     </div>
   );
 }

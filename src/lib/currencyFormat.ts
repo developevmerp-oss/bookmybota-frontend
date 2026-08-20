@@ -1,6 +1,8 @@
 /**
  * Project currency — Ethiopian Birr (ETB).
  * Use these helpers for all money display in the UI.
+ *
+ * Display style: "30 ETB" / "1,250.00 ETB" (amount first, then code).
  */
 
 export const CURRENCY_CODE = 'ETB';
@@ -10,22 +12,34 @@ export const CURRENCY_SYMBOL = 'ETB';
 type FormatMoneyOptions = {
   /** Decimal places (default 2; set 0 for whole amounts) */
   decimals?: number;
-  /** Shorthand for decimals: 0 */
+  /** Shorthand for decimals: 0 → e.g. "30 ETB" */
   compact?: boolean;
 };
 
+/**
+ * Format an amount for display across the app.
+ * @example formatMoney(30, { compact: true }) → "30 ETB"
+ * @example formatMoney(1250.5) → "1,250.50 ETB"
+ */
 export function formatMoney(
   amount: number | string | undefined | null,
   options?: FormatMoneyOptions
 ): string {
   const n = Number(amount ?? 0);
-  if (!Number.isFinite(n)) return `${CURRENCY_SYMBOL} 0.00`;
+  if (!Number.isFinite(n)) {
+    const decimals = options?.compact ? 0 : (options?.decimals ?? 2);
+    const zero = (0).toLocaleString(CURRENCY_LOCALE, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    return `${zero} ${CURRENCY_SYMBOL}`;
+  }
   const decimals = options?.compact ? 0 : (options?.decimals ?? 2);
   const formatted = n.toLocaleString(CURRENCY_LOCALE, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-  return `${CURRENCY_SYMBOL} ${formatted}`;
+  return `${formatted} ${CURRENCY_SYMBOL}`;
 }
 
 /** @deprecated Use formatMoney — kept for gradual migration */

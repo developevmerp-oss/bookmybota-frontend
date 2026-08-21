@@ -4,15 +4,22 @@ type GuestTableAnimationProps = {
   count: number;
 };
 
-const CHAIR = 32;
-const PITCH = 54;
-const TABLE_GAP = 20;
-const CORNER = 30;
-const MIN_TABLE = 86;
+/** Dribbble-style top-down table reservation (shot 3791049). */
+const CHAIR_W = 34;
+const CHAIR_H = 28;
+const PITCH = 52;
+const TABLE_GAP = 10;
+const CORNER = 28;
+const MIN_TABLE = 88;
 const MAX_TOP = 3;
 const MAX_END = 2;
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
-const DURATION = "700ms";
+const DURATION = "650ms";
+
+const TABLE_YELLOW = "#F5C518";
+const CHAIR_FILL = "#5B5FBF";
+const CHAIR_STROKE = "#2F3270";
+const PLATE = "#FFFFFF";
 
 function layout(n: number) {
   const guests = Math.max(1, Math.min(10, n));
@@ -44,18 +51,20 @@ function evenCenters(count: number, mid: number): number[] {
   return Array.from({ length: count }, (_, i) => start + i * PITCH);
 }
 
+/** Top-down chair: rounded seat + arched backrest (open side faces table). */
 function ChairGlyph() {
   return (
-    <svg viewBox="0 0 40 42" width={CHAIR} height={CHAIR} fill="none" aria-hidden>
+    <svg viewBox="0 0 40 36" width={CHAIR_W} height={CHAIR_H} fill="none" aria-hidden>
+      {/* Outer backrest arch */}
       <path
-        fill="#2C3348"
-        d="M8 40c-2.2 0-4-1.6-4-4.2V18C4 8.8 12.2 3 20 3s16 5.8 16 15v17.8c0 2.6-1.8 4.2-4 4.2h-3.2c-1.4 0-2.3-1.2-2.3-2.6V21.4c0-5-2.8-7.2-6.5-7.2s-6.5 2.2-6.5 7.2v16c0 1.4-.9 2.6-2.3 2.6H8Z"
+        d="M6 30V14C6 6.5 12.2 2 20 2s14 4.5 14 12v16"
+        stroke={CHAIR_STROKE}
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        fill="none"
       />
-      <path
-        fill="#3D4660"
-        d="M11.2 38.2V21.2c0-6.2 3.6-9.4 8.8-9.4s8.8 3.2 8.8 9.4v17"
-        opacity="0.35"
-      />
+      {/* Seat pad */}
+      <rect x="9" y="14" width="22" height="18" rx="6" fill={CHAIR_FILL} stroke={CHAIR_STROKE} strokeWidth="1.6" />
     </svg>
   );
 }
@@ -75,17 +84,37 @@ function Seat({
     <div
       className="absolute top-0 left-0"
       style={{
-        width: CHAIR,
-        height: CHAIR,
-        transform: `translate(${x - CHAIR / 2}px, ${y - CHAIR / 2}px) rotate(${rotate}deg) scale(${visible ? 1 : 0.45})`,
+        width: CHAIR_W,
+        height: CHAIR_H,
+        transform: `translate(${x - CHAIR_W / 2}px, ${y - CHAIR_H / 2}px) rotate(${rotate}deg) scale(${visible ? 1 : 0.35})`,
         opacity: visible ? 1 : 0,
-        transition: `transform ${DURATION} ${EASE}, opacity 400ms ease`,
+        transition: `transform ${DURATION} ${EASE}, opacity 380ms ease`,
         willChange: "transform, opacity",
         pointerEvents: "none",
       }}
     >
       <ChairGlyph />
     </div>
+  );
+}
+
+function Plate({ x, y, visible }: { x: number; y: number; visible: boolean }) {
+  return (
+    <div
+      className="absolute rounded-full"
+      style={{
+        width: 14,
+        height: 14,
+        left: x - 7,
+        top: y - 7,
+        background: PLATE,
+        boxShadow: "0 0 0 1.5px rgba(47,50,112,0.12)",
+        opacity: visible ? 1 : 0,
+        transform: `scale(${visible ? 1 : 0.4})`,
+        transition: `transform ${DURATION} ${EASE}, opacity 380ms ease`,
+        pointerEvents: "none",
+      }}
+    />
   );
 }
 
@@ -98,8 +127,8 @@ export default function GuestTableAnimation({ count }: GuestTableAnimationProps)
 
   const maxW = Math.max(sideSize(MAX_TOP), MIN_TABLE);
   const maxH = Math.max(sideSize(MAX_END), MIN_TABLE);
-  const sceneW = maxW + (CHAIR + TABLE_GAP) * 2 + 16;
-  const sceneH = maxH + (CHAIR + TABLE_GAP) * 2 + 16;
+  const sceneW = maxW + (CHAIR_H + TABLE_GAP) * 2 + 28;
+  const sceneH = maxH + (CHAIR_H + TABLE_GAP) * 2 + 28;
   const cx = sceneW / 2;
   const cy = sceneH / 2;
 
@@ -113,16 +142,20 @@ export default function GuestTableAnimation({ count }: GuestTableAnimationProps)
   const leftYs = evenCenters(left, cy);
   const rightYs = evenCenters(right, cy);
 
-  const leftX = tableLeft - TABLE_GAP - CHAIR / 2;
-  const rightX = tableRight + TABLE_GAP + CHAIR / 2;
-  const topY = tableTop - TABLE_GAP - CHAIR / 2;
-  const bottomY = tableBottom + TABLE_GAP + CHAIR / 2;
+  // Chairs sit just outside the table; backrest faces outward
+  const leftX = tableLeft - TABLE_GAP - CHAIR_H / 2 + 4;
+  const rightX = tableRight + TABLE_GAP + CHAIR_H / 2 - 4;
+  const topY = tableTop - TABLE_GAP - CHAIR_H / 2 + 4;
+  const bottomY = tableBottom + TABLE_GAP + CHAIR_H / 2 - 4;
 
-  const radius = n <= 2 ? MIN_TABLE / 2 : 18;
+  // Plates sit inset from each chair along the table edge
+  const plateInset = 18;
+  const radius = n <= 2 ? 18 : 16;
 
   return (
-    <div className="w-full flex justify-center py-2 sm:py-3 select-none" aria-hidden="true">
+    <div className="w-full flex justify-center py-3 sm:py-4 select-none" aria-hidden="true">
       <div className="relative max-w-full overflow-visible" style={{ width: sceneW, height: sceneH }}>
+        {/* Yellow table */}
         <div
           className="absolute"
           style={{
@@ -132,25 +165,40 @@ export default function GuestTableAnimation({ count }: GuestTableAnimationProps)
             height: tableH,
             transform: "translate(-50%, -50%)",
             borderRadius: radius,
-            background: "linear-gradient(180deg, #F8E7CC 0%, #E9CBA6 52%, #D9B48A 100%)",
-            boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -8px 12px rgba(160,110,50,0.12), 0 10px 22px rgba(160,120,70,0.22)",
+            background: TABLE_YELLOW,
+            boxShadow: "0 8px 20px rgba(47, 50, 112, 0.12)",
+            border: `2.5px solid ${CHAIR_STROKE}`,
             transition: `width ${DURATION} ${EASE}, height ${DURATION} ${EASE}, border-radius ${DURATION} ${EASE}`,
             willChange: "width, height",
           }}
         />
 
+        {/* Place-setting plates */}
+        {topXs.map((x, i) => (
+          <Plate key={`pt-${i}`} x={x} y={tableTop + plateInset} visible={i < top} />
+        ))}
+        {bottomXs.map((x, i) => (
+          <Plate key={`pb-${i}`} x={x} y={tableBottom - plateInset} visible={i < bottom} />
+        ))}
+        {leftYs.map((y, i) => (
+          <Plate key={`pl-${i}`} x={tableLeft + plateInset} y={y} visible={i < left} />
+        ))}
+        {rightYs.map((y, i) => (
+          <Plate key={`pr-${i}`} x={tableRight - plateInset} y={y} visible={i < right} />
+        ))}
+
+        {/* Chairs — rotate so open/seat side faces the table */}
         {Array.from({ length: MAX_END }).map((_, i) => (
-          <Seat key={`l-${i}`} x={leftX} y={leftYs[i] ?? cy} rotate={-90} visible={i < left} />
+          <Seat key={`l-${i}`} x={leftX} y={leftYs[i] ?? cy} rotate={90} visible={i < left} />
         ))}
         {Array.from({ length: MAX_END }).map((_, i) => (
-          <Seat key={`r-${i}`} x={rightX} y={rightYs[i] ?? cy} rotate={90} visible={i < right} />
+          <Seat key={`r-${i}`} x={rightX} y={rightYs[i] ?? cy} rotate={-90} visible={i < right} />
         ))}
         {Array.from({ length: MAX_TOP }).map((_, i) => (
-          <Seat key={`t-${i}`} x={topXs[i] ?? cx} y={topY} rotate={0} visible={i < top} />
+          <Seat key={`t-${i}`} x={topXs[i] ?? cx} y={topY} rotate={180} visible={i < top} />
         ))}
         {Array.from({ length: MAX_TOP }).map((_, i) => (
-          <Seat key={`b-${i}`} x={bottomXs[i] ?? cx} y={bottomY} rotate={180} visible={i < bottom} />
+          <Seat key={`b-${i}`} x={bottomXs[i] ?? cx} y={bottomY} rotate={0} visible={i < bottom} />
         ))}
       </div>
     </div>

@@ -624,14 +624,14 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
         
         {isPromoted && (
-          <span className="absolute top-3 left-3 bg-black/40 backdrop-blur-[2px] text-white text-[10px] font-semibold px-2 py-0.5 rounded shadow-sm">
+          <span className="absolute top-3 left-3 bg-black/40 backdrop-blur-[2px] text-white text-sm font-semibold px-2 py-0.5 rounded shadow-sm">
             Promoted
           </span>
         )}
 
         {offerLabel && (
           <div
-            className="absolute bottom-3 left-0 text-white text-[11px] font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md"
+            className="absolute bottom-3 left-0 text-white text-xs sm:text-sm lg:text-xs font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md"
             style={{ backgroundColor: HERO_ACCENT, boxShadow: "0 6px 14px rgba(105,0,170,0.28)" }}
           >
             <Percent size={11} className="text-white shrink-0" />
@@ -642,23 +642,23 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
       <div className="px-1 pb-1">
         <div className="flex justify-between items-start gap-2 mb-1.5">
-          <h3 className="font-bold text-slate-800 text-[16px] leading-tight truncate flex-1 group-hover:text-rose-600 transition-colors">
+          <h3 className="font-bold text-slate-800 text-lg sm:text-xl lg:text-lg leading-tight truncate flex-1 group-hover:text-rose-600 transition-colors">
             {restaurant.name}
           </h3>
-          <div className="shrink-0 flex items-center gap-0.5 bg-emerald-700 text-white text-[11px] font-black px-1.5 py-0.5 rounded-md shadow-sm">
+          <div className="shrink-0 flex items-center gap-0.5 bg-emerald-700 text-white text-sm font-black px-1.5 py-0.5 rounded-md shadow-sm">
             <span>{rating}</span>
             <span className="text-[9px]">★</span>
           </div>
         </div>
 
-        <div className="flex justify-between items-center gap-4 mb-1 text-[13px] text-slate-500">
+        <div className="flex justify-between items-center gap-4 mb-1 text-sm sm:text-base lg:text-sm text-slate-500">
           <span className="truncate flex-1 font-medium">{cuisine}</span>
           <span className="shrink-0 whitespace-nowrap font-medium text-slate-650">
             {getPriceForTwo(idHash)}
           </span>
         </div>
 
-        <div className="flex justify-between items-center gap-4 text-xs text-slate-400">
+        <div className="flex justify-between items-center gap-4 text-sm sm:text-base lg:text-sm text-slate-400">
           <span className="truncate flex-1 font-medium">{getLocality(restaurant.address)}</span>
           <span className="shrink-0 whitespace-nowrap font-medium">{getDistance(idHash)}</span>
         </div>
@@ -684,7 +684,7 @@ function CollectionCard({
   return (
     <Link
       href={href}
-      className="relative shrink-0 w-48 h-56 rounded-2xl overflow-hidden cursor-pointer group shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block"
+      className="relative shrink-0 w-[200px] h-[268px] sm:w-[220px] sm:h-[300px] lg:w-[236px] lg:h-[320px] rounded-2xl overflow-hidden cursor-pointer group shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block"
     >
       <img
         src={collection.image_url || "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80"}
@@ -697,8 +697,10 @@ function CollectionCard({
       />
       <div className={`absolute inset-0 bg-gradient-to-t ${collection.color_gradient || 'from-rose-900/80'} to-transparent`} />
       <div className="absolute bottom-0 left-0 right-0 p-4">
-        <h3 className="text-white font-bold text-base leading-tight">{collection.title}</h3>
-        <p className="text-white/70 text-xs mt-1">{subtitle}</p>
+        <h3 className="text-white font-bold text-base sm:text-lg leading-tight">{collection.title}</h3>
+        <p className="text-white/80 text-xs sm:text-sm mt-1 flex items-center gap-0.5">
+          {subtitle} <ChevronRight size={14} className="opacity-80" />
+        </p>
       </div>
     </Link>
   );
@@ -846,17 +848,29 @@ export default function Home() {
   const collectionsRef = useRef<HTMLDivElement>(null);
   const cuisinesRef = useRef<HTMLDivElement>(null);
   const offersRef = useRef<HTMLDivElement>(null);
+  const [collectionsScroll, setCollectionsScroll] = useState({ left: false, right: false });
 
-  const scrollCollections = (direction: 'left' | 'right') => {
-    if (collectionsRef.current) {
-      const cardWidth = 192; // w-48 = 192px
-      const gap = 16; // gap-4 = 16px
-      const scrollAmount = cardWidth + gap;
-      collectionsRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
+  const updateCollectionsScroll = useCallback(() => {
+    const el = collectionsRef.current;
+    if (!el) {
+      setCollectionsScroll({ left: false, right: false });
+      return;
     }
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const canOverflow = maxScroll > 2;
+    setCollectionsScroll({
+      left: canOverflow && el.scrollLeft > 2,
+      right: canOverflow && el.scrollLeft < maxScroll - 2,
+    });
+  }, []);
+
+  const scrollCollections = (direction: "left" | "right") => {
+    if (!collectionsRef.current) return;
+    const amount = Math.max(collectionsRef.current.clientWidth * 0.7, 236);
+    collectionsRef.current.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
   };
 
   const scrollCuisines = (direction: "left" | "right") => {
@@ -1241,6 +1255,27 @@ export default function Home() {
     diningFilters.bookTable;
   const showHomeExtras = !hasActiveFilters;
 
+  useEffect(() => {
+    if (!showHomeExtras) {
+      setCollectionsScroll({ left: false, right: false });
+      return;
+    }
+    const frame = requestAnimationFrame(() => updateCollectionsScroll());
+    const el = collectionsRef.current;
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => updateCollectionsScroll()) : null;
+    if (el) {
+      ro?.observe(el);
+      el.addEventListener("scroll", updateCollectionsScroll, { passive: true });
+    }
+    window.addEventListener("resize", updateCollectionsScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro?.disconnect();
+      el?.removeEventListener("scroll", updateCollectionsScroll);
+      window.removeEventListener("resize", updateCollectionsScroll);
+    };
+  }, [collections, showHomeExtras, updateCollectionsScroll]);
+
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
   const totalRestaurants = businessesData?.meta?.total ?? filteredRestaurants.length;
@@ -1317,7 +1352,7 @@ export default function Home() {
       </section> */}
 
       {/* ── 1. Hero Search Banner (centered, reference layout) ─────────────── */}
-      <section
+      {/* <section
         className={`relative w-full ${
           showLocationDropdown ? "z-40" : "z-0"
         }`}
@@ -1478,13 +1513,127 @@ export default function Home() {
             <span>50+ Cities</span>
           </div>
         </div>
+      </section> */}
+
+      {/* ── Explore Dining categories ─────────────────────────────────────── */}
+      <section className="w-full bg-white border-b border-slate-100">
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-6 sm:py-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-5 tracking-tight">
+            Explore Dining
+          </h2>
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pb-1">
+            {([
+              {
+                id: "all-dining",
+                title: "All dining",
+                image: "/images/dining-category-all.png",
+                match: null as string[] | null,
+              },
+              {
+                id: "bar",
+                title: "Bar",
+                image: "/images/dining-category-bar.png",
+                match: ["bar", "pub", "lounge"],
+              },
+              {
+                id: "restaurant",
+                title: "Restaurant",
+                image: "/images/dining-category-restaurant.png",
+                match: ["restaurant"],
+              },
+              {
+                id: "bar-grill",
+                title: "Bar & Grill",
+                image: "/images/dining-category-bar-grill.png",
+                match: ["grill", "bar & grill", "bar and grill"],
+              },
+              {
+                id: "cafe",
+                title: "Cafe",
+                image: "/images/dining-category-cafe.png",
+                match: ["cafe", "café", "coffee"],
+              },
+              {
+                id: "pub",
+                title: "Pub",
+                image: "/images/dining-category-pub.png",
+                match: ["pub", "bar"],
+              },
+              {
+                id: "fine-dining",
+                title: "Fine dining",
+                image: "/images/dining-category-fine-dining.png",
+                match: ["fine dining", "fine-dining", "fine"],
+              },
+              {
+                id: "general-restaurant",
+                title: "General restaurant",
+                image: "/images/dining-category-general.png",
+                match: ["general", "restaurant"],
+              },
+            ] as const).map((card) => {
+              const resolvedCategory = card.match
+                ? businessTypes.find((t) =>
+                    card.match!.some((m) => t.name.toLowerCase().includes(m))
+                  )?.name || card.title
+                : null;
+              const isActive = resolvedCategory
+                ? activeCategories.length === 1 &&
+                  activeCategories[0].toLowerCase() === resolvedCategory.toLowerCase()
+                : activeCategories.length === 0;
+              return (
+                <div className="text-center flex flex-col items-center justify-center">
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => {
+                    if (resolvedCategory) {
+                      setActiveCategories([resolvedCategory]);
+                    } else {
+                      setActiveCategories([]);
+                    }
+                    setCurrentPage(1);
+                    document
+                      .getElementById("restaurant-listings")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="text-center cursor-pointer w-[120px] h-[140px] sm:w-[132px] sm:h-[160px]"
+                >
+                  {/* <span className="block w-[120px] h-[120px] sm:w-[132px] sm:h-[132px] overflow-hidden rounded-2xl mx-auto"> */}
+                    <img
+                      src={card.image}
+                      alt={card.title}
+                      className={`w-full h-full  block ${
+                        isActive ? "opacity-100" : "opacity-90 hover:opacity-100"
+                      }`}
+                    />
+                  {/* </span> */}
+                  
+                </button>
+
+<p
+className={`text-sm font-bold mt-2 ${
+  isActive ? "text-[#6900AA]" : "text-slate-800"
+}`}
+>
+{card.title}
+</p>
+
+</div>
+
+                
+              );
+            })}
+          </div>
+          
+        </div>
       </section>
 
       {showHomeExtras && (
       <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
-      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-5 pb-2">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-5 pb-2">
         {/* ── 2. Collections (after hero) ──────────────────────────────────── */}
-          <section className=" w-full mx-auto">
+          <section className="w-full">
             {/* Mobile / tablet: title + All collections on one line, subtitle below */}
             <div className="lg:hidden mb-2">
               <div className="flex items-center justify-between gap-2">
@@ -1518,34 +1667,38 @@ export default function Home() {
             </div>
 
             <div className="relative mt-5">
-              <button
-                onClick={() => scrollCollections("left")}
-                className="absolute left-2 sm:-left-5 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-slate-700 w-10 h-10 rounded-full hidden md:flex items-center justify-center border border-slate-200 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer backdrop-blur-sm"
-                aria-label="Scroll left"
-              >
-                <ChevronLeft size={20} />
-              </button>
+              {collectionsScroll.left && (
+                <button
+                  type="button"
+                  onClick={() => scrollCollections("left")}
+                  className="absolute left-0 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
+                  aria-label="Scroll left"
+                >
+                  <ChevronLeft size={22} strokeWidth={1.75} />
+                </button>
+              )}
 
               <div
                 ref={collectionsRef}
-                className="overflow-x-auto pt-3 pb-4 scrollbar-hide scroll-smooth"
+                className="overflow-x-auto pt-1 pb-4 scrollbar-hide scroll-smooth"
               >
-                <div className="flex min-w-full justify-center">
-                  <div className="flex gap-4 px-1">
-                    {collections.map((col) => (
-                      <CollectionCard key={col.id} collection={col} city={activeCity} />
-                    ))}
-                  </div>
+                <div className="flex gap-4 w-max">
+                  {collections.map((col) => (
+                    <CollectionCard key={col.id} collection={col} city={activeCity} />
+                  ))}
                 </div>
               </div>
 
-              <button
-                onClick={() => scrollCollections("right")}
-                className="absolute right-2 sm:-right-5 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-slate-750 w-10 h-10 rounded-full hidden md:flex items-center justify-center border border-slate-200 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer backdrop-blur-sm"
-                aria-label="Scroll right"
-              >
-                <ChevronRight size={20} />
-              </button>
+              {collectionsScroll.right && (
+                <button
+                  type="button"
+                  onClick={() => scrollCollections("right")}
+                  className="absolute right-0 top-1/2 z-20 translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
+                  aria-label="Scroll right"
+                >
+                  <ChevronRight size={22} strokeWidth={1.75} />
+                </button>
+              )}
             </div>
           </section>
 
@@ -1610,7 +1763,7 @@ export default function Home() {
 
           {/* ── 5. Offer Section ────────────────────────────────────────────── */}
           {showHomeExtras && (
-            <section id="dining-offers" className="py-3 sm:pt-2 scroll-mt-24">
+            <section id="dining-offers" className="pt-3 pb-5 sm:pt-2 scroll-mt-24">
               {DINING_OFFER_CARDS.length > 3 ? (
                 <div className="relative">
                   <button
@@ -1658,7 +1811,7 @@ export default function Home() {
           <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-2"}`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-3">
             <div>
-              <h2 className="text-xl sm:text-2xl lgL:text-xl font-bold text-slate-800">
+              <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
                 {getFilteredSectionTitle()}
               </h2>
               <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
@@ -1901,7 +2054,7 @@ export default function Home() {
                           }}
                         />
                       </span>
-                      <span className="mt-1.5 sm:mt-3 text-[11px] sm:text-[13px] lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
+                      <span className="mt-1.5 sm:mt-3 text-sm sm:text-lg lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
                         {item.name}
                       </span>
                     </button>

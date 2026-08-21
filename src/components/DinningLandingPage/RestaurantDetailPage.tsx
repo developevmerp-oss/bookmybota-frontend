@@ -514,6 +514,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   // Lightbox / Image Zoom & Slider state
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+  const [lightboxItems, setLightboxItems] = useState<string[]>([]);
 
   const uploadedPhotos = [];
   if (profile?.cover_image_url) {
@@ -529,7 +530,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     ? (uploadedPhotos.length > 0 ? uploadedPhotos : getPhotosForVenue(profile.type_name, profile.cover_image_url))
     : [];
 
-  const openLightbox = (index: number) => {
+  const openLightbox = (index: number, items?: string[]) => {
+    const list = items && items.length > 0 ? items : photos;
+    setLightboxItems(list);
     setCurrentPhotoIdx(index);
     setIsLightboxOpen(true);
   };
@@ -539,11 +542,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   };
 
   const nextPhoto = () => {
-    setCurrentPhotoIdx((prev) => (prev + 1) % (photos.length || 1));
+    setCurrentPhotoIdx((prev) => (prev + 1) % (lightboxItems.length || 1));
   };
 
   const prevPhoto = () => {
-    setCurrentPhotoIdx((prev) => (prev - 1 + (photos.length || 1)) % (photos.length || 1));
+    setCurrentPhotoIdx((prev) => (prev - 1 + (lightboxItems.length || 1)) % (lightboxItems.length || 1));
   };
 
   useEffect(() => {
@@ -555,7 +558,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLightboxOpen, photos.length]);
+  }, [isLightboxOpen, lightboxItems.length]);
 
   const bookingDates = getBookingDates();
 
@@ -843,6 +846,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     ? "Closed Today"
     : `${todayOpenFormatted} - ${todayCloseFormatted} (Today)`;
   const cuisines = profile.cuisine || "Continental, Italian, Fast Food";
+  const cuisineList = cuisines
+    .replace(/·/g, ",")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
 
   // Dynamic city & country parsing helper
   const parseAddressLocation = (address?: string) => {
@@ -1085,59 +1093,231 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {activeTab === "Overview" && (
               <div className="space-y-8">
 
-                {/* Dining Offers (first in Overview) */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5">
-                    <Sparkles size={16} className="text-[#6900AA]" /> Dining Offers
-                  </h3>
-                  {profile.dining_offers && profile.dining_offers.length > 0 ? (
-                    <div className="w-full space-y-3">
-                      {profile.dining_offers.map((offer: any, idx: number) => (
-                        <div key={idx} className="p-5 rounded-2xl border border-dashed border-[#e3bcff] bg-gradient-to-r from-[#f7e9ff]/70 to-[#f7e9ff]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-all hover:bg-[#f7e9ff]/80">
-                          <div className="space-y-1.5">
-                            <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-[#6900AA] bg-[#efd7ff]/80 px-2.5 py-0.5 rounded-full">
-                              {offer.type || 'Offer'}
-                            </span>
-                            <p className="text-base font-extrabold text-slate-800">{offer.title}</p>
-                            <p className="text-xs text-slate-400 font-medium">{offer.validity}</p>
-                          </div>
+                {/* Dining Offers — 1 = full-width blue; 2+ = first blue, rest white compact cards */}
+                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                  <h3 className="text-xl font-bold text-zinc-800">Dining Offers</h3>
+                  {diningOffers.length > 1 && (
+                    <p className="text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
+                  )}
+                  {diningOffers.length <= 1 && <div className="mb-4" />}
+                  {diningOffers.length > 0 ? (
+                    <div
+                      className={
+                        diningOffers.length === 1
+                          ? "grid grid-cols-1"
+                          : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
+                      }
+                    >
+                      {diningOffers.map((offer, idx) => {
+                        const isSingle = diningOffers.length === 1;
+                        const isFeatured = isSingle || idx === 0;
+                        return (
                           <button
+                            key={`${offer.title}-${idx}`}
+                            type="button"
                             onClick={() => handleQuickBook(offer)}
-                            className="self-start sm:self-center shrink-0 bg-[#6900AA] hover:bg-[#57008E] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm"
+                            className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer ${
+                              isFeatured
+                                ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
+                                : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
+                            } ${
+                              isSingle
+                                ? "w-full p-5 sm:p-6 min-h-[140px]"
+                                : "p-3.5 sm:p-4 min-h-[120px]"
+                            }`}
                           >
-                            Book table to unlock
+                            <p
+                              className={`text-[10px] font-extrabold uppercase tracking-wider ${
+                                isFeatured ? "text-white/85" : "text-[#2563eb]"
+                              }`}
+                            >
+                              {offer.type || "Offer"}
+                            </p>
+                            <p
+                              className={`font-extrabold mt-1.5 leading-snug ${
+                                isFeatured ? "text-white" : "text-zinc-900"
+                              } ${isSingle ? "text-xl sm:text-2xl" : "text-base sm:text-lg"}`}
+                            >
+                              {offer.title}
+                            </p>
+                            {offer.validity && (
+                              <p
+                                className={`mt-2 leading-snug ${
+                                  isFeatured ? "text-white/80" : "text-zinc-500"
+                                } ${isSingle ? "text-sm" : "text-xs"}`}
+                              >
+                                {offer.validity}
+                              </p>
+                            )}
+                            <span
+                              className={`pointer-events-none absolute font-black leading-none select-none ${
+                                isFeatured ? "text-white/15" : "text-[#2563eb]/10"
+                              } ${
+                                isSingle
+                                  ? "-bottom-4 -right-1 text-[100px]"
+                                  : "-bottom-3 -right-1 text-[72px]"
+                              }`}
+                              aria-hidden
+                            >
+                              %
+                            </span>
                           </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-sm text-slate-400">No dining offers available for this venue yet.</p>
                   )}
                 </section>
 
-                {/* About Venue, Average Cost & Cuisines */}
-                <section>
-                  <h3 className="text-xl font-bold text-black mb-3">About the Venue</h3>
+                {/* Menu — bordered card, cuisine pills, stack preview → lightbox */}
+                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <h3 className="text-xl font-bold text-zinc-800">Menu</h3>
+                    {menus.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab("Menu");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="inline-flex items-center gap-0.5 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        See all menus <ChevronRight size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  <h4 className="text-sm font-semibold text-[#9a7b2f] mb-2.5">Cuisines</h4>
+                  <div className="flex flex-wrap gap-2 mb-5">
+                    {cuisineList.map((c) => (
+                      <span
+                        key={c}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-[#e8d9a8] text-[#9a7b2f] text-sm font-medium"
+                      >
+                        <span className="text-[10px] leading-none" aria-hidden>✦</span>
+                        {c}
+                        <span className="text-[10px] leading-none" aria-hidden>✦</span>
+                      </span>
+                    ))}
+                  </div>
+
+                  {menus.length > 0 ? (
+                    <>
+                      {/* Mobile / tablet: single stack card → lightbox slider */}
+                      <div className="lg:hidden">
+                        <button
+                          type="button"
+                          onClick={() => openLightbox(0, menus)}
+                          className="w-[148px] sm:w-[168px] text-left cursor-pointer group"
+                        >
+                          <div className="relative pt-3 px-2">
+                            <div className="absolute top-0 left-4 right-4 h-3 rounded-t-md border border-slate-200 bg-slate-50" aria-hidden />
+                            <div className="absolute top-1.5 left-2.5 right-2.5 h-3 rounded-t-md border border-slate-200 bg-slate-100" aria-hidden />
+                            <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4] shadow-sm">
+                              <img
+                                src={menus[0]}
+                                alt="Menu"
+                                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-2.5 text-sm font-bold text-zinc-800">Menu</p>
+                          <p className="text-xs text-zinc-500">
+                            {menus.length} {menus.length === 1 ? "page" : "pages"}
+                          </p>
+                        </button>
+                      </div>
+
+                      {/* Desktop: up to 3 cards in a row; more than 3 → single stack */}
+                      <div className="hidden lg:block">
+                        {menus.length <= 3 ? (
+                          <div className="grid grid-cols-3 gap-5">
+                            {menus.map((menuUrl, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => openLightbox(idx, menus)}
+                                className="w-full text-left cursor-pointer group"
+                              >
+                                <div className="relative pt-3 px-2">
+                                  <div className="absolute top-0 left-4 right-4 h-3 rounded-t-md border border-slate-200 bg-slate-50" aria-hidden />
+                                  <div className="absolute top-1.5 left-2.5 right-2.5 h-3 rounded-t-md border border-slate-200 bg-slate-100" aria-hidden />
+                                  <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4] shadow-sm">
+                                    <img
+                                      src={menuUrl}
+                                      alt={`Menu ${idx + 1}`}
+                                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src =
+                                          "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                                <p className="mt-2.5 text-sm font-bold text-zinc-800">Menu</p>
+                                <p className="text-xs text-zinc-500">
+                                  {idx + 1} of {menus.length} {menus.length === 1 ? "page" : "pages"}
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openLightbox(0, menus)}
+                            className="w-[168px] text-left cursor-pointer group"
+                          >
+                            <div className="relative pt-3 px-2">
+                              <div className="absolute top-0 left-4 right-4 h-3 rounded-t-md border border-slate-200 bg-slate-50" aria-hidden />
+                              <div className="absolute top-1.5 left-2.5 right-2.5 h-3 rounded-t-md border border-slate-200 bg-slate-100" aria-hidden />
+                              <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4] shadow-sm">
+                                <img
+                                  src={menus[0]}
+                                  alt="Menu"
+                                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src =
+                                      "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <p className="mt-2.5 text-sm font-bold text-zinc-800">Menu</p>
+                            <p className="text-xs text-zinc-500">{menus.length} pages</p>
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-slate-400">No menu photos available yet.</p>
+                  )}
+                </section>
+
+                {/* About Venue & Average Cost */}
+                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                  <h3 className="text-xl font-bold text-zinc-800 mb-3">About the Venue</h3>
                   <p className="text-slate-500 text-sm leading-relaxed whitespace-pre-wrap">
                     {profile.description || 'This venue has not provided a description yet. Enjoy a curated dining experience with premium seats, lovely ambiance, and delicious gourmet specialties.'}
                   </p>
 
-                  <h4 className="text-base font-bold text-black mt-6 mb-1">Average Cost</h4>
-                  <p className="text-sm text-slate-500">{costText}</p>
-                  <p className="text-xs text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any.</p>
-
-                  <h4 className="text-base font-bold text-black mt-6 mb-1">Cuisines</h4>
-                  <p className="text-sm text-slate-500">
-                    {cuisines.replace(/·/g, ',').split(',').map((c) => c.trim()).filter(Boolean).join(', ')}
-                  </p>
+                  <h4 className="text-base font-bold text-zinc-800 mt-6 mb-1">Average Cost</h4>
+                  <p className="text-sm text-slate-600 font-medium">{costText}</p>
+                  <p className="text-xs text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any</p>
 
                   {profile.amenities && profile.amenities.length > 0 && (
                     <>
-                      <h4 className="text-base font-bold text-black mt-6 mb-3">Venue Amenities</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+                      <h4 className="text-base font-bold text-zinc-800 mt-6 mb-3">More Info</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
                         {profile.amenities.map((info: string) => (
-                          <div key={info} className="flex items-center gap-2 text-sm text-slate-500">
-                            <span className="text-slate-400 text-[11px] shrink-0">❖</span>
+                          <div key={info} className="flex items-center gap-2 text-sm text-slate-600">
+                            <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                              <Check size={10} strokeWidth={3} />
+                            </span>
                             <span>{info}</span>
                           </div>
                         ))}
@@ -1145,74 +1325,42 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </>
                   )}
                 </section>
-
-                {/* OpenStreetMap Address Block */}
-                <section>
-                  <h3 className="text-xl font-bold text-black mb-3">Direction & Contact</h3>
-                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                    <div className="w-full h-48 sm:h-56 bg-slate-100 relative">
-                      {profile.address ? (
-                        <iframe
-                          title={`Map of ${profile.name}`}
-                          className="absolute inset-0 w-full h-full border-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          src={`https://maps.google.com/maps?q=${encodeURIComponent(profile.address)}&z=15&output=embed`}
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs">
-                          Map unavailable
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="px-4 py-3.5">
-                      <p className="text-base font-bold text-black">{profile.name}</p>
-                      <p className="text-sm text-slate-600 mt-1 leading-relaxed">{profile.address || 'Address hidden'}</p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (profile.address) {
-                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
-                        }
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3.5 border-t border-slate-200 text-left hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      <Navigation size={16} className="text-black shrink-0" />
-                      <span className="text-sm font-bold text-black">Get Directions</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleCopyAddress}
-                      className="w-full flex items-center gap-3 px-4 py-3.5 border-t border-slate-200 text-left hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      <Copy size={16} className="text-black shrink-0" />
-                      <span className="text-sm font-bold text-black">{copied ? "Copied" : "Copy"}</span>
-                    </button>
-                  </div>
-                </section>
               </div>
             )}
 
-            {/* Menu Tab Content */}
+            {/* Menu Tab Content — uniform gallery cards, 3 per row on desktop */}
             {activeTab === "Menu" && (
-              <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <section className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200">
                 <h3 className="text-lg font-bold text-slate-800 mb-5">Menu Card</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {menus.map((menuUrl, idx) => (
-                    <div key={idx} className="rounded-xl overflow-hidden border border-slate-200 group cursor-zoom-in">
-                      <div className="h-[240px] overflow-hidden bg-slate-100">
-                        <img src={menuUrl} alt={`Menu Page ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300" />
-                      </div>
-                      <div className="p-3 border-t border-slate-200 bg-slate-50">
-                        <p className="text-xs font-bold text-slate-700">Menu Page {idx + 1}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {menus.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {menus.map((menuUrl, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => openLightbox(idx, menus)}
+                        className="rounded-xl overflow-hidden border border-slate-200 group cursor-zoom-in text-left bg-white flex flex-col h-full"
+                      >
+                        <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 shrink-0">
+                          <img
+                            src={menuUrl}
+                            alt={`Menu Page ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
+                            }}
+                          />
+                        </div>
+                        <div className="p-3 border-t border-slate-200 bg-[#f4f7fb] mt-auto">
+                          <p className="text-xs font-bold text-slate-700">Menu Page {idx + 1}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">No menu photos available yet.</p>
+                )}
               </section>
             )}
 
@@ -1395,10 +1543,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           {!hideBookingSidebar && (
           <div ref={bookingWidgetRef} className="lg:col-span-1 space-y-6 lg:sticky lg:top-28">
 
+              {/* Book a Table step 1: animation only on the right */}
+              {activeTab === "Book a Table" && drawerStep === 1 ? (
+                <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+                  <GuestTableAnimation count={Number(guests)} />
+                </div>
+              ) : (
+                <>
               {/* Table Reservation Widget */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-md overflow-hidden">
-
-                {/* Lavender / Pale blue/indigo Header */}
                 <div className="bg-indigo-50/60 p-4 border-b border-indigo-100/50">
                   <h3 className="text-sm font-bold text-slate-800 tracking-wide uppercase">Table reservation</h3>
                   {widgetOfferLabel ? (
@@ -1412,10 +1565,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 </div>
 
                 <div className="p-4 space-y-4">
-                  {/* Select Row */}
                   <div className="grid grid-cols-2 gap-2">
-
-                    {/* Date Dropdown */}
                     <div className="relative">
                       <select
                         value={selectedDateIndex}
@@ -1437,7 +1587,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <ChevronRight size={12} className="absolute right-2 top-2.5 text-slate-400 rotate-90 pointer-events-none" />
                     </div>
 
-                    {/* Guest Dropdown */}
                     <div className="relative">
                       <select
                         value={guests}
@@ -1452,10 +1601,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </select>
                       <ChevronRight size={12} className="absolute right-2 top-2.5 text-slate-400 rotate-90 pointer-events-none" />
                     </div>
-
                   </div>
 
-                  {/* Red button: Book a table */}
                   <button
                     type="button"
                     onClick={() => handleQuickBook()}
@@ -1464,57 +1611,43 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     Book a table
                   </button>
                 </div>
-
               </div>
 
-              {/* Quick Contact / Timing Info Box */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Call Venue</p>
-                  <a href={`tel:${profile.phone || '9737315326'}`} className="text-sm font-bold text-slate-700 hover:text-rose-600 transition-colors flex items-center gap-1">
-                    <Phone size={14} className="text-purple-600" />
-                    {profile.phone || '+91 97373 15326'}
-                  </a>
-                </div>
-                <hr className="border-slate-100" />
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Timing Details</p>
-                  <div className="space-y-1.5 text-xs font-semibold">
-                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
-                      const dayName = day.charAt(0).toUpperCase() + day.slice(1, 3);
-                      const rules = profile.operating_hours?.[day];
-                      let timeStr = "";
-
-                      if (rules) {
-                        if (rules.closed) {
-                          timeStr = "Closed";
-                        } else {
-                          const openFormatted = formatSlotLabel(rules.open || "08:00");
-                          const closeFormatted = formatSlotLabel(rules.close || "23:30");
-                          timeStr = `${openFormatted} - ${closeFormatted}`;
-                        }
-                      } else {
-                        // Fallback
-                        if (['friday', 'saturday', 'sunday'].includes(day)) {
-                          timeStr = "8:00 AM - 1:00 AM";
-                        } else {
-                          timeStr = "8:00 AM - 11:30 PM";
-                        }
+              {/* Direction card (replaces Call Venue / Timing) */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+                <h3 className="text-lg font-bold text-zinc-800 mb-2">Direction</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed mb-4">
+                  {profile.address || "Address hidden"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyAddress}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-zinc-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <Copy size={14} className="text-zinc-500" />
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (profile.address) {
+                        window.open(
+                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`,
+                          "_blank",
+                          "noopener,noreferrer"
+                        );
                       }
-
-                      const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-                      const isToday = todayName === day;
-
-                      return (
-                        <p key={day} className={`flex justify-between ${isToday ? 'text-purple-600 font-bold' : 'text-slate-500'}`}>
-                          <span>{dayName}:</span>
-                          <span className={isToday ? 'text-purple-600' : 'text-slate-605'}>{timeStr}</span>
-                        </p>
-                      );
-                    })}
-                  </div>
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                  >
+                    <Navigation size={14} />
+                    Direction
+                  </button>
                 </div>
               </div>
+                </>
+              )}
 
             </div>
           )}
@@ -1623,12 +1756,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* ── 7. Lightbox / Image Slider Modal ── */}
-        {isLightboxOpen && (
+        {isLightboxOpen && lightboxItems.length > 0 && (
           <div className="fixed inset-0 z-50 bg-black/95 flex flex-col justify-between py-6 px-4 select-none animate-fadeIn">
             {/* Header */}
             <div className="flex justify-between items-center max-w-7xl mx-auto w-full text-white">
               <span className="text-sm font-semibold tracking-wider text-slate-300 font-mono">
-                {currentPhotoIdx + 1} / {photos.length}
+                {currentPhotoIdx + 1} of {lightboxItems.length}
               </span>
               <button
                 onClick={closeLightbox}
@@ -1640,50 +1773,60 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex items-center justify-between max-w-7xl mx-auto w-full gap-4 my-4 relative">
+            <div className="flex-1 flex items-center justify-between max-w-7xl mx-auto w-full gap-2 sm:gap-4 my-4 relative">
               {/* Left Button */}
-              <button
-                onClick={prevPhoto}
-                className="p-3 bg-white/5 hover:bg-white/15 active:scale-95 text-white rounded-full transition-all cursor-pointer backdrop-blur-sm shadow-lg border border-white/10"
-                aria-label="Previous image"
-              >
-                <ChevronLeft size={24} />
-              </button>
+              {lightboxItems.length > 1 ? (
+                <button
+                  onClick={prevPhoto}
+                  className="p-2 sm:p-3 bg-white/5 hover:bg-white/15 active:scale-95 text-white rounded-full transition-all cursor-pointer backdrop-blur-sm shadow-lg border border-white/10 shrink-0"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+              ) : (
+                <div className="w-10 sm:w-12 shrink-0" />
+              )}
 
               {/* Current Image Container */}
-              <div className="flex-1 h-full flex items-center justify-center overflow-hidden px-2">
+              <div className="flex-1 h-full flex items-center justify-center overflow-auto px-1 sm:px-2">
                 <img
-                  src={photos[currentPhotoIdx]}
+                  src={lightboxItems[currentPhotoIdx]}
                   alt={`Gallery image ${currentPhotoIdx + 1}`}
-                  className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl transition-all duration-300 select-none pointer-events-none"
+                  className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl transition-all duration-300 select-none bg-white"
                 />
               </div>
 
               {/* Right Button */}
-              <button
-                onClick={nextPhoto}
-                className="p-3 bg-white/5 hover:bg-white/15 active:scale-95 text-white rounded-full transition-all cursor-pointer backdrop-blur-sm shadow-lg border border-white/10"
-                aria-label="Next image"
-              >
-                <ChevronRight size={24} />
-              </button>
+              {lightboxItems.length > 1 ? (
+                <button
+                  onClick={nextPhoto}
+                  className="p-2 sm:p-3 bg-white/5 hover:bg-white/15 active:scale-95 text-white rounded-full transition-all cursor-pointer backdrop-blur-sm shadow-lg border border-white/10 shrink-0"
+                  aria-label="Next image"
+                >
+                  <ChevronRight size={24} />
+                </button>
+              ) : (
+                <div className="w-10 sm:w-12 shrink-0" />
+              )}
             </div>
 
             {/* Thumbnails Row */}
-            <div className="max-w-4xl mx-auto w-full overflow-x-auto py-2 flex justify-center gap-2.5 px-4 scrollbar-hide">
-              {photos.map((url, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentPhotoIdx(idx)}
-                  className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${currentPhotoIdx === idx
-                    ? 'border-rose-500 scale-105 opacity-100 shadow-md'
-                    : 'border-transparent opacity-50 hover:opacity-80'
-                    }`}
-                >
-                  <img src={url} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
+            {lightboxItems.length > 1 && (
+              <div className="max-w-4xl mx-auto w-full overflow-x-auto py-2 flex justify-center gap-2.5 px-4 scrollbar-hide">
+                {lightboxItems.map((url, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentPhotoIdx(idx)}
+                    className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${currentPhotoIdx === idx
+                      ? 'border-rose-500 scale-105 opacity-100 shadow-md'
+                      : 'border-transparent opacity-50 hover:opacity-80'
+                      }`}
+                  >
+                    <img src={url} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
 
           </div>
         )}
@@ -1771,15 +1914,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                 return (
                   <div className="space-y-5 max-w-3xl">
-                    <div>
-                      <h4 className="text-xl font-semibold text-slate-900 tracking-tight">
-                        Select your booking details
-                      </h4>
-                      <div className="mt-2">
-                        <GuestTableAnimation count={Number(guests)} />
-                      </div>
-                    </div>
+                    <h4 className="text-xl font-semibold text-slate-900 tracking-tight">
+                      Select your booking details
+                    </h4>
 
+                    <div className="space-y-5 bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
                     <div ref={bookingFiltersRef} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Date dropdown */}
                       <div className="relative">
@@ -2078,11 +2217,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
                     )}
                   </div>
+                  </div>
                 );
               })()}
 
               {drawerStep === 2 && (
-                <div className="space-y-6 max-w-sm sm:max-w-md">
+                <div className="space-y-6 max-w-sm sm:max-w-md bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
                   {!isRegisterMode ? (
                     // PHONE LOGIN FORM
                     <div>

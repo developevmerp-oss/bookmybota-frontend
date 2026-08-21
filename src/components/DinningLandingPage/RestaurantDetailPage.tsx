@@ -1060,9 +1060,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         <div id="restaurant-tabs" className="sticky top-16 z-40 bg-white -mx-4 px-4 border-b border-slate-200 mt-6">
           <div className="flex gap-6 overflow-x-auto scrollbar-hide">
             {["Overview", "Reviews", "Photos", "Menu", "Book a Table"].map((tab) => (
-              <button
+          <button
                 key={tab}
-                onClick={() => {
+            onClick={() => {
                   setActiveTab(tab);
                   if (tab === "Book a Table") {
                     setDrawerStep(1);
@@ -1555,10 +1555,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <div className="bg-indigo-50/60 p-4 border-b border-indigo-100/50">
                   <h3 className="text-sm font-bold text-slate-800 tracking-wide uppercase">Table reservation</h3>
                   {widgetOfferLabel ? (
-                    <div className="flex items-center gap-1.5 text-xs text-indigo-700 font-bold mt-1">
-                      <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-black shrink-0 shadow-sm">%</span>
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-700 font-bold mt-1">
+                    <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-black shrink-0 shadow-sm">%</span>
                       <span>{widgetOfferLabel}</span>
-                    </div>
+                  </div>
                   ) : (
                     <p className="text-xs text-slate-500 font-medium mt-1">Reserve a table at this venue</p>
                   )}
@@ -1988,12 +1988,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </button>
                         {bookingDropdownOpen === 'guests' && (
                           <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-56 overflow-y-auto rounded-lg bg-white py-1 shadow-lg">
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
                               const selected = Number(guests) === num;
-                              return (
-                                <button
-                                  key={num}
-                                  type="button"
+                          return (
+                            <button
+                              key={num}
+                              type="button"
                                   onClick={() => {
                                     setGuests(num.toString());
                                     setAvailabilityStatus(null);
@@ -2006,12 +2006,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   }`}
                                 >
                                   {num} {num === 1 ? 'guest' : 'guests'}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
+                            </button>
+                          );
+                        })}
                       </div>
+                        )}
+                    </div>
 
                       {/* Meal dropdown */}
                       <div className="relative">
@@ -2033,10 +2033,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-lg bg-white py-1 shadow-lg overflow-hidden">
                             {mealOptions.map((m) => {
                               const selected = selectedMeal?.id === m.id;
-                              return (
-                                <button
+                          return (
+                            <button
                                   key={m.id}
-                                  type="button"
+                              type="button"
                                   onClick={() => {
                                     setActiveMealSection(m.id);
                                     setSelectedTime('');
@@ -2050,9 +2050,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   }`}
                                 >
                                   {m.label}
-                                </button>
-                              );
-                            })}
+                            </button>
+                          );
+                        })}
                           </div>
                         )}
                       </div>
@@ -2074,13 +2074,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
                           {visibleSlots.map((slot) => {
-                            const isSelected = selectedTime === slot;
+                                    const isSelected = selectedTime === slot;
                             const promoText = offerChipLabel;
-                            return (
-                              <button
-                                key={slot}
-                                type="button"
-                                onClick={() => handleTimeSelect(slot)}
+                                    return (
+                                      <button
+                                        key={slot}
+                                        type="button"
+                                        onClick={() => handleTimeSelect(slot)}
                                 className={`h-[48px] px-2 rounded-md border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
                                   isSelected
                                     ? 'border-[#6900AA] bg-[#f7e9ff] text-slate-900'
@@ -2095,18 +2095,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     {promoText}
                                   </span>
                                 ) : null}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
 
                     {/* Choose an offer — shown when venue has dining offers */}
                     {diningOffers.length > 0 && (
                       <div className="space-y-3 pt-2">
-                        <button
-                          type="button"
+                              <button
+                                type="button"
                           onClick={() => setOffersSectionOpen((v) => !v)}
                           className="w-full flex items-center gap-3 cursor-pointer"
                         >
@@ -2118,7 +2118,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             size={16}
                             className={`text-slate-400 shrink-0 transition-transform ${offersSectionOpen ? "rotate-180" : ""}`}
                           />
-                        </button>
+                              </button>
 
                         {offersSectionOpen && (
                           <div className="flex flex-wrap gap-3 pt-3 pl-2">
@@ -2134,10 +2134,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 "#D97706",
                               ];
                               const badgeBg = badgeColors[idx % badgeColors.length];
-                              return (
-                                <button
+                                    return (
+                                      <button
                                   key={`${offer.title}-${idx}`}
-                                  type="button"
+                                        type="button"
                                   onClick={() => {
                                     setSelectedOffer(offer);
                                     setNoOfferSelected(false);
@@ -2174,12 +2174,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                       {offer.validity}
                                     </p>
                                   ) : null}
-                                </button>
-                              );
-                            })}
+                                      </button>
+                                    );
+                                  })}
 
-                            <button
-                              type="button"
+                              <button
+                                type="button"
                               onClick={() => {
                                 setSelectedOffer(null);
                                 setNoOfferSelected(true);
@@ -2211,11 +2211,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
                                 Book without applying a dining offer
                               </p>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                                      </button>
+                                </div>
+                              )}
+                            </div>
+                      )}
                   </div>
                   </div>
                 );
@@ -2392,7 +2392,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   {availabilityStatus === 'loading' && (
                     <div className="flex items-center gap-2.5 bg-amber-50 text-amber-700 px-4 py-3 rounded-xl text-sm font-semibold border border-amber-100">
                       <Loader2 size={16} className="animate-spin shrink-0" /> Checking seat availability…
-                    </div>
+                  </div>
                   )}
                   {availabilityStatus === 'unavailable' && (
                     <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center space-y-3">
@@ -2435,14 +2435,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 {selectedDateIndex === 0 ? 'Today' : selectedDateIndex === 1 ? 'Tomorrow' : bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short' })}{' '}
                                 {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}{' '}
                                 at {formatSlotLabel(selectedTime)}
-                              </p>
-                            </div>
+                        </p>
+                      </div>
                             <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
                               <Users size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
                               <p className="text-sm font-semibold text-zinc-900">
                                 {guests} {Number(guests) === 1 ? 'guest' : 'guests'}
                               </p>
-                            </div>
+                      </div>
                             <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
                               <MapPin size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
                               <div className="min-w-0">
@@ -2452,8 +2452,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     {city || profile.address}
                                   </p>
                                 )}
-                              </div>
-                            </div>
+                      </div>
+                      </div>
                             {appliedOffer && (
                               <div className="flex items-start gap-3 py-3.5">
                                 <Tag size={18} className="text-[#2563eb] shrink-0 mt-0.5" strokeWidth={1.75} />
@@ -2465,20 +2465,20 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   {appliedOffer.validity && (
                                     <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{appliedOffer.validity}</p>
                                   )}
-                                </div>
-                              </div>
+                    </div>
+                  </div>
                             )}
                             {!appliedOffer && noOfferSelected && (
                               <div className="flex items-start gap-3 py-3.5">
                                 <Tag size={18} className="text-zinc-400 shrink-0 mt-0.5" strokeWidth={1.75} />
                                 <p className="text-sm font-semibold text-zinc-600">No offer selected</p>
-                              </div>
-                            )}
+                    </div>
+                  )}
                           </div>
                           <div className="mt-3">
                             {!specialRequestOpen ? (
-                              <button
-                                type="button"
+                      <button
+                        type="button"
                                 onClick={() => setSpecialRequestOpen(true)}
                                 className="text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer"
                               >
@@ -2499,7 +2499,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     className="text-xs font-semibold text-zinc-400 hover:text-zinc-600 cursor-pointer"
                                   >
                                     Remove
-                                  </button>
+                      </button>
                                 </div>
                                 <textarea
                                   id="special-request"
@@ -2510,13 +2510,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   placeholder="e.g. Window seat, birthday celebration, high chair…"
                                   className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 resize-y min-h-[84px]"
                                 />
-                              </div>
-                            )}
+                    </div>
+                  )}
                           </div>
                           <p className="text-[11px] text-zinc-400 mt-3 leading-relaxed">
                             The restaurant will try to allot the seats for the selected preference but availability of preferred seating is subject to restaurant discretion and no refunds/cancellations are possible.
                           </p>
-                        </div>
+                      </div>
 
                         {/* Right — editable guest form */}
                         <div>
@@ -2529,9 +2529,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   name="name"
                                   control={control}
                                   render={({ field }) => (
-                                    <input
+                          <input
                                       {...field}
-                                      type="text"
+                            type="text"
                                       autoComplete="name"
                                       aria-label="Full Name"
                                       aria-invalid={!!confirmErrors.name}
@@ -2549,20 +2549,20 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               {confirmErrors.name && (
                                 <p className="text-red-500 text-[11px] font-semibold mt-1.5 px-0.5">{confirmErrors.name.message}</p>
                               )}
-                            </div>
+                        </div>
 
-                            <div>
+                        <div>
                               <label className={`rounded-lg border bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5 cursor-text focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all ${confirmErrors.phone ? 'border-red-400' : 'border-zinc-200'}`}>
                                 <Phone size={16} className="text-primary shrink-0" />
                                 <Controller
                                   name="phone"
                                   control={control}
                                   render={({ field }) => (
-                                    <input
+                          <input
                                       {...field}
-                                      type="tel"
-                                      inputMode="numeric"
-                                      maxLength={12}
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={12}
                                       autoComplete="tel"
                                       aria-label="Phone Number"
                                       aria-invalid={!!confirmErrors.phone}
@@ -2580,7 +2580,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               {confirmErrors.phone && (
                                 <p className="text-red-500 text-[11px] font-semibold mt-1.5 px-0.5">{confirmErrors.phone.message}</p>
                               )}
-                            </div>
+                        </div>
 
                             <div ref={arrivalFieldRef} className="relative">
                               <div className={`rounded-lg border bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5 ${confirmErrors.arrivalTime ? 'border-red-400' : 'border-zinc-200'}`}>
@@ -2600,7 +2600,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     className={`shrink-0 text-zinc-500 transition-transform duration-200 ${arrivalDropdownOpen ? 'rotate-180' : ''}`}
                                   />
                                 </button>
-                              </div>
+                        </div>
 
                               {arrivalDropdownOpen && (
                                 <ul
@@ -2649,12 +2649,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </div>
                       </div>
 
-                      <button
-                        type="submit"
+                        <button
+                          type="submit"
                         className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-primary hover:bg-[#57008E] text-white text-sm font-bold transition-colors cursor-pointer shadow-sm"
-                      >
-                        Confirm Booking
-                      </button>
+                        >
+                          Confirm Booking
+                        </button>
                     </form>
                   )}
                 </div>
@@ -2670,7 +2670,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                           <Check size={12} strokeWidth={3} />
                         </span>
-                      </div>
+                    </div>
                       <p className="text-sm text-zinc-500 font-medium leading-relaxed mb-4">
                         <strong className="text-zinc-800">{profile.name}</strong> has confirmed your booking. Have a great meal!
                       </p>
@@ -2678,7 +2678,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       {appliedOffer?.title && (
                         <div className="rounded-lg bg-[#eef5ff] text-[#2563eb] text-xs font-semibold px-3 py-2.5 mb-4">
                           Show this QR at the restaurant to avail {appliedOffer.title}.
-                        </div>
+                      </div>
                       )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4 py-4 border-y border-dashed border-zinc-200">
@@ -2689,19 +2689,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}{' '}
                             at {formatSlotLabel(selectedTime)}
                           </p>
-                        </div>
+                      </div>
                         <div className="flex items-start gap-2.5 min-w-0">
                           <Users size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
                           <p className="text-sm font-semibold text-zinc-900">
                             {guests} {Number(guests) === 1 ? 'guest' : 'guests'}
                           </p>
-                        </div>
+                      </div>
                         <div className="flex items-start gap-2.5 min-w-0">
                           <MapPin size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
                           <p className="text-sm font-semibold text-zinc-900 leading-snug">
                             {profile.name}{city ? `, ${city}` : ''}
                           </p>
-                        </div>
+                      </div>
                         {appliedOffer?.title ? (
                           <div className="flex items-start gap-2.5 min-w-0">
                             <Tag size={18} className="text-[#2563eb] shrink-0 mt-0.5" strokeWidth={1.75} />
@@ -2721,7 +2721,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             </div>
                           </div>
                         )}
-                      </div>
+                    </div>
 
                       {lastBookingId && (
                         <div className="mt-4 flex items-start gap-2">
@@ -2749,9 +2749,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </div>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => {
+                        <button
+                          type="button"
+                          onClick={() => {
                           closeBookingPanel();
                           handleResetBooking();
                         }}
@@ -2805,9 +2805,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             </a>
                           </div>
                           <div className="mt-4 pt-3 border-t border-dashed border-zinc-200 grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
+                      <button
+                        type="button"
+                        onClick={() => {
                                 if (profile.address) {
                                   window.open(
                                     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`,
@@ -2841,9 +2841,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             >
                               <Copy size={14} />
                               Copy number
-                            </button>
-                          </div>
-                        </div>
+                      </button>
+                    </div>
+                  </div>
                       </div>
 
                       <div className="rounded-xl border border-zinc-200 bg-white p-4 flex flex-col items-center text-center">
@@ -2895,58 +2895,58 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {drawerStep === 1 && (
               <div className="mt-8 max-w-3xl">
                 <label className="flex items-start gap-2.5 cursor-pointer select-none mb-4">
-                  <div className="relative mt-0.5 shrink-0">
-                    <input
-                      type="checkbox"
-                      id="termsAcceptFooter"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      className="sr-only"
-                    />
-                    <div
+                    <div className="relative mt-0.5 shrink-0">
+                      <input
+                        type="checkbox"
+                        id="termsAcceptFooter"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div
                       className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${acceptedTerms ? 'bg-[#6900AA] border-[#6900AA]' : 'bg-white border-slate-300 hover:border-slate-400'
-                        }`}
-                    >
-                      {acceptedTerms && (
+                          }`}
+                      >
+                        {acceptedTerms && (
                         <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
                     </div>
-                  </div>
                   <span className="text-[12px] text-slate-500 font-medium leading-relaxed">
-                    I agree to the{' '}
+                      I agree to the{' '}
                     <a href="#" className="text-[#6900AA] font-semibold hover:underline" onClick={e => e.preventDefault()}>Terms &amp; Conditions</a>
-                    {' '}and{' '}
+                      {' '}and{' '}
                     <a href="#" className="text-[#6900AA] font-semibold hover:underline" onClick={e => e.preventDefault()}>Cancellation Policy</a>
-                  </span>
-                </label>
+                    </span>
+                  </label>
 
-                <button
-                  type="button"
-                  disabled={!selectedTime || !acceptedTerms}
-                  onClick={() => {
-                    if (!authUser) {
-                      setDrawerStep(2);
-                      setLoginStep(1);
-                      setLoginError(null);
-                    } else {
-                      setDrawerStep(3);
-                      setName(authUser.name || '');
-                      setPhone(authUser.phone || '');
-                    }
-                  }}
+                  <button
+                    type="button"
+                    disabled={!selectedTime || !acceptedTerms}
+                    onClick={() => {
+                      if (!authUser) {
+                        setDrawerStep(2);
+                        setLoginStep(1);
+                        setLoginError(null);
+                      } else {
+                        setDrawerStep(3);
+                        setName(authUser.name || '');
+                        setPhone(authUser.phone || '');
+                      }
+                    }}
                   className={`w-full py-3.5 rounded-md text-[15px] font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
                     ? 'bg-[#6900AA] hover:bg-[#57008E] text-white cursor-pointer'
                     : 'bg-[#cfcfcf] text-white cursor-not-allowed'
                     }`}
                 >
                   Proceed to book
-                </button>
+                  </button>
               </div>
             )}
           </div>
         , bookTableSlot)}
-    </div>
-  );
+      </div>
+      );
 }

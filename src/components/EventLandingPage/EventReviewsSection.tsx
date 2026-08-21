@@ -19,6 +19,7 @@ import {
   eventReviewFormSchema,
   type EventReviewFormValues,
 } from "@/lib/eventReviewFormSchema";
+import { EventReviewsShimmer } from "@/components/Shared/Shimmer";
 
 const BRAND = "#6900AA";
 
@@ -386,10 +387,7 @@ export default function EventReviewsSection({ eventId, eventRating, reviewsCount
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-[1rem] sm:text-[1.0625rem] text-slate-500">
-          <Loader2 size={16} className="animate-spin" />
-          Loading reviews…
-        </div>
+        <EventReviewsShimmer />
       ) : isError ? (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-6 text-[1rem] sm:text-[1.0625rem] text-red-700">
           Could not load reviews. Please refresh the page.

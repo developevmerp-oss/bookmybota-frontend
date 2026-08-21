@@ -27,6 +27,7 @@ import {
   useGetPublicEventQuery,
   useGetPublicEventsQuery,
   useGetEventInterestQuery,
+  useGetEventInterestCountQuery,
   useToggleEventInterestMutation,
   type PublicEvent,
 } from "@/services/api";
@@ -38,8 +39,10 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import { toast } from "sonner";
+import { EventDetailShimmer } from "@/components/Shared/Shimmer";
 import EventMediaSlider from "@/components/EventLandingPage/EventMediaSlider";
 import EventGallerySection from "@/components/EventLandingPage/EventGallerySection";
+import EventVenuesModal from "@/components/EventLandingPage/EventVenuesModal";
 import EventReviewsSection from "@/components/EventLandingPage/EventReviewsSection";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import Footer from "@/components/LandingPage/Footer";
@@ -83,6 +86,18 @@ function formatDurationLong(minutes?: number | null) {
   const hourPart = h ? `${h} hour${h === 1 ? "" : "s"}` : "";
   const minPart = m ? `${m} minute${m === 1 ? "" : "s"}` : "";
   return [hourPart, minPart].filter(Boolean).join(" ");
+}
+
+function formatInterestCount(count: number) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) {
+    const k = n / 1000;
+    const rounded = k >= 10 ? Math.round(k).toString() : k.toFixed(1).replace(/\.0$/, "");
+    return `${rounded}k`;
+  }
+  const m = n / 1_000_000;
+  return `${m.toFixed(1).replace(/\.0$/, "")}m`;
 }
 
 function formatLongDate(value?: string) {
@@ -170,11 +185,14 @@ export default function PublicEventDetailPage({
     { eventId: id, customerId },
     { skip: !isCustomerLoggedIn || !customerId }
   );
+  const { data: interestCountData, refetch: refetchInterestCount } =
+    useGetEventInterestCountQuery(id);
   const [toggleEventInterest, { isLoading: isTogglingInterest }] = useToggleEventInterestMutation();
   const [optimisticInterest, setOptimisticInterest] = useState<{
     eventId: string;
     customerId: string;
     interested: boolean;
+    interest_count?: number;
   } | null>(null);
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -201,6 +219,21 @@ export default function PublicEventDetailPage({
       : optimisticInterest?.eventId === id && optimisticInterest.customerId === customerId
         ? optimisticInterest.interested
         : Boolean(interestData?.interested);
+
+  const interestCount = useMemo(() => {
+    if (
+      optimisticInterest?.eventId === id &&
+      typeof optimisticInterest.interest_count === "number"
+    ) {
+      return optimisticInterest.interest_count;
+    }
+    if (typeof interestData?.interest_count === "number") {
+      return interestData.interest_count;
+    }
+    return Number(interestCountData?.interest_count) || 0;
+  }, [optimisticInterest, id, interestData?.interest_count, interestCountData?.interest_count]);
+
+  const interestCountLabel = formatInterestCount(interestCount);
 
   const genres = useMemo(() => parseGenres(event?.genres), [event?.genres]);
   const languages = useMemo(() => parseEventLanguages(event?.language), [event?.language]);
@@ -273,16 +306,26 @@ export default function PublicEventDetailPage({
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
-  const applyInterestToggle = async () => {
+  const applyInterestToggle = async (forceInterested?: boolean) => {
     if (!customerId) {
       pendingInterestAfterAuthRef.current = true;
       setAuthModalOpen(true);
       return;
     }
     try {
-      const result = await toggleEventInterest({ eventId: id, customerId }).unwrap();
-      setOptimisticInterest({ eventId: id, customerId, interested: result.interested });
+      const result = await toggleEventInterest({
+        eventId: id,
+        customerId,
+        ...(typeof forceInterested === "boolean" ? { interested: forceInterested } : {}),
+      }).unwrap();
+      setOptimisticInterest({
+        eventId: id,
+        customerId,
+        interested: result.interested,
+        interest_count: result.interest_count,
+      });
       void refetchInterest();
+      void refetchInterestCount();
       toast.success(result.interested ? "Marked as interested" : "Interest removed");
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Could not update interest. Please try again."));
@@ -297,6 +340,11 @@ export default function PublicEventDetailPage({
       return;
     }
     void applyInterestToggle();
+  };
+
+  const undoInterest = () => {
+    if (isTogglingInterest) return;
+    void applyInterestToggle(false);
   };
 
   const onAuthSuccess = () => {
@@ -324,6 +372,7 @@ export default function PublicEventDetailPage({
           eventId: id,
           customerId: nextCustomerId,
           interested: result.interested,
+          interest_count: result.interest_count,
         });
         dispatch(api.util.invalidateTags(["EventInterests"]));
         toast.success(result.interested ? "Marked as interested" : "Interest updated");
@@ -347,7 +396,7 @@ export default function PublicEventDetailPage({
   };
 
   if (isLoading) {
-    return <div className="text-center py-20 text-slate-500">Loading event...</div>;
+    return <EventDetailShimmer />;
   }
 
   if (isError) {
@@ -451,24 +500,12 @@ export default function PublicEventDetailPage({
             {otherVenues.length > 0 && (
               <button
                 type="button"
-                onClick={() => setVenuesOpen((v) => !v)}
+                onClick={() => setVenuesOpen(true)}
                 className="block mt-1.5 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer"
                 style={{ color: BRAND }}
               >
-                {venuesOpen
-                  ? "Hide other venues"
-                  : `View ${otherVenues.length} Other Venue${otherVenues.length === 1 ? "" : "s"}`}
+                View {otherVenues.length} Other Venue{otherVenues.length === 1 ? "" : "s"}
               </button>
-            )}
-            {venuesOpen && otherVenues.length > 0 && (
-              <ul className="mt-2 space-y-1.5 text-[1rem] sm:text-[1.0625rem] font-normal text-[#555]">
-                {otherVenues.map((v) => (
-                  <li key={`${v.name}-${v.address || ""}`} className="break-words">
-                    {v.name}
-                    {v.address ? `: ${v.address}` : ""}
-                  </li>
-                ))}
-              </ul>
             )}
           </MetaRow>
         )}
@@ -485,27 +522,36 @@ export default function PublicEventDetailPage({
       </div>
 
       {fillingFast && (
-        <div className="mx-3 sm:mx-4 mb-3 flex items-start sm:items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-[1rem] sm:text-[1.0625rem] text-[#6B4E16]">
+        <div className="mx-3 sm:mx-4 mb-3 flex items-start sm:items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-[0.875rem] sm:text-[0.9375rem] text-[#6B4E16]">
           <Info size={14} className="shrink-0 mt-0.5 sm:mt-0" />
-          <span>Bookings are filling fast{nextShowtime?.venue_name ? ` for ${nextShowtime.venue_name}` : ""}</span>
+          <span>
+            Bookings are filling fast
+            {nextShowtime?.venue_name ? ` for ${nextShowtime.venue_name}` : ""}
+          </span>
         </div>
       )}
 
-      <div className="border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-2.5 sm:gap-3">
+      <div className="border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 sm:gap-4">
         <div className="min-w-0 flex-1">
           {minPrice != null && Number.isFinite(minPrice) && (
-            <p className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-extrabold text-[#1A1A1A] leading-none">
+            <p className="text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] font-extrabold text-[#1A1A1A] leading-tight">
               {formatMoney(minPrice, { compact: true })} onwards
             </p>
           )}
-          {fillingFast && <p className="mt-1.5 text-[0.875rem] sm:text-[1rem] font-semibold text-[#E85D04]">Filling Fast</p>}
-          {soldOut && <p className="mt-1.5 text-[0.875rem] sm:text-[1rem] font-semibold text-red-600">Sold out</p>}
+          {fillingFast && (
+            <p className="mt-1 text-[0.8125rem] sm:text-[0.875rem] font-semibold text-[#C47A2C]">
+              Filling Fast
+            </p>
+          )}
+          {soldOut && !fillingFast && (
+            <p className="mt-1 text-[0.8125rem] sm:text-[0.875rem] font-semibold text-red-600">Sold out</p>
+          )}
         </div>
         <button
           type="button"
           disabled={!canBook}
           onClick={() => openCheckout()}
-          className={`shrink-0 min-w-[120px] sm:min-w-[140px] px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg font-bold text-[1.125rem] sm:text-[1.25rem] ${
+          className={`shrink-0 min-w-[7.5rem] sm:min-w-[8.75rem] px-4 sm:px-5 py-2.5 sm:py-3 rounded-[0.5rem] font-bold text-[0.9375rem] sm:text-[1rem] ${
             canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
           }`}
           style={canBook ? { backgroundColor: BRAND } : undefined}
@@ -539,7 +585,6 @@ export default function PublicEventDetailPage({
               eventName={event.name}
               posterHorizontal={event.poster_horizontal_url}
               posterVertical={event.poster_vertical_url}
-              gallery={event.gallery_images}
               youtubeUrl={event.youtube_url}
             />
 
@@ -554,26 +599,54 @@ export default function PublicEventDetailPage({
                   </span>
                 ))}
               </div>
-              <div className="flex items-center gap-2.5 sm:gap-3 sm:ml-auto shrink-0">
-                {saved && (
-                  <span className="inline-flex items-center gap-1.5 text-[1rem] sm:text-[1.0625rem] font-medium text-[#1A1A1A]">
-                    <ThumbsUp size={17} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
-                    You&apos;re Interested
-                  </span>
+              <div className="flex items-center gap-3 sm:gap-4 sm:ml-auto shrink-0 min-w-0">
+                {saved ? (
+                  <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+                    <span className="inline-flex items-center gap-2 text-[1rem] sm:text-[1.0625rem] font-medium text-[#333333] min-w-0">
+                      <ThumbsUp size={18} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
+                      <span className="truncate">
+                        {interestCount <= 1
+                          ? "You are interested"
+                          : `You & ${interestCountLabel} are interested`}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={undoInterest}
+                      disabled={isTogglingInterest}
+                      className="shrink-0 rounded-lg border px-3.5 sm:px-4 py-1.5 sm:py-2 text-[0.9375rem] sm:text-[1rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#F6EBFF] transition-colors"
+                      style={{
+                        color: BRAND,
+                        borderColor: BRAND,
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      Undo
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                    {interestCount > 0 && (
+                      <span className="inline-flex items-center gap-1.5 text-[0.9375rem] sm:text-[1rem] font-medium text-[#5A5A5A]">
+                        <ThumbsUp size={15} className="text-[#2E7D32] shrink-0" fill="#2E7D32" />
+                        {interestCountLabel} interested
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={toggleSave}
+                      disabled={isTogglingInterest}
+                      className="rounded-lg border px-3.5 sm:px-4 py-2 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer disabled:opacity-60"
+                      style={{
+                        color: BRAND,
+                        borderColor: BRAND,
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      I&apos;m Interested
+                    </button>
+                  </div>
                 )}
-                <button
-                  type="button"
-                  onClick={toggleSave}
-                  disabled={isTogglingInterest}
-                  className="rounded-lg border px-3.5 sm:px-4 py-2 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer disabled:opacity-60"
-                  style={{
-                    color: BRAND,
-                    borderColor: BRAND,
-                    backgroundColor: saved ? "#F6EBFF" : "transparent",
-                  }}
-                >
-                  {saved ? "Interested" : "I'm Interested"}
-                </button>
               </div>
             </div>
 
@@ -662,7 +735,7 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
-            <EventGallerySection eventId={id} images={event.gallery_images || []} />
+            <EventGallerySection eventName={event.name} images={event.gallery_images || []} />
 
             {termLines.length > 0 && (
               <button
@@ -744,20 +817,22 @@ export default function PublicEventDetailPage({
         </div>
       </div>
 
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-2.5 sm:gap-3">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3">
         <div className="min-w-0 flex-1">
           {minPrice != null && Number.isFinite(minPrice) && (
-            <p className="text-[1.125rem] sm:text-[1.25rem] font-extrabold text-[#1A1A1A] truncate">
+            <p className="text-[1rem] sm:text-[1.0625rem] font-extrabold text-[#1A1A1A] leading-tight truncate">
               {formatMoney(minPrice, { compact: true })} onwards
             </p>
           )}
-          {fillingFast && <p className="text-[0.875rem] sm:text-[1rem] font-semibold text-[#E85D04]">Filling Fast</p>}
+          {fillingFast && (
+            <p className="mt-0.5 text-[0.8125rem] sm:text-[0.875rem] font-semibold text-[#C47A2C]">Filling Fast</p>
+          )}
         </div>
         <button
           type="button"
           disabled={!canBook}
           onClick={() => openCheckout()}
-          className={`shrink-0 px-5 sm:px-6 py-2.5 rounded-lg font-bold text-[1.125rem] sm:text-[1.25rem] ${
+          className={`shrink-0 min-w-[7.5rem] px-5 sm:px-6 py-2.5 rounded-[0.5rem] font-bold text-[0.9375rem] sm:text-[1rem] ${
             canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
           }`}
           style={canBook ? { backgroundColor: BRAND } : undefined}
@@ -906,6 +981,12 @@ export default function PublicEventDetailPage({
           pendingInterestAfterAuthRef.current = false;
         }}
         onSuccess={onAuthSuccess}
+      />
+
+      <EventVenuesModal
+        open={venuesOpen && otherVenues.length > 0}
+        onClose={() => setVenuesOpen(false)}
+        showtimes={showtimes}
       />
 
       <Footer />

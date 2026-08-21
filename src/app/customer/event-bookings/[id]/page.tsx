@@ -25,6 +25,7 @@ import { formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatMoney } from "@/lib/currencyFormat";
+import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
 
 function shortBookingCode(id: string) {
   const compact = id.replace(/-/g, "").toUpperCase();
@@ -217,9 +218,7 @@ export default function EventBookingDetailPage({
   };
 
   if (!user || isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f4f5f7] pt-24 text-center text-slate-500">Loading booking...</div>
-    );
+    return <EventConfirmationShimmer />;
   }
 
   if (error || !booking) {

@@ -22,6 +22,7 @@ import { formatMoney } from "@/lib/currencyFormat";
 import images from "@/Images";
 import Footer from "@/components/LandingPage/Footer";
 import EventHeroSlider from "@/components/EventLandingPage/EventHeroSlider";
+import { EventListShimmer } from "@/components/Shared/Shimmer";
 
 function imageSrc(img: string | { src: string }) {
   return typeof img === "string" ? img : img.src;
@@ -724,7 +725,7 @@ export default function PublicEventsPage() {
             </div>
 
             {isLoading ? (
-              <p className="text-sm text-slate-500 py-16 text-center">Loading events...</p>
+              <EventListShimmer />
             ) : paged.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
                 <FaMapMarkerAlt className="mx-auto text-slate-300 mb-3" size={28} />

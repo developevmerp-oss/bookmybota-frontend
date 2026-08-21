@@ -99,7 +99,8 @@ export default function RootLayout({
     pathname === "/admin/login" ||
     pathname === "/business/login" ||
     pathname === "/organizer/login";
-  const showPublicHeader = !isAdminOrBusiness;
+  const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
+  const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow;
   const showLayoutFooter =
     showPublicHeader && !isLandingPage && !isAuthPage && !isEventsPublicPage;
 

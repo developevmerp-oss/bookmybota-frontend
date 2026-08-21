@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useGetPublicEventQuery } from "@/services/api";
 import EventCheckout from "@/components/EventLandingPage/EventCheckout";
+import { EventBookingShimmer } from "@/components/Shared/Shimmer";
 
 export default function EventBookingPage({
   params,
@@ -26,9 +27,7 @@ export default function EventBookingPage({
   }, [event]);
 
   if (isLoading) {
-    return (
-      <div className="text-center py-20 text-[1rem] text-slate-500">Loading booking…</div>
-    );
+    return <EventBookingShimmer />;
   }
 
   if (isError || !event) {

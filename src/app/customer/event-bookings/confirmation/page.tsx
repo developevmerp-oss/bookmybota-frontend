@@ -7,14 +7,10 @@ import {
   Calendar,
   Check,
   ChevronRight,
-  Clock,
   Copy,
   Download,
   Home,
-  Loader2,
-  Mail,
   MapPin,
-  Send,
   Share2,
   Sparkles,
   Ticket,
@@ -26,6 +22,7 @@ import { useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
+import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
 
 function formatLongDate(value?: string) {
   if (!value) return "";
@@ -291,12 +288,7 @@ function ConfirmationContent() {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f4f5f7] pt-24 flex flex-col items-center gap-3 text-slate-500">
-        <Loader2 className="animate-spin text-[#6900AA]" size={32} />
-        Loading confirmation...
-      </div>
-    );
+    return <EventConfirmationShimmer />;
   }
 
   if (error || !booking) {
@@ -313,201 +305,160 @@ function ConfirmationContent() {
   const qrData = booking.qr_code || booking.qr_payload || booking.id;
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7]">
-      <section className="relative overflow-hidden bg-[#6900AA] text-white">
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,#9D00FF_0,transparent_40%),radial-gradient(circle_at_80%_0%,#ffffff_0,transparent_35%)]" />
-        <div className="absolute top-6 left-[12%] w-2 h-2 rounded-full bg-[#9D00FF]" />
-        <div className="absolute top-16 right-[18%] w-1.5 h-1.5 rounded-full bg-[#8C00E3]/80" />
-        <div className="absolute bottom-8 left-[40%] w-2 h-2 rounded-full bg-white/40" />
-        <div className="relative max-w-6xl mx-auto px-4 py-5 text-center">
-          <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center mx-auto mb-4">
-            <Check size={32} className="text-[#6900AA]" strokeWidth={3} />
+    <div className="min-h-screen bg-[#F5F5F5]">
+      <section className="bg-white border-b border-slate-200">
+        <div className="max-w-[72rem] mx-auto px-3 sm:px-6 py-5 sm:py-6">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <span className="mt-0.5 h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center shrink-0">
+              <Check size={22} strokeWidth={3} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-[1.375rem] sm:text-[1.625rem] lg:text-[1.875rem] font-extrabold text-slate-900 leading-tight">
+                Booking confirmed
+              </h1>
+              <p className="mt-1 text-[0.875rem] sm:text-[0.9375rem] text-slate-600 leading-relaxed">
+                Your tickets for <span className="font-semibold text-slate-800">{booking.event_name}</span> are
+                ready. We&apos;ve also emailed the confirmation
+                {booking.guest_email ? ` to ${booking.guest_email}` : ""}.
+              </p>
+            </div>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold">You&apos;re all set!</h1>
-          <p className="mt-3 text-white/90 max-w-xl mx-auto">
-            Your tickets for <span className="font-semibold">{booking.event_name}</span> have been
-            confirmed. We can&apos;t wait to see you there!
-          </p>
         </div>
       </section>
 
-      <div className="max-w-6xl mx-auto px-4 my-5  relative z-10">
-        <div className="grid lg:grid-cols-[1fr_340px] gap-5">
+      <div className="max-w-[72rem] mx-auto px-3 sm:px-6 py-5 sm:py-7">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-4 sm:gap-5">
           <div
             ref={ticketRef}
-            className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 sm:p-6"
+            className="bg-white rounded-[0.75rem] border border-slate-200 shadow-sm overflow-hidden"
           >
-            <div className="flex gap-4">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex gap-3.5 sm:gap-4">
               {poster ? (
                 <img
                   src={poster}
                   alt={booking.event_name || "Event"}
-                  className="w-24 sm:w-28 aspect-[3/4] object-cover rounded-xl shrink-0"
+                  className="w-[4.5rem] sm:w-[5.5rem] aspect-[3/4] object-cover rounded-[0.5rem] shrink-0 bg-slate-100"
                 />
               ) : (
-                <div className="w-24 sm:w-28 aspect-[3/4] rounded-xl bg-slate-200 shrink-0" />
+                <div className="w-[4.5rem] sm:w-[5.5rem] aspect-[3/4] rounded-[0.5rem] bg-slate-200 shrink-0" />
               )}
               <div className="min-w-0 flex-1">
-                <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#6900AA]">
-                  <Ticket size={12} /> Event
-                </p>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">
+                <p className="text-[0.6875rem] font-bold uppercase tracking-wide text-[#6900AA]">M-Ticket</p>
+                <h2 className="mt-1 text-[1.0625rem] sm:text-[1.25rem] font-extrabold text-slate-900 leading-snug">
                   {booking.event_name}
                 </h2>
                 {venue && (
-                  <p className="text-sm text-slate-500 mt-1 flex items-start gap-1.5">
+                  <p className="mt-1.5 text-[0.8125rem] sm:text-[0.875rem] text-slate-500 flex items-start gap-1.5">
                     <MapPin size={13} className="mt-0.5 shrink-0" />
-                    {venue}
+                    <span>{venue}</span>
                   </p>
                 )}
-                <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#6900AA] text-white text-xs font-semibold px-2.5 py-1">
+                <span className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-[#E8F5E9] text-[#2E7D32] text-[0.75rem] font-semibold px-2.5 py-1">
                   <Check size={12} strokeWidth={3} /> Confirmed
                 </span>
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="flex items-start gap-2.5">
-                <Calendar size={16} className="text-[#6900AA] mt-0.5" />
-                <div>
-                  <p className="text-[11px] text-slate-400 font-medium">Date</p>
-                  <p className="text-sm font-semibold text-slate-900">{formatLongDate(booking.starts_at)}</p>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-0 p-4 sm:p-5 border-b border-slate-100">
+              <div className="sm:pr-4 sm:border-r border-slate-100">
+                <p className="text-[0.6875rem] text-slate-400 font-medium uppercase tracking-wide">Date</p>
+                <p className="mt-1 text-[0.875rem] font-semibold text-slate-900">{formatLongDate(booking.starts_at)}</p>
               </div>
-              <div className="flex items-start gap-2.5">
-                <Clock size={16} className="text-[#6900AA] mt-0.5" />
-                <div>
-                  <p className="text-[11px] text-slate-400 font-medium">Time</p>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {formatTime12h(booking.starts_at)} Onwards
-                  </p>
-                </div>
+              <div className="sm:px-4 sm:border-r border-slate-100">
+                <p className="text-[0.6875rem] text-slate-400 font-medium uppercase tracking-wide">Time</p>
+                <p className="mt-1 text-[0.875rem] font-semibold text-slate-900">
+                  {formatTime12h(booking.starts_at)} Onwards
+                </p>
               </div>
-              <div className="flex items-start gap-2.5">
-                <Ticket size={16} className="text-[#6900AA] mt-0.5" />
-                <div>
-                  <p className="text-[11px] text-slate-400 font-medium">Tickets</p>
-                  <p className="text-sm font-semibold text-slate-900">{ticketLabel}</p>
-                </div>
+              <div className="sm:pl-4">
+                <p className="text-[0.6875rem] text-slate-400 font-medium uppercase tracking-wide">Tickets</p>
+                <p className="mt-1 text-[0.875rem] font-semibold text-slate-900">{ticketLabel}</p>
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
+            <div className="p-4 sm:p-5 border-b border-slate-100 space-y-2">
+              <p className="text-[0.8125rem] font-bold text-slate-900 mb-2">Order summary</p>
               {booking.items?.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm text-slate-600">
+                <div key={item.id} className="flex justify-between text-[0.8125rem] sm:text-[0.875rem] text-slate-600">
                   <span>
                     {item.ticket_type} x {item.qty}
                   </span>
-                  <span className="font-medium text-slate-800">
+                  <span className="font-semibold text-slate-800">
                     {formatMoney(Number(item.unit_price) * item.qty)}
                   </span>
                 </div>
               ))}
-              <div className="flex justify-between text-sm text-slate-600">
+              <div className="flex justify-between text-[0.8125rem] sm:text-[0.875rem] text-slate-600">
                 <span>Convenience Fee</span>
-                <span className="font-medium text-slate-800">
+                <span className="font-semibold text-slate-800">
                   {formatMoney(booking.convenience_fee_total)}
                 </span>
               </div>
-              <div className="flex justify-between items-baseline pt-2">
-                <span className="font-semibold text-slate-800">Total Paid</span>
-                <span className="text-xl font-extrabold text-[#6900AA]">
+              {Number(booking.discount_amount) > 0 && (
+                <div className="flex justify-between text-[0.8125rem] sm:text-[0.875rem] text-[#57008E]">
+                  <span>Promo discount</span>
+                  <span className="font-semibold">−{formatMoney(booking.discount_amount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-2.5 border-t border-dashed border-slate-200">
+                <span className="text-[0.875rem] font-bold text-slate-900">Amount paid</span>
+                <span className="text-[1.125rem] font-extrabold text-[#6900AA]">
                   {formatMoney(booking.grand_total)}
                 </span>
               </div>
             </div>
 
             {qrData && (
-              <div className="mt-6 rounded-xl border border-slate-200 p-4 flex items-center gap-4">
+              <div className="p-4 sm:p-5 flex items-center gap-4">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(qrData)}`}
                   alt="Ticket QR code"
-                  className="w-24 h-24 rounded-lg bg-white"
+                  className="w-[5.5rem] h-[5.5rem] rounded-[0.375rem] bg-white border border-slate-100"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-600">
-                    Show this QR at the entry. This QR code is unique to your booking.
+                  <p className="text-[0.875rem] font-bold text-slate-900">Entry QR</p>
+                  <p className="mt-1 text-[0.8125rem] text-slate-500 leading-relaxed">
+                    Show this QR at the venue entrance. It is unique to your booking.
                   </p>
-                 
+                  <button
+                    type="button"
+                    onClick={copyCode}
+                    className="mt-2 inline-flex items-center gap-1.5 text-[0.75rem] font-semibold text-[#6900AA] cursor-pointer hover:underline"
+                  >
+                    <Copy size={12} />
+                    {displayCode}
+                  </button>
                 </div>
               </div>
             )}
 
-            <div className="mt-4 flex flex-wrap justify-between gap-2 text-[11px] text-slate-400">
+            <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap justify-between gap-2 text-[0.6875rem] sm:text-[0.75rem] text-slate-400">
               <span>Booking ID: {booking.id}</span>
               <span>{formatBookedOn(booking.created_at)}</span>
             </div>
           </div>
 
-          <aside className="space-y-4">
-            <div className="rounded-2xl bg-[#6900AA] text-white p-5">
-              <div className="flex items-start gap-3">
-                <span className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-                  <Mail size={18} />
-                </span>
-                <div>
-                  <p className="font-bold text-base">Confirmation sent!</p>
-                  <p className="text-xs text-white/85 mt-1 leading-relaxed">
-                    {booking.guest_email
-                      ? `A confirmation email with your tickets has been sent to ${booking.guest_email}`
-                      : "A confirmation email with your tickets has been sent."}
-                  </p>
-                </div>
-              </div>
+          <aside className="space-y-3 sm:space-y-4">
+            <div className="rounded-[0.75rem] bg-white border border-slate-200 shadow-sm p-4">
+              <p className="text-[0.9375rem] font-bold text-slate-900 flex items-center gap-1.5">
+                <Ticket size={15} className="text-[#6900AA]" />
+                Your ticket
+              </p>
+              <p className="mt-1.5 text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
+                Save the PDF to your phone so it&apos;s ready at the gate.
+              </p>
               <button
                 type="button"
-                onClick={() => toast.success("Confirmation email was already sent to your inbox.")}
-                className="mt-4 w-full py-2.5 rounded-xl border border-white/80 text-white text-sm font-medium inline-flex items-center justify-center gap-2 cursor-pointer"
+                onClick={downloadTickets}
+                disabled={downloading}
+                className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-[0.5rem] bg-[#6900AA] hover:bg-[#57008E] text-white text-[0.8125rem] font-semibold cursor-pointer disabled:opacity-60"
               >
-                <Send size={14} />
-                Resend Email
+                <Download size={14} />
+                {downloading ? "Downloading..." : "Download Ticket (PDF)"}
               </button>
             </div>
 
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 flex gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-[#6900AA] flex items-center gap-1.5">
-                  <Ticket size={15} />
-                  Your Ticket
-                </p>
-                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                  Save your ticket to your phone so it&apos;s always with you.
-                </p>
-                <button
-                  type="button"
-                  onClick={downloadTickets}
-                  disabled={downloading}
-                  className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#6900AA] text-[#6900AA] text-xs font-semibold cursor-pointer disabled:opacity-60"
-                >
-                  <Download size={14} />
-                  {downloading ? "Downloading..." : "Download Ticket (PDF)"}
-                </button>
-              </div>
-              <div className="relative shrink-0 w-[72px]">
-                <div className="w-[64px] h-[110px] rounded-[14px] border-2 border-slate-800 bg-white mx-auto overflow-hidden shadow-sm">
-                  <div className="h-2 bg-slate-800" />
-                  <div className="p-1.5 flex flex-col items-center gap-1">
-                    <div className="w-8 h-1 rounded bg-slate-200" />
-                    {qrData ? (
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrData)}`}
-                        alt=""
-                        className="w-10 h-10"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-slate-200" />
-                    )}
-                    <div className="w-10 h-1 rounded bg-slate-200" />
-                    <div className="w-7 h-1 rounded bg-slate-200" />
-                  </div>
-                </div>
-                <span className="absolute -bottom-1 -right-0 w-7 h-7 rounded-full bg-[#6900AA] text-white flex items-center justify-center shadow">
-                  <Download size={12} />
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+            <div className="rounded-[0.75rem] bg-white border border-slate-200 shadow-sm overflow-hidden">
               {[
                 { href: "/customer/dashboard" as string | null, label: "View My Bookings", icon: Ticket, action: null as (() => void) | null },
                 { href: null, label: "Add to Calendar", icon: Calendar, action: addToCalendar },
@@ -517,7 +468,7 @@ function ConfirmationContent() {
                   <Link
                     key={item.label}
                     href={item.href}
-                    className="flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                    className="flex items-center justify-between px-4 py-3 text-[0.875rem] font-medium text-slate-800 hover:bg-slate-50 border-b border-slate-100 last:border-0"
                   >
                     <span className="inline-flex items-center gap-2">
                       <item.icon size={15} className="text-[#6900AA]" />
@@ -530,7 +481,7 @@ function ConfirmationContent() {
                     key={item.label}
                     type="button"
                     onClick={item.action || undefined}
-                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-50 border-b border-slate-100 last:border-0 cursor-pointer"
+                    className="w-full flex items-center justify-between px-4 py-3 text-[0.875rem] font-medium text-slate-800 hover:bg-slate-50 border-b border-slate-100 last:border-0 cursor-pointer"
                   >
                     <span className="inline-flex items-center gap-2">
                       <item.icon size={15} className="text-[#6900AA]" />
@@ -544,14 +495,14 @@ function ConfirmationContent() {
 
             <Link
               href="/events"
-              className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white font-semibold text-sm"
+              className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 rounded-[0.5rem] bg-[#6900AA] hover:bg-[#57008E] text-white font-semibold text-[0.875rem]"
             >
               <Sparkles size={16} />
               Explore More Events
             </Link>
             <Link
               href="/"
-              className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-800 font-semibold text-sm"
+              className="inline-flex items-center justify-center gap-2 w-full px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-800 font-semibold text-[0.875rem]"
             >
               <Home size={16} />
               Back to Home
@@ -565,13 +516,7 @@ function ConfirmationContent() {
 
 export default function EventBookingConfirmationPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#f4f5f7] pt-24 flex justify-center text-slate-500">
-          <Loader2 className="animate-spin text-[#6900AA]" size={32} />
-        </div>
-      }
-    >
+    <Suspense fallback={<EventConfirmationShimmer />}>
       <ConfirmationContent />
     </Suspense>
   );

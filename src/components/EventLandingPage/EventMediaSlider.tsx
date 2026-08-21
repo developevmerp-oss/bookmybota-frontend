@@ -21,12 +21,12 @@ export default function EventMediaSlider({
   eventName,
   posterHorizontal,
   posterVertical,
-  gallery = [],
+  gallery: _gallery = [],
   youtubeUrl,
 }: Props) {
   const [active, setActive] = useState(0);
   const youtubeId = parseYouTubeId(youtubeUrl);
-  const images = [posterHorizontal, posterVertical, ...gallery].filter(
+  const images = [posterHorizontal, posterVertical].filter(
     (u, i, arr): u is string => Boolean(u) && arr.indexOf(u) === i
   );
 

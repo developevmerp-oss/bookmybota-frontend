@@ -2,14 +2,11 @@
 
 import { Suspense } from "react";
 import EventBookingPage from "@/components/EventLandingPage/EventBookingPage";
+import { EventBookingShimmer } from "@/components/Shared/Shimmer";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense
-      fallback={
-        <div className="text-center py-20 text-[1rem] text-slate-500">Loading booking…</div>
-      }
-    >
+    <Suspense fallback={<EventBookingShimmer />}>
       <EventBookingPage params={params} />
     </Suspense>
   );

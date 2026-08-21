@@ -38,7 +38,7 @@ export default function VenueLayoutViewer({
   layoutData,
   ticketTypes,
   onSeatsSelected,
-  maxSelectable = 10,
+  maxSelectable = Number.MAX_SAFE_INTEGER,
   initialSelectedSeats = [],
 }: {
   layoutData: any;

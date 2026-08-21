@@ -3036,24 +3036,49 @@ export const {
 export const eventInterestApi = api.injectEndpoints({
   overrideExisting: true,
   endpoints: (builder) => ({
+    getEventInterestCount: builder.query<
+      { event_id: string; interest_count: number },
+      string
+    >({
+      query: (eventId) => `/events/public/${eventId}/interest-count`,
+      transformResponse: (res: {
+        data?: { event_id: string; interest_count?: number };
+      }) => ({
+        event_id: res?.data?.event_id || '',
+        interest_count: Number(res?.data?.interest_count) || 0,
+      }),
+      providesTags: (_result, _error, eventId) => [
+        { type: 'EventInterests', id: `count:${eventId}` },
+      ],
+    }),
+
     getEventInterest: builder.query<
-      { event_id: string; interested: boolean },
+      { event_id: string; interested: boolean; interest_count: number },
       { eventId: string; customerId: string }
     >({
       query: ({ eventId }) => `/events/public/${eventId}/interest`,
-      transformResponse: (res: { data?: { event_id: string; interested: boolean } }) => ({
+      transformResponse: (res: {
+        data?: { event_id: string; interested: boolean; interest_count?: number };
+      }) => ({
         event_id: res?.data?.event_id || '',
         interested: Boolean(res?.data?.interested),
+        interest_count: Number(res?.data?.interest_count) || 0,
       }),
       // Cache per customer so switching accounts never reuses another user's interest.
       providesTags: (_result, _error, arg) => [
         { type: 'EventInterests', id: `${arg.customerId}:${arg.eventId}` },
         { type: 'EventInterests', id: arg.customerId },
+        { type: 'EventInterests', id: `count:${arg.eventId}` },
       ],
     }),
 
     toggleEventInterest: builder.mutation<
-      { event_id: string; interested: boolean; message?: string },
+      {
+        event_id: string;
+        interested: boolean;
+        interest_count: number;
+        message?: string;
+      },
       { eventId: string; customerId: string; interested?: boolean }
     >({
       query: ({ eventId, interested }) => ({
@@ -3062,19 +3087,29 @@ export const eventInterestApi = api.injectEndpoints({
         body: typeof interested === 'boolean' ? { interested } : {},
       }),
       transformResponse: (res: {
-        data?: { event_id: string; interested: boolean };
+        data?: {
+          event_id: string;
+          interested: boolean;
+          interest_count?: number;
+        };
         message?: string;
       }) => ({
         event_id: res?.data?.event_id || '',
         interested: Boolean(res?.data?.interested),
+        interest_count: Number(res?.data?.interest_count) || 0,
         message: res?.message,
       }),
       invalidatesTags: (_result, _error, arg) => [
         { type: 'EventInterests', id: `${arg.customerId}:${arg.eventId}` },
         { type: 'EventInterests', id: arg.customerId },
+        { type: 'EventInterests', id: `count:${arg.eventId}` },
       ],
     }),
   }),
 });
 
-export const { useGetEventInterestQuery, useToggleEventInterestMutation } = eventInterestApi;
+export const {
+  useGetEventInterestQuery,
+  useGetEventInterestCountQuery,
+  useToggleEventInterestMutation,
+} = eventInterestApi;

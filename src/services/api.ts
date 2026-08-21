@@ -53,6 +53,8 @@ export interface Business {
   id: string;
   name: string;
   address: string;
+  city_id?: number | null;
+  city_name?: string | null;
   phone?: string;
   description?: string;
   type_id?: number;
@@ -157,6 +159,8 @@ export interface BusinessSettings {
   id: string;
   name?: string;
   address?: string;
+  city_id?: number | null;
+  city_name?: string | null;
   cuisine?: string;
   phone?: string;
   description?: string;
@@ -289,6 +293,22 @@ export interface BusinessType {
   slug?: string;
 }
 
+export interface BusinessListQuery extends PagedQuery {
+  collection?: string;
+  mood?: string;
+  module?: 'dining' | 'event';
+  q?: string;
+  city?: string;
+  categories?: string[];
+  cuisines?: string[];
+  min_rating?: number;
+  offers_only?: boolean;
+  pure_veg?: boolean;
+  serves_alcohol?: boolean;
+  max_cost?: number;
+  sort?: 'relevance' | 'rating' | 'popular' | 'costAsc' | 'costDesc';
+}
+
 export interface AdminEvent {
   id: string;
   business_id: string;
@@ -326,6 +346,8 @@ export interface AdminEvent {
     id: string;
     venue_name?: string;
     venue_address?: string;
+    city_id?: number | null;
+    city_name?: string | null;
     starts_at: string;
     ends_at?: string;
     duration_type?: 'ONE_DAY' | 'MULTI_DAY';
@@ -374,6 +396,19 @@ export interface DiningCuisineMaster {
   name: string;
   slug?: string;
   image_url?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
+export interface CityMaster {
+  id: number;
+  name: string;
+  slug?: string;
+  state?: string | null;
+  country?: string | null;
+  icon_url?: string | null;
+  is_popular: boolean;
   is_active: boolean;
   sort_order: number;
   created_at?: string;
@@ -521,6 +556,7 @@ export interface EventFormPayload {
   showtimes: Array<{
     venue_name: string;
     venue_address: string;
+    city_id?: number | null;
     starts_at: string;
     ends_at: string;
     duration_type?: 'ONE_DAY' | 'MULTI_DAY';
@@ -966,7 +1002,13 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
       ) as UserRole;
       clearSessionForRole(role);
       api.dispatch(clearCredentials());
-      window.location.replace('/login');
+      const loginPath =
+        role === 'event_admin'
+          ? '/organizer/login'
+          : role === 'business_admin'
+            ? '/business/login'
+            : '/login';
+      window.location.replace(loginPath);
     }
   }
   return result;
@@ -975,7 +1017,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1224,7 +1266,7 @@ export const api = createApi({
 
     getBusinesses: builder.query<
       Business[],
-      { collection?: string; mood?: string; module?: 'dining' | 'event' | 'venue' } | void
+      { collection?: string; mood?: string; module?: 'dining' | 'event' | 'venue'; city?: string } | void
     >({
       query: (params) => {
         let url = '/businesses';
@@ -1233,12 +1275,38 @@ export const api = createApi({
           if (params.collection) searchParams.append('collection', params.collection);
           if (params.mood) searchParams.append('mood', params.mood);
           if (params.module) searchParams.append('module', params.module);
+          if (params.city) searchParams.append('city', params.city);
           const queryString = searchParams.toString();
           if (queryString) url += `?${queryString}`;
         }
         return url;
       },
       transformResponse: (res: { data: Business[] }) => res.data || [],
+      providesTags: ['Businesses'],
+    }),
+
+    getBusinessesPaged: builder.query<PaginatedList<Business>, BusinessListQuery | void>({
+      query: (params) => {
+        const listParams = {
+          collection: params?.collection,
+          mood: params?.mood,
+          module: params?.module,
+          q: params?.q,
+          city: params?.city,
+          categories: params?.categories?.length ? params.categories.join(',') : undefined,
+          cuisines: params?.cuisines?.length ? params.cuisines.join(',') : undefined,
+          min_rating: params?.min_rating,
+          offers_only: params?.offers_only ? 'true' : undefined,
+          pure_veg: params?.pure_veg ? 'true' : undefined,
+          serves_alcohol: params?.serves_alcohol ? 'true' : undefined,
+          max_cost: params?.max_cost,
+          sort: params?.sort,
+          page: params?.page,
+          limit: params?.limit,
+        };
+        return `/businesses${toListQuery(listParams)}`;
+      },
+      transformResponse: (res: { data: Business[]; meta?: any }) => unwrapPaginated(res),
       providesTags: ['Businesses'],
     }),
 
@@ -1257,6 +1325,18 @@ export const api = createApi({
       query: () => '/businesses/cuisines',
       transformResponse: (res: { data?: DiningCuisineMaster[] }) => res?.data ?? [],
       providesTags: [{ type: 'DiningMasters', id: 'PUBLIC_LIST' }],
+    }),
+
+    getCities: builder.query<CityMaster[], { q?: string; popular?: boolean } | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.popular) sp.set('popular', 'true');
+        const qs = sp.toString();
+        return `/cities${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: CityMaster[] }) => res?.data ?? [],
+      providesTags: [{ type: 'CityMasters', id: 'PUBLIC_LIST' }],
     }),
 
     getBusinessTypes: builder.query<BusinessType[], void>({
@@ -1417,136 +1497,6 @@ export const api = createApi({
         'Businesses',
         'DiningMasters',
       ],
-    }),
-
-    getVenueLayoutRequests: builder.query<VenueLayoutRequest[], string>({
-      query: (bizId) => `/businesses/${bizId}/venue-layout-requests`,
-      transformResponse: (res: { data?: VenueLayoutRequest[] }) => res?.data ?? [],
-      providesTags: (_result, _error, bizId) => [{ type: 'BusinessSettings', id: `${bizId}-venue-layouts` }],
-    }),
-
-    createVenueLayoutRequest: builder.mutation<
-      VenueLayoutRequest,
-      {
-        bizId: string;
-        request_id?: string;
-        hall_name: string;
-        hall_description?: string;
-        hall_capacity?: number;
-        is_indoor?: boolean;
-        layout_name: string;
-        layout_type: string;
-        capacity: number;
-        spec_json?: Record<string, unknown>;
-        submit_now?: boolean;
-      }
-    >({
-      query: ({ bizId, ...body }) => ({
-        url: `/businesses/${bizId}/venue-layout-requests`,
-        method: 'POST',
-        body,
-      }),
-      transformResponse: (res: { data: VenueLayoutRequest }) => res.data,
-      invalidatesTags: (_result, _error, arg) => [
-        { type: 'BusinessSettings', id: `${arg?.bizId}-venue-layouts` },
-        'VenueLayouts',
-      ],
-    }),
-
-    getAdminVenueLayoutRequests: builder.query<
-      VenueLayoutRequest[],
-      { tab?: string; status?: string; business_id?: string } | void
-    >({
-      query: (params) => {
-        const searchParams = new URLSearchParams();
-        if (params?.tab) searchParams.set('tab', params.tab);
-        if (params?.status) searchParams.set('status', params.status);
-        if (params?.business_id) searchParams.set('business_id', params.business_id);
-        const qs = searchParams.toString();
-        return `/admin/venue-layout-requests${qs ? `?${qs}` : ''}`;
-      },
-      transformResponse: (res: { data?: VenueLayoutRequest[] }) => res?.data ?? [],
-      providesTags: ['VenueLayouts'],
-    }),
-
-    getAdminVenueLayoutRequest: builder.query<VenueLayoutRequest, string>({
-      query: (id) => `/admin/venue-layout-requests/${id}`,
-      transformResponse: (res: { data: VenueLayoutRequest }) => res.data,
-      providesTags: (_r, _e, id) => [{ type: 'VenueLayouts', id }],
-    }),
-
-    reviewAdminVenueLayoutRequest: builder.mutation<
-      VenueLayoutRequest,
-      { id: string; status: 'UNDER_REVIEW' | 'REJECTED'; review_comments?: string }
-    >({
-      query: ({ id, ...body }) => ({
-        url: `/admin/venue-layout-requests/${id}/review`,
-        method: 'PATCH',
-        body,
-      }),
-      transformResponse: (res: { data: VenueLayoutRequest }) => res.data,
-      invalidatesTags: ['VenueLayouts'],
-    }),
-
-    saveAdminVenueLayoutTemplate: builder.mutation<
-      VenueLayoutTemplate,
-      {
-        id: string;
-        seating_config: Record<string, unknown>;
-        seats: unknown[];
-        publish?: boolean;
-        name?: string;
-        template_id?: string;
-        save_as_new?: boolean;
-      }
-    >({
-      query: ({ id, ...body }) => ({
-        url: `/admin/venue-layout-requests/${id}/template`,
-        method: 'PUT',
-        body,
-      }),
-      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      invalidatesTags: ['VenueLayouts'],
-    }),
-
-    getVenueLayoutTemplates: builder.query<VenueLayoutTemplate[], string>({
-      query: (bizId) => `/businesses/${bizId}/venue-layout-templates`,
-      transformResponse: (res: { data?: VenueLayoutTemplate[] }) => res?.data ?? [],
-      providesTags: ['VenueLayouts'],
-    }),
-
-    getVenueLayoutTemplate: builder.query<VenueLayoutTemplate, { bizId: string; templateId: string }>({
-      query: ({ bizId, templateId }) => `/businesses/${bizId}/venue-layout-templates/${templateId}`,
-      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      providesTags: (_r, _e, arg) => [{ type: 'VenueLayouts', id: arg.templateId }],
-    }),
-
-    approveVenueLayoutTemplate: builder.mutation<VenueLayoutTemplate, { bizId: string; templateId: string }>({
-      query: ({ bizId, templateId }) => ({
-        url: `/businesses/${bizId}/venue-layout-templates/${templateId}/approve`,
-        method: 'POST',
-      }),
-      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      invalidatesTags: ['VenueLayouts'],
-    }),
-
-    rejectVenueLayoutTemplate: builder.mutation<
-      VenueLayoutTemplate,
-      { bizId: string; templateId: string; reason: string }
-    >({
-      query: ({ bizId, templateId, reason }) => ({
-        url: `/businesses/${bizId}/venue-layout-templates/${templateId}/reject`,
-        method: 'POST',
-        body: { reason },
-      }),
-      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      invalidatesTags: ['VenueLayouts'],
-    }),
-
-    getApprovedVenueLayout: builder.query<VenueLayoutTemplate | null, string>({
-      query: (bizId) => `/businesses/${bizId}/approved-venue-layout`,
-      transformResponse: (res: { data?: VenueLayoutTemplate | null }) => res?.data ?? null,
-      providesTags: ['VenueLayouts'],
     }),
 
     getVenueLayoutRequests: builder.query<VenueLayoutRequest[], string>({
@@ -2670,6 +2620,79 @@ export const api = createApi({
       ],
     }),
 
+    // ── Admin City Masters ────────────────────────────────────────────────────
+
+    getAdminCities: builder.query<
+      PaginatedList<CityMaster>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/cities${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: CityMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+              ...result.items.map((c) => ({ type: 'CityMasters' as const, id: c.id })),
+              { type: 'CityMasters', id: 'LIST' },
+            ]
+          : [{ type: 'CityMasters', id: 'LIST' }],
+    }),
+
+    createAdminCity: builder.mutation<
+      CityMaster,
+      {
+        name: string;
+        slug?: string;
+        state?: string;
+        country?: string;
+        icon_url?: string;
+        is_popular?: boolean;
+        is_active?: boolean;
+        sort_order?: number;
+      }
+    >({
+      query: (body) => ({
+        url: '/admin/cities',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: CityMaster }) => res?.data ?? ({} as CityMaster),
+      invalidatesTags: [
+        { type: 'CityMasters', id: 'LIST' },
+        { type: 'CityMasters', id: 'PUBLIC_LIST' },
+        'CityMasters',
+      ],
+    }),
+
+    updateAdminCity: builder.mutation<
+      CityMaster,
+      { id: number; body: Partial<CityMaster> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/cities/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: CityMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'CityMasters', id },
+        { type: 'CityMasters', id: 'LIST' },
+        { type: 'CityMasters', id: 'PUBLIC_LIST' },
+      ],
+    }),
+
+    deleteAdminCity: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/cities/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'CityMasters', id: 'LIST' },
+        { type: 'CityMasters', id: 'PUBLIC_LIST' },
+        'CityMasters',
+      ],
+    }),
+
     getAdminDiningCollections: builder.query<
       PaginatedList<Collection>,
       { q?: string; page?: number; limit?: number } | void
@@ -2860,6 +2883,7 @@ export const {
   useRegisterCustomerMutation,
   useRegisterBusinessMutation,
   useGetBusinessesQuery,
+  useGetBusinessesPagedQuery,
   useGetAdminBusinessesQuery,
   useGetAdminBusinessQuery,
   useUpdateAdminBusinessMutation,
@@ -2989,6 +3013,11 @@ export const {
   useCreateAdminDiningCuisineMutation,
   useUpdateAdminDiningCuisineMutation,
   useDeleteAdminDiningCuisineMutation,
+  useGetCitiesQuery,
+  useGetAdminCitiesQuery,
+  useCreateAdminCityMutation,
+  useUpdateAdminCityMutation,
+  useDeleteAdminCityMutation,
   useGetAdminDiningCollectionsQuery,
   useCreateAdminDiningCollectionMutation,
   useUpdateAdminDiningCollectionMutation,

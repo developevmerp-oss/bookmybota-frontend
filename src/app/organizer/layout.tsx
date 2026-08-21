@@ -48,7 +48,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     clearSessionForRole("event_admin");
-    router.push("/login");
+    router.push("/organizer/login");
   };
 
   return (
@@ -195,6 +195,12 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  if (pathname === "/organizer/login") {
+    return <>{children}</>;
+  }
+
   return (
     <AuthGate mode="require" roles={["event_admin"]}>
       <SessionGuard>

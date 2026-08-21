@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Save, ImagePlus, X, Upload, Info, Tag, Wifi, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery, useGetCollectionsQuery } from '@/services/api';
+import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery, useGetCollectionsQuery, useGetCitiesQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import { isValidPhone } from '@/lib/validation';
@@ -37,6 +37,7 @@ export default function ProfilePage() {
   const { data: settings, isLoading } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
   const { data: collections = [] } = useGetCollectionsQuery();
+  const { data: cities = [] } = useGetCitiesQuery();
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
 
   const [phone, setPhone] = useState('');
@@ -51,6 +52,7 @@ export default function ProfilePage() {
   const [averageCost, setAverageCost] = useState<string>('');
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [cityId, setCityId] = useState<number | ''>('');
   const [cuisine, setCuisine] = useState('');
   const [collectionIds, setCollectionIds] = useState<number[]>([]);
   const [openTime, setOpenTime] = useState('08:00');
@@ -69,6 +71,7 @@ export default function ProfilePage() {
       if (settings.average_cost) setAverageCost(settings.average_cost.toString());
       if (settings.name) setName(settings.name);
       if (settings.address) setAddress(settings.address);
+      setCityId(settings.city_id ?? '');
       if (settings.cuisine) setCuisine(settings.cuisine);
       setCollectionIds(
         Array.isArray(settings.collection_ids)
@@ -103,6 +106,7 @@ export default function ProfilePage() {
           average_cost: averageCost ? parseInt(averageCost) : undefined,
           name,
           address,
+          city_id: cityId === '' ? null : cityId,
           cuisine,
           collection_ids: collectionIds,
           operating_hours: {
@@ -208,6 +212,23 @@ export default function ProfilePage() {
                   required={false}
                   placeholder="9876543210"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">City</label>
+                <select
+                  value={cityId === '' ? '' : String(cityId)}
+                  onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all"
+                >
+                  <option value="">Select city</option>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.state ? `, ${c.state}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-zinc-500 mt-1">Used for the top-bar city filter on the dining listing.</p>
               </div>
 
               <div>

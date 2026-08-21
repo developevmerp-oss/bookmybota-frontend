@@ -141,7 +141,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <AuthGate mode="guest">
+    <AuthGate mode="guest" guestRoles={[]}>
       <Suspense
         fallback={
           <div className="min-h-screen flex items-center justify-center text-slate-500">Loading…</div>

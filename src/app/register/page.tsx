@@ -100,7 +100,7 @@ function RegisterForm() {
 
 export default function Register() {
   return (
-    <AuthGate mode="guest">
+    <AuthGate mode="guest" guestRoles={["customer"]}>
       <RegisterForm />
     </AuthGate>
   );

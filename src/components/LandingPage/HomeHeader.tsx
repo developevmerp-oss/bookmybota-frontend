@@ -32,13 +32,11 @@ function readCity() {
 
 export default function HomeHeader() {
   const pathname = usePathname();
-  const { data: filters } = useGetPublicEventFiltersQuery();
   const [city, setCity] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [customer, setCustomer] = useState<StoredCustomer | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const cities = filters?.cities || [];
   const isAuthPage = pathname === "/login" || pathname === "/register";
 
   useEffect(() => {
@@ -247,7 +245,6 @@ export default function HomeHeader() {
 
       <CitySelectModal
         open={cityOpen}
-        cities={cities}
         selected={city}
         onClose={() => setCityOpen(false)}
         onSelect={handleCityChange}

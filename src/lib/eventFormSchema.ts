@@ -25,6 +25,11 @@ const ticketSchema = yup.object({
 const showtimeSchema = yup.object({
   venue_name: yup.string().trim().required('Venue name is required'),
   venue_address: yup.string().trim().default(''),
+  city_id: yup
+    .number()
+    .nullable()
+    .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+    .default(null),
   duration_type: yup.string().oneOf(['ONE_DAY', 'MULTI_DAY']).default('ONE_DAY'),
   event_date: yup.string().default(''),
   start_time: yup.string().default(''),
@@ -123,6 +128,7 @@ export type EventFormValues = yup.InferType<typeof eventDraftSchema>;
 export const defaultVenue = (): EventFormValues['showtimes'][number] => ({
   venue_name: '',
   venue_address: '',
+  city_id: null,
   duration_type: 'ONE_DAY',
   event_date: '',
   start_time: '',

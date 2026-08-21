@@ -129,7 +129,7 @@ function ForgotPasswordForm() {
 
 export default function ForgotPasswordPage() {
   return (
-    <AuthGate mode="guest">
+    <AuthGate mode="guest" guestRoles={[]}>
       <ForgotPasswordForm />
     </AuthGate>
   );

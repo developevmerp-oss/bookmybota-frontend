@@ -3,7 +3,7 @@ import type { Business } from "@/services/api";
 export type SortOption = "relevance" | "rating" | "popular" | "costAsc" | "costDesc";
 
 export interface DiningFilterState {
-  cuisine: string;
+  cuisines: string[];
   minRating: number;
   offersOnly: boolean;
   sort: SortOption;
@@ -14,7 +14,7 @@ export interface DiningFilterState {
 }
 
 export const DEFAULT_DINING_FILTERS: DiningFilterState = {
-  cuisine: "",
+  cuisines: [],
   minRating: 0,
   offersOnly: false,
   sort: "relevance",
@@ -56,8 +56,10 @@ export function applyDiningFilters(
     const cost = Number(r.average_cost || 0);
 
     const matchesCuisine =
-      !filters.cuisine ||
-      cuisine.toLowerCase().includes(filters.cuisine.toLowerCase());
+      filters.cuisines.length === 0 ||
+      filters.cuisines.some((selected) =>
+        cuisine.toLowerCase().includes(selected.toLowerCase())
+      );
     const matchesRating = !filters.minRating || rating >= filters.minRating;
     const matchesOffers = !filters.offersOnly || businessHasOffer(r);
     const matchesBookTable = !filters.bookTable || r.is_open !== false;

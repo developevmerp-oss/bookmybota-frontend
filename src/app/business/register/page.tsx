@@ -21,7 +21,7 @@ export default function BusinessRegisterPage() {
             </Link>
             <div className="flex gap-4 items-center">
               <Link
-                href="/login"
+                href="/business/login"
                 className="px-5 py-2 rounded-full border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 hover:text-slate-900 transition-all text-sm"
               >
                 Login

@@ -1,9 +1,39 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { UtensilsCrossed } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { UtensilsCrossed, X } from "lucide-react";
+import PartnerLoginForm from "@/components/Shared/PartnerLoginForm";
+import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
 
 export default function BusinessLandingPage() {
+  const router = useRouter();
+  const [loginOpen, setLoginOpen] = useState(false);
+
+  useEffect(() => {
+    if (!loginOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLoginOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [loginOpen]);
+
+  const openLogin = () => {
+    const session = readSessionForRole("business_admin");
+    if (session) {
+      router.push(homePathForRole("business_admin"));
+      return;
+    }
+    setLoginOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <header className="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
@@ -18,12 +48,13 @@ export default function BusinessLandingPage() {
                 <span className="text-[#6900AA]">Bota</span>
               </span>
             </Link>
-            <Link
-              href="/login"
-              className="px-5 py-2 rounded-full border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 hover:text-slate-900 transition-all text-sm"
+            <button
+              type="button"
+              onClick={openLogin}
+              className="px-5 py-2 rounded-full border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 hover:text-slate-900 transition-all text-sm cursor-pointer"
             >
               Login
-            </Link>
+            </button>
           </div>
         </div>
       </header>
@@ -61,6 +92,44 @@ export default function BusinessLandingPage() {
           </Link>
         </div>
       </div>
+
+      {loginOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm"
+          onClick={() => setLoginOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="relative w-full max-w-md"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="partner-login-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setLoginOpen(false)}
+              className="absolute -top-3 -right-3 z-10 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-md flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
+              aria-label="Close login"
+            >
+              <X size={18} />
+            </button>
+            <PartnerLoginForm
+              variant="embedded"
+              expectedRole="business_admin"
+              title="Dining Admin Login"
+              titleId="partner-login-title"
+              subtitle="Sign in to manage your restaurant"
+              showCustomerLink={false}
+              hint={
+                <p className="text-[10px] text-slate-400">
+                  Dining admins: name@bookmybota.com / Admin@123
+                </p>
+              }
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

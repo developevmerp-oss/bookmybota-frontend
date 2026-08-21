@@ -12,6 +12,7 @@ import {
   useGetBusinessSettingsQuery,
   useUpdateBusinessSettingsMutation,
   useUploadImageMutation,
+  useGetCitiesQuery,
 } from "@/services/api";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 
@@ -21,9 +22,11 @@ export default function OrganizerProfilePage() {
   const { data: settings, isLoading } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
+  const { data: cities = [] } = useGetCitiesQuery();
 
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [cityId, setCityId] = useState<number | "">("");
   const [phone, setPhone] = useState("");
   const [description, setDescription] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -33,6 +36,7 @@ export default function OrganizerProfilePage() {
     if (!settings || initialized) return;
     setName(settings.name || "");
     setAddress(settings.address || "");
+    setCityId(settings.city_id ?? "");
     setPhone(settings.phone || "");
     setDescription(settings.description || "");
     setCoverImageUrl(settings.cover_image_url || "");
@@ -56,6 +60,7 @@ export default function OrganizerProfilePage() {
         body: {
           name: name.trim(),
           address: address.trim(),
+          city_id: cityId === "" ? null : cityId,
           phone: phone.trim(),
           description: description.trim(),
           cover_image_url: coverImageUrl || "",
@@ -164,6 +169,26 @@ export default function OrganizerProfilePage() {
         <div>
           <label className="block text-sm font-medium text-zinc-400 mb-1.5">
             <span className="inline-flex items-center gap-1.5">
+              <MapPin size={14} /> City
+            </span>
+          </label>
+          <select
+            value={cityId === "" ? "" : String(cityId)}
+            onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : "")}
+            className="input-field w-full"
+          >
+            <option value="">Select city</option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}{c.state ? `, ${c.state}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-400 mb-1.5">
+            <span className="inline-flex items-center gap-1.5">
               <MapPin size={14} /> Address
             </span>
           </label>
@@ -171,7 +196,7 @@ export default function OrganizerProfilePage() {
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             className="input-field w-full"
-            placeholder="Office / city"
+            placeholder="Office / street address"
           />
         </div>
 

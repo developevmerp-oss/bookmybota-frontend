@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import type { DiningFilterState, SortOption } from "@/lib/diningFilters";
-import { extractCuisines } from "@/lib/diningFilters";
-import { useGetBusinessesQuery, useGetDiningCuisinesQuery } from "@/services/api";
+import { useGetDiningCuisinesQuery } from "@/services/api";
 
 interface DiningFiltersBarProps {
   cuisines: string[];
@@ -13,11 +12,14 @@ interface DiningFiltersBarProps {
   onChange: (next: DiningFilterState) => void;
   onReset?: () => void;
   categories?: string[];
+  categoriesSelected?: string[];
+  onCategoriesChange?: (categories: string[]) => void;
   category?: string;
   onCategoryChange?: (category: string) => void;
 }
 
 const ACCENT = "#6900AA";
+const EMPTY_CATEGORIES: string[] = [];
 
 type FilterTab =
   | "sort"
@@ -88,32 +90,72 @@ function RadioRow({
   );
 }
 
+function CheckboxRow({
+  label,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center justify-between gap-3 py-3 text-left cursor-pointer"
+    >
+      <span className={`text-sm ${checked ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+        {label}
+      </span>
+      <span
+        className={`w-[18px] h-[18px] rounded-[4px] border-2 flex items-center justify-center shrink-0 ${
+          checked ? "border-[#6900AA] bg-[#6900AA]" : "border-slate-300 bg-white"
+        }`}
+      >
+        {checked && <span className="w-2.5 h-2.5 rounded-[2px] bg-white" />}
+      </span>
+    </button>
+  );
+}
+
 export default function DiningFiltersBar({
   cuisines,
   filters,
   onChange,
   onReset,
   categories = [],
+  categoriesSelected = [],
+  onCategoriesChange,
   category = "All",
   onCategoryChange,
 }: DiningFiltersBarProps) {
+  const effectiveCategoriesSelected = useMemo(() => {
+    if (categoriesSelected.length > 0) return categoriesSelected;
+    if (category && category !== "All") return [category];
+    return EMPTY_CATEGORIES;
+  }, [categoriesSelected, category]);
+
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [draft, setDraft] = useState<DiningFilterState>(filters);
-  const [draftCategory, setDraftCategory] = useState(category);
+  const [draftCategories, setDraftCategories] = useState<string[]>(effectiveCategoriesSelected);
   const [tab, setTab] = useState<FilterTab>("sort");
   const [draftSort, setDraftSort] = useState<SortOption>(filters.sort);
   const sortRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
+  const wasFilterOpenRef = useRef(false);
   const [sortPos, setSortPos] = useState({ top: 0, left: 0 });
-  const { data: businesses = [] } = useGetBusinessesQuery({ module: "dining" });
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
+  const normalizedCategories = useMemo(
+    () => categories.filter((c) => c.toLowerCase() !== "all"),
+    [categories]
+  );
   const cuisineList = useMemo(() => {
-    const fromBiz = extractCuisines(businesses);
     const fromMaster = cuisineMasters.map((c) => c.name);
     const seen = new Set<string>();
     const out: string[] = [];
-    [...fromMaster, ...fromBiz, ...cuisines].forEach((name) => {
+    [...fromMaster, ...cuisines].forEach((name) => {
       if (!name) return;
       const key = name.toLowerCase();
       if (seen.has(key)) return;
@@ -121,15 +163,17 @@ export default function DiningFiltersBar({
       out.push(name);
     });
     return out;
-  }, [businesses, cuisineMasters, cuisines]);
+  }, [cuisineMasters, cuisines]);
 
+  // Sync draft only when the popup opens — not on every parent re-render while open.
   useEffect(() => {
-    if (showFilter) {
+    if (showFilter && !wasFilterOpenRef.current) {
       setDraft(filters);
-      setDraftCategory(category);
+      setDraftCategories(effectiveCategoriesSelected);
       setTab("sort");
     }
-  }, [showFilter, filters, category]);
+    wasFilterOpenRef.current = showFilter;
+  }, [showFilter, filters, effectiveCategoriesSelected]);
 
   useEffect(() => {
     if (showSort) setDraftSort(filters.sort);
@@ -176,16 +220,16 @@ export default function DiningFiltersBar({
 
   const activeCount = useMemo(() => {
     let n = 0;
-    if (filters.cuisine) n += 1;
+    if (filters.cuisines.length > 0) n += 1;
     if (filters.minRating > 0) n += 1;
     if (filters.offersOnly) n += 1;
     if (filters.pureVeg) n += 1;
     if (filters.servesAlcohol) n += 1;
     if (filters.maxCost > 0) n += 1;
     if (filters.sort !== "relevance") n += 1;
-    if (category && category !== "All") n += 1;
+    if (effectiveCategoriesSelected.length > 0) n += 1;
     return n;
-  }, [filters, category]);
+  }, [filters, effectiveCategoriesSelected]);
 
   const sortLabel =
     SORT_OPTIONS.find((o) => o.value === filters.sort)?.label.split(":")[0] || "Sort By";
@@ -195,14 +239,24 @@ export default function DiningFiltersBar({
     const lbl = SORT_OPTIONS.find((o) => o.value === filters.sort)?.label || filters.sort;
     activeChips.push({ label: lbl, onClear: () => onChange({ ...filters, sort: "relevance" }) });
   }
-  if (category && category !== "All") {
+  for (const selectedCategory of effectiveCategoriesSelected) {
     activeChips.push({
-      label: category.toLowerCase() === "all" ? "All Dining" : category,
-      onClear: () => onCategoryChange?.("All"),
+      label: selectedCategory.toLowerCase() === "all" ? "All Dining" : selectedCategory,
+      onClear: () =>
+        onCategoriesChange?.(
+          effectiveCategoriesSelected.filter((c) => c.toLowerCase() !== selectedCategory.toLowerCase())
+        ),
     });
   }
-  if (filters.cuisine) {
-    activeChips.push({ label: filters.cuisine, onClear: () => onChange({ ...filters, cuisine: "" }) });
+  for (const selectedCuisine of filters.cuisines) {
+    activeChips.push({
+      label: selectedCuisine,
+      onClear: () =>
+        onChange({
+          ...filters,
+          cuisines: filters.cuisines.filter((c) => c.toLowerCase() !== selectedCuisine.toLowerCase()),
+        }),
+    });
   }
   if (filters.minRating > 0) {
     activeChips.push({ label: `Rating ${filters.minRating}+`, onClear: () => onChange({ ...filters, minRating: 0 }) });
@@ -234,7 +288,10 @@ export default function DiningFiltersBar({
 
   const applyDraft = () => {
     onChange(draft);
-    onCategoryChange?.(draftCategory);
+    onCategoriesChange?.(draftCategories);
+    if (!onCategoriesChange) {
+      onCategoryChange?.(draftCategories[0] ?? "All");
+    }
     setShowFilter(false);
   };
 
@@ -375,7 +432,8 @@ export default function DiningFiltersBar({
                 type="button"
                 onClick={() => {
                   onReset?.();
-                  onCategoryChange?.("All");
+                  onCategoriesChange?.([]);
+                  if (!onCategoriesChange) onCategoryChange?.("All");
                 }}
                 className="text-xs font-bold px-2 py-1.5 transition-colors cursor-pointer hover:underline"
                 style={{ color: ACCENT }}
@@ -457,14 +515,23 @@ export default function DiningFiltersBar({
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                       Category
                     </p>
-                    {categories.map((c) => {
+                    {normalizedCategories.map((c) => {
                       const label = c.toLowerCase() === "all" ? "All Dining" : c;
+                      const checked = draftCategories.some(
+                        (selected) => selected.toLowerCase() === c.toLowerCase()
+                      );
                       return (
-                        <RadioRow
+                        <CheckboxRow
                           key={c}
                           label={label}
-                          selected={draftCategory.toLowerCase() === c.toLowerCase()}
-                          onSelect={() => setDraftCategory(c)}
+                          checked={checked}
+                          onToggle={() =>
+                            setDraftCategories((prev) =>
+                              checked
+                                ? prev.filter((selected) => selected.toLowerCase() !== c.toLowerCase())
+                                : [...prev, c]
+                            )
+                          }
                         />
                       );
                     })}
@@ -477,11 +544,21 @@ export default function DiningFiltersBar({
                       Cuisine
                     </p>
                     {cuisineList.map((c) => (
-                      <RadioRow
+                      <CheckboxRow
                         key={c}
                         label={c}
-                        selected={draft.cuisine.toLowerCase() === c.toLowerCase()}
-                        onSelect={() => setDraft({ ...draft, cuisine: c })}
+                        checked={draft.cuisines.some((selected) => selected.toLowerCase() === c.toLowerCase())}
+                        onToggle={() =>
+                          setDraft((prev) => {
+                            const exists = prev.cuisines.some((selected) => selected.toLowerCase() === c.toLowerCase());
+                            return {
+                              ...prev,
+                              cuisines: exists
+                                ? prev.cuisines.filter((selected) => selected.toLowerCase() !== c.toLowerCase())
+                                : [...prev.cuisines, c],
+                            };
+                          })
+                        }
                       />
                     ))}
                   </div>
@@ -550,7 +627,8 @@ export default function DiningFiltersBar({
                 type="button"
                 onClick={() => {
                   onReset?.();
-                  onCategoryChange?.("All");
+                  onCategoriesChange?.([]);
+                  if (!onCategoriesChange) onCategoryChange?.("All");
                   setShowFilter(false);
                 }}
                 className="text-sm sm:text-base lg:text-sm font-bold"

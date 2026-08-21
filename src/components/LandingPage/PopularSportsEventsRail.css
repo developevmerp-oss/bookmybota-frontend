@@ -1,0 +1,38 @@
+.sports-rail {
+  display: flex;
+  width: 100%;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+}
+
+.sports-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.sports-rail-slot {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 160px;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 640px) {
+  .sports-rail-slot {
+    width: 180px;
+  }
+}
+
+/* Desktop: 5 cards in the first viewport; 6th+ on scroll */
+@media (min-width: 768px) {
+  .sports-rail {
+    gap: 1rem;
+  }
+
+  .sports-rail-slot {
+    width: calc((100% - (var(--sports-visible, 5) - 1) * 1rem) / var(--sports-visible, 5));
+  }
+}

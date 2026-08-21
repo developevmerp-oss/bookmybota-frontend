@@ -1,0 +1,56 @@
+.top-artists-rail {
+  display: flex;
+  width: 100%;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+}
+
+.top-artists-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile: ~2.5–3 artists visible */
+.top-artists-slot {
+  flex: 0 0 auto;
+  width: calc((100% - 1.5rem) / 2.4);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.top-artists-avatar {
+  width: 88px;
+  height: 88px;
+}
+
+@media (min-width: 640px) {
+  .top-artists-slot {
+    width: calc((100% - 2.25rem) / 3.2);
+  }
+
+  .top-artists-avatar {
+    width: 100px;
+    height: 100px;
+  }
+}
+
+/* Desktop / tablet: exactly 6 artists in the first viewport */
+@media (min-width: 768px) {
+  .top-artists-rail {
+    gap: 1rem;
+  }
+
+  .top-artists-slot {
+    /* (100% - 5 gaps) / 6 = one of six visible slots */
+    width: calc((100% - (var(--artists-visible, 6) - 1) * 1rem) / var(--artists-visible, 6));
+  }
+
+  .top-artists-avatar {
+    width: min(124px, 72%);
+    height: min(124px, 72%);
+    aspect-ratio: 1;
+  }
+}

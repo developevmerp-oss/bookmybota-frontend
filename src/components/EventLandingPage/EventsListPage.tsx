@@ -1,22 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  FaBuilding,
-  FaBullhorn,
   FaCalendarAlt,
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
-  FaEllipsisH,
-  FaFutbol,
-  FaImage,
-  FaLeaf,
   FaMapMarkerAlt,
-  FaMusic,
   FaSearch,
-  FaSmile,
 } from "react-icons/fa";
 import {
   api,
@@ -64,22 +56,6 @@ const PRICE_BANDS = [
   { id: "2000+", label: "Above 2000" },
 ] as const;
 const PRICE_SLIDER_MAX = 2500;
-function categoryStyle(name: string): {
-  Icon: ComponentType<{ size?: number; className?: string }>;
-  color: string;
-} {
-  const n = name.toLowerCase();
-  if (n.includes("comedy")) return { Icon: FaSmile, color: "text-[#6900AA]" };
-  if (n.includes("music") || n.includes("concert")) return { Icon: FaMusic, color: "text-[#6900AA]" };
-  if (n.includes("conference")) return { Icon: FaBuilding, color: "text-[#c47a3a]" };
-  if (n.includes("festival")) return { Icon: FaLeaf, color: "text-[#6900AA]" };
-  if (n.includes("sport")) return { Icon: FaFutbol, color: "text-[#6900AA]" };
-  if (n.includes("exhibit")) return { Icon: FaImage, color: "text-slate-800" };
-  if (n.includes("talk") || n.includes("theatre") || n.includes("theater")) {
-    return { Icon: FaBullhorn, color: "text-[#c47a3a]" };
-  }
-  return { Icon: FaCalendarAlt, color: "text-[#6900AA]" };
-}
 
 function dateBadge(value?: string) {
   if (!value) return null;
@@ -244,7 +220,6 @@ export default function PublicEventsPage() {
   });
   const [sort, setSort] = useState("recommended");
   const [page, setPage] = useState(1);
-  const [showAllCategories, setShowAllCategories] = useState(false);
   const [venueFilter, setVenueFilter] = useState("");
   const [browseVenues, setBrowseVenues] = useState(false);
   const [mobileFilterTab, setMobileFilterTab] = useState<"categories" | "date" | "languages" | "price" | null>(null);
@@ -372,7 +347,6 @@ export default function PublicEventsPage() {
     return cells;
   }, [calMonth]);
 
-  const popular = showAllCategories ? categories : categories.slice(0, 7);
   const headingCity = city || "Ethiopia";
   const hasOfferHero = offerHeroEvents.length > 0;
   const activeHeroEvent = hasOfferHero ? offerHeroEvents[heroSlideIndex] : null;
@@ -643,68 +617,7 @@ export default function PublicEventsPage() {
         </section>
       )}
 
-      <section id="categories" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12">
-        <div className="flex items-center justify-between mb-5 sm:mb-8">
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-900">Popular Categories</h2>
-          {/* <button
-            type="button"
-            onClick={() => {
-              setShowAllCategories(true);
-              document.getElementById("city-filter")?.scrollIntoView({ behavior: "smooth" });
-            }}
-            className="text-sm text-[#6900AA] hover:underline cursor-pointer"
-          >
-            View All Categories
-          </button> */}
-        </div>
-        {categories.length === 0 ? (
-          <p className="text-sm text-slate-400">Categories load from the event catalog.</p>
-        ) : (
-          <div className="flex gap-5 sm:gap-8 lg:gap-10 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {popular.map((cat) => {
-              const { Icon, color } = categoryStyle(cat.name);
-              const active = !!cat.slug && selectedSlugs.includes(cat.slug);
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => selectSlug(cat.slug)}
-                  className="flex flex-col items-center gap-2 cursor-pointer w-[64px] sm:w-[72px] shrink-0"
-                >
-                  <span
-                    className={`w-14 h-14 sm:w-[68px] sm:h-[68px] rounded-full flex items-center justify-center transition-colors ${
-                      active ? "bg-[#6900AA] text-white" : `bg-[#eef0f2] ${color}`
-                    }`}
-                  >
-                    <Icon size={20} />
-                  </span>
-                  <span
-                    className={`text-[12px] sm:text-[13px] text-center leading-tight ${
-                      active ? "font-semibold text-[#6900AA]" : "text-slate-800"
-                    }`}
-                  >
-                    {cat.name}
-                  </span>
-                </button>
-              );
-            })}
-            {!showAllCategories && categories.length > 7 && (
-              <button
-                type="button"
-                onClick={() => setShowAllCategories(true)}
-                className="flex flex-col items-center gap-2 cursor-pointer w-[64px] sm:w-[72px] shrink-0"
-              >
-                <span className="w-14 h-14 sm:w-[68px] sm:h-[68px] rounded-full bg-[#eef0f2] text-slate-800 flex items-center justify-center">
-                  <FaEllipsisH size={16} />
-                </span>
-                <span className="text-[12px] sm:text-[13px] text-slate-800">More</span>
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-14 lg:pb-16">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-14 lg:pb-16 pt-8 sm:pt-10">
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[260px_1fr] gap-5 lg:gap-8">
           <aside
             id="city-filter"

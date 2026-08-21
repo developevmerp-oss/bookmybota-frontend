@@ -89,11 +89,6 @@ export default function CustomerHelpPage() {
 
   return (
     <CustomerAccountLayout>
-      <div className="mb-6">
-        <h1 className="text-[32px] leading-tight font-extrabold text-[#111111]">Help Centre</h1>
-        <p className="text-slate-500 mt-1">Find answers or look up your reservation.</p>
-      </div>
-
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-8">
           <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
             <Ticket size={18} className="text-rose-600" /> Find your ticket

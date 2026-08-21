@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { User, Mail, Save, Loader2, MapPin } from "lucide-react";
+import { Check, Loader2, Mail, MapPin, Pencil, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetCustomerProfileQuery,
@@ -13,6 +13,73 @@ import { loadFromStorage, updateUser } from "@/features/auth/authSlice";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { isValidPhone } from "@/lib/validation";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+
+type FieldKey = "name" | "phone" | "email" | "address" | "city" | "state";
+
+const inputClass =
+  "w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-[#6900AA]/25 focus:border-[#6900AA] disabled:bg-[#f7f7f7] disabled:text-[#555]";
+
+const plainInputClass =
+  "w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-[#6900AA]/25 focus:border-[#6900AA] disabled:bg-[#f7f7f7] disabled:text-[#555]";
+
+function FieldHeader({
+  label,
+  required,
+  editing,
+  onEdit,
+  htmlFor,
+}: {
+  label: string;
+  required?: boolean;
+  editing: boolean;
+  onEdit: () => void;
+  htmlFor?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 mb-1.5">
+      <label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
+        {label}
+        {required && <span className="text-[#6900AA] ml-0.5">*</span>}
+      </label>
+      {!editing && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="inline-flex items-center gap-1 text-[13px] font-medium text-[#8B1538] hover:text-[#6900AA] cursor-pointer"
+        >
+          <Pencil size={12} strokeWidth={2.25} />
+          Edit
+        </button>
+      )}
+    </div>
+  );
+}
+
+function IconField({
+  icon,
+  children,
+  showCheck,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  showCheck?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+        {icon}
+      </span>
+      {children}
+      {showCheck && (
+        <Check
+          size={16}
+          strokeWidth={2.5}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none"
+        />
+      )}
+    </div>
+  );
+}
 
 export default function CustomerProfilePage() {
   const router = useRouter();
@@ -27,6 +94,25 @@ export default function CustomerProfilePage() {
   const [state, setState] = useState("");
   const [initialized, setInitialized] = useState(false);
   const [phoneValid, setPhoneValid] = useState(false);
+  const [editing, setEditing] = useState<Record<FieldKey, boolean>>({
+    name: false,
+    phone: false,
+    email: false,
+    address: false,
+    city: false,
+    state: false,
+  });
+
+  const nameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const cityRef = useRef<HTMLInputElement>(null);
+  const stateRef = useRef<HTMLInputElement>(null);
+
+  const enableEdit = (key: FieldKey, focus?: () => void) => {
+    setEditing((prev) => ({ ...prev, [key]: true }));
+    window.setTimeout(() => focus?.(), 0);
+  };
 
   useEffect(() => {
     dispatch(loadFromStorage());
@@ -91,6 +177,14 @@ export default function CustomerProfilePage() {
         })
       );
       window.dispatchEvent(new Event("auth_changed"));
+      setEditing({
+        name: false,
+        phone: false,
+        email: false,
+        address: false,
+        city: false,
+        state: false,
+      });
       toast.success("Profile updated successfully");
     } catch (err: unknown) {
       const message =
@@ -113,110 +207,160 @@ export default function CustomerProfilePage() {
 
   return (
     <CustomerAccountLayout>
-      <div className="mb-6">
-        <h1 className="text-[32px] leading-tight font-extrabold text-[#111111]">Edit Profile</h1>
-        <p className="text-slate-500 mt-1">Update your personal and contact details.</p>
-      </div>
-
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-          <div className="flex items-center gap-4 mb-8 pb-6 border-b border-border">
-            <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center text-2xl font-bold">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p className="text-lg font-semibold text-foreground">{displayName}</p>
-              <p className="text-sm text-muted-foreground">{email || user.email}</p>
+        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-border">
+          <div className="w-16 h-16 rounded-full bg-[#F7E9FF] text-[#6900AA] flex items-center justify-center text-2xl font-bold">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-foreground">{displayName}</p>
+            <p className="text-sm text-muted-foreground">{email || user.email}</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <FieldHeader
+              label="Full Name"
+              htmlFor="profile-name"
+              editing={editing.name}
+              onEdit={() => enableEdit("name", () => nameRef.current?.focus())}
+            />
+            <IconField icon={<User size={16} />}>
+              <input
+                ref={nameRef}
+                id="profile-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={!editing.name}
+                className={inputClass}
+                placeholder="Your name"
+                required
+              />
+            </IconField>
+          </div>
+
+          <div>
+            <FieldHeader
+              label="Phone"
+              required
+              editing={editing.phone}
+              onEdit={() => enableEdit("phone")}
+            />
+            <div className="relative">
+              <PhoneInput
+                value={phone}
+                onChange={setPhone}
+                onValidChange={setPhoneValid}
+                required={!!phone.trim()}
+                placeholder="9876543210"
+                showIcon
+                disabled={!editing.phone}
+                inputClassName={`${inputClass}${!editing.phone && phone.trim() ? " pr-10" : ""}`}
+              />
+              {!editing.phone && phone.trim() && (
+                <Check
+                  size={16}
+                  strokeWidth={2.5}
+                  className="absolute right-3 top-[13px] text-emerald-500 pointer-events-none"
+                  aria-hidden
+                />
+              )}
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
-              <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
-                  placeholder="Your name"
-                  required
-                />
-              </div>
-            </div>
-
-            <PhoneInput
-              label="Phone"
-              labelClassName="block text-sm font-medium text-foreground mb-1.5"
-              value={phone}
-              onChange={setPhone}
-              onValidChange={setPhoneValid}
-              required={!!phone.trim()}
-              placeholder="9876543210"
-              inputClassName="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
+          <div>
+            <FieldHeader
+              label="Email"
+              htmlFor="profile-email"
+              editing={editing.email}
+              onEdit={() => enableEdit("email", () => emailRef.current?.focus())}
             />
+            <IconField icon={<Mail size={16} />} showCheck={!editing.email && !!email.trim()}>
+              <input
+                ref={emailRef}
+                id="profile-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={!editing.email}
+                className={`${inputClass}${!editing.email && email.trim() ? " pr-10" : ""}`}
+                placeholder="you@example.com"
+              />
+            </IconField>
+          </div>
 
+          <div>
+            <FieldHeader
+              label="Address"
+              htmlFor="profile-address"
+              editing={editing.address}
+              onEdit={() => enableEdit("address", () => addressRef.current?.focus())}
+            />
+            <IconField icon={<MapPin size={16} />}>
+              <input
+                ref={addressRef}
+                id="profile-address"
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                disabled={!editing.address}
+                className={inputClass}
+                placeholder="Street address"
+              />
+            </IconField>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
-                  placeholder="you@example.com"
-                />
-              </div>
+              <FieldHeader
+                label="City"
+                htmlFor="profile-city"
+                editing={editing.city}
+                onEdit={() => enableEdit("city", () => cityRef.current?.focus())}
+              />
+              <input
+                ref={cityRef}
+                id="profile-city"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={!editing.city}
+                className={plainInputClass}
+                placeholder="City"
+              />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Address</label>
-              <div className="relative">
-                <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
-                  placeholder="Street address"
-                />
-              </div>
+              <FieldHeader
+                label="State"
+                htmlFor="profile-state"
+                editing={editing.state}
+                onEdit={() => enableEdit("state", () => stateRef.current?.focus())}
+              />
+              <input
+                ref={stateRef}
+                id="profile-state"
+                type="text"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                disabled={!editing.state}
+                className={plainInputClass}
+                placeholder="State"
+              />
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">City</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
-                  placeholder="City"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">State</label>
-                <input
-                  type="text"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-500"
-                  placeholder="State"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSaving || (phone.trim() !== "" && !phoneValid)}
-              className="btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 disabled:opacity-60"
-            >
-              {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {isSaving ? "Saving..." : "Save Changes"}
-            </button>
-          </form>
-        </div>
+          <button
+            type="submit"
+            disabled={isSaving || (phone.trim() !== "" && !phoneValid)}
+            className="btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 disabled:opacity-60"
+          >
+            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            {isSaving ? "Saving..." : "Save Changes"}
+          </button>
+        </form>
+      </div>
     </CustomerAccountLayout>
   );
 }

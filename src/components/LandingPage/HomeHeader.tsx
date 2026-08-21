@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Gift, Search } from "lucide-react";
+import { toast } from "sonner";
 import { useGetPublicEventFiltersQuery } from "@/services/api";
 import images from "@/Images";
 import CitySelectModal from "./CitySelectModal";
@@ -66,7 +67,6 @@ export default function HomeHeader() {
   const cityLabel = city || "Select city";
   const displayName = customer?.name || customer?.email?.split("@")[0] || "Account";
   const initial = displayName.charAt(0).toUpperCase();
-  const openGiftSrc = typeof images.openGift === "string" ? images.openGift : images.openGift.src;
   const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
 
   return (
@@ -100,8 +100,8 @@ export default function HomeHeader() {
             <span className="w-9 h-9" />
           ) : customer ? (
             <Link
-              href="/customer/settings"
-              aria-label="My Account"
+              href="/customer/profile"
+              aria-label={displayName}
               className="w-9 h-9 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] flex items-center justify-center"
             >
               <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
@@ -157,13 +157,15 @@ export default function HomeHeader() {
             <span className="w-9 h-9" />
           ) : customer ? (
             <Link
-              href="/customer/settings"
+              href="/customer/profile"
               className="inline-flex h-9 items-center gap-1.5 pl-1 pr-2.5 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors"
             >
               <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
                 {initial}
               </span>
-              <span className="text-sm font-medium text-[#111111] whitespace-nowrap">Account</span>
+              <span className="text-sm font-medium text-[#111111] max-w-[90px] truncate whitespace-nowrap">
+                {displayName}
+              </span>
             </Link>
           ) : isAuthPage ? null : (
             <Link
@@ -214,21 +216,23 @@ export default function HomeHeader() {
             <span className="w-[132px] h-9" />
           ) : customer ? (
             <>
-              <img
-                src={openGiftSrc}
-                alt=""
-                aria-hidden="true"
-                className="h-23 w-23 object-contain shrink-0"
-              />
+              <button
+                type="button"
+                onClick={() => toast.message("Coming soon")}
+                className="inline-flex h-11 items-center gap-2 px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
+              >
+                <Gift size={18} className="shrink-0" />
+                Gift Cards
+              </button>
               <Link
-                href="/customer/settings"
+                href="/customer/profile"
                 className="inline-flex h-13 items-center gap-2 pl-1 pr-3 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors"
               >
                 <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white text-[16px] font-semibold flex items-center justify-center">
                   {initial}
                 </span>
                 <span className="text-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
-                  My Account
+                  {displayName}
                 </span>
               </Link>
             </>

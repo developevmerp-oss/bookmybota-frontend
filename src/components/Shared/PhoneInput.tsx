@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Phone } from "lucide-react";
 import {
   getPhoneValidationError,
   isValidPhone,
@@ -27,6 +28,8 @@ interface PhoneInputProps {
   label?: string;
   labelClassName?: string;
   helperText?: string;
+  /** Show phone icon on the left inside the field */
+  showIcon?: boolean;
 }
 
 const variantClasses: Record<InputVariant, string> = {
@@ -52,6 +55,7 @@ export default function PhoneInput({
   label,
   labelClassName,
   helperText,
+  showIcon = false,
 }: PhoneInputProps) {
   const [touched, setTouched] = useState(false);
   const error = !value && !required ? null : getPhoneValidationError(value);
@@ -68,6 +72,7 @@ export default function PhoneInput({
 
   const baseInput = inputClassName || variantClasses[variant];
   const errorBorder = showError ? " border-rose-500 focus:border-rose-500 focus:ring-rose-500" : "";
+  const iconPad = showIcon && !inputClassName?.includes("pl-") ? " pl-10" : "";
 
   return (
     <div className={className}>
@@ -83,22 +88,30 @@ export default function PhoneInput({
           {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       )}
-      <input
-        id={id}
-        name={name}
-        type="tel"
-        inputMode="numeric"
-        autoComplete="tel"
-        pattern="[0-9]*"
-        required={required}
-        disabled={disabled}
-        value={value}
-        onChange={handleChange}
-        onBlur={() => setTouched(true)}
-        placeholder={placeholder}
-        className={`${baseInput}${errorBorder}`}
-        maxLength={PHONE_MAX_LENGTH_ATTR}
-      />
+      <div className={showIcon ? "relative" : undefined}>
+        {showIcon && (
+          <Phone
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
+        )}
+        <input
+          id={id}
+          name={name}
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          pattern="[0-9]*"
+          required={required}
+          disabled={disabled}
+          value={value}
+          onChange={handleChange}
+          onBlur={() => setTouched(true)}
+          placeholder={placeholder}
+          className={`${baseInput}${iconPad}${errorBorder}`}
+          maxLength={PHONE_MAX_LENGTH_ATTR}
+        />
+      </div>
       {helperText && !showError && (
         <p className="text-xs text-muted-foreground mt-1">{helperText}</p>
       )}

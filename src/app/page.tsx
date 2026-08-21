@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import PromoBannerCarousel from "@/components/LandingPage/PromoBannerCarousel";
 import PopularDiningRail from "@/components/LandingPage/PopularDiningRail";
+import TopArtistsRail from "@/components/LandingPage/TopArtistsRail";
+import RecommendedMoviesRail from "@/components/LandingPage/RecommendedMoviesRail";
 import PopularEventsRail from "@/components/LandingPage/PopularEventsRail";
+import SpecialOffersRail from "@/components/LandingPage/SpecialOffersRail";
 import LiveCategoryTiles from "@/components/LandingPage/LiveCategoryTiles";
 import EventsNearYouRail from "@/components/LandingPage/EventsNearYouRail";
+import SportsStadiumBanner from "@/components/LandingPage/SportsStadiumBanner";
+import PopularSportsEventsRail from "@/components/LandingPage/PopularSportsEventsRail";
 import Footer from "@/components/LandingPage/Footer";
 
 export default function Home() {
@@ -22,15 +27,20 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-[#111111] overflow-x-hidden">
+    <div className=" bg-white text-[#111111] overflow-x-hidden">
       {/* Hero + category tiles share one viewport below the sticky header (lg+) */}
       <div className="flex flex-col lg:h-[calc(100dvh-5.75rem)] xl:h-[calc(100dvh-6.75rem)]">
         <PromoBannerCarousel city={city} />
         <LiveCategoryTiles city={city} />
       </div>
       <PopularDiningRail city={city} />
+      <TopArtistsRail />
+      {/* <RecommendedMoviesRail /> */}
       <PopularEventsRail city={city} />
+      <SpecialOffersRail />
       <EventsNearYouRail city={city} />
+      <SportsStadiumBanner />
+      <PopularSportsEventsRail />
       <Footer />
     </div>
   );

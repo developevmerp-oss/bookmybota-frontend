@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Calendar,
   HelpCircle,
-  Home,
   Lock,
   LogOut,
   Tag,
@@ -16,8 +15,7 @@ import { useAppDispatch } from "@/lib/hooks";
 import { clearCredentials } from "@/features/auth/authSlice";
 
 const NAV = [
-  { href: "/customer/settings", icon: Home, label: "Overview" },
-  { href: "/customer/profile", icon: User, label: "Edit Profile" },
+  { href: "/customer/profile", icon: User, label: "My Profile" },
   { href: "/customer/change-password", icon: Lock, label: "Change Password" },
   { href: "/customer/dashboard", icon: Calendar, label: "My Orders / Reservations" },
   { href: "/customer/help", icon: HelpCircle, label: "Help Centre" },
@@ -39,10 +37,11 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
 
   return (
     <div className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-          <aside className="w-full lg:w-[260px] shrink-0 lg:mt-23">
+          <aside className="w-full lg:w-[260px] shrink-0">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-col h-fit">
+              <h1 className="px-3 pt-2 pb-3 text-3xl border-b border-slate-200 mb-3 font-extrabold text-[#111111]">My Account</h1>
               <nav className="flex flex-col gap-1">
                 {NAV.map((item) => {
                   const active = !item.soon && pathname === item.href;

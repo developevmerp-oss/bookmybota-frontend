@@ -37,7 +37,7 @@ export default function EventHeroSlider({ slides }: { slides: HeroSlide[] }) {
           nextEl: nextRef.current,
         }}
         onBeforeInit={(swiper: SwiperType) => {
-          const nav = swiper.params.navigation;
+          const nav = swiper.params?.navigation;
           if (nav && typeof nav !== "boolean") {
             nav.prevEl = prevRef.current;
             nav.nextEl = nextRef.current;
@@ -45,15 +45,14 @@ export default function EventHeroSlider({ slides }: { slides: HeroSlide[] }) {
         }}
         onSwiper={(swiper) => {
           setTimeout(() => {
+            if (!swiper || swiper.destroyed || !swiper.params) return;
             const nav = swiper.params.navigation;
             if (!nav || typeof nav === "boolean") return;
             nav.prevEl = prevRef.current;
             nav.nextEl = nextRef.current;
-            const navigationApi = swiper.navigation;
-            if (!navigationApi) return;
-            navigationApi.destroy?.();
-            navigationApi.init?.();
-            navigationApi.update?.();
+            swiper.navigation?.destroy?.();
+            swiper.navigation?.init?.();
+            swiper.navigation?.update?.();
           });
         }}
         className="h-full w-full"

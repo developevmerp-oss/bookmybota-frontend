@@ -35,7 +35,7 @@ const COLUMNS = [
       { label: "Help Center", href: "/customer/help" },
       { label: "FAQs", href: "/customer/help" },
       { label: "My Bookings", href: "/customer/dashboard" },
-      { label: "My Account", href: "/customer/settings" },
+      { label: "My Account", href: "/customer/profile" },
     ],
   },
 ];

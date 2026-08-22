@@ -80,7 +80,23 @@ export interface Business {
   operating_hours?: Record<string, { open: string; close: string; closed: boolean }>;
   gallery_images?: string[];
   menu_images?: string[];
-  dining_offers?: Array<{ type: string; title: string; validity: string }>;
+  dining_offers?: Array<{
+    id?: string;
+    type: string;
+    title: string;
+    validity: string;
+    promo_code?: string;
+    discount_type?: 'PERCENT' | 'FLAT';
+    discount_value?: number;
+    max_discount?: number | null;
+    min_bill_amount?: number;
+    is_active?: boolean;
+    per_day_limit?: number | null;
+    status?: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'SCHEDULED' | 'EXPIRED' | 'ARCHIVED';
+    archived_at?: string | null;
+    start_at?: string | null;
+    end_at?: string | null;
+  }>;
   amenities?: string[];
   average_cost?: number;
   is_promoted?: boolean;
@@ -170,7 +186,23 @@ export interface BusinessSettings {
   operating_hours?: Record<string, { open: string; close: string; closed: boolean }>;
   gallery_images?: string[];
   menu_images?: string[];
-  dining_offers?: Array<{ type: string; title: string; validity: string }>;
+  dining_offers?: Array<{
+    id?: string;
+    type: string;
+    title: string;
+    validity: string;
+    promo_code?: string;
+    discount_type?: 'PERCENT' | 'FLAT';
+    discount_value?: number;
+    max_discount?: number | null;
+    min_bill_amount?: number;
+    is_active?: boolean;
+    per_day_limit?: number | null;
+    status?: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'SCHEDULED' | 'EXPIRED' | 'ARCHIVED';
+    archived_at?: string | null;
+    start_at?: string | null;
+    end_at?: string | null;
+  }>;
   amenities?: string[];
   average_cost?: number;
   collection_ids?: number[];
@@ -872,6 +904,52 @@ export interface AppliedPromoOffer {
   discount_type: 'PERCENT' | 'FLAT';
   discount_value: number;
   discount_amount: number;
+  source?: 'platform' | 'organizer';
+}
+
+export interface PlatformOffer {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  discount_type: 'PERCENT' | 'FLAT';
+  discount_value: number;
+  max_discount?: number | null;
+  min_order_amount: number;
+  category: 'ALL' | 'EVENTS' | 'DINING';
+  apply_to: 'ENTIRE_CATEGORY' | 'SELECTED_ITEMS';
+  customer_eligibility: 'ALL' | 'NEW' | 'EXISTING';
+  usage_limit?: number | null;
+  per_user_limit: number;
+  start_at?: string | null;
+  end_at?: string | null;
+  status: string;
+  effective_status?: string;
+  display_theme?: string;
+  sort_order?: number;
+  redemption_count?: number;
+  event_ids?: string[];
+  restaurant_ids?: string[];
+  discount_label?: string;
+  scope_label?: string;
+}
+
+export interface OfferRedemption {
+  id: string;
+  offer_id: string;
+  offer_name?: string;
+  offer_code?: string;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  guest_phone?: string | null;
+  booking_type: string;
+  booking_id: string;
+  promo_code: string;
+  original_amount: number;
+  discount_amount: number;
+  final_amount: number;
+  category: string;
+  redeemed_at: string;
 }
 
 export interface CommissionLedgerRow {
@@ -1095,8 +1173,54 @@ export interface Booking {
   created_at?: string;
   approx_arrival?: string;
   qr_token?: string;
-  applied_offer?: { type?: string; title?: string; validity?: string } | null;
+  applied_offer?: {
+    id?: string;
+    type?: string;
+    title?: string;
+    validity?: string;
+    promo_code?: string;
+    discount_type?: string;
+    discount_value?: number;
+    max_discount?: number | null;
+    min_bill_amount?: number;
+  } | null;
   checked_out_at?: string | null;
+  offer_redeemed_at?: string | null;
+  offer_redeemed_by?: string | null;
+  bill_amount?: number | string | null;
+  offer_redemption_notes?: string | null;
+}
+
+export interface DiningOfferRedemption {
+  id: string;
+  business_id: string;
+  booking_id?: string | null;
+  promo_code: string;
+  offer_title: string;
+  offer_snapshot?: Record<string, unknown>;
+  redemption_source: 'booking' | 'walk_in';
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  bill_amount?: number | string | null;
+  notes?: string | null;
+  redeemed_at: string;
+  redeemed_by_email?: string | null;
+}
+
+export interface DiningOfferRedemptionReport {
+  items: DiningOfferRedemption[];
+  meta?: import('@/lib/pagination').PaginationMeta;
+  summary?: {
+    total_redemptions: number;
+    booking_redemptions: number;
+    walk_in_redemptions: number;
+    total_bill_amount: number | string;
+  };
+  by_offer?: Array<{
+    promo_code: string;
+    offer_title: string;
+    redemption_count: number;
+  }>;
 }
 
 export interface CustomerProfile {
@@ -1191,7 +1315,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -2023,7 +2147,7 @@ export const api = createApi({
         guests: number;
         customer_id?: string;
         approx_arrival?: string;
-        applied_offer?: { type?: string; title?: string; validity?: string } | null;
+        applied_offer?: { type?: string; title?: string; validity?: string; promo_code?: string; id?: string } | null;
       }
     >({
       query: (body) => ({
@@ -2094,12 +2218,84 @@ export const api = createApi({
       }),
     }),
 
-    checkoutDiningBooking: builder.mutation<{ message?: string; data: Booking }, string>({
-      query: (id) => ({
+    checkoutDiningBooking: builder.mutation<
+      { message?: string; data: Booking },
+      {
+        id: string;
+        offer_redeemed?: boolean;
+        bill_amount?: number | null;
+        promo_code?: string;
+        offer_redemption_notes?: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({
         url: `/bookings/${id}/checkout`,
         method: 'PUT',
+        body,
       }),
-      invalidatesTags: ['Bookings'],
+      invalidatesTags: ['Bookings', 'DiningOfferRedemptions'],
+    }),
+
+    validateMerchantPromoCode: builder.mutation<
+      { discount_label?: string; promo_code?: string; title?: string; discount_type?: string; discount_value?: number },
+      { promo_code: string; bill_amount?: number | null }
+    >({
+      query: (body) => ({
+        url: '/bookings/validate-merchant-promo',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: Record<string, unknown> }) => res.data as {
+        discount_label?: string;
+        promo_code?: string;
+        title?: string;
+      },
+    }),
+
+    redeemWalkInMerchantPromo: builder.mutation<
+      { message?: string; data: Record<string, unknown> },
+      {
+        promo_code: string;
+        bill_amount: number;
+        guest_name?: string;
+        guest_phone?: string;
+        notes?: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/bookings/redeem-walkin-promo',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['DiningOfferRedemptions'],
+    }),
+
+    getMerchantOfferRedemptions: builder.query<
+      DiningOfferRedemptionReport,
+      { q?: string; page?: number; limit?: number; from?: string; to?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.from) sp.set('from', params.from);
+        if (params?.to) sp.set('to', params.to);
+        const qs = sp.toString();
+        return `/bookings/merchant-offer-redemptions${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: {
+        data?: DiningOfferRedemption[];
+        meta?: import('@/lib/pagination').PaginationMeta;
+        summary?: DiningOfferRedemptionReport['summary'];
+        by_offer?: DiningOfferRedemptionReport['by_offer'];
+      }) => ({
+        items: res.data ?? [],
+        meta: res.meta,
+        summary: res.summary,
+        by_offer: res.by_offer,
+      }),
+      providesTags: ['DiningOfferRedemptions'],
     }),
 
     // ── Reviews ──────────────────────────────────────────────────────────────
@@ -2190,6 +2386,94 @@ export const api = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['MarketingPlans'],
+    }),
+
+    getPlatformOffers: builder.query<PaginatedList<PlatformOffer>, (PagedQuery & { status?: string }) | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.status) sp.set('status', params.status);
+        const qs = sp.toString();
+        return `/admin/platform-offers${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: PlatformOffer[] }) => unwrapPaginated(res),
+      providesTags: ['PlatformOffers'],
+    }),
+
+    getPlatformOffer: builder.query<PlatformOffer, string>({
+      query: (id) => `/admin/platform-offers/${id}`,
+      transformResponse: (res: { data: PlatformOffer }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'PlatformOffers', id }],
+    }),
+
+    createPlatformOffer: builder.mutation<PlatformOffer, Partial<PlatformOffer> & { event_ids?: string[]; restaurant_ids?: string[] }>({
+      query: (body) => ({
+        url: '/admin/platform-offers',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: PlatformOffer }) => res.data,
+      invalidatesTags: ['PlatformOffers', 'PublicPlatformOffers'],
+    }),
+
+    updatePlatformOffer: builder.mutation<PlatformOffer, Partial<PlatformOffer> & { id: string; event_ids?: string[]; restaurant_ids?: string[] }>({
+      query: ({ id, ...body }) => ({
+        url: `/admin/platform-offers/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      transformResponse: (res: { data: PlatformOffer }) => res.data,
+      invalidatesTags: ['PlatformOffers', 'PublicPlatformOffers'],
+    }),
+
+    patchPlatformOfferStatus: builder.mutation<PlatformOffer, { id: string; status: string }>({
+      query: ({ id, status }) => ({
+        url: `/admin/platform-offers/${id}/status`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      transformResponse: (res: { data: PlatformOffer }) => res.data,
+      invalidatesTags: ['PlatformOffers', 'PublicPlatformOffers'],
+    }),
+
+    deletePlatformOffer: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/platform-offers/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['PlatformOffers', 'PublicPlatformOffers'],
+    }),
+
+    getOfferRedemptions: builder.query<PaginatedList<OfferRedemption>, (PagedQuery & { offer_id?: string }) | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.offer_id) sp.set('offer_id', params.offer_id);
+        const qs = sp.toString();
+        return `/admin/platform-offers/redemptions${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: OfferRedemption[] }) => unwrapPaginated(res),
+      providesTags: ['OfferRedemptions'],
+    }),
+
+    getOfferEligibleEventsAdmin: builder.query<Array<{ id: string; name: string; status: string }>, void>({
+      query: () => '/admin/platform-offers/eligible-events',
+      transformResponse: (res: { data: Array<{ id: string; name: string; status: string }> }) => res.data || [],
+    }),
+
+    getOfferEligibleRestaurantsAdmin: builder.query<Array<{ id: string; name: string }>, void>({
+      query: () => '/admin/platform-offers/eligible-restaurants',
+      transformResponse: (res: { data: Array<{ id: string; name: string }> }) => res.data || [],
+    }),
+
+    getActivePlatformOffers: builder.query<PlatformOffer[], void>({
+      query: () => '/platform-offers/active',
+      transformResponse: (res: { data: PlatformOffer[] }) => res.data || [],
+      providesTags: ['PublicPlatformOffers'],
     }),
 
     getMarketingCampaigns: builder.query<PaginatedList<any>, PagedQuery | void>({
@@ -2461,12 +2745,12 @@ export const api = createApi({
 
     validateEventPromoCode: builder.mutation<
       AppliedPromoOffer,
-      { eventId: string; promo_code: string; ticket_amount: number }
+      { eventId: string; promo_code: string; ticket_amount: number; guest_phone?: string }
     >({
-      query: ({ eventId, promo_code, ticket_amount }) => ({
+      query: ({ eventId, promo_code, ticket_amount, guest_phone }) => ({
         url: `/events/public/${eventId}/validate-promo`,
         method: 'POST',
-        body: { promo_code, ticket_amount },
+        body: { promo_code, ticket_amount, ...(guest_phone ? { guest_phone } : {}) },
       }),
       transformResponse: (res: { data: AppliedPromoOffer }) => res.data,
     }),
@@ -3379,6 +3663,9 @@ export const {
   useCancelBookingMutation,
   useScanDiningBookingQrMutation,
   useCheckoutDiningBookingMutation,
+  useValidateMerchantPromoCodeMutation,
+  useRedeemWalkInMerchantPromoMutation,
+  useGetMerchantOfferRedemptionsQuery,
   useGetAdminStatsQuery,
   useUpdateSubscriptionMutation,
   useGetAnalyticsQuery,
@@ -3390,6 +3677,16 @@ export const {
   useCreateMarketingPlanMutation,
   useUpdateMarketingPlanMutation,
   useDeleteMarketingPlanMutation,
+  useGetPlatformOffersQuery,
+  useGetPlatformOfferQuery,
+  useCreatePlatformOfferMutation,
+  useUpdatePlatformOfferMutation,
+  usePatchPlatformOfferStatusMutation,
+  useDeletePlatformOfferMutation,
+  useGetOfferRedemptionsQuery,
+  useGetOfferEligibleEventsAdminQuery,
+  useGetOfferEligibleRestaurantsAdminQuery,
+  useGetActivePlatformOffersQuery,
   useGetMarketingCampaignsQuery,
   useAssignMarketingCampaignMutation,
   useGetBusinessCampaignsQuery,

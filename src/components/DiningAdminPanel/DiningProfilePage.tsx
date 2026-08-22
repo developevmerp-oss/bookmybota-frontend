@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { Save, ImagePlus, X, Upload, Info, Tag, Wifi, Image as ImageIcon } from 'lucide-react';
+import { Save, ImagePlus, X, Upload, Info, Wifi, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery, useGetCollectionsQuery, useGetCitiesQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
@@ -47,7 +47,6 @@ export default function ProfilePage() {
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [menuImages, setMenuImages] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("Basic Info");
-  const [diningOffers, setDiningOffers] = useState<{ type: string; title: string; validity: string }[]>([]);
   const [amenities, setAmenities] = useState<string[]>([]);
   const [averageCost, setAverageCost] = useState<string>('');
   const [name, setName] = useState('');
@@ -66,7 +65,6 @@ export default function ProfilePage() {
       setCoverUrl(settings.cover_image_url || '');
       setGalleryImages(normalizeImageList(settings.gallery_images));
       setMenuImages(normalizeImageList(settings.menu_images));
-      setDiningOffers(settings.dining_offers || []);
       setAmenities(settings.amenities || []);
       if (settings.average_cost) setAverageCost(settings.average_cost.toString());
       if (settings.name) setName(settings.name);
@@ -101,7 +99,6 @@ export default function ProfilePage() {
           cover_image_url: coverUrl,
           gallery_images: galleryImages,
           menu_images: menuImages,
-          dining_offers: diningOffers,
           amenities: amenities,
           average_cost: averageCost ? parseInt(averageCost) : undefined,
           name,
@@ -172,7 +169,6 @@ export default function ProfilePage() {
           { name: "Basic Info", icon: <Info size={16} /> },
           { name: "Facilities", icon: <Wifi size={16} /> },
           { name: "Photos & Menu", icon: <ImageIcon size={16} /> },
-          { name: "Offers", icon: <Tag size={16} /> }
         ].map((tab) => (
           <button
             key={tab.name}
@@ -342,82 +338,6 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-zinc-400 mb-2">About the Venue</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all" placeholder="Tell your story. What makes your venue special?" rows={5} />
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "Offers" && (
-          <div className="glass-panel p-8 rounded-2xl border border-white/5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-white">Dining Offers & Promotions</h3>
-              <button
-                onClick={() => setDiningOffers([...diningOffers, { type: 'Pre-Book Offer', title: '', validity: '' }])}
-                className="text-xs font-bold bg-rose-600/20 text-rose-500 hover:bg-rose-600 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
-              >
-                + Add Offer
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {diningOffers.length === 0 ? (
-                <p className="text-sm text-zinc-500 italic">No dining offers configured. Click "+ Add Offer" to create one.</p>
-              ) : (
-                diningOffers.map((offer, idx) => (
-                  <div key={idx} className="relative bg-zinc-900/50 border border-white/10 rounded-xl p-4">
-                    <button
-                      onClick={() => setDiningOffers(diningOffers.filter((_, i) => i !== idx))}
-                      className="absolute top-3 right-3 text-zinc-500 hover:text-rose-500 transition-colors"
-                      title="Remove Offer"
-                    >
-                      <X size={16} />
-                    </button>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pr-6">
-                      <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1">Offer Type</label>
-                        <input
-                          type="text"
-                          value={offer.type}
-                          onChange={(e) => {
-                            const newOffers = [...diningOffers];
-                            newOffers[idx].type = e.target.value;
-                            setDiningOffers(newOffers);
-                          }}
-                          className="input-field text-sm"
-                          placeholder="e.g. Pre-Book Offer"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1">Offer Title</label>
-                        <input
-                          type="text"
-                          value={offer.title}
-                          onChange={(e) => {
-                            const newOffers = [...diningOffers];
-                            newOffers[idx].title = e.target.value;
-                            setDiningOffers(newOffers);
-                          }}
-                          className="input-field text-sm"
-                          placeholder="e.g. Flat 10% OFF"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-zinc-400 mb-1">Validity text</label>
-                        <input
-                          type="text"
-                          value={offer.validity}
-                          onChange={(e) => {
-                            const newOffers = [...diningOffers];
-                            newOffers[idx].validity = e.target.value;
-                            setDiningOffers(newOffers);
-                          }}
-                          className="input-field text-sm"
-                          placeholder="e.g. Valid 11AM - 11PM"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           </div>
         )}

@@ -23,6 +23,7 @@ import {
   Wallet,
   MapPin,
   Map,
+  Tag,
   Mic2,
 } from "lucide-react";
 import AuthGate from "@/components/Shared/AuthGate";
@@ -53,6 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Organizer Payouts', href: '/admin/organizer-payouts', icon: Wallet },
     { name: 'Subscription & Billing', href: '/admin/billing', icon: CreditCard },
     { name: 'Marketing Plans', href: '/admin/marketing', icon: Megaphone },
+    { name: 'Platform Offers', href: '/admin/platform-offers', icon: Tag },
     { name: 'Content Management', href: '/admin/content', icon: FileText },
     { name: 'Customers', href: '/admin/customers', icon: Users },
     { name: 'Change Password', href: '/admin/change-password', icon: KeyRound },

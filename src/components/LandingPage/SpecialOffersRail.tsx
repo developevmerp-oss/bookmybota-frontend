@@ -1,71 +1,112 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Flame } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Flame, Loader2, Sparkles, Users } from "lucide-react";
+import { useGetActivePlatformOffersQuery, type PlatformOffer } from "@/services/api";
+import { formatDate } from "@/lib/dateFormat";
+import { formatMoney, formatWholeNumber } from "@/lib/currencyFormat";
 import "./SpecialOffersRail.css";
 
 type OfferTheme = "magenta" | "violet" | "ocean" | "sunset" | "emerald";
 
-type SpecialOffer = {
+type DisplayOffer = {
   id: string;
   theme: OfferTheme;
-  discount: string;
+  discountMain: string;
+  discountMax: string | null;
+  name: string;
   scope: string;
+  eligibilityNote: string | null;
+  badge: { label: string; tone: "hot" | "new" | "existing" };
   minBooking: string;
   validTill: string;
   code: string;
 };
 
-/** Static showcase offers for the landing page. */
-export const SPECIAL_OFFERS: SpecialOffer[] = [
-  {
-    id: "1",
-    theme: "magenta",
-    discount: "25% OFF",
-    scope: "On Venues",
-    minBooking: "Min. booking: $100 ETB",
-    validTill: "Valid till 31 Aug, 2026",
-    code: "VENUE25",
-  },
-  {
-    id: "2",
-    theme: "violet",
-    discount: "20% OFF",
-    scope: "On All Events",
-    minBooking: "Min. booking: $150 ETB",
-    validTill: "Valid till 15 Sep, 2026",
-    code: "EVENT20",
-  },
-  {
-    id: "3",
-    theme: "sunset",
-    discount: "15% OFF",
-    scope: "On Dining",
-    minBooking: "Min. booking: $100 ETB",
-    validTill: "Valid till 30 Sep, 2026",
-    code: "DINING15",
-  },
-  {
-    id: "4",
-    theme: "ocean",
-    discount: "30% OFF",
-    scope: "On Sports",
-    minBooking: "Min. booking: $100 ETB",
-    validTill: "Valid till 20 Oct, 2026",
-    code: "SPORT30",
-  },
-  {
-    id: "5",
-    theme: "emerald",
-    discount: "10% OFF",
-    scope: "On Concerts",
-    minBooking: "Min. booking: $200 ETB",
-    validTill: "Valid till 31 Dec, 2026",
-    code: "MUSIC10",
-  },
-];
+function formatOfferDiscountDisplay(o: PlatformOffer): {
+  main: string;
+  max: string | null;
+} {
+  if (o.discount_type === "FLAT") {
+    return {
+      main: `${formatMoney(o.discount_value, { compact: true })} OFF`,
+      max: null,
+    };
+  }
 
-function OfferCard({ offer }: { offer: SpecialOffer }) {
+  const main = `${formatWholeNumber(o.discount_value)}% OFF`;
+  const maxAmt = o.max_discount != null ? Number(o.max_discount) : 0;
+  const max =
+    maxAmt > 0 ? `Max ${formatMoney(maxAmt, { compact: true })}` : null;
+
+  return { main, max };
+}
+
+function eligibilityCopy(eligibility?: string): {
+  badge: DisplayOffer["badge"];
+  note: string | null;
+} {
+  const e = (eligibility || "ALL").toUpperCase();
+  if (e === "NEW") {
+    return {
+      badge: { label: "NEW USER", tone: "new" },
+      note: "First booking only",
+    };
+  }
+  if (e === "EXISTING") {
+    return {
+      badge: { label: "MEMBERS", tone: "existing" },
+      note: "Existing customers only",
+    };
+  }
+  return { badge: { label: "HOT DEAL", tone: "hot" }, note: null };
+}
+
+const THEMES: OfferTheme[] = ["magenta", "violet", "ocean", "sunset", "emerald"];
+
+function mapPlatformOffer(o: PlatformOffer, index: number): DisplayOffer {
+  const theme = (THEMES.includes(o.display_theme as OfferTheme)
+    ? o.display_theme
+    : THEMES[index % THEMES.length]) as OfferTheme;
+
+  const { main: discountMain, max: discountMax } = formatOfferDiscountDisplay(o);
+
+  const scope =
+    o.scope_label ||
+    (o.category === "ALL"
+      ? "On Events & Dining"
+      : o.category === "EVENTS"
+        ? "On Events"
+        : "On Dining");
+
+  const minAmt = Number(o.min_order_amount) || 0;
+  const minBooking =
+    minAmt > 0
+      ? `Min. booking: ${formatMoney(minAmt, { compact: true })}`
+      : "No minimum booking";
+
+  const validTill = o.end_at
+    ? `Valid till ${formatDate(o.end_at)}`
+    : "Limited time offer";
+
+  const { badge, note } = eligibilityCopy(o.customer_eligibility);
+
+  return {
+    id: o.id,
+    theme,
+    discountMain,
+    discountMax,
+    name: o.name || o.code,
+    scope,
+    eligibilityNote: note,
+    badge,
+    minBooking,
+    validTill,
+    code: o.code,
+  };
+}
+
+function OfferCard({ offer }: { offer: DisplayOffer }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -86,13 +127,28 @@ function OfferCard({ offer }: { offer: SpecialOffer }) {
   return (
     <article className={`offers-rail-slot offer-card offer-card--${offer.theme}`}>
       <div className="offer-card__left">
-        <p className="offer-card__badge">
-          <Flame size={14} fill="currentColor" strokeWidth={0} />
-          HOT DEAL
+        <p className={`offer-card__badge offer-card__badge--${offer.badge.tone}`}>
+          {offer.badge.tone === "new" ? (
+            <Sparkles size={14} fill="currentColor" strokeWidth={0} />
+          ) : offer.badge.tone === "existing" ? (
+            <Users size={14} strokeWidth={2.5} />
+          ) : (
+            <Flame size={14} fill="currentColor" strokeWidth={0} />
+          )}
+          {offer.badge.label}
         </p>
         <div>
-          <p className="offer-card__discount">{offer.discount}</p>
-          <p className="offer-card__scope">{offer.scope}</p>
+          <p className="offer-card__discount">{offer.discountMain}</p>
+          {offer.discountMax ? (
+            <p className="offer-card__discount-max">{offer.discountMax}</p>
+          ) : null}
+          <p className="offer-card__name">{offer.name}</p>
+          <p className="offer-card__scope">
+            {offer.scope}
+            {offer.eligibilityNote ? (
+              <span className="offer-card__eligibility"> · {offer.eligibilityNote}</span>
+            ) : null}
+          </p>
         </div>
         <p className="offer-card__min">
           <Calendar size={13} strokeWidth={2} />
@@ -121,12 +177,21 @@ function OfferCard({ offer }: { offer: SpecialOffer }) {
 
 export default function SpecialOffersRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const { data: platformOffers = [], isLoading } = useGetActivePlatformOffersQuery();
+
+  const offers = platformOffers
+    .filter((o) => o.effective_status === "ACTIVE" || o.effective_status === "SCHEDULED")
+    .map(mapPlatformOffer);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: "smooth" });
   };
+
+  if (!isLoading && offers.length === 0) {
+    return null;
+  }
 
   return (
     <section className="bg-white py-6 sm:py-8 lg:py-10">
@@ -138,29 +203,38 @@ export default function SpecialOffersRail() {
         </div>
 
         <div className="relative">
-          <button
-            type="button"
-            aria-label="Previous offers"
-            onClick={() => scrollBy(-1)}
-            className="hidden md:flex absolute -left-4 md:-left-5 lg:-left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-          >
-            <ChevronLeft size={18} />
-          </button>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-[#666] gap-2">
+              <Loader2 className="animate-spin" size={20} />
+              Loading offers…
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                aria-label="Previous offers"
+                onClick={() => scrollBy(-1)}
+                className="hidden md:flex absolute -left-4 md:-left-5 lg:-left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+              >
+                <ChevronLeft size={18} />
+              </button>
 
-          <div ref={scrollerRef} className="offers-rail">
-            {SPECIAL_OFFERS.map((offer) => (
-              <OfferCard key={offer.id} offer={offer} />
-            ))}
-          </div>
+              <div ref={scrollerRef} className="offers-rail">
+                {offers.map((offer) => (
+                  <OfferCard key={offer.id} offer={offer} />
+                ))}
+              </div>
 
-          <button
-            type="button"
-            aria-label="Next offers"
-            onClick={() => scrollBy(1)}
-            className="hidden md:flex absolute -right-4 md:-right-5 lg:-right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-          >
-            <ChevronRight size={18} />
-          </button>
+              <button
+                type="button"
+                aria-label="Next offers"
+                onClick={() => scrollBy(1)}
+                className="hidden md:flex absolute -right-4 md:-right-5 lg:-right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </section>

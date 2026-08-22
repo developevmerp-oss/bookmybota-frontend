@@ -125,6 +125,14 @@
   color: #facc15;
 }
 
+.offer-card__badge--new {
+  color: #fde68a;
+}
+
+.offer-card__badge--existing {
+  color: #c4b5fd;
+}
+
 .offer-card__discount {
   margin: 0;
   font-size: 2.2rem;
@@ -133,10 +141,33 @@
   letter-spacing: -0.03em;
 }
 
-.offer-card__scope {
-  margin: 0.35rem 0 0;
-  font-size: 1.1rem;
+.offer-card__discount-max {
+  margin: 0.28rem 0 0;
+  font-size: 0.68rem;
   font-weight: 600;
+  line-height: 1.2;
+  opacity: 0.85;
+  letter-spacing: 0.01em;
+}
+
+.offer-card__name {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  opacity: 0.98;
+}
+
+.offer-card__scope {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.offer-card__eligibility {
+  font-weight: 600;
+  opacity: 0.92;
 }
 
 .offer-card__min {
@@ -249,8 +280,16 @@
     font-size: 2.4rem;
   }
 
+  .offer-card__discount-max {
+    font-size: 0.72rem;
+  }
+
+  .offer-card__name {
+    font-size: 1rem;
+  }
+
   .offer-card__scope {
-    font-size: 1.12rem;
+    font-size: 0.92rem;
   }
 
   .offer-card__code-box {

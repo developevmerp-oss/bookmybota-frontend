@@ -1,6 +1,12 @@
 /** Role-scoped auth storage + redirect helpers */
 
-export type UserRole = 'super_admin' | 'business_admin' | 'event_admin' | 'venue_admin' | 'customer';
+export type UserRole =
+  | 'super_admin'
+  | 'business_admin'
+  | 'event_admin'
+  | 'venue_admin'
+  | 'artist_admin'
+  | 'customer';
 
 export interface StoredAuthUser {
   id: string;
@@ -16,6 +22,7 @@ const ROLE_PRIORITY: UserRole[] = [
   'super_admin',
   'event_admin',
   'venue_admin',
+  'artist_admin',
   'business_admin',
   'customer',
 ];
@@ -30,6 +37,8 @@ export function storageKeysForRole(role: UserRole | string) {
       return { tokenKey: 'token_event_admin', userKey: 'user_event_admin' };
     case 'venue_admin':
       return { tokenKey: 'token_venue_admin', userKey: 'user_venue_admin' };
+    case 'artist_admin':
+      return { tokenKey: 'token_artist_admin', userKey: 'user_artist_admin' };
     default:
       return { tokenKey: 'token_customer', userKey: 'user_customer' };
   }
@@ -39,6 +48,7 @@ export function storageKeysForPath(pathname: string) {
   if (pathname.startsWith('/admin')) return storageKeysForRole('super_admin');
   if (pathname.startsWith('/organizer')) return storageKeysForRole('event_admin');
   if (pathname.startsWith('/venue')) return storageKeysForRole('venue_admin');
+  if (pathname.startsWith('/artist')) return storageKeysForRole('artist_admin');
   if (pathname.startsWith('/business')) return storageKeysForRole('business_admin');
   if (pathname.startsWith('/customer')) return storageKeysForRole('customer');
   return storageKeysForRole('customer');
@@ -54,6 +64,8 @@ export function homePathForRole(role: UserRole | string) {
       return '/organizer';
     case 'venue_admin':
       return '/venue';
+    case 'artist_admin':
+      return '/artist';
     case 'customer':
       return '/customer/dashboard';
     default:
@@ -70,6 +82,10 @@ export function loginPathForRole(role: UserRole | string) {
       return '/business/login';
     case 'event_admin':
       return '/organizer/login';
+    case 'venue_admin':
+      return '/venue/login';
+    case 'artist_admin':
+      return '/artist/login';
     case 'customer':
     default:
       return '/';

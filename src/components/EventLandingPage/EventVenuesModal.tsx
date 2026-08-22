@@ -10,6 +10,8 @@ export type VenueShowtimeRow = {
   venue_address?: string;
   city_name?: string | null;
   starts_at: string;
+  venue_is_authorized?: boolean;
+  venue_source?: string;
 };
 
 type VenueEntry = {
@@ -19,6 +21,7 @@ type VenueEntry = {
   city: string;
   starts_at: string;
   mapsUrl: string;
+  unauthorized?: boolean;
 };
 
 type Props = {
@@ -57,6 +60,9 @@ export default function EventVenuesModal({ open, onClose, showtimes }: Props) {
           city,
           starts_at: s.starts_at,
           mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`,
+          unauthorized:
+            s.venue_source === "auto_registered" ||
+            s.venue_is_authorized === false,
         });
       }
     }
@@ -125,6 +131,11 @@ export default function EventVenuesModal({ open, onClose, showtimes }: Props) {
                       {v.address && (
                         <p className="mt-1.5 text-[0.875rem] sm:text-[0.9375rem] text-[#4A4A4A] leading-relaxed whitespace-pre-wrap">
                           {v.address}
+                        </p>
+                      )}
+                      {v.unauthorized && (
+                        <p className="mt-1 text-[0.6875rem] text-slate-400">
+                          Not platform-authorized
                         </p>
                       )}
                       <a

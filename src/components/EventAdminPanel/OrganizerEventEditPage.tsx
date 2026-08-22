@@ -37,7 +37,7 @@ export default function EditOrganizerEventPage({
   const handleSaveDraft = async (payload: EventFormPayload) => {
     try {
       await updateEvent({ id, body: payload }).unwrap();
-      toast.success("Event saved successfully");
+      toast.success("Draft saved. You can continue editing anytime from My Events.");
       router.push("/organizer/events");
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save event"));
@@ -79,7 +79,7 @@ export default function EditOrganizerEventPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <Link href="/organizer/events" className="inline-flex items-center gap-2 text-sm portal-muted hover:text-slate-900">
         <ArrowLeft size={16} /> Back to events
       </Link>

@@ -3,18 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle } from "lucide-react";
+import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetBusinessTypesQuery,
   useGetEventMastersQuery,
   useGetCitiesQuery,
   useUploadImageMutation,
+  useSearchOrganizerVenuesQuery,
+  useGetOrganizerVenueLayoutsQuery,
+  useSearchOrganizerArtistsQuery,
+  type CityMaster,
   type EventDocumentUpload,
   type EventFormPayload,
   type OrganizerEvent,
+  type OrganizerVenueSearchResult,
+  type OrganizerArtistSearchResult,
 } from "@/services/api";
-import { AGE_GROUP_OPTIONS, LANGUAGE_OPTIONS, parseEventLanguages } from "@/lib/eventValidation";
+import { fuzzyFilter } from "@/lib/fuzzySearch";
+import { parseEventLanguages, LANGUAGE_OPTIONS, AGE_GROUP_OPTIONS } from "@/lib/eventValidation";
 import {
   eventDraftSchema,
   eventSubmitSchema,
@@ -22,7 +29,9 @@ import {
   type EventFormValues,
   defaultEventFormValues,
   defaultVenue,
+  defaultArtist,
   showtimeToIso,
+  isShowtimePersistable,
 } from "@/lib/eventFormSchema";
 import {
   formatDate,
@@ -35,6 +44,10 @@ import {
 } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import ImageCropPicker, { CroppedImageField } from "@/components/Shared/ImageCropPicker";
+import EventStepperNav, {
+  EVENT_STEPPER_STEPS,
+  type EventStepperStepId,
+} from "@/components/EventAdminPanel/EventStepperNav";
 
 function normalizeFormDocuments(docs?: EventDocumentUpload[] | string[]): EventDocumentUpload[] {
   if (!docs?.length) return [];
@@ -111,6 +124,21 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     about_event: event.about_event || "",
     age_group: event.age_group || "",
     duration_minutes: event.duration_minutes ?? null,
+    artists:
+      event.artists?.map((a, i) => ({
+        artist_source:
+          a.artist_source === "registered"
+            ? "registered"
+            : a.artist_source === "auto_registered"
+              ? "auto_registered"
+              : "external",
+        artist_business_id: a.artist_business_id || null,
+        name: a.name || "",
+        role_title: a.role_title || "",
+        description: a.description || "",
+        image_url: a.image_url || a.artist_business_image || "",
+        sort_order: a.sort_order ?? i,
+      })) || [],
     showtimes:
       event.showtimes?.map((s, i) => {
         const durationType =
@@ -119,6 +147,29 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
           venue_name: s.venue_name || "",
           venue_address: s.venue_address || "",
           city_id: s.city_id ?? null,
+          venue_source:
+            s.venue_source === "registered"
+              ? "registered"
+              : s.venue_source === "auto_registered"
+                ? "auto_registered"
+                : "manual",
+          venue_business_id: s.venue_business_id || null,
+          venue_layout_template_id: s.venue_layout_template_id || null,
+          layout_mode:
+            s.layout_mode === "standard" || s.layout_mode === "custom"
+              ? s.layout_mode
+              : s.venue_layout_template_id
+                ? "standard"
+                : "none",
+          custom_layout_name: s.custom_layout_name || "",
+          custom_layout_type: s.custom_layout_type || "custom",
+          custom_layout_capacity: s.custom_layout_capacity ?? null,
+          custom_layout_notes: s.custom_layout_notes || "",
+          custom_layout_images: Array.isArray((s as { custom_layout_images?: string[] }).custom_layout_images)
+            ? ((s as { custom_layout_images?: string[] }).custom_layout_images || [])
+            : [],
+          location_id: (s as { location_id?: number | null }).location_id ?? null,
+          venue_proposal: (s as { venue_proposal?: unknown }).venue_proposal || null,
           duration_type: durationType,
           event_date: toDateInput(s.starts_at),
           start_time: toTimeInput(s.starts_at),
@@ -129,6 +180,500 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
         };
       }) || [defaultVenue()],
   };
+}
+
+function CityLocationFields({
+  index,
+  readOnly,
+  cities,
+  labelClass,
+  inputClass,
+  errorClass,
+}: {
+  index: number;
+  readOnly: boolean;
+  cities: CityMaster[];
+  labelClass: string;
+  inputClass: string;
+  errorClass: string;
+}) {
+  const {
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<EventFormValues>();
+  const cityId = watch(`showtimes.${index}.city_id`);
+  const [countryFilter, setCountryFilter] = useState("");
+
+  const countries = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of cities) {
+      const country = (c.country || "").trim();
+      if (country) set.add(country);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [cities]);
+
+  const filteredCities = useMemo(() => {
+    return cities.filter((c) => {
+      if (countryFilter && (c.country || "").trim() !== countryFilter) return false;
+      return true;
+    });
+  }, [cities, countryFilter]);
+
+  useEffect(() => {
+    if (cityId == null) return;
+    const selected = cities.find((c) => c.id === cityId);
+    if (!selected) return;
+    if (selected.country && !countryFilter) setCountryFilter(selected.country.trim());
+  }, [cityId, cities]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
+      <div>
+        <label className={labelClass}>Country</label>
+        <select
+          disabled={readOnly}
+          className={inputClass}
+          value={countryFilter}
+          onChange={(e) => {
+            setCountryFilter(e.target.value);
+            setValue(`showtimes.${index}.city_id`, null, { shouldDirty: true });
+            setValue(`showtimes.${index}.location_id`, null, { shouldDirty: true });
+          }}
+        >
+          <option value="">All countries</option>
+          {countries.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={labelClass}>City</label>
+        <select
+          disabled={readOnly}
+          className={inputClass}
+          value={cityId ?? ""}
+          onChange={(e) => {
+            const next = e.target.value === "" ? null : Number(e.target.value);
+            setValue(`showtimes.${index}.city_id`, next, { shouldDirty: true, shouldValidate: true });
+            setValue(`showtimes.${index}.location_id`, null, { shouldDirty: true });
+            const selected = cities.find((c) => c.id === next);
+            if (selected?.country) setCountryFilter(selected.country.trim());
+          }}
+        >
+          <option value="">Select city</option>
+          {filteredCities.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+              {c.state ? `, ${c.state}` : ""}
+              {c.country ? ` (${c.country})` : ""}
+            </option>
+          ))}
+        </select>
+        {errors.showtimes?.[index]?.city_id && (
+          <p className={errorClass}>{errors.showtimes[index]?.city_id?.message}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VenueNameSearchField({
+  index,
+  readOnly,
+  labelClass,
+  inputClass,
+  errorClass,
+  onAddNewVenue,
+  onVenueSelected,
+  onSearchAgain,
+}: {
+  index: number;
+  readOnly: boolean;
+  labelClass: string;
+  inputClass: string;
+  errorClass: string;
+  onAddNewVenue: (name: string) => void;
+  onVenueSelected: () => void;
+  onSearchAgain: () => void;
+}) {
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<EventFormValues>();
+  const cityId = watch(`showtimes.${index}.city_id`);
+  const venueBusinessId = watch(`showtimes.${index}.venue_business_id`);
+  const venueName = watch(`showtimes.${index}.venue_name`) || "";
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(venueName.trim()), 250);
+    return () => clearTimeout(t);
+  }, [venueName]);
+
+  const { data: allVenues = [], isFetching } = useSearchOrganizerVenuesQuery(
+    { city_id: cityId ?? undefined },
+    { skip: readOnly }
+  );
+
+  const venues = useMemo(
+    () =>
+      fuzzyFilter(allVenues, debouncedQ, ["name", "address", "city_name", "city_state"], {
+        limit: 30,
+        threshold: 0.45,
+      }),
+    [allVenues, debouncedQ]
+  );
+
+  const clearVenueSelection = () => {
+    setValue(`showtimes.${index}.venue_business_id`, null, { shouldDirty: true });
+    setValue(`showtimes.${index}.venue_source`, "manual", { shouldDirty: true });
+    setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+    const mode = watch(`showtimes.${index}.layout_mode`);
+    if (mode === "standard") {
+      setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+    }
+  };
+
+  const applyVenue = (venue: OrganizerVenueSearchResult) => {
+    const verified =
+      venue.is_partner_authorized !== false &&
+      venue.partner_source !== "event_auto" &&
+      venue.approval_status === "APPROVED";
+    setValue(`showtimes.${index}.venue_business_id`, venue.id, { shouldDirty: true, shouldValidate: true });
+    setValue(`showtimes.${index}.venue_source`, verified ? "registered" : "auto_registered", {
+      shouldDirty: true,
+    });
+    setValue(`showtimes.${index}.venue_name`, venue.name, { shouldDirty: true, shouldValidate: true });
+    setValue(`showtimes.${index}.venue_address`, venue.address || "", { shouldDirty: true });
+    if (venue.city_id != null) {
+      setValue(`showtimes.${index}.city_id`, venue.city_id, { shouldDirty: true, shouldValidate: true });
+    }
+    if (verified && venue.default_layout_id) {
+      setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
+      setValue(`showtimes.${index}.venue_layout_template_id`, venue.default_layout_id, { shouldDirty: true });
+    }
+    setShowResults(false);
+    onVenueSelected();
+  };
+
+  const { onChange: onVenueNameChange, ...venueNameReg } = register(`showtimes.${index}.venue_name`);
+
+  return (
+    <div>
+      <label className={labelClass}>Venue name</label>
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        <input
+          disabled={readOnly}
+          className={`${inputClass} pl-9`}
+          placeholder="Search or type venue name — e.g. tagor hall"
+          {...venueNameReg}
+          onFocus={() => setShowResults(true)}
+          onChange={(e) => {
+            onVenueNameChange(e);
+            if (venueBusinessId) clearVenueSelection();
+            onSearchAgain();
+            setShowResults(true);
+          }}
+          onBlur={() => {
+            window.setTimeout(() => setShowResults(false), 150);
+          }}
+        />
+      </div>
+      <p className="text-xs text-slate-500 mt-1">
+        Search existing venues and select one. If not found, use Add venue to enter details.
+      </p>
+      {errors.showtimes?.[index]?.venue_name && (
+        <p className={errorClass}>{errors.showtimes[index]?.venue_name?.message}</p>
+      )}
+
+      {venueBusinessId && !readOnly && (
+        <button
+          type="button"
+          onClick={() => {
+            clearVenueSelection();
+            onSearchAgain();
+            setShowResults(true);
+          }}
+          className="mt-1.5 text-xs text-slate-600 hover:text-rose-600"
+        >
+          Change venue
+        </button>
+      )}
+
+      {showResults && !readOnly && debouncedQ.length >= 2 && !venueBusinessId && (
+        <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm">
+          {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
+          {!isFetching && venues.length === 0 && (
+            <div className="px-3 py-3 space-y-2">
+              <p className="text-xs text-slate-500">
+                No matching venues for &quot;{debouncedQ}&quot;.
+              </p>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onAddNewVenue(debouncedQ);
+                  setShowResults(false);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+              >
+                <Plus size={14} />
+                Add &quot;{debouncedQ}&quot; as new venue
+              </button>
+            </div>
+          )}
+          {venues.map((v) => {
+            const selected = venueBusinessId === v.id;
+            const verified =
+              v.is_partner_authorized !== false &&
+              v.partner_source !== "event_auto" &&
+              v.approval_status === "APPROVED";
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyVenue(v)}
+                className={`w-full text-left px-3 py-2 hover:bg-violet-50 transition-colors ${
+                  selected ? "bg-violet-50" : ""
+                }`}
+              >
+                <p className="text-sm font-medium text-slate-800">{v.name}</p>
+                <p className="text-xs text-slate-500">
+                  {[v.city_name, v.city_state].filter(Boolean).join(", ") || "City not set"}
+                  {typeof v.published_layout_count === "number" && verified
+                    ? ` · ${v.published_layout_count} published layout${v.published_layout_count === 1 ? "" : "s"}`
+                    : ""}
+                </p>
+                <p className={`text-[11px] mt-0.5 ${verified ? "text-emerald-700" : "text-amber-700"}`}>
+                  {verified ? "Verified partner" : "In system — not platform-authorized"}
+                  {verified && v.default_layout_name ? ` · Default: ${v.default_layout_name}` : ""}
+                </p>
+              </button>
+            );
+          })}
+          {!isFetching && venues.length > 0 && (
+            <div className="px-3 py-2 border-t border-slate-100 bg-slate-50">
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onAddNewVenue(debouncedQ);
+                  setShowResults(false);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:text-violet-900"
+              >
+                <Plus size={13} />
+                Not listed? Add &quot;{debouncedQ}&quot; as new venue
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeatingLayoutFields({
+  index,
+  readOnly,
+  labelClass,
+  inputClass,
+  errorClass,
+}: {
+  index: number;
+  readOnly: boolean;
+  labelClass: string;
+  inputClass: string;
+  errorClass: string;
+}) {
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<EventFormValues>();
+  const venueSource = watch(`showtimes.${index}.venue_source`) || "manual";
+  const venueBusinessId = watch(`showtimes.${index}.venue_business_id`);
+  const isRegisteredPartner = venueSource === "registered" && Boolean(venueBusinessId);
+  const layoutMode = watch(`showtimes.${index}.layout_mode`) || "none";
+  const layoutId = watch(`showtimes.${index}.venue_layout_template_id`);
+
+  const { data: layoutData } = useGetOrganizerVenueLayoutsQuery(venueBusinessId!, {
+    skip: readOnly || !venueBusinessId || layoutMode !== "standard",
+  });
+
+  const setLayoutMode = (next: "none" | "standard" | "custom") => {
+    setValue(`showtimes.${index}.layout_mode`, next, { shouldDirty: true, shouldValidate: true });
+    if (next !== "standard") {
+      setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+    }
+    if (next !== "custom") {
+      setValue(`showtimes.${index}.custom_layout_name`, "", { shouldDirty: true });
+      setValue(`showtimes.${index}.custom_layout_notes`, "", { shouldDirty: true });
+    } else if (!watch(`showtimes.${index}.custom_layout_name`)) {
+      const venueName = watch(`showtimes.${index}.venue_name`) || "Venue";
+      setValue(`showtimes.${index}.custom_layout_name`, `${venueName} custom layout`, { shouldDirty: true });
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+      <div>
+        <p className={labelClass}>Seating layout</p>
+        <p className="text-xs text-slate-500 mb-2">
+          Optional. Choose a published venue layout, request a custom one, or skip for now.
+        </p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              disabled={readOnly}
+              checked={layoutMode === "none"}
+              onChange={() => setLayoutMode("none")}
+            />
+            None
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              disabled={readOnly || !isRegisteredPartner}
+              checked={layoutMode === "standard"}
+              onChange={() => setLayoutMode("standard")}
+            />
+            Standard (published layout)
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              disabled={readOnly}
+              checked={layoutMode === "custom"}
+              onChange={() => setLayoutMode("custom")}
+            />
+            Custom request
+          </label>
+        </div>
+        {!isRegisteredPartner && (
+          <p className="text-xs text-slate-500 mt-1">
+            Standard layouts require a verified registered venue. New or unverified venues can still request a custom layout.
+          </p>
+        )}
+      </div>
+
+      {layoutMode === "standard" && (
+        <div>
+          <label className={labelClass}>Published layout</label>
+          <select
+            disabled={readOnly || !venueBusinessId}
+            className={inputClass}
+            value={layoutId || ""}
+            onChange={(e) =>
+              setValue(`showtimes.${index}.venue_layout_template_id`, e.target.value || null, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          >
+            <option value="">Select published layout</option>
+            {(layoutData?.layouts || []).map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+                {l.is_default ? " (default)" : ""}
+                {l.capacity ? ` · ${l.capacity} seats` : ""}
+              </option>
+            ))}
+          </select>
+          {errors.showtimes?.[index]?.venue_layout_template_id && (
+            <p className={errorClass}>{errors.showtimes[index]?.venue_layout_template_id?.message}</p>
+          )}
+        </div>
+      )}
+
+      {layoutMode === "custom" && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>Layout name</label>
+            <input
+              disabled={readOnly}
+              className={inputClass}
+              {...register(`showtimes.${index}.custom_layout_name`)}
+              placeholder="Festival floor plan"
+            />
+            {errors.showtimes?.[index]?.custom_layout_name && (
+              <p className={errorClass}>{errors.showtimes[index]?.custom_layout_name?.message}</p>
+            )}
+          </div>
+          <div>
+            <label className={labelClass}>Layout type</label>
+            <select
+              disabled={readOnly}
+              className={inputClass}
+              {...register(`showtimes.${index}.custom_layout_type`)}
+            >
+              <option value="custom">Custom</option>
+              <option value="theater">Theater</option>
+              <option value="banquet">Banquet</option>
+              <option value="standing">Standing</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Expected capacity</label>
+            <input
+              disabled={readOnly}
+              type="number"
+              min={0}
+              className={inputClass}
+              {...register(`showtimes.${index}.custom_layout_capacity`, {
+                setValueAs: (v) => (v === "" || v == null ? null : Number(v)),
+              })}
+              placeholder="e.g. 500"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelClass}>Notes / requirements</label>
+            <textarea
+              disabled={readOnly}
+              rows={2}
+              className={inputClass}
+              {...register(`showtimes.${index}.custom_layout_notes`)}
+              placeholder="Sections, VIP areas, stage position, accessibility…"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelClass}>Reference images (URLs, one per line)</label>
+            <textarea
+              disabled={readOnly}
+              rows={3}
+              className={inputClass}
+              placeholder="https://…/layout-ref-1.jpg"
+              value={((watch(`showtimes.${index}.custom_layout_images`) as string[] | undefined) || []).join("\n")}
+              onChange={(e) => {
+                const urls = e.target.value
+                  .split("\n")
+                  .map((u) => u.trim())
+                  .filter(Boolean);
+                setValue(`showtimes.${index}.custom_layout_images` as never, urls as never, {
+                  shouldDirty: true,
+                });
+              }}
+            />
+          </div>
+          <p className="sm:col-span-2 text-xs text-slate-500">
+            Saved with the draft. Submitted to the platform when you submit the event for approval.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function VenueBlock({
@@ -142,7 +687,7 @@ function VenueBlock({
   readOnly: boolean;
   canRemove: boolean;
   onRemove: () => void;
-  cities: Array<{ id: number; name: string; state?: string | null }>;
+  cities: CityMaster[];
 }) {
   const {
     register,
@@ -163,6 +708,26 @@ function VenueBlock({
   const endTime = watch(`showtimes.${index}.end_time`);
   const startsAt = watch(`showtimes.${index}.starts_at`);
   const endsAt = watch(`showtimes.${index}.ends_at`);
+  const venueBusinessId = watch(`showtimes.${index}.venue_business_id`);
+  const venueName = watch(`showtimes.${index}.venue_name`) || "";
+  const venueAddress = watch(`showtimes.${index}.venue_address`) || "";
+  const cityId = watch(`showtimes.${index}.city_id`);
+  const venueSource = watch(`showtimes.${index}.venue_source`) || "manual";
+  const [addingNewVenue, setAddingNewVenue] = useState(false);
+  const [addModeInitialized, setAddModeInitialized] = useState(false);
+
+  useEffect(() => {
+    if (addModeInitialized) return;
+    if (!venueBusinessId && venueName.trim() && (venueAddress.trim() || cityId != null)) {
+      setAddingNewVenue(true);
+    }
+    setAddModeInitialized(true);
+  }, [addModeInitialized, venueBusinessId, venueName, venueAddress, cityId]);
+
+  const showManualVenueFields = addingNewVenue && !venueBusinessId;
+  const isVerifiedSelected =
+    venueBusinessId &&
+    venueSource === "registered";
   const labelClass = "portal-label block text-sm font-semibold mb-1.5";
   const errorClass = "text-rose-600 text-xs mt-1";
   const inputClass = "input-field w-full";
@@ -177,36 +742,80 @@ function VenueBlock({
           </button>
         )}
       </div>
+
       <div className="grid sm:grid-cols-2 gap-3">
-        <div>
-          <label className={labelClass}>Venue name</label>
-          <input disabled={readOnly} className={inputClass} {...register(`showtimes.${index}.venue_name`)} placeholder="City Auditorium" />
-          {errors.showtimes?.[index]?.venue_name && (
-            <p className={errorClass}>{errors.showtimes[index]?.venue_name?.message}</p>
-          )}
-        </div>
-        <div>
-          <label className={labelClass}>City</label>
-          <select
-            disabled={readOnly}
-            className={inputClass}
-            {...register(`showtimes.${index}.city_id`, {
-              setValueAs: (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
-            })}
-          >
-            <option value="">Select city</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}{c.state ? `, ${c.state}` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="sm:col-span-2">
-          <label className={labelClass}>Venue address</label>
-          <input disabled={readOnly} className={inputClass} {...register(`showtimes.${index}.venue_address`)} placeholder="Full address" />
+          <VenueNameSearchField
+            index={index}
+            readOnly={readOnly}
+            labelClass={labelClass}
+            inputClass={inputClass}
+            errorClass={errorClass}
+            onAddNewVenue={(name) => {
+              setValue(`showtimes.${index}.venue_name`, name, { shouldDirty: true, shouldValidate: true });
+              setValue(`showtimes.${index}.venue_source`, "manual", { shouldDirty: true });
+              setValue(`showtimes.${index}.venue_business_id`, null, { shouldDirty: true });
+              setAddingNewVenue(true);
+            }}
+            onVenueSelected={() => setAddingNewVenue(false)}
+            onSearchAgain={() => setAddingNewVenue(false)}
+          />
         </div>
+
+        {venueBusinessId && (
+          <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+            <p className="text-sm font-medium text-slate-800">{venueName}</p>
+            {venueAddress && <p className="text-xs text-slate-600 mt-0.5">{venueAddress}</p>}
+            <p className={`text-[11px] mt-1 ${isVerifiedSelected ? "text-emerald-700" : "text-amber-700"}`}>
+              {isVerifiedSelected ? "Verified partner venue selected" : "Venue in system — not platform-authorized"}
+            </p>
+          </div>
+        )}
+
+        {showManualVenueFields && (
+          <>
+            <div className="sm:col-span-2 flex items-center justify-between gap-3 rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2">
+              <p className="text-sm font-semibold text-violet-900">
+                Add new venue{venueName.trim() ? `: ${venueName.trim()}` : ""}
+              </p>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => setAddingNewVenue(false)}
+                  className="text-xs text-slate-600 hover:text-rose-600 shrink-0"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <label className={labelClass}>Venue address</label>
+              <input
+                disabled={readOnly}
+                className={inputClass}
+                {...register(`showtimes.${index}.venue_address`)}
+                placeholder="Full address"
+              />
+            </div>
+            <CityLocationFields
+              index={index}
+              readOnly={readOnly}
+              cities={cities}
+              labelClass={labelClass}
+              inputClass={inputClass}
+              errorClass={errorClass}
+            />
+          </>
+        )}
       </div>
+
+      <SeatingLayoutFields
+        index={index}
+        readOnly={readOnly}
+        labelClass={labelClass}
+        inputClass={inputClass}
+        errorClass={errorClass}
+      />
 
       <div>
         <p className={labelClass}>Event duration</p>
@@ -328,6 +937,181 @@ function VenueBlock({
   );
 }
 
+function ArtistBlock({
+  index,
+  readOnly,
+  onRemove,
+}: {
+  index: number;
+  readOnly: boolean;
+  onRemove: () => void;
+}) {
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<EventFormValues>();
+  const businessId = watch(`artists.${index}.artist_business_id`);
+  const artistName = watch(`artists.${index}.name`) || "";
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const labelClass = "portal-label block text-sm font-semibold mb-1.5";
+  const errorClass = "text-rose-600 text-xs mt-1";
+  const inputClass = "input-field w-full";
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(artistName.trim()), 250);
+    return () => clearTimeout(t);
+  }, [artistName]);
+
+  const { data: allPartners = [], isFetching } = useSearchOrganizerArtistsQuery(undefined, {
+    skip: readOnly,
+  });
+
+  const partners = useMemo(
+    () => fuzzyFilter(allPartners, debouncedQ, ["name", "description", "type_name", "city_name"], { limit: 25 }),
+    [allPartners, debouncedQ]
+  );
+
+  const clearArtistSelection = () => {
+    setValue(`artists.${index}.artist_business_id`, null, { shouldDirty: true });
+    setValue(`artists.${index}.artist_source`, "external", { shouldDirty: true });
+  };
+
+  const applyPartner = (artist: OrganizerArtistSearchResult) => {
+    const verified =
+      artist.is_partner_authorized !== false && artist.partner_source !== "event_auto";
+    setValue(`artists.${index}.artist_business_id`, artist.id, { shouldDirty: true, shouldValidate: true });
+    setValue(`artists.${index}.artist_source`, verified ? "registered" : "auto_registered", {
+      shouldDirty: true,
+    });
+    setValue(`artists.${index}.name`, artist.name, { shouldDirty: true, shouldValidate: true });
+    setValue(`artists.${index}.description`, artist.description || "", { shouldDirty: true });
+    setValue(`artists.${index}.image_url`, artist.cover_image_url || "", { shouldDirty: true });
+    setShowResults(false);
+  };
+
+  const { onChange: onArtistNameChange, ...artistNameReg } = register(`artists.${index}.name`);
+
+  return (
+    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-800">Artist {index + 1}</p>
+        {!readOnly && (
+          <button type="button" onClick={onRemove} className="p-1.5 text-slate-400 hover:text-rose-600">
+            <Trash2 size={16} />
+          </button>
+        )}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label className={labelClass}>Artist name</label>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              disabled={readOnly}
+              className={`${inputClass} pl-9`}
+              placeholder="Search or type artist name"
+              {...artistNameReg}
+              onFocus={() => setShowResults(true)}
+              onChange={(e) => {
+                onArtistNameChange(e);
+                if (businessId) clearArtistSelection();
+                setShowResults(true);
+              }}
+              onBlur={() => {
+                window.setTimeout(() => setShowResults(false), 150);
+              }}
+            />
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Select an existing artist from results, or type a new name to auto-register on save.
+          </p>
+          {errors.artists?.[index]?.name && (
+            <p className={errorClass}>{errors.artists[index]?.name?.message}</p>
+          )}
+
+          {businessId && !readOnly && (
+            <button
+              type="button"
+              onClick={() => {
+                clearArtistSelection();
+                setShowResults(true);
+              }}
+              className="mt-1.5 text-xs text-slate-600 hover:text-rose-600"
+            >
+              Clear selection — add as new artist
+            </button>
+          )}
+
+          {showResults && !readOnly && debouncedQ.length >= 2 && (
+            <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm">
+              {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
+              {!isFetching && partners.length === 0 && (
+                <p className="px-3 py-2 text-xs text-slate-500">
+                  No matches — continue to add &quot;{debouncedQ}&quot; as a new artist.
+                </p>
+              )}
+              {partners.map((a) => {
+                const verified =
+                  a.is_partner_authorized !== false && a.partner_source !== "event_auto";
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyPartner(a)}
+                    className={`w-full text-left px-3 py-2 hover:bg-violet-50 ${
+                      businessId === a.id ? "bg-violet-50" : ""
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-slate-800">{a.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {[a.type_name, a.city_name].filter(Boolean).join(" · ") || "Artist"}
+                    </p>
+                    <p className={`text-[11px] ${verified ? "text-emerald-700" : "text-amber-700"}`}>
+                      {verified ? "Verified partner" : "In system — not platform-authorized"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {!businessId && (
+          <p className="sm:col-span-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            This artist will be auto-registered when you save. Customers will see a small note that they are not
+            platform-authorized.
+          </p>
+        )}
+
+        <div>
+          <label className={labelClass}>Role on lineup</label>
+          <input
+            disabled={readOnly}
+            className={inputClass}
+            {...register(`artists.${index}.role_title`)}
+            placeholder="Headliner, Guest, Opener…"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className={labelClass}>Short description</label>
+          <textarea
+            disabled={readOnly}
+            rows={2}
+            className={inputClass}
+            {...register(`artists.${index}.description`)}
+            placeholder="Optional bio or notes"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface EventFormProps {
   event?: OrganizerEvent | null;
   readOnly?: boolean;
@@ -357,6 +1141,13 @@ export default function EventForm({
   const [selectedTerms, setSelectedTerms] = useState(initialTerms.selected);
   const [customTerms, setCustomTerms] = useState<string[]>(initialTerms.custom);
   const [customTermDraft, setCustomTermDraft] = useState("");
+  const [hostingType, setHostingType] = useState<"single" | "tour">(
+    (event?.showtimes?.length || 0) > 1 ? "tour" : "single"
+  );
+  const [stepId, setStepId] = useState<EventStepperStepId>(event ? "details" : "type");
+  const [visitedSteps, setVisitedSteps] = useState<EventStepperStepId[]>(() =>
+    event ? EVENT_STEPPER_STEPS.map((s) => s.id) : []
+  );
 
   const categories = useMemo(
     () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
@@ -376,6 +1167,7 @@ export default function EventForm({
     setValue,
     reset,
     getValues,
+    trigger,
     formState: { errors },
   } = methods;
 
@@ -395,6 +1187,12 @@ export default function EventForm({
     append: appendShowtime,
     remove: removeShowtime,
   } = useFieldArray({ control, name: "showtimes" });
+
+  const {
+    fields: artistFields,
+    append: appendArtist,
+    remove: removeArtist,
+  } = useFieldArray({ control, name: "artists" });
 
   useEffect(() => {
     if (event) {
@@ -416,13 +1214,46 @@ export default function EventForm({
     }
   }, [categoryTypeId, masters?.genres, getValues, setValue]);
 
-  const buildPayload = (values: EventFormValues): EventFormPayload => {
-    const showtimes = (values.showtimes || []).map((s) => {
+  const buildPayload = (values: EventFormValues, opts?: { forDraft?: boolean }): EventFormPayload => {
+    const draftMode = opts?.forDraft === true;
+    const rawShowtimes = values.showtimes || [];
+    const persistableShowtimes = draftMode
+      ? rawShowtimes.filter(isShowtimePersistable)
+      : rawShowtimes;
+    const showtimes = persistableShowtimes.map((s, stopIndex) => {
       const range = showtimeToIso(s);
+      const venueSource =
+        s.venue_business_id && s.venue_source === "registered"
+          ? "registered"
+          : s.venue_business_id && s.venue_source === "auto_registered"
+            ? "auto_registered"
+            : "manual";
+      const layoutMode =
+        s.layout_mode === "standard" || s.layout_mode === "custom" ? s.layout_mode : "none";
+      const originalIndex = rawShowtimes.indexOf(s);
+      const stopOrderIndex = originalIndex >= 0 ? originalIndex : stopIndex;
       return {
-        venue_name: s.venue_name.trim(),
+        venue_name: s.venue_name.trim() || (draftMode ? "Venue TBD" : s.venue_name.trim()),
         venue_address: s.venue_address?.trim() || "",
         city_id: s.city_id ?? null,
+        venue_source: venueSource as "manual" | "registered" | "auto_registered",
+        venue_business_id: s.venue_business_id || null,
+        venue_layout_template_id: layoutMode === "standard" ? s.venue_layout_template_id || null : null,
+        layout_mode: layoutMode as "none" | "standard" | "custom",
+        custom_layout_name: layoutMode === "custom" ? s.custom_layout_name?.trim() || null : null,
+        custom_layout_type: layoutMode === "custom" ? s.custom_layout_type?.trim() || "custom" : null,
+        custom_layout_capacity:
+          layoutMode === "custom" && s.custom_layout_capacity != null
+            ? Number(s.custom_layout_capacity)
+            : null,
+        custom_layout_notes: layoutMode === "custom" ? s.custom_layout_notes?.trim() || null : null,
+        custom_layout_images:
+          layoutMode === "custom" && Array.isArray(s.custom_layout_images)
+            ? s.custom_layout_images.filter(Boolean)
+            : [],
+        location_id: null,
+        tour_stop_order: hostingType === "tour" ? stopOrderIndex : null,
+        venue_proposal: null,
         starts_at: range.starts_at,
         ends_at: range.ends_at,
         duration_type: (s.duration_type === "MULTI_DAY" ? "MULTI_DAY" : "ONE_DAY") as "ONE_DAY" | "MULTI_DAY",
@@ -434,8 +1265,9 @@ export default function EventForm({
       };
     });
     const ticket_types = showtimes.flatMap((s) => s.ticket_types);
-    return {
-      name: values.name.trim(),
+    const draftArtists = (values.artists || []).filter((a) => a.name?.trim());
+    const payload: EventFormPayload = {
+      name: values.name.trim() || (draftMode ? "Untitled Event" : values.name.trim()),
       category_type_id: values.category_type_id,
       genres: values.genres || [],
       poster_horizontal_url: values.poster_horizontal_url || "",
@@ -453,8 +1285,39 @@ export default function EventForm({
         custom: customTerms.map((t) => t.trim()).filter(Boolean),
       },
       ticket_types,
+      hosting_type: hostingType,
+      tour_id: (event as { tour_id?: string | null } | undefined)?.tour_id || null,
+      tour:
+        hostingType === "tour"
+          ? {
+              id: (event as { tour_id?: string | null } | undefined)?.tour_id || null,
+              name: values.name.trim() || "Untitled Event",
+              description: values.about_event?.trim() || null,
+              category_type_id: values.category_type_id,
+              main_artist_name: null,
+              poster_url: values.poster_horizontal_url || null,
+            }
+          : null,
+      artists: (draftMode ? draftArtists : values.artists || []).map((a, i) => ({
+        artist_source: (a.artist_source === "registered"
+          ? "registered"
+          : a.artist_source === "auto_registered"
+            ? "auto_registered"
+            : "external") as "registered" | "external" | "auto_registered",
+        artist_business_id:
+          a.artist_source === "registered" || a.artist_source === "auto_registered"
+            ? a.artist_business_id || null
+            : null,
+        name: a.name.trim(),
+        role_title: a.role_title?.trim() || null,
+        description: a.description?.trim() || null,
+        image_url: a.image_url?.trim() || null,
+        documents: Array.isArray(a.documents) ? a.documents : [],
+        sort_order: i,
+      })),
       showtimes,
     };
+    return payload;
   };
 
   const toggleMasterTerm = (term: { id: number; text: string }) => {
@@ -491,14 +1354,26 @@ export default function EventForm({
     );
   };
 
-  const runSaveDraft = handleSubmit(async (values) => {
-    const payload = buildPayload(values);
+  const runSaveDraft = async () => {
+    const values = getValues();
+    const youtube = values.youtube_url?.trim();
+    if (youtube) {
+      try {
+        await eventDraftSchema.validateAt("youtube_url", values);
+      } catch (e: unknown) {
+        const msg =
+          e && typeof e === "object" && "message" in e ? String((e as Error).message) : "Invalid YouTube link";
+        toast.error(msg);
+        return;
+      }
+    }
+    const payload = buildPayload(values, { forDraft: true });
     try {
       await onSaveDraft(payload);
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save draft"));
     }
-  });
+  };
 
   const runSubmit = async (values: EventFormValues) => {
     try {
@@ -601,11 +1476,207 @@ export default function EventForm({
   const errorClass = "text-rose-600 text-xs mt-1";
   const inputClass = "input-field w-full";
 
+  const stepIndex = EVENT_STEPPER_STEPS.findIndex((s) => s.id === stepId);
+  const isFirstStep = stepIndex <= 0;
+  const isLastStep = stepId === "review";
+
+  const markVisited = (id: EventStepperStepId) => {
+    setVisitedSteps((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const goToStep = (id: EventStepperStepId) => {
+    markVisited(stepId);
+    setStepId(id);
+  };
+
+  const validateCurrentStep = async (): Promise<boolean> => {
+    if (stepId === "type") {
+      if (!hostingType) {
+        toast.error("Choose Single Event or Tour to continue.");
+        return false;
+      }
+      return true;
+    }
+    if (stepId === "details") {
+      const ok = await trigger([
+        "name",
+        "category_type_id",
+        "duration_minutes",
+        "genres",
+        "languages",
+        "age_group",
+        "about_event",
+      ]);
+      if (!ok) {
+        toast.error("Please complete the required event details.");
+        return false;
+      }
+      const values = getValues();
+      if (!values.name?.trim()) {
+        toast.error("Event name is required.");
+        return false;
+      }
+      if (!values.category_type_id) {
+        toast.error("Event category is required.");
+        return false;
+      }
+      if (masters?.genres?.length && !(values.genres || []).length) {
+        toast.error("Select at least one genre for this category.");
+        return false;
+      }
+      if (!(values.languages || []).length) {
+        toast.error("Select at least one language.");
+        return false;
+      }
+      return true;
+    }
+    if (stepId === "media") {
+      const ok = await trigger(["poster_horizontal_url", "youtube_url"]);
+      if (!ok || !getValues("poster_horizontal_url")?.trim()) {
+        toast.error("Horizontal poster is required.");
+        return false;
+      }
+      return true;
+    }
+    if (stepId === "venue") {
+      const ok = await trigger(["showtimes"]);
+      if (!ok) {
+        toast.error("Please complete venue, city, schedule, and ticket details.");
+        return false;
+      }
+      try {
+        await eventSubmitSchema.validateAt("showtimes", getValues());
+      } catch (e: unknown) {
+        const msg =
+          e && typeof e === "object" && "message" in e
+            ? String((e as Error).message)
+            : "Venue / ticket details are incomplete.";
+        toast.error(msg);
+        return false;
+      }
+      return true;
+    }
+    if (stepId === "artists") {
+      const artists = getValues("artists") || [];
+      if (!artists.length) return true;
+      const ok = await trigger(["artists"]);
+      if (!ok) {
+        toast.error("Please complete artist details or remove incomplete entries.");
+        return false;
+      }
+      try {
+        await eventSubmitSchema.validateAt("artists", getValues());
+      } catch (e: unknown) {
+        const msg =
+          e && typeof e === "object" && "message" in e
+            ? String((e as Error).message)
+            : "Artist details are incomplete.";
+        toast.error(msg);
+        return false;
+      }
+      return true;
+    }
+    if (stepId === "documents") {
+      const masterErr = validateMasters(true);
+      if (masterErr) {
+        toast.error(masterErr);
+        return false;
+      }
+      return true;
+    }
+    return true;
+  };
+
+  const goNext = async () => {
+    const ok = await validateCurrentStep();
+    if (!ok) return;
+    markVisited(stepId);
+    const next = EVENT_STEPPER_STEPS[stepIndex + 1];
+    if (next) setStepId(next.id);
+  };
+
+  const goBack = () => {
+    const prev = EVENT_STEPPER_STEPS[stepIndex - 1];
+    if (prev) setStepId(prev.id);
+  };
+
+  const cityName = (id: number | null | undefined) =>
+    cities.find((c) => c.id === id)?.name || "City not set";
+
   return (
     <FormProvider {...methods}>
-      <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
         {statusBanner()}
 
+        <EventStepperNav
+          currentId={stepId}
+          completedIds={visitedSteps.filter((id) => id !== stepId)}
+          allowJump
+          onStepClick={(id) => {
+            const targetIndex = EVENT_STEPPER_STEPS.findIndex((s) => s.id === id);
+            if (readOnly || targetIndex <= stepIndex || visitedSteps.includes(id)) goToStep(id);
+          }}
+        />
+
+        {stepId === "type" && (
+          <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+            <div>
+              <h3 className="portal-heading text-lg font-semibold">What would you like to host?</h3>
+              <p className="portal-muted text-sm mt-1">
+                Choose how this listing is structured. You can still save a draft at any later step.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => setHostingType("single")}
+                className={`text-left rounded-2xl border p-5 transition-all ${
+                  hostingType === "single"
+                    ? "border-violet-500 bg-violet-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-violet-300"
+                }`}
+              >
+                <div className="h-10 w-10 rounded-xl bg-violet-100 text-violet-700 inline-flex items-center justify-center mb-3">
+                  <CalendarDays size={20} />
+                </div>
+                <p className="font-semibold text-slate-900">Single Event</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  One concert, comedy show, sports match, or other event at one or more venues.
+                </p>
+              </button>
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => setHostingType("tour")}
+                className={`text-left rounded-2xl border p-5 transition-all ${
+                  hostingType === "tour"
+                    ? "border-violet-500 bg-violet-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-violet-300"
+                }`}
+              >
+                <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-700 inline-flex items-center justify-center mb-3">
+                  <MapPin size={20} />
+                </div>
+                <p className="font-semibold text-slate-900">Tour</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Multiple city stops under one tour. For now, add each stop as a venue in the Venue step.
+                </p>
+              </button>
+            </div>
+            {hostingType === "tour" && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-1">
+                <p className="font-medium">Tour mode</p>
+                <p>
+                  Saving creates/updates a <strong>tour</strong> record and links this event as its stop list.
+                  Add each city stop in the Venue step (order is preserved).
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+
+        {stepId === "details" && (
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
           <h3 className="portal-heading text-lg font-semibold">Basic details</h3>
 
@@ -712,7 +1783,10 @@ export default function EventForm({
             {errors.about_event && <p className={errorClass}>{errors.about_event.message}</p>}
           </div>
         </section>
+        )}
 
+        {stepId === "media" && (
+        <>
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
           <h3 className="portal-heading text-lg font-semibold">Posters</h3>
           <p className="portal-muted text-xs">Drag a crop box on the photo, then save. You can edit or remove any image later.</p>
@@ -818,7 +1892,11 @@ export default function EventForm({
           />
           {errors.youtube_url && <p className={errorClass}>{errors.youtube_url.message}</p>}
         </section>
+        </>
+        )}
 
+        {stepId === "documents" && (
+        <>
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
           <div>
             <h3 className="portal-heading text-lg font-semibold">Event-specific documents</h3>
@@ -978,10 +2056,16 @@ export default function EventForm({
             </div>
           )}
         </section>
+        </>
+        )}
 
+        {stepId === "venue" && (
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="portal-heading text-lg font-semibold">Venues, timings & tickets <span className="text-rose-500 text-sm">*</span></h3>
+            <h3 className="portal-heading text-lg font-semibold">
+              {hostingType === "tour" ? "Tour stops, timings & tickets" : "Venues, timings & tickets"}{" "}
+              <span className="text-rose-500 text-sm">*</span>
+            </h3>
             {!readOnly && (
               <button type="button" onClick={() => appendShowtime(defaultVenue())} className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1">
                 <Plus size={14} /> Add venue
@@ -989,7 +2073,9 @@ export default function EventForm({
             )}
           </div>
           <p className="portal-muted text-xs">
-            Each venue has its own ticket types and show times. Dates display as MM-DD-YYYY.
+            {hostingType === "tour"
+              ? "Add each tour city stop as a venue. Each stop has its own ticket types and show times. Dates display as MM-DD-YYYY."
+              : "Each venue has its own ticket types and show times. City is selected from Admin city master. Dates display as MM-DD-YYYY."}
           </p>
           {showtimeFields.map((field, i) => (
             <VenueBlock
@@ -1005,25 +2091,230 @@ export default function EventForm({
             <p className={errorClass}>{errors.showtimes.message}</p>
           )}
         </section>
+        )}
+
+        {stepId === "artists" && (
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="portal-heading text-lg font-semibold">Event artists</h3>
+              <p className="portal-muted text-xs mt-1">
+                Optional. Search existing artists or type a new name to add to the lineup.
+              </p>
+            </div>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => appendArtist({ ...defaultArtist(), sort_order: artistFields.length })}
+                className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
+              >
+                <Plus size={14} /> Add artist
+              </button>
+            )}
+          </div>
+
+          {artistFields.length === 0 && (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+              <p className="text-sm text-slate-600">No artists added yet. You can continue without a lineup.</p>
+            </div>
+          )}
+
+          {artistFields.map((field, i) => (
+            <ArtistBlock key={field.id} index={i} readOnly={readOnly} onRemove={() => removeArtist(i)} />
+          ))}
+        </section>
+        )}
+
+        {stepId === "review" && (
+          <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-6">
+            <div>
+              <h3 className="portal-heading text-lg font-semibold">Review & submit</h3>
+              <p className="portal-muted text-sm mt-1">
+                Confirm everything looks correct. You can go back to edit any step, save a draft, or submit for Super Admin approval.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Event</p>
+                <p className="font-semibold text-slate-900">{watch("name") || "—"}</p>
+                <p className="text-sm text-slate-600">
+                  {categories.find((c) => c.id === categoryTypeId)?.name || "No category"}
+                  {" · "}
+                  {hostingType === "tour" ? "Tour" : "Single event"}
+                </p>
+                <p className="text-sm text-slate-600">
+                  {(genres || []).join(", ") || "No genres"} · {(languages || []).join(", ") || "No languages"}
+                </p>
+                <p className="text-sm text-slate-600">
+                  Age {watch("age_group") || "—"} · {watch("duration_minutes") || "—"} min
+                </p>
+                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("details")}>
+                  Edit details
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Media</p>
+                <p className="text-sm text-slate-600">
+                  Horizontal poster: {posterHorizontal ? "Uploaded" : "Missing"}
+                </p>
+                <p className="text-sm text-slate-600">
+                  Vertical poster: {posterVertical ? "Uploaded" : "Optional / not set"}
+                </p>
+                <p className="text-sm text-slate-600">Gallery photos: {galleryImages.length}</p>
+                <p className="text-sm text-slate-600">
+                  YouTube: {watch("youtube_url")?.trim() ? "Linked" : "Not set"}
+                </p>
+                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("media")}>
+                  Edit media
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {hostingType === "tour" ? "Tour stops" : "Venues & tickets"}
+                </p>
+                {(watch("showtimes") || []).map((show, idx) => (
+                  <div key={idx} className="rounded-lg bg-white border border-slate-200 px-3 py-2">
+                    <p className="font-medium text-slate-900">
+                      {show.venue_name || `Stop ${idx + 1}`} · {cityName(show.city_id)}
+                      {show.venue_source === "registered"
+                        ? " · Verified venue"
+                        : show.venue_source === "auto_registered" || show.venue_business_id
+                          ? " · In system (not authorized)"
+                          : " · New venue (auto-register)"}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Layout:{" "}
+                      {show.layout_mode === "standard"
+                        ? "Standard published"
+                        : show.layout_mode === "custom"
+                          ? `Custom request${show.custom_layout_name ? ` (${show.custom_layout_name})` : ""}`
+                          : "None"}
+                      {" · "}
+                      {(show.ticket_types || []).length} ticket type(s)
+                      {(show.ticket_types || [])
+                        .filter((t) => t.ticket_type)
+                        .map((t) => ` · ${t.ticket_type} (${t.total_count} @ ${t.price})`)
+                        .join("")}
+                    </p>
+                  </div>
+                ))}
+                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("venue")}>
+                  Edit venue & tickets
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Artists</p>
+                {(watch("artists") || []).length === 0 ? (
+                  <p className="text-sm text-slate-600">No artists added</p>
+                ) : (
+                  (watch("artists") || []).map((artist, idx) => (
+                    <div key={idx} className="rounded-lg bg-white border border-slate-200 px-3 py-2">
+                      <p className="font-medium text-slate-900">
+                        {artist.name || `Artist ${idx + 1}`}
+                        {artist.role_title ? ` · ${artist.role_title}` : ""}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {artist.artist_source === "registered" ? "Registered partner" : "External / guest"}
+                      </p>
+                    </div>
+                  ))
+                )}
+                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("artists")}>
+                  Edit artists
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Documents & T&amp;C</p>
+                <p className="text-sm text-slate-600">
+                  Uploaded documents: {documents.filter((d) => d.url).length}
+                  {masters?.documents?.length
+                    ? ` / ${masters.documents.length} listed for this category`
+                    : ""}
+                </p>
+                <p className="text-sm text-slate-600">
+                  T&amp;C points: {selectedTerms.length} master + {customTerms.length} custom
+                </p>
+                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("documents")}>
+                  Edit documents
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
 
         {!readOnly && (
-          <div className="flex flex-wrap gap-3 pt-2">
-            <button
-              type="button"
-              disabled={saving || submitting}
-              onClick={runSaveDraft}
-              className="btn-secondary px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save draft"}
-            </button>
-            {canSubmit && (
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 sticky bottom-0 bg-background/95 backdrop-blur py-3 border-t border-white/10 z-10">
+            <div className="flex flex-wrap gap-2">
+              {!isFirstStep && (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-1.5"
+                >
+                  <ChevronLeft size={16} /> Back
+                </button>
+              )}
               <button
                 type="button"
                 disabled={saving || submitting}
-                onClick={handleSubmit(runSubmit)}
-                className="btn-primary disabled:opacity-50"
+                onClick={runSaveDraft}
+                className="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
               >
-                {submitting ? "Submitting..." : "Submit for approval"}
+                {saving ? "Saving..." : "Save draft"}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {!isLastStep ? (
+                <button
+                  type="button"
+                  onClick={() => void goNext()}
+                  className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-1.5"
+                >
+                  Continue <ChevronRight size={16} />
+                </button>
+              ) : (
+                canSubmit && (
+                  <button
+                    type="button"
+                    disabled={saving || submitting}
+                    onClick={handleSubmit(runSubmit)}
+                    className="btn-primary disabled:opacity-50"
+                  >
+                    {submitting ? "Submitting..." : "Submit for approval"}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+        {readOnly && (
+          <div className="flex flex-wrap gap-2">
+            {!isFirstStep && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-1.5"
+              >
+                <ChevronLeft size={16} /> Back
+              </button>
+            )}
+            {!isLastStep && (
+              <button
+                type="button"
+                onClick={() => {
+                  markVisited(stepId);
+                  const next = EVENT_STEPPER_STEPS[stepIndex + 1];
+                  if (next) setStepId(next.id);
+                }}
+                className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-1.5"
+              >
+                Continue <ChevronRight size={16} />
               </button>
             )}
           </div>

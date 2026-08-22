@@ -30,6 +30,36 @@ const showtimeSchema = yup.object({
     .nullable()
     .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
     .default(null),
+  venue_source: yup.string().oneOf(['manual', 'registered', 'auto_registered']).default('manual'),
+  venue_business_id: yup.string().nullable().default(null),
+  venue_layout_template_id: yup.string().nullable().default(null),
+  layout_mode: yup.string().oneOf(['none', 'standard', 'custom']).default('none'),
+  custom_layout_name: yup.string().trim().default(''),
+  custom_layout_type: yup.string().trim().default('custom'),
+  custom_layout_capacity: yup
+    .number()
+    .nullable()
+    .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+    .default(null),
+  custom_layout_notes: yup.string().trim().default(''),
+  custom_layout_images: yup.array().of(yup.string().required()).default([]),
+  location_id: yup
+    .number()
+    .nullable()
+    .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+    .default(null),
+  venue_proposal: yup
+    .object({
+      contact_name: yup.string().default(''),
+      contact_phone: yup.string().default(''),
+      contact_email: yup.string().default(''),
+      capacity: yup.number().nullable().default(null),
+      facilities: yup.array().of(yup.string().required()).default([]),
+      image_urls: yup.array().of(yup.string().required()).default([]),
+      notes: yup.string().default(''),
+    })
+    .nullable()
+    .default(null),
   duration_type: yup.string().oneOf(['ONE_DAY', 'MULTI_DAY']).default('ONE_DAY'),
   event_date: yup.string().default(''),
   start_time: yup.string().default(''),
@@ -37,6 +67,26 @@ const showtimeSchema = yup.object({
   starts_at: yup.string().default(''),
   ends_at: yup.string().default(''),
   ticket_types: yup.array().of(ticketSchema).default([]),
+});
+
+const artistSchema = yup.object({
+  artist_source: yup.string().oneOf(['registered', 'external', 'auto_registered']).default('external'),
+  artist_business_id: yup.string().nullable().default(null),
+  name: yup.string().trim().required('Artist name is required'),
+  role_title: yup.string().trim().default(''),
+  description: yup.string().trim().default(''),
+  image_url: yup.string().trim().default(''),
+  documents: yup
+    .array()
+    .of(
+      yup.object({
+        document_type_id: yup.number().default(0),
+        url: yup.string().required(),
+        document_name: yup.string().default(''),
+      })
+    )
+    .default([]),
+  sort_order: yup.number().default(0),
 });
 
 function showtimeRangeIso(s: {
@@ -60,7 +110,7 @@ function showtimeRangeIso(s: {
 }
 
 export const eventDraftSchema = yup.object({
-  name: yup.string().trim().required('Event name is required'),
+  name: yup.string().trim().default(''),
   category_type_id: yup.number().nullable().default(null),
   genres: yup.array().of(yup.string().required()).default([]),
   poster_horizontal_url: yup.string().default(''),
@@ -78,9 +128,11 @@ export const eventDraftSchema = yup.object({
   age_group: yup.string().default(''),
   duration_minutes: yup.number().nullable().default(null),
   showtimes: yup.array().of(showtimeSchema).default([]),
+  artists: yup.array().of(artistSchema).default([]),
 });
 
 export const eventSubmitSchema = eventDraftSchema.shape({
+  name: yup.string().trim().required('Event name is required'),
   category_type_id: yup.number().required('Event category is required'),
   genres: yup.array().of(yup.string().required()).min(1, 'Select at least one genre'),
   poster_horizontal_url: yup.string().trim().required('Horizontal poster is required'),
@@ -94,7 +146,43 @@ export const eventSubmitSchema = eventDraftSchema.shape({
     .required('Duration is required'),
   showtimes: yup
     .array()
-    .of(showtimeSchema)
+    .of(
+      showtimeSchema.shape({
+        city_id: yup
+          .number()
+          .typeError('City is required')
+          .nullable()
+          .required('City is required')
+          .test('city-required', 'City is required', (v) => v != null && Number.isFinite(Number(v))),
+        venue_business_id: yup
+          .string()
+          .nullable()
+          .default(null)
+          .when('venue_source', {
+            is: 'registered',
+            then: (schema) => schema.required('Select a registered venue partner'),
+            otherwise: (schema) => schema.nullable(),
+          }),
+        venue_layout_template_id: yup
+          .string()
+          .nullable()
+          .default(null)
+          .when('layout_mode', {
+            is: 'standard',
+            then: (schema) => schema.required('Select a published layout for Standard mode'),
+            otherwise: (schema) => schema.nullable(),
+          }),
+        custom_layout_name: yup
+          .string()
+          .trim()
+          .default('')
+          .when('layout_mode', {
+            is: 'custom',
+            then: (schema) => schema.required('Custom layout name is required'),
+            otherwise: (schema) => schema,
+          }),
+      })
+    )
     .min(1, 'At least one venue / showtime is required')
     .required()
     .test('venue-tickets-dates', function (showtimes) {
@@ -121,6 +209,22 @@ export const eventSubmitSchema = eventDraftSchema.shape({
       }
       return true;
     }),
+  artists: yup
+    .array()
+    .of(
+      artistSchema.shape({
+        artist_business_id: yup
+          .string()
+          .nullable()
+          .default(null)
+          .when('artist_source', {
+            is: 'registered',
+            then: (schema) => schema.required('Select a registered artist partner'),
+            otherwise: (schema) => schema.nullable(),
+          }),
+      })
+    )
+    .default([]),
 });
 
 export type EventFormValues = yup.InferType<typeof eventDraftSchema>;
@@ -129,6 +233,17 @@ export const defaultVenue = (): EventFormValues['showtimes'][number] => ({
   venue_name: '',
   venue_address: '',
   city_id: null,
+  venue_source: 'manual',
+  venue_business_id: null,
+  venue_layout_template_id: null,
+  layout_mode: 'none',
+  custom_layout_name: '',
+  custom_layout_type: 'custom',
+  custom_layout_capacity: null,
+  custom_layout_notes: '',
+  custom_layout_images: [],
+  location_id: null,
+  venue_proposal: null,
   duration_type: 'ONE_DAY',
   event_date: '',
   start_time: '',
@@ -136,6 +251,17 @@ export const defaultVenue = (): EventFormValues['showtimes'][number] => ({
   starts_at: '',
   ends_at: '',
   ticket_types: [{ ticket_type: '', total_count: 100, price: 0 }],
+});
+
+export const defaultArtist = (): EventFormValues['artists'][number] => ({
+  artist_source: 'external',
+  artist_business_id: null,
+  name: '',
+  role_title: '',
+  description: '',
+  image_url: '',
+  documents: [],
+  sort_order: 0,
 });
 
 export function defaultEventFormValues(): EventFormValues {
@@ -152,12 +278,21 @@ export function defaultEventFormValues(): EventFormValues {
     age_group: '',
     duration_minutes: null,
     showtimes: [defaultVenue()],
+    artists: [],
   };
 }
 
 export function showtimeToIso(s: EventFormValues['showtimes'][number]): { starts_at: string; ends_at: string } {
   const { start, end } = showtimeRangeIso(s);
   return { starts_at: start, ends_at: end };
+}
+
+/** True when a showtime row has enough data to persist (needs valid start datetime). */
+export function isShowtimePersistable(s: EventFormValues['showtimes'][number]): boolean {
+  const { starts_at } = showtimeToIso(s);
+  if (!starts_at) return false;
+  const ms = new Date(starts_at).getTime();
+  return !Number.isNaN(ms);
 }
 
 export function validateRequiredDocuments(

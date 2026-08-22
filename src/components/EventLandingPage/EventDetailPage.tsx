@@ -53,17 +53,8 @@ type StaticArtist = {
   role?: string;
   description?: string;
   image_url?: string;
+  unauthorized?: boolean;
 };
-const DEFAULT_ARTISTS: StaticArtist[] = [
-  {
-    name: "Aarav Mehta",
-    role: "Stand-up Comedian & Live Entertainer",
-    description:
-      "Aarav Mehta is known for clean observational humor and energetic live stage presence.",
-    image_url:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=80",
-  },
-];
 
 function parseGenres(genres?: string[] | string | null): string[] {
   if (!genres) return [];
@@ -239,6 +230,22 @@ export default function PublicEventDetailPage({
   const languages = useMemo(() => parseEventLanguages(event?.language), [event?.language]);
   const showtimes = useMemo(() => event?.showtimes || [], [event?.showtimes]);
   const ticketTypes = useMemo(() => event?.ticket_types || [], [event?.ticket_types]);
+  const displayArtists = useMemo((): StaticArtist[] => {
+    const rows = event?.artists || [];
+    return rows.map((a) => {
+      const unauthorized =
+        a.artist_source === "auto_registered" ||
+        a.artist_source === "external" ||
+        a.artist_is_authorized === false;
+      return {
+        name: a.name || a.artist_business_name || "Artist",
+        role: a.role_title || undefined,
+        description: a.description || undefined,
+        image_url: a.image_url || a.artist_business_image || undefined,
+        unauthorized,
+      };
+    });
+  }, [event?.artists]);
   const minPrice = ticketTypes.length
     ? Math.min(...ticketTypes.map((t) => Number(t.price) || 0))
     : null;
@@ -447,6 +454,10 @@ export default function PublicEventDetailPage({
   const venueLabel = [nextShowtime?.venue_name, nextShowtime?.venue_address]
     .filter(Boolean)
     .join(": ");
+  const venueUnauthorized =
+    nextShowtime?.venue_source === "auto_registered" ||
+    nextShowtime?.venue_is_authorized === false ||
+    nextShowtime?.venue_claim_status === "UNCLAIMED";
   const mapsQuery = [nextShowtime?.venue_name, nextShowtime?.venue_address].filter(Boolean).join(", ");
   const mapsUrl = mapsQuery
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
@@ -497,6 +508,11 @@ export default function PublicEventDetailPage({
                 </a>
               )}
             </span>
+            {venueUnauthorized && (
+              <span className="block mt-1 text-[0.6875rem] sm:text-xs text-[#9AA0A6] font-normal leading-snug">
+                This venue is listed by the organizer and is not platform-authorized.
+              </span>
+            )}
             {otherVenues.length > 0 && (
               <button
                 type="button"
@@ -676,12 +692,13 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
+            {displayArtists.length > 0 && (
             <section className="mt-6 sm:mt-8 lg:mt-9">
               <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
                 Artists
               </h2>
               <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {DEFAULT_ARTISTS.map((artist, i) => (
+                {displayArtists.map((artist, i) => (
                   <button
                     key={`${artist.name}-${i}`}
                     type="button"
@@ -703,10 +720,16 @@ export default function PublicEventDetailPage({
                     {artist.role && (
                       <p className="mt-0.5 text-[0.875rem] sm:text-[1rem] text-[#8A8A8A]">{artist.role}</p>
                     )}
+                    {artist.unauthorized && (
+                      <p className="mt-0.5 text-[0.6875rem] sm:text-xs text-[#9AA0A6] leading-snug">
+                        Not platform-authorized
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
             </section>
+            )}
 
             {offers.length > 0 && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
@@ -926,6 +949,11 @@ export default function PublicEventDetailPage({
               </h2>
               {artistModal.role && (
                 <p className="mt-1 text-[1rem] sm:text-[1.0625rem] text-[#8A8A8A]">{artistModal.role}</p>
+              )}
+              {artistModal.unauthorized && (
+                <p className="mt-1 text-[0.6875rem] sm:text-xs text-[#9AA0A6] leading-snug">
+                  This artist is listed by the organizer and is not platform-authorized.
+                </p>
               )}
               {artistModal.description && (
                 <p className="mt-3 sm:mt-4 text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] text-[#333] whitespace-pre-wrap">

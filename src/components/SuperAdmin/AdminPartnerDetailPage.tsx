@@ -26,7 +26,7 @@ import {
 } from "@/services/api";
 
 interface AdminPartnerDetailPageProps {
-  module: "dining" | "event" | "venue";
+  module: "dining" | "event" | "venue" | "artist";
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
@@ -43,12 +43,31 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const id = String(params.id ?? "");
   const isDining = module === "dining";
   const isVenue = module === "venue";
+  const isArtist = module === "artist";
+  const hasSubtype = isDining || isVenue || isArtist;
   const listHref = `/admin/businesses/${module}`;
   const { data: biz, isLoading } = useGetAdminBusinessQuery(id, { skip: !id });
   const [archiveBusiness, { isLoading: isArchiving }] = useArchiveBusinessMutation();
   const [unarchiveBusiness, { isLoading: isUnarchiving }] = useUnarchiveBusinessMutation();
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const listLabel = isDining
+    ? "dining businesses"
+    : isVenue
+      ? "venue partners"
+      : isArtist
+        ? "artist partners"
+        : "event organizers";
+  const nameLabel = isDining
+    ? "Business name"
+    : isVenue
+      ? "Venue name"
+      : isArtist
+        ? "Artist name"
+        : "Organizer name";
+  const typeLabel = isArtist ? "Artist type" : isDining || isVenue ? "Venue type" : "Module";
+  const typeValue = hasSubtype ? biz?.type_name : "Event";
+  const moduleBadge = isArtist ? "Artist" : "Event";
 
   if (isLoading) {
     return <div className="text-white p-10 text-center">Loading partner...</div>;
@@ -71,7 +90,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const isArchived = !!biz.deleted_at;
   const archiveBlocked = isDining
     ? (biz.upcoming_booking_count ?? 0) > 0
-    : isVenue
+    : isVenue || isArtist
       ? false
       : (biz.live_event_count ?? 0) > 0;
   const actionBusy = isArchiving || isUnarchiving || confirmBusy;
@@ -115,7 +134,9 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
             ? `You cannot archive this dining partner while they have upcoming or in-progress reservations. After archive, "${biz.name}" cannot log in. Booking history is kept.`
             : isVenue
               ? `Archive "${biz.name}"? After archive, they cannot log in. Layout request history is kept.`
-              : `You cannot archive this organizer if any event is still LIVE. Close live events first. After archive, "${biz.name}" cannot log in. Booking and fee history is kept.`,
+              : isArtist
+                ? `Archive "${biz.name}"? After archive, they cannot log in. Artist profile history is kept.`
+                : `You cannot archive this organizer if any event is still LIVE. Close live events first. After archive, "${biz.name}" cannot log in. Booking and fee history is kept.`,
           confirmLabel: "Archive",
           danger: true,
         };
@@ -126,7 +147,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         href={listHref}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-400 hover:text-white"
       >
-        <ArrowLeft size={16} /> Back to {isDining ? "dining businesses" : isVenue ? "venue partners" : "event organizers"}
+        <ArrowLeft size={16} /> Back to {listLabel}
       </Link>
       {isVenue && (
         <div>
@@ -163,7 +184,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
                   <XCircle size={12} /> Disabled
                 </span>
               )}
-              {isDining || isVenue ? (
+              {hasSubtype ? (
                 biz.type_name && (
                   <span className="px-2 py-1 rounded-md text-xs font-semibold bg-white/5 text-zinc-300 border border-white/10">
                     {biz.type_name}
@@ -171,7 +192,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
                 )
               ) : (
                 <span className="px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border bg-violet-500/10 text-violet-400 border-violet-500/20">
-                  Event
+                  {moduleBadge}
                 </span>
               )}
             </div>
@@ -222,9 +243,9 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {(isDining || isVenue) && <Field label="Parent category" value={biz.parent_type_name} />}
-          <Field label={isDining || isVenue ? "Venue type" : "Module"} value={isDining || isVenue ? biz.type_name : "Event"} />
-          <Field label={isDining ? "Business name" : isVenue ? "Venue name" : "Organizer name"} value={biz.name} />
+          {hasSubtype && <Field label="Parent category" value={biz.parent_type_name} />}
+          <Field label={typeLabel} value={typeValue} />
+          <Field label={nameLabel} value={biz.name} />
           <Field label="Address" value={biz.address} />
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">Phone</p>

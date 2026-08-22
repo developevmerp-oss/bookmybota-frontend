@@ -18,7 +18,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { clearCredentials } from '@/features/auth/authSlice';
-import { clearSessionForRole, storageKeysForPath, type UserRole } from '@/lib/authStorage';
+import { clearSessionForRole, loginPathForRole, storageKeysForPath, type UserRole } from '@/lib/authStorage';
 import {
   unwrapPaginated,
   toListQuery,
@@ -138,7 +138,7 @@ export interface PartnerDocumentMaster {
   id: number;
   name: string;
   slug: string;
-  module: 'dining' | 'event' | 'venue' | 'both';
+  module: 'dining' | 'event' | 'venue' | 'artist' | 'both';
   description?: string | null;
   is_required: boolean;
   accept?: string;
@@ -148,7 +148,7 @@ export interface PartnerDocumentMaster {
 
 export interface PartnerOnboardingTerm {
   id: number;
-  module: 'dining' | 'event' | 'venue' | 'both';
+  module: 'dining' | 'event' | 'venue' | 'artist' | 'both';
   text: string;
   is_active: boolean;
   sort_order: number;
@@ -348,6 +348,19 @@ export interface AdminEvent {
     venue_address?: string;
     city_id?: number | null;
     city_name?: string | null;
+    city_state?: string | null;
+    city_country?: string | null;
+    venue_business_id?: string | null;
+    venue_business_name?: string | null;
+    venue_layout_template_id?: string | null;
+    venue_source?: 'manual' | 'registered' | 'auto_registered';
+    venue_is_authorized?: boolean;
+    venue_claim_status?: 'UNCLAIMED' | 'CLAIMED' | string;
+    layout_mode?: 'none' | 'standard' | 'custom';
+    custom_layout_name?: string | null;
+    custom_layout_type?: string | null;
+    custom_layout_capacity?: number | null;
+    custom_layout_notes?: string | null;
     starts_at: string;
     ends_at?: string;
     duration_type?: 'ONE_DAY' | 'MULTI_DAY';
@@ -369,6 +382,32 @@ export interface AdminEvent {
   gallery_images?: string[];
   youtube_url?: string | null;
   documents?: EventDocumentUpload[] | string[];
+  artists?: EventArtistItem[];
+  layout_requests?: Array<{
+    id: string;
+    showtime_id?: string | null;
+    layout_name: string;
+    layout_type?: string;
+    capacity?: number;
+    notes?: string | null;
+    status: string;
+    venue_name?: string | null;
+    organizer_change_notes?: string | null;
+    reference_images?: string[];
+    status_history?: Array<{ status?: string; at?: string; by?: string; note?: string | null }>;
+  }>;
+  hosting_type?: 'single' | 'tour';
+  tour_id?: string | null;
+  tour?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    main_artist_name?: string | null;
+    poster_url?: string | null;
+    starts_on?: string | null;
+    ends_on?: string | null;
+    status?: string;
+  } | null;
   terms_points?: {
     selected?: Array<{ id?: number; text?: string } | string>;
     custom?: string[];
@@ -548,20 +587,153 @@ export interface EventFormPayload {
   about_event: string;
   age_group: string;
   duration_minutes: number | null;
+  hosting_type?: 'single' | 'tour';
+  tour_id?: string | null;
+  tour?: {
+    id?: string | null;
+    name?: string;
+    description?: string | null;
+    category_type_id?: number | null;
+    main_artist_name?: string | null;
+    poster_url?: string | null;
+    starts_on?: string | null;
+    ends_on?: string | null;
+  } | null;
   terms_points?: {
     selected: Array<{ id: number; text: string }>;
     custom: string[];
   };
   ticket_types: Array<{ ticket_type: string; total_count: number; price: number }>;
+  artists?: Array<{
+    artist_source: 'registered' | 'external';
+    artist_business_id?: string | null;
+    name: string;
+    role_title?: string | null;
+    description?: string | null;
+    image_url?: string | null;
+    documents?: Array<{ document_type_id?: number; url: string; document_name?: string }>;
+    sort_order?: number;
+  }>;
   showtimes: Array<{
     venue_name: string;
     venue_address: string;
     city_id?: number | null;
+    location_id?: number | null;
+    venue_business_id?: string | null;
+    venue_layout_template_id?: string | null;
+    venue_source?: 'manual' | 'registered' | 'auto_registered';
+    venue_is_authorized?: boolean;
+    venue_claim_status?: 'UNCLAIMED' | 'CLAIMED' | string;
+    layout_mode?: 'none' | 'standard' | 'custom';
+    custom_layout_name?: string | null;
+    custom_layout_type?: string | null;
+    custom_layout_capacity?: number | null;
+    custom_layout_notes?: string | null;
+    custom_layout_images?: string[];
+    tour_stop_order?: number | null;
+    venue_proposal?: {
+      contact_name?: string;
+      contact_phone?: string;
+      contact_email?: string;
+      capacity?: number | null;
+      facilities?: string[];
+      image_urls?: string[];
+      notes?: string;
+    } | null;
     starts_at: string;
     ends_at: string;
     duration_type?: 'ONE_DAY' | 'MULTI_DAY';
     ticket_types?: Array<{ ticket_type: string; total_count: number; price: number }>;
   }>;
+}
+
+export interface OrganizerVenueSearchResult {
+  id: string;
+  name: string;
+  address?: string | null;
+  city_id?: number | null;
+  cover_image_url?: string | null;
+  phone?: string | null;
+  approval_status?: string | null;
+  partner_source?: string | null;
+  is_partner_authorized?: boolean;
+  documents?: unknown;
+  description?: string | null;
+  city_name?: string | null;
+  city_state?: string | null;
+  city_country?: string | null;
+  published_layout_count?: number;
+  default_layout_id?: string | null;
+  default_layout_name?: string | null;
+}
+
+export interface OrganizerArtistSearchResult {
+  id: string;
+  name: string;
+  description?: string | null;
+  cover_image_url?: string | null;
+  phone?: string | null;
+  city_id?: number | null;
+  partner_source?: string | null;
+  is_partner_authorized?: boolean;
+  city_name?: string | null;
+  type_name?: string | null;
+}
+
+export interface OrganizerVenueLayoutOption {
+  id: string;
+  name: string;
+  status: string;
+  is_default: boolean;
+  capacity: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AdminEventLayoutRequest {
+  id: string;
+  event_id: string;
+  showtime_id?: string | null;
+  organizer_business_id: string;
+  venue_business_id?: string | null;
+  venue_name?: string | null;
+  layout_name: string;
+  layout_type?: string;
+  capacity?: number;
+  notes?: string | null;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED' | string;
+  rejection_reason?: string | null;
+  fulfilled_template_id?: string | null;
+  submitted_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  event_name?: string;
+  event_status?: string;
+  organizer_name?: string;
+  venue_partner_name?: string | null;
+  showtime_venue_name?: string | null;
+  showtime_starts_at?: string | null;
+  showtime_layout_mode?: string | null;
+  showtime_template_id?: string | null;
+  fulfilled_template_name?: string | null;
+  fulfilled_template_capacity?: number | null;
+  fulfilled_template_status?: string | null;
+  workflow_tab?: string;
+  published_layouts?: OrganizerVenueLayoutOption[];
+}
+
+export interface EventArtistItem {
+  id?: string;
+  artist_source: 'registered' | 'external' | 'auto_registered';
+  artist_business_id?: string | null;
+  artist_business_name?: string | null;
+  artist_business_image?: string | null;
+  artist_is_authorized?: boolean;
+  name: string;
+  role_title?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  sort_order?: number;
 }
 
 export interface PublicEvent {
@@ -957,7 +1129,7 @@ export interface Analytics {
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'super_admin' | 'business_admin' | 'event_admin' | 'venue_admin' | 'customer';
+  role: 'super_admin' | 'business_admin' | 'event_admin' | 'venue_admin' | 'artist_admin' | 'customer';
   business_id?: string;
   customer_id?: string;
   name?: string;
@@ -990,7 +1162,11 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
   if (result.error && typeof window !== 'undefined') {
     const path = window.location.pathname;
     const onManagedPanel =
-      path.startsWith('/business') || path.startsWith('/organizer') || path.startsWith('/venue') || path.startsWith('/customer');
+      path.startsWith('/business') ||
+      path.startsWith('/organizer') ||
+      path.startsWith('/venue') ||
+      path.startsWith('/artist') ||
+      path.startsWith('/customer');
     const data = result.error.data as { code?: string } | undefined;
     if (onManagedPanel && data?.code === 'ACCOUNT_DISABLED') {
       const role = (
@@ -998,9 +1174,11 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
           ? 'event_admin'
           : path.startsWith('/venue')
             ? 'venue_admin'
-          : path.startsWith('/business')
-            ? 'business_admin'
-            : 'customer'
+            : path.startsWith('/artist')
+              ? 'artist_admin'
+              : path.startsWith('/business')
+                ? 'business_admin'
+                : 'customer'
       ) as UserRole;
       clearSessionForRole(role);
       api.dispatch(clearCredentials());
@@ -1013,7 +1191,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1095,7 +1273,7 @@ export const api = createApi({
         type_id?: number;
         admin_email: string;
         admin_password?: string;
-        partner_type?: 'dining' | 'event' | 'venue';
+        partner_type?: 'dining' | 'event' | 'venue' | 'artist';
         documents?: PartnerDocumentUpload[];
         cover_image_url?: string;
         collection_ids?: number[];
@@ -1149,7 +1327,7 @@ export const api = createApi({
 
     getAdminBusinesses: builder.query<
       PaginatedList<Business>,
-      { module?: 'dining' | 'event' | 'venue'; tab?: 'active' | 'archived'; q?: string; page?: number; limit?: number } | void
+      { module?: 'dining' | 'event' | 'venue' | 'artist'; tab?: 'active' | 'archived'; q?: string; page?: number; limit?: number } | void
     >({
       query: (params) =>
         `/admin/businesses${toListQuery({
@@ -1342,7 +1520,7 @@ export const api = createApi({
 
     getPartnerDocumentMasters: builder.query<
       PartnerDocumentMaster[],
-      'dining' | 'event' | 'venue' | void
+      'dining' | 'event' | 'venue' | 'artist' | void
     >({
       query: (module) => {
         const qs = module ? `?module=${module}` : '';
@@ -1354,7 +1532,7 @@ export const api = createApi({
 
     getPartnerOnboardingTerms: builder.query<
       PartnerOnboardingTerm[],
-      'dining' | 'event' | 'venue' | void
+      'dining' | 'event' | 'venue' | 'artist' | void
     >({
       query: (module) => {
         const qs = module ? `?module=${module}` : '';
@@ -1366,7 +1544,7 @@ export const api = createApi({
 
     getAdminPartnerDocuments: builder.query<
       PaginatedList<PartnerDocumentMaster>,
-      { module?: 'dining' | 'event' | 'venue' | 'both'; q?: string; page?: number; limit?: number } | void
+      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'both'; q?: string; page?: number; limit?: number } | void
     >({
       query: (params) =>
         `/admin/partner-documents${toListQuery({
@@ -1391,7 +1569,7 @@ export const api = createApi({
       {
         name: string;
         description?: string;
-        module?: 'dining' | 'event' | 'venue' | 'both';
+        module?: 'dining' | 'event' | 'venue' | 'artist' | 'both';
         is_required?: boolean;
         is_active?: boolean;
         sort_order?: number;
@@ -1430,7 +1608,7 @@ export const api = createApi({
 
     getAdminPartnerOnboardingTerms: builder.query<
       PartnerOnboardingTerm[],
-      { module?: 'dining' | 'event' | 'venue' | 'both' } | void
+      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'both' } | void
     >({
       query: (params) => {
         const qs = params?.module ? `?module=${params.module}` : '';
@@ -1442,7 +1620,7 @@ export const api = createApi({
 
     createAdminPartnerOnboardingTerm: builder.mutation<
       PartnerOnboardingTerm,
-      { module?: 'dining' | 'event' | 'venue' | 'both'; text: string; is_active?: boolean; sort_order?: number }
+      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'both'; text: string; is_active?: boolean; sort_order?: number }
     >({
       query: (body) => ({ url: '/admin/partner-onboarding-terms', method: 'POST', body }),
       transformResponse: (res: { data?: PartnerOnboardingTerm }) => res?.data ?? ({} as PartnerOnboardingTerm),
@@ -1583,6 +1761,153 @@ export const api = createApi({
       }),
       transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
       invalidatesTags: ['VenueLayouts'],
+    }),
+
+    getAdminEventLayoutRequests: builder.query<
+      AdminEventLayoutRequest[],
+      { tab?: string; q?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.tab) sp.set('tab', params.tab);
+        if (params?.q?.trim()) sp.set('q', params.q.trim());
+        const qs = sp.toString();
+        return `/admin/event-layout-requests${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: AdminEventLayoutRequest[] }) => res?.data ?? [],
+      providesTags: ['EventLayoutRequests'],
+    }),
+
+    getAdminEventLayoutRequest: builder.query<AdminEventLayoutRequest, string>({
+      query: (id) => `/admin/event-layout-requests/${id}`,
+      transformResponse: (res: { data: AdminEventLayoutRequest }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventLayoutRequests', id }],
+    }),
+
+    reviewAdminEventLayoutRequest: builder.mutation<
+      AdminEventLayoutRequest,
+      { id: string; status: 'UNDER_REVIEW' | 'REJECTED'; rejection_reason?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/event-layout-requests/${id}/review`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: AdminEventLayoutRequest }) => res.data,
+      invalidatesTags: ['EventLayoutRequests', 'OrganizerEvents', 'AdminEvents'],
+    }),
+
+    fulfillAdminEventLayoutRequest: builder.mutation<
+      { data: AdminEventLayoutRequest; message?: string },
+      {
+        id: string;
+        fulfilled_template_id?: string | null;
+        apply_to_event?: boolean;
+        notes?: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/event-layout-requests/${id}/fulfill`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['EventLayoutRequests', 'EventLayouts', 'OrganizerEvents', 'AdminEvents'],
+    }),
+
+    reviewOrganizerEventLayoutRequest: builder.mutation<
+      { data?: unknown },
+      { id: string; action: 'approve' | 'request_changes'; notes?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/events/organizer/layout-requests/${id}/review`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['OrganizerEvents', 'EventLayoutRequests'],
+    }),
+
+    getGeoCountries: builder.query<Array<{ id: number; name: string; slug?: string }>, void>({
+      query: () => `/geo/countries`,
+      transformResponse: (res: { data?: Array<{ id: number; name: string; slug?: string }> }) =>
+        res?.data ?? [],
+    }),
+
+    getGeoStates: builder.query<
+      Array<{ id: number; country_id: number; name: string }>,
+      { country_id?: number } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.country_id) sp.set('country_id', String(params.country_id));
+        const qs = sp.toString();
+        return `/geo/states${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: {
+        data?: Array<{ id: number; country_id: number; name: string }>;
+      }) => res?.data ?? [],
+    }),
+
+    getGeoLocations: builder.query<
+      Array<{ id: number; city_id: number; name: string }>,
+      { city_id: number }
+    >({
+      query: ({ city_id }) => `/geo/locations?city_id=${city_id}`,
+      transformResponse: (res: { data?: Array<{ id: number; city_id: number; name: string }> }) =>
+        res?.data ?? [],
+    }),
+
+    getAdminGeoCountries: builder.query<Array<{ id: number; name: string }>, void>({
+      query: () => `/admin/geo/countries?limit=200`,
+      transformResponse: (res: { data?: Array<{ id: number; name: string }> }) => res?.data ?? [],
+    }),
+    createAdminGeoCountry: builder.mutation<{ id: number; name: string }, { name: string }>({
+      query: (body) => ({ url: `/admin/geo/countries`, method: 'POST', body }),
+      transformResponse: (res: { data: { id: number; name: string } }) => res.data,
+      invalidatesTags: ['CityMasters'],
+    }),
+    getAdminGeoStates: builder.query<
+      Array<{ id: number; country_id: number; name: string }>,
+      { country_id?: number } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.country_id) sp.set('country_id', String(params.country_id));
+        const qs = sp.toString();
+        return `/admin/geo/states${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: {
+        data?: Array<{ id: number; country_id: number; name: string }>;
+      }) => res?.data ?? [],
+    }),
+    createAdminGeoState: builder.mutation<
+      { id: number; name: string },
+      { country_id: number; name: string }
+    >({
+      query: (body) => ({ url: `/admin/geo/states`, method: 'POST', body }),
+      transformResponse: (res: { data: { id: number; name: string } }) => res.data,
+      invalidatesTags: ['CityMasters'],
+    }),
+    getAdminGeoLocations: builder.query<
+      Array<{ id: number; city_id: number; name: string }>,
+      { city_id?: number } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.city_id) sp.set('city_id', String(params.city_id));
+        const qs = sp.toString();
+        return `/admin/geo/locations${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: {
+        data?: Array<{ id: number; city_id: number; name: string }>;
+      }) => res?.data ?? [],
+    }),
+    createAdminGeoLocation: builder.mutation<
+      { id: number; name: string },
+      { city_id: number; name: string }
+    >({
+      query: (body) => ({ url: `/admin/geo/locations`, method: 'POST', body }),
+      transformResponse: (res: { data: { id: number; name: string } }) => res.data,
+      invalidatesTags: ['CityMasters'],
     }),
 
     getVenueLayoutTemplates: builder.query<VenueLayoutTemplate[], string>({
@@ -2318,6 +2643,110 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id }],
     }),
 
+    searchOrganizerVenues: builder.query<
+      OrganizerVenueSearchResult[],
+      { q?: string; city_id?: number | null } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q?.trim()) sp.set('q', params.q.trim());
+        if (params?.city_id != null) sp.set('city_id', String(params.city_id));
+        const qs = sp.toString();
+        return `/events/organizer/venues/search${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: OrganizerVenueSearchResult[] }) => res?.data ?? [],
+    }),
+
+    getOrganizerVenueLayouts: builder.query<
+      { venue: { id: string; name: string }; layouts: OrganizerVenueLayoutOption[] },
+      string
+    >({
+      query: (businessId) => `/events/organizer/venues/${businessId}/layouts`,
+      transformResponse: (res: {
+        data: { venue: { id: string; name: string }; layouts: OrganizerVenueLayoutOption[] };
+      }) => res.data,
+    }),
+
+    searchOrganizerArtists: builder.query<OrganizerArtistSearchResult[], { q?: string } | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q?.trim()) sp.set('q', params.q.trim());
+        const qs = sp.toString();
+        return `/events/organizer/artists/search${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: OrganizerArtistSearchResult[] }) => res?.data ?? [],
+    }),
+
+    autoRegisterOrganizerVenue: builder.mutation<
+      OrganizerVenueSearchResult,
+      {
+        name: string;
+        address?: string;
+        city_id?: number | null;
+        phone?: string;
+        capacity?: number | null;
+        contact_name?: string;
+        contact_email?: string;
+        notes?: string;
+        facilities?: string[];
+        image_urls?: string[];
+      }
+    >({
+      query: (body) => ({
+        url: `/events/organizer/venues/auto-register`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: OrganizerVenueSearchResult }) => res.data,
+    }),
+
+    autoRegisterOrganizerArtist: builder.mutation<
+      OrganizerArtistSearchResult,
+      { name: string; description?: string; image_url?: string; city_id?: number | null; phone?: string }
+    >({
+      query: (body) => ({
+        url: `/events/organizer/artists/auto-register`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: OrganizerArtistSearchResult }) => res.data,
+    }),
+
+    getVenueClaimableShowtimes: builder.query<
+      Array<{
+        showtime_id: string;
+        event_id: string;
+        event_name: string;
+        venue_name: string;
+        starts_at: string;
+        city_name?: string;
+        organizer_name?: string;
+      }>,
+      string
+    >({
+      query: (businessId) => `/businesses/${businessId}/venue/claimable-showtimes`,
+      transformResponse: (res: { data?: unknown[] }) => (res?.data ?? []) as Array<{
+        showtime_id: string;
+        event_id: string;
+        event_name: string;
+        venue_name: string;
+        starts_at: string;
+        city_name?: string;
+        organizer_name?: string;
+      }>,
+    }),
+
+    claimVenueShowtime: builder.mutation<
+      { message?: string },
+      { businessId: string; showtimeId: string }
+    >({
+      query: ({ businessId, showtimeId }) => ({
+        url: `/businesses/${businessId}/venue/claim-showtime/${showtimeId}`,
+        method: 'POST',
+      }),
+      transformResponse: (res: { message?: string }) => res,
+    }),
+
     getEventLayout: builder.query<any, string>({
       query: (id) => `/events/organizer/${id}/layout`,
       providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id }],
@@ -2916,6 +3345,20 @@ export const {
   useGetAdminVenueLayoutRequestQuery,
   useReviewAdminVenueLayoutRequestMutation,
   useSaveAdminVenueLayoutTemplateMutation,
+  useGetAdminEventLayoutRequestsQuery,
+  useGetAdminEventLayoutRequestQuery,
+  useReviewAdminEventLayoutRequestMutation,
+  useFulfillAdminEventLayoutRequestMutation,
+  useReviewOrganizerEventLayoutRequestMutation,
+  useGetGeoCountriesQuery,
+  useGetGeoStatesQuery,
+  useGetGeoLocationsQuery,
+  useGetAdminGeoCountriesQuery,
+  useCreateAdminGeoCountryMutation,
+  useGetAdminGeoStatesQuery,
+  useCreateAdminGeoStateMutation,
+  useGetAdminGeoLocationsQuery,
+  useCreateAdminGeoLocationMutation,
   useGetVenueLayoutTemplatesQuery,
   useGetVenueLayoutTemplateQuery,
   useApproveVenueLayoutTemplateMutation,
@@ -2983,6 +3426,13 @@ export const {
   useGetOrganizerPayoutsQuery,
   useGetOrganizerEventsQuery,
   useGetOrganizerEventQuery,
+  useSearchOrganizerVenuesQuery,
+  useAutoRegisterOrganizerVenueMutation,
+  useAutoRegisterOrganizerArtistMutation,
+  useGetVenueClaimableShowtimesQuery,
+  useClaimVenueShowtimeMutation,
+  useGetOrganizerVenueLayoutsQuery,
+  useSearchOrganizerArtistsQuery,
   useGetEventLayoutQuery,
   useUpdateEventLayoutMutation,
   useGetOrganizerTicketStatsQuery,

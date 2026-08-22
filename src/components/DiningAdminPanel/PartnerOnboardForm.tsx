@@ -80,9 +80,19 @@ export default function PartnerOnboardForm({
     partnerType === "event" || selectedParent?.module_key === "event";
   const isVenueParent =
     partnerType === "venue" || selectedParent?.module_key === "venue";
-  const resolvedModule: "dining" | "event" | "venue" = isEventParent ? "event" : isVenueParent ? "venue" : "dining";
+  const isArtistParent =
+    partnerType === "artist" || selectedParent?.module_key === "artist";
+  const resolvedModule: "dining" | "event" | "venue" | "artist" = isEventParent
+    ? "event"
+    : isVenueParent
+      ? "venue"
+      : isArtistParent
+        ? "artist"
+        : "dining";
   const isDining = resolvedModule === "dining";
   const isVenue = resolvedModule === "venue";
+  const isArtist = resolvedModule === "artist";
+  const needsSubtype = isDining || isVenue || isArtist;
 
   const { data: partnerDocMasters = [] } = useGetPartnerDocumentMastersQuery(resolvedModule, {
     skip: partnerType === "combined" && !parentTypeId,
@@ -123,14 +133,14 @@ export default function PartnerOnboardForm({
         businessTypes.find((t) => t.id === editingBusiness.type_id);
       setParentTypeId(eventParent ? String(eventParent.id) : editingBusiness.type_id ? String(editingBusiness.type_id) : "");
       setVenueTypeId("");
-    } else if (partnerType === "venue") {
-      const venue = businessTypes.find((t) => t.id === editingBusiness.type_id);
-      setParentTypeId(venue?.parent_type_id != null ? String(venue.parent_type_id) : "");
-      setVenueTypeId(venue ? String(venue.id) : "");
+    } else if (partnerType === "venue" || partnerType === "artist" || partnerType === "dining") {
+      const child = businessTypes.find((t) => t.id === editingBusiness.type_id);
+      setParentTypeId(child?.parent_type_id != null ? String(child.parent_type_id) : "");
+      setVenueTypeId(child ? String(child.id) : "");
     } else {
-      const venue = businessTypes.find((t) => t.id === editingBusiness.type_id);
-      setParentTypeId(venue?.parent_type_id != null ? String(venue.parent_type_id) : "");
-      setVenueTypeId(venue ? String(venue.id) : "");
+      const child = businessTypes.find((t) => t.id === editingBusiness.type_id);
+      setParentTypeId(child?.parent_type_id != null ? String(child.parent_type_id) : "");
+      setVenueTypeId(child ? String(child.id) : "");
     }
     setFormReady(true);
   }, [mode, editingBusiness, partnerType, businessTypes, formReady]);
@@ -156,14 +166,14 @@ export default function PartnerOnboardForm({
     !!adminEmail &&
     phoneValid &&
     !!parentTypeId &&
-    (isDining || isVenue ? !!venueTypeId : true) &&
+    (needsSubtype ? !!venueTypeId : true) &&
     acceptTerms;
 
   const canSubmitEdit =
     !!businessName &&
     phoneValid &&
     !!parentTypeId &&
-    (isDining || isVenue ? !!venueTypeId : true);
+    (needsSubtype ? !!venueTypeId : true);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,20 +199,26 @@ export default function PartnerOnboardForm({
             ? { partner_type: "event" as const, type_id: parseInt(parentTypeId, 10) }
             : partnerType === "venue"
               ? { partner_type: "venue" as const, type_id: parseInt(parentTypeId, 10) }
-            : null;
+              : partnerType === "artist"
+                ? { partner_type: "artist" as const, type_id: parseInt(parentTypeId, 10) }
+                : null;
       const data = await registerBusiness({
         business_name: businessName,
         address,
         phone,
         description,
-        type_id: selectedPartner ? (selectedPartner.partner_type === "event" ? selectedPartner.type_id : parseInt(venueTypeId, 10)) : parseInt(venueTypeId, 10),
+        type_id: selectedPartner
+          ? selectedPartner.partner_type === "event"
+            ? selectedPartner.type_id
+            : parseInt(venueTypeId, 10)
+          : parseInt(venueTypeId, 10),
         admin_email: adminEmail,
         partner_type: selectedPartner ? selectedPartner.partner_type : "dining",
         documents,
         cover_image_url: coverImageUrl || undefined,
         ...(isDining && variant === "dark" ? { collection_ids: collectionIds } : {}),
         registration_terms_accepted: true,
-        registration_terms_version: "venue-v1",
+        registration_terms_version: `${resolvedModule}-v1`,
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
@@ -232,11 +248,21 @@ export default function PartnerOnboardForm({
         description,
         ...(isDining
           ? { type_id: parseInt(venueTypeId, 10), collection_ids: collectionIds }
-          : { type_id: parseInt(parentTypeId, 10) }),
+          : isVenue || isArtist
+            ? { type_id: parseInt(venueTypeId, 10) }
+            : { type_id: parseInt(parentTypeId, 10) }),
         documents,
         cover_image_url: coverImageUrl || undefined,
       }).unwrap();
-      toast.success(isDining ? "Dining business updated" : isVenue ? "Venue partner updated" : "Event organizer updated");
+      toast.success(
+        isDining
+          ? "Dining business updated"
+          : isVenue
+            ? "Venue partner updated"
+            : isArtist
+              ? "Artist partner updated"
+              : "Event organizer updated"
+      );
       router.push(backHref);
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to update"));

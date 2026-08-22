@@ -23,6 +23,7 @@ import {
   Wallet,
   MapPin,
   Map,
+  Mic2,
 } from "lucide-react";
 import AuthGate from "@/components/Shared/AuthGate";
 import { clearSessionForRole } from "@/lib/authStorage";
@@ -38,9 +39,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Dining Businesses', href: '/admin/businesses/dining', icon: UtensilsCrossed },
     { name: 'Dining Masters', href: '/admin/dining-masters', icon: ChefHat },
     { name: 'City Masters', href: '/admin/cities', icon: MapPin },
+    { name: 'Location Hierarchy', href: '/admin/geo', icon: MapPin },
     { name: 'Event Organizers', href: '/admin/businesses/event', icon: Store },
     { name: 'Venue Partners', href: '/admin/businesses/venue', icon: Store },
+    { name: 'Artist Partners', href: '/admin/businesses/artist', icon: Mic2 },
     { name: 'Venue Layouts', href: '/admin/venue-layouts', icon: Map },
+    { name: 'Event Layouts', href: '/admin/event-layouts', icon: Map },
     { name: 'Events', href: '/admin/events', icon: CalendarDays },
     { name: 'Event Contracts', href: '/admin/event-contracts', icon: FileSignature },
     { name: 'Event Masters', href: '/admin/event-masters', icon: ListChecks },

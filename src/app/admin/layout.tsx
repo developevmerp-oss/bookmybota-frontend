@@ -65,7 +65,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = () => {
     clearSessionForRole('super_admin');
-    router.push('/admin/login');
+    router.push('/');
   };
 
   // Login page must not sit behind the require gate (would loop).

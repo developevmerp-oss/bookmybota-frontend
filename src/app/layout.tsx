@@ -84,13 +84,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
+
+  const isOrganizerRegister = pathname === "/organizer/register";
+  /** Register keeps public chrome; /organizer landing uses partner header like /business */
+  const isOrganizerMarketing = isOrganizerRegister;
+
   const isAdminOrBusiness =
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/business") ||
-    pathname?.startsWith("/organizer") ||
-    pathname?.startsWith("/venue");
+    pathname?.startsWith("/venue") ||
+    (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerMarketing);
+
   const isLandingPage = pathname === "/";
   const isEventsPublicPage = pathname === "/events" || Boolean(pathname?.startsWith("/events/"));
+  const isOrganizerMarketingPage = isOrganizerMarketing;
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/register" ||
@@ -102,7 +109,11 @@ export default function RootLayout({
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
   const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow;
   const showLayoutFooter =
-    showPublicHeader && !isLandingPage && !isAuthPage && !isEventsPublicPage;
+    showPublicHeader &&
+    !isLandingPage &&
+    !isAuthPage &&
+    !isEventsPublicPage &&
+    !isOrganizerMarketingPage;
 
   useEffect(() => {
     window.scrollTo(0, 0);

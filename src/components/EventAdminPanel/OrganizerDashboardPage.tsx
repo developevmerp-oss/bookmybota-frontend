@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useAppSelector } from "@/lib/hooks";
-import { useGetBusinessSettingsQuery, useGetOrganizerEventsQuery, useGetOrganizerTicketStatsQuery } from "@/services/api";
+import {
+  useGetBusinessSettingsQuery,
+  useGetOrganizerEventsQuery,
+  useGetOrganizerTicketStatsQuery,
+} from "@/services/api";
 import { CalendarDays, Ticket, Info, Plus, BarChart3, Users } from "lucide-react";
+import OrganizerLandingPage from "@/components/EventAdminPanel/OrganizerLandingPage";
 
-export default function OrganizerDashboardPage() {
+function OrganizerDashboard() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
@@ -135,7 +140,13 @@ export default function OrganizerDashboardPage() {
           <ol className="text-zinc-400 list-decimal list-inside space-y-1">
             <li>Save a draft or submit the full form for review.</li>
             <li>Super Admin approves or rejects with a reason.</li>
-            <li>Approved events appear on the public <Link href="/events" className="text-violet-400 hover:text-violet-300">Events page</Link> for customers.</li>
+            <li>
+              Approved events appear on the public{" "}
+              <Link href="/events" className="text-violet-400 hover:text-violet-300">
+                Events page
+              </Link>{" "}
+              for customers.
+            </li>
           </ol>
           {user?.email && (
             <p className="text-zinc-500 mt-2">
@@ -150,4 +161,14 @@ export default function OrganizerDashboardPage() {
       </div>
     </div>
   );
+}
+
+export default function OrganizerDashboardPage() {
+  const user = useAppSelector((state) => state.auth.user);
+
+  if (!user || user.role !== "event_admin") {
+    return <OrganizerLandingPage />;
+  }
+
+  return <OrganizerDashboard />;
 }

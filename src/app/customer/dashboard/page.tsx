@@ -109,7 +109,7 @@ export default function CustomerDashboard() {
     if (user === null) return;
     const stored = typeof window !== "undefined" ? localStorage.getItem("user_customer") : null;
     if (!stored) {
-      router.push("/login");
+      router.push("/");
       return;
     }
     const parsed = JSON.parse(stored);

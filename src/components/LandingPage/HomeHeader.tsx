@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Gift, Search } from "lucide-react";
+import { ChevronDown, Gift, Search, Ticket, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
-import { useGetPublicEventFiltersQuery } from "@/services/api";
 import images from "@/Images";
 import CitySelectModal from "./CitySelectModal";
 import SearchOverlay from "./SearchOverlay";
+import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 
 type StoredCustomer = {
   name?: string;
@@ -31,11 +31,98 @@ function readCity() {
   return stored && stored !== "All Cities" ? stored : "";
 }
 
+const BUSINESS_LINKS = [
+  {
+    href: "/organizer",
+    label: "Events",
+    description: "List & manage shows",
+    Icon: Ticket,
+  },
+  {
+    href: "/business",
+    label: "Dining",
+    description: "Partner your restaurant",
+    Icon: UtensilsCrossed,
+  },
+] as const;
+
+function ForBusinessMenu({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const triggerClass =
+    size === "lg"
+      ? "inline-flex h-11 items-center gap-1.5 px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-base font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
+      : size === "md"
+        ? "inline-flex h-9 items-center gap-1 px-3 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
+        : "inline-flex h-8 items-center gap-0.5 px-2.5 rounded-full bg-[#F3F3F3] text-[#111111] text-xs font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer";
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+        className={triggerClass}
+      >
+        {size === "sm" ? "Business" : "For Business"}
+        <ChevronDown
+          size={size === "sm" ? 12 : 14}
+          className={`shrink-0 text-[#6B6B6B] transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 z-[60]"
+        >
+          {BUSINESS_LINKS.map(({ href, label, description, Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-start gap-3 px-3.5 py-2.5 hover:bg-[#F7E9FF] transition-colors"
+            >
+              <span className="mt-0.5 w-8 h-8 rounded-lg bg-[#F7E9FF] text-[#6900AA] flex items-center justify-center shrink-0">
+                <Icon size={16} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-[#111111]">{label}</span>
+                <span className="block text-xs text-[#6B6B6B] mt-0.5">{description}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function HomeHeader() {
   const pathname = usePathname();
   const [city, setCity] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [customer, setCustomer] = useState<StoredCustomer | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/register";
@@ -96,6 +183,8 @@ export default function HomeHeader() {
             <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
           </button>
 
+          <ForBusinessMenu size="sm" />
+
           {!authReady ? (
             <span className="w-9 h-9" />
           ) : customer ? (
@@ -109,17 +198,18 @@ export default function HomeHeader() {
               </span>
             </Link>
           ) : isAuthPage ? null : (
-            <Link
-              href="/login"
-              className="inline-flex h-8 items-center px-3 rounded-full bg-[#6900AA] text-white text-xs font-semibold hover:bg-[#57008E]"
+            <button
+              type="button"
+              onClick={() => setLoginOpen(true)}
+              className="inline-flex h-8 items-center px-3 rounded-full bg-[#6900AA] text-white text-xs font-semibold hover:bg-[#57008E] cursor-pointer"
             >
               Login
-            </Link>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Tablet (md → lg): compact row, no overflow */}
+      {/* Tablet (md → lg) */}
       <div className="hidden md:flex lg:hidden px-4 py-2.5 items-center gap-3">
         <Link href="/" className="shrink-0 flex items-center">
           <img src={logoSrc} alt="Book My Bota" className="h-10 w-auto object-contain" />
@@ -146,12 +236,7 @@ export default function HomeHeader() {
             <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
           </button>
 
-          <Link
-            href="/business"
-            className="inline-flex h-9 items-center px-3 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap"
-          >
-            Partner
-          </Link>
+          <ForBusinessMenu size="md" />
 
           {!authReady ? (
             <span className="w-9 h-9" />
@@ -168,17 +253,18 @@ export default function HomeHeader() {
               </span>
             </Link>
           ) : isAuthPage ? null : (
-            <Link
-              href="/login"
-              className="inline-flex h-9 items-center px-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] whitespace-nowrap"
+            <button
+              type="button"
+              onClick={() => setLoginOpen(true)}
+              className="inline-flex h-9 items-center px-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] whitespace-nowrap cursor-pointer"
             >
               Login
-            </Link>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Desktop (lg+): your full design */}
+      {/* Desktop (lg+) */}
       <div className="hidden lg:flex container mx-auto h-auto px-6 xl:px-8 items-center gap-4">
         <Link href="/" className="shrink-0 flex items-center">
           <img src={logoSrc} alt="Book My Bota" className="h-15 xl:h-20 pt-2 w-auto object-contain" />
@@ -205,15 +291,10 @@ export default function HomeHeader() {
             <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
           </button>
 
-          <Link
-            href="/business"
-            className="inline-flex h-11 items-center px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-lg font-normal hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap"
-          >
-            Partner with Us
-          </Link>
+          <ForBusinessMenu size="lg" />
 
           {!authReady ? (
-            <span className="w-[132px] h-9" />
+            <span className="w-[88px] h-9" />
           ) : customer ? (
             <>
               <button
@@ -237,12 +318,13 @@ export default function HomeHeader() {
               </Link>
             </>
           ) : isAuthPage ? null : (
-            <Link
-              href="/login"
-              className="inline-flex h-9 items-center px-4 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] shadow-[0_1px_2px_rgba(105,0,170,0.35)] transition-colors whitespace-nowrap"
+            <button
+              type="button"
+              onClick={() => setLoginOpen(true)}
+              className="inline-flex h-9 items-center px-4 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] shadow-[0_1px_2px_rgba(105,0,170,0.35)] transition-colors whitespace-nowrap cursor-pointer"
             >
-              Customer Login
-            </Link>
+              Login
+            </button>
           )}
         </div>
       </div>
@@ -255,6 +337,12 @@ export default function HomeHeader() {
       />
 
       <SearchOverlay open={searchOpen} city={city} onClose={() => setSearchOpen(false)} />
+
+      <CustomerAuthModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={() => setCustomer(readCustomer())}
+      />
     </header>
   );
 }

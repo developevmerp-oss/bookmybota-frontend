@@ -82,7 +82,7 @@ export default function VenueLayout({ children }: { children: React.ReactNode })
                 {navigation.find((n) => isNavActive(n.href))?.name || "Venue Panel"}
               </h1>
             </div>
-            <button onClick={() => { clearSessionForRole("venue_admin"); router.push("/login"); }} className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 hover:text-amber-600 hover:bg-amber-50 border border-slate-200 transition-all">
+            <button onClick={() => { clearSessionForRole("venue_admin"); router.push("/"); }} className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 hover:text-amber-600 hover:bg-amber-50 border border-slate-200 transition-all">
               <LogOut size={16} />
               <span className="hidden sm:inline">Sign Out</span>
             </button>

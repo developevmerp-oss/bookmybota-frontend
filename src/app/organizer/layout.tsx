@@ -1,12 +1,13 @@
 "use client";
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAppSelector } from "@/lib/hooks";
+import { useAppDispatch, useAppSelector } from "@/lib/hooks";
+import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
-import AuthGate from "@/components/Shared/AuthGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
-import { clearSessionForRole } from "@/lib/authStorage";
+import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,
   BarChart3,
@@ -48,7 +49,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     clearSessionForRole("event_admin");
-    router.push("/organizer/login");
+    router.push("/");
   };
 
   return (
@@ -196,16 +197,56 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
 
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  if (pathname === "/organizer/login") {
+  const isLoginPage = pathname === "/organizer/login";
+  const isPublicLanding =
+    pathname === "/organizer" || pathname === "/organizer/register" || isLoginPage;
+  const isEventAdmin = user?.role === "event_admin";
+
+  useEffect(() => {
+    if (isLoginPage) {
+      setCheckingAuth(false);
+      return;
+    }
+
+    const organizer = readSessionForRole("event_admin");
+    if (organizer) {
+      dispatch(setCredentials({ user: organizer.user, token: organizer.token }));
+    } else {
+      dispatch(loadFromStorage());
+    }
+
+    if (!organizer && !isPublicLanding) {
+      router.replace("/organizer/login");
+      return;
+    }
+
+    setCheckingAuth(false);
+  }, [dispatch, router, isPublicLanding, isLoginPage, pathname]);
+
+  if (isLoginPage) {
     return <>{children}</>;
   }
 
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!isEventAdmin) {
+    return <div className="min-h-screen bg-white">{children}</div>;
+  }
+
   return (
-    <AuthGate mode="require" roles={["event_admin"]}>
-      <SessionGuard>
-        <OrganizerShell>{children}</OrganizerShell>
-      </SessionGuard>
-    </AuthGate>
+    <SessionGuard>
+      <OrganizerShell>{children}</OrganizerShell>
+    </SessionGuard>
   );
 }

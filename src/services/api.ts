@@ -1002,13 +1002,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
       ) as UserRole;
       clearSessionForRole(role);
       api.dispatch(clearCredentials());
-      const loginPath =
-        role === 'event_admin'
-          ? '/organizer/login'
-          : role === 'business_admin'
-            ? '/business/login'
-            : '/login';
-      window.location.replace(loginPath);
+      window.location.replace('/');
     }
   }
   return result;

@@ -32,7 +32,7 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
     localStorage.removeItem("token_customer");
     localStorage.removeItem("user_customer");
     window.dispatchEvent(new Event("auth_changed"));
-    router.push("/login");
+    router.push("/");
   };
 
   return (

@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { UtensilsCrossed, X } from "lucide-react";
+import { X } from "lucide-react";
 import PartnerLoginForm from "@/components/Shared/PartnerLoginForm";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
+import images from "@/Images";
+
+const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
 
 export default function BusinessLandingPage() {
   const router = useRouter();
@@ -38,15 +41,13 @@ export default function BusinessLandingPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <header className="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex justify-between items-center min-h-20 py-2">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="bg-[#6900AA] p-2 rounded-lg group-hover:scale-105 transition-transform shadow-[0_0_15px_rgba(105,0,170,0.35)]">
-                <UtensilsCrossed size={24} className="text-white" />
-              </div>
-              <span className="text-xl font-extrabold tracking-tight">
-                <span className="text-[#111111]">Book My </span>
-                <span className="text-[#6900AA]">Bota</span>
-              </span>
+              <img
+                src={logoSrc}
+                alt="Book My Bota"
+                className="h-15 xl:h-20 pt-2 w-auto object-contain object-left group-hover:opacity-90 transition-opacity"
+              />
             </Link>
             <button
               type="button"
@@ -60,7 +61,7 @@ export default function BusinessLandingPage() {
       </header>
 
       <div
-        className="relative flex items-center justify-center flex-1 min-h-screen pt-20"
+        className="relative flex items-center justify-center flex-1 min-h-screen pt-28"
         style={{ background: "linear-gradient(135deg, #18181b 0%, #27272a 50%, #09090b 100%)" }}
       >
         <div

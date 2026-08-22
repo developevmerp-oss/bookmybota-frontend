@@ -137,12 +137,12 @@ export default function SpecialOffersRail() {
           </h2>
         </div>
 
-        <div className="relative md:px-6 lg:px-7">
+        <div className="relative">
           <button
             type="button"
             aria-label="Previous offers"
             onClick={() => scrollBy(-1)}
-            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            className="hidden md:flex absolute -left-4 md:-left-5 lg:-left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
           >
             <ChevronLeft size={18} />
           </button>
@@ -157,7 +157,7 @@ export default function SpecialOffersRail() {
             type="button"
             aria-label="Next offers"
             onClick={() => scrollBy(1)}
-            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            className="hidden md:flex absolute -right-4 md:-right-5 lg:-right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
           >
             <ChevronRight size={18} />
           </button>

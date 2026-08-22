@@ -67,6 +67,19 @@ export function formatOfferDiscount(
   discountType: 'PERCENT' | 'FLAT' | string,
   discountValue: number | string
 ): string {
-  if (discountType === 'PERCENT') return `${discountValue}% off`;
+  if (discountType === 'PERCENT') return `${formatWholeNumber(discountValue)}% off`;
   return `${formatMoney(discountValue, { compact: true })} off`;
+}
+
+/** Whole numbers without trailing .00 — e.g. 20, 200, 1,250.5 */
+export function formatWholeNumber(amount: number | string | undefined | null): string {
+  const n = Number(amount ?? 0);
+  if (!Number.isFinite(n)) return '0';
+  if (Math.abs(n - Math.round(n)) < 1e-9) {
+    return Math.round(n).toLocaleString(CURRENCY_LOCALE);
+  }
+  return n.toLocaleString(CURRENCY_LOCALE, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }

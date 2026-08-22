@@ -306,7 +306,7 @@ export default function EventCheckout({
   const ticketAmount = moneySum(selectedLines.map((l) => l.unit * l.qty));
   const discountAmount = !isOrganizer && appliedPromo ? appliedPromo.discount_amount : 0;
   const netTicketAmount = moneySum([Math.max(0, ticketAmount - discountAmount)]);
-  const convenienceFee = moneySum([(netTicketAmount * conveniencePct) / 100]);
+  const convenienceFee = moneySum([(ticketAmount * conveniencePct) / 100]);
   const grandTotal = moneySum([netTicketAmount, convenienceFee]);
   const ticketQty = selectedLines.reduce((sum, l) => sum + l.qty, 0);
 
@@ -344,6 +344,7 @@ export default function EventCheckout({
         eventId: event.id,
         promo_code: code,
         ticket_amount: ticketAmount,
+        ...(phone.trim() ? { guest_phone: sanitizePhoneInput(phone) } : {}),
       }).unwrap();
       setAppliedPromo(result);
       toast.success(`Promo code "${result.promo_code}" applied!`);
@@ -1122,7 +1123,12 @@ export default function EventCheckout({
                       <div className="flex items-center justify-between gap-2 bg-[#F7E9FF] border border-[#E3BCFF] rounded-xl px-3 py-2">
                         <div className="min-w-0">
                           <p className="text-[0.875rem] font-bold text-[#6900AA] truncate">
-                            {appliedPromo.promo_code} Â· {appliedPromo.title}
+                            {appliedPromo.promo_code} · {appliedPromo.title}
+                            {appliedPromo.source === "platform" && (
+                              <span className="ml-1.5 text-[0.65rem] font-bold uppercase tracking-wide bg-[#6900AA] text-white px-1.5 py-0.5 rounded">
+                                BookMyBota
+                              </span>
+                            )}
                           </p>
                           <p className="text-[0.8125rem] text-[#57008E]">
                             You save {formatMoney(appliedPromo.discount_amount)}

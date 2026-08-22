@@ -12,6 +12,7 @@ import Pagination from '@/components/Shared/Pagination';
 import { PAGE_SIZE } from '@/lib/pagination';
 import { isValidPhone } from '@/lib/validation';
 import { formatDate, formatTime12h } from '@/lib/dateFormat';
+import { formatDiningOfferDiscount } from '@/lib/diningOffers';
 
 export default function BookingsManager() {
   const dispatch = useAppDispatch();
@@ -238,9 +239,17 @@ export default function BookingsManager() {
                       {booking.applied_offer?.title ? (
                         <div>
                           <p className="text-sm font-semibold text-white">{booking.applied_offer.title}</p>
-                          {booking.applied_offer.validity && (
-                            <p className="text-[11px] text-zinc-500 mt-0.5">{booking.applied_offer.validity}</p>
+                          {booking.applied_offer.promo_code && (
+                            <p className="text-[11px] font-mono text-rose-400 mt-0.5">{booking.applied_offer.promo_code}</p>
                           )}
+                          <p className="text-[11px] text-zinc-500 mt-0.5">
+                            {formatDiningOfferDiscount(booking.applied_offer as Parameters<typeof formatDiningOfferDiscount>[0])}
+                          </p>
+                          {booking.offer_redeemed_at ? (
+                            <p className="text-[11px] text-emerald-400 mt-0.5 font-semibold">Redeemed</p>
+                          ) : booking.status === "COMPLETED" ? (
+                            <p className="text-[11px] text-zinc-500 mt-0.5">Not redeemed</p>
+                          ) : null}
                         </div>
                       ) : (
                         <span className="text-zinc-600 text-xs italic font-medium">None</span>

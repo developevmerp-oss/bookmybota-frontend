@@ -36,8 +36,10 @@ export function extractCuisines(businesses: Business[]): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
+import { businessHasCustomerVisibleOffer } from "@/lib/diningOffers";
+
 export function businessHasOffer(b: Business): boolean {
-  return Boolean(b.dining_offers && b.dining_offers.some((offer) => Boolean(offer?.title?.trim())));
+  return businessHasCustomerVisibleOffer(b.dining_offers);
 }
 
 function businessText(b: Business): string {

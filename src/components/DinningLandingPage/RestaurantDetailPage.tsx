@@ -15,6 +15,11 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
 import {
   bookingWidgetOfferLabel,
+  businessHasCustomerVisibleOffer,
+  formatDiningOfferDiscount,
+  getEffectiveDiningOfferStatus,
+  isDiningOfferCustomerVisible,
+  isDiningOfferRedeemable,
   normalizeDiningOffers,
   snapshotDiningOffer,
   type DiningOffer,
@@ -353,18 +358,29 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [bookingIdCopied, setBookingIdCopied] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<DiningOffer | null>(null);
   const [noOfferSelected, setNoOfferSelected] = useState(false);
-  const diningOffers = normalizeDiningOffers(profile?.dining_offers);
+  const allDiningOffers = normalizeDiningOffers(profile?.dining_offers);
+  const visibleOffers = allDiningOffers.filter(isDiningOfferCustomerVisible);
+  const bookableOffers = allDiningOffers.filter(isDiningOfferRedeemable);
   const appliedOffer = noOfferSelected
     ? null
-    : snapshotDiningOffer(diningOffers, selectedOffer);
-  const widgetOfferLabel = bookingWidgetOfferLabel(diningOffers);
+    : selectedOffer
+      ? snapshotDiningOffer(bookableOffers, selectedOffer)
+      : null;
+  const widgetOfferLabel = bookingWidgetOfferLabel(profile?.dining_offers);
   const offerChipLabel =
-    diningOffers.length > 0
-      ? `${diningOffers.length} offer${diningOffers.length > 1 ? "s" : ""}`
+    visibleOffers.length > 0
+      ? `${visibleOffers.length} offer${visibleOffers.length > 1 ? "s" : ""}`
       : "";
   const [offersSectionOpen, setOffersSectionOpen] = useState(true);
   const [availabilityStatus, setAvailabilityStatus] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+
+  useEffect(() => {
+    if (bookableOffers.length === 0) return;
+    if (!noOfferSelected && !selectedOffer) {
+      setSelectedOffer(bookableOffers[0]);
+    }
+  }, [profile?.dining_offers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Drawer & Auth states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -637,6 +653,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           ? authUser.customer_id
           : undefined;
 
+      if (!noOfferSelected && !appliedOffer) {
+        toast.error('Selected offer is no longer available. Choose another or book without an offer.');
+        return;
+      }
+
       const result = await createBooking({
         business_id: resolvedParams.id,
         customer_name: customerName,
@@ -645,7 +666,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         booking_source: 'ONLINE',
         guests: Number(guests),
         approx_arrival: approxArrival,
-        ...(appliedOffer ? { applied_offer: appliedOffer } : {}),
+        ...(noOfferSelected
+          ? { applied_offer: null }
+          : appliedOffer
+            ? { applied_offer: appliedOffer }
+            : {}),
         ...(customerIdPayload ? { customer_id: customerIdPayload } : {}),
       }).unwrap();
       setBookingSuccess(true);
@@ -742,9 +767,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   };
 
   const handleQuickBook = (offer?: DiningOffer) => {
-    if (offer) {
+    if (offer && isDiningOfferRedeemable(offer)) {
       setSelectedOffer(offer);
       setNoOfferSelected(false);
+    } else if (offer) {
+      setSelectedOffer(null);
+      setNoOfferSelected(true);
+      toast.info("This offer is coming soon and cannot be attached to a booking yet.");
     }
     setDrawerStep(1);
     setActiveTab("Book a Table");
@@ -977,7 +1006,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               Reviews
             </button>
             <button
-              onClick={handleQuickBook}
+              onClick={() => handleQuickBook()}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
                 activeTab === "Book a Table"
                   ? "border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]"
@@ -1096,24 +1125,25 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {/* Dining Offers — 1 = full-width blue; 2+ = first blue, rest white compact cards */}
                 <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
                   <h3 className="text-xl font-bold text-zinc-800">Dining Offers</h3>
-                  {diningOffers.length > 1 && (
+                  {visibleOffers.length > 1 && (
                     <p className="text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
                   )}
-                  {diningOffers.length <= 1 && <div className="mb-4" />}
-                  {diningOffers.length > 0 ? (
+                  {visibleOffers.length <= 1 && <div className="mb-4" />}
+                  {visibleOffers.length > 0 ? (
                     <div
                       className={
-                        diningOffers.length === 1
+                        visibleOffers.length === 1
                           ? "grid grid-cols-1"
                           : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
                       }
                     >
-                      {diningOffers.map((offer, idx) => {
-                        const isSingle = diningOffers.length === 1;
+                      {visibleOffers.map((offer, idx) => {
+                        const isSingle = visibleOffers.length === 1;
                         const isFeatured = isSingle || idx === 0;
+                        const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
                         return (
                           <button
-                            key={`${offer.title}-${idx}`}
+                            key={`${offer.id || offer.title}-${idx}`}
                             type="button"
                             onClick={() => handleQuickBook(offer)}
                             className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer ${
@@ -1126,6 +1156,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 : "p-3.5 sm:p-4 min-h-[120px]"
                             }`}
                           >
+                            {scheduled && (
+                              <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                Coming soon
+                              </span>
+                            )}
                             <p
                               className={`text-[10px] font-extrabold uppercase tracking-wider ${
                                 isFeatured ? "text-white/85" : "text-[#2563eb]"
@@ -1140,15 +1175,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             >
                               {offer.title}
                             </p>
-                            {offer.validity && (
-                              <p
-                                className={`mt-2 leading-snug ${
-                                  isFeatured ? "text-white/80" : "text-zinc-500"
-                                } ${isSingle ? "text-sm" : "text-xs"}`}
-                              >
-                                {offer.validity}
-                              </p>
-                            )}
+                            <p
+                              className={`mt-2 leading-snug font-semibold ${
+                                isFeatured ? "text-white/90" : "text-[#2563eb]"
+                              } ${isSingle ? "text-sm" : "text-xs"}`}
+                            >
+                              {formatDiningOfferDiscount(offer)}
+                              {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
+                            </p>
                             <span
                               className={`pointer-events-none absolute font-black leading-none select-none ${
                                 isFeatured ? "text-white/15" : "text-[#2563eb]/10"
@@ -2103,7 +2137,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             </div>
 
                     {/* Choose an offer — shown when venue has dining offers */}
-                    {diningOffers.length > 0 && (
+                    {bookableOffers.length > 0 && (
                       <div className="space-y-3 pt-2">
                               <button
                                 type="button"
@@ -2122,11 +2156,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                         {offersSectionOpen && (
                           <div className="flex flex-wrap gap-3 pt-3 pl-2">
-                            {diningOffers.map((offer, idx) => {
+                            {bookableOffers.map((offer, idx) => {
                               const isActive =
                                 !noOfferSelected &&
-                                ((selectedOffer?.title && selectedOffer.title === offer.title) ||
-                                  (!selectedOffer && idx === 0));
+                                ((selectedOffer?.id && selectedOffer.id === offer.id) ||
+                                  (selectedOffer?.title === offer.title && selectedOffer?.promo_code === offer.promo_code));
                               const badgeColors = [
                                 "#2563EB",
                                 "#6900AA",
@@ -2136,7 +2170,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               const badgeBg = badgeColors[idx % badgeColors.length];
                                     return (
                                       <button
-                                  key={`${offer.title}-${idx}`}
+                                  key={`${offer.id || offer.title}-${idx}`}
                                         type="button"
                                   onClick={() => {
                                     setSelectedOffer(offer);
@@ -2169,11 +2203,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   <p className="text-[15px] font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
                                     {offer.title}
                                   </p>
-                                  {offer.validity ? (
-                                    <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
-                                      {offer.validity}
-                                    </p>
-                                  ) : null}
+                                  <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
+                                    {formatDiningOfferDiscount(offer)}
+                                    {offer.promo_code ? ` · ${offer.promo_code}` : ""}
+                                  </p>
                                       </button>
                                     );
                                   })}

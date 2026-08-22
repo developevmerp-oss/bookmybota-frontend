@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaBell, FaChevronDown, FaHeart, FaMapMarkerAlt } from "react-icons/fa";
+import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -23,12 +24,23 @@ type EventsNavbarProps = {
 export default function EventsNavbar({ city, cityOptions, onCityChange }: EventsNavbarProps) {
   const pathname = usePathname();
   const [cityOpen, setCityOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const cityRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsLoggedIn(Boolean(localStorage.getItem("user_customer")));
   }, [pathname]);
+
+  useEffect(() => {
+    const syncAuth = () => setIsLoggedIn(Boolean(localStorage.getItem("user_customer")));
+    window.addEventListener("auth_changed", syncAuth);
+    window.addEventListener("storage", syncAuth);
+    return () => {
+      window.removeEventListener("auth_changed", syncAuth);
+      window.removeEventListener("storage", syncAuth);
+    };
+  }, []);
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {
@@ -108,29 +120,57 @@ export default function EventsNavbar({ city, cityOptions, onCityChange }: Events
             </div>
 
             <Link
-              href={isLoggedIn ? "/customer/dashboard" : "/login"}
+              href={isLoggedIn ? "/customer/dashboard" : "/"}
               className="text-slate-500 hover:text-[#1B5E3B]"
               aria-label="Favorites"
+              onClick={(e) => {
+                if (!isLoggedIn) {
+                  e.preventDefault();
+                  setLoginOpen(true);
+                }
+              }}
             >
               <FaHeart size={16} />
             </Link>
             <Link
-              href={isLoggedIn ? "/customer/dashboard" : "/login"}
+              href={isLoggedIn ? "/customer/dashboard" : "/"}
               className="text-slate-500 hover:text-[#1B5E3B]"
               aria-label="Notifications"
+              onClick={(e) => {
+                if (!isLoggedIn) {
+                  e.preventDefault();
+                  setLoginOpen(true);
+                }
+              }}
             >
               <FaBell size={16} />
             </Link>
 
-            <Link
-              href={isLoggedIn ? "/customer/dashboard" : "/login"}
-              className="inline-flex items-center bg-[#1B5E3B] hover:bg-[#164e31] text-white text-sm font-semibold px-4 py-2 rounded-lg whitespace-nowrap transition-colors"
-            >
-              {isLoggedIn ? "My Account" : "Login / Sign Up"}
-            </Link>
+            {isLoggedIn ? (
+              <Link
+                href="/customer/dashboard"
+                className="inline-flex items-center bg-[#1B5E3B] hover:bg-[#164e31] text-white text-sm font-semibold px-4 py-2 rounded-lg whitespace-nowrap transition-colors"
+              >
+                My Account
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setLoginOpen(true)}
+                className="inline-flex items-center bg-[#1B5E3B] hover:bg-[#164e31] text-white text-sm font-semibold px-4 py-2 rounded-lg whitespace-nowrap transition-colors cursor-pointer"
+              >
+                Login / Sign Up
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      <CustomerAuthModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={() => setIsLoggedIn(true)}
+      />
     </header>
   );
 }

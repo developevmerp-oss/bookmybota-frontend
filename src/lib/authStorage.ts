@@ -72,7 +72,7 @@ export function loginPathForRole(role: UserRole | string) {
       return '/organizer/login';
     case 'customer':
     default:
-      return '/login';
+      return '/';
   }
 }
 

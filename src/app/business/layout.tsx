@@ -74,7 +74,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
 
   const handleLogout = () => {
     clearSessionForRole("business_admin");
-    router.push("/business/login");
+    router.push("/");
   };
 
   if (isLoginPage) {

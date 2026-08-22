@@ -577,6 +577,8 @@ export interface PublicEvent {
   category_name?: string;
   category_slug?: string;
   organizer_name?: string;
+  venue_name?: string;
+  city_name?: string;
   next_showtime?: string;
   min_price?: number | string;
   status?: string;

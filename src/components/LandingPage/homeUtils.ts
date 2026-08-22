@@ -13,10 +13,29 @@ export function eventLandscape(event: PublicEvent) {
 }
 
 export function formatShowDateBar(iso?: string) {
+  return formatEventDateLine(iso);
+}
+
+/** Reference card date: "Sat, 10 Oct onwards" */
+export function formatEventDateLine(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
+  const day = d.getDate();
+  const month = d.toLocaleString("en-GB", { month: "short" });
+  return `${weekday}, ${day} ${month} onwards`;
+}
+
+export function eventPlaceLine(event: PublicEvent, fallbackCity?: string) {
+  const venue = event.venue_name?.trim() || event.organizer_name?.trim();
+  const city =
+    event.city_name?.trim() ||
+    (fallbackCity && fallbackCity !== "All Cities" && fallbackCity !== "Ethiopia" ? fallbackCity : "");
+  if (venue && city) return `${venue}: ${city}`;
+  if (venue) return venue;
+  if (city) return city;
+  return "";
 }
 
 export function isMusicEvent(event: PublicEvent) {

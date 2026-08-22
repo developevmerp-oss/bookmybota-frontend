@@ -21,7 +21,7 @@ export default function RecommendedEventsRail({ city }: { city: string }) {
       empty={empty}
     >
       {items.map((event) => (
-        <EventPosterCard key={event.id} event={event} />
+        <EventPosterCard key={event.id} event={event} city={city} />
       ))}
     </ContentRail>
   );

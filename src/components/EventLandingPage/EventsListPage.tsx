@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  FaCalendarAlt,
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
@@ -20,6 +19,7 @@ import {
 import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
 import images from "@/Images";
+import { EventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import EventHeroSlider from "@/components/EventLandingPage/EventHeroSlider";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
@@ -57,16 +57,6 @@ const PRICE_BANDS = [
   { id: "2000+", label: "Above 2000" },
 ] as const;
 const PRICE_SLIDER_MAX = 2500;
-
-function dateBadge(value?: string) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return {
-    month: d.toLocaleString("en-US", { month: "short" }).toUpperCase(),
-    day: String(d.getDate()).padStart(2, "0"),
-  };
-}
 
 function toIsoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -159,46 +149,8 @@ function FilterCard({
   );
 }
 
-function EventCard({ event }: { event: PublicEvent }) {
-  const image = event.poster_horizontal_url || event.poster_vertical_url;
-  const badge = dateBadge(event.next_showtime);
-
-  return (
-    <Link
-      href={`/events/${event.id}`}
-      className="group bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
-    >
-      <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
-        {image ? (
-          <img src={image} alt={event.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300">
-            <FaCalendarAlt size={28} />
-          </div>
-        )}
-      </div>
-      <div className="p-3">
-        {badge && (
-          <div className="inline-flex flex-col rounded-md bg-[#6900AA] px-2 py-1 leading-none text-white mb-3">
-            <span className="text-[9px] font-bold tracking-wider">{badge.month}</span>
-            <span className="text-sm font-extrabold mt-0.5">{badge.day}</span>
-          </div>
-        )}
-        <h3 className="font-bold text-slate-900 text-sm line-clamp-2">{event.name}</h3>
-        {event.organizer_name && (
-          <p className="mt-1.5 text-xs text-slate-500 line-clamp-1">{event.organizer_name}</p>
-        )}
-        {event.category_name && (
-          <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{event.category_name}</p>
-        )}
-        {event.min_price != null && (
-          <p className="mt-2 text-sm font-semibold text-[#6900AA]">
-            {formatMoney(event.min_price, { compact: true })} onwards
-          </p>
-        )}
-      </div>
-    </Link>
-  );
+function EventCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: string }) {
+  return <EventPosterCard event={event} city={cityLabel} fullWidth />;
 }
 
 export default function PublicEventsPage() {
@@ -618,7 +570,7 @@ export default function PublicEventsPage() {
         </section>
       )}
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-14 lg:pb-16 pt-8 sm:pt-10">
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-14 lg:pb-16 pt-8 sm:pt-10">
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[260px_1fr] gap-5 lg:gap-8">
           <aside
             id="city-filter"
@@ -735,7 +687,7 @@ export default function PublicEventsPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                 {paged.map((event) => (
-                  <EventCard key={event.id} event={event} />
+                  <EventCard key={event.id} event={event} cityLabel={headingCity} />
                 ))}
               </div>
             )}

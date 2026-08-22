@@ -92,8 +92,10 @@ export default function RootLayout({
   const isAdminOrBusiness =
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/business") ||
+    pathname?.startsWith("/artist");
     pathname?.startsWith("/venue") ||
     (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerMarketing);
+    
 
   const isLandingPage = pathname === "/";
   const isEventsPublicPage = pathname === "/events" || Boolean(pathname?.startsWith("/events/"));
@@ -105,7 +107,10 @@ export default function RootLayout({
     pathname === "/reset-password" ||
     pathname === "/admin/login" ||
     pathname === "/business/login" ||
-    pathname === "/organizer/login";
+    pathname === "/organizer/login" ||
+    pathname === "/venue/login" ||
+    pathname === "/artist/login" ||
+    pathname === "/artist/register";
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
   const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow;
   const showLayoutFooter =

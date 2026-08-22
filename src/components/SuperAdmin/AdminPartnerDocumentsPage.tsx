@@ -55,7 +55,7 @@ const MODULE_LABEL: Record<string, string> = {
 };
 
 export default function AdminPartnerDocumentsPage() {
-  const [moduleFilter, setModuleFilter] = useState<"" | "dining" | "event" | "venue" | "both">("");
+  const [moduleFilter, setModuleFilter] = useState<"" | "dining" | "event" | "venue" | "artist" | "both">("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const queryArg = {
@@ -92,12 +92,12 @@ export default function AdminPartnerDocumentsPage() {
   const [newDoc, setNewDoc] = useState({
     name: "",
     description: "",
-    module: "both" as "dining" | "event" | "venue" | "both",
+    module: "both" as "dining" | "event" | "venue" | "artist" | "both",
     is_required: false,
   });
   const [newTerm, setNewTerm] = useState({
     text: "",
-    module: "both" as "dining" | "event" | "venue" | "both",
+    module: "both" as "dining" | "event" | "venue" | "artist" | "both",
   });
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -173,7 +173,7 @@ export default function AdminPartnerDocumentsPage() {
                 onChange={(e) =>
                   setNewDoc((p) => ({
                     ...p,
-                    module: e.target.value as "dining" | "event" | "venue" | "both",
+                    module: e.target.value as "dining" | "event" | "venue" | "artist" | "both",
                   }))
                 }
                 className="input-field w-full"
@@ -182,6 +182,7 @@ export default function AdminPartnerDocumentsPage() {
                 <option value="dining">Dining only</option>
                 <option value="event">Event only</option>
                 <option value="venue">Venue only</option>
+                <option value="artist">Artist only</option>
               </select>
             </div>
             <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
@@ -207,7 +208,7 @@ export default function AdminPartnerDocumentsPage() {
               <select
                 value={moduleFilter}
                 onChange={(e) => {
-                  setModuleFilter(e.target.value as "" | "dining" | "event" | "venue" | "both");
+                  setModuleFilter(e.target.value as "" | "dining" | "event" | "venue" | "artist" | "both");
                   setPage(1);
                 }}
                 className="input-field text-sm py-2 w-auto min-w-[160px]"
@@ -217,6 +218,7 @@ export default function AdminPartnerDocumentsPage() {
                 <option value="dining">Dining only</option>
                 <option value="event">Event only</option>
                 <option value="venue">Venue only</option>
+                <option value="artist">Artist only</option>
               </select>
               <SearchInput
                 value={q}
@@ -354,13 +356,14 @@ export default function AdminPartnerDocumentsPage() {
           />
           <select
             value={newTerm.module}
-            onChange={(e) => setNewTerm((p) => ({ ...p, module: e.target.value as "dining" | "event" | "venue" | "both" }))}
+            onChange={(e) => setNewTerm((p) => ({ ...p, module: e.target.value as "dining" | "event" | "venue" | "artist" | "both" }))}
             className="input-field"
           >
             <option value="both">All modules</option>
             <option value="dining">Dining only</option>
             <option value="event">Event only</option>
             <option value="venue">Venue only</option>
+            <option value="artist">Artist only</option>
           </select>
           <button
             type="button"

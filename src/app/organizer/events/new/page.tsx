@@ -20,7 +20,7 @@ export default function NewOrganizerEventPage() {
   const handleSaveDraft = async (payload: EventFormPayload) => {
     try {
       await createEvent(payload).unwrap();
-      toast.success("Event draft saved successfully");
+      toast.success("Draft saved. You can continue editing anytime from My Events.");
       router.push("/organizer/events");
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save draft"));
@@ -41,13 +41,15 @@ export default function NewOrganizerEventPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <Link href="/organizer/events" className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white">
         <ArrowLeft size={16} /> Back to events
       </Link>
       <div>
         <h2 className="portal-heading text-2xl font-bold">Create event</h2>
-        <p className="portal-muted mt-1">Fill in the details, upload posters and documents, then submit for review.</p>
+        <p className="portal-muted mt-1">
+          Guided steps: choose type, add details, venues & tickets, documents, then review and submit.
+        </p>
       </div>
       <EventForm
         canSubmit

@@ -4,8 +4,8 @@ import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import OrganizerLayoutRequestsPanel from "@/components/EventAdminPanel/OrganizerLayoutRequestsPanel";
 
-// Konva relies on window, so we must load it client-side only
 const VenueLayoutBuilder = dynamic(
   () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
   { ssr: false }
@@ -16,8 +16,8 @@ export default function EventLayoutPage() {
   const eventId = typeof params.id === "string" ? params.id : "";
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col h-full">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="max-w-7xl mx-auto flex flex-col h-full gap-8">
+      <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
             <Link
@@ -26,15 +26,18 @@ export default function EventLayoutPage() {
             >
               <ArrowLeft size={20} />
             </Link>
-            <h1 className="text-2xl font-bold text-white">Seating Layout Builder</h1>
+            <h1 className="text-2xl font-bold text-white">Seating & layout</h1>
           </div>
           <p className="text-zinc-400 mt-1 ml-11">
-            Drag and drop seats to configure your dynamic venue floor plan.
+            Review custom layout builds from the platform, then edit your floor plan if needed.
           </p>
         </div>
       </div>
 
+      <OrganizerLayoutRequestsPanel eventId={eventId} />
+
       <div className="flex-1 min-h-0">
+        <h2 className="text-lg font-semibold text-white mb-3">Layout builder</h2>
         <VenueLayoutBuilder eventId={eventId} />
       </div>
     </div>

@@ -43,7 +43,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const { data, isLoading } = useGetAdminBusinessesQuery({
-    module: module as "dining" | "event" | "venue",
+    module: module as "dining" | "event" | "venue" | "artist",
     tab,
     page,
     limit: PAGE_SIZE,
@@ -59,8 +59,15 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
 
   const isDining = module === "dining";
   const isVenue = module === "venue";
+  const isArtist = module === "artist";
   const listBase = `/admin/businesses/${module}`;
-  const label = isDining ? "dining business" : isVenue ? "venue partner" : "event organizer";
+  const label = isDining
+    ? "dining business"
+    : isVenue
+      ? "venue partner"
+      : isArtist
+        ? "artist partner"
+        : "event organizer";
   const actionBusy = isToggling || isArchiving || isUnarchiving || confirmBusy;
 
   const closeConfirm = () => {
@@ -164,7 +171,13 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-bold text-white">
-            {isDining ? "Dining Businesses" : isVenue ? "Venue Partners" : "Event Organizers"}
+            {isDining
+              ? "Dining Businesses"
+              : isVenue
+                ? "Venue Partners"
+                : isArtist
+                  ? "Artist Partners"
+                  : "Event Organizers"}
           </h2>
           <p className="text-zinc-400">
             Enable/Disable freezes login. Archive moves them off the Active list; history is kept.
@@ -227,7 +240,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
             <tr>
               <th className="px-6 py-4 font-medium">Business Name</th>
               {isDining && <th className="px-6 py-4 font-medium">Parent</th>}
-              <th className="px-6 py-4 font-medium">{isDining || isVenue ? "Venue Type" : "Module"}</th>
+              <th className="px-6 py-4 font-medium">{isDining || isVenue || isArtist ? (isArtist ? "Artist Type" : "Venue Type") : "Module"}</th>
               <th className="px-6 py-4 font-medium">Location</th>
               <th className="px-6 py-4 font-medium">Admin</th>
               <th className="px-6 py-4 font-medium">Docs</th>
@@ -240,7 +253,9 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
               const isArchived = !!biz.deleted_at;
               const archiveBlocked = isDining
                 ? (biz.upcoming_booking_count ?? 0) > 0
-                : (biz.live_event_count ?? 0) > 0;
+                : isVenue || isArtist
+                  ? false
+                  : (biz.live_event_count ?? 0) > 0;
               return (
                 <tr key={biz.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 font-medium text-white">
@@ -252,7 +267,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
                     <td className="px-6 py-4 text-zinc-400">{biz.parent_type_name || "—"}</td>
                   )}
                   <td className="px-6 py-4">
-                    {isDining || isVenue ? (
+                    {isDining || isVenue || isArtist ? (
                       <span className="text-zinc-400">{biz.type_name || "Unspecified"}</span>
                     ) : (
                       <span className="px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border bg-violet-500/10 text-violet-400 border-violet-500/20">
@@ -367,8 +382,8 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
               <tr>
                 <td colSpan={isDining ? 8 : 7} className="text-center py-10 text-zinc-500">
                   {tab === "archived"
-                    ? `No archived ${isDining ? "dining businesses" : isVenue ? "venue partners" : "event organizers"}.`
-                    : `No ${isDining ? "dining businesses" : isVenue ? "venue partners" : "event organizers"} found.`}
+                    ? `No archived ${isDining ? "dining businesses" : isVenue ? "venue partners" : isArtist ? "artist partners" : "event organizers"}.`
+                    : `No ${isDining ? "dining businesses" : isVenue ? "venue partners" : isArtist ? "artist partners" : "event organizers"} found.`}
                 </td>
               </tr>
             )}

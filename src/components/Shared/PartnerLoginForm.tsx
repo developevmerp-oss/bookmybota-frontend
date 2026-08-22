@@ -25,6 +25,8 @@ const ROLE_LABEL: Record<UserRole, string> = {
   super_admin: "Super Admin",
   business_admin: "Dining Admin",
   event_admin: "Event Organizer",
+  venue_admin: "Venue Admin",
+  artist_admin: "Artist Admin",
   customer: "Customer",
 };
 

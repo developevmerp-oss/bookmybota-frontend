@@ -1,92 +1,146 @@
 "use client";
 
 import Link from "next/link";
+import { Calendar } from "lucide-react";
 import { Star } from "lucide-react";
 import type { Business, PublicEvent } from "@/services/api";
-import { formatMoney, normalizePriceRange } from "@/lib/currencyFormat";
-import { eventPortrait, formatShowDate, formatShowDateBar, localityFromAddress } from "./homeUtils";
+import { normalizePriceRange } from "@/lib/currencyFormat";
+import {
+  eventPortrait,
+  eventPlaceLine,
+  formatEventDateLine,
+  localityFromAddress,
+} from "./homeUtils";
 
 export function EventPosterCard({
   event,
-  dark = false,
+  city,
+  className = "",
+  fullWidth = false,
 }: {
   event: PublicEvent;
-  dark?: boolean;
+  city?: string;
+  className?: string;
+  fullWidth?: boolean;
 }) {
   const image = eventPortrait(event);
-  const meta = [event.language, event.category_name].filter(Boolean).join(" · ");
-  const date = formatShowDate(event.next_showtime);
+  const dateLine = formatEventDateLine(event.next_showtime);
+  const placeLine = eventPlaceLine(event, city);
+  const eventType = event.category_name?.trim();
+  const widthClass = fullWidth
+    ? "w-full"
+    : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px]";
 
   return (
     <Link
       href={`/events/${event.id}`}
-      className="snap-start shrink-0 w-[160px] sm:w-[250px] md:w-[270px] group"
+      className={`${widthClass} group block bg-white rounded-2xl overflow-hidden transition-shadow ${className}`}
     >
-      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-[#F7F7F7] border border-[#EDEDED]">
-        {image ? (
-          <img
-            src={image}
-            alt={event.name}
-            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-[#9A9A9A]">
-            No poster
+      <div className="pb-0">
+        <div className="rounded-t-[10px] overflow-hidden bg-white">
+          <div className="relative aspect-[3/4]  overflow-hidden">
+            {image ? (
+              <img
+                src={image}
+                alt={event.name}
+                className="w-full h-full object-cover group-hover:scale-[1.08] transition-transform duration-500"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-300">
+                <Calendar size={28} strokeWidth={1.5} />
+              </div>
+            )}
+          </div>
+        </div>
+        {dateLine && (
+          <div className="bg-black text-white px-3 py-2.5 text-[12px] sm:text-[13px] font-medium rounded-b-[10px]">
+            {dateLine}
           </div>
         )}
       </div>
-      <h3
-        className={`mt-2.5 text-sm font-semibold line-clamp-2 leading-snug ${
-          dark ? "text-white" : "text-[#111111]"
-        }`}
-      >
-        {event.name}
-      </h3>
-      {meta && <p className="mt-1 text-xs text-[#6B6B6B] line-clamp-1">{meta}</p>}
-      {date && <p className="mt-0.5 text-xs text-[#6B6B6B]">{date}</p>}
-      {event.min_price != null && event.min_price !== "" && (
-        <p className={`mt-1 text-xs font-medium ${dark ? "text-[#E0D7FF]" : "text-[#111111]"}`}>
-          From {formatMoney(event.min_price, { compact: true })}
-        </p>
-      )}
+
+      <div className="px-3 pt-3 pb-4">
+        <h3 className="font-bold text-[#1a2744] text-[14px] sm:text-[15px] leading-snug line-clamp-2">
+          {event.name}
+        </h3>
+        {placeLine && (
+          <p className="mt-2 text-[12px] sm:text-[13px] text-[#6b7280] leading-snug line-clamp-2">{placeLine}</p>
+        )}
+        {eventType && (
+          <p className="mt-1 text-[11px] sm:text-[12px] text-[#9ca3af] line-clamp-1">{eventType}</p>
+        )}
+      </div>
     </Link>
   );
 }
 
-export function MusicEventCard({ event, city }: { event: PublicEvent; city?: string }) {
-  const image = eventPortrait(event);
-  const date = formatShowDateBar(event.next_showtime);
-  const venue = [event.organizer_name, city && city !== "All Cities" ? city : ""]
-    .filter(Boolean)
-    .join(": ");
+/** Static showcase card — same layout as EventPosterCard (no price). */
+export function ShowcaseEventPosterCard({
+  title,
+  image,
+  showDate,
+  place,
+  eventType,
+  href,
+  className = "",
+  fullWidth = false,
+}: {
+  title: string;
+  image: string;
+  showDate?: string;
+  place?: string;
+  eventType?: string;
+  href: string;
+  className?: string;
+  fullWidth?: boolean;
+}) {
+  const dateLine = formatEventDateLine(showDate);
+  const widthClass = fullWidth
+    ? "w-full"
+    : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px]";
 
   return (
-    <Link href={`/events/${event.id}`} className="snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px] group">
-      <div className="rounded-t-xl overflow-hidden bg-[#F7F7F7] relative aspect-[3/4]">
-        {image ? (
-          <img
-            src={image}
-            alt={event.name}
-            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-[#9A9A9A]">
-            No poster
+    <Link
+      href={href}
+      className={`${widthClass} group block bg-white rounded-xl overflow-hidden hover:shadow-md transition-shadow ${className}`}
+    >
+      <div className="pb-0">
+        <div className="rounded-t-[10px] overflow-hidden bg-white">
+          <div className="relative aspect-[3/4] bg-slate-100 overflow-hidden">
+            <img
+              src={image}
+              alt={title}
+              className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
+              loading="lazy"
+              draggable={false}
+            />
           </div>
-        )}
-        {date && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black text-white text-[11px] font-medium px-2 py-1">
-            {date}
+        </div>
+        {dateLine && (
+          <div className="bg-black text-white px-3 py-2.5 text-[12px] sm:text-[13px] font-medium rounded-b-[10px]">
+            {dateLine}
           </div>
         )}
       </div>
-      <div className="bg-[#F7F7F7] rounded-b-xl px-2.5 py-2.5 min-h-[88px]">
-        <h3 className="text-sm font-bold text-[#111111] line-clamp-2 leading-snug">{event.name}</h3>
-        {venue && <p className="mt-1 text-xs text-[#6B6B6B] line-clamp-1">{venue}</p>}
-        <p className="mt-0.5 text-xs text-[#6B6B6B]">{event.category_name || "Concerts"}</p>
+
+      <div className="px-3 pt-3 pb-4 bg-white">
+        <h3 className="font-bold text-[#1a2744] text-[14px] sm:text-[15px] leading-snug line-clamp-2">
+          {title}
+        </h3>
+        {place && (
+          <p className="mt-2 text-[12px] sm:text-[13px] text-[#6b7280] leading-snug line-clamp-2">{place}</p>
+        )}
+        {eventType && (
+          <p className="mt-1 text-[11px] sm:text-[12px] text-[#9ca3af] line-clamp-1">{eventType}</p>
+        )}
       </div>
     </Link>
   );
+}
+
+/** @deprecated Use EventPosterCard — kept for category rails */
+export function MusicEventCard({ event, city }: { event: PublicEvent; city?: string }) {
+  return <EventPosterCard event={event} city={city} />;
 }
 
 export function DiningPosterCard({ place }: { place: Business }) {

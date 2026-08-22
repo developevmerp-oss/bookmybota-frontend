@@ -46,6 +46,34 @@ const BUSINESS_LINKS = [
   },
 ] as const;
 
+function CustomerDropdown({ 
+  children, 
+  onLogout 
+}: { 
+  children: React.ReactNode; 
+  onLogout: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div className="relative group">
+      {children}
+      <div className="absolute right-0 top-full pt-1 w-56 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+        <div className="rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 overflow-hidden">
+          <Link href="/customer/profile" className="block px-4 py-2.5 text-sm font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Profile</Link>
+          <Link href="/customer/change-password" className="block px-4 py-2.5 text-sm font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
+          <Link href="/customer/dashboard" className="block px-4 py-2.5 text-sm font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Orders / Reservations</Link>
+          <button 
+            type="button"
+            onClick={onLogout} 
+            className="block w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+          >
+            Log out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ForBusinessMenu({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -151,6 +179,16 @@ export default function HomeHeader() {
     window.dispatchEvent(new Event("selected_city_changed"));
   };
 
+  const handleLogout = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    localStorage.removeItem("token_customer");
+    localStorage.removeItem("user_customer");
+    window.dispatchEvent(new Event("auth_changed"));
+    window.dispatchEvent(new Event("storage"));
+    toast.success("Logged out successfully");
+  };
+
   const cityLabel = city || "Select city";
   const displayName = customer?.name || customer?.email?.split("@")[0] || "Account";
   const initial = displayName.charAt(0).toUpperCase();
@@ -188,15 +226,17 @@ export default function HomeHeader() {
           {!authReady ? (
             <span className="w-9 h-9" />
           ) : customer ? (
-            <Link
-              href="/customer/profile"
-              aria-label={displayName}
-              className="w-9 h-9 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] flex items-center justify-center"
-            >
-              <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
-                {initial}
-              </span>
-            </Link>
+            <CustomerDropdown onLogout={handleLogout}>
+              <Link
+                href="/customer/profile"
+                aria-label={displayName}
+                className="w-9 h-9 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] flex items-center justify-center relative z-10"
+              >
+                <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
+                  {initial}
+                </span>
+              </Link>
+            </CustomerDropdown>
           ) : isAuthPage ? null : (
             <button
               type="button"
@@ -241,17 +281,19 @@ export default function HomeHeader() {
           {!authReady ? (
             <span className="w-9 h-9" />
           ) : customer ? (
-            <Link
-              href="/customer/profile"
-              className="inline-flex h-9 items-center gap-1.5 pl-1 pr-2.5 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors"
-            >
-              <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
-                {initial}
-              </span>
-              <span className="text-sm font-medium text-[#111111] max-w-[90px] truncate whitespace-nowrap">
-                {displayName}
-              </span>
-            </Link>
+            <CustomerDropdown onLogout={handleLogout}>
+              <Link
+                href="/customer/profile"
+                className="inline-flex h-9 items-center gap-1.5 pl-1 pr-2.5 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors relative z-10"
+              >
+                <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
+                  {initial}
+                </span>
+                <span className="text-sm font-medium text-[#111111] max-w-[90px] truncate whitespace-nowrap">
+                  {displayName}
+                </span>
+              </Link>
+            </CustomerDropdown>
           ) : isAuthPage ? null : (
             <button
               type="button"
@@ -305,17 +347,19 @@ export default function HomeHeader() {
                 <Gift size={18} className="shrink-0" />
                 Gift Cards
               </button>
-              <Link
-                href="/customer/profile"
-                className="inline-flex h-13 items-center gap-2 pl-1 pr-3 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors"
-              >
-                <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white text-[16px] font-semibold flex items-center justify-center">
-                  {initial}
-                </span>
-                <span className="text-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
-                  {displayName}
-                </span>
-              </Link>
+              <CustomerDropdown onLogout={handleLogout}>
+                <Link
+                  href="/customer/profile"
+                  className="inline-flex h-13 items-center gap-2 pl-1 pr-3 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors relative z-10"
+                >
+                  <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white text-[16px] font-semibold flex items-center justify-center">
+                    {initial}
+                  </span>
+                  <span className="text-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
+                    {displayName}
+                  </span>
+                </Link>
+              </CustomerDropdown>
             </>
           ) : isAuthPage ? null : (
             <button

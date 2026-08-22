@@ -3,15 +3,16 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ShowcaseEventPosterCard } from "./PosterCard";
 import "./PopularSportsEventsRail.css";
 
 type SportEvent = {
   id: string;
   title: string;
-  meta: string;
   image: string;
-  date: string;
-  price: string;
+  showDate: string;
+  place: string;
+  eventType: string;
   href: string;
 };
 
@@ -20,91 +21,69 @@ export const POPULAR_SPORTS_EVENTS: SportEvent[] = [
   {
     id: "1",
     title: "Great Ethiopian Run 10K",
-    meta: "English · Running",
     image: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=500&h=750&fit=crop&q=80",
-    date: "20 Nov 2026",
-    price: "From 200 ETB",
+    showDate: "2026-11-20T09:00:00",
+    place: "Meskel Square: Addis Ababa",
+    eventType: "Sports · Running",
     href: "/events?category=sports",
   },
   {
     id: "2",
     title: "Ethiopian Premier League Final",
-    meta: "Amharic · Football",
     image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=500&h=750&fit=crop&q=80",
-    date: "5 Dec 2026",
-    price: "From 350 ETB",
+    showDate: "2026-12-05T16:00:00",
+    place: "Addis Ababa Stadium: Addis Ababa",
+    eventType: "Sports · Football",
     href: "/events?category=sports",
   },
   {
     id: "3",
     title: "National Wrestling Cup",
-    meta: "Amharic · Wrestling",
     image: "https://images.unsplash.com/photo-1555597673-b21d5c935865?w=500&h=750&fit=crop&q=80",
-    date: "12 Dec 2026",
-    price: "From 150 ETB",
+    showDate: "2026-12-12T14:00:00",
+    place: "Dire Dawa Arena: Dire Dawa",
+    eventType: "Sports · Wrestling",
     href: "/events?category=sports",
   },
   {
     id: "4",
     title: "Addis Basketball Night",
-    meta: "English · Basketball",
     image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=500&h=750&fit=crop&q=80",
-    date: "18 Dec 2026",
-    price: "From 250 ETB",
+    showDate: "2026-12-18T19:00:00",
+    place: "Millennium Hall: Addis Ababa",
+    eventType: "Sports · Basketball",
     href: "/events?category=sports",
   },
   {
     id: "5",
     title: "Rift Valley Cycling Challenge",
-    meta: "English · Cycling",
     image: "https://images.unsplash.com/photo-1517649763962-0c623066027c?w=500&h=750&fit=crop&q=80",
-    date: "22 Jan 2027",
-    price: "From 300 ETB",
+    showDate: "2027-01-22T07:00:00",
+    place: "Hawassa Lakeside: Hawassa",
+    eventType: "Sports · Cycling",
     href: "/events?category=sports",
   },
   {
     id: "6",
     title: "Track & Field Open Meet",
-    meta: "English · Athletics",
     image: "https://images.unsplash.com/photo-1461896836934-ffe607ba6851?w=500&h=750&fit=crop&q=80",
-    date: "8 Feb 2027",
-    price: "From 180 ETB",
+    showDate: "2027-02-08T10:00:00",
+    place: "Bahir Dar Stadium: Bahir Dar",
+    eventType: "Sports · Athletics",
     href: "/events?category=sports",
   },
   {
     id: "7",
     title: "Youth Football Festival",
-    meta: "Amharic · Football",
     image: "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=500&h=750&fit=crop&q=80",
-    date: "15 Feb 2027",
-    price: "From 100 ETB",
+    showDate: "2027-02-15T15:00:00",
+    place: "Jimma Sports Complex: Jimma",
+    eventType: "Sports · Football",
     href: "/events?category=sports",
   },
 ];
 
 const VISIBLE = 5;
-
-function SportEventCard({ event }: { event: SportEvent }) {
-  return (
-    <Link href={event.href} className="sports-rail-slot group block min-w-0">
-      <div className="aspect-[2/3] rounded-xl overflow-hidden bg-[#F7F7F7] border border-[#EDEDED]">
-        <img
-          src={event.image}
-          alt={event.title}
-          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-          loading="lazy"
-          draggable={false}
-        />
-      </div>
-      <h3 className="mt-2.5 text-sm font-semibold text-[#111111] line-clamp-2 leading-snug">
-        {event.title}
-      </h3>
-      <p className="mt-1 text-xs text-[#6B6B6B] line-clamp-1">{event.meta}</p>
-      <p className="mt-0.5 text-xs text-[#6B6B6B]">{event.date}</p>
-      <p className="mt-1 text-xs font-medium text-[#111111]">{event.price}</p>
-    </Link>
-  );
-}
 
 export default function PopularSportsEventsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -146,7 +125,17 @@ export default function PopularSportsEventsRail() {
             style={{ ["--sports-visible" as string]: VISIBLE }}
           >
             {POPULAR_SPORTS_EVENTS.map((event) => (
-              <SportEventCard key={event.id} event={event} />
+              <div key={event.id} className="sports-rail-slot">
+                <ShowcaseEventPosterCard
+                  title={event.title}
+                  image={event.image}
+                  showDate={event.showDate}
+                  place={event.place}
+                  eventType={event.eventType}
+                  href={event.href}
+                  fullWidth
+                />
+              </div>
             ))}
           </div>
 

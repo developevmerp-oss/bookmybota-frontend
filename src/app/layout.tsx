@@ -92,7 +92,7 @@ export default function RootLayout({
   const isAdminOrBusiness =
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/business") ||
-    pathname?.startsWith("/artist");
+    pathname?.startsWith("/artist") ||
     pathname?.startsWith("/venue") ||
     (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerMarketing);
     
@@ -124,12 +124,22 @@ export default function RootLayout({
     window.scrollTo(0, 0);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!isEventBookingFlow) return;
+    document.documentElement.classList.add("overflow-hidden");
+    document.body.classList.add("overflow-hidden");
+    return () => {
+      document.documentElement.classList.remove("overflow-hidden");
+      document.body.classList.remove("overflow-hidden");
+    };
+  }, [isEventBookingFlow]);
+
   return (
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={roboto.className}>
         <StoreProvider>
           {showPublicHeader && <HomeHeader />}
-          <main>
+          <main className={isEventBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
             {children}
             {showLayoutFooter && <Footer />}
           </main>

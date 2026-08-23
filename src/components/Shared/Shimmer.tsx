@@ -68,11 +68,11 @@ export function EventBookingShimmer() {
             </div>
           </div>
           <div className="max-w-[40rem] mx-auto px-4 py-3 flex items-center justify-center gap-2">
-            {[0, 1, 2, 3].map((i) => (
+            {[0, 1, 2].map((i) => (
               <div key={i} className="flex items-center gap-2">
                 <Skeleton circle width={24} height={24} />
                 <Skeleton width={56} height={12} />
-                {i < 3 && <Skeleton width={12} height={12} />}
+                {i < 2 && <Skeleton width={12} height={12} />}
               </div>
             ))}
           </div>

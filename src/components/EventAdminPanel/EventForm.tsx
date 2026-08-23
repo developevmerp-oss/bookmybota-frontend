@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search } from "lucide-react";
+import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetBusinessTypesQuery,
@@ -33,6 +33,11 @@ import {
   showtimeToIso,
   isShowtimePersistable,
 } from "@/lib/eventFormSchema";
+import {
+  TICKET_MODE_OPTIONS,
+  normalizeAllowedTicketModes,
+  type TicketDeliveryMode,
+} from "@/lib/eventTicketMode";
 import {
   formatDate,
   formatDateTime12h,
@@ -124,6 +129,7 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     about_event: event.about_event || "",
     age_group: event.age_group || "",
     duration_minutes: event.duration_minutes ?? null,
+    allowed_ticket_modes: normalizeAllowedTicketModes(event.allowed_ticket_modes),
     artists:
       event.artists?.map((a, i) => ({
         artist_source:
@@ -1177,6 +1183,16 @@ export default function EventForm({
   const posterHorizontal = watch("poster_horizontal_url");
   const posterVertical = watch("poster_vertical_url");
   const galleryImages = watch("gallery_images") || [];
+  const allowedTicketModes = watch("allowed_ticket_modes") || [];
+
+  const toggleTicketMode = (mode: TicketDeliveryMode) => {
+    if (readOnly) return;
+    const current = getValues("allowed_ticket_modes") || [];
+    const next = current.includes(mode)
+      ? current.filter((m) => m !== mode)
+      : [...current, mode];
+    setValue("allowed_ticket_modes", next, { shouldDirty: true, shouldValidate: true });
+  };
 
   const { data: masters, isLoading: mastersLoading } = useGetEventMastersQuery(categoryTypeId!, {
     skip: !categoryTypeId,
@@ -1284,6 +1300,7 @@ export default function EventForm({
         selected: selectedTerms,
         custom: customTerms.map((t) => t.trim()).filter(Boolean),
       },
+      allowed_ticket_modes: normalizeAllowedTicketModes(values.allowed_ticket_modes),
       ticket_types,
       hosting_type: hostingType,
       tour_id: (event as { tour_id?: string | null } | undefined)?.tour_id || null,
@@ -1506,6 +1523,7 @@ export default function EventForm({
         "languages",
         "age_group",
         "about_event",
+        "allowed_ticket_modes",
       ]);
       if (!ok) {
         toast.error("Please complete the required event details.");
@@ -1526,6 +1544,10 @@ export default function EventForm({
       }
       if (!(values.languages || []).length) {
         toast.error("Select at least one language.");
+        return false;
+      }
+      if (!(values.allowed_ticket_modes || []).length) {
+        toast.error("Select at least one ticket delivery mode for customers.");
         return false;
       }
       return true;
@@ -1775,6 +1797,52 @@ export default function EventForm({
               </select>
               {errors.age_group && <p className={errorClass}>{errors.age_group.message}</p>}
             </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>
+              Ticket delivery modes for customers <span className="text-rose-500">*</span>
+            </label>
+            <p className="portal-muted text-xs mb-3">
+              Choose which options buyers can select when purchasing tickets for this event.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              {TICKET_MODE_OPTIONS.map((option) => {
+                const selected = allowedTicketModes.includes(option.id);
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => toggleTicketMode(option.id)}
+                    className={`rounded-xl border p-4 text-left transition-colors ${
+                      selected
+                        ? "border-violet-500 bg-violet-500/10"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span
+                        className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                          selected
+                            ? "border-violet-600 bg-violet-600 text-white"
+                            : "border-slate-300 bg-white"
+                        }`}
+                      >
+                        {selected && <Check size={10} strokeWidth={3} />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{option.label}</p>
+                        <p className="mt-1 text-xs text-slate-500 leading-relaxed">{option.description}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {errors.allowed_ticket_modes && (
+              <p className={errorClass}>{errors.allowed_ticket_modes.message as string}</p>
+            )}
           </div>
 
           <div>
@@ -2148,6 +2216,15 @@ export default function EventForm({
                 </p>
                 <p className="text-sm text-slate-600">
                   Age {watch("age_group") || "—"} · {watch("duration_minutes") || "—"} min
+                </p>
+                <p className="text-sm text-slate-600">
+                  Ticket modes:{" "}
+                  {(allowedTicketModes.length
+                    ? TICKET_MODE_OPTIONS.filter((o) => allowedTicketModes.includes(o.id))
+                    : TICKET_MODE_OPTIONS
+                  )
+                    .map((o) => o.label)
+                    .join(", ") || "None selected"}
                 </p>
                 <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("details")}>
                   Edit details

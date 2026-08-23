@@ -17,11 +17,14 @@ import {
   Minus,
   Plus,
   Shield,
+  Smartphone,
   Star,
   Ticket,
+  Truck,
   User,
   Users,
   X,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -40,6 +43,14 @@ import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { getPhoneValidationError, sanitizePhoneInput } from "@/lib/validation";
+import {
+  ticketModeConfirmNote,
+  ticketModeDetailBullets,
+  ticketModeLabel,
+  ticketModeOptionsForEvent,
+  defaultTicketModeForEvent,
+  type TicketDeliveryMode,
+} from "@/lib/eventTicketMode";
 import dynamic from "next/dynamic";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import images from "@/Images";
@@ -110,10 +121,16 @@ function ticketTypeIcon(name: string) {
 
 const CHECKOUT_STEPS = [
   { n: 1, label: "Venue", short: "Venue" },
-  { n: 2, label: "Ticket", short: "Ticket" },
-  { n: 3, label: "Registration", short: "Registration" },
-  { n: 4, label: "Review & Proceed to Pay", short: "Pay" },
+  { n: 2, label: "Tickets", short: "Tickets" },
+  { n: 3, label: "Ticket Mode", short: "Mode" },
+  { n: 4, label: "Review & Confirm", short: "Confirm" },
 ] as const;
+
+function ticketModeIcon(mode: TicketDeliveryMode) {
+  if (mode === "BOX_OFFICE") return Building2;
+  if (mode === "PHYSICAL_DELIVERY") return Truck;
+  return Smartphone;
+}
 
 function moneySum(values: number[]) {
   return Math.round(values.reduce((sum, n) => sum + (Number(n) || 0), 0) * 100) / 100;
@@ -145,18 +162,34 @@ export default function EventCheckout({
   const [submitting, setSubmitting] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
-  const [sendUpdates, setSendUpdates] = useState(true);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [expandedCity, setExpandedCity] = useState<string>("");
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [mTicketModalOpen, setMTicketModalOpen] = useState(false);
+  const [ticketModeDetailsOpen, setTicketModeDetailsOpen] = useState<TicketDeliveryMode | null>(null);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [cancelTxnOpen, setCancelTxnOpen] = useState(false);
   const [cancelTxnAction, setCancelTxnAction] = useState<"back" | "exit">("back");
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [ticketMode, setTicketMode] = useState<TicketDeliveryMode>("M_TICKET");
+  const [deliveryAddressLine, setDeliveryAddressLine] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
   const dateScrollRef = useRef<HTMLDivElement>(null);
+  const checkoutScrollFadeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [checkoutScrollActive, setCheckoutScrollActive] = useState(false);
+
+  const handleCheckoutScroll = () => {
+    setCheckoutScrollActive(true);
+    if (checkoutScrollFadeRef.current) clearTimeout(checkoutScrollFadeRef.current);
+    checkoutScrollFadeRef.current = setTimeout(() => setCheckoutScrollActive(false), 900);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (checkoutScrollFadeRef.current) clearTimeout(checkoutScrollFadeRef.current);
+    };
+  }, []);
 
   const customerId = authUser?.role === "customer" ? authUser.customer_id || "" : "";
   const { data: profile } = useGetCustomerProfileQuery(customerId, { skip: !customerId || isOrganizer });
@@ -170,6 +203,11 @@ export default function EventCheckout({
 
   const showtimes = event.showtimes || [];
   const ticketTypes = event.ticket_types || [];
+
+  const availableTicketModes = useMemo(
+    () => ticketModeOptionsForEvent(event.allowed_ticket_modes),
+    [event.allowed_ticket_modes]
+  );
 
   const dateOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -202,14 +240,22 @@ export default function EventCheckout({
     setPromoInput("");
     setAppliedPromo(null);
     setSubmitting(false);
-    setSendUpdates(true);
-    setTermsAccepted(false);
     setAuthModalOpen(false);
     setExpandedCity("");
-    setMTicketModalOpen(false);
+    setTicketModeDetailsOpen(null);
     setContactModalOpen(false);
     setCancelTxnOpen(false);
-  }, [open, event.id, initialShowtimeId]);
+    setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
+    setDeliveryAddressLine("");
+    setDeliveryCity("");
+    setDeliveryNotes("");
+  }, [open, event.id, event.allowed_ticket_modes, initialShowtimeId]);
+
+  useEffect(() => {
+    if (!availableTicketModes.some((o) => o.id === ticketMode)) {
+      setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
+    }
+  }, [availableTicketModes, ticketMode, event.allowed_ticket_modes]);
 
   useEffect(() => {
     if (isOrganizer || authUser?.role !== "customer") return;
@@ -319,7 +365,7 @@ export default function EventCheckout({
     }));
   };
 
-  const requestLeavePayStep = (action: "back" | "exit") => {
+  const requestLeaveConfirmStep = (action: "back" | "exit") => {
     setCancelTxnAction(action);
     setCancelTxnOpen(true);
   };
@@ -363,6 +409,12 @@ export default function EventCheckout({
     e.preventDefault();
     if (!showtimeId || selectedLines.length === 0) return;
 
+    if (!isOrganizer && (!isCustomerLoggedIn || !customerId)) {
+      toast.error("Please sign in to complete your booking.");
+      setAuthModalOpen(true);
+      return;
+    }
+
     const phoneErr = getPhoneValidationError(phone);
     if (!name.trim()) {
       toast.error(isOrganizer ? "Please enter the customer's name." : "Please enter your name.");
@@ -379,6 +431,16 @@ export default function EventCheckout({
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       toast.error("Enter a valid email address.");
       return;
+    }
+    if (ticketMode === "PHYSICAL_DELIVERY") {
+      if (!deliveryAddressLine.trim()) {
+        toast.error("Enter the delivery street address.");
+        return;
+      }
+      if (!deliveryCity.trim()) {
+        toast.error("Enter the delivery city.");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -397,6 +459,14 @@ export default function EventCheckout({
       const guest_name = name.trim();
       const guest_phone = sanitizePhoneInput(phone);
       const guest_email = email.trim() || undefined;
+      const deliveryPayload =
+        ticketMode === "PHYSICAL_DELIVERY"
+          ? {
+              delivery_address_line: deliveryAddressLine.trim(),
+              delivery_city: deliveryCity.trim(),
+              delivery_notes: deliveryNotes.trim() || undefined,
+            }
+          : {};
 
       let result;
       if (isOrganizer) {
@@ -409,6 +479,8 @@ export default function EventCheckout({
           guest_email,
           booking_source: "ORGANIZER",
           for_organizer: true,
+          ticket_mode: ticketMode,
+          ...deliveryPayload,
         }).unwrap();
       } else {
         result = await createEventBooking({
@@ -418,9 +490,11 @@ export default function EventCheckout({
           guest_name,
           guest_phone,
           guest_email,
-          customer_id: customerId || undefined,
+          customer_id: customerId,
           booking_source: "ONLINE",
           promo_code: appliedPromo?.promo_code,
+          ticket_mode: ticketMode,
+          ...deliveryPayload,
         }).unwrap();
       }
 
@@ -456,29 +530,82 @@ export default function EventCheckout({
       : step === 2
         ? "Select Tickets"
         : step === 3
-          ? "Registration"
-          : "Review & Pay";
+          ? "Ticket Mode"
+          : "Review & Confirm";
   const stepSubtitle =
     step === 1
       ? "Choose a city and venue for your event."
       : step === 2
         ? "You can add tickets based on availability."
         : step === 3
-          ? "Please fill all mandatory details for registration."
-          : "Confirm your booking summary and pay securely.";
-  const detailsReady =
+          ? availableTicketModes.length === 1
+            ? "Confirm ticket delivery and sign in to continue."
+            : "Choose how you want your tickets and sign in to continue."
+          : "Review your order and confirm your booking.";
+  const isCustomerLoggedIn = authUser?.role === "customer";
+  const contactDetailsReady =
     Boolean(name.trim()) &&
     !getPhoneValidationError(phone) &&
     Boolean(email.trim()) &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) &&
-    (isOrganizer || termsAccepted);
-  const canPay = detailsReady && !submitting;
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const detailsReady =
+    contactDetailsReady && (isOrganizer || isCustomerLoggedIn);
+  const canConfirm = detailsReady && !submitting && Boolean(ticketMode);
+  const deliveryDetailsReady =
+    ticketMode !== "PHYSICAL_DELIVERY" ||
+    (Boolean(deliveryAddressLine.trim()) && Boolean(deliveryCity.trim()));
+  const canProceedFromTicketMode =
+    Boolean(ticketMode) &&
+    deliveryDetailsReady &&
+    (isOrganizer ? contactDetailsReady : isCustomerLoggedIn && contactDetailsReady);
   const hasReservedSeats = Boolean(activeLayoutData?.data?.seats?.length);
-  const isCustomerLoggedIn = authUser?.role === "customer";
+
+  const proceedFromTickets = () => {
+    if (ticketQty < 1) return;
+    setStep(3);
+  };
+
+  const proceedToReview = () => {
+    if (!canProceedFromTicketMode) {
+      if (!isOrganizer && !isCustomerLoggedIn) {
+        setAuthModalOpen(true);
+        return;
+      }
+      if (!contactDetailsReady) {
+        setEditName(name);
+        setEditPhone(phone);
+        setEditEmail(email);
+        setContactModalOpen(true);
+        toast.error(isOrganizer ? "Please enter customer contact details." : "Please complete your contact details.");
+        return;
+      }
+      if (ticketMode === "PHYSICAL_DELIVERY" && !deliveryDetailsReady) {
+        toast.error("Enter the full delivery address.");
+        return;
+      }
+      return;
+    }
+    setStep(4);
+  };
+
+  const canNavigateToStep = (targetStep: number) => {
+    if (targetStep === step) return false;
+    if (targetStep < step) return true;
+    if (targetStep >= 2 && !showtimeId) return false;
+    if (targetStep >= 3 && ticketQty < 1) return false;
+    if (targetStep >= 4 && !canProceedFromTicketMode) return false;
+    return targetStep <= CHECKOUT_STEPS.length;
+  };
+
+  const navigateToStep = (targetStep: number) => {
+    if (!canNavigateToStep(targetStep)) return;
+    if (targetStep !== 2) setIsMapFullscreen(false);
+    setStep(targetStep);
+  };
 
   const showtimeSummaryBar =
     selectedShowtime && step >= 2 ? (
-      <div className="bg-[#E8ECF0] border-y border-slate-200/80">
+      <div className="shrink-0 bg-[#E8ECF0] border-y border-slate-200/80">
         <div
           className={`${
             isPage ? "max-w-[36rem] mx-auto" : ""
@@ -501,17 +628,31 @@ export default function EventCheckout({
     ) : null;
 
   const pageStepper = (
-    <div className="border-t border-slate-100 bg-white">
-      <div className="max-w-[40rem] mx-auto px-3 sm:px-6 py-3 sm:py-3.5">
-        <ol className="flex items-center justify-center gap-1 sm:gap-2 flex-wrap">
+    <div className="border-t border-slate-100 bg-white w-full">
+      <div className="max-w-[42rem] mx-auto px-3 sm:px-4 py-2 sm:py-2.5">
+        <ol className="flex items-center justify-center gap-0.5 sm:gap-1.5 flex-nowrap">
           {CHECKOUT_STEPS.map((s, i) => {
             const done = step > s.n;
             const active = step === s.n;
+            const clickable = canNavigateToStep(s.n);
             return (
-              <li key={s.n} className="flex items-center gap-1 sm:gap-2 min-w-0">
-                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <li key={s.n} className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => navigateToStep(s.n)}
+                  disabled={!clickable}
+                  aria-current={active ? "step" : undefined}
+                  aria-label={`Go to ${s.label}`}
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md text-left transition-opacity ${
+                    clickable
+                      ? "cursor-pointer hover:opacity-75"
+                      : active
+                        ? "cursor-default"
+                        : "cursor-not-allowed"
+                  }`}
+                >
                   <span
-                    className={`h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-[0.875rem] font-bold shrink-0 ${
+                    className={`h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-[0.75rem] sm:text-[0.875rem] font-bold shrink-0 ${
                       done
                         ? "bg-[#6900AA] text-white"
                         : active
@@ -522,16 +663,35 @@ export default function EventCheckout({
                     {done ? <Check size={12} strokeWidth={3} /> : s.n}
                   </span>
                   <span
-                    className={`text-[0.8125rem] sm:text-[0.9375rem] font-semibold leading-tight truncate max-w-[4.5rem] sm:max-w-none ${
+                    className={`whitespace-nowrap text-[0.6875rem] sm:text-[0.8125rem] md:text-[0.875rem] font-semibold leading-tight ${
                       active || done ? "text-slate-900" : "text-slate-400"
                     }`}
                   >
-                    <span className="sm:hidden">{s.short}</span>
-                    <span className="hidden sm:inline">{s.label}</span>
+                    {s.n === 4 ? (
+                      <>
+                        <span className="md:hidden">{s.short}</span>
+                        <span className="hidden md:inline xl:hidden">Confirm</span>
+                        <span className="hidden xl:inline">{s.label}</span>
+                      </>
+                    ) : s.n === 3 ? (
+                      <>
+                        <span className="sm:hidden">{s.short}</span>
+                        <span className="hidden sm:inline">{s.label}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="sm:hidden">{s.short}</span>
+                        <span className="hidden sm:inline">{s.label}</span>
+                      </>
+                    )}
                   </span>
-                </div>
+                </button>
                 {i < CHECKOUT_STEPS.length - 1 && (
-                  <ChevronRight size={14} className="text-slate-300 shrink-0 mx-0.5 sm:mx-1" aria-hidden />
+                  <ChevronRight
+                    size={12}
+                    className="text-slate-300 shrink-0 mx-0.5 sm:mx-1"
+                    aria-hidden
+                  />
                 )}
               </li>
             );
@@ -567,12 +727,12 @@ export default function EventCheckout({
       <div
         className={
           isPage
-            ? "relative w-full flex flex-col min-h-screen"
+            ? "relative w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#F5F5F5]"
             : "relative h-full w-full max-w-[26.25rem] bg-white shadow-2xl flex flex-col"
         }
       >
         {isPage && (
-          <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shrink-0">
+          <div className="z-30 bg-white border-b border-slate-200 shrink-0">
             <div className="relative h-[4.75rem] sm:h-[5.25rem] flex items-center px-3 sm:px-5">
               <Link href="/" className="absolute left-3 sm:left-5 shrink-0 flex items-center z-[1]">
                 <img
@@ -584,7 +744,7 @@ export default function EventCheckout({
               <div className="w-full max-w-[36rem] mx-auto px-12 sm:px-16 flex items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => (step === 4 ? requestLeavePayStep("exit") : onClose())}
+                  onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
                   aria-label="Back to event"
                   className="h-9 w-9 rounded-full text-slate-700 flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0"
                 >
@@ -627,12 +787,27 @@ export default function EventCheckout({
               {isOrganizer ? " Â· Organizer sale" : ""}
             </p>
 
-            <div className="mt-4 grid grid-cols-4 gap-1">
+            <div className="mt-4 grid grid-cols-4 gap-0.5">
               {CHECKOUT_STEPS.map((s) => {
                 const done = step > s.n;
                 const active = step === s.n;
+                const clickable = canNavigateToStep(s.n);
                 return (
-                  <div key={s.n} className="flex flex-col items-center min-w-0">
+                  <button
+                    key={s.n}
+                    type="button"
+                    onClick={() => navigateToStep(s.n)}
+                    disabled={!clickable}
+                    aria-current={active ? "step" : undefined}
+                    aria-label={`Go to ${s.short}`}
+                    className={`flex flex-col items-center min-w-0 rounded-lg py-1 transition-opacity ${
+                      clickable
+                        ? "cursor-pointer hover:opacity-75"
+                        : active
+                          ? "cursor-default"
+                          : "cursor-not-allowed"
+                    }`}
+                  >
                     <span
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-[0.9375rem] font-bold ${
                         done || active
@@ -649,7 +824,7 @@ export default function EventCheckout({
                     >
                       {s.short}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -657,14 +832,14 @@ export default function EventCheckout({
         )}
 
         <div
+          onScroll={handleCheckoutScroll}
           className={
             isPage
-              ? "flex-1 w-full max-w-[36rem] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-[5.5rem]"
-              : "flex-1 overflow-y-auto px-5 py-5 bg-white"
+              ? `flex-1 min-h-0 overflow-y-auto overscroll-y-contain checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} w-full max-w-[36rem] mx-auto px-4 sm:px-5 py-4 sm:py-5 pb-8`
+              : `flex-1 min-h-0 overflow-y-auto checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} px-5 py-5 bg-white`
           }
         >
-          {(step !== 3 || !isPage) && (
-            <div className="mb-5">
+          <div className="mb-5">
               <h3 className="text-[1.4375rem] sm:text-[1.6875rem] font-bold text-slate-900 tracking-tight">
                 {stepTitle}
               </h3>
@@ -672,7 +847,6 @@ export default function EventCheckout({
                 {stepSubtitle}
               </p>
             </div>
-          )}
 
           {step === 1 && (
             <div className="space-y-3">
@@ -942,117 +1116,210 @@ export default function EventCheckout({
           )}
 
           {step === 3 && (
-            <form
-              id="event-checkout-details-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (detailsReady) setStep(4);
-              }}
-              className="space-y-5"
-            >
-              {isPage && (
-                <p className="text-[1.0625rem] text-slate-600">
-                  Please fill all mandatory details for registration.
+            <div className="space-y-4 pb-2">
+              <div>
+                <p className="text-[0.9375rem] font-bold text-slate-900 mb-1">
+                  How do you want your tickets?
                 </p>
-              )}
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[1rem] font-semibold text-slate-800 mb-1.5 block">
-                    <span className="text-[#E11D48]">*</span> Name
-                  </label>
-                  <input
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className={`w-full bg-white border border-slate-300 rounded-[0.375rem] px-3.5 py-2.5 text-[1.0625rem] focus:outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]/25 text-slate-800`}
-                    placeholder="Enter name"
-                  />
+                {availableTicketModes.length === 1 && (
+                  <p className="text-[0.8125rem] text-slate-500">
+                    This event only offers {availableTicketModes[0].label.toLowerCase()}.
+                  </p>
+                )}
+                <div className="space-y-2.5 mt-3">
+                  {availableTicketModes.map((option) => {
+                    const Icon = ticketModeIcon(option.id);
+                    const selected = ticketMode === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setTicketMode(option.id)}
+                        className={`w-full text-left rounded-xl border p-4 transition-colors cursor-pointer ${
+                          selected
+                            ? "border-[#6900AA] bg-[#FBF6FF]"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`mt-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              selected
+                                ? "border-[#6900AA] bg-[#6900AA]"
+                                : "border-slate-300 bg-white"
+                            }`}
+                          >
+                            {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Icon size={16} className="text-[#6900AA] shrink-0" />
+                              <p className="text-[1.0625rem] font-bold text-slate-900">
+                                {option.label}
+                              </p>
+                              {option.recommended && (
+                                <span className="text-[0.6875rem] font-bold uppercase tracking-wide text-[#6900AA] bg-[#F7E9FF] px-2 py-0.5 rounded-full">
+                                  Recommended
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1.5 text-[0.9375rem] text-slate-500 leading-relaxed">
+                              {option.description}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTicketModeDetailsOpen(option.id);
+                              }}
+                              className="mt-2 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                            >
+                              View details
+                            </button>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label className="text-[1rem] font-semibold text-slate-800 mb-1.5 block">
-                    <span className="text-[#E11D48]">*</span> Phone Number
-                  </label>
-                  <div className="flex items-center gap-2 border border-slate-300 rounded-[0.375rem] px-3 bg-white focus-within:border-[#6900AA] focus-within:ring-1 focus-within:ring-[#6900AA]/25">
-                    <span className="inline-flex items-center gap-1 text-[1rem] font-semibold text-slate-700 shrink-0">
-                      +251
-                      <ChevronDown size={12} className="text-slate-400" />
-                    </span>
-                    <span className="w-px h-5 bg-slate-200 shrink-0" />
+              </div>
+
+              {ticketMode === "BOX_OFFICE" && selectedShowtime && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
+                  <p className="text-[0.875rem] font-bold text-amber-900">Pickup location</p>
+                  <p className="mt-1 text-[0.9375rem] text-amber-950 font-semibold">
+                    {selectedShowtime.venue_name || "Venue box office"}
+                  </p>
+                  {selectedShowtime.venue_address && (
+                    <p className="mt-1 text-[0.875rem] text-amber-900/80">
+                      {selectedShowtime.venue_address}
+                    </p>
+                  )}
+                  <p className="mt-2 text-[0.8125rem] text-amber-900/70 leading-relaxed">
+                    Arrive with your booking ID and photo ID. Counter opens about 60–90 minutes
+                    before showtime.
+                  </p>
+                </div>
+              )}
+
+              {ticketMode === "PHYSICAL_DELIVERY" && (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <p className="text-[0.9375rem] font-bold text-slate-900">Delivery address</p>
+                  <div>
+                    <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
+                      <span className="text-[#6900AA]">*</span> Street / house / area
+                    </label>
                     <input
-                      required
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
-                      inputMode="numeric"
-                      maxLength={12}
-                      className="flex-1 bg-transparent py-2.5 text-[1.0625rem] focus:outline-none text-slate-800 min-w-0"
-                      placeholder="Phone number"
+                      value={deliveryAddressLine}
+                      onChange={(e) => setDeliveryAddressLine(e.target.value)}
+                      className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
+                      placeholder="e.g. Bole Road, Building 12, Apt 4"
                     />
                   </div>
+                  <div>
+                    <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
+                      <span className="text-[#6900AA]">*</span> City
+                    </label>
+                    <input
+                      value={deliveryCity}
+                      onChange={(e) => setDeliveryCity(e.target.value)}
+                      className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
+                      placeholder="e.g. Addis Ababa"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
+                      Delivery notes <span className="font-normal text-slate-400">(optional)</span>
+                    </label>
+                    <textarea
+                      value={deliveryNotes}
+                      onChange={(e) => setDeliveryNotes(e.target.value)}
+                      rows={2}
+                      className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none resize-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
+                      placeholder="Landmark, gate code, preferred time..."
+                    />
+                  </div>
+                  <p className="text-[0.8125rem] text-slate-500 leading-relaxed">
+                    Printed tickets are usually delivered in 3–5 business days within city limits.
+                  </p>
                 </div>
-                <div>
-                  <label className="text-[1rem] font-semibold text-slate-800 mb-1.5 block">
-                    <span className="text-[#E11D48]">*</span> Email ID
-                  </label>
-                  <input
-                    required
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={`w-full bg-white border border-slate-300 rounded-[0.375rem] px-3.5 py-2.5 text-[1.0625rem] focus:outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]/25 text-slate-800`}
-                    placeholder="Enter email"
-                  />
-                </div>
+              )}
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4 pb-4">
+                <p className="text-[0.9375rem] font-bold text-slate-900 mb-3">
+                  {isOrganizer ? "Customer contact" : "Sign in & contact details"}
+                </p>
+
                 {isOrganizer ? (
-                  <p className="text-[0.875rem] text-slate-500">Enter the attendee&apos;s information.</p>
+                  <>
+                    {contactDetailsReady ? (
+                      <div className="space-y-1">
+                        <p className="text-[0.875rem] font-semibold text-slate-800">{name}</p>
+                        <p className="text-[0.875rem] text-slate-600">
+                          {phone ? `+251 ${phone}` : "—"}
+                        </p>
+                        <p className="text-[0.875rem] text-slate-600 truncate">{email}</p>
+                      </div>
+                    ) : (
+                      <p className="text-[0.875rem] text-slate-500">
+                        Add customer name, phone, and email to send tickets.
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditName(name);
+                        setEditPhone(phone);
+                        setEditEmail(email);
+                        setContactModalOpen(true);
+                      }}
+                      className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                    >
+                      {contactDetailsReady ? "Edit contact details" : "Add contact details"}
+                    </button>
+                  </>
+                ) : isCustomerLoggedIn ? (
+                  <>
+                    <div className="space-y-1">
+                      <p className="text-[0.875rem] font-semibold text-slate-800">
+                        {name || authUser?.name}
+                      </p>
+                      <p className="text-[0.875rem] text-slate-600">
+                        {phone ? `+251 ${phone}` : authUser?.phone ? `+251 ${authUser.phone}` : "—"}
+                      </p>
+                      <p className="text-[0.875rem] text-slate-600 truncate">
+                        {email || authUser?.email}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditName(name);
+                        setEditPhone(phone);
+                        setEditEmail(email);
+                        setContactModalOpen(true);
+                      }}
+                      className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                    >
+                      Edit contact details
+                    </button>
+                  </>
                 ) : (
-                  authUser?.role !== "customer" && (
-                    <p className="text-[0.875rem] text-slate-500">
-                      Booking as guest.{" "}
-                      <Link href="/login" className="text-[#6900AA] font-semibold hover:underline">
-                        Log in
-                      </Link>{" "}
-                      to save this booking to My Bookings.
+                  <div className="space-y-3">
+                    <p className="text-[0.875rem] text-slate-500 leading-relaxed">
+                      Sign in with your phone number to book tickets and receive your M-Ticket.
                     </p>
-                  )
-                )}
-                {!isOrganizer && (
-                  <label className="flex items-start gap-2.5 text-[1rem] text-slate-700 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-[#6900AA] cursor-pointer"
-                    />
-                    <span>
-                      I agree to the{" "}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toast.message("Tickets are non-transferable and subject to event terms.");
-                        }}
-                        className="text-[#6900AA] font-semibold hover:underline cursor-pointer"
-                      >
-                        Terms and Conditions
-                      </button>
-                      . <span className="text-[#E11D48]">*</span>
-                    </span>
-                  </label>
-                )}
-                {!isOrganizer && (
-                  <label className="flex items-start gap-2.5 text-[0.9375rem] text-slate-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={sendUpdates}
-                      onChange={(e) => setSendUpdates(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-[#6900AA] cursor-pointer"
-                    />
-                    Send me updates about this event.
-                  </label>
+                    <button
+                      type="button"
+                      onClick={() => setAuthModalOpen(true)}
+                      className={`w-full py-3 rounded-xl ${accentBtn} text-white font-semibold text-[1rem] cursor-pointer`}
+                    >
+                      Sign in with phone
+                    </button>
+                  </div>
                 )}
               </div>
-            </form>
+            </div>
           )}
 
           {step === 4 && (
@@ -1084,17 +1351,42 @@ export default function EventCheckout({
                   <span className="inline-flex items-center gap-2 text-[0.9375rem] text-slate-700 min-w-0">
                     <Ticket size={14} className="text-[#6900AA] shrink-0" />
                     <span>
-                      Ticket Mode: <strong>M-Ticket ({ticketQty})</strong>
+                      Ticket Mode:{" "}
+                      <strong>
+                        {ticketModeLabel(ticketMode)} ({ticketQty})
+                      </strong>
                     </span>
                   </span>
                   <button
                     type="button"
-                    onClick={() => setMTicketModalOpen(true)}
+                    onClick={() => navigateToStep(3)}
                     className="shrink-0 text-[0.9375rem] font-semibold text-[#6900AA] cursor-pointer hover:underline"
                   >
-                    Details
+                    Change
                   </button>
                 </div>
+
+                {ticketMode === "PHYSICAL_DELIVERY" && (
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <p className="text-[0.875rem] font-bold text-slate-900 mb-1">Delivery address</p>
+                    <p className="text-[0.875rem] text-slate-600 leading-relaxed">
+                      {deliveryAddressLine}
+                      {deliveryCity ? `, ${deliveryCity}` : ""}
+                      {deliveryNotes ? ` · ${deliveryNotes}` : ""}
+                    </p>
+                  </div>
+                )}
+
+                {ticketMode === "BOX_OFFICE" && selectedShowtime && (
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <p className="text-[0.875rem] font-bold text-slate-900 mb-1">Box office pickup</p>
+                    <p className="text-[0.875rem] text-slate-600 leading-relaxed">
+                      {[selectedShowtime.venue_name, selectedShowtime.venue_address]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  </div>
+                )}
 
                 <div className="px-4 py-3 space-y-2 border-b border-slate-100">
                   <div className="flex justify-between text-[0.9375rem] text-slate-600">
@@ -1180,16 +1472,20 @@ export default function EventCheckout({
                       Edit
                     </button>
                   </div>
-                  <p className="text-[0.875rem] text-slate-600">{phone ? `+251 ${phone}` : "â€”"}</p>
-                  <p className="text-[0.875rem] text-slate-600 truncate">{email || "â€”"}</p>
+                  <p className="text-[0.875rem] font-semibold text-slate-800">{name.trim() || "—"}</p>
+                  <p className="text-[0.875rem] text-slate-600">{phone ? `+251 ${phone}` : "—"}</p>
+                  <p className="text-[0.875rem] text-slate-600 truncate">{email || "—"}</p>
                 </div>
 
                 <div className="px-4 py-3.5 bg-slate-50 flex items-center justify-between gap-3">
-                  <span className="text-[1rem] font-semibold text-slate-800">Amount Payable</span>
+                  <span className="text-[1rem] font-semibold text-slate-800">Order total</span>
                   <span className="text-[1.25rem] font-extrabold text-slate-900">
                     {formatMoney(grandTotal)}
                   </span>
                 </div>
+                <p className="px-4 pb-3 text-[0.8125rem] text-slate-500 leading-relaxed">
+                  {ticketModeConfirmNote(ticketMode)}
+                </p>
               </aside>
             </form>
           )}
@@ -1198,7 +1494,7 @@ export default function EventCheckout({
         <div
           className={
             isPage
-              ? "fixed bottom-0 inset-x-0 z-20 bg-[#F0F0F0] border-t border-slate-200 px-4 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]"
+              ? "relative z-20 shrink-0 w-full bg-[#F0F0F0] border-t border-slate-200 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] px-4 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]"
               : "p-5 border-t border-slate-100 bg-white shrink-0"
           }
         >
@@ -1221,6 +1517,54 @@ export default function EventCheckout({
           )}
           {step === 2 && (
             <>
+              {isPage && ticketQty > 0 ? (
+                <div className="flex items-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="shrink-0 px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 text-right">
+                      <p className="text-[0.9375rem] text-slate-500">
+                        {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
+                      </p>
+                      <p className="text-[1.25rem] font-extrabold text-slate-900 leading-tight">
+                        {formatMoney(grandTotal, { compact: true })}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={ticketQty < 1}
+                      onClick={proceedFromTickets}
+                      className={`w-full py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </div>
+              ) : isPage ? (
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={ticketQty < 1}
+                    onClick={proceedFromTickets}
+                    className={`flex-1 py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
+                  >
+                    Continue
+                  </button>
+                </div>
+              ) : (
+              <>
               {ticketQty > 0 && (
                 <div className="mb-2.5 flex items-end justify-end gap-3">
                   <div className="min-w-0 text-right">
@@ -1233,36 +1577,6 @@ export default function EventCheckout({
                   </div>
                 </div>
               )}
-              {isPage ? (
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="px-4 py-3 rounded-[0.5rem] border border-slate-300 bg-white text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <ArrowLeft size={14} /> Back
-                  </button>
-                  {!isOrganizer && !isCustomerLoggedIn ? (
-                    <button
-                      type="button"
-                      disabled={ticketQty < 1}
-                      onClick={() => setAuthModalOpen(true)}
-                      className={`flex-1 py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
-                    >
-                      Login To Book
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={ticketQty < 1}
-                      onClick={() => setStep(3)}
-                      className={`flex-1 py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
-                    >
-                      Proceed
-                    </button>
-                  )}
-                </div>
-              ) : (
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -1271,36 +1585,17 @@ export default function EventCheckout({
                 >
                   <ArrowLeft size={14} /> Back
                 </button>
-                {!isOrganizer && !isCustomerLoggedIn ? (
-                  <button
-                    type="button"
-                    disabled={ticketQty < 1}
-                    onClick={() => setAuthModalOpen(true)}
-                    className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-[#E3BCFF] disabled:text-white disabled:hover:bg-[#E3BCFF] text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
-                  >
-                    Login To Book
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={ticketQty < 1}
-                    onClick={() => setStep(3)}
-                    className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-[#E3BCFF] disabled:text-white disabled:hover:bg-[#E3BCFF] text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
-                  >
-                    Continue
-                    <ChevronRight size={16} />
-                  </button>
-                )}
-              </div>
-              )}
-              {!isOrganizer && !isCustomerLoggedIn && ticketQty >= 1 && (
                 <button
                   type="button"
-                  onClick={() => setStep(3)}
-                  className="mt-2 w-full text-center text-[0.9375rem] font-semibold text-[#6900AA] cursor-pointer hover:underline"
+                  disabled={ticketQty < 1}
+                  onClick={proceedFromTickets}
+                  className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-[#E3BCFF] disabled:text-white disabled:hover:bg-[#E3BCFF] text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
                 >
-                  Continue as guest
+                  Continue
+                  <ChevronRight size={16} />
                 </button>
+              </div>
+              </>
               )}
             </>
           )}
@@ -1309,22 +1604,23 @@ export default function EventCheckout({
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer ${
+                  isPage
+                    ? "rounded-[0.5rem] border-slate-300 bg-white"
+                    : "rounded-xl border-slate-200"
+                }`}
               >
                 <ArrowLeft size={14} /> Back
               </button>
               <button
-                type="submit"
-                form="event-checkout-details-form"
-                disabled={!detailsReady}
-                className={`flex-1 py-3 rounded-xl ${
-                  detailsReady
-                    ? accentBtn
-                    : "bg-slate-300 hover:bg-slate-300"
-                } disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
+                type="button"
+                onClick={proceedToReview}
+                disabled={!canProceedFromTicketMode}
+                className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed ${
+                  isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
+                }`}
               >
-                {isPage ? "Submit" : "Continue"}
-                {!isPage && <ChevronRight size={16} />}
+                Continue to review
               </button>
             </div>
           )}
@@ -1332,19 +1628,27 @@ export default function EventCheckout({
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => requestLeavePayStep("back")}
-                className="px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer"
+                onClick={() => requestLeaveConfirmStep("back")}
+                className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer ${
+                  isPage
+                    ? "rounded-[0.5rem] border-slate-300 bg-white"
+                    : "rounded-xl border-slate-200"
+                }`}
               >
                 <ArrowLeft size={14} /> Back
               </button>
               <button
                 type="submit"
                 form="event-checkout-form"
-                disabled={!canPay}
-                className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-[#E3BCFF] disabled:text-white disabled:hover:bg-[#E3BCFF] disabled:opacity-100 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed`}
+                disabled={!canConfirm}
+                className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 disabled:opacity-100 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
+                  isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
+                }`}
               >
                 {submitting && <Loader2 size={16} className="animate-spin" />}
-                Pay {formatMoney(grandTotal)}
+                {isOrganizer
+                  ? `Confirm & Send · ${formatMoney(grandTotal)}`
+                  : `Confirm Booking · ${formatMoney(grandTotal)}`}
               </button>
             </div>
           )}
@@ -1353,7 +1657,7 @@ export default function EventCheckout({
       </div>
   );
 
-  const mTicketSubtitle =
+  const ticketModeSubtitle =
     selectedLines.length > 0
       ? selectedLines
           .map((l) => `${String(l.ticket_type || "Ticket").toUpperCase()} (${l.qty} ticket(s))`)
@@ -1382,51 +1686,41 @@ export default function EventCheckout({
 
   const checkoutModals = (
     <>
-      {mTicketModalOpen && (
+      {ticketModeDetailsOpen && (
         <div
           className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50"
-          onClick={() => setMTicketModalOpen(false)}
+          onClick={() => setTicketModeDetailsOpen(null)}
           role="presentation"
         >
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="m-ticket-title"
+            aria-labelledby="ticket-mode-title"
             className="relative w-full sm:max-w-[26rem] rounded-t-[1rem] sm:rounded-[0.75rem] bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-slate-100">
               <div className="min-w-0">
-                <h3 id="m-ticket-title" className="text-[1.4375rem] font-extrabold text-slate-800">
-                  M-Ticket
+                <h3 id="ticket-mode-title" className="text-[1.4375rem] font-extrabold text-slate-800">
+                  {ticketModeLabel(ticketModeDetailsOpen)}
                 </h3>
                 <p className="mt-1 text-[0.875rem] font-semibold uppercase tracking-wide text-slate-400">
-                  {mTicketSubtitle}
+                  {ticketModeSubtitle}
                 </p>
               </div>
               <button
                 type="button"
                 aria-label="Close"
-                onClick={() => setMTicketModalOpen(false)}
+                onClick={() => setTicketModeDetailsOpen(null)}
                 className="h-8 w-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200 shrink-0"
               >
                 <X size={16} />
               </button>
             </div>
             <ul className="px-5 py-4 space-y-3 text-[1rem] text-slate-700 leading-relaxed list-disc pl-8 pb-6">
-              <li>
-                You can access your ticket(s) anytime from{" "}
-                <span className="font-semibold text-slate-900">My Bookings</span> on Book My Bota
-                (website or mobile).
-              </li>
-              <li>
-                Please show the Entry QR from your booking confirmation / My Bookings at the venue
-                gate â€” it is unique to this booking.
-              </li>
-              <li>
-                No physical ticket(s) are required. A confirmation is also sent to your registered
-                email.
-              </li>
+              {ticketModeDetailBullets(ticketModeDetailsOpen).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
             </ul>
           </div>
         </div>
@@ -1555,7 +1849,7 @@ export default function EventCheckout({
               id="cancel-txn-title"
               className="text-center text-[1.25rem] font-extrabold text-slate-900"
             >
-              Cancel Transaction?
+              Cancel booking?
             </h3>
             <p className="mt-3 text-center text-[1rem] text-slate-500 leading-relaxed">
               {hasReservedSeats
@@ -1587,7 +1881,7 @@ export default function EventCheckout({
   if (isPage) {
     return (
       <>
-        <div className="min-h-screen bg-[#F5F5F5]">{panel}</div>
+        {panel}
         {checkoutModals}
         {!isOrganizer && (
           <CustomerAuthModal
@@ -1596,7 +1890,6 @@ export default function EventCheckout({
             onSuccess={() => {
               dispatch(loadFromStorage());
               setAuthModalOpen(false);
-              if (ticketQty >= 1) setStep(3);
             }}
           />
         )}
@@ -1611,7 +1904,7 @@ export default function EventCheckout({
           type="button"
           className="absolute inset-0 bg-slate-900/40"
           aria-label="Close checkout"
-          onClick={() => (step === 4 ? requestLeavePayStep("exit") : onClose())}
+          onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
         />
         {panel}
       </div>
@@ -1623,7 +1916,6 @@ export default function EventCheckout({
           onSuccess={() => {
             dispatch(loadFromStorage());
             setAuthModalOpen(false);
-            if (ticketQty >= 1) setStep(3);
           }}
         />
       )}

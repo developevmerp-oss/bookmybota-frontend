@@ -27,6 +27,7 @@ import {
   Mic2,
 } from "lucide-react";
 import AuthGate from "@/components/Shared/AuthGate";
+import SessionGuard from "@/components/Shared/SessionGuard";
 import { clearSessionForRole } from "@/lib/authStorage";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -81,6 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AuthGate mode="require" roles={['super_admin']}>
+    <SessionGuard>
     <div className="min-h-screen flex bg-background admin-dashboard-layout">
       <aside className="w-64 glass-panel border-r border-white/5 fixed h-full z-40 hidden md:flex flex-col">
         <div className="p-6 border-b border-white/5">
@@ -185,6 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </main>
     </div>
+    </SessionGuard>
     </AuthGate>
   );
 }

@@ -12,7 +12,6 @@ import "./EventMediaSlider.css";
 type Props = {
   eventName: string;
   posterHorizontal?: string;
-  posterVertical?: string;
   gallery?: string[];
   youtubeUrl?: string | null;
 };
@@ -20,15 +19,12 @@ type Props = {
 export default function EventMediaSlider({
   eventName,
   posterHorizontal,
-  posterVertical,
   gallery: _gallery = [],
   youtubeUrl,
 }: Props) {
   const [active, setActive] = useState(0);
   const youtubeId = parseYouTubeId(youtubeUrl);
-  const images = [posterHorizontal, posterVertical].filter(
-    (u, i, arr): u is string => Boolean(u) && arr.indexOf(u) === i
-  );
+  const images = posterHorizontal ? [posterHorizontal] : [];
 
   const slides: Array<{ type: "image"; src: string } | { type: "youtube"; id: string }> = [];
   if (images[0]) slides.push({ type: "image", src: images[0] });

@@ -9,15 +9,14 @@ import {
   Clock,
   Download,
   ExternalLink,
+  Loader2,
   MapPin,
   Printer,
   Share2,
   Ticket,
-  Tickets,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import Swal from "sweetalert2";
 import { useCancelEventBookingMutation, useGetEventBookingByIdQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -25,17 +24,9 @@ import { formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatMoney } from "@/lib/currencyFormat";
+import { buildEventTicketPdf, downloadPdfBlob, shortBookingCode } from "@/lib/eventTicketPdf";
+import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
 import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
-
-function shortBookingCode(id: string) {
-  const compact = id.replace(/-/g, "").toUpperCase();
-  return `BMB-${compact.slice(0, 8)}-${compact.slice(8, 12)}`;
-}
-
-function ticketCode(id: string) {
-  const compact = id.replace(/-/g, "").toUpperCase();
-  return `TKT-${compact.slice(0, 8)}-${compact.slice(8, 12)}-01`;
-}
 
 function formatDateLine(iso?: string) {
   if (!iso) return "";
@@ -49,22 +40,6 @@ function formatWeekday(iso?: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString("en-US", { weekday: "long" });
-}
-
-async function urlToDataUrl(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
 }
 
 function statusStyles(status: string) {
@@ -136,80 +111,10 @@ export default function EventBookingDetailPage({
     if (!booking || downloading) return;
     setDownloading(true);
     try {
-      const { jsPDF } = await import("jspdf");
-      const qrRaw = booking.qr_code || booking.qr_payload || booking.id;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrRaw)}`;
-      const [posterData, qrDataUrl] = await Promise.all([
-        poster ? urlToDataUrl(poster) : Promise.resolve(null),
-        urlToDataUrl(qrUrl),
-      ]);
-      const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-      const x = 18;
-      const w = 174;
-      let y = 20;
-      doc.setDrawColor(229, 231, 235);
-      doc.roundedRect(x, y, w, 250, 3, 3);
-      const inner = x + 10;
-      y += 12;
-      if (posterData) {
-        try {
-          doc.addImage(posterData, posterData.includes("png") ? "PNG" : "JPEG", inner, y, 28, 36);
-        } catch {
-          /* skip */
-        }
-      }
-      const textX = posterData ? inner + 34 : inner;
-      doc.setTextColor(27, 94, 59);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text("EVENT", textX, y + 6);
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(16);
-      doc.text(booking.event_name || "Event", textX, y + 14, { maxWidth: 110 });
-      doc.setTextColor(100, 116, 139);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      if (venue) doc.text(venue, textX, y + 21, { maxWidth: 110 });
-      y += 48;
-      (booking.items || []).forEach((item) => {
-        doc.setTextColor(71, 85, 105);
-        doc.setFontSize(10);
-        doc.text(`${item.ticket_type} x ${item.qty}`, inner, y);
-        doc.text(formatMoney(Number(item.unit_price) * item.qty), x + w - 10, y, { align: "right" });
-        y += 7;
-      });
-      doc.text("Convenience Fee", inner, y);
-      doc.text(formatMoney(booking.convenience_fee_total), x + w - 10, y, { align: "right" });
-      y += 10;
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(27, 94, 59);
-      doc.setFontSize(14);
-      doc.text("Total Paid", inner, y);
-      doc.text(formatMoney(booking.grand_total), x + w - 10, y, { align: "right" });
-      y += 12;
-      if (qrDataUrl) {
-        try {
-          doc.addImage(qrDataUrl, "PNG", inner, y, 34, 34);
-        } catch {
-          /* skip */
-        }
-      }
+      const blob = await buildEventTicketPdf(booking, { posterUrl: poster });
       const filename = `${(booking.event_name || "ticket").replace(/[^\w\-]+/g, "_")}-ticket.pdf`;
-      const blob = doc.output("blob");
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-      await Swal.fire({
-        icon: "success",
-        title: "Download successfully",
-        text: "Your ticket has been downloaded.",
-        confirmButtonColor: "#6900AA",
-      });
+      downloadPdfBlob(blob, filename);
+      toast.success("Ticket PDF downloaded — save it for venue entry.");
     } catch {
       toast.error("Could not download the ticket PDF.");
     } finally {
@@ -236,10 +141,18 @@ export default function EventBookingDetailPage({
     !!booking.starts_at &&
     new Date(booking.starts_at) > new Date() &&
     booking.status === "CONFIRMED";
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(displayCode || booking?.id || "");
+      toast.success("Booking ID copied");
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+
   const mapsUrl = booking.venue_name || booking.venue_address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venue)}`
     : null;
-  const qrRaw = booking.qr_code || booking.qr_payload || booking.id;
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] pt-10 pb-16">
@@ -267,10 +180,14 @@ export default function EventBookingDetailPage({
                 type="button"
                 onClick={handleDownload}
                 disabled={downloading}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-60"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-[#6900AA] to-[#57008E] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-purple-500/20 transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Download size={16} />
-                {downloading ? "Downloading..." : "Download Ticket"}
+                {downloading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                {downloading ? "Preparing PDF…" : "Download Ticket"}
               </button>
             )}
             <button
@@ -406,27 +323,8 @@ export default function EventBookingDetailPage({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-          <h3 className="font-extrabold text-slate-900 mb-4">Your Ticket</h3>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex items-center gap-4 relative overflow-hidden">
-            {booking.qr_code || booking.qr_payload ? (
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrRaw)}`}
-                alt="Ticket QR"
-                className="w-28 h-28 bg-white rounded-lg shrink-0"
-              />
-            ) : (
-              <div className="w-28 h-28 bg-white rounded-lg border border-slate-200 flex items-center justify-center text-xs text-slate-400 shrink-0">
-                QR Code
-              </div>
-            )}
-            <div className="min-w-0 relative z-10">
-              <p className="font-bold text-slate-900">Show this QR at the venue for entry.</p>
-              <p className="text-sm text-slate-500 mt-1">This QR code is unique to your booking</p>
-              {/* <p className="text-xs text-slate-400 mt-2">Ticket ID: {ticketCode(booking.id)}</p> */}
-            </div>
-            <Tickets size={72} className="absolute right-4 text-slate-200 hidden sm:block" />
-          </div>
+        <div className="mb-5">
+          <EventTicketCard booking={booking} posterUrl={poster} onCopyCode={copyCode} />
         </div>
       </div>
       <ConfirmDialog

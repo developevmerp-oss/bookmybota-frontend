@@ -57,12 +57,14 @@ export default function EventBookingPage({
   }
 
   return (
-    <EventCheckout
-      event={event}
-      open
-      variant="page"
-      initialShowtimeId={initialShowtimeId || undefined}
-      onClose={() => router.push(`/events/${id}`)}
-    />
+    <div className="h-full min-h-0 flex flex-col">
+      <EventCheckout
+        event={event}
+        open
+        variant="page"
+        initialShowtimeId={initialShowtimeId || undefined}
+        onClose={() => router.push(`/events/${id}`)}
+      />
+    </div>
   );
 }

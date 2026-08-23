@@ -43,7 +43,6 @@ import { EventDetailShimmer } from "@/components/Shared/Shimmer";
 import EventMediaSlider from "@/components/EventLandingPage/EventMediaSlider";
 import EventGallerySection from "@/components/EventLandingPage/EventGallerySection";
 import EventVenuesModal from "@/components/EventLandingPage/EventVenuesModal";
-import EventReviewsSection from "@/components/EventLandingPage/EventReviewsSection";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import Footer from "@/components/LandingPage/Footer";
 
@@ -600,7 +599,6 @@ export default function PublicEventDetailPage({
             <EventMediaSlider
               eventName={event.name}
               posterHorizontal={event.poster_horizontal_url}
-              posterVertical={event.poster_vertical_url}
               youtubeUrl={event.youtube_url}
             />
 
@@ -770,14 +768,6 @@ export default function PublicEventDetailPage({
                 <ChevronRight size={18} className="text-slate-400 shrink-0" />
               </button>
             )}
-
-            <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-200">
-              <EventReviewsSection
-                eventId={id}
-                eventRating={event.rating}
-                reviewsCount={event.reviews_count}
-              />
-            </div>
 
             {related.length > 0 && (
               <section className="mt-8 sm:mt-10 pt-5 sm:pt-6 border-t border-slate-200">

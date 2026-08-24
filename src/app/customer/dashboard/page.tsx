@@ -34,6 +34,11 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 
+const DEFAULT_DINING_IMAGE =
+  "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
+const DEFAULT_EVENT_IMAGE =
+  "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80";
+
 type KindTab = "all" | "dining" | "event";
 type StatusTab = "all" | "upcoming" | "past" | "cancelled";
 
@@ -236,17 +241,17 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-[#F7F6FB] pt-10 pb-16">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-black mb-2">
+            <h1 className="text-3xl sm:text-4xl lg:text-3xl font-extrabold text-black mb-2">
               Welcome back, {welcomeName}! 👋
             </h1>
-            <p className="text-slate-500 text-sm sm:text-base">Manage your table reservations and event tickets.</p>
+            <p className="text-slate-500 text-base sm:text-lg lg:text-sm">Manage your table reservations and event tickets.</p>
           </div>
           <Link
             href="/customer/profile"
-            className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 self-start sm:self-auto"
+            className="inline-flex items-center justify-center gap-2 text-base sm:text-lg lg:text-sm font-medium px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 self-start sm:self-auto"
           >
             <User size={16} /> Edit Profile
           </Link>
@@ -264,7 +269,7 @@ export default function CustomerDashboard() {
                   setKind(tab.key);
                   if (tab.key === "all") setFilter("all");
                 }}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border transition-colors ${
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-base sm:text-lg lg:text-sm font-semibold whitespace-nowrap cursor-pointer border transition-colors ${
                   active
                     ? "bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-300/40"
                     : "bg-white text-violet-700 border-violet-200 hover:bg-violet-50"
@@ -286,7 +291,7 @@ export default function CustomerDashboard() {
               key={tab.key}
               type="button"
               onClick={() => setFilter(tab.key)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-base sm:text-lg lg:text-sm font-semibold whitespace-nowrap cursor-pointer border transition-colors ${
                 filter === tab.key
                   ? "bg-violet-100 text-violet-700 border-violet-200"
                   : "bg-white text-slate-500 border-slate-200 hover:border-violet-200 hover:text-violet-700"
@@ -331,30 +336,36 @@ export default function CustomerDashboard() {
                   className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgba(88,28,180,0.06)] flex flex-col lg:flex-row gap-4"
                 >
                   <div className="relative w-full h-40 sm:h-44 lg:w-40 lg:h-40 xl:w-44 xl:h-44 shrink-0">
-                    {b.image ? (
-                      <img
-                        src={b.image}
-                        alt=""
-                        className="w-full h-full rounded-2xl object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-2xl bg-violet-50 flex items-center justify-center text-violet-500">
-                        <KindIcon size={28} />
-                      </div>
-                    )}
+                    <img
+                      src={
+                        b.image ||
+                        (isEvent ? DEFAULT_EVENT_IMAGE : DEFAULT_DINING_IMAGE)
+                      }
+                      alt={b.title}
+                      className="w-full h-full rounded-2xl object-cover bg-violet-50"
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        const fallback = isEvent
+                          ? DEFAULT_EVENT_IMAGE
+                          : DEFAULT_DINING_IMAGE;
+                        if (el.dataset.fallbackApplied === "1") return;
+                        el.dataset.fallbackApplied = "1";
+                        el.src = fallback;
+                      }}
+                    />
                     <span className="absolute bottom-2.5 left-2.5 w-8 h-8 rounded-lg bg-white/75 backdrop-blur-[2px] text-violet-600 flex items-center justify-center shadow-sm">
                       <KindIcon size={15} />
                     </span>
                   </div>
 
                   <div className="flex-1 min-w-0 flex flex-col">
-                    <span className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[10px] font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[0.625rem] font-bold uppercase tracking-wider">
                       <KindIcon size={11} />
                       {isEvent ? "Event" : "Dining"}
                     </span>
-                    <h3 className="text-lg sm:text-xl font-extrabold text-black mt-1.5 truncate">{b.title}</h3>
+                    <h3 className="text-xl sm:text-2xl lg:text-xl font-extrabold text-black mt-1.5 truncate">{b.title}</h3>
                     {b.address && (
-                      <p className="mt-1 text-sm text-slate-500 flex items-start gap-1.5">
+                      <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500 flex items-start gap-1.5">
                         <MapPin size={14} className="shrink-0 mt-0.5 text-violet-500" />
                         <span className="line-clamp-1">{b.address}</span>
                       </p>
@@ -365,8 +376,8 @@ export default function CustomerDashboard() {
                         <div className="flex items-start gap-2 min-w-0">
                           <Calendar size={16} className="text-violet-600 mt-0.5 shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900">{formatDateLine(b.when)}</p>
-                            <p className="text-xs text-slate-400">{formatWeekday(b.when)}</p>
+                            <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900">{formatDateLine(b.when)}</p>
+                            <p className="text-sm sm:text-base lg:text-xs text-slate-400">{formatWeekday(b.when)}</p>
                           </div>
                         </div>
                       )}
@@ -374,7 +385,7 @@ export default function CustomerDashboard() {
                         <div className="flex items-start gap-2 min-w-0">
                           <Clock size={16} className="text-violet-600 mt-0.5 shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900">{formatTimeLine(b.when)}</p>
+                            <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900">{formatTimeLine(b.when)}</p>
                           </div>
                         </div>
                       )}
@@ -385,8 +396,8 @@ export default function CustomerDashboard() {
                           <Users size={16} className="text-violet-600 mt-0.5 shrink-0" />
                         )}
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 capitalize">{b.extra || "—"}</p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 capitalize">{b.extra || "—"}</p>
+                          <p className="text-sm sm:text-base lg:text-xs text-slate-400">
                             {isEvent
                               ? "Tickets"
                               : b.guests != null
@@ -400,7 +411,7 @@ export default function CustomerDashboard() {
 
                   <div className="w-full lg:w-[260px] xl:w-[280px] shrink-0 lg:border-l lg:border-slate-100 lg:pl-5 flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-2">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase ${statusStyles(b.status)}`}>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sm:text-sm lg:text-xs font-bold uppercase ${statusStyles(b.status)}`}>
                         {b.status === "CONFIRMED" && <Check size={12} strokeWidth={3} />}
                         {b.status}
                       </span>
@@ -410,9 +421,9 @@ export default function CustomerDashboard() {
                     </div>
 
                     <div>
-                      <p className="text-[11px] text-slate-400 font-medium">Booking ID</p>
+                      <p className="text-xs sm:text-sm lg:text-xs text-slate-400 font-medium">Booking ID</p>
                       <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">{shortBookingCode(b.id)}</p>
+                        <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-800 truncate">{shortBookingCode(b.id)}</p>
                         <button
                           type="button"
                           onClick={() => copyBookingCode(b.id)}
@@ -429,14 +440,14 @@ export default function CustomerDashboard() {
                         <button
                           type="button"
                           onClick={() => handleCancel(b)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg border border-red-200 bg-white text-sm font-semibold text-red-500 hover:bg-red-50 cursor-pointer"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg border border-red-200 bg-white text-base sm:text-lg lg:text-sm font-semibold text-red-500 hover:bg-red-50 cursor-pointer"
                         >
                           <XCircle size={14} /> Cancel
                         </button>
                       )}
                       <Link
                         href={b.href}
-                        className="flex-1 inline-flex items-center justify-center gap-1 h-10 px-4 rounded-lg border border-violet-200 bg-white text-sm font-semibold text-violet-700 hover:bg-violet-50 whitespace-nowrap"
+                        className="flex-1 inline-flex items-center justify-center gap-1 h-10 px-4 rounded-lg border border-violet-200 bg-white text-base sm:text-lg lg:text-sm font-semibold text-violet-700 hover:bg-violet-50 whitespace-nowrap"
                       >
                         View Details <ChevronRight size={14} />
                       </Link>
@@ -445,7 +456,7 @@ export default function CustomerDashboard() {
                 </div>
               );
             })}
-            <p className="text-center text-slate-400 text-sm pt-4">That&apos;s all your bookings! 🎉</p>
+            <p className="text-center text-slate-400 text-base sm:text-lg lg:text-sm pt-4">That&apos;s all your bookings! 🎉</p>
           </div>
         )}
       </div>

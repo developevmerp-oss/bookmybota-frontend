@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Calendar,
+  Gift,
   HelpCircle,
   Lock,
   LogOut,
@@ -19,6 +20,7 @@ const NAV = [
   { href: "/customer/change-password", icon: Lock, label: "Change Password" },
   { href: "/customer/dashboard", icon: Calendar, label: "My Orders / Reservations" },
   { href: "/customer/help", icon: HelpCircle, label: "Help Centre" },
+  { href: "#gift-cards", icon: Gift, label: "Gift Cards", soon: true, mobileOnly: true },
   { href: "/offers", icon: Tag, label: "Offers", soon: true },
 ];
 
@@ -59,7 +61,7 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
                         active
                           ? "bg-[#F7E9FF] text-[#6900AA]"
                           : "text-slate-700 hover:bg-slate-50"
-                      }`}
+                      }${item.mobileOnly ? " lg:hidden" : ""}`}
                     >
                       <Icon size={18} className={active ? "text-[#6900AA]" : "text-slate-500"} />
                       <span className="flex-1">{item.label}</span>

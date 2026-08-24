@@ -380,6 +380,19 @@ function getDiningTypeVisual(label: string): {
   return { Icon, bg: `${accent}1F`, accent };
 }
 
+/** Resolve a static explore card to a backend type name. Exact name only (no substring overlap). */
+function resolveExploreTypeName(
+  match: readonly string[] | null,
+  types: { name: string }[],
+  fallback: string
+): string | null {
+  if (!match) return null;
+  const exact = types.find((t) =>
+    match.some((m) => t.name.trim().toLowerCase() === m)
+  );
+  return exact?.name || fallback;
+}
+
 function CuisineLandmarkIcon({
   type,
   color,
@@ -837,6 +850,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
+  const [exploreCardId, setExploreCardId] = useState("all-dining");
   const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadedRestaurants, setLoadedRestaurants] = useState<Business[]>([]);
@@ -1521,72 +1535,72 @@ export default function Home() {
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-5 tracking-tight">
             Explore Dining
           </h2>
-          <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pb-1">
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pt-1.5 pb-1">
             {([
               {
                 id: "all-dining",
                 title: "All dining",
                 image: "/images/dining-category-all.png",
-                match: null as string[] | null,
+                match: null as readonly string[] | null,
               },
               {
                 id: "bar",
                 title: "Bar",
                 image: "/images/dining-category-bar.png",
-                match: ["bar", "pub", "lounge"],
+                match: ["bar"] as const,
               },
               {
                 id: "restaurant",
                 title: "Restaurant",
                 image: "/images/dining-category-restaurant.png",
-                match: ["restaurant"],
+                match: ["restaurant"] as const,
               },
               {
                 id: "bar-grill",
                 title: "Bar & Grill",
                 image: "/images/dining-category-bar-grill.png",
-                match: ["grill", "bar & grill", "bar and grill"],
+                match: ["grill", "bar & grill", "bar and grill"] as const,
               },
               {
                 id: "cafe",
                 title: "Cafe",
                 image: "/images/dining-category-cafe.png",
-                match: ["cafe", "café", "coffee"],
+                match: ["cafe", "café", "coffee"] as const,
               },
               {
                 id: "pub",
                 title: "Pub",
                 image: "/images/dining-category-pub.png",
-                match: ["pub", "bar"],
+                match: ["pub"] as const,
               },
               {
                 id: "fine-dining",
                 title: "Fine dining",
                 image: "/images/dining-category-fine-dining.png",
-                match: ["fine dining", "fine-dining", "fine"],
+                match: ["fine dining", "fine-dining", "fine"] as const,
               },
               {
                 id: "general-restaurant",
                 title: "General restaurant",
                 image: "/images/dining-category-general.png",
-                match: ["general", "restaurant"],
+                match: ["general restaurant", "general"] as const,
               },
             ] as const).map((card) => {
-              const resolvedCategory = card.match
-                ? businessTypes.find((t) =>
-                    card.match!.some((m) => t.name.toLowerCase().includes(m))
-                  )?.name || card.title
-                : null;
-              const isActive = resolvedCategory
-                ? activeCategories.length === 1 &&
-                  activeCategories[0].toLowerCase() === resolvedCategory.toLowerCase()
-                : activeCategories.length === 0;
+              const resolvedCategory = resolveExploreTypeName(
+                card.match,
+                businessTypes,
+                card.title
+              );
+              const isActive = exploreCardId === card.id;
               return (
-                <div className="text-center flex flex-col items-center justify-center">
-                <button
+                <div
                   key={card.id}
+                  className="text-center flex flex-col items-center justify-center transition-all shrink-0"
+                >
+                <button
                   type="button"
                   onClick={() => {
+                    setExploreCardId(card.id);
                     if (resolvedCategory) {
                       setActiveCategories([resolvedCategory]);
                     } else {
@@ -1597,22 +1611,25 @@ export default function Home() {
                       .getElementById("restaurant-listings")
                       ?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
-                  className="text-center cursor-pointer w-[120px] h-[140px] sm:w-[132px] sm:h-[160px]"
+                  className="text-center cursor-pointer w-[120px] h-[140px] sm:w-[132px] sm:h-[160px] rounded-2xl transition-all hover:-translate-y-0.5"
+                  aria-pressed={isActive}
                 >
-                  {/* <span className="block w-[120px] h-[120px] sm:w-[132px] sm:h-[132px] overflow-hidden rounded-2xl mx-auto"> */}
+                  <span className={`block w-full h-full rounded-2xl transition-all ${
+                    isActive ? "border-[2px] border-[#6900AA]" : "border-[2px] border-transparent"
+                  }`}>
                     <img
                       src={card.image}
                       alt={card.title}
-                      className={`w-full h-full  block ${
+                      className={`w-full h-full block rounded-xl transition-all ${
                         isActive ? "opacity-100" : "opacity-90 hover:opacity-100"
                       }`}
                     />
-                  {/* </span> */}
+                  </span>
                   
                 </button>
 
 <p
-className={`text-sm font-bold mt-2 ${
+className={`text-sm font-bold mt-2 transition-colors ${
   isActive ? "text-[#6900AA]" : "text-slate-800"
 }`}
 >
@@ -1757,7 +1774,10 @@ className={`text-sm font-bold mt-2 ${
               onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
               categories={filters.map((f) => f.label)}
               categoriesSelected={activeCategories}
-              onCategoriesChange={setActiveCategories}
+              onCategoriesChange={(next) => {
+                setActiveCategories(next);
+                if (next.length === 0) setExploreCardId("all-dining");
+              }}
             />
           </section>
 
@@ -1873,13 +1893,13 @@ className={`text-sm font-bold mt-2 ${
                 >
                   <span>Category: {selectedCategory}</span>
                   <button
-                    onClick={() =>
-                      setActiveCategories(
-                        activeCategories.filter(
-                          (c) => c.toLowerCase() !== selectedCategory.toLowerCase()
-                        )
-                      )
-                    }
+                    onClick={() => {
+                      const next = activeCategories.filter(
+                        (c) => c.toLowerCase() !== selectedCategory.toLowerCase()
+                      );
+                      setActiveCategories(next);
+                      if (next.length === 0) setExploreCardId("all-dining");
+                    }}
                     className="hover:bg-slate-200 p-0.5 rounded-full transition-colors flex items-center justify-center"
                     aria-label="Clear category filter"
                   >
@@ -1907,6 +1927,7 @@ className={`text-sm font-bold mt-2 ${
                     setSearchInput("");
                     setSearchQuery("");
                     setActiveCategories([]);
+                    setExploreCardId("all-dining");
                     setDiningFilters(DEFAULT_DINING_FILTERS);
                     setMealOccasion("");
                     setCurrentPage(1);
@@ -1939,6 +1960,7 @@ className={`text-sm font-bold mt-2 ${
                     setSearchQuery("");
                     setSearchInput("");
                     setActiveCategories([]);
+                    setExploreCardId("all-dining");
                     setDiningFilters(DEFAULT_DINING_FILTERS);
                     setMealOccasion("");
                     setLocationCity("");

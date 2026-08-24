@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Phone, ChevronRight, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { usePhoneLoginMutation, useRegisterCustomerMutation } from "@/services/api";
+import {
+  useSendCustomerOtpMutation,
+  useVerifyCustomerOtpMutation,
+  useRegisterCustomerMutation,
+} from "@/services/api";
 import { useAppDispatch } from "@/lib/hooks";
 import { setCredentials } from "@/features/auth/authSlice";
 import { extractApiError, extractApiSuccessMessage } from "@/lib/apiErrors";
@@ -24,6 +28,7 @@ import {
 
 type CustomerStep = "phone" | "otp" | "register";
 
+const DIAL_CODE = "+251";
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
 const inputBase =
   "w-full bg-slate-50 border rounded-2xl py-3.5 text-sm focus:outline-none focus:bg-white text-slate-800 font-semibold transition-all";
@@ -54,8 +59,10 @@ function CustomerLoginForm() {
   const dispatch = useAppDispatch();
   const [customerStep, setCustomerStep] = useState<CustomerStep>("phone");
   const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [verificationToken, setVerificationToken] = useState("");
 
-  const [phoneLogin, { isLoading: isPhoneLoading }] = usePhoneLoginMutation();
+  const [sendOtp, { isLoading: isSendingOtp }] = useSendCustomerOtpMutation();
+  const [verifyOtp, { isLoading: isVerifyingOtp }] = useVerifyCustomerOtpMutation();
   const [registerCustomer, { isLoading: isRegistering }] = useRegisterCustomerMutation();
 
   const phoneForm = useForm<PhoneLoginValues>({
@@ -76,43 +83,52 @@ function CustomerLoginForm() {
     mode: "onBlur",
   });
 
-  const onSendOtp = phoneForm.handleSubmit((values) => {
+  const onSendOtp = phoneForm.handleSubmit(async (values) => {
     const phone = sanitizePhoneInput(values.phone);
-    setVerifiedPhone(phone);
-    otpForm.reset({ otp: "" });
-    setCustomerStep("otp");
-    toast.success(`OTP sent to +91 ${phone}. Use demo OTP 123456.`);
+    try {
+      const data = await sendOtp({ phone }).unwrap();
+      setVerifiedPhone(phone);
+      otpForm.reset({ otp: "" });
+      setCustomerStep("otp");
+      toast.success(data.message || `OTP sent to ${DIAL_CODE} ${phone}.`);
+      if (data.demo_otp) toast.message(`Demo OTP: ${data.demo_otp}`);
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Could not send OTP."));
+    }
   });
 
   const onVerifyOtp = otpForm.handleSubmit(async (values) => {
-    if (values.otp !== "123456") {
-      toast.error("Invalid OTP. For demo, please use 123456.");
-      return;
-    }
     try {
-      const data = await phoneLogin({ phone: verifiedPhone, otp: values.otp }).unwrap();
-      dispatch(setCredentials({ user: data.user, token: data.token }));
-      window.dispatchEvent(new Event("auth_changed"));
-      toast.success(extractApiSuccessMessage(data, "Login successful"));
-      router.push("/");
-    } catch (err: unknown) {
-      const msg = extractApiError(err, "Login failed");
-      if (msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("register")) {
-        registerForm.reset({ name: "", email: "", phone: verifiedPhone });
-        setCustomerStep("register");
-        toast.message("New number — please create an account");
+      const data = await verifyOtp({ phone: verifiedPhone, otp: values.otp }).unwrap();
+      if (data.next === "authenticated") {
+        dispatch(setCredentials({ user: data.user, token: data.token }));
+        window.dispatchEvent(new Event("auth_changed"));
+        toast.success(extractApiSuccessMessage(data, "Login successful"));
+        router.push("/");
         return;
       }
-      toast.error(msg);
+      setVerificationToken(data.verification_token);
+      registerForm.reset({ name: "", email: "", phone: verifiedPhone });
+      setCustomerStep("register");
+      toast.info("Complete your profile to create an account.");
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "OTP verification failed."));
     }
   });
 
   const onRegister = registerForm.handleSubmit(async (values) => {
+    if (!verificationToken) {
+      toast.error("Phone verification expired. Please verify OTP again.");
+      setCustomerStep("otp");
+      return;
+    }
     try {
       const data = await registerCustomer({
         name: values.name.trim(),
         email: values.email.trim(),
-        phone: sanitizePhoneInput(values.phone),
+        phone: verifiedPhone,
+        verification_token: verificationToken,
+        auto_generate_password: true,
       }).unwrap();
       dispatch(setCredentials({ user: data.user, token: data.token }));
       window.dispatchEvent(new Event("auth_changed"));
@@ -129,9 +145,9 @@ function CustomerLoginForm() {
         <div className="bg-white rounded-3xl border border-[#EDEDED] shadow-sm overflow-hidden p-8">
           {customerStep === "phone" && (
             <div>
-              <h2 className="text-2xl font-black text-slate-800 mb-1">Customer Login</h2>
+              <h2 className="text-2xl font-black text-slate-800 mb-1">Get Started</h2>
               <p className="text-sm text-slate-400 font-medium mb-7">
-                Sign in with your mobile number
+                Enter your mobile number to sign in or register
               </p>
 
               <form onSubmit={onSendOtp} className="space-y-5" noValidate>
@@ -139,15 +155,15 @@ function CustomerLoginForm() {
                   <FormLabel required>Mobile Number</FormLabel>
                   <div className="relative">
                     <span className="absolute left-4 top-3.5 text-slate-500 font-bold text-sm">
-                      +91
+                      {DIAL_CODE}
                     </span>
                     <input
                       type="tel"
                       inputMode="numeric"
                       maxLength={12}
                       autoFocus
-                      placeholder="9876543210"
-                      className={`${inputBase} pl-14 pr-4 ${
+                      placeholder="912345678"
+                      className={`${inputBase} pl-16 pr-4 ${
                         phoneForm.formState.errors.phone ? inputErr : inputOk
                       }`}
                       {...phoneForm.register("phone", {
@@ -163,10 +179,11 @@ function CustomerLoginForm() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full bg-[#6900AA] hover:bg-[#57008E] text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-sm cursor-pointer flex justify-center items-center gap-2"
+                  disabled={isSendingOtp}
+                  className="w-full bg-[#6900AA] hover:bg-[#57008E] text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-sm cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
                 >
                   <Phone size={16} />
-                  Send OTP
+                  {isSendingOtp ? "Sending..." : "Send OTP"}
                   <ChevronRight size={16} />
                 </button>
               </form>
@@ -200,7 +217,7 @@ function CustomerLoginForm() {
 
               <h2 className="text-2xl font-black text-slate-800 mb-1">Verify OTP</h2>
               <p className="text-sm text-slate-400 font-medium mb-7">
-                Sent to +91 {verifiedPhone}
+                Sent to {DIAL_CODE} {verifiedPhone}
               </p>
 
               <form onSubmit={onVerifyOtp} className="space-y-5" noValidate>
@@ -226,10 +243,10 @@ function CustomerLoginForm() {
                 </div>
                 <button
                   type="submit"
-                  disabled={isPhoneLoading}
+                  disabled={isVerifyingOtp}
                   className="w-full bg-[#6900AA] hover:bg-[#57008E] text-white rounded-2xl py-3.5 text-sm font-bold transition-all shadow-sm cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
                 >
-                  {isPhoneLoading ? "Verifying..." : "Verify & Login"}
+                  {isVerifyingOtp ? "Verifying..." : "Verify & Continue"}
                 </button>
               </form>
             </div>
@@ -239,15 +256,15 @@ function CustomerLoginForm() {
             <div>
               <button
                 type="button"
-                onClick={() => setCustomerStep("phone")}
+                onClick={() => setCustomerStep("otp")}
                 className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 font-semibold mb-5 cursor-pointer transition-colors"
               >
-                <ArrowLeft size={14} /> Back to login
+                <ArrowLeft size={14} /> Back
               </button>
 
               <h2 className="text-2xl font-black text-slate-800 mb-1">Create Account</h2>
               <p className="text-sm text-slate-400 font-medium mb-7">
-                Join Book My Bota in seconds
+                Verified: {DIAL_CODE} {verifiedPhone}
               </p>
 
               <form onSubmit={onRegister} className="space-y-4" noValidate>
@@ -256,7 +273,7 @@ function CustomerLoginForm() {
                   <input
                     type="text"
                     autoFocus
-                    placeholder="Raj Mehta"
+                    placeholder="Your name"
                     className={`${inputBase} px-4 ${
                       registerForm.formState.errors.name ? inputErr : inputOk
                     }`}
@@ -270,7 +287,7 @@ function CustomerLoginForm() {
                   <FormLabel required>Email Address</FormLabel>
                   <input
                     type="email"
-                    placeholder="raj@example.com"
+                    placeholder="you@example.com"
                     className={`${inputBase} px-4 ${
                       registerForm.formState.errors.email ? inputErr : inputOk
                     }`}
@@ -278,31 +295,6 @@ function CustomerLoginForm() {
                   />
                   {registerForm.formState.errors.email && (
                     <p className={fieldErrorClass}>{registerForm.formState.errors.email.message}</p>
-                  )}
-                </div>
-                <div>
-                  <FormLabel required>Phone Number</FormLabel>
-                  <div className="relative">
-                    <span className="absolute left-4 top-3.5 text-slate-500 font-bold text-sm">
-                      +91
-                    </span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={12}
-                      placeholder="9876543210"
-                      className={`${inputBase} pl-14 pr-4 ${
-                        registerForm.formState.errors.phone ? inputErr : inputOk
-                      }`}
-                      {...registerForm.register("phone", {
-                        onChange: (e) => {
-                          e.target.value = sanitizePhoneInput(e.target.value);
-                        },
-                      })}
-                    />
-                  </div>
-                  {registerForm.formState.errors.phone && (
-                    <p className={fieldErrorClass}>{registerForm.formState.errors.phone.message}</p>
                   )}
                 </div>
                 <button

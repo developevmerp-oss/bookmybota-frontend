@@ -6,8 +6,8 @@
  * - Endpoints: URLs, methods, bodies, query params, transformResponse
  * - Cache: tagTypes / providesTags / invalidatesTags
  * - Auth tokens: role-scoped keys via authStorage (pathname → token key)
- * - ACCOUNT_DISABLED on /business|/organizer|/customer: clear session + redirect /login
- * - SessionGuard: triggers GET /auth/me only; logout stays in baseQuery wrapper
+ * - 401 session errors (expired/invalid token, ACCOUNT_DISABLED): handleAuthSessionFailure in authSession
+ * - SessionGuard: triggers GET /auth/me; logout on failure via authSession
  *
  * Base URL:
  * - Prefer NEXT_PUBLIC_API_BASE_URL when set
@@ -17,8 +17,14 @@
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { clearCredentials } from '@/features/auth/authSlice';
-import { clearSessionForRole, loginPathForRole, storageKeysForPath, type UserRole } from '@/lib/authStorage';
+import { storageKeysForPath } from '@/lib/authStorage';
+import {
+  handleAuthSessionFailure,
+  isAuthSessionError,
+  isLoginAuthRequest,
+  resolveRoleFromPath,
+} from '@/lib/authSession';
+import type { AppDispatch } from '@/lib/store';
 import {
   unwrapPaginated,
   toListQuery,
@@ -359,6 +365,8 @@ export interface AdminEvent {
   about_event?: string;
   age_group?: string;
   duration_minutes?: number;
+  /** Ticket delivery modes customers may choose for this event. */
+  allowed_ticket_modes?: Array<'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY'>;
   tickets_sold?: number;
   convenience_fee_earned?: number | string;
   commission_earned?: number | string;
@@ -635,6 +643,8 @@ export interface EventFormPayload {
     selected: Array<{ id: number; text: string }>;
     custom: string[];
   };
+  /** Which delivery modes customers can choose at purchase. At least one required on submit. */
+  allowed_ticket_modes?: Array<'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY'>;
   ticket_types: Array<{ ticket_type: string; total_count: number; price: number }>;
   artists?: Array<{
     artist_source: 'registered' | 'external';
@@ -852,6 +862,8 @@ export interface OrganizerEventBooking {
   venue_name?: string;
   starts_at?: string;
   items?: EventBookingItem[];
+  ticket_mode?: string;
+  checked_in_at?: string | null;
 }
 
 export interface EventBookingItem {
@@ -895,6 +907,16 @@ export interface EventBooking {
   items?: EventBookingItem[];
   promo_code?: string | null;
   discount_amount?: number | string;
+  ticket_mode?: string;
+  delivery_address_line?: string | null;
+  delivery_city?: string | null;
+  delivery_notes?: string | null;
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
+  already_checked_in?: boolean;
+  can_check_in?: boolean;
+  check_in_message?: string;
+  just_checked_in?: boolean;
 }
 
 export interface AppliedPromoOffer {
@@ -1263,18 +1285,18 @@ export interface AuthUser {
 // ─── RTK Query API ────────────────────────────────────────────────────────────
 
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: BASE_URL,
-  prepareHeaders: (headers) => {
-    if (typeof window !== 'undefined') {
+    baseUrl: BASE_URL,
+    prepareHeaders: (headers) => {
+      if (typeof window !== 'undefined') {
       // Same rules as before: /admin|/organizer|/business|/customer → role token; else customer.
       const { tokenKey } = storageKeysForPath(window.location.pathname);
-      const token = localStorage.getItem(tokenKey);
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
+        const token = localStorage.getItem(tokenKey);
+        if (token) {
+          headers.set('Authorization', `Bearer ${token}`);
+        }
       }
-    }
-    return headers;
-  },
+      return headers;
+    },
 });
 
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
@@ -1285,28 +1307,17 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
   const result = await rawBaseQuery(args, api, extraOptions);
   if (result.error && typeof window !== 'undefined') {
     const path = window.location.pathname;
-    const onManagedPanel =
-      path.startsWith('/business') ||
-      path.startsWith('/organizer') ||
-      path.startsWith('/venue') ||
-      path.startsWith('/artist') ||
-      path.startsWith('/customer');
-    const data = result.error.data as { code?: string } | undefined;
-    if (onManagedPanel && data?.code === 'ACCOUNT_DISABLED') {
-      const role = (
-        path.startsWith('/organizer')
-          ? 'event_admin'
-          : path.startsWith('/venue')
-            ? 'venue_admin'
-            : path.startsWith('/artist')
-              ? 'artist_admin'
-              : path.startsWith('/business')
-                ? 'business_admin'
-                : 'customer'
-      ) as UserRole;
-      clearSessionForRole(role);
-      api.dispatch(clearCredentials());
-      window.location.replace('/');
+    const url = typeof args === 'string' ? args : args.url;
+
+    if (isLoginAuthRequest(url)) {
+      return result;
+    }
+
+    const data = result.error.data as { code?: string; error?: string } | undefined;
+    const status = result.error.status;
+
+    if (isAuthSessionError(status, data, path)) {
+      handleAuthSessionFailure(resolveRoleFromPath(path), api.dispatch as AppDispatch, data, path);
     }
   }
   return result;
@@ -1376,12 +1387,57 @@ export const api = createApi({
         name: string;
         email: string;
         phone: string;
+        verification_token: string;
         password?: string;
         auto_generate_password?: boolean;
       }
     >({
       query: (body) => ({
         url: '/auth/register-customer',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    sendCustomerOtp: builder.mutation<
+      { message?: string; expires_in?: number; demo_otp?: string },
+      { phone: string }
+    >({
+      query: (body) => ({
+        url: '/auth/customer/send-otp',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    verifyCustomerOtp: builder.mutation<
+      | {
+          next: 'authenticated';
+          token: string;
+          user: AuthUser;
+          message?: string;
+        }
+      | {
+          next: 'register';
+          verification_token: string;
+          expires_in?: number;
+          message?: string;
+        },
+      { phone: string; otp: string }
+    >({
+      query: (body) => ({
+        url: '/auth/customer/verify-otp',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    checkCustomerPhone: builder.mutation<
+      { phone: string; registered: boolean; can_register: boolean },
+      { phone: string }
+    >({
+      query: (body) => ({
+        url: '/auth/customer/check-phone',
         method: 'POST',
         body,
       }),
@@ -3075,6 +3131,32 @@ export const api = createApi({
       providesTags: ['OrganizerBookings'],
     }),
 
+    scanOrganizerEventBooking: builder.mutation<
+      { data: EventBooking },
+      { qr_token: string }
+    >({
+      query: (body) => ({
+        url: '/events/organizer/bookings/scan',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    checkInOrganizerEventBooking: builder.mutation<
+      {
+        message?: string;
+        already_checked_in?: boolean;
+        data: EventBooking & { just_checked_in?: boolean };
+      },
+      string
+    >({
+      query: (id) => ({
+        url: `/events/organizer/bookings/${id}/check-in`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['OrganizerBookings', 'OrganizerTicketStats'],
+    }),
+
     createOrganizerEvent: builder.mutation<OrganizerEvent, EventFormPayload>({
       query: (body) => ({ url: '/events/organizer', method: 'POST', body }),
       transformResponse: (res: { data: OrganizerEvent }) => res.data,
@@ -3165,6 +3247,10 @@ export const api = createApi({
         customer_id?: string;
         booking_source?: 'ONLINE' | 'WALK_IN' | 'CASH' | 'ORGANIZER';
         promo_code?: string;
+        ticket_mode?: 'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY';
+        delivery_address_line?: string;
+        delivery_city?: string;
+        delivery_notes?: string;
         /** When true, POST to organizer booking API (event_admin selling for a customer) */
         for_organizer?: boolean;
       }
@@ -3226,8 +3312,8 @@ export const api = createApi({
         result?.items
           ? [
             ...result.items.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
-            { type: 'EventMasters', id: 'GENRE_LIST' },
-          ]
+              { type: 'EventMasters', id: 'GENRE_LIST' },
+            ]
           : [{ type: 'EventMasters', id: 'GENRE_LIST' }],
     }),
 
@@ -3480,8 +3566,8 @@ export const api = createApi({
         result?.items
           ? [
             ...result.items.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
-            { type: 'EventMasters', id: 'DOC_LIST' },
-          ]
+              { type: 'EventMasters', id: 'DOC_LIST' },
+            ]
           : [{ type: 'EventMasters', id: 'DOC_LIST' }],
     }),
 
@@ -3590,6 +3676,9 @@ export const {
   useChangePasswordMutation,
   useGetMeQuery,
   useRegisterCustomerMutation,
+  useSendCustomerOtpMutation,
+  useVerifyCustomerOtpMutation,
+  useCheckCustomerPhoneMutation,
   useRegisterBusinessMutation,
   useGetBusinessesQuery,
   useGetBusinessesPagedQuery,
@@ -3734,6 +3823,8 @@ export const {
   useUpdateEventLayoutMutation,
   useGetOrganizerTicketStatsQuery,
   useGetOrganizerBookingsQuery,
+  useScanOrganizerEventBookingMutation,
+  useCheckInOrganizerEventBookingMutation,
   useCreateOrganizerEventMutation,
   useUpdateOrganizerEventMutation,
   useSubmitOrganizerEventMutation,

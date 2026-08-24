@@ -28,7 +28,8 @@ import { useRouter } from 'next/navigation';
 import {
   useGetBusinessPublicQuery,
   useCreateBookingMutation,
-  usePhoneLoginMutation,
+  useSendCustomerOtpMutation,
+  useVerifyCustomerOtpMutation,
   useRegisterCustomerMutation,
   useGetReviewsQuery,
   useCreateReviewMutation,
@@ -391,16 +392,17 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [bookingDropdownOpen, setBookingDropdownOpen] = useState<'date' | 'guests' | 'meal' | null>(null);
   const bookingFiltersRef = useRef<HTMLDivElement>(null);
 
-  const [loginStep, setLoginStep] = useState(1); // 1: Enter phone, 2: Enter OTP
+  const [loginStep, setLoginStep] = useState(1); // 1: phone, 2: OTP, 3: register profile
   const [loginPhone, setLoginPhone] = useState('');
   const [loginOtp, setLoginOtp] = useState('');
+  const [verificationToken, setVerificationToken] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regPhone, setRegPhone] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  const [phoneLogin, { isLoading: isPhoneLoggingIn }] = usePhoneLoginMutation();
+  const [sendCustomerOtp, { isLoading: isSendingOtp }] = useSendCustomerOtpMutation();
+  const [verifyCustomerOtp, { isLoading: isVerifyingOtp }] = useVerifyCustomerOtpMutation();
   const [registerCustomer, { isLoading: isRegistering }] = useRegisterCustomerMutation();
 
   const {
@@ -455,7 +457,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [bookingDropdownOpen]);
 
-  // Handle phone login submission
   const handlePhoneLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
@@ -465,55 +466,73 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         setLoginError(phoneErr);
         return;
       }
-      setLoginStep(2);
-      setLoginOtp('');
-    } else {
-      if (loginOtp !== '123456') {
-        setLoginError('Invalid OTP. For demo purposes, please use 123456.');
-        return;
-      }
       try {
-        const data = await phoneLogin({ phone: loginPhone, otp: loginOtp }).unwrap();
+        await sendCustomerOtp({ phone: sanitizePhoneInput(loginPhone) }).unwrap();
+        setLoginStep(2);
+        setLoginOtp('');
+        setIsRegisterMode(false);
+      } catch (err: unknown) {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        setLoginError(msg || 'Could not send OTP. Please try again.');
+      }
+      return;
+    }
+
+    try {
+      const data = await verifyCustomerOtp({
+        phone: sanitizePhoneInput(loginPhone),
+        otp: loginOtp,
+      }).unwrap();
+
+      if (data.next === 'authenticated') {
         dispatch(setCredentials({ user: data.user, token: data.token }));
-        // Notify the header to update immediately (no page refresh needed)
         window.dispatchEvent(new Event('auth_changed'));
         setName(data.user.name || '');
         setPhone(data.user.phone || loginPhone);
         setDrawerStep(3);
-      } catch (err: any) {
-        setLoginError(err?.data?.error || 'Login failed. Please try again.');
+        return;
       }
+
+      setVerificationToken(data.verification_token);
+      setRegName('');
+      setRegEmail('');
+      setLoginStep(3);
+      setIsRegisterMode(true);
+    } catch (err: unknown) {
+      const msg = (err as { data?: { error?: string } })?.data?.error;
+      setLoginError(msg || 'OTP verification failed.');
     }
   };
 
-  // Handle customer registration submission
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    if (!regName || !regEmail || !regPhone) {
-      setLoginError('All fields are required.');
+    if (!regName || !regEmail) {
+      setLoginError('Name and email are required.');
       return;
     }
-    const phoneErr = getPhoneValidationError(regPhone);
-    if (phoneErr) {
-      setLoginError(phoneErr);
+    if (!verificationToken) {
+      setLoginError('Phone verification expired. Please verify OTP again.');
+      setLoginStep(2);
       return;
     }
     try {
+      const cleanPhone = sanitizePhoneInput(loginPhone);
       const data = await registerCustomer({
         name: regName,
         email: regEmail,
-        phone: regPhone,
+        phone: cleanPhone,
+        verification_token: verificationToken,
         auto_generate_password: true,
       }).unwrap();
       dispatch(setCredentials({ user: data.user, token: data.token }));
-      // Notify the header to update immediately (no page refresh needed)
       window.dispatchEvent(new Event('auth_changed'));
       setName(regName);
-      setPhone(regPhone);
+      setPhone(cleanPhone);
       setDrawerStep(3);
-    } catch (err: any) {
-      setLoginError(err?.data?.error || 'Registration failed. Please try again.');
+    } catch (err: unknown) {
+      const msg = (err as { data?: { error?: string } })?.data?.error;
+      setLoginError(msg || 'Registration failed. Please try again.');
     }
   };
 
@@ -638,6 +657,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
   const submitBooking = async (customerName: string, customerPhone: string, approxArrival: string) => {
     if (availabilityStatus !== 'available') return;
+    if (!authUser || authUser.role !== 'customer' || !authUser.customer_id) {
+      toast.error('Please sign in to complete your booking.');
+      setDrawerStep(2);
+      setLoginStep(1);
+      return;
+    }
     const phoneErr = getPhoneValidationError(customerPhone);
     if (phoneErr) {
       toast.error(phoneErr);
@@ -658,6 +683,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         return;
       }
 
+      if (!noOfferSelected && !appliedOffer) {
+        toast.error('Selected offer is no longer available. Choose another or book without an offer.');
+        return;
+      }
+
       const result = await createBooking({
         business_id: resolvedParams.id,
         customer_name: customerName,
@@ -671,7 +701,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           : appliedOffer
             ? { applied_offer: appliedOffer }
             : {}),
-        ...(customerIdPayload ? { customer_id: customerIdPayload } : {}),
+        customer_id: customerIdPayload,
       }).unwrap();
       setBookingSuccess(true);
       setDrawerStep(4);
@@ -1887,7 +1917,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               </button>
               <div className={drawerStep === 3 ? 'flex-1 text-center min-w-0 px-1' : ''}>
                 <h3 className={`font-extrabold text-slate-800 ${drawerStep === 3 ? 'text-sm sm:text-base truncate' : 'text-base'}`}>
-                  {drawerStep === 2 && (isRegisterMode ? 'Create Account' : loginStep === 2 ? 'Verify OTP' : 'Verify Mobile Number')}
+                  {drawerStep === 2 && (loginStep === 3 ? 'Create Account' : loginStep === 2 ? 'Verify OTP' : 'Verify Mobile Number')}
                   {drawerStep === 3 && 'Review booking details'}
                   {drawerStep === 4 && 'Booking Confirmed'}
                 </h3>
@@ -2256,11 +2286,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
               {drawerStep === 2 && (
                 <div className="space-y-6 max-w-sm sm:max-w-md bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                  {!isRegisterMode ? (
-                    // PHONE LOGIN FORM
+                  {loginStep !== 3 ? (
+                    // Unified phone + OTP login
                     <div>
-                      <h4 className="text-lg font-black text-slate-800 mb-1 tracking-tight">Login</h4>
-                      <p className="text-xs text-slate-400 mb-6 font-semibold">Verify to secure your booking slot instantly.</p>
+                      <h4 className="text-lg font-black text-slate-800 mb-1 tracking-tight">Sign in to book</h4>
+                      <p className="text-xs text-slate-400 mb-6 font-semibold">Verify your mobile number to continue.</p>
 
                       {loginError && (
                         <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold p-3.5 rounded-2xl text-center mb-5">
@@ -2273,7 +2303,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Phone Number</label>
                             <div className="relative">
-                              <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-xs">+91</span>
+                              <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-xs">+251</span>
                               <input
                                 type="tel"
                                 required
@@ -2287,7 +2317,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             </div>
                             <button
                               type="submit"
-                              disabled={isPhoneLoggingIn}
+                              disabled={isSendingOtp}
                               className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
                             >
                               Send OTP
@@ -2300,7 +2330,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 <Sparkles size={14} className="text-indigo-600" />
                                 <span>Demo Assistant</span>
                               </span>
-                              <span className="font-medium text-slate-500">OTP has been sent to +91 {loginPhone}. Use static code <strong>123456</strong>.</span>
+                              <span className="font-medium text-slate-500">OTP sent to +251 {loginPhone}. Demo code <strong>123456</strong>.</span>
                             </div>
 
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Enter OTP</label>
@@ -2315,11 +2345,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             />
                             <button
                               type="submit"
-                              disabled={isPhoneLoggingIn}
+                              disabled={isVerifyingOtp}
                               className="w-full bg-rose-600 hover:bg-rose-700 text-white rounded-2xl py-3.5 text-xs font-bold transition-all shadow-md shadow-rose-200 cursor-pointer mt-6 flex justify-center items-center gap-1.5"
                             >
-                              {isPhoneLoggingIn ? <Loader2 size={14} className="animate-spin" /> : null}
-                              Verify & Log In
+                              {isVerifyingOtp ? <Loader2 size={14} className="animate-spin" /> : null}
+                              Verify & Continue
                             </button>
                             <button
                               type="button"
@@ -2331,23 +2361,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           </div>
                         )}
                       </form>
-
-                      <p className="mt-8 text-center text-xs text-slate-400 font-semibold">
-                        New to Book My Bota?{' '}
-                        <button
-                          type="button"
-                          onClick={() => { setIsRegisterMode(true); setLoginError(null); }}
-                          className="text-rose-600 font-extrabold hover:underline cursor-pointer"
-                        >
-                          Create an account
-                        </button>
-                      </p>
                     </div>
                   ) : (
                     // REGISTRATION FORM
                     <div>
                       <h4 className="text-lg font-black text-slate-800 mb-1 tracking-tight">Create Account</h4>
-                      <p className="text-xs text-slate-400 mb-6 font-semibold">Register in seconds to complete your booking.</p>
+                      <p className="text-xs text-slate-400 mb-6 font-semibold">
+                        Phone verified: <span className="font-bold text-slate-600">+251 {loginPhone}</span>
+                      </p>
 
                       {loginError && (
                         <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold p-3.5 rounded-2xl text-center mb-5">
@@ -2378,22 +2399,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             placeholder="john@example.com"
                           />
                         </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Phone Number</label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-3 text-slate-400 font-bold text-xs">+91</span>
-                            <input
-                              type="tel"
-                              required
-                              value={regPhone}
-                              onChange={(e) => setRegPhone(sanitizePhoneInput(e.target.value))}
-                              inputMode="numeric"
-                              maxLength={12}
-                              className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3 text-xs focus:outline-none focus:border-rose-500 text-slate-800 font-semibold"
-                              placeholder="99000-00000"
-                            />
-                          </div>
-                        </div>
 
                         <button
                           type="submit"
@@ -2406,13 +2411,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </form>
 
                       <p className="mt-8 text-center text-xs text-slate-400 font-semibold">
-                        Already have an account?{' '}
                         <button
                           type="button"
-                          onClick={() => { setIsRegisterMode(false); setLoginError(null); }}
+                          onClick={() => { setLoginStep(2); setLoginError(null); }}
                           className="text-rose-600 font-extrabold hover:underline cursor-pointer"
                         >
-                          Log in
+                          Back to OTP
                         </button>
                       </p>
                     </div>

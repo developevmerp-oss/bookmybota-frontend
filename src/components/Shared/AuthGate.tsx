@@ -6,8 +6,10 @@ import {
   homePathForRole,
   loginPathForRole,
   readSessionForRole,
+  clearSessionForRole,
   type UserRole,
 } from "@/lib/authStorage";
+import { isTokenExpired } from "@/lib/authSession";
 import { useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 
@@ -92,6 +94,12 @@ export default function AuthGate({
       // Other roles may remain logged in; only this panel requires its own session.
       const loginRole = allowed[0] || "customer";
       router.replace(loginPathForRole(loginRole));
+      return;
+    }
+
+    if (isTokenExpired(matched.token)) {
+      clearSessionForRole(matched.user.role);
+      router.replace(loginPathForRole(matched.user.role));
       return;
     }
 

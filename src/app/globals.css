@@ -232,18 +232,89 @@
   }
 
   /* Custom styled scrollbar for panels that need it */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
   }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
   .custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
+
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
-    border-radius: 99px;
+    background: rgba(100, 116, 139, 0.35);
+    border-radius: 999px;
   }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.55);
+  }
+
+  html.dark .custom-scrollbar {
+    scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  }
+
   html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(148, 163, 184, 0.35);
+  }
+
+  html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.55);
+  }
+
+  /* Checkout scroll — hidden by default; slim thumb on hover or while scrolling */
+  .checkout-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .checkout-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .checkout-scrollbar:hover,
+  .checkout-scrollbar.checkout-scrollbar-active {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+  }
+
+  .checkout-scrollbar:hover::-webkit-scrollbar,
+  .checkout-scrollbar.checkout-scrollbar-active::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .checkout-scrollbar:hover::-webkit-scrollbar-track,
+  .checkout-scrollbar.checkout-scrollbar-active::-webkit-scrollbar-track {
+    margin-block: 4px;
+    background: transparent;
+  }
+
+  .checkout-scrollbar:hover::-webkit-scrollbar-thumb,
+  .checkout-scrollbar.checkout-scrollbar-active::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.42);
+    border-radius: 999px;
+  }
+
+  .checkout-scrollbar:hover::-webkit-scrollbar-thumb:hover,
+  .checkout-scrollbar.checkout-scrollbar-active::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.58);
+  }
+
+  html.dark .checkout-scrollbar:hover,
+  html.dark .checkout-scrollbar.checkout-scrollbar-active {
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  }
+
+  html.dark .checkout-scrollbar:hover::-webkit-scrollbar-thumb,
+  html.dark .checkout-scrollbar.checkout-scrollbar-active::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
   }
 
   @keyframes fadeIn {

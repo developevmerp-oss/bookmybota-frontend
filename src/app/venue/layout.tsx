@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import AuthGate from "@/components/Shared/AuthGate";
+import SessionGuard from "@/components/Shared/SessionGuard";
 import { clearSessionForRole } from "@/lib/authStorage";
 import { Building2, ClipboardList, KeyRound, LogOut, Menu, Ticket, User, X } from "lucide-react";
 
@@ -23,6 +24,7 @@ export default function VenueLayout({ children }: { children: React.ReactNode })
 
   return (
     <AuthGate mode="require" roles={["venue_admin"]}>
+      <SessionGuard>
       <div className="min-h-screen flex bg-background admin-dashboard-layout">
         <aside className="w-64 glass-panel border-r border-white/5 fixed h-full z-40 hidden md:flex flex-col">
           <div className="p-6 border-b border-white/5">
@@ -91,6 +93,7 @@ export default function VenueLayout({ children }: { children: React.ReactNode })
           <div className="p-4 sm:p-8">{children}</div>
         </main>
       </div>
+      </SessionGuard>
     </AuthGate>
   );
 }

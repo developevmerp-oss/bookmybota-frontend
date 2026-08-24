@@ -127,6 +127,10 @@ export const eventDraftSchema = yup.object({
   about_event: yup.string().default(''),
   age_group: yup.string().default(''),
   duration_minutes: yup.number().nullable().default(null),
+  allowed_ticket_modes: yup
+    .array()
+    .of(yup.string().oneOf(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']).required())
+    .default(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']),
   showtimes: yup.array().of(showtimeSchema).default([]),
   artists: yup.array().of(artistSchema).default([]),
 });
@@ -144,6 +148,11 @@ export const eventSubmitSchema = eventDraftSchema.shape({
     .typeError('Duration is required')
     .min(1, 'Duration must be greater than 0')
     .required('Duration is required'),
+  allowed_ticket_modes: yup
+    .array()
+    .of(yup.string().oneOf(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']).required())
+    .min(1, 'Select at least one ticket delivery mode')
+    .required('Select at least one ticket delivery mode'),
   showtimes: yup
     .array()
     .of(
@@ -277,6 +286,7 @@ export function defaultEventFormValues(): EventFormValues {
     about_event: '',
     age_group: '',
     duration_minutes: null,
+    allowed_ticket_modes: ['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY'],
     showtimes: [defaultVenue()],
     artists: [],
   };

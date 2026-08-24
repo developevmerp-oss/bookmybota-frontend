@@ -6,11 +6,15 @@ import { FaApple, FaGoogle } from "react-icons/fa";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { usePhoneLoginMutation, useRegisterCustomerMutation } from "@/services/api";
+import {
+  useSendCustomerOtpMutation,
+  useVerifyCustomerOtpMutation,
+  useRegisterCustomerMutation,
+} from "@/services/api";
 import { useAppDispatch } from "@/lib/hooks";
 import { setCredentials } from "@/features/auth/authSlice";
 import { extractApiError, extractApiSuccessMessage } from "@/lib/apiErrors";
-import { sanitizePhoneInput } from "@/lib/validation";
+import { sanitizePhoneInput, PHONE_MIN_DIGITS } from "@/lib/validation";
 import {
   phoneLoginSchema,
   otpVerifySchema,
@@ -29,19 +33,18 @@ type Props = {
 };
 
 const BRAND = "#6900AA";
-
-function isNotRegisteredError(err: unknown): boolean {
-  const e = err as { status?: number; data?: { error?: string } };
-  if (e?.status === 404) return true;
-  const msg = String(e?.data?.error || "").toLowerCase();
-  return msg.includes("not registered") || msg.includes("create an account");
-}
+const DIAL_CODE = "+251";
+const RESEND_SECONDS = 30;
 
 export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
   const dispatch = useAppDispatch();
   const [step, setStep] = useState<Step>("start");
   const [verifiedPhone, setVerifiedPhone] = useState("");
-  const [phoneLogin, { isLoading: isPhoneLoading }] = usePhoneLoginMutation();
+  const [verificationToken, setVerificationToken] = useState("");
+  const [resendIn, setResendIn] = useState(0);
+
+  const [sendOtp, { isLoading: isSendingOtp }] = useSendCustomerOtpMutation();
+  const [verifyOtp, { isLoading: isVerifyingOtp }] = useVerifyCustomerOtpMutation();
   const [registerCustomer, { isLoading: isRegistering }] = useRegisterCustomerMutation();
 
   const phoneForm = useForm<PhoneLoginValues>({
@@ -62,13 +65,21 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
     mode: "onBlur",
   });
 
+  useEffect(() => {
+    if (step === "register" && verifiedPhone) {
+      registerForm.setValue("phone", verifiedPhone);
+    }
+  }, [step, verifiedPhone, registerForm]);
+
   const phoneValue = phoneForm.watch("phone");
   const phoneDigits = sanitizePhoneInput(phoneValue || "");
-  const canContinuePhone = phoneDigits.length >= 10 && !phoneForm.formState.errors.phone;
+  const canContinuePhone = phoneDigits.length >= PHONE_MIN_DIGITS && !phoneForm.formState.errors.phone;
 
   const resetFlow = () => {
     setStep("start");
     setVerifiedPhone("");
+    setVerificationToken("");
+    setResendIn(0);
     phoneForm.reset({ phone: "" });
     otpForm.reset({ otp: "" });
     registerForm.reset({ name: "", email: "", phone: "" });
@@ -92,6 +103,14 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = window.setInterval(() => {
+      setResendIn((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [resendIn]);
+
   const finishAuth = (message?: string) => {
     window.dispatchEvent(new Event("auth_changed"));
     if (message) toast.success(message);
@@ -103,40 +122,68 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
     toast.info(`${provider} sign-in is coming soon. Please use phone number for now.`);
   };
 
-  const onSendOtp = phoneForm.handleSubmit((values) => {
-    const phone = sanitizePhoneInput(values.phone);
+  const requestOtp = async (phone: string) => {
+    const data = await sendOtp({ phone }).unwrap();
     setVerifiedPhone(phone);
     otpForm.reset({ otp: "" });
     setStep("otp");
-    toast.success(`OTP sent to +91 ${phone}. Use demo OTP 123456.`);
+    setResendIn(RESEND_SECONDS);
+    toast.success(data.message || `OTP sent to ${DIAL_CODE} ${phone}.`);
+    if (data.demo_otp) {
+      toast.message(`Demo OTP: ${data.demo_otp}`, { duration: 8000 });
+    }
+  };
+
+  const onSendOtp = phoneForm.handleSubmit(async (values) => {
+    const phone = sanitizePhoneInput(values.phone);
+    try {
+      await requestOtp(phone);
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Could not send OTP. Please try again."));
+    }
   });
 
-  const onVerifyOtp = otpForm.handleSubmit(async (values) => {
-    if (values.otp !== "123456") {
-      toast.error("Invalid OTP. For demo, please use 123456.");
-      return;
-    }
+  const onResendOtp = async () => {
+    if (!verifiedPhone || resendIn > 0 || isSendingOtp) return;
     try {
-      const data = await phoneLogin({ phone: verifiedPhone, otp: values.otp }).unwrap();
-      dispatch(setCredentials({ user: data.user, token: data.token }));
-      finishAuth(extractApiSuccessMessage(data, "Login successful"));
+      await requestOtp(verifiedPhone);
     } catch (err: unknown) {
-      if (isNotRegisteredError(err)) {
-        registerForm.reset({ name: "", email: "", phone: verifiedPhone });
-        setStep("register");
-        toast.info("Phone not registered. Create an account to continue.");
+      toast.error(extractApiError(err, "Could not resend OTP."));
+    }
+  };
+
+  const onVerifyOtp = otpForm.handleSubmit(async (values) => {
+    try {
+      const data = await verifyOtp({ phone: verifiedPhone, otp: values.otp }).unwrap();
+
+      if (data.next === "authenticated") {
+        dispatch(setCredentials({ user: data.user, token: data.token }));
+        finishAuth(extractApiSuccessMessage(data, "Login successful"));
         return;
       }
-      toast.error(extractApiError(err, "Login failed. Please try again."));
+
+      setVerificationToken(data.verification_token);
+      registerForm.reset({ name: "", email: "", phone: verifiedPhone });
+      setStep("register");
+      toast.info("Complete your profile to create an account.");
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "OTP verification failed."));
     }
   });
 
   const onRegister = registerForm.handleSubmit(async (values) => {
+    if (!verificationToken) {
+      toast.error("Phone verification expired. Please verify OTP again.");
+      setStep("otp");
+      return;
+    }
     try {
+      const phone = sanitizePhoneInput(values.phone || verifiedPhone);
       const data = await registerCustomer({
         name: values.name.trim(),
         email: values.email.trim(),
-        phone: sanitizePhoneInput(values.phone || verifiedPhone),
+        phone,
+        verification_token: verificationToken,
         auto_generate_password: true,
       }).unwrap();
       dispatch(setCredentials({ user: data.user, token: data.token }));
@@ -175,10 +222,13 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
             <>
               <h2
                 id="customer-auth-title"
-                className="text-center text-[22px] sm:text-[24px] font-extrabold text-[#1A1A1A] mb-5 sm:mb-6"
+                className="text-center text-[22px] sm:text-[24px] font-extrabold text-[#1A1A1A] mb-2"
               >
                 Get Started
               </h2>
+              <p className="text-center text-sm text-slate-500 mb-5 sm:mb-6">
+                Enter your mobile number. We&apos;ll send an OTP to sign in or create an account.
+              </p>
 
               <div className="space-y-2.5 sm:space-y-3">
                 <button
@@ -219,16 +269,15 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 <div className="flex items-end gap-3 border-b border-[#6900AA]/pb-2">
                   <div className="flex items-center gap-1.5 shrink-0 pb-0.5 text-[14px] font-semibold text-[#1A1A1A]">
                     <span aria-hidden className="text-base leading-none">
-                      🇮🇳
+                      🇪🇹
                     </span>
-                    <span>+91</span>
-                    <span className="text-slate-400 text-xs">▾</span>
+                    <span>{DIAL_CODE}</span>
                   </div>
                   <input
                     type="tel"
                     inputMode="numeric"
                     maxLength={12}
-                    placeholder=""
+                    placeholder="Mobile number"
                     autoFocus
                     className="min-w-0 flex-1 bg-transparent border-0 outline-none text-[15px] sm:text-[16px] font-semibold text-[#1A1A1A] py-0.5"
                     {...phoneForm.register("phone", {
@@ -246,15 +295,15 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
 
                 <button
                   type="submit"
-                  disabled={!canContinuePhone || isPhoneLoading}
+                  disabled={!canContinuePhone || isSendingOtp}
                   className={`mt-5 sm:mt-6 w-full rounded-xl py-3 sm:py-3.5 text-[14px] sm:text-[15px] font-bold text-white transition-colors ${
-                    canContinuePhone && !isPhoneLoading
+                    canContinuePhone && !isSendingOtp
                       ? "cursor-pointer"
                       : "bg-slate-300 cursor-not-allowed"
                   }`}
-                  style={canContinuePhone && !isPhoneLoading ? { backgroundColor: BRAND } : undefined}
+                  style={canContinuePhone && !isSendingOtp ? { backgroundColor: BRAND } : undefined}
                 >
-                  Continue
+                  {isSendingOtp ? "Sending OTP..." : "Continue"}
                 </button>
               </form>
             </>
@@ -276,7 +325,10 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 Enter OTP
               </h2>
               <p className="text-center text-sm text-slate-500 mb-1">
-                Sent to <span className="font-bold text-slate-700">+91 {verifiedPhone}</span>
+                Sent to{" "}
+                <span className="font-bold text-slate-700">
+                  {DIAL_CODE} {verifiedPhone}
+                </span>
               </p>
               <p className="text-center text-xs text-amber-700 font-semibold mb-5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
                 Demo OTP: <span className="tracking-widest font-black">123456</span>
@@ -302,12 +354,26 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 )}
                 <button
                   type="submit"
-                  disabled={isPhoneLoading}
+                  disabled={isVerifyingOtp}
                   className="w-full rounded-xl py-3.5 text-[15px] font-bold text-white cursor-pointer disabled:opacity-60"
                   style={{ backgroundColor: BRAND }}
                 >
-                  {isPhoneLoading ? "Verifying..." : "Verify & Continue"}
+                  {isVerifyingOtp ? "Verifying..." : "Verify & Continue"}
                 </button>
+                <p className="text-center text-xs text-slate-500">
+                  {resendIn > 0 ? (
+                    <>Resend OTP in {resendIn}s</>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onResendOtp}
+                      disabled={isSendingOtp}
+                      className="font-bold text-[#6900AA] hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      Resend OTP
+                    </button>
+                  )}
+                </p>
               </form>
             </>
           )}
@@ -328,13 +394,17 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 Create Account
               </h2>
               <p className="text-center text-sm text-slate-500 mb-5">
-                Finish signup for <span className="font-bold text-slate-700">+91 {verifiedPhone}</span>
+                Finish signup for{" "}
+                <span className="font-bold text-slate-700">
+                  {DIAL_CODE} {verifiedPhone}
+                </span>
               </p>
               <form onSubmit={onRegister} className="space-y-3.5" noValidate>
                 <div>
                   <input
                     type="text"
                     placeholder="Full name"
+                    autoFocus
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#6900AA] focus:bg-white"
                     {...registerForm.register("name")}
                   />
@@ -357,11 +427,11 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                     </p>
                   )}
                 </div>
-                <input type="hidden" {...registerForm.register("phone")} />
+                <input type="hidden" {...registerForm.register("phone")} value={verifiedPhone} />
                 <button
                   type="submit"
                   disabled={isRegistering}
-                  className="w-full rounded-xl py-3.5 text-[15px] font-bold text-white cursor-pointer disabled:opacity-60"
+                  className="w-full rounded-xl py-3.5 text-[15px] font-bold text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ backgroundColor: BRAND }}
                 >
                   {isRegistering ? "Creating..." : "Create account"}

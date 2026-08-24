@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useRef, Children, type CSSProperties, type ReactNode } from "react";
+import "./AdaptiveCardRow.css";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import AdaptiveCardRow from "./AdaptiveCardRow";
 
 type ContentRailProps = {
   title: string;
@@ -16,6 +18,10 @@ type ContentRailProps = {
   children: ReactNode;
   label: string;
   cardStyle?: "poster" | "dining";
+  /** Cards visible in the row before scroll. Default 5. */
+  minVisible?: number;
+  /** Use AdaptiveCardRow width-fill logic. Default true. */
+  adaptive?: boolean;
 };
 
 export default function ContentRail({
@@ -30,8 +36,12 @@ export default function ContentRail({
   children,
   label,
   cardStyle = "poster",
+  minVisible = 5,
+  adaptive = true,
 }: ContentRailProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const childCount = Children.toArray(children).filter(Boolean).length;
+  const showArrows = !adaptive || childCount > minVisible;
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -53,14 +63,14 @@ export default function ContentRail({
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
             <h2
-              className={`text-xl sm:text-[22px] md:text-2xl font-semibold tracking-tight ${
+              className={`type-section font-semibold tracking-tight ${
                 dark ? "text-white" : "text-[#111111]"
               }`}
             >
               {title}
             </h2>
             {subtitle && (
-              <p className={`text-xs sm:text-sm mt-1 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>
+              <p className={`type-body mt-1 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>
                 {subtitle}
               </p>
             )}
@@ -68,7 +78,7 @@ export default function ContentRail({
           {seeAllHref && (
             <Link
               href={seeAllHref}
-              className="shrink-0 text-xs sm:text-sm font-medium text-[#6900AA] hover:text-[#57008E]"
+              className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
             >
               {seeAllLabel} ›
             </Link>
@@ -76,16 +86,12 @@ export default function ContentRail({
         </div>
 
         {isLoading ? (
-          <div className="flex gap-3 sm:gap-4 overflow-hidden">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className={
-                  cardStyle === "dining"
-                    ? "w-[240px] sm:w-[340px] md:w-[355px] shrink-0"
-                    : "w-[160px] sm:w-[250px] md:w-[270px] shrink-0"
-                }
-              >
+          <div
+            className="adaptive-card-row overflow-hidden"
+            style={{ ["--adaptive-count" as string]: minVisible } as CSSProperties}
+          >
+            {Array.from({ length: minVisible }).map((_, i) => (
+              <div key={i} className="adaptive-card-slot">
                 <div
                   className={`rounded-xl ${
                     cardStyle === "dining" ? "aspect-[4/3]" : "aspect-[2/3]"
@@ -105,39 +111,49 @@ export default function ContentRail({
             ))}
           </div>
         ) : empty ? (
-          <p className={`text-sm py-8 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>{empty}</p>
+          <p className={`type-body py-8 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>{empty}</p>
         ) : (
           <div className="relative">
-            <button
-              type="button"
-              aria-label={`Previous ${label}`}
-              onClick={() => scrollBy(-1)}
-              className={`hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
-                dark
-                  ? "bg-white/10 text-white hover:bg-white/20"
-                  : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-              }`}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div
-              ref={scrollerRef}
-              className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {children}
-            </div>
-            <button
-              type="button"
-              aria-label={`Next ${label}`}
-              onClick={() => scrollBy(1)}
-              className={`hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
-                dark
-                  ? "bg-white/10 text-white hover:bg-white/20"
-                  : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-              }`}
-            >
-              <ChevronRight size={18} />
-            </button>
+            {showArrows && (
+              <button
+                type="button"
+                aria-label={`Previous ${label}`}
+                onClick={() => scrollBy(-1)}
+                className={`hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
+                  dark
+                    ? "bg-white/10 text-white hover:bg-white/20"
+                    : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                }`}
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
+            {adaptive ? (
+              <AdaptiveCardRow minVisible={minVisible} scrollerRef={scrollerRef}>
+                {children}
+              </AdaptiveCardRow>
+            ) : (
+              <div
+                ref={scrollerRef}
+                className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {children}
+              </div>
+            )}
+            {showArrows && (
+              <button
+                type="button"
+                aria-label={`Next ${label}`}
+                onClick={() => scrollBy(1)}
+                className={`hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
+                  dark
+                    ? "bg-white/10 text-white hover:bg-white/20"
+                    : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                }`}
+              >
+                <ChevronRight size={18} />
+              </button>
+            )}
           </div>
         )}
       </div>

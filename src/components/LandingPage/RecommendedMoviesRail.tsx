@@ -92,7 +92,7 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
           />
         </div>
         {movie.promoted && (
-          <span className="absolute top-2 right-2 rounded-full bg-[#6900AA] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          <span className="absolute top-2 right-2 rounded-full bg-[#6900AA] px-2 py-0.5 type-card-caption font-bold uppercase tracking-wide text-white">
             Promoted
           </span>
         )}
@@ -100,21 +100,21 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
           {movie.likes ? (
             <>
               <ThumbsUp size={14} className="shrink-0 text-[#22C55E]" fill="currentColor" />
-              <span className="text-xs font-medium truncate">{movie.likes}</span>
+              <span className="type-card-caption font-medium truncate">{movie.likes}</span>
             </>
           ) : (
             <>
               <Star size={14} className="shrink-0 text-[#6900AA]" fill="currentColor" />
-              <span className="text-xs font-semibold shrink-0">{movie.rating}</span>
-              <span className="text-xs text-white/80 truncate">{movie.votes}</span>
+              <span className="type-card-caption font-semibold shrink-0">{movie.rating}</span>
+              <span className="type-card-caption text-white/80 truncate">{movie.votes}</span>
             </>
           )}
         </div>
       </div>
-      <h3 className="mt-2.5 text-sm sm:text-base font-semibold text-[#111111] line-clamp-2 leading-snug">
+      <h3 className="mt-2.5 type-card-title font-semibold text-[#111111] line-clamp-2 leading-snug">
         {movie.title}
       </h3>
-      <p className="mt-1 text-xs sm:text-sm text-[#6B6B6B] line-clamp-1">{movie.genres}</p>
+      <p className="mt-1 type-card-body text-[#6B6B6B] line-clamp-1">{movie.genres}</p>
     </article>
   );
 }
@@ -132,12 +132,12 @@ export default function RecommendedMoviesRail() {
     <section className="bg-white py-6 sm:py-8 lg:py-10">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="text-xl sm:text-[22px] md:text-2xl font-semibold tracking-tight text-[#111111]">
+          <h2 className="type-section font-semibold tracking-tight text-[#111111]">
             Recommended Movies
           </h2>
           <Link
             href="/events"
-            className="shrink-0 text-xs sm:text-sm font-medium text-[#6900AA] hover:text-[#57008E]"
+            className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
           >
             See All ›
           </Link>

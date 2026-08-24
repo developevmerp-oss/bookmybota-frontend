@@ -58,13 +58,13 @@ function CustomerDropdown({
       {children}
       <div className="absolute right-0 top-full pt-1 w-56 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
         <div className="rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 overflow-hidden">
-          <Link href="/customer/profile" className="block px-4 py-2.5 text-sm font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Profile</Link>
-          <Link href="/customer/change-password" className="block px-4 py-2.5 text-sm font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
-          <Link href="/customer/dashboard" className="block px-4 py-2.5 text-sm font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Orders / Reservations</Link>
+          <Link href="/customer/profile" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Profile</Link>
+          <Link href="/customer/change-password" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
+          <Link href="/customer/dashboard" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Orders / Reservations</Link>
           <button 
             type="button"
             onClick={onLogout} 
-            className="block w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+            className="block w-full text-left px-4 py-2.5 type-nav-md font-medium text-red-600 hover:bg-[#F7E9FF] transition-colors cursor-pointer"
           >
             Log out
           </button>
@@ -96,10 +96,10 @@ function ForBusinessMenu({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
   const triggerClass =
     size === "lg"
-      ? "inline-flex h-11 items-center gap-1.5 px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-base font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
+      ? "inline-flex h-11 items-center gap-1.5 px-4 rounded-full bg-[#F3F3F3] text-[#111111] type-nav-md font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
       : size === "md"
-        ? "inline-flex h-9 items-center gap-1 px-3 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
-        : "inline-flex h-8 items-center gap-0.5 px-2.5 rounded-full bg-[#F3F3F3] text-[#111111] text-xs font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer";
+        ? "inline-flex h-9 items-center gap-1 px-3 rounded-full bg-[#F3F3F3] text-[#111111] type-nav-md font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
+        : "inline-flex h-8 items-center gap-0.5 px-2.5 rounded-full bg-[#F3F3F3] text-[#111111] type-nav font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer";
 
   return (
     <div className="relative" ref={ref}>
@@ -110,7 +110,7 @@ function ForBusinessMenu({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
         onClick={() => setOpen((v) => !v)}
         className={triggerClass}
       >
-        {size === "sm" ? "Business" : "For Business"}
+        For Business
         <ChevronDown
           size={size === "sm" ? 12 : 14}
           className={`shrink-0 text-[#6B6B6B] transition-transform ${open ? "rotate-180" : ""}`}
@@ -134,8 +134,8 @@ function ForBusinessMenu({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
                 <Icon size={16} />
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-[#111111]">{label}</span>
-                <span className="block text-xs text-[#6B6B6B] mt-0.5">{description}</span>
+                <span className="block type-nav-md font-semibold text-[#111111]">{label}</span>
+                <span className="block type-label text-[#6B6B6B] mt-0.5">{description}</span>
               </span>
             </Link>
           ))}
@@ -197,42 +197,42 @@ export default function HomeHeader() {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-black/10">
       {/* Phone (< md) */}
-      <div className="md:hidden px-4 py-2.5 flex items-center gap-2">
+      <div className="md:hidden px-3 py-2.5 flex items-center gap-1.5">
         <Link href="/" className="shrink-0 flex items-center min-w-0">
-          <img src={logoSrc} alt="Book My Bota" className="h-8 w-auto max-w-[120px] object-contain object-left" />
+          <img src={logoSrc} alt="Book My Bota" className="h-7 w-auto max-w-[88px] object-contain object-left" />
         </Link>
 
         <div className="ml-auto flex items-center gap-1 shrink-0">
           <button
             type="button"
-            className="w-9 h-9 rounded-full hover:bg-[#F7E9FF] flex items-center justify-center cursor-pointer"
+            className="w-8 h-8 rounded-full hover:bg-[#F7E9FF] flex items-center justify-center cursor-pointer"
             aria-label="Search"
             onClick={() => setSearchOpen(true)}
           >
-            <Search size={18} />
+            <Search size={16} />
           </button>
 
           <button
             type="button"
             onClick={() => setCityOpen(true)}
-            className="flex items-center gap-0.5 max-w-[96px] h-9 px-1.5 rounded-full text-xs font-medium text-[#111111] cursor-pointer hover:bg-[#F7E9FF] hover:text-[#6900AA]"
+            className="inline-flex h-8 items-center gap-0.5 px-2.5 rounded-full bg-[#F3F3F3] text-[#111111] type-nav font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors cursor-pointer max-w-[7.25rem]"
           >
             <span className="truncate">{cityLabel}</span>
-            <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
+            <ChevronDown size={12} className="shrink-0 text-[#6B6B6B]" />
           </button>
 
           <ForBusinessMenu size="sm" />
 
           {!authReady ? (
-            <span className="w-9 h-9" />
+            <span className="w-8 h-8" />
           ) : customer ? (
             <CustomerDropdown onLogout={handleLogout}>
               <Link
                 href="/customer/profile"
                 aria-label={displayName}
-                className="w-9 h-9 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] flex items-center justify-center relative z-10"
+                className="w-8 h-8 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] flex items-center justify-center relative z-10"
               >
-                <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
+                <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white type-nav font-semibold flex items-center justify-center">
                   {initial}
                 </span>
               </Link>
@@ -241,7 +241,7 @@ export default function HomeHeader() {
             <button
               type="button"
               onClick={() => setLoginOpen(true)}
-              className="inline-flex h-8 items-center px-3 rounded-full bg-[#6900AA] text-white text-xs font-semibold hover:bg-[#57008E] cursor-pointer"
+              className="inline-flex h-8 items-center px-2.5 rounded-full bg-[#6900AA] text-white type-nav font-semibold hover:bg-[#57008E] cursor-pointer"
             >
               Login
             </button>
@@ -261,7 +261,7 @@ export default function HomeHeader() {
           className="flex flex-1 min-w-0 relative cursor-pointer"
         >
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9A9A] pointer-events-none" />
-          <span className="w-full h-10 pl-9 pr-3 rounded-lg bg-[#F7F7F7] text-sm text-[#9A9A9A] flex items-center text-left truncate whitespace-nowrap overflow-hidden">
+          <span className="w-full h-10 pl-9 pr-3 rounded-lg bg-[#F7F7F7] type-nav-md text-[#9A9A9A] flex items-center text-left truncate whitespace-nowrap overflow-hidden">
             Search for Events, Dining and Experiences
           </span>
         </button>
@@ -270,7 +270,7 @@ export default function HomeHeader() {
           <button
             type="button"
             onClick={() => setCityOpen(true)}
-            className="flex items-center gap-1 text-sm font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] max-w-[110px]"
+            className="flex items-center gap-1 type-nav-md font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] max-w-[110px]"
           >
             <span className="truncate">{cityLabel}</span>
             <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
@@ -286,10 +286,10 @@ export default function HomeHeader() {
                 href="/customer/profile"
                 className="inline-flex h-9 items-center gap-1.5 pl-1 pr-2.5 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors relative z-10"
               >
-                <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white text-xs font-semibold flex items-center justify-center">
+                <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white type-nav font-semibold flex items-center justify-center">
                   {initial}
                 </span>
-                <span className="text-sm font-medium text-[#111111] max-w-[90px] truncate whitespace-nowrap">
+                <span className="type-nav-md font-medium text-[#111111] max-w-[90px] truncate whitespace-nowrap">
                   {displayName}
                 </span>
               </Link>
@@ -298,7 +298,7 @@ export default function HomeHeader() {
             <button
               type="button"
               onClick={() => setLoginOpen(true)}
-              className="inline-flex h-9 items-center px-3 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] whitespace-nowrap cursor-pointer"
+              className="inline-flex h-9 items-center px-3 rounded-full bg-[#6900AA] text-white type-nav-md font-semibold hover:bg-[#57008E] whitespace-nowrap cursor-pointer"
             >
               Login
             </button>
@@ -318,7 +318,7 @@ export default function HomeHeader() {
           className="flex flex-1 mx-auto relative cursor-pointer min-w-0"
         >
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A9A9A]" />
-          <span className="w-full h-15 pl-13 pr-4 rounded-lg bg-[#F7F7F7] text-lg text-[#9A9A9A] flex items-center text-left truncate whitespace-nowrap overflow-hidden">
+          <span className="w-full h-15 pl-13 pr-4 rounded-lg bg-[#F7F7F7] type-nav-lg text-[#9A9A9A] flex items-center text-left truncate whitespace-nowrap overflow-hidden">
             Search for Events, Dining and Experiences
           </span>
         </button>
@@ -327,7 +327,7 @@ export default function HomeHeader() {
           <button
             type="button"
             onClick={() => setCityOpen(true)}
-            className="flex items-center gap-1 text-sm font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] max-w-[160px]"
+            className="flex items-center gap-1 type-nav-md font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] max-w-[160px]"
           >
             <span className="truncate">{cityLabel}</span>
             <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
@@ -342,7 +342,7 @@ export default function HomeHeader() {
               <button
                 type="button"
                 onClick={() => toast.message("Coming soon")}
-                className="inline-flex h-11 items-center gap-2 px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
+                className="inline-flex h-11 items-center gap-2 px-4 rounded-full bg-[#F3F3F3] text-[#111111] type-nav-md font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
               >
                 <Gift size={18} className="shrink-0" />
                 Gift Cards
@@ -352,10 +352,10 @@ export default function HomeHeader() {
                   href="/customer/profile"
                   className="inline-flex h-13 items-center gap-2 pl-1 pr-3 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors relative z-10"
                 >
-                  <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white text-[16px] font-semibold flex items-center justify-center">
+                  <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white type-nav-md font-semibold flex items-center justify-center">
                     {initial}
                   </span>
-                  <span className="text-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
+                  <span className="type-nav-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
                     {displayName}
                   </span>
                 </Link>
@@ -365,7 +365,7 @@ export default function HomeHeader() {
             <button
               type="button"
               onClick={() => setLoginOpen(true)}
-              className="inline-flex h-9 items-center px-4 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] shadow-[0_1px_2px_rgba(105,0,170,0.35)] transition-colors whitespace-nowrap cursor-pointer"
+              className="inline-flex h-9 items-center px-4 rounded-full bg-[#6900AA] text-white type-nav-md font-semibold hover:bg-[#57008E] shadow-[0_1px_2px_rgba(105,0,170,0.35)] transition-colors whitespace-nowrap cursor-pointer"
             >
               Login
             </button>

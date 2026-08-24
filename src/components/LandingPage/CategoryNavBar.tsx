@@ -38,7 +38,7 @@ function diningHref(city: string) {
 }
 
 function linkClass(active: boolean) {
-  return `relative shrink-0 text-[13px] pb-0.5 ${
+  return `relative shrink-0 type-card-body pb-0.5 ${
     active ? "text-white font-medium" : "text-[#C8C8C8] hover:text-white"
   }`;
 }

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { ArrowLeft, CheckCircle, Loader2, Plus, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import PartnerTypeFields, {
@@ -13,9 +15,12 @@ import PartnerDocumentsFields, {
   validateRequiredPartnerDocuments,
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import PhoneInput from "@/components/Shared/PhoneInput";
-import { isValidPhone } from "@/lib/validation";
 import { extractApiError } from "@/lib/apiErrors";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
+import {
+  partnerOnboardSchema,
+  type PartnerOnboardValues,
+} from "@/lib/adminFormSchemas";
 import {
   useGetBusinessTypesQuery,
   useGetPartnerDocumentMastersQuery,
@@ -58,22 +63,41 @@ export default function PartnerOnboardForm({
   const [updateAdminBusiness, { isLoading: isUpdating }] = useUpdateAdminBusinessMutation();
   const [uploadImage, { isLoading: uploadingImage }] = useUploadImageMutation();
 
-  const [businessName, setBusinessName] = useState("");
-  const [address, setAddress] = useState("");
-  const [phone, setPhone] = useState("");
-  const [description, setDescription] = useState("");
-  const [parentTypeId, setParentTypeId] = useState("");
-  const [venueTypeId, setVenueTypeId] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [collectionIds, setCollectionIds] = useState<number[]>([]);
-  const [phoneValid, setPhoneValid] = useState(false);
-  const [acceptTerms, setAcceptTerms] = useState(mode === "edit");
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
-  const [registerError, setRegisterError] = useState<string | null>(null);
   const [formReady, setFormReady] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    setError,
+    clearErrors,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<PartnerOnboardValues>({
+    resolver: yupResolver(partnerOnboardSchema),
+    defaultValues: {
+      business_name: "",
+      address: "",
+      phone: "",
+      description: "",
+      parent_type_id: "",
+      venue_type_id: "",
+      admin_email: "",
+      accept_terms: mode === "edit",
+    },
+    mode: "onSubmit",
+  });
+
+  const parentTypeId = watch("parent_type_id");
+  const venueTypeId = watch("venue_type_id");
+  const phone = watch("phone");
+  const acceptTerms = watch("accept_terms");
 
   const selectedParent = businessTypes.find((t) => String(t.id) === parentTypeId);
   const isEventParent =
@@ -109,41 +133,48 @@ export default function PartnerOnboardForm({
   useEffect(() => {
     if (mode !== "edit" || !editingBusiness || formReady) return;
     if (businessTypes.length === 0) return;
-    setBusinessName(editingBusiness.name || "");
-    setAddress(editingBusiness.address || "");
-    setPhone(editingBusiness.phone || "");
-    setDescription(editingBusiness.description || "");
+
+    let nextParent = "";
+    let nextVenue = "";
+    if (partnerType === "event") {
+      const eventParent =
+        businessTypes.find((t) => t.module_key === "event" && !t.parent_type_id) ||
+        businessTypes.find((t) => t.id === editingBusiness.type_id);
+      nextParent = eventParent ? String(eventParent.id) : editingBusiness.type_id ? String(editingBusiness.type_id) : "";
+      nextVenue = "";
+    } else if (partnerType === "venue" || partnerType === "artist" || partnerType === "dining") {
+      const child = businessTypes.find((t) => t.id === editingBusiness.type_id);
+      nextParent = child?.parent_type_id != null ? String(child.parent_type_id) : "";
+      nextVenue = child ? String(child.id) : "";
+    } else {
+      const child = businessTypes.find((t) => t.id === editingBusiness.type_id);
+      nextParent = child?.parent_type_id != null ? String(child.parent_type_id) : "";
+      nextVenue = child ? String(child.id) : "";
+    }
+
+    reset({
+      business_name: editingBusiness.name || "",
+      address: editingBusiness.address || "",
+      phone: editingBusiness.phone || "",
+      description: editingBusiness.description || "",
+      parent_type_id: nextParent,
+      venue_type_id: nextVenue,
+      admin_email: editingBusiness.admin_email || "",
+      accept_terms: true,
+    });
     setCoverImageUrl(editingBusiness.cover_image_url || "");
     setCollectionIds(
       Array.isArray(editingBusiness.collection_ids)
         ? editingBusiness.collection_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0)
         : []
     );
-    setAdminEmail(editingBusiness.admin_email || "");
     setDocuments(
       Array.isArray(editingBusiness.documents)
         ? editingBusiness.documents.filter((d) => d.document_type_id > 0 && d.url)
         : []
     );
-    setPhoneValid(!!editingBusiness.phone);
-
-    if (partnerType === "event") {
-      const eventParent =
-        businessTypes.find((t) => t.module_key === "event" && !t.parent_type_id) ||
-        businessTypes.find((t) => t.id === editingBusiness.type_id);
-      setParentTypeId(eventParent ? String(eventParent.id) : editingBusiness.type_id ? String(editingBusiness.type_id) : "");
-      setVenueTypeId("");
-    } else if (partnerType === "venue" || partnerType === "artist" || partnerType === "dining") {
-      const child = businessTypes.find((t) => t.id === editingBusiness.type_id);
-      setParentTypeId(child?.parent_type_id != null ? String(child.parent_type_id) : "");
-      setVenueTypeId(child ? String(child.id) : "");
-    } else {
-      const child = businessTypes.find((t) => t.id === editingBusiness.type_id);
-      setParentTypeId(child?.parent_type_id != null ? String(child.parent_type_id) : "");
-      setVenueTypeId(child ? String(child.id) : "");
-    }
     setFormReady(true);
-  }, [mode, editingBusiness, partnerType, businessTypes, formReady]);
+  }, [mode, editingBusiness, partnerType, businessTypes, formReady, reset]);
 
   const isDark = variant === "dark";
   const labelClass = isDark
@@ -160,97 +191,87 @@ export default function PartnerOnboardForm({
   const panelClass = isDark
     ? "glass-panel rounded-2xl border border-white/10 p-6 md:p-8"
     : "bg-white rounded-2xl border border-slate-100 shadow-xl p-6 md:p-8 w-full";
+  const fieldErrorClass = isDark
+    ? "mt-1.5 text-xs text-rose-400 font-medium"
+    : "mt-1.5 text-xs text-rose-600 font-medium";
 
-  const canSubmitCreate =
-    !!businessName &&
-    !!adminEmail &&
-    phoneValid &&
-    !!parentTypeId &&
-    (needsSubtype ? !!venueTypeId : true) &&
-    acceptTerms;
-
-  const canSubmitEdit =
-    !!businessName &&
-    phoneValid &&
-    !!parentTypeId &&
-    (needsSubtype ? !!venueTypeId : true);
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isValidPhone(phone)) return;
-    if (!acceptTerms) {
-      const message = "You must accept the onboarding terms and conditions.";
-      setRegisterError(message);
-      toast.error(message);
-      return;
+  const onValid = async (values: PartnerOnboardValues) => {
+    let hasLocalError = false;
+    if (needsSubtype && !values.venue_type_id) {
+      setError("venue_type_id", { type: "manual", message: "Please select a type." });
+      hasLocalError = true;
+    } else {
+      clearErrors("venue_type_id");
     }
+    if (mode === "create" && !values.accept_terms) {
+      setError("accept_terms", {
+        type: "manual",
+        message: "You must accept the onboarding terms and conditions.",
+      });
+      hasLocalError = true;
+    } else {
+      clearErrors("accept_terms");
+    }
+    if (hasLocalError) return;
+
     const docsErr = validateRequiredPartnerDocuments(partnerDocMasters, documents);
     if (docsErr) {
-      setRegisterError(docsErr);
       toast.error(docsErr);
       return;
     }
-    setRegisterError(null);
-    try {
-      const selectedPartner =
-        partnerType === "combined"
-          ? resolvePartnerFromParentId(businessTypes, parentTypeId)
-          : partnerType === "event"
-            ? { partner_type: "event" as const, type_id: parseInt(parentTypeId, 10) }
-            : partnerType === "venue"
-              ? { partner_type: "venue" as const, type_id: parseInt(parentTypeId, 10) }
-              : partnerType === "artist"
-                ? { partner_type: "artist" as const, type_id: parseInt(parentTypeId, 10) }
-                : null;
-      const data = await registerBusiness({
-        business_name: businessName,
-        address,
-        phone,
-        description,
-        type_id: selectedPartner
-          ? selectedPartner.partner_type === "event"
-            ? selectedPartner.type_id
-            : parseInt(venueTypeId, 10)
-          : parseInt(venueTypeId, 10),
-        admin_email: adminEmail,
-        partner_type: selectedPartner ? selectedPartner.partner_type : "dining",
-        documents,
-        cover_image_url: coverImageUrl || undefined,
-        ...(isDining && variant === "dark" ? { collection_ids: collectionIds } : {}),
-        registration_terms_accepted: true,
-        registration_terms_version: `${resolvedModule}-v1`,
-      }).unwrap();
-      setOnboardStatus("success");
-      toast.success(data.message || "Registration received");
-      setTimeout(() => router.push(backHref), 2500);
-    } catch (err: unknown) {
-      const message = extractApiError(err, "Registration failed. Please check your details or try again.");
-      setRegisterError(message);
-      toast.error(message);
-    }
-  };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (mode === "create") {
+      try {
+        const selectedPartner =
+          partnerType === "combined"
+            ? resolvePartnerFromParentId(businessTypes, values.parent_type_id)
+            : partnerType === "event"
+              ? { partner_type: "event" as const, type_id: parseInt(values.parent_type_id, 10) }
+              : partnerType === "venue"
+                ? { partner_type: "venue" as const, type_id: parseInt(values.parent_type_id, 10) }
+                : partnerType === "artist"
+                  ? { partner_type: "artist" as const, type_id: parseInt(values.parent_type_id, 10) }
+                  : null;
+        const data = await registerBusiness({
+          business_name: values.business_name,
+          address: values.address,
+          phone: values.phone,
+          description: values.description || "",
+          type_id: selectedPartner
+            ? selectedPartner.partner_type === "event"
+              ? selectedPartner.type_id
+              : parseInt(values.venue_type_id, 10)
+            : parseInt(values.venue_type_id, 10),
+          admin_email: values.admin_email,
+          partner_type: selectedPartner ? selectedPartner.partner_type : "dining",
+          documents,
+          cover_image_url: coverImageUrl || undefined,
+          ...(isDining && variant === "dark" ? { collection_ids: collectionIds } : {}),
+          registration_terms_accepted: true,
+          registration_terms_version: `${resolvedModule}-v1`,
+        }).unwrap();
+        setOnboardStatus("success");
+        toast.success(data.message || "Registration received");
+        setTimeout(() => router.push(backHref), 2500);
+      } catch (err: unknown) {
+        toast.error(extractApiError(err, "Registration failed. Please check your details or try again."));
+      }
+      return;
+    }
+
     if (!editingBusiness) return;
-    if (phone && !isValidPhone(phone)) return;
-    const docsErr = validateRequiredPartnerDocuments(partnerDocMasters, documents);
-    if (docsErr) {
-      toast.error(docsErr);
-      return;
-    }
     try {
       await updateAdminBusiness({
         id: editingBusiness.id,
-        name: businessName,
-        address,
-        phone,
-        description,
+        name: values.business_name,
+        address: values.address,
+        phone: values.phone,
+        description: values.description || "",
         ...(isDining
-          ? { type_id: parseInt(venueTypeId, 10), collection_ids: collectionIds }
+          ? { type_id: parseInt(values.venue_type_id, 10), collection_ids: collectionIds }
           : isVenue || isArtist
-            ? { type_id: parseInt(venueTypeId, 10) }
-            : { type_id: parseInt(parentTypeId, 10) }),
+            ? { type_id: parseInt(values.venue_type_id, 10) }
+            : { type_id: parseInt(values.parent_type_id, 10) }),
         documents,
         cover_image_url: coverImageUrl || undefined,
       }).unwrap();
@@ -279,12 +300,20 @@ export default function PartnerOnboardForm({
         parentTypeId={parentTypeId}
         venueTypeId={venueTypeId}
         onParentTypeIdChange={(id) => {
-          setParentTypeId(id);
+          setValue("parent_type_id", id, { shouldValidate: true, shouldDirty: true });
           if (partnerType === "combined") setDocuments([]);
         }}
-        onVenueTypeIdChange={setVenueTypeId}
+        onVenueTypeIdChange={(id) =>
+          setValue("venue_type_id", id, { shouldValidate: true, shouldDirty: true })
+        }
         variant={variant}
       />
+      {errors.parent_type_id && (
+        <p className={`md:col-span-2 ${fieldErrorClass}`}>{errors.parent_type_id.message}</p>
+      )}
+      {needsSubtype && errors.venue_type_id && (
+        <p className={`md:col-span-2 ${fieldErrorClass}`}>{errors.venue_type_id.message}</p>
+      )}
 
       {isDining && isDark && (
         <div className="md:col-span-2">
@@ -335,12 +364,11 @@ export default function PartnerOnboardForm({
         </label>
         <input
           type="text"
-          value={businessName}
-          onChange={(e) => setBusinessName(e.target.value)}
+          {...register("business_name")}
           className={inputClass}
           placeholder={isDining ? "E.g., The Sapphire Room" : isVenue ? "E.g., Millennium Hall" : "E.g., LiveWire Productions"}
-          required
         />
+        {errors.business_name && <p className={fieldErrorClass}>{errors.business_name.message}</p>}
       </div>
       <div>
         <label className={labelClass}>
@@ -348,23 +376,23 @@ export default function PartnerOnboardForm({
         </label>
         <input
           type="text"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
+          {...register("address")}
           className={inputClass}
           placeholder="City / area"
-          required
         />
+        {errors.address && <p className={fieldErrorClass}>{errors.address.message}</p>}
       </div>
       <PhoneInput
         label="Phone Number"
         labelClassName={labelClass}
         variant={isDark ? "dark" : "light"}
         className={isDark ? undefined : "md:col-span-2"}
-        value={phone}
-        onChange={setPhone}
-        onValidChange={setPhoneValid}
+        value={phone || ""}
+        onChange={(v) => setValue("phone", v, { shouldValidate: true, shouldDirty: true })}
         required
         placeholder="9876543210"
+        error={errors.phone?.message}
+        showError={Boolean(errors.phone)}
         helperText={!isDark ? "9–12 digits, numbers only" : undefined}
       />
             <div className={isDark ? "" : "md:col-span-2"}>
@@ -400,14 +428,13 @@ export default function PartnerOnboardForm({
         </label>
         <input
           type="email"
-          value={adminEmail}
-          onChange={(e) => setAdminEmail(e.target.value)}
+          {...register("admin_email")}
           className={`${inputClass} ${mode === "edit" ? "opacity-60 cursor-not-allowed" : ""}`}
           placeholder="admin@example.com"
-          required={mode === "create"}
           disabled={mode === "edit"}
           readOnly={mode === "edit"}
         />
+        {errors.admin_email && <p className={fieldErrorClass}>{errors.admin_email.message}</p>}
         <p className={`mt-1 text-xs ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
           {mode === "create"
             ? "Password is auto-generated and emailed after onboarding."
@@ -417,8 +444,7 @@ export default function PartnerOnboardForm({
       <div className="md:col-span-2">
         <label className={labelClass}>Description</label>
         <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          {...register("description")}
           className={textareaClass}
           placeholder="Brief description..."
           rows={3}
@@ -440,7 +466,7 @@ export default function PartnerOnboardForm({
   const submitButton = (
     <button
       type="submit"
-      disabled={busy || (mode === "create" ? !canSubmitCreate : !canSubmitEdit)}
+      disabled={busy}
       className={
         isDark
           ? "btn-primary disabled:opacity-50 inline-flex items-center justify-center gap-2 min-w-48"
@@ -504,17 +530,30 @@ export default function PartnerOnboardForm({
         {onboardStatus === "success" ? (
           successBlock
         ) : (
-          <form onSubmit={mode === "edit" ? handleUpdate : handleRegister} className="space-y-6">
+          <form onSubmit={handleSubmit(onValid)} className="space-y-6" noValidate>
             {fieldsGrid}
             {documentsBlock}
             {mode === "create" && (
               <div className="space-y-2">
                 <label className="flex items-start gap-3 text-sm text-slate-600">
-                  <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="mt-1" />
+                  <input
+                    type="checkbox"
+                    checked={!!acceptTerms}
+                    onChange={(e) =>
+                      setValue("accept_terms", e.target.checked, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                    className="mt-1"
+                  />
                   <span>
                     I confirm the documents are valid and I accept the platform onboarding terms and conditions.
                   </span>
                 </label>
+                {errors.accept_terms && (
+                  <p className={fieldErrorClass}>{errors.accept_terms.message}</p>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowTermsModal(true)}
@@ -523,9 +562,6 @@ export default function PartnerOnboardForm({
                   View terms and conditions
                 </button>
               </div>
-            )}
-            {registerError && (
-              <p className="text-sm font-semibold text-rose-500 text-center">{registerError}</p>
             )}
             {submitButton}
           </form>
@@ -550,7 +586,7 @@ export default function PartnerOnboardForm({
       {onboardStatus === "success" ? (
         successBlock
       ) : (
-        <form onSubmit={mode === "edit" ? handleUpdate : handleRegister} className="space-y-6">
+        <form onSubmit={handleSubmit(onValid)} className="space-y-6" noValidate>
           <div className="glass-panel rounded-2xl border border-white/10 p-6 md:p-8">
             <h2 className="text-lg font-semibold text-white mb-5">Partner details</h2>
             {fieldsGrid}
@@ -561,9 +597,22 @@ export default function PartnerOnboardForm({
           {mode === "create" && (
             <div className="glass-panel rounded-2xl border border-white/10 p-5">
               <label className="flex items-start gap-3 text-sm text-zinc-300">
-                <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="mt-1" />
+                <input
+                  type="checkbox"
+                  checked={!!acceptTerms}
+                  onChange={(e) =>
+                    setValue("accept_terms", e.target.checked, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
+                  className="mt-1"
+                />
                 <span>I confirm the documents are valid and I accept the platform onboarding terms and conditions.</span>
               </label>
+              {errors.accept_terms && (
+                <p className={fieldErrorClass}>{errors.accept_terms.message}</p>
+              )}
               <button
                 type="button"
                 onClick={() => setShowTermsModal(true)}
@@ -572,10 +621,6 @@ export default function PartnerOnboardForm({
                 View terms and conditions
               </button>
             </div>
-          )}
-
-          {registerError && (
-            <p className="text-sm font-semibold text-rose-500">{registerError}</p>
           )}
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
@@ -623,7 +668,7 @@ export default function PartnerOnboardForm({
               <button
                 type="button"
                 onClick={() => {
-                  setAcceptTerms(true);
+                  setValue("accept_terms", true, { shouldValidate: true, shouldDirty: true });
                   setShowTermsModal(false);
                 }}
                 className="btn-primary"

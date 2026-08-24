@@ -87,7 +87,7 @@ export default function AdminCustomerDetailPage() {
         };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <Link
         href="/admin/customers"
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-400 hover:text-white"

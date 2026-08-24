@@ -6,6 +6,8 @@ import {
   getPhoneValidationError,
   isValidPhone,
   sanitizePhoneInput,
+  PHONE_MAX_DIGITS,
+  PHONE_MIN_DIGITS,
 } from "@/lib/validation";
 
 type InputVariant = "light" | "dark" | "input-field";
@@ -13,6 +15,7 @@ type InputVariant = "light" | "dark" | "input-field";
 interface PhoneInputProps {
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   /** Called when validity changes (for disabling submit) */
   onValidChange?: (valid: boolean) => void;
   id?: string;
@@ -25,6 +28,8 @@ interface PhoneInputProps {
   variant?: InputVariant;
   /** Show error after blur or when showError is true */
   showError?: boolean;
+  /** External error (e.g. react-hook-form) — preferred over built-in message when set */
+  error?: string | null;
   label?: string;
   labelClassName?: string;
   helperText?: string;
@@ -42,6 +47,7 @@ const variantClasses: Record<InputVariant, string> = {
 export default function PhoneInput({
   value,
   onChange,
+  onBlur,
   onValidChange,
   id,
   name,
@@ -52,22 +58,41 @@ export default function PhoneInput({
   inputClassName,
   variant = "input-field",
   showError: showErrorProp = false,
+  error: externalError,
   label,
   labelClassName,
   helperText,
   showIcon = false,
 }: PhoneInputProps) {
   const [touched, setTouched] = useState(false);
-  const error = !value && !required ? null : getPhoneValidationError(value);
-  const showError = (touched || showErrorProp) && !!error;
+  const builtInError = !value && !required ? null : getPhoneValidationError(value);
+  const error = externalError ?? builtInError;
+  const showError = Boolean(externalError) || ((touched || showErrorProp) && !!error);
 
   useEffect(() => {
     const valid = !required && !value ? true : isValidPhone(value);
     onValidChange?.(valid);
   }, [value, required, onValidChange]);
 
+  const digitCount = sanitizePhoneInput(value).length;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(sanitizePhoneInput(e.target.value));
+    onChange(sanitizePhoneInput(e.target.value).slice(0, PHONE_MAX_DIGITS));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) > (input.selectionStart ?? 0);
+    if (hasSelection) return;
+    const extraDigit =
+      e.key.length === 1 && /\d/.test(e.key) && digitCount >= PHONE_MAX_DIGITS;
+    if (extraDigit) e.preventDefault();
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    onChange(sanitizePhoneInput(e.clipboardData.getData("text")).slice(0, PHONE_MAX_DIGITS));
   };
 
   const baseInput = inputClassName || variantClasses[variant];
@@ -101,30 +126,35 @@ export default function PhoneInput({
           type="tel"
           inputMode="numeric"
           autoComplete="tel"
-          pattern="[0-9]*"
           required={required}
           disabled={disabled}
           value={value}
           onChange={handleChange}
-          onBlur={() => setTouched(true)}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          onBlur={() => {
+            setTouched(true);
+            onBlur?.();
+          }}
           placeholder={placeholder}
           className={`${baseInput}${iconPad}${errorBorder}`}
-          maxLength={PHONE_MAX_LENGTH_ATTR}
+          maxLength={PHONE_MAX_DIGITS}
+          aria-invalid={showError || undefined}
         />
       </div>
       {helperText && !showError && (
         <p className="text-xs text-muted-foreground mt-1">{helperText}</p>
       )}
       {!helperText && !showError && (
-        <p className="text-xs text-slate-400 mt-1">9–12 digits, numbers only</p>
+        <p className="text-xs text-slate-400 mt-1">
+          {PHONE_MIN_DIGITS}–{PHONE_MAX_DIGITS} digits, numbers only
+        </p>
       )}
-      {showError && (
+      {showError && error && (
         <p className="text-xs text-rose-500 font-medium mt-1">{error}</p>
       )}
     </div>
   );
 }
-
-const PHONE_MAX_LENGTH_ATTR = 12;
 
 export { sanitizePhoneInput, isValidPhone, getPhoneValidationError };

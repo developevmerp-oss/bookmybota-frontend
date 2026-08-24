@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Map, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useGetAdminVenueLayoutRequestsQuery } from "@/services/api";
 
 const TABS = [
@@ -53,19 +53,7 @@ function AdminVenueLayoutsPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <span className="bg-rose-500/15 text-rose-500 p-2 rounded-xl">
-            <Map size={22} />
-          </span>
-          Venue layout requests
-        </h1>
-        <p className="text-zinc-400 mt-2">
-          Review venue admin submissions, build the layout with the same event layout tools, then submit it to the venue.
-        </p>
-      </div>
-
+    <div className="w-full space-y-6">
       <div className="flex flex-wrap gap-2">
         {TABS.map((item) => (
           <button
@@ -109,7 +97,7 @@ function AdminVenueLayoutsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${TAB_STYLES[workflow] || TAB_STYLES.needs_action}`}>
+                    <span className={`px-2.5 py-1 rounded-md text-[0.6875rem] font-bold border ${TAB_STYLES[workflow] || TAB_STYLES.needs_action}`}>
                       {TAB_LABELS[workflow] || workflow.replaceAll("_", " ")}
                     </span>
                     <Link

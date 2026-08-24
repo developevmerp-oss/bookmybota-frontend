@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import {
   Loader2,
   Pencil,
   Plus,
-  Tag,
   Trash2,
   Pause,
   Play,
@@ -24,9 +25,14 @@ import {
   type PlatformOffer,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  adminPlatformOfferSchema,
+  type AdminPlatformOfferValues,
+} from "@/lib/adminFormSchemas";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { formatDate } from "@/lib/dateFormat";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
@@ -52,26 +58,26 @@ const STATUS_TABS: { key: TabKey; label: string }[] = [
   { key: "REDEMPTIONS", label: "Redemptions" },
 ];
 
-const EMPTY_FORM = {
+const EMPTY_FORM: AdminPlatformOfferValues = {
   name: "",
   code: "",
   description: "",
-  discount_type: "FLAT" as "PERCENT" | "FLAT",
-  discount_value: "",
+  discount_type: "FLAT",
+  discount_value: NaN,
   max_discount: "",
   min_order_amount: "0",
-  category: "EVENTS" as "ALL" | "EVENTS" | "DINING",
-  apply_to: "ENTIRE_CATEGORY" as "ENTIRE_CATEGORY" | "SELECTED_ITEMS",
-  customer_eligibility: "ALL" as "ALL" | "NEW" | "EXISTING",
+  category: "EVENTS",
+  apply_to: "ENTIRE_CATEGORY",
+  customer_eligibility: "ALL",
   usage_limit: "",
   per_user_limit: "1",
   start_at: "",
   end_at: "",
-  status: "DRAFT" as string,
+  status: "DRAFT",
   display_theme: "magenta",
   sort_order: "0",
-  event_ids: [] as string[],
-  restaurant_ids: [] as string[],
+  event_ids: [],
+  restaurant_ids: [],
 };
 
 function statusBadge(status?: string) {
@@ -86,7 +92,7 @@ function statusBadge(status?: string) {
   };
   return (
     <span
-      className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+      className={`inline-flex px-2 py-0.5 rounded-md text-[0.625rem] font-bold uppercase tracking-wide border ${
         colors[s] || colors.DRAFT
       }`}
     >
@@ -95,13 +101,13 @@ function statusBadge(status?: string) {
   );
 }
 
-function offerToForm(o: PlatformOffer) {
+function offerToForm(o: PlatformOffer): AdminPlatformOfferValues {
   return {
     name: o.name || "",
     code: o.code || "",
     description: o.description || "",
     discount_type: o.discount_type,
-    discount_value: String(o.discount_value ?? ""),
+    discount_value: Number(o.discount_value ?? 0),
     max_discount: o.max_discount != null ? String(o.max_discount) : "",
     min_order_amount: String(o.min_order_amount ?? 0),
     category: o.category,
@@ -123,25 +129,44 @@ export default function AdminPlatformOffersPage() {
   const [tab, setTab] = useState<TabKey>("ALL");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ ...EMPTY_FORM });
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<AdminPlatformOfferValues>({
+    resolver: yupResolver(adminPlatformOfferSchema),
+    defaultValues: EMPTY_FORM,
+    mode: "onSubmit",
+  });
+
+  const discountType = watch("discount_type");
+  const applyTo = watch("apply_to");
+  const category = watch("category");
+  const eventIds = watch("event_ids") ?? [];
+  const restaurantIds = watch("restaurant_ids") ?? [];
+
   const listArg = {
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(q.trim() ? { q: q.trim() } : {}),
     ...(tab !== "ALL" && tab !== "REDEMPTIONS" ? { status: tab } : {}),
   };
 
-  const { data: offersData, isLoading } = useGetPlatformOffersQuery(listArg, {
+  const { data: offersData, isLoading, isFetching } = useGetPlatformOffersQuery(listArg, {
     skip: tab === "REDEMPTIONS",
   });
-  const { data: redemptionsData, isLoading: redemptionsLoading } =
+  const { data: redemptionsData, isLoading: redemptionsLoading, isFetching: redemptionsFetching } =
     useGetOfferRedemptionsQuery(
-      { page, limit: PAGE_SIZE, ...(q.trim() ? { q: q.trim() } : {}) },
+      { page, limit, ...(q.trim() ? { q: q.trim() } : {}) },
       { skip: tab !== "REDEMPTIONS" }
     );
 
@@ -162,48 +187,49 @@ export default function AdminPlatformOffersPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ ...EMPTY_FORM });
+    reset({ ...EMPTY_FORM });
     setFormOpen(true);
   };
 
   const openEdit = (offer: PlatformOffer) => {
     setEditingId(offer.id);
-    setForm(offerToForm(offer));
+    reset(offerToForm(offer));
     setFormOpen(true);
   };
 
-  const buildPayload = () => ({
-    name: form.name.trim(),
-    code: form.code.trim().toUpperCase(),
-    description: form.description.trim(),
-    discount_type: form.discount_type,
-    discount_value: Number(form.discount_value),
-    max_discount: form.max_discount ? Number(form.max_discount) : null,
-    min_order_amount: Number(form.min_order_amount) || 0,
-    category: form.category,
-    apply_to: form.apply_to,
-    customer_eligibility: form.customer_eligibility,
-    usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
-    per_user_limit: Number(form.per_user_limit) || 1,
-    start_at: form.start_at || null,
-    end_at: form.end_at || null,
-    status: form.status,
-    display_theme: form.display_theme,
-    sort_order: Number(form.sort_order) || 0,
-    event_ids: form.event_ids,
-    restaurant_ids: form.restaurant_ids,
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = buildPayload();
+  const onValid = async (values: AdminPlatformOfferValues) => {
+    const payload = {
+      name: values.name.trim(),
+      code: values.code.trim().toUpperCase(),
+      description: (values.description ?? "").trim(),
+      discount_type: values.discount_type,
+      discount_value: Number(values.discount_value),
+      max_discount: values.max_discount ? Number(values.max_discount) : null,
+      min_order_amount: Number(values.min_order_amount) || 0,
+      category: values.category,
+      apply_to: values.apply_to,
+      customer_eligibility: values.customer_eligibility,
+      usage_limit: values.usage_limit ? Number(values.usage_limit) : null,
+      per_user_limit: Number(values.per_user_limit) || 1,
+      start_at: values.start_at || null,
+      end_at: values.end_at || null,
+      status: values.status,
+      display_theme: values.display_theme,
+      sort_order: Number(values.sort_order) || 0,
+      event_ids: values.event_ids ?? [],
+      restaurant_ids: values.restaurant_ids ?? [],
+    };
     try {
       if (editingId) {
-        await updateOffer({ id: editingId, ...payload }).unwrap();
-        toast.success("Platform offer updated.");
+        const res = await updateOffer({ id: editingId, ...payload }).unwrap();
+        toast.success(
+          (res as { message?: string }).message || "Platform offer updated."
+        );
       } else {
-        await createOffer(payload).unwrap();
-        toast.success("Platform offer created.");
+        const res = await createOffer(payload).unwrap();
+        toast.success(
+          (res as { message?: string }).message || "Platform offer created."
+        );
       }
       setFormOpen(false);
     } catch (err) {
@@ -239,54 +265,35 @@ export default function AdminPlatformOffersPage() {
   };
 
   const toggleId = (field: "event_ids" | "restaurant_ids", id: string) => {
-    setForm((prev) => {
-      const list = prev[field];
-      return {
-        ...prev,
-        [field]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id],
-      };
-    });
+    const list = field === "event_ids" ? eventIds : restaurantIds;
+    const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+    setValue(field, next, { shouldDirty: true });
   };
 
   const showEventPicker =
-    form.apply_to === "SELECTED_ITEMS" &&
-    (form.category === "EVENTS" || form.category === "ALL");
+    applyTo === "SELECTED_ITEMS" && (category === "EVENTS" || category === "ALL");
   const showRestaurantPicker =
-    form.apply_to === "SELECTED_ITEMS" &&
-    (form.category === "DINING" || form.category === "ALL");
+    applyTo === "SELECTED_ITEMS" && (category === "DINING" || category === "ALL");
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-            <span className="bg-rose-500/20 text-rose-500 p-2 rounded-xl">
-              <Tag size={28} />
-            </span>
-            Platform Offers
-          </h1>
-          <p className="text-zinc-400 mt-2">
-            BookMyBota-funded promo codes for Events & Dining (Sports coming soon)
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <SearchInput
-            value={q}
-            onChange={(value) => {
-              setQ(value);
-              setPage(1);
-            }}
-            placeholder="Search offers or codes"
-          />
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all whitespace-nowrap"
-          >
-            <Plus size={18} />
-            Create Offer
-          </button>
-        </div>
+    <div className="w-full space-y-6">
+      <div className="admin-list-toolbar">
+        <SearchInput
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search offers or codes"
+        />
+        <button
+          type="button"
+          onClick={openCreate}
+          className="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all whitespace-nowrap"
+        >
+          <Plus size={18} />
+          Create Offer
+        </button>
       </div>
 
       <div className="flex gap-2 flex-wrap border-b border-white/10 pb-1">
@@ -310,7 +317,10 @@ export default function AdminPlatformOffersPage() {
       </div>
 
       {tab !== "REDEMPTIONS" && (
-        <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+        isLoading ? (
+          <AdminListShimmer rows={6} columns={6} showTabs={false} showToolbar={false} />
+        ) : (
+        <div className="glass-panel rounded-2xl border border-white/5 overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white/5 border-b border-white/5">
@@ -331,14 +341,7 @@ export default function AdminPlatformOffersPage() {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-zinc-400">
-                    <Loader2 className="animate-spin inline mr-2" size={18} />
-                    Loading offers…
-                  </td>
-                </tr>
-              ) : offers.length === 0 ? (
+              {offers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-zinc-500">
                     No platform offers yet. Create your first offer (e.g. WELCOME200).
@@ -413,10 +416,14 @@ export default function AdminPlatformOffersPage() {
             </tbody>
           </table>
         </div>
+        )
       )}
 
       {tab === "REDEMPTIONS" && (
-        <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+        redemptionsLoading ? (
+          <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar={false} />
+        ) : (
+        <div className="glass-panel rounded-2xl border border-white/5 overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white/5 border-b border-white/5">
@@ -431,14 +438,7 @@ export default function AdminPlatformOffersPage() {
               </tr>
             </thead>
             <tbody>
-              {redemptionsLoading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-zinc-400">
-                    <Loader2 className="animate-spin inline mr-2" size={18} />
-                    Loading redemptions…
-                  </td>
-                </tr>
-              ) : redemptions.length === 0 ? (
+              {redemptions.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="p-8 text-center text-zinc-500">
                     <Receipt className="inline mr-2 opacity-50" size={18} />
@@ -468,9 +468,29 @@ export default function AdminPlatformOffersPage() {
             </tbody>
           </table>
         </div>
+        )
       )}
 
-      {listMeta && <Pagination meta={listMeta} onPageChange={setPage} />}
+      <div className="admin-list-footer">
+        <Pagination
+          meta={
+            listMeta ?? {
+              page,
+              limit,
+              total: 0,
+              total_pages: 0,
+              has_prev: false,
+              has_next: false,
+            }
+          }
+          onPageChange={setPage}
+          onLimitChange={(next) => {
+            setLimit(next);
+            setPage(1);
+          }}
+          disabled={tab === "REDEMPTIONS" ? redemptionsFetching : isFetching}
+        />
+      </div>
 
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-sm">
@@ -482,33 +502,37 @@ export default function AdminPlatformOffersPage() {
               Funded by BookMyBota — applies at event checkout (dining when payments are enabled).
             </p>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit(onValid)} noValidate className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
                     Offer Name
                   </label>
                   <input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    {...register("name")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white"
                     placeholder="Welcome Offer"
                   />
+                  {errors.name && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.name.message}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
                     Offer Code
                   </label>
                   <input
-                    required
-                    value={form.code}
-                    onChange={(e) =>
-                      setForm({ ...form, code: e.target.value.toUpperCase() })
-                    }
+                    {...register("code", {
+                      onChange: (e) => {
+                        e.target.value = e.target.value.toUpperCase();
+                      },
+                    })}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white font-mono"
                     placeholder="WELCOME200"
                   />
+                  {errors.code && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.code.message}</p>
+                  )}
                 </div>
               </div>
 
@@ -517,8 +541,7 @@ export default function AdminPlatformOffersPage() {
                   Description
                 </label>
                 <textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  {...register("description")}
                   rows={2}
                   className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white resize-none"
                   placeholder="Get 200 ETB off your first event booking"
@@ -531,13 +554,7 @@ export default function AdminPlatformOffersPage() {
                     Type
                   </label>
                   <select
-                    value={form.discount_type}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        discount_type: e.target.value as "PERCENT" | "FLAT",
-                      })
-                    }
+                    {...register("discount_type")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
                     <option value="FLAT">Flat</option>
@@ -549,16 +566,19 @@ export default function AdminPlatformOffersPage() {
                     Value
                   </label>
                   <input
-                    required
                     type="number"
                     min="0"
                     step="0.01"
-                    value={form.discount_value}
-                    onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                    {...register("discount_value", { valueAsNumber: true })}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   />
+                  {errors.discount_value && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                      {errors.discount_value.message}
+                    </p>
+                  )}
                 </div>
-                {form.discount_type === "PERCENT" && (
+                {discountType === "PERCENT" && (
                   <div>
                     <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
                       Max Discount
@@ -566,8 +586,7 @@ export default function AdminPlatformOffersPage() {
                     <input
                       type="number"
                       min="0"
-                      value={form.max_discount}
-                      onChange={(e) => setForm({ ...form, max_discount: e.target.value })}
+                      {...register("max_discount")}
                       className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                     />
                   </div>
@@ -579,8 +598,7 @@ export default function AdminPlatformOffersPage() {
                   <input
                     type="number"
                     min="0"
-                    value={form.min_order_amount}
-                    onChange={(e) => setForm({ ...form, min_order_amount: e.target.value })}
+                    {...register("min_order_amount")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   />
                 </div>
@@ -592,13 +610,7 @@ export default function AdminPlatformOffersPage() {
                     Category
                   </label>
                   <select
-                    value={form.category}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        category: e.target.value as "ALL" | "EVENTS" | "DINING",
-                      })
-                    }
+                    {...register("category")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
                     <option value="ALL">All (Events + Dining)</option>
@@ -611,13 +623,7 @@ export default function AdminPlatformOffersPage() {
                     Apply To
                   </label>
                   <select
-                    value={form.apply_to}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        apply_to: e.target.value as "ENTIRE_CATEGORY" | "SELECTED_ITEMS",
-                      })
-                    }
+                    {...register("apply_to")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
                     <option value="ENTIRE_CATEGORY">Entire category</option>
@@ -629,13 +635,7 @@ export default function AdminPlatformOffersPage() {
                     Customers
                   </label>
                   <select
-                    value={form.customer_eligibility}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        customer_eligibility: e.target.value as "ALL" | "NEW" | "EXISTING",
-                      })
-                    }
+                    {...register("customer_eligibility")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
                     <option value="ALL">All customers</option>
@@ -660,7 +660,7 @@ export default function AdminPlatformOffersPage() {
                       >
                         <input
                           type="checkbox"
-                          checked={form.event_ids.includes(ev.id)}
+                          checked={eventIds.includes(ev.id)}
                           onChange={() => toggleId("event_ids", ev.id)}
                         />
                         {ev.name}
@@ -682,7 +682,7 @@ export default function AdminPlatformOffersPage() {
                     >
                       <input
                         type="checkbox"
-                        checked={form.restaurant_ids.includes(r.id)}
+                        checked={restaurantIds.includes(r.id)}
                         onChange={() => toggleId("restaurant_ids", r.id)}
                       />
                       {r.name}
@@ -699,8 +699,7 @@ export default function AdminPlatformOffersPage() {
                   <input
                     type="number"
                     min="1"
-                    value={form.usage_limit}
-                    onChange={(e) => setForm({ ...form, usage_limit: e.target.value })}
+                    {...register("usage_limit")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                     placeholder="Unlimited"
                   />
@@ -712,8 +711,7 @@ export default function AdminPlatformOffersPage() {
                   <input
                     type="number"
                     min="1"
-                    value={form.per_user_limit}
-                    onChange={(e) => setForm({ ...form, per_user_limit: e.target.value })}
+                    {...register("per_user_limit")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   />
                 </div>
@@ -723,8 +721,7 @@ export default function AdminPlatformOffersPage() {
                   </label>
                   <input
                     type="date"
-                    value={form.start_at}
-                    onChange={(e) => setForm({ ...form, start_at: e.target.value })}
+                    {...register("start_at")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   />
                 </div>
@@ -734,8 +731,7 @@ export default function AdminPlatformOffersPage() {
                   </label>
                   <input
                     type="date"
-                    value={form.end_at}
-                    onChange={(e) => setForm({ ...form, end_at: e.target.value })}
+                    {...register("end_at")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   />
                 </div>
@@ -747,8 +743,7 @@ export default function AdminPlatformOffersPage() {
                     Status
                   </label>
                   <select
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    {...register("status")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
                     <option value="DRAFT">Draft</option>
@@ -762,8 +757,7 @@ export default function AdminPlatformOffersPage() {
                     Card Theme
                   </label>
                   <select
-                    value={form.display_theme}
-                    onChange={(e) => setForm({ ...form, display_theme: e.target.value })}
+                    {...register("display_theme")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
                     <option value="magenta">Magenta</option>
@@ -779,8 +773,7 @@ export default function AdminPlatformOffersPage() {
                   </label>
                   <input
                     type="number"
-                    value={form.sort_order}
-                    onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+                    {...register("sort_order")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   />
                 </div>

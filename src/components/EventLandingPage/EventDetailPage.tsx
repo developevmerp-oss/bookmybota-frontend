@@ -546,8 +546,8 @@ export default function PublicEventDetailPage({
           >
             View seating plan
           </button>
-        )}
-      </div>
+            )}
+          </div>
 
       {fillingFast && (
         <div className="mx-3 sm:mx-4 mb-3 flex items-start sm:items-center gap-2 rounded-md bg-[#FFF6E5] px-3 py-2 text-[0.875rem] sm:text-[0.9375rem] text-[#6B4E16]">
@@ -586,8 +586,8 @@ export default function PublicEventDetailPage({
         >
           {bookLabel}
         </button>
-      </div>
-    </div>
+              </div>
+              </div>
   );
 
   return (
@@ -605,7 +605,7 @@ export default function PublicEventDetailPage({
           >
             <Share2 size={18} />
           </button>
-        </div>
+              </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-5 sm:gap-6 lg:gap-8 2xl:gap-10">
           <div className="min-w-0">
@@ -650,7 +650,7 @@ export default function PublicEventDetailPage({
                     >
                       Undo
                     </button>
-                  </div>
+                        </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                     {interestCount > 0 && (
@@ -659,8 +659,8 @@ export default function PublicEventDetailPage({
                         {interestCountLabel} interested
                       </span>
                     )}
-                    <button
-                      type="button"
+                            <button
+                              type="button"
                       onClick={toggleSave}
                       disabled={isTogglingInterest}
                       className="rounded-lg border px-3.5 sm:px-4 py-2 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer disabled:opacity-60"
@@ -671,11 +671,11 @@ export default function PublicEventDetailPage({
                       }}
                     >
                       I&apos;m Interested
-                    </button>
+                            </button>
                   </div>
-                )}
-              </div>
-            </div>
+                          )}
+                        </div>
+                      </div>
 
             <div className="lg:hidden mt-4 sm:mt-5">{bookingCard}</div>
 
@@ -734,40 +734,40 @@ export default function PublicEventDetailPage({
                     {artist.unauthorized && (
                       <p className="mt-0.5 text-[0.6875rem] sm:text-xs text-[#9AA0A6] leading-snug">
                         Not platform-authorized
-                      </p>
-                    )}
+                </p>
+              )}
                   </button>
                 ))}
               </div>
             </section>
-            )}
+          )}
 
-            {offers.length > 0 && (
+          {offers.length > 0 && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
                 <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
                   Offers
-                </h2>
+              </h2>
                 <ul className="space-y-2.5 sm:space-y-3">
-                  {offers.map((o) => (
-                    <li
-                      key={o.id}
+                {offers.map((o) => (
+                  <li
+                    key={o.id}
                       className="rounded-xl border border-dashed border-[#E3BCFF] bg-[#FBF6FF] p-3.5 sm:p-4"
-                    >
+                  >
                       <p className="font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem]">{o.title}</p>
-                      {o.description && (
+                    {o.description && (
                         <p className="text-[1rem] sm:text-[1.0625rem] text-slate-600 mt-1">{o.description}</p>
-                      )}
+                    )}
                       <p className="text-[1rem] sm:text-[1.0625rem] font-bold mt-2" style={{ color: BRAND }}>
-                        {o.discount_type === "PERCENT"
-                          ? `${o.discount_value}% off`
-                          : formatOfferDiscount(o.discount_type, o.discount_value)}
-                        {o.promo_code ? ` · Use code ${o.promo_code}` : ""}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+                      {o.discount_type === "PERCENT"
+                        ? `${o.discount_value}% off`
+                        : formatOfferDiscount(o.discount_type, o.discount_value)}
+                      {o.promo_code ? ` · Use code ${o.promo_code}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
             <EventGallerySection eventName={event.name} images={event.gallery_images || []} />
 
@@ -798,7 +798,7 @@ export default function PublicEventDetailPage({
                     {related.map((e) => (
                       <RelatedCard key={e.id} event={e} />
                     ))}
-                  </div>
+              </div>
                   {related.length > 3 && (
                     <button
                       type="button"
@@ -913,8 +913,8 @@ export default function PublicEventDetailPage({
               </button>
             </div>
           </div>
-        </div>
-      )}
+              </div>
+            )}
 
       {artistModal && (
         <div
@@ -1000,9 +1000,9 @@ export default function PublicEventDetailPage({
                   {line}
                 </p>
               ))}
-            </div>
           </div>
         </div>
+      </div>
       )}
 
       <CustomerAuthModal

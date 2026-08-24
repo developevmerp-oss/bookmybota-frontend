@@ -101,7 +101,7 @@ export default function AdminVenueLayoutBuilderPage() {
   }
 
   return (
-    <div className="max-w-[1760px] mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link href="/admin/venue-layouts" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white">
@@ -250,9 +250,9 @@ export default function AdminVenueLayoutBuilderPage() {
                 >
                   <LayoutSeatPreview seats={item.seats_json} config={item.seating_config} heightClass="h-24" />
                   <p className="text-sm font-medium text-slate-900 mt-2">{item.name}</p>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">{optionStatusLabel(item)}</p>
+                  <p className="text-[0.6875rem] text-zinc-500 mt-0.5">{optionStatusLabel(item)}</p>
                   {item.status === "REJECTED" && item.rejection_reason && (
-                    <p className="text-[11px] text-rose-600 mt-1 line-clamp-3">{item.rejection_reason}</p>
+                    <p className="text-[0.6875rem] text-rose-600 mt-1 line-clamp-3">{item.rejection_reason}</p>
                   )}
                 </button>
               ))}

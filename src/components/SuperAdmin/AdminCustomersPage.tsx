@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Archive,
   CheckCircle,
@@ -16,6 +16,7 @@ import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 import {
   useArchiveAdminCustomerMutation,
@@ -28,23 +29,48 @@ import {
 type ListTab = "active" | "archived";
 type ConfirmAction = "enable" | "disable" | "archive" | "unarchive";
 
+function Field({
+  label,
+  children,
+  full = false,
+}: {
+  label: string;
+  children: ReactNode;
+  full?: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-w-0 flex-col gap-1 border-b border-slate-100 px-4 py-3 ${
+        full ? "sm:col-span-2" : ""
+      }`}
+    >
+      <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
+      <div className="break-words text-sm font-medium text-slate-800">{children}</div>
+    </div>
+  );
+}
+
 export default function AdminCustomersPage() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<ListTab>("active");
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useGetAdminCustomersQuery({
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const { data, isLoading, isFetching } = useGetAdminCustomersQuery({
     tab,
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(q.trim() ? { q: q.trim() } : {}),
   });
   const customers = data?.items ?? [];
   const [setEnabled, { isLoading: isToggling }] = useSetAdminCustomerEnabledMutation();
   const [archiveCustomer, { isLoading: isArchiving }] = useArchiveAdminCustomerMutation();
   const [unarchiveCustomer, { isLoading: isUnarchiving }] = useUnarchiveAdminCustomerMutation();
-  const [confirmState, setConfirmState] = useState<{ action: ConfirmAction; customer: AdminCustomer } | null>(
-    null
-  );
+  const [confirmState, setConfirmState] = useState<{
+    action: ConfirmAction;
+    customer: AdminCustomer;
+  } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   const actionBusy = isToggling || isArchiving || isUnarchiving || confirmBusy;
@@ -114,21 +140,134 @@ export default function AdminCustomersPage() {
     };
   })();
 
+  const statusNode = (c: AdminCustomer) => {
+    if (c.deleted_at) {
+      return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+          <Archive size={12} /> Archived
+        </span>
+      );
+    }
+    if (c.is_enabled) {
+      return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+          <CheckCircle size={12} /> Enabled
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+        <XCircle size={12} /> Disabled
+      </span>
+    );
+  };
+
+  const actionsNode = (c: AdminCustomer) => {
+    const liveCount = c.live_event_booking_count ?? 0;
+    const isArchived = !!c.deleted_at;
+    return (
+      <div className="flex items-center flex-wrap gap-2">
+        <Link
+          href={`/admin/customers/${c.id}`}
+          className="p-2 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
+          title="View details"
+        >
+          <Eye size={17} />
+        </Link>
+        {!isArchived && (
+          <>
+            <Link
+              href={`/admin/customers/${c.id}/edit`}
+              className="p-2 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
+              title="Edit"
+            >
+              <Pencil size={17} />
+            </Link>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!c.is_enabled}
+              onClick={() =>
+                setConfirmState({ action: c.is_enabled ? "disable" : "enable", customer: c })
+              }
+              disabled={actionBusy}
+              title={c.is_enabled ? "Disable" : "Enable"}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors disabled:opacity-50 ${
+                c.is_enabled ? "bg-emerald-500" : "bg-zinc-400"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                  c.is_enabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmState({ action: "archive", customer: c })}
+              disabled={actionBusy || liveCount > 0}
+              className="p-2 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+              title={liveCount > 0 ? "Close live event bookings first" : "Archive"}
+            >
+              <Archive size={17} />
+            </button>
+          </>
+        )}
+        {isArchived && (
+          <button
+            type="button"
+            onClick={() => setConfirmState({ action: "unarchive", customer: c })}
+            disabled={actionBusy}
+            className="p-2 rounded-lg text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
+            title="Unarchive"
+          >
+            <Undo2 size={17} />
+          </button>
+        )}
+      </div>
+    );
+  };
+
   if (isLoading) {
-    return <div className="text-white p-10 text-center">Loading customers...</div>;
+    return <AdminListShimmer rows={6} columns={8} showTabs tabCount={2} showToolbar />;
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Customers</h2>
-          <p className="text-zinc-400">
-            Enable/Disable freezes login. Archive moves them off the Active list; history is kept.
-          </p>
+    <div className="w-full">
+      <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 lg:mb-5 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+        <div className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-100/80 p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setTab("active");
+              setPage(1);
+            }}
+            className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+              tab === "active"
+                ? "bg-white text-rose-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTab("archived");
+              setPage(1);
+            }}
+            className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+              tab === "archived"
+                ? "bg-white text-rose-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Archived
+          </button>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <SearchInput
+            className="w-full sm:max-w-xs lg:max-w-sm"
             value={q}
             onChange={(value) => {
               setQ(value);
@@ -136,164 +275,118 @@ export default function AdminCustomersPage() {
             }}
             placeholder="Search name, phone, email"
           />
-          <Link href="/admin/customers/new" className="btn-primary inline-flex items-center justify-center gap-2">
+          <Link
+            href="/admin/customers/new"
+            className="btn-primary inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap"
+          >
             <Plus size={16} /> Add customer
           </Link>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-white/10 mb-6">
-        <button
-          type="button"
-          onClick={() => {
-            setTab("active");
-            setPage(1);
-          }}
-          className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
-            tab === "active"
-              ? "border-rose-500 text-rose-500 bg-rose-500/5"
-              : "border-transparent text-zinc-400 hover:text-white"
-          }`}
-        >
-          Active
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setTab("archived");
-            setPage(1);
-          }}
-          className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
-            tab === "archived"
-              ? "border-rose-500 text-rose-500 bg-rose-500/5"
-              : "border-transparent text-zinc-400 hover:text-white"
-          }`}
-        >
-          Archived
-        </button>
-      </div>
+      {isFetching && !isLoading ? (
+        <AdminListShimmer rows={limit > 10 ? 8 : 5} columns={8} showTabs={false} showToolbar={false} />
+      ) : customers.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center text-base text-slate-500 shadow-sm">
+          {tab === "archived" ? "No archived customers." : "No customers found."}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+            {customers.map((c) => (
+              <article
+                key={c.id}
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <Link
+                    href={`/admin/customers/${c.id}`}
+                    className="min-w-0 text-sm font-bold text-slate-900 hover:text-rose-600"
+                  >
+                    {c.name}
+                  </Link>
+                  {statusNode(c)}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2">
+                  <Field label="Phone">{c.phone || "—"}</Field>
+                  <Field label="Type">{c.is_registered_user ? "Registered" : "Guest"}</Field>
+                  <Field label="Email" full>
+                    {c.user_email || c.email || "—"}
+                  </Field>
+                  <Field label="Dining">{c.dining_bookings_count ?? 0}</Field>
+                  <Field label="Events">{c.event_bookings_count ?? 0}</Field>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-1 border-t border-slate-100 bg-slate-50/80 px-3 py-2.5">
+                  {actionsNode(c)}
+                </div>
+              </article>
+            ))}
+          </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
-            <tr>
-              <th className="px-6 py-4 font-medium">Name</th>
-              <th className="px-6 py-4 font-medium">Phone</th>
-              <th className="px-6 py-4 font-medium">Email</th>
-              <th className="px-6 py-4 font-medium">Type</th>
-              <th className="px-6 py-4 font-medium">Dining</th>
-              <th className="px-6 py-4 font-medium">Events</th>
-              <th className="px-6 py-4 font-medium">Status</th>
-              <th className="px-6 py-4 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {customers.map((c) => {
-              const liveCount = c.live_event_booking_count ?? 0;
-              const isArchived = !!c.deleted_at;
-              return (
-                <tr key={c.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4 font-medium text-white">
-                    <Link href={`/admin/customers/${c.id}`} className="hover:text-rose-400">
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td className="px-6 py-4 text-zinc-400">{c.phone || "—"}</td>
-                  <td className="px-6 py-4 text-zinc-400 text-sm">{c.user_email || c.email || "—"}</td>
-                  <td className="px-6 py-4 text-zinc-400 text-sm">
-                    {c.is_registered_user ? "Registered" : "Guest"}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-400">{c.dining_bookings_count ?? 0}</td>
-                  <td className="px-6 py-4 text-zinc-400">{c.event_bookings_count ?? 0}</td>
-                  <td className="px-6 py-4">
-                    {isArchived ? (
-                      <span className="flex items-center gap-1 text-zinc-400 text-sm">
-                        <Archive size={14} /> Archived
-                      </span>
-                    ) : c.is_enabled ? (
-                      <span className="flex items-center gap-1 text-green-400 text-sm">
-                        <CheckCircle size={14} /> Enabled
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-amber-400 text-sm">
-                        <XCircle size={14} /> Disabled
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-3">
-                      <Link
-                        href={`/admin/customers/${c.id}`}
-                        className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
-                        title="View details"
-                      >
-                        <Eye size={16} />
-                      </Link>
-                      {!isArchived && (
-                        <>
-                          <Link
-                            href={`/admin/customers/${c.id}/edit`}
-                            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
-                            title="Edit"
-                          >
-                            <Pencil size={16} />
-                          </Link>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={!!c.is_enabled}
-                            onClick={() =>
-                              setConfirmState({ action: c.is_enabled ? "disable" : "enable", customer: c })
-                            }
-                            disabled={actionBusy}
-                            title={c.is_enabled ? "Disable" : "Enable"}
-                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors disabled:opacity-50 ${
-                              c.is_enabled ? "bg-emerald-500" : "bg-zinc-600"
-                            }`}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-                                c.is_enabled ? "translate-x-5" : "translate-x-0"
-                              }`}
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmState({ action: "archive", customer: c })}
-                            disabled={actionBusy || liveCount > 0}
-                            className="p-2 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
-                            title={liveCount > 0 ? "Close live event bookings first" : "Archive"}
-                          >
-                            <Archive size={16} />
-                          </button>
-                        </>
-                      )}
-                      {isArchived && (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmState({ action: "unarchive", customer: c })}
-                          disabled={actionBusy}
-                          className="p-2 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
-                          title="Unarchive"
-                        >
-                          <Undo2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {customers.length === 0 && (
-              <tr>
-                <td colSpan={8} className="text-center py-10 text-zinc-500">
-                  {tab === "archived" ? "No archived customers." : "No customers found."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <Pagination meta={data?.meta ?? { page: 1, limit: PAGE_SIZE, total: 0, total_pages: 0, has_prev: false, has_next: false }} onPageChange={setPage} />
+          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-base">
+                <thead className="border-b border-slate-200 bg-slate-50 text-sm text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3.5 font-semibold">Name</th>
+                    <th className="px-5 py-3.5 font-semibold">Phone</th>
+                    <th className="px-5 py-3.5 font-semibold">Email</th>
+                    <th className="px-5 py-3.5 font-semibold">Type</th>
+                    <th className="px-5 py-3.5 font-semibold">Dining</th>
+                    <th className="px-5 py-3.5 font-semibold">Events</th>
+                    <th className="px-5 py-3.5 font-semibold">Status</th>
+                    <th className="px-5 py-3.5 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {customers.map((c) => (
+                    <tr key={c.id} className="transition-colors hover:bg-slate-50/80">
+                      <td className="px-5 py-4 font-semibold text-slate-900">
+                        <Link href={`/admin/customers/${c.id}`} className="hover:text-rose-600">
+                          {c.name}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-4 text-slate-500">{c.phone || "—"}</td>
+                      <td className="px-5 py-4 text-sm text-slate-500">
+                        {c.user_email || c.email || "—"}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-slate-500">
+                        {c.is_registered_user ? "Registered" : "Guest"}
+                      </td>
+                      <td className="px-5 py-4 text-slate-500">{c.dining_bookings_count ?? 0}</td>
+                      <td className="px-5 py-4 text-slate-500">{c.event_bookings_count ?? 0}</td>
+                      <td className="px-5 py-4">{statusNode(c)}</td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end">{actionsNode(c)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="admin-list-footer">
+        <Pagination
+          meta={
+            data?.meta ?? {
+              page,
+              limit,
+              total: 0,
+              total_pages: 0,
+              has_prev: false,
+              has_next: false,
+            }
+          }
+          onPageChange={setPage}
+          onLimitChange={(next) => {
+            setLimit(next);
+            setPage(1);
+          }}
+          disabled={isFetching || actionBusy}
+        />
       </div>
 
       <ConfirmDialog
@@ -303,7 +396,9 @@ export default function AdminCustomersPage() {
         confirmLabel={confirmCopy.confirmLabel}
         danger={confirmCopy.danger}
         variant={
-          confirmState?.action === "enable" || confirmState?.action === "unarchive" ? "success" : "warning"
+          confirmState?.action === "enable" || confirmState?.action === "unarchive"
+            ? "success"
+            : "warning"
         }
         busy={confirmBusy}
         onCancel={() => setConfirmState(null)}

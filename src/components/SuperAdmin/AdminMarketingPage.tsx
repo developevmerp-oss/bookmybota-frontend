@@ -1,60 +1,80 @@
 "use client";
 
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { 
   useGetMarketingPlansQuery, 
   useCreateMarketingPlanMutation,
-  useUpdateMarketingPlanMutation,
   useDeleteMarketingPlanMutation,
   useGetMarketingCampaignsQuery,
   useAssignMarketingCampaignMutation,
   useGetBusinessesQuery
 } from '@/services/api';
-import { Megaphone, Plus, Trash2, Calendar, Target, Loader2, Store } from 'lucide-react';
+import { Plus, Trash2, Calendar, Target, Loader2, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate } from '@/lib/dateFormat';
+import { extractApiError } from '@/lib/apiErrors';
+import {
+  adminMarketingPlanSchema,
+  adminMarketingCampaignSchema,
+  type AdminMarketingPlanValues,
+  type AdminMarketingCampaignValues,
+} from '@/lib/adminFormSchemas';
 import ConfirmDialog from '@/components/Shared/ConfirmDialog';
 import SearchInput from '@/components/Shared/SearchInput';
 import Pagination from '@/components/Shared/Pagination';
+import { AdminListShimmer } from '@/components/Shared/Shimmer';
 import { PAGE_SIZE } from '@/lib/pagination';
 
 export default function AdminMarketingPage() {
   const [activeTab, setActiveTab] = useState<'plans' | 'campaigns'>('plans');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const listArg = {
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(q.trim() ? { q: q.trim() } : {}),
   };
-  const { data: plansData, isLoading: plansLoading } = useGetMarketingPlansQuery(listArg);
+  const { data: plansData, isLoading: plansLoading, isFetching: plansFetching } = useGetMarketingPlansQuery(listArg);
   const { data: allPlansData } = useGetMarketingPlansQuery();
   const plans = plansData?.items ?? [];
   const planOptions = allPlansData?.items ?? [];
   const [createPlan, { isLoading: isCreating }] = useCreateMarketingPlanMutation();
   const [deletePlan] = useDeleteMarketingPlanMutation();
-  
-  const [newPlan, setNewPlan] = useState({ name: '', duration_days: 30, price: 0 });
+
+  const planForm = useForm<AdminMarketingPlanValues>({
+    resolver: yupResolver(adminMarketingPlanSchema),
+    defaultValues: { name: '', duration_days: 30, price: 0 },
+    mode: 'onSubmit',
+  });
 
   // Campaigns State
-  const { data: campaignsData, isLoading: campaignsLoading } = useGetMarketingCampaignsQuery(listArg);
+  const { data: campaignsData, isLoading: campaignsLoading, isFetching: campaignsFetching } = useGetMarketingCampaignsQuery(listArg);
   const campaigns = campaignsData?.items ?? [];
   const { data: businesses = [] } = useGetBusinessesQuery();
   const [assignCampaign, { isLoading: isAssigning }] = useAssignMarketingCampaignMutation();
 
-  const [newCampaign, setNewCampaign] = useState({ businessId: '', plan_id: '' });
+  const campaignForm = useForm<AdminMarketingCampaignValues>({
+    resolver: yupResolver(adminMarketingCampaignSchema),
+    defaultValues: { businessId: '', plan_id: '' },
+    mode: 'onSubmit',
+  });
+
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
-  const handleCreatePlan = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onCreatePlan = async (values: AdminMarketingPlanValues) => {
     try {
-      await createPlan({ ...newPlan, is_active: true }).unwrap();
-      toast.success('Marketing plan created successfully');
-      setNewPlan({ name: '', duration_days: 30, price: 0 });
-    } catch (error: any) {
-      toast.error(error?.data?.error || 'Failed to create plan');
+      const created = await createPlan({ ...values, is_active: true }).unwrap();
+      toast.success(
+        (created as { message?: string }).message || 'Marketing plan created successfully'
+      );
+      planForm.reset({ name: '', duration_days: 30, price: 0 });
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, 'Failed to create plan'));
     }
   };
 
@@ -62,41 +82,34 @@ export default function AdminMarketingPage() {
     setPendingDeleteId(id);
   };
 
-  const handleAssignCampaign = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCampaign.businessId || !newCampaign.plan_id) return toast.error('Please select both a business and a plan');
-    
-    const selectedPlan = planOptions.find(p => p.id.toString() === newCampaign.plan_id);
-    if (!selectedPlan) return;
+  const onAssignCampaign = async (values: AdminMarketingCampaignValues) => {
+    const selectedPlan = planOptions.find((p) => p.id.toString() === values.plan_id);
+    if (!selectedPlan) {
+      toast.error('Selected plan was not found');
+      return;
+    }
 
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + selectedPlan.duration_days);
 
     try {
-      await assignCampaign({
-        businessId: newCampaign.businessId,
-        plan_id: parseInt(newCampaign.plan_id),
-        end_date: endDate.toISOString()
+      const created = await assignCampaign({
+        businessId: values.businessId,
+        plan_id: parseInt(values.plan_id, 10),
+        end_date: endDate.toISOString(),
       }).unwrap();
-      toast.success('Campaign assigned successfully!');
-      setNewCampaign({ businessId: '', plan_id: '' });
-    } catch (error: any) {
-      toast.error(error?.data?.error || 'Failed to assign campaign');
+      toast.success(
+        (created as { message?: string }).message || 'Campaign assigned successfully!'
+      );
+      campaignForm.reset({ businessId: '', plan_id: '' });
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, 'Failed to assign campaign'));
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-            <span className="bg-rose-500/20 text-rose-500 p-2 rounded-xl">
-              <Megaphone size={28} />
-            </span>
-            Marketing & Promotions
-          </h1>
-          <p className="text-zinc-400 mt-2">Manage advertising plans and promoted businesses</p>
-        </div>
+    <div className="w-full space-y-6">
+      <div className="admin-list-toolbar">
         <SearchInput
           value={q}
           onChange={(value) => {
@@ -143,38 +156,47 @@ export default function AdminMarketingPage() {
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                 <Plus size={18} className="text-rose-500" /> Create Plan
               </h3>
-              <form onSubmit={handleCreatePlan} className="space-y-4">
+              <form onSubmit={planForm.handleSubmit(onCreatePlan)} noValidate className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Plan Name</label>
                   <input
-                    required
                     type="text"
-                    value={newPlan.name}
-                    onChange={e => setNewPlan({ ...newPlan, name: e.target.value })}
+                    {...planForm.register('name')}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50"
                     placeholder="e.g. 1 Month Priority"
                   />
+                  {planForm.formState.errors.name && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                      {planForm.formState.errors.name.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Duration (Days)</label>
                   <input
-                    required
                     type="number"
-                    value={newPlan.duration_days}
-                    onChange={e => setNewPlan({ ...newPlan, duration_days: parseInt(e.target.value) })}
+                    {...planForm.register('duration_days', { valueAsNumber: true })}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
                   />
+                  {planForm.formState.errors.duration_days && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                      {planForm.formState.errors.duration_days.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Price ($)</label>
                   <input
-                    required
                     type="number"
                     step="0.01"
-                    value={newPlan.price}
-                    onChange={e => setNewPlan({ ...newPlan, price: parseFloat(e.target.value) })}
+                    {...planForm.register('price', { valueAsNumber: true })}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
                   />
+                  {planForm.formState.errors.price && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                      {planForm.formState.errors.price.message}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="submit"
@@ -189,7 +211,10 @@ export default function AdminMarketingPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+            {plansLoading ? (
+              <AdminListShimmer rows={5} columns={4} showTabs={false} showToolbar={false} />
+            ) : (
+            <div className="glass-panel rounded-2xl border border-white/5 overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-white/5 border-b border-white/5">
@@ -200,9 +225,7 @@ export default function AdminMarketingPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {plansLoading ? (
-                    <tr><td colSpan={4} className="p-8 text-center text-zinc-500"><Loader2 className="animate-spin mx-auto" /></td></tr>
-                  ) : plans.length === 0 ? (
+                  {plans.length === 0 ? (
                     <tr><td colSpan={4} className="p-8 text-center text-zinc-500">No marketing plans found.</td></tr>
                   ) : (
                     plans.map((plan: any) => (
@@ -230,8 +253,28 @@ export default function AdminMarketingPage() {
                   )}
                 </tbody>
               </table>
-              {plansData?.meta && <Pagination meta={plansData.meta} onPageChange={setPage} />}
+              <div className="admin-list-footer">
+                <Pagination
+                  meta={
+                    plansData?.meta ?? {
+                      page,
+                      limit,
+                      total: 0,
+                      total_pages: 0,
+                      has_prev: false,
+                      has_next: false,
+                    }
+                  }
+                  onPageChange={setPage}
+                  onLimitChange={(next) => {
+                    setLimit(next);
+                    setPage(1);
+                  }}
+                  disabled={plansFetching}
+                />
+              </div>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -243,13 +286,11 @@ export default function AdminMarketingPage() {
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                 <Target size={18} className="text-rose-500" /> Assign Campaign
               </h3>
-              <form onSubmit={handleAssignCampaign} className="space-y-4">
+              <form onSubmit={campaignForm.handleSubmit(onAssignCampaign)} noValidate className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Select Business</label>
                   <select
-                    required
-                    value={newCampaign.businessId}
-                    onChange={e => setNewCampaign({ ...newCampaign, businessId: e.target.value })}
+                    {...campaignForm.register('businessId')}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
                   >
                     <option value="">-- Choose Business --</option>
@@ -257,13 +298,16 @@ export default function AdminMarketingPage() {
                       <option key={b.id} value={b.id}>{b.name}</option>
                     ))}
                   </select>
+                  {campaignForm.formState.errors.businessId && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                      {campaignForm.formState.errors.businessId.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Select Plan</label>
                   <select
-                    required
-                    value={newCampaign.plan_id}
-                    onChange={e => setNewCampaign({ ...newCampaign, plan_id: e.target.value })}
+                    {...campaignForm.register('plan_id')}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-rose-500/50"
                   >
                     <option value="">-- Choose Plan --</option>
@@ -271,6 +315,11 @@ export default function AdminMarketingPage() {
                       <option key={p.id} value={p.id}>{p.name} ({p.duration_days} days)</option>
                     ))}
                   </select>
+                  {campaignForm.formState.errors.plan_id && (
+                    <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                      {campaignForm.formState.errors.plan_id.message}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="submit"
@@ -285,7 +334,10 @@ export default function AdminMarketingPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+            {campaignsLoading ? (
+              <AdminListShimmer rows={5} columns={4} showTabs={false} showToolbar={false} />
+            ) : (
+            <div className="glass-panel rounded-2xl border border-white/5 overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-white/5 border-b border-white/5">
@@ -296,9 +348,7 @@ export default function AdminMarketingPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {campaignsLoading ? (
-                    <tr><td colSpan={4} className="p-8 text-center text-zinc-500"><Loader2 className="animate-spin mx-auto" /></td></tr>
-                  ) : campaigns.length === 0 ? (
+                  {campaigns.length === 0 ? (
                     <tr><td colSpan={4} className="p-8 text-center text-zinc-500">No active campaigns.</td></tr>
                   ) : (
                     campaigns.map((camp: any) => {
@@ -327,8 +377,28 @@ export default function AdminMarketingPage() {
                   )}
                 </tbody>
               </table>
-              {campaignsData?.meta && <Pagination meta={campaignsData.meta} onPageChange={setPage} />}
+              <div className="admin-list-footer">
+                <Pagination
+                  meta={
+                    campaignsData?.meta ?? {
+                      page,
+                      limit,
+                      total: 0,
+                      total_pages: 0,
+                      has_prev: false,
+                      has_next: false,
+                    }
+                  }
+                  onPageChange={setPage}
+                  onLimitChange={(next) => {
+                    setLimit(next);
+                    setPage(1);
+                  }}
+                  disabled={campaignsFetching}
+                />
+              </div>
             </div>
+            )}
           </div>
         </div>
       )}
@@ -348,8 +418,8 @@ export default function AdminMarketingPage() {
             await deletePlan(pendingDeleteId).unwrap();
             toast.success('Plan deleted');
             setPendingDeleteId(null);
-          } catch {
-            toast.error('Failed to delete plan. It might be in use.');
+          } catch (err: unknown) {
+            toast.error(extractApiError(err, 'Failed to delete plan. It might be in use.'));
           } finally {
             setConfirmBusy(false);
           }

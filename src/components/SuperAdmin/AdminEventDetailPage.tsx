@@ -130,7 +130,7 @@ export default function AdminEventDetailPage({
   );
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <Link
         href="/admin/events"
         className="inline-flex items-center gap-2 text-sm portal-muted hover:text-slate-900"
@@ -349,7 +349,7 @@ export default function AdminEventDetailPage({
                     <span className="text-violet-500 mt-0.5">•</span>
                     <span>
                       {line}{" "}
-                      <span className="text-[10px] uppercase tracking-wide text-zinc-400">(event-only)</span>
+                      <span className="text-[0.625rem] uppercase tracking-wide text-zinc-400">(event-only)</span>
                     </span>
                   </li>
                 ))}

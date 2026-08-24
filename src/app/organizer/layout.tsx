@@ -56,10 +56,10 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background admin-dashboard-layout">
-      <aside className="w-64 glass-panel border-r border-white/5 fixed h-full z-40 hidden md:flex flex-col">
+      <aside className="admin-sidebar w-64 glass-panel border-r border-white/5 fixed inset-y-0 left-0 z-40 hidden md:flex flex-col overflow-hidden">
         <Link
           href="/organizer/profile"
-          className="p-6 border-b border-white/5 block hover:bg-white/[0.03] transition-colors"
+          className="p-5 border-b border-white/5 block hover:bg-white/[0.03] transition-colors shrink-0"
           title="Open profile"
         >
           <h2
@@ -73,7 +73,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
           </h2>
           <p className="text-xs text-zinc-500 mt-2">Profile · Event Organizer</p>
         </Link>
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="admin-sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 space-y-1">
           {navigation.map((item) => {
             const isActive = isNavActive(item.href);
             const Icon = item.icon;
@@ -81,13 +81,13 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                   isActive
                     ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
-                    : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                    : "text-zinc-400 hover:bg-white/5 hover:text-white border border-transparent"
                 }`}
               >
-                <Icon size={18} />
+                <Icon size={16} className="shrink-0" />
                 <span className="font-medium text-sm">{item.name}</span>
               </Link>
             );
@@ -101,8 +101,8 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileMenuOpen(false)}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
-          <div className="relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-6">
-            <div className="flex items-center justify-between mb-8">
+          <div className="admin-sidebar relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-4 overflow-hidden">
+            <div className="flex items-center justify-between mb-4 shrink-0">
               <Link
                 href="/organizer/profile"
                 onClick={() => setMobileMenuOpen(false)}
@@ -120,7 +120,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
                 <X size={20} />
               </button>
             </div>
-            <nav className="flex-1 space-y-2">
+            <nav className="admin-sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 pr-1">
               {navigation.map((item) => {
                 const isActive = isNavActive(item.href);
                 const Icon = item.icon;
@@ -129,13 +129,13 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
                     key={item.name}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                       isActive
                         ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
-                        : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                        : "text-zinc-400 hover:bg-white/5 hover:text-white border border-transparent"
                     }`}
                   >
-                    <Icon size={18} />
+                    <Icon size={16} className="shrink-0" />
                     <span className="font-medium text-sm">{item.name}</span>
                   </Link>
                 );

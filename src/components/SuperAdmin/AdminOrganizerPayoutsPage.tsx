@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Banknote, Loader2, Plus, Wallet } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import { Banknote, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateOrganizerPayoutMutation,
@@ -12,17 +14,22 @@ import {
 import { formatDate } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
+import {
+  adminPayoutSchema,
+  type AdminPayoutValues,
+} from "@/lib/adminFormSchemas";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 
 const money = formatMoney;
 
-const EMPTY_FORM = {
+const EMPTY_FORM: AdminPayoutValues = {
   business_id: "",
   event_id: "",
-  amount: "",
-  status: "PAID" as "PAID" | "PENDING",
+  amount: undefined as unknown as number,
+  status: "PAID",
   payment_reference: "",
   notes: "",
 };
@@ -30,26 +37,41 @@ const EMPTY_FORM = {
 export default function AdminOrganizerPayoutsPage() {
   const [organizerFilter, setOrganizerFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const { data: organizers = [] } = useGetBusinessesQuery({ module: "event" });
   const { data: eventsData } = useGetAdminEventsQuery();
   const events = eventsData?.items ?? [];
-  const { data: payoutsData, isLoading } = useGetOrganizerPayoutsQuery({
+  const { data: payoutsData, isLoading, isFetching } = useGetOrganizerPayoutsQuery({
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(organizerFilter ? { business_id: organizerFilter } : {}),
     ...(q.trim() ? { q: q.trim() } : {}),
   });
   const payouts = payoutsData?.items ?? [];
   const [createPayout, { isLoading: saving }] = useCreateOrganizerPayoutMutation();
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<AdminPayoutValues>({
+    resolver: yupResolver(adminPayoutSchema),
+    defaultValues: EMPTY_FORM,
+    mode: "onSubmit",
+  });
+
+  const businessId = watch("business_id");
+
   const organizerEvents = useMemo(() => {
-    if (!form.business_id) return [];
-    return events.filter((e) => e.business_id === form.business_id);
-  }, [events, form.business_id]);
+    if (!businessId) return [];
+    return events.filter((e) => e.business_id === businessId);
+  }, [events, businessId]);
 
   const stats = useMemo(() => {
     const paid = payouts
@@ -67,28 +89,20 @@ export default function AdminOrganizerPayoutsPage() {
     };
   }, [payouts]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.business_id) {
-      toast.error("Select an event organizer.");
-      return;
-    }
-    const amount = Number(form.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Enter a valid amount.");
-      return;
-    }
+  const onValid = async (values: AdminPayoutValues) => {
     try {
-      await createPayout({
-        business_id: form.business_id,
-        event_id: form.event_id || undefined,
-        amount,
-        status: form.status,
-        payment_reference: form.payment_reference.trim() || undefined,
-        notes: form.notes.trim() || undefined,
+      const created = await createPayout({
+        business_id: values.business_id,
+        event_id: values.event_id || undefined,
+        amount: values.amount,
+        status: values.status,
+        payment_reference: values.payment_reference?.trim() || undefined,
+        notes: values.notes?.trim() || undefined,
       }).unwrap();
-      toast.success("Payout recorded.");
-      setForm(EMPTY_FORM);
+      toast.success(
+        (created as { message?: string }).message || "Payout recorded."
+      );
+      reset(EMPTY_FORM);
       setShowForm(false);
     } catch (err) {
       toast.error(extractApiError(err, "Failed to record payout"));
@@ -96,21 +110,12 @@ export default function AdminOrganizerPayoutsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Wallet className="text-rose-400" size={24} />
-            Organizer Payouts
-          </h2>
-          <p className="text-zinc-400 text-sm mt-1">
-            Record payments to event organizers from ticket revenue. Organizers see these in their Ledger.
-          </p>
-        </div>
+    <div className="w-full space-y-6">
+      <div className="admin-list-toolbar">
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors"
         >
           <Plus size={16} />
           Record payout
@@ -130,7 +135,8 @@ export default function AdminOrganizerPayoutsPage() {
 
       {showForm && (
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handleSubmit(onValid)}
+          noValidate
           className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4"
         >
           <h3 className="text-lg font-semibold text-white">New payout</h3>
@@ -138,12 +144,10 @@ export default function AdminOrganizerPayoutsPage() {
             <div>
               <label className="block text-xs text-zinc-500 mb-1">Event organizer *</label>
               <select
-                value={form.business_id}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, business_id: e.target.value, event_id: "" }))
-                }
+                {...register("business_id", {
+                  onChange: () => setValue("event_id", ""),
+                })}
                 className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                required
               >
                 <option value="">Select organizer</option>
                 {organizers.map((b) => (
@@ -152,14 +156,18 @@ export default function AdminOrganizerPayoutsPage() {
                   </option>
                 ))}
               </select>
+              {errors.business_id && (
+                <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                  {errors.business_id.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs text-zinc-500 mb-1">Event (optional)</label>
               <select
-                value={form.event_id}
-                onChange={(e) => setForm((f) => ({ ...f, event_id: e.target.value }))}
+                {...register("event_id")}
                 className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                disabled={!form.business_id}
+                disabled={!businessId}
               >
                 <option value="">General payout</option>
                 {organizerEvents.map((ev) => (
@@ -175,31 +183,31 @@ export default function AdminOrganizerPayoutsPage() {
                 type="number"
                 min="0.01"
                 step="0.01"
-                value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                {...register("amount", { valueAsNumber: true })}
                 className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                required
               />
+              {errors.amount && (
+                <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.amount.message}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs text-zinc-500 mb-1">Status</label>
               <select
-                value={form.status}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, status: e.target.value as "PAID" | "PENDING" }))
-                }
+                {...register("status")}
                 className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
               >
                 <option value="PAID">Paid</option>
                 <option value="PENDING">Pending</option>
               </select>
+              {errors.status && (
+                <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.status.message}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs text-zinc-500 mb-1">Payment reference</label>
               <input
                 type="text"
-                value={form.payment_reference}
-                onChange={(e) => setForm((f) => ({ ...f, payment_reference: e.target.value }))}
+                {...register("payment_reference")}
                 placeholder="UTR / transaction ID"
                 className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
               />
@@ -208,8 +216,7 @@ export default function AdminOrganizerPayoutsPage() {
               <label className="block text-xs text-zinc-500 mb-1">Notes</label>
               <input
                 type="text"
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                {...register("notes")}
                 className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
               />
             </div>
@@ -268,46 +275,46 @@ export default function AdminOrganizerPayoutsPage() {
         />
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-x-auto">
-        {isLoading ? (
-          <div className="text-center py-12 text-zinc-400">
-            <Loader2 className="inline animate-spin mr-2" size={18} />
-            Loading payouts...
-          </div>
-        ) : (
-          <table className="w-full text-left min-w-[800px]">
-            <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
-              <tr>
-                <th className="px-6 py-4 font-medium">Date</th>
-                <th className="px-6 py-4 font-medium">Organizer</th>
-                <th className="px-6 py-4 font-medium">Event</th>
-                <th className="px-6 py-4 font-medium text-right">Amount</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Reference</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm">
-              {payouts.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-zinc-500">
-                    No payouts recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                payouts.map((p) => (
-                  <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                    <td className="px-6 py-4 text-zinc-300">
+      {isLoading || isFetching ? (
+        <AdminListShimmer
+          rows={isLoading ? 6 : limit > 10 ? 8 : 5}
+          columns={6}
+          showTabs={false}
+          showToolbar={false}
+        />
+      ) : payouts.length === 0 ? (
+        <div className="glass-panel rounded-2xl border border-white/5 px-6 py-10 text-center text-zinc-500">
+          No payouts recorded yet.
+        </div>
+      ) : (
+        <>
+          <div className="admin-card-grid">
+            {payouts.map((p) => (
+              <article key={p.id} className="admin-data-card">
+                <div className="admin-data-card-header">
+                  <p className="admin-data-card-title">{p.organizer_name || "—"}</p>
+                </div>
+                <div className="admin-data-card-body">
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Date</span>
+                    <div className="admin-data-card-value">
                       {formatDate(p.paid_at || p.created_at)}
-                    </td>
-                    <td className="px-6 py-4 text-white">{p.organizer_name || "—"}</td>
-                    <td className="px-6 py-4 text-zinc-400">{p.event_name || "General"}</td>
-                    <td className="px-6 py-4 text-right font-semibold text-emerald-400">
-                      <span className="inline-flex items-center justify-end gap-1">
-                        <Banknote size={14} />
-                        {money(p.amount)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
+                    </div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Event</span>
+                    <div className="admin-data-card-value">{p.event_name || "General"}</div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Amount</span>
+                    <div className="admin-data-card-value font-semibold text-emerald-400 inline-flex items-center gap-1">
+                      <Banknote size={14} />
+                      {money(p.amount)}
+                    </div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Status</span>
+                    <div className="admin-data-card-value">
                       <span
                         className={`text-xs font-semibold px-2 py-1 rounded-full ${
                           p.status === "PAID"
@@ -317,15 +324,83 @@ export default function AdminOrganizerPayoutsPage() {
                       >
                         {p.status}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-zinc-500">{p.payment_reference || "—"}</td>
+                    </div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Reference</span>
+                    <div className="admin-data-card-value">{p.payment_reference || "—"}</div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="admin-table-desktop glass-panel rounded-2xl border border-white/5 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[800px]">
+                <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
+                  <tr>
+                    <th className="px-6 py-4 font-medium">Date</th>
+                    <th className="px-6 py-4 font-medium">Organizer</th>
+                    <th className="px-6 py-4 font-medium">Event</th>
+                    <th className="px-6 py-4 font-medium text-right">Amount</th>
+                    <th className="px-6 py-4 font-medium">Status</th>
+                    <th className="px-6 py-4 font-medium">Reference</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        )}
-        {payoutsData?.meta && <Pagination meta={payoutsData.meta} onPageChange={setPage} />}
+                </thead>
+                <tbody className="text-sm">
+                  {payouts.map((p) => (
+                    <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="px-6 py-4 text-zinc-300">
+                        {formatDate(p.paid_at || p.created_at)}
+                      </td>
+                      <td className="px-6 py-4 text-white">{p.organizer_name || "—"}</td>
+                      <td className="px-6 py-4 text-zinc-400">{p.event_name || "General"}</td>
+                      <td className="px-6 py-4 text-right font-semibold text-emerald-400">
+                        <span className="inline-flex items-center justify-end gap-1">
+                          <Banknote size={14} />
+                          {money(p.amount)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                            p.status === "PAID"
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : "bg-amber-500/10 text-amber-400"
+                          }`}
+                        >
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-zinc-500">{p.payment_reference || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+      <div className="admin-list-footer">
+        <Pagination
+          meta={
+            payoutsData?.meta ?? {
+              page,
+              limit,
+              total: 0,
+              total_pages: 0,
+              has_prev: false,
+              has_next: false,
+            }
+          }
+          onPageChange={setPage}
+          onLimitChange={(next) => {
+            setLimit(next);
+            setPage(1);
+          }}
+          disabled={isFetching}
+        />
       </div>
     </div>
   );

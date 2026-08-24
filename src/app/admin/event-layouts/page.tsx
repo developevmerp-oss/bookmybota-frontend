@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, LayoutTemplate, Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { useGetAdminEventLayoutRequestsQuery } from "@/services/api";
 
 const TABS = [
@@ -49,19 +49,7 @@ export default function AdminEventLayoutsPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <span className="bg-rose-500/15 text-rose-500 p-2 rounded-xl">
-            <LayoutTemplate size={22} />
-          </span>
-          Event layout requests
-        </h1>
-        <p className="text-zinc-400 mt-2">
-          Review custom seating layout requests from organizers. Attach a published venue layout and optionally apply seats to the event.
-        </p>
-      </div>
-
+    <div className="w-full space-y-6">
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
         <div className="flex flex-wrap gap-2">
           {TABS.map((item) => (
@@ -129,7 +117,7 @@ export default function AdminEventLayoutsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${
+                      className={`px-2.5 py-1 rounded-md text-[0.6875rem] font-bold border ${
                         TAB_STYLES[workflow] || TAB_STYLES.submitted
                       }`}
                     >

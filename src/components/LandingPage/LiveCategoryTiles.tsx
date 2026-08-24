@@ -102,53 +102,35 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
         image: tile.image,
       };
     });
-    live.push({
-      key: "dining",
-      href:
-        city && city !== "All Cities"
-          ? `/dining?city=${encodeURIComponent(city)}`
-          : "/dining",
-      title: "Dining",
-      count: dining.length,
-      image: dining.find((d) => d.cover_image_url)?.cover_image_url || "",
-      gradient: "from-[#0F766E] to-[#5EEAD4]",
-    });
-    return live;
-  }, [categories, pool, dining, city]);
-
-  const scrollBy = (dir: -1 | 1) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * 280, behavior: "smooth" });
-  };
+  }, [categories, pool, dining]);
 
   return (
     <section className="bg-white py-5 sm:py-6 lg:py-3 lg:pb-4 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
       <div className="container mx-auto px-4 md:px-5 lg:px-8 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
-        <h2 className="text-xl sm:text-[22px] md:text-2xl font-semibold text-[#111111] mb-3 sm:mb-4 lg:mb-3 shrink-0">
+        <h2 className="type-section font-semibold text-[#111111] mb-3 sm:mb-4 lg:mb-3 shrink-0">
           The Best of Live Events
         </h2>
 
         {isLoadingFilters ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 md:gap-4 lg:flex-1 lg:min-h-0 lg:h-full">
+          <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 lg:flex-1 lg:min-h-0 lg:content-stretch">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="w-full aspect-[3/4] sm:aspect-[5/7] lg:aspect-auto lg:h-full rounded-2xl bg-[#F7F7F7]"
+                className="w-[calc((100%-0.625rem)/2)] sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)] aspect-[3/4] sm:aspect-[5/7] rounded-2xl bg-[#F7F7F7]"
               />
             ))}
           </div>
         ) : cards.length === 0 ? (
-          <p className="text-sm text-[#6B6B6B] py-6">No event categories yet.</p>
+          <p className="type-body text-[#6B6B6B] py-6">No event categories yet.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 md:gap-4 lg:flex-1 lg:min-h-0 lg:h-full">
+          <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 lg:flex-1 lg:min-h-0 lg:content-stretch">
             {cards.map((card) => {
               const lines = titleLines(card.title);
               return (
                 <Link
                   key={card.key}
                   href={card.href}
-                  className="w-full aspect-[3/4] sm:aspect-[5/7] lg:aspect-auto lg:h-full lg:min-h-0 rounded-xl sm:rounded-2xl overflow-hidden relative group"
+                  className="w-[calc((100%-0.625rem)/2)] sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)] aspect-[3/4] sm:aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden relative group"
                 >
                   <img
                     src={card.image}
@@ -160,12 +142,12 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
                     {lines.map((line) => (
                       <p
                         key={line}
-                        className="text-white font-extrabold uppercase text-base sm:text-xl lg:text-lg xl:text-2xl leading-[1.05] tracking-tight"
+                        className="text-white font-extrabold uppercase type-tile leading-[1.05] tracking-tight"
                       >
                         {line}
                       </p>
                     ))}
-                    <p className="text-white font-semibold text-xs sm:text-sm lg:text-sm xl:text-base mt-1.5 sm:mt-2">
+                    <p className="text-white font-semibold type-tile-meta mt-1.5 sm:mt-2">
                       {card.count > 0 ? `${card.count}+ Events` : "Events"}
                     </p>
                   </div>

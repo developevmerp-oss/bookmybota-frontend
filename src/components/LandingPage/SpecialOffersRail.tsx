@@ -197,14 +197,14 @@ export default function SpecialOffersRail() {
     <section className="bg-white py-6 sm:py-8 lg:py-10">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="text-xl sm:text-[22px] md:text-2xl font-semibold tracking-tight text-[#111111]">
+          <h2 className="type-section font-semibold tracking-tight text-[#111111]">
             Special Offers
           </h2>
         </div>
 
         <div className="relative">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12 text-[#666] gap-2">
+            <div className="flex items-center justify-center py-12 type-body text-[#666] gap-2">
               <Loader2 className="animate-spin" size={20} />
               Loading offers…
             </div>

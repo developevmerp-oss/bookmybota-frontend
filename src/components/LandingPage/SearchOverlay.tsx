@@ -150,20 +150,20 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search for events, dining, plays, sports..."
-              className="w-full h-12 sm:h-[52px] pl-12 pr-5 rounded-full bg-[#EEEEEE] text-[15px] text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#6900AA]"
+              className="w-full h-12 sm:h-[52px] pl-12 pr-5 rounded-full bg-[#EEEEEE] type-card-title text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#6900AA]"
             />
           </div>
         </form>
 
-        <h2 className="text-[18px] font-bold text-[#111111] mb-3">
+        <h2 className="type-brand font-bold text-[#111111] mb-3">
           {query.trim() ? "Search results" : "Trending Now"}
         </h2>
 
         <div className="bg-white rounded-xl border border-[#EDEDED] shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
           {isLoadingEvents ? (
-            <p className="px-5 py-6 text-sm text-[#6B6B6B]">Loading...</p>
+            <p className="px-5 py-6 type-body text-[#6B6B6B]">Loading...</p>
           ) : filtered.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-[#6B6B6B]">
+            <p className="px-5 py-6 type-body text-[#6B6B6B]">
               {query.trim() ? "No matches found." : "No trending events yet."}
             </p>
           ) : (
@@ -179,7 +179,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
                         i > 0 ? "border-t border-[#F0F0F0]" : ""
                       }`}
                     >
-                      <span className="text-[15px] text-[#111111] truncate">{item.label}</span>
+                      <span className="type-card-title text-[#111111] truncate">{item.label}</span>
                       <Icon size={16} className="text-[#9A9A9A] shrink-0" />
                     </button>
                   </li>

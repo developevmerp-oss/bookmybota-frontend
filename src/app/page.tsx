@@ -39,7 +39,7 @@ export default function Home() {
       <PopularEventsRail city={city} />
       <SpecialOffersRail />
       <EventsNearYouRail city={city} />
-      <SportsStadiumBanner />
+      {/* <SportsStadiumBanner /> */}
       <PopularSportsEventsRail />
       <Footer />
     </div>

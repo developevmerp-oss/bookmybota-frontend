@@ -19,7 +19,7 @@ export default function SportsStadiumBanner() {
           <img
             src={src}
             alt="Live sports at the stadium"
-            className="w-full h-auto object-cover object-center aspect-[21/9] sm:aspect-[16/6] max-h-[280px] sm:max-h-[340px] lg:max-h-[500px]"
+            className="w-full h-auto object-cover object-center aspect-[16/9] sm:aspect-[21/9] md:aspect-[16/6] max-h-[180px] sm:max-h-[240px] md:max-h-[300px] lg:max-h-[500px]"
             loading="lazy"
           />
         </Link>

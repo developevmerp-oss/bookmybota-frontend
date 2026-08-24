@@ -167,7 +167,7 @@ export default function CitySelectModal({
       <div className="relative w-full max-w-[920px] mt-8 sm:mt-12 max-h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 shrink-0 border-b border-slate-100">
-          <h2 className="text-base sm:text-lg font-bold text-slate-900">Select City</h2>
+          <h2 className="type-brand font-bold text-slate-900">Select City</h2>
           <button
             type="button"
             onClick={onClose}
@@ -186,7 +186,7 @@ export default function CitySelectModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search for your city"
-              className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-[color:var(--city-accent)] focus:ring-1 focus:ring-[color:var(--city-accent)]"
+              className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-white type-body text-slate-800 placeholder:text-slate-400 outline-none focus:border-[color:var(--city-accent)] focus:ring-1 focus:ring-[color:var(--city-accent)]"
               style={{ ["--city-accent" as string]: ACCENT }}
               autoFocus
             />
@@ -197,7 +197,7 @@ export default function CitySelectModal({
             type="button"
             onClick={detectLocation}
             disabled={detecting}
-            className="mt-2.5 inline-flex items-center gap-1.5 text-sm font-medium cursor-pointer disabled:opacity-60"
+            className="mt-2.5 inline-flex items-center gap-1.5 type-body font-medium cursor-pointer disabled:opacity-60"
             style={{ color: ACCENT }}
           >
             <Locate size={15} />
@@ -205,20 +205,20 @@ export default function CitySelectModal({
           </button>
 
           {isLoading ? (
-            <p className="text-sm text-slate-400 text-center py-10">Loading cities…</p>
+            <p className="type-body text-slate-400 text-center py-10">Loading cities…</p>
           ) : searching ? (
             <div className="mt-4">
-              <p className="text-center text-xs font-semibold text-slate-500 mb-2">Search results</p>
+              <p className="text-center type-label font-semibold text-slate-500 mb-2">Search results</p>
               {searchResults.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-6">No cities match “{query.trim()}”.</p>
+                <p className="type-body text-slate-400 text-center py-6">No cities match “{query.trim()}”.</p>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-1">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {searchResults.map((city) => (
                     <button
                       key={city.id}
                       type="button"
                       onClick={() => pickCity(city.name)}
-                      className={`text-left text-[13px] py-1 hover:underline ${
+                      className={`w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] md:w-[calc((100%-3rem)/4)] lg:w-[calc((100%-4rem)/5)] text-left type-card-body py-1 hover:underline ${
                         city.name === selected ? "font-semibold" : "text-slate-600"
                       }`}
                       style={city.name === selected ? { color: ACCENT } : undefined}
@@ -234,8 +234,8 @@ export default function CitySelectModal({
               {/* Popular */}
               {popularCities.length > 0 && (
                 <div className="mt-4">
-                  <p className="text-center text-xs font-semibold text-slate-500 mb-3">Popular Cities</p>
-                  <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-2 sm:gap-3">
+                  <p className="text-center type-label font-semibold text-slate-500 mb-3">Popular Cities</p>
+                  <div className="flex flex-wrap gap-2 sm:gap-3">
                     {popularCities.map((city) => {
                       const active = city.name === selected;
                       return (
@@ -243,7 +243,7 @@ export default function CitySelectModal({
                           key={city.id}
                           type="button"
                           onClick={() => pickCity(city.name)}
-                          className={`flex flex-col items-center gap-1 py-1.5 px-0.5 rounded-lg transition-colors ${
+                          className={`w-[calc((100%-1.5rem)/4)] sm:w-[calc((100%-3rem)/5)] md:w-[calc((100%-7rem)/8)] lg:w-[calc((100%-9*0.75rem)/10)] flex flex-col items-center gap-1 py-1.5 px-0.5 rounded-lg transition-colors ${
                             active ? "bg-[#F3EEFF]" : "hover:bg-slate-50"
                           }`}
                         >
@@ -255,7 +255,7 @@ export default function CitySelectModal({
                             <PopularCityIcon city={city} />
                           </span>
                           <span
-                            className={`text-[11px] font-medium text-center leading-tight ${
+                            className={`type-card-caption font-medium text-center leading-tight ${
                               active ? "text-[#6900AA]" : "text-slate-600"
                             }`}
                           >
@@ -270,22 +270,22 @@ export default function CitySelectModal({
 
               {/* Other cities */}
               <div className="mt-5">
-                <p className="text-center text-xs font-semibold text-slate-500 mb-2.5">Other Cities</p>
+                <p className="text-center type-label font-semibold text-slate-500 mb-2.5">Other Cities</p>
                 {showOtherCities ? (
                   otherCities.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-4">
+                    <p className="type-body text-slate-400 text-center py-4">
                       {cities.length === 0
                         ? "No cities yet. Super Admin can add them under City Masters."
                         : "No other cities."}
                     </p>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-0.5">
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5">
                       {otherCities.map((city) => (
                         <button
                           key={city.id}
                           type="button"
                           onClick={() => pickCity(city.name)}
-                          className={`text-left text-[13px] py-1 hover:underline ${
+                          className={`w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] md:w-[calc((100%-3rem)/4)] lg:w-[calc((100%-4rem)/5)] text-left type-card-body py-1 hover:underline ${
                             city.name === selected ? "font-semibold" : "text-slate-500"
                           }`}
                           style={city.name === selected ? { color: ACCENT } : undefined}
@@ -307,7 +307,7 @@ export default function CitySelectModal({
             <button
               type="button"
               onClick={() => setShowOtherCities((v) => !v)}
-              className="inline-flex items-center gap-1 text-sm font-medium"
+              className="inline-flex items-center gap-1 type-body font-medium"
               style={{ color: ACCENT }}
             >
               {showOtherCities ? (
@@ -325,7 +325,7 @@ export default function CitySelectModal({
             <button
               type="button"
               onClick={clearCity}
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2"
+              className="type-body font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2"
             >
               Clear City
             </button>

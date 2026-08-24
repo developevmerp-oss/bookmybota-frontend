@@ -3,8 +3,8 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import AdaptiveCardRow from "./AdaptiveCardRow";
 import { ShowcaseEventPosterCard } from "./PosterCard";
-import "./PopularSportsEventsRail.css";
 
 type SportEvent = {
   id: string;
@@ -83,10 +83,11 @@ export const POPULAR_SPORTS_EVENTS: SportEvent[] = [
   },
 ];
 
-const VISIBLE = 5;
+const MIN_VISIBLE = 5;
 
 export default function PopularSportsEventsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const showArrows = POPULAR_SPORTS_EVENTS.length > MIN_VISIBLE;
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -98,55 +99,53 @@ export default function PopularSportsEventsRail() {
     <section className="bg-white py-6 sm:py-8 lg:py-10">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="text-xl sm:text-[22px] md:text-2xl font-semibold tracking-tight text-[#111111]">
+          <h2 className="type-section font-semibold tracking-tight text-[#111111]">
             Popular Sports Events
           </h2>
           <Link
             href="/events?category=sports"
-            className="shrink-0 text-xs sm:text-sm font-medium text-[#6900AA] hover:text-[#57008E]"
+            className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
           >
             See All ›
           </Link>
         </div>
 
         <div className="relative">
-          <button
-            type="button"
-            aria-label="Previous sports events"
-            onClick={() => scrollBy(-1)}
-            className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-          >
-            <ChevronLeft size={18} />
-          </button>
+          {showArrows && (
+            <button
+              type="button"
+              aria-label="Previous sports events"
+              onClick={() => scrollBy(-1)}
+              className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
 
-          <div
-            ref={scrollerRef}
-            className="sports-rail"
-            style={{ ["--sports-visible" as string]: VISIBLE }}
-          >
+          <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
             {POPULAR_SPORTS_EVENTS.map((event) => (
-              <div key={event.id} className="sports-rail-slot">
-                <ShowcaseEventPosterCard
-                  title={event.title}
-                  image={event.image}
-                  showDate={event.showDate}
-                  place={event.place}
-                  eventType={event.eventType}
-                  href={event.href}
-                  fullWidth
-                />
-              </div>
+              <ShowcaseEventPosterCard
+                key={event.id}
+                title={event.title}
+                image={event.image}
+                showDate={event.showDate}
+                place={event.place}
+                eventType={event.eventType}
+                href={event.href}
+              />
             ))}
-          </div>
+          </AdaptiveCardRow>
 
-          <button
-            type="button"
-            aria-label="Next sports events"
-            onClick={() => scrollBy(1)}
-            className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-          >
-            <ChevronRight size={18} />
-          </button>
+          {showArrows && (
+            <button
+              type="button"
+              aria-label="Next sports events"
+              onClick={() => scrollBy(1)}
+              className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            >
+              <ChevronRight size={18} />
+            </button>
+          )}
         </div>
       </div>
     </section>

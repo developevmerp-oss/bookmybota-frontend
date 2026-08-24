@@ -1,0 +1,41 @@
+.adaptive-card-row {
+  --adaptive-gap: 0.75rem;
+  --adaptive-visible: 2;
+  --adaptive-count: 1;
+  display: flex;
+  width: 100%;
+  gap: var(--adaptive-gap);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.adaptive-card-row::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .adaptive-card-row {
+    --adaptive-visible: 3;
+    --adaptive-gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .adaptive-card-row {
+    --adaptive-visible: 5;
+  }
+}
+
+.adaptive-card-slot {
+  min-width: 0;
+  scroll-snap-align: start;
+  flex: 0 0
+    calc(
+      (100% - (min(var(--adaptive-count), var(--adaptive-visible)) - 1) * var(--adaptive-gap)) /
+        min(var(--adaptive-count), var(--adaptive-visible))
+    );
+}

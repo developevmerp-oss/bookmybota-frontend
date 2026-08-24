@@ -68,9 +68,9 @@ const VISIBLE = 6;
 
 function ArtistCard({ artist }: { artist: TopArtist }) {
   return (
-    <div className="top-artists-slot flex flex-col items-center text-center group">
-      <div className="top-artists-avatar rounded-full p-[3px] transition-colors">
-        <div className="w-35 h-35 rounded-full overflow-hidden bg-[#F7F7F7] border-2 border-[#6900AA] ring-2 ring-white">
+    <div className="top-artists-slot">
+      <div className="top-artists-avatar">
+        <div className="top-artists-avatar-inner">
           <img
             src={artist.image}
             alt={artist.name}
@@ -80,10 +80,8 @@ function ArtistCard({ artist }: { artist: TopArtist }) {
           />
         </div>
       </div>
-      <p className="mt-7 text-sm sm:text-base ml-5 font-semibold text-[#111111] line-clamp-2 leading-snug px-1">
-        {artist.name}
-      </p>
-      <p className="mt-0.5 text-xs sm:text-sm ml-5 text-[#6B6B6B] line-clamp-1">{artist.role}</p>
+      <p className="top-artists-name">{artist.name}</p>
+      <p className="top-artists-role">{artist.role}</p>
     </div>
   );
 }
@@ -95,19 +93,19 @@ export default function TopArtistsRail() {
     const el = scrollerRef.current;
     if (!el) return;
     // Scroll by roughly one viewport (6 artists) so the remaining 2 come into view
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.7, 280), behavior: "smooth" });
   };
 
   return (
     <section className="bg-white py-6 sm:py-8 lg:py-10">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="text-xl sm:text-[22px] md:text-2xl font-semibold tracking-tight text-[#111111]">
+          <h2 className="type-section font-semibold tracking-tight text-[#111111]">
             Top Artists
           </h2>
           <Link
             href="/events"
-            className="shrink-0 text-xs sm:text-sm font-medium text-[#6900AA] hover:text-[#57008E]"
+            className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
           >
             See All ›
           </Link>
@@ -118,7 +116,7 @@ export default function TopArtistsRail() {
             type="button"
             aria-label="Previous artists"
             onClick={() => scrollBy(-1)}
-            className="hidden md:flex absolute -left-2 lg:-left-3 top-[42%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            className="flex absolute left-0 md:-left-2 lg:-left-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
           >
             <ChevronLeft size={18} />
           </button>
@@ -137,7 +135,7 @@ export default function TopArtistsRail() {
             type="button"
             aria-label="Next artists"
             onClick={() => scrollBy(1)}
-            className="hidden md:flex absolute -right-2 lg:-right-3 top-[42%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            className="flex absolute right-0 md:-right-2 lg:-right-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
           >
             <ChevronRight size={18} />
           </button>

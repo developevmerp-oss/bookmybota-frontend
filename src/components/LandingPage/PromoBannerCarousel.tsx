@@ -24,9 +24,9 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
 
   if (isLoadingEvents || (slides.length === 0 && isLoadingFallback)) {
     return (
-      <section className="bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 lg:pt-3 lg:pb-2 w-full lg:flex-[1.15] lg:min-h-0 lg:flex lg:flex-col">
-        <div className="relative h-[200px] sm:h-[280px] md:h-[320px] lg:flex-1 lg:h-auto lg:min-h-0 w-full px-3 sm:px-4">
-          <div className="h-full w-full rounded-xl bg-[#F7F7F7]" />
+      <section className="bg-white w-full lg:flex-[1.15] lg:min-h-0 lg:flex lg:flex-col">
+        <div className="relative h-[180px] sm:h-[240px] md:h-[280px] lg:flex-1 lg:h-auto lg:min-h-[220px] w-full">
+          <div className="h-full w-full bg-[#F7F7F7]" />
         </div>
       </section>
     );
@@ -37,8 +37,8 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
   const multi = slides.length > 1;
 
   return (
-    <section className="promo-banner-swiper bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 lg:pt-3 lg:pb-2 w-full overflow-hidden lg:flex-[1.15] lg:min-h-0 lg:flex lg:flex-col">
-      <div className="relative h-[200px] sm:h-[280px] md:h-[320px] lg:flex-1 lg:h-auto lg:min-h-0 w-full">
+    <section className="promo-banner-swiper bg-white w-full overflow-hidden lg:flex-[1.15] lg:min-h-0 lg:flex lg:flex-col">
+      <div className="relative h-[180px] sm:h-[240px] md:h-[280px] lg:flex-1 lg:h-auto lg:min-h-[220px] w-full">
         <Swiper
           key={`promo-auto-${slides.map((s) => s.id).join("-")}`}
           modules={[Autoplay, Navigation, Pagination]}
@@ -92,10 +92,10 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
         >
           {slides.map((slide) => (
             <SwiperSlide key={slide.id} className="h-full">
-              <div className="h-full w-full px-3 sm:px-[82px] md:px-[106px]">
+              <div className="h-full w-full">
                 <Link
                   href={`/events/${slide.id}`}
-                  className="block h-full w-full rounded-xl overflow-hidden bg-[#111111]"
+                  className="block h-full w-full overflow-hidden bg-[#111111]"
                 >
                   <img
                     src={eventLandscape(slide)}

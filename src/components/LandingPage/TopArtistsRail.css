@@ -1,56 +1,130 @@
 .top-artists-rail {
   display: flex;
   width: 100%;
-  gap: 0.75rem;
+  gap: 0.35rem;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.5rem;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .top-artists-rail::-webkit-scrollbar {
   display: none;
 }
 
-/* Mobile: ~2.5–3 artists visible */
 .top-artists-slot {
   flex: 0 0 auto;
-  width: calc((100% - 1.5rem) / 2.4);
+  width: 6.75rem;
   min-width: 0;
   scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .top-artists-avatar {
-  width: 88px;
-  height: 88px;
+  width: 96px;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+}
+
+.top-artists-avatar-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: #f7f7f7;
+  border: 2px solid #6900aa;
+  box-sizing: border-box;
+}
+
+.top-artists-name {
+  margin: 0.5rem 0 0;
+  width: 100%;
+  padding: 0 0.15rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #111111;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.top-artists-role {
+  margin: 0.15rem 0 0;
+  width: 100%;
+  padding: 0 0.15rem;
+  font-size: 0.9375rem;
+  line-height: 1.2;
+  color: #6b6b6b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (min-width: 640px) {
+  .top-artists-rail {
+    gap: 0.4rem;
+  }
+
   .top-artists-slot {
-    width: calc((100% - 2.25rem) / 3.2);
+    width: 7.25rem;
   }
 
   .top-artists-avatar {
-    width: 100px;
-    height: 100px;
+    width: 104px;
+  }
+
+  .top-artists-name {
+    font-size: 1.125rem;
+  }
+
+  .top-artists-role {
+    font-size: 1rem;
   }
 }
 
-/* Desktop / tablet: exactly 6 artists in the first viewport */
+/* Tablet: keep artists close together */
 @media (min-width: 768px) {
+  .top-artists-rail {
+    gap: 0.5rem;
+  }
+
+  .top-artists-slot {
+    width: 7.75rem;
+  }
+
+  .top-artists-avatar {
+    width: 112px;
+  }
+
+  .top-artists-name {
+    font-size: 1.1875rem;
+    margin-top: 0.625rem;
+  }
+
+  .top-artists-role {
+    font-size: 1.0625rem;
+  }
+}
+
+/* Desktop: 6 artists evenly in the row */
+@media (min-width: 1024px) {
   .top-artists-rail {
     gap: 1rem;
   }
 
   .top-artists-slot {
-    /* (100% - 5 gaps) / 6 = one of six visible slots */
     width: calc((100% - (var(--artists-visible, 6) - 1) * 1rem) / var(--artists-visible, 6));
   }
 
   .top-artists-avatar {
-    width: min(124px, 72%);
-    height: min(124px, 72%);
-    aspect-ratio: 1;
+    width: min(124px, 100%);
   }
 }

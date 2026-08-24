@@ -981,17 +981,17 @@ function VenueBlock({
                 >
                   Cancel
                 </button>
-              )}
-            </div>
+          )}
+        </div>
             <div className="sm:col-span-2">
-              <label className={labelClass}>Venue address</label>
+          <label className={labelClass}>Venue address</label>
               <input
                 disabled={readOnly}
                 className={inputClass}
                 {...register(`showtimes.${index}.venue_address`)}
                 placeholder="Full address"
               />
-            </div>
+        </div>
           </>
         )}
 
@@ -2547,7 +2547,7 @@ export default function EventForm({
                 Optional. Add artists, guests, or chief guests. For artists you can search partners or auto-register a new name.
               </p>
             </div>
-            {!readOnly && (
+        {!readOnly && (
               <button
                 type="button"
                 onClick={() => appendArtist({ ...defaultArtist(), sort_order: artistFields.length })}
@@ -2721,14 +2721,14 @@ export default function EventForm({
                   <ChevronLeft size={16} /> Back
                 </button>
               )}
-              <button
-                type="button"
-                disabled={saving || submitting}
-                onClick={runSaveDraft}
+            <button
+              type="button"
+              disabled={saving || submitting}
+              onClick={runSaveDraft}
                 className="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save draft"}
-              </button>
+            >
+              {saving ? "Saving..." : "Save draft"}
+            </button>
             </div>
             <div className="flex flex-wrap gap-2">
               {!isLastStep ? (
@@ -2741,14 +2741,14 @@ export default function EventForm({
                 </button>
               ) : (
                 canSubmit && (
-                  <button
-                    type="button"
-                    disabled={saving || submitting}
-                    onClick={handleSubmit(runSubmit)}
-                    className="btn-primary disabled:opacity-50"
-                  >
-                    {submitting ? "Submitting..." : "Submit for approval"}
-                  </button>
+              <button
+                type="button"
+                disabled={saving || submitting}
+                onClick={handleSubmit(runSubmit)}
+                className="btn-primary disabled:opacity-50"
+              >
+                {submitting ? "Submitting..." : "Submit for approval"}
+              </button>
                 )
               )}
             </div>

@@ -12,7 +12,7 @@ export default function AdminLoginPage() {
         subtitle="Sign in with your admin credentials"
         hint={
           <>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">
+            <p className="text-[0.625rem] text-slate-400 font-semibold uppercase tracking-wider mb-1">
               Super Admin Default
             </p>
             <p className="text-xs text-slate-600 font-mono">admin@reserve.com / Admin@123</p>

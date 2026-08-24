@@ -72,7 +72,7 @@ export default function AdminEventContractDetailPage() {
   const needsSign = !contract.admin_signed_at && contract.status === "PENDING_SIGNATURES";
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <Link
           href="/admin/event-contracts"

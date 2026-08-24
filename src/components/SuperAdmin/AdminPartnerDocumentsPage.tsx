@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   useGetAdminPartnerDocumentsQuery,
   useCreateAdminPartnerDocumentMutation,
@@ -14,9 +16,16 @@ import {
   useDeleteAdminPartnerOnboardingTermMutation,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  adminPartnerDocumentCreateSchema,
+  adminPartnerTermCreateSchema,
+  type AdminPartnerDocumentCreateValues,
+  type AdminPartnerTermCreateValues,
+} from "@/lib/adminFormSchemas";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 
 function ActiveToggle({
@@ -58,9 +67,10 @@ export default function AdminPartnerDocumentsPage() {
   const [moduleFilter, setModuleFilter] = useState<"" | "dining" | "event" | "venue" | "artist" | "both">("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const queryArg = {
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(moduleFilter ? { module: moduleFilter } : {}),
     ...(q.trim() ? { q: q.trim() } : {}),
   };
@@ -89,109 +99,114 @@ export default function AdminPartnerDocumentsPage() {
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
-  const [newDoc, setNewDoc] = useState({
-    name: "",
-    description: "",
-    module: "both" as "dining" | "event" | "venue" | "artist" | "both",
-    is_required: false,
-  });
-  const [newTerm, setNewTerm] = useState({
-    text: "",
-    module: "both" as "dining" | "event" | "venue" | "artist" | "both",
+  const docForm = useForm<AdminPartnerDocumentCreateValues>({
+    resolver: yupResolver(adminPartnerDocumentCreateSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      module: "both",
+      is_required: false,
+    },
+    mode: "onSubmit",
   });
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDoc.name.trim()) {
-      toast.error("Document name is required");
-      return;
-    }
+  const termForm = useForm<AdminPartnerTermCreateValues>({
+    resolver: yupResolver(adminPartnerTermCreateSchema),
+    defaultValues: { text: "", module: "both" },
+    mode: "onSubmit",
+  });
+
+  const onCreateDocument = async (values: AdminPartnerDocumentCreateValues) => {
     try {
       const created = await createDocument({
-        name: newDoc.name.trim(),
-        description: newDoc.description.trim() || undefined,
-        module: newDoc.module,
-        is_required: newDoc.is_required,
+        name: values.name.trim(),
+        description: values.description?.trim() || undefined,
+        module: values.module,
+        is_required: values.is_required,
         is_active: true,
       }).unwrap();
-      toast.success(`"${created.name}" added — it now appears on partner onboarding`);
-      setNewDoc({ name: "", description: "", module: newDoc.module, is_required: false });
+      toast.success(
+        (created as { message?: string }).message ||
+          `"${created.name}" added — it now appears on partner onboarding`
+      );
+      docForm.reset({
+        name: "",
+        description: "",
+        module: values.module,
+        is_required: false,
+      });
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to add document type"));
+    }
+  };
+
+  const onCreateTerm = async (values: AdminPartnerTermCreateValues) => {
+    try {
+      const created = await createTerm({
+        text: values.text.trim(),
+        module: values.module,
+        is_active: true,
+      }).unwrap();
+      toast.success(
+        (created as { message?: string }).message || "Onboarding term added"
+      );
+      termForm.reset({ text: "", module: values.module });
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Failed to add onboarding term"));
     }
   };
 
   const listLoading = isLoading && documents.length === 0;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-          <span className="bg-rose-500/20 text-rose-500 p-2 rounded-xl">
-            <FileText size={28} />
-          </span>
-          Partner Document Master
-        </h1>
-        <p className="text-zinc-400 mt-2">
-          Document types shown on <strong className="text-white">/business</strong> and Super Admin
-          dining/event onboarding. Active items appear immediately after you add them.
-        </p>
-      </div>
-
+    <div className="w-full space-y-6">
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="glass-panel p-6 border border-white/5 rounded-2xl">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <Plus size={18} className="text-rose-500" /> Add document type
           </h3>
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={docForm.handleSubmit(onCreateDocument)} noValidate className="space-y-4">
             <div>
               <label className="block text-sm text-zinc-400 mb-1.5">
                 Document name <span className="text-rose-500">*</span>
               </label>
               <input
-                value={newDoc.name}
-                onChange={(e) => setNewDoc((p) => ({ ...p, name: e.target.value }))}
+                {...docForm.register("name")}
                 placeholder="e.g. Fire Safety Certificate"
                 className="input-field w-full"
-                required
               />
+              {docForm.formState.errors.name && (
+                <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                  {docForm.formState.errors.name.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm text-zinc-400 mb-1.5">Description / examples</label>
               <textarea
                 rows={3}
-                value={newDoc.description}
-                onChange={(e) => setNewDoc((p) => ({ ...p, description: e.target.value }))}
+                {...docForm.register("description")}
                 className="input-field w-full resize-y min-h-[80px]"
                 placeholder="What partners should upload..."
               />
             </div>
             <div>
               <label className="block text-sm text-zinc-400 mb-1.5">Applies to</label>
-              <select
-                value={newDoc.module}
-                onChange={(e) =>
-                  setNewDoc((p) => ({
-                    ...p,
-                    module: e.target.value as "dining" | "event" | "venue" | "artist" | "both",
-                  }))
-                }
-                className="input-field w-full"
-              >
+              <select {...docForm.register("module")} className="input-field w-full">
                 <option value="both">All modules</option>
                 <option value="dining">Dining only</option>
                 <option value="event">Event only</option>
                 <option value="venue">Venue only</option>
                 <option value="artist">Artist only</option>
               </select>
+              {docForm.formState.errors.module && (
+                <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                  {docForm.formState.errors.module.message}
+                </p>
+              )}
             </div>
             <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={newDoc.is_required}
-                onChange={(e) => setNewDoc((p) => ({ ...p, is_required: e.target.checked }))}
-                className="rounded"
-              />
+              <input type="checkbox" {...docForm.register("is_required")} className="rounded" />
               Required on onboarding
             </label>
             <p className="text-xs text-zinc-500">New types are active and show on partner forms immediately.</p>
@@ -236,7 +251,7 @@ export default function AdminPartnerDocumentsPage() {
           </div>
 
           {listLoading ? (
-            <div className="p-8 text-center text-zinc-500">Loading document types...</div>
+            <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar={false} />
           ) : isError ? (
             <div className="p-8 text-center space-y-3">
               <p className="text-rose-400">{extractApiError(error, "Failed to load documents")}</p>
@@ -258,11 +273,11 @@ export default function AdminPartnerDocumentsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-white">{doc.name}</span>
                         {doc.is_required && (
-                          <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                          <span className="text-[0.625rem] uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
                             Required
                           </span>
                         )}
-                        <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/10">
+                        <span className="text-[0.625rem] uppercase px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-white/10">
                           {MODULE_LABEL[doc.module] || doc.module}
                         </span>
                       </div>
@@ -338,7 +353,26 @@ export default function AdminPartnerDocumentsPage() {
               ))}
             </div>
           )}
-          {documentsData?.meta && <Pagination meta={documentsData.meta} onPageChange={setPage} />}
+          <div className="admin-list-footer">
+            <Pagination
+              meta={
+                documentsData?.meta ?? {
+                  page,
+                  limit,
+                  total: 0,
+                  total_pages: 0,
+                  has_prev: false,
+                  has_next: false,
+                }
+              }
+              onPageChange={setPage}
+              onLimitChange={(next) => {
+                setLimit(next);
+                setPage(1);
+              }}
+              disabled={isFetching}
+            />
+          </div>
         </div>
       </div>
 
@@ -347,43 +381,34 @@ export default function AdminPartnerDocumentsPage() {
         <p className="text-zinc-400 text-sm mb-4">
           These terms are shown in the registration popup before partner submission.
         </p>
-        <div className="grid md:grid-cols-[1fr_180px_auto] gap-3 mb-4">
-          <input
-            value={newTerm.text}
-            onChange={(e) => setNewTerm((p) => ({ ...p, text: e.target.value }))}
-            placeholder="e.g. I confirm all uploaded documents are valid."
-            className="input-field"
-          />
-          <select
-            value={newTerm.module}
-            onChange={(e) => setNewTerm((p) => ({ ...p, module: e.target.value as "dining" | "event" | "venue" | "artist" | "both" }))}
-            className="input-field"
-          >
+        <form
+          onSubmit={termForm.handleSubmit(onCreateTerm)}
+          noValidate
+          className="grid md:grid-cols-[1fr_180px_auto] gap-3 mb-4"
+        >
+          <div>
+            <input
+              {...termForm.register("text")}
+              placeholder="e.g. I confirm all uploaded documents are valid."
+              className="input-field w-full"
+            />
+            {termForm.formState.errors.text && (
+              <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                {termForm.formState.errors.text.message}
+              </p>
+            )}
+          </div>
+          <select {...termForm.register("module")} className="input-field">
             <option value="both">All modules</option>
             <option value="dining">Dining only</option>
             <option value="event">Event only</option>
             <option value="venue">Venue only</option>
             <option value="artist">Artist only</option>
           </select>
-          <button
-            type="button"
-            disabled={creatingTerm}
-            onClick={async () => {
-              const text = newTerm.text.trim();
-              if (!text) return toast.error("Term text is required");
-              try {
-                await createTerm({ text, module: newTerm.module, is_active: true }).unwrap();
-                setNewTerm((p) => ({ ...p, text: "" }));
-                toast.success("Onboarding term added");
-              } catch (err: unknown) {
-                toast.error(extractApiError(err, "Failed to add onboarding term"));
-              }
-            }}
-            className="btn-primary disabled:opacity-50"
-          >
+          <button type="submit" disabled={creatingTerm} className="btn-primary disabled:opacity-50">
             Add term
           </button>
-        </div>
+        </form>
 
         <div className="space-y-2">
           {terms.map((term) => (

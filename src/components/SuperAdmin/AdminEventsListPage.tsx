@@ -11,6 +11,7 @@ import {
 } from '@/services/api';
 import SearchInput from '@/components/Shared/SearchInput';
 import Pagination from '@/components/Shared/Pagination';
+import { AdminListShimmer } from '@/components/Shared/Shimmer';
 import { PAGE_SIZE } from '@/lib/pagination';
 
 const STATUS_FILTERS = [
@@ -39,17 +40,16 @@ export default function AdminEventsPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
-  const { data, isLoading } = useGetAdminEventsQuery({
+  const { data, isLoading, isFetching } = useGetAdminEventsQuery({
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(statusFilter ? { status: statusFilter } : {}),
     ...(q.trim() ? { q: q.trim() } : {}),
   });
   const events = data?.items ?? [];
   const [updateEvent, { isLoading: isUpdating }] = useUpdateAdminEventMutation();
-
-  const pendingCount = data?.meta?.total ?? 0;
 
   const openDetail = (event: AdminEvent) => {
     setSelected(event);
@@ -100,23 +100,34 @@ export default function AdminEventsPage() {
   };
 
   if (isLoading) {
-    return <div className="portal-muted p-10 text-center">Loading Events...</div>;
+    return <AdminListShimmer rows={6} columns={6} showTabs tabCount={6} showToolbar />;
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-        <div>
-          <h2 className="portal-heading text-2xl font-bold">Events</h2>
-          <p className="portal-muted">
-            Review organizer submissions, then create & sign the dynamic contract. Events go public only after both signatures.
-            {statusFilter === 'PENDING_APPROVAL' && pendingCount > 0
-              ? ` ${pendingCount} awaiting review.`
-              : ''}
-          </p>
+    <div className="w-full">
+      <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 lg:mb-5 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-xl bg-slate-100/80 p-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.value || "all"}
+              type="button"
+              onClick={() => {
+                setStatusFilter(f.value);
+                setPage(1);
+              }}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                statusFilter === f.value
+                  ? "bg-white text-rose-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
-        <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-1 sm:justify-end">
           <SearchInput
+            className="w-full sm:max-w-xs lg:max-w-sm"
             value={q}
             onChange={(value) => {
               setQ(value);
@@ -124,87 +135,75 @@ export default function AdminEventsPage() {
             }}
             placeholder="Search event or organizer"
           />
-          <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.value || 'all'}
-              onClick={() => {
-                setStatusFilter(f.value);
-                setPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                statusFilter === f.value
-                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                  : 'text-zinc-400 border-white/10 hover:bg-white/5'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-          </div>
         </div>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
-            <tr>
-              <th className="px-6 py-4 font-medium">Event</th>
-              <th className="px-6 py-4 font-medium">Organizer</th>
-              <th className="px-6 py-4 font-medium">Status</th>
-              <th className="px-6 py-4 font-medium">Fees</th>
-              <th className="px-6 py-4 font-medium">Visible</th>
-              <th className="px-6 py-4 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
+      {isFetching && !isLoading ? (
+        <AdminListShimmer rows={limit > 10 ? 8 : 5} columns={6} showTabs={false} showToolbar={false} />
+      ) : events.length === 0 ? (
+        <div className="glass-panel rounded-2xl border border-white/5 text-center py-10 text-zinc-500 text-base">
+          No events found for this filter.
+        </div>
+      ) : (
+        <>
+          <div className="admin-card-grid">
             {events.map((event) => (
-              <tr key={event.id} className="hover:bg-white/5 transition-colors">
-                <td className="px-6 py-4">
-                  <button
-                    onClick={() => openDetail(event)}
-                    className="text-left font-medium portal-table-link hover:text-rose-600"
-                  >
-                    {event.name}
-                  </button>
-                  <div className="text-xs portal-table-muted mt-0.5">
-                    {event.category_name || 'Uncategorized'}
+              <article key={event.id} className="admin-data-card">
+                <div className="admin-data-card-header">
+                  <div className="min-w-0">
+                    <button
+                      onClick={() => openDetail(event)}
+                      className="admin-data-card-title text-left"
+                    >
+                      {event.name}
+                    </button>
+                    <p className="text-xs text-zinc-500 mt-0.5">{event.category_name || 'Uncategorized'}</p>
                   </div>
-                </td>
-                <td className="px-6 py-4 portal-table-muted">{event.organizer_name || '—'}</td>
-                <td className="px-6 py-4">
                   <span
-                    className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
+                    className={`shrink-0 px-2 py-1 rounded-md text-[0.6875rem] font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
                   >
                     {event.status.replace('_', ' ')}
                   </span>
-                </td>
-                <td className="px-6 py-4 text-sm portal-table-muted">
-                  <div>{Number(event.convenience_fee_percent || 0).toFixed(2)}% convenience</div>
-                  <div className="text-xs">
-                    {Number(event.commission_percent || 0).toFixed(2)}% commission
+                </div>
+                <div className="admin-data-card-body">
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Organizer</span>
+                    <div className="admin-data-card-value">{event.organizer_name || '—'}</div>
                   </div>
-                </td>
-                <td className="px-6 py-4">
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Fees</span>
+                    <div className="admin-data-card-value">
+                      {Number(event.convenience_fee_percent || 0).toFixed(2)}% convenience
+                      <div className="text-xs text-zinc-500">
+                        {Number(event.commission_percent || 0).toFixed(2)}% commission
+                      </div>
+                    </div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Visible</span>
+                    <div className="admin-data-card-value">
+                      {event.is_visible ? 'Yes' : 'No'}
+                    </div>
+                  </div>
+                </div>
+                <div className="admin-data-card-actions">
                   <button
                     onClick={() => toggleVisibility(event)}
-                    className="text-zinc-400 hover:text-white"
+                    className="p-2 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
                     title="Toggle visibility"
                   >
-                    {event.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                    {event.is_visible ? <Eye size={17} /> : <EyeOff size={17} />}
                   </button>
-                </td>
-                <td className="px-6 py-4 text-right space-x-2">
                   <Link
                     href={`/admin/events/${event.id}`}
-                    className="text-zinc-400 hover:text-white text-sm"
+                    className="text-sm font-medium text-zinc-600 hover:text-rose-600 px-2 py-1"
                   >
                     Details
                   </Link>
                   {event.status === 'PENDING_APPROVAL' && (
                     <button
                       onClick={() => openDetail(event)}
-                      className="text-green-400 hover:text-green-300 text-sm font-medium"
+                      className="text-sm font-medium text-green-600 hover:text-green-700 px-2 py-1"
                     >
                       Review
                     </button>
@@ -212,24 +211,118 @@ export default function AdminEventsPage() {
                   {(event.status === 'PENDING_APPROVAL' || event.status === 'APPROVED') && (
                     <Link
                       href={`/admin/event-contracts/create?eventId=${event.id}`}
-                      className="text-emerald-400 hover:text-emerald-300 text-sm font-medium inline-flex items-center gap-1"
+                      className="text-sm font-medium text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 px-2 py-1"
                     >
                       <FileSignature size={14} /> Create contract
                     </Link>
                   )}
-                </td>
-              </tr>
+                </div>
+              </article>
             ))}
-            {events.length === 0 && (
-              <tr>
-                <td colSpan={6} className="text-center py-10 text-zinc-500">
-                  No events found for this filter.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        {data?.meta && <Pagination meta={data.meta} onPageChange={setPage} />}
+          </div>
+
+          <div className="admin-table-desktop glass-panel rounded-2xl border border-white/5 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-base">
+                <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
+                  <tr>
+                    <th className="px-5 py-3.5 font-semibold">Event</th>
+                    <th className="px-5 py-3.5 font-semibold">Organizer</th>
+                    <th className="px-5 py-3.5 font-semibold">Status</th>
+                    <th className="px-5 py-3.5 font-semibold">Fees</th>
+                    <th className="px-5 py-3.5 font-semibold">Visible</th>
+                    <th className="px-5 py-3.5 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {events.map((event) => (
+                    <tr key={event.id} className="hover:bg-white/5 transition-colors">
+                      <td className="px-5 py-4">
+                        <button
+                          onClick={() => openDetail(event)}
+                          className="text-left font-semibold portal-table-link hover:text-rose-600"
+                        >
+                          {event.name}
+                        </button>
+                        <div className="text-xs portal-table-muted mt-0.5">
+                          {event.category_name || 'Uncategorized'}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 portal-table-muted">{event.organizer_name || '—'}</td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
+                        >
+                          {event.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm portal-table-muted">
+                        <div>{Number(event.convenience_fee_percent || 0).toFixed(2)}% convenience</div>
+                        <div className="text-xs">
+                          {Number(event.commission_percent || 0).toFixed(2)}% commission
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button
+                          onClick={() => toggleVisibility(event)}
+                          className="text-zinc-400 hover:text-white"
+                          title="Toggle visibility"
+                        >
+                          {event.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                        </button>
+                      </td>
+                      <td className="px-5 py-4 text-right space-x-2">
+                        <Link
+                          href={`/admin/events/${event.id}`}
+                          className="text-zinc-400 hover:text-white text-sm"
+                        >
+                          Details
+                        </Link>
+                        {event.status === 'PENDING_APPROVAL' && (
+                          <button
+                            onClick={() => openDetail(event)}
+                            className="text-green-400 hover:text-green-300 text-sm font-medium"
+                          >
+                            Review
+                          </button>
+                        )}
+                        {(event.status === 'PENDING_APPROVAL' || event.status === 'APPROVED') && (
+                          <Link
+                            href={`/admin/event-contracts/create?eventId=${event.id}`}
+                            className="text-emerald-400 hover:text-emerald-300 text-sm font-medium inline-flex items-center gap-1"
+                          >
+                            <FileSignature size={14} /> Create contract
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="admin-list-footer">
+        <Pagination
+          meta={
+            data?.meta ?? {
+              page,
+              limit,
+              total: 0,
+              total_pages: 0,
+              has_prev: false,
+              has_next: false,
+            }
+          }
+          onPageChange={setPage}
+          onLimitChange={(next) => {
+            setLimit(next);
+            setPage(1);
+          }}
+          disabled={isFetching}
+        />
       </div>
 
       {selected && (

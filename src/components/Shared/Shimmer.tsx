@@ -194,3 +194,127 @@ export function EventReviewsShimmer() {
     </Wrap>
   );
 }
+
+/** Super Admin list loading state — matches tabs/search bar, cards (<lg), table (lg+), pagination */
+export function AdminListShimmer({
+  rows = 6,
+  columns = 6,
+  showTabs = false,
+  showToolbar = true,
+  showPagination = true,
+  tabCount = 2,
+}: {
+  rows?: number;
+  columns?: number;
+  showTabs?: boolean;
+  showToolbar?: boolean;
+  showPagination?: boolean;
+  tabCount?: number;
+}) {
+  const cardCount = Math.min(Math.max(rows, 2), 4);
+
+  return (
+    <Wrap>
+      <div className="w-full space-y-4">
+        {(showToolbar || showTabs) && (
+          <div className="mb-1 flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+            {showTabs ? (
+              <div className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-100/80 p-1">
+                {Array.from({ length: tabCount }).map((_, i) => (
+                  <Skeleton
+                    key={i}
+                    width={i === 0 ? 72 : 88}
+                    height={36}
+                    borderRadius={8}
+                    className="!rounded-lg"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="hidden lg:block" />
+            )}
+            {showToolbar && (
+              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <Skeleton height={42} borderRadius={12} className="w-full sm:!max-w-xs lg:!max-w-sm" />
+                <Skeleton height={42} width={148} borderRadius={12} className="!w-full sm:!w-[9.25rem]" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Mobile / tablet cards */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+          {Array.from({ length: cardCount }).map((_, i) => (
+            <div
+              key={i}
+              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                <Skeleton width="55%" height={18} />
+                <Skeleton width={76} height={24} borderRadius={999} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2">
+                {[0, 1, 2, 3].map((f) => (
+                  <div
+                    key={f}
+                    className={`border-b border-slate-100 px-4 py-3 ${f >= 2 ? "sm:col-span-2" : ""}`}
+                  >
+                    <Skeleton width={56} height={10} className="mb-2" />
+                    <Skeleton width={f >= 2 ? "85%" : "70%"} height={14} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-end gap-1.5 border-t border-slate-100 bg-slate-50/80 px-3 py-2.5">
+                <Skeleton width={34} height={34} borderRadius={10} />
+                <Skeleton width={34} height={34} borderRadius={10} />
+                <Skeleton width={44} height={28} borderRadius={999} />
+                <Skeleton width={34} height={34} borderRadius={10} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:block">
+          <div
+            className="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3.5"
+            style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+          >
+            {Array.from({ length: columns }).map((_, i) => (
+              <Skeleton key={i} height={12} width={i === columns - 1 ? "40%" : "55%"} />
+            ))}
+          </div>
+          {Array.from({ length: rows }).map((_, r) => (
+            <div
+              key={r}
+              className="grid gap-3 border-b border-slate-100 px-5 py-4 last:border-0"
+              style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+            >
+              {Array.from({ length: columns }).map((_, c) => (
+                <Skeleton
+                  key={c}
+                  height={16}
+                  width={c === 0 ? "70%" : c === columns - 1 ? "45%" : "60%"}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {showPagination && (
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <Skeleton width={160} height={16} />
+              <Skeleton width={110} height={32} borderRadius={10} />
+            </div>
+            <div className="inline-flex items-center gap-1 sm:gap-2 ml-auto">
+              <Skeleton width={36} height={32} borderRadius={10} />
+              <Skeleton width={40} height={16} />
+              <Skeleton width={36} height={32} borderRadius={10} />
+            </div>
+          </div>
+        )}
+      </div>
+    </Wrap>
+  );
+}

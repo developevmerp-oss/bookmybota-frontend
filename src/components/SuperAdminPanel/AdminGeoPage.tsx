@@ -35,14 +35,7 @@ export default function AdminGeoPage() {
   const cityList = cities;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Location hierarchy</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Country → Region/State → City (existing City Masters) → Location/locality
-        </p>
-      </div>
-
+    <div className="w-full space-y-8">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
         <h2 className="font-semibold text-slate-900">Countries</h2>
         <div className="flex gap-2">

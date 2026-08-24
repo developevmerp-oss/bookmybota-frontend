@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { MapPin, Plus, Star, Trash2 } from "lucide-react";
+import { Plus, Star, Trash2 } from "lucide-react";
 import {
   useGetAdminCitiesQuery,
   useCreateAdminCityMutation,
@@ -12,9 +14,14 @@ import {
   type CityMaster,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  adminCityCreateSchema,
+  type AdminCityCreateValues,
+} from "@/lib/adminFormSchemas";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { PAGE_SIZE } from "@/lib/pagination";
 
@@ -55,13 +62,7 @@ function ActiveToggle({
 export default function AdminCitiesPage() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [newCity, setNewCity] = useState({
-    name: "",
-    state: "",
-    country: "",
-    icon_url: "",
-    is_popular: false,
-  });
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
@@ -69,13 +70,34 @@ export default function AdminCitiesPage() {
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<AdminCityCreateValues>({
+    resolver: yupResolver(adminCityCreateSchema),
+    defaultValues: {
+      name: "",
+      state: "",
+      country: "",
+      icon_url: "",
+      is_popular: false,
+    },
+    mode: "onSubmit",
+  });
+  const isPopular = watch("is_popular");
+  const iconUrl = watch("icon_url") || "";
+
   const queryArg = useMemo(
     () => ({
       page,
-      limit: PAGE_SIZE,
+      limit,
       ...(q.trim() ? { q: q.trim() } : {}),
     }),
-    [q, page]
+    [q, page, limit]
   );
 
   const {
@@ -93,17 +115,8 @@ export default function AdminCitiesPage() {
   const [deleteCity] = useDeleteAdminCityMutation();
   const [uploadImage, { isLoading: uploadingIcon }] = useUploadImageMutation();
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCity.name.trim()) {
-      toast.error("City name is required");
-      return;
-    }
-    if (!newCity.country) {
-      toast.error("Please select a country");
-      return;
-    }
-    if (newCity.is_popular) {
+  const onCreateValid = async (values: AdminCityCreateValues) => {
+    if (values.is_popular) {
       const popularCount = cities.filter((c) => c.is_popular).length;
       if (popularCount >= 10) {
         toast.error("Maximum 10 popular cities allowed. Unmark one first.");
@@ -112,15 +125,18 @@ export default function AdminCitiesPage() {
     }
     try {
       const created = await createCity({
-        name: newCity.name.trim(),
-        state: newCity.state.trim() || undefined,
-        country: newCity.country,
-        icon_url: newCity.icon_url.trim() || undefined,
-        is_popular: newCity.is_popular,
+        name: values.name.trim(),
+        state: values.state?.trim() || undefined,
+        country: values.country,
+        icon_url: values.icon_url?.trim() || undefined,
+        is_popular: values.is_popular,
         is_active: true,
       }).unwrap();
-      toast.success(`City "${created.name}" added successfully`);
-      setNewCity({ name: "", state: "", country: "", icon_url: "", is_popular: false });
+      toast.success(
+        (created as { message?: string }).message ||
+          `City "${created.name}" added successfully`
+      );
+      reset({ name: "", state: "", country: "", icon_url: "", is_popular: false });
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to add city"));
     }
@@ -208,21 +224,10 @@ export default function AdminCitiesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <MapPin className="text-rose-500" size={24} />
-            City Masters
-          </h1>
-          <p className="text-zinc-400 text-sm mt-1">
-            Manage cities used in the top-bar filter, dining profiles, and event venues.
-          </p>
-        </div>
-      </div>
-
+    <div className="w-full space-y-4 sm:space-y-6">
       <form
-        onSubmit={handleCreate}
+        onSubmit={handleSubmit(onCreateValid)}
+        noValidate
         className="glass-panel rounded-2xl border border-white/5 p-5 space-y-4"
       >
         <h2 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
@@ -230,66 +235,66 @@ export default function AdminCitiesPage() {
           Add city
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input
-            type="text"
-            placeholder="City name *"
-            value={newCity.name}
-            onChange={(e) => setNewCity((p) => ({ ...p, name: e.target.value }))}
-            className="input-field"
-          />
-          <input
-            type="text"
-            placeholder="State / region"
-            value={newCity.state}
-            onChange={(e) => setNewCity((p) => ({ ...p, state: e.target.value }))}
-            className="input-field"
-          />
-          <select
-            value={newCity.country}
-            onChange={(e) => setNewCity((p) => ({ ...p, country: e.target.value }))}
-            className="input-field"
-            required
-          >
-            <option value="">Select country *</option>
-            {CITY_COUNTRIES.map((country) => (
-              <option key={country} value={country}>
-                {country}
-              </option>
-            ))}
-          </select>
-          <label className="flex items-center gap-2 text-sm text-zinc-300 px-1">
+          <div>
             <input
-              type="checkbox"
-              checked={newCity.is_popular}
-              onChange={(e) => setNewCity((p) => ({ ...p, is_popular: e.target.checked }))}
-              className="rounded border-zinc-600"
+              type="text"
+              placeholder="City name *"
+              {...register("name")}
+              className="input-field w-full"
             />
+            {errors.name && (
+              <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.name.message}</p>
+            )}
+          </div>
+          <div>
+            <input
+              type="text"
+              placeholder="State / region"
+              {...register("state")}
+              className="input-field w-full"
+            />
+          </div>
+          <div>
+            <select {...register("country")} className="input-field w-full">
+              <option value="">Select country *</option>
+              {CITY_COUNTRIES.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
+              ))}
+            </select>
+            {errors.country && (
+              <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.country.message}</p>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-sm text-zinc-300 px-1">
+            <input type="checkbox" {...register("is_popular")} className="rounded border-zinc-600" />
             Mark as popular
           </label>
         </div>
-        {newCity.is_popular && (
+        {isPopular && (
           <div>
             <p className="text-xs text-zinc-500 mb-2">
               Popular city icon (optional). Shown in the top-bar city picker. Square PNG/SVG works best.
             </p>
             <CroppedImageField
-              value={newCity.icon_url}
+              value={iconUrl}
               aspect={1}
               disabled={uploadingIcon}
               previewClassName="w-16 h-16 rounded-xl border border-white/10 bg-zinc-900/40 object-contain"
               emptyClassName="flex flex-col items-center justify-center w-16 h-16 rounded-xl border border-dashed border-white/20 hover:border-rose-400"
-              onRemove={() => setNewCity((p) => ({ ...p, icon_url: "" }))}
+              onRemove={() => setValue("icon_url", "", { shouldDirty: true })}
               onCroppedFile={async (file) => {
                 const fd = new FormData();
                 fd.append("image", file);
                 try {
                   const res = await uploadImage(fd).unwrap();
-                  if (res.url) setNewCity((p) => ({ ...p, icon_url: res.url }));
+                  if (res.url) setValue("icon_url", res.url, { shouldDirty: true });
                 } catch {
                   toast.error("Failed to upload icon");
                 }
               }}
-              emptyContent={<span className="text-[10px] text-zinc-500">Icon</span>}
+              emptyContent={<span className="text-[0.625rem] text-zinc-500">Icon</span>}
             />
           </div>
         )}
@@ -320,7 +325,7 @@ export default function AdminCitiesPage() {
         </div>
 
         {isLoading ? (
-          <div className="p-10 text-center text-zinc-400 text-sm">Loading cities…</div>
+          <AdminListShimmer rows={6} columns={7} showTabs={false} showToolbar={false} />
         ) : isError ? (
           <div className="p-10 text-center space-y-3">
             <p className="text-rose-400 text-sm">{extractApiError(error, "Failed to load cities")}</p>
@@ -333,7 +338,98 @@ export default function AdminCitiesPage() {
             No cities yet. Add your first city above.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="admin-card-grid">
+              {cities.map((city) => (
+                <article key={city.id} className="admin-data-card">
+                  <div className="admin-data-card-header">
+                    <div className="min-w-0">
+                      <p className="admin-data-card-title">{city.name}</p>
+                      {city.slug ? <p className="text-xs text-zinc-500 mt-0.5">{city.slug}</p> : null}
+                    </div>
+                    <CroppedImageField
+                      value={city.icon_url || ""}
+                      aspect={1}
+                      disabled={uploadingIcon}
+                      previewClassName="w-10 h-10 rounded-lg border border-white/10 bg-zinc-900/40 object-contain"
+                      emptyClassName="flex items-center justify-center w-10 h-10 rounded-lg border border-dashed border-white/20 hover:border-rose-400"
+                      onRemove={() => clearCityIcon(city)}
+                      onCroppedFile={(file) => uploadCityIcon(city, file)}
+                      emptyContent={<span className="text-[0.5625rem] text-zinc-500">+</span>}
+                    />
+                  </div>
+                  <div className="admin-data-card-body">
+                    <div className="admin-data-card-row">
+                      <span className="admin-data-card-label">State</span>
+                      <div className="admin-data-card-value">{city.state || "—"}</div>
+                    </div>
+                    <div className="admin-data-card-row">
+                      <span className="admin-data-card-label">Country</span>
+                      <div className="admin-data-card-value">
+                        <select
+                          value={
+                            city.country && CITY_COUNTRIES.includes(city.country as (typeof CITY_COUNTRIES)[number])
+                              ? city.country
+                              : ""
+                          }
+                          onChange={(e) => updateCountry(city, e.target.value)}
+                          className="bg-zinc-900/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-rose-500 w-full"
+                        >
+                          <option value="">Select country</option>
+                          {CITY_COUNTRIES.map((country) => (
+                            <option key={country} value={country}>
+                              {country}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="admin-data-card-row">
+                      <span className="admin-data-card-label">Popular</span>
+                      <div className="admin-data-card-value">
+                        <button
+                          type="button"
+                          onClick={() => togglePopular(city)}
+                          className={`inline-flex items-center justify-center p-1.5 rounded-lg transition-colors ${
+                            city.is_popular
+                              ? "text-amber-400 bg-amber-500/10"
+                              : "text-zinc-500 hover:text-amber-400"
+                          }`}
+                          title={city.is_popular ? "Remove from popular" : "Mark as popular"}
+                        >
+                          <Star size={16} fill={city.is_popular ? "currentColor" : "none"} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="admin-data-card-row">
+                      <span className="admin-data-card-label">Active</span>
+                      <div className="admin-data-card-value">
+                        <ActiveToggle
+                          active={city.is_active}
+                          onToggle={() => toggleActive(city)}
+                          title={
+                            city.is_active
+                              ? "Active — visible in city pickers"
+                              : "Inactive — hidden from city pickers"
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="admin-data-card-actions">
+                    <button
+                      type="button"
+                      onClick={() => askDelete(city)}
+                      className="inline-flex items-center justify-center p-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      title="Delete city"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="admin-table-desktop overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-zinc-500 border-b border-white/5">
@@ -364,7 +460,7 @@ export default function AdminCitiesPage() {
                         emptyClassName="flex items-center justify-center w-10 h-10 rounded-lg border border-dashed border-white/20 hover:border-rose-400"
                         onRemove={() => clearCityIcon(city)}
                         onCroppedFile={(file) => uploadCityIcon(city, file)}
-                        emptyContent={<span className="text-[9px] text-zinc-500">+</span>}
+                        emptyContent={<span className="text-[0.5625rem] text-zinc-500">+</span>}
                       />
                     </td>
                     <td className="px-4 py-3 text-zinc-400">{city.state || "—"}</td>
@@ -427,10 +523,30 @@ export default function AdminCitiesPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
 
-        {data?.meta && <Pagination meta={data.meta} onPageChange={setPage} disabled={isFetching} />}
+        <div className="admin-list-footer">
+          <Pagination
+            meta={
+              data?.meta ?? {
+                page,
+                limit,
+                total: 0,
+                total_pages: 0,
+                has_prev: false,
+                has_next: false,
+              }
+            }
+            onPageChange={setPage}
+            onLimitChange={(next) => {
+              setLimit(next);
+              setPage(1);
+            }}
+            disabled={isFetching}
+          />
+        </div>
       </div>
 
       <ConfirmDialog

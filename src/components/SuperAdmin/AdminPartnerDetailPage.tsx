@@ -142,7 +142,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <Link
         href={listHref}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-400 hover:text-white"

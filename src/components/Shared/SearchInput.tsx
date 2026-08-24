@@ -39,7 +39,7 @@ export default function SearchInput({
         value={local}
         onChange={(e) => setLocal(e.target.value)}
         placeholder={placeholder}
-        className="input-field pl-9 w-full sm:w-72"
+        className="input-field pl-9 w-full"
       />
     </div>
   );

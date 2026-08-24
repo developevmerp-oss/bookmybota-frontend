@@ -46,7 +46,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
 
   if (mode === "create") {
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full">
         <PartnerOnboardForm
           partnerType={module}
           variant="dark"
@@ -87,7 +87,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full">
       <PartnerOnboardForm
         partnerType={module}
         variant="dark"

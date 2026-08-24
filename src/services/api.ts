@@ -1392,10 +1392,52 @@ export const api = createApi({
       invalidatesTags: [],
     }),
 
-    getMe: builder.query<{ id: string; role: string; business_id?: string; customer_id?: string; email?: string }, void>({
+    getMe: builder.query<
+      {
+        id: string;
+        role: string;
+        business_id?: string;
+        customer_id?: string;
+        email?: string;
+        name?: string | null;
+        phone?: string | null;
+      },
+      void
+    >({
       query: () => '/auth/me',
-      transformResponse: (res: { data: { id: string; role: string; business_id?: string; customer_id?: string; email?: string } }) =>
-        res.data,
+      transformResponse: (res: {
+        data: {
+          id: string;
+          role: string;
+          business_id?: string;
+          customer_id?: string;
+          email?: string;
+          name?: string | null;
+          phone?: string | null;
+        };
+      }) => res.data,
+    }),
+
+    updateMyProfile: builder.mutation<
+      {
+        message?: string;
+        data: {
+          id: string;
+          email: string;
+          role: string;
+          business_id?: string;
+          customer_id?: string;
+          name?: string | null;
+          phone?: string | null;
+        };
+      },
+      { name: string; phone: string }
+    >({
+      query: (body) => ({
+        url: '/auth/profile',
+        method: 'PUT',
+        body,
+      }),
     }),
 
     registerCustomer: builder.mutation<
@@ -3731,6 +3773,7 @@ export const {
   useResetPasswordMutation,
   useChangePasswordMutation,
   useGetMeQuery,
+  useUpdateMyProfileMutation,
   useRegisterCustomerMutation,
   useSendCustomerOtpMutation,
   useVerifyCustomerOtpMutation,

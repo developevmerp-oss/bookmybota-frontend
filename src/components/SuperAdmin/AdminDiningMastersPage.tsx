@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { ChefHat, LayoutGrid, Plus, Trash2, UtensilsCrossed } from "lucide-react";
+import { ChefHat, LayoutGrid, Plus, Trash2 } from "lucide-react";
 import {
   useGetAdminDiningCuisinesQuery,
   useCreateAdminDiningCuisineMutation,
@@ -17,9 +19,16 @@ import {
   type DiningCuisineMaster,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  adminCuisineCreateSchema,
+  adminCollectionCreateSchema,
+  type AdminCuisineCreateValues,
+  type AdminCollectionCreateValues,
+} from "@/lib/adminFormSchemas";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { PAGE_SIZE } from "@/lib/pagination";
 
@@ -57,8 +66,7 @@ export default function AdminDiningMastersPage() {
   const [tab, setTab] = useState<"cuisines" | "collections">("cuisines");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [newCuisine, setNewCuisine] = useState({ name: "", image_url: "" });
-  const [newCollection, setNewCollection] = useState({ title: "", subtitle: "", image_url: "" });
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
@@ -66,13 +74,26 @@ export default function AdminDiningMastersPage() {
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
+  const cuisineForm = useForm<AdminCuisineCreateValues>({
+    resolver: yupResolver(adminCuisineCreateSchema),
+    defaultValues: { name: "", image_url: "" },
+    mode: "onSubmit",
+  });
+  const collectionForm = useForm<AdminCollectionCreateValues>({
+    resolver: yupResolver(adminCollectionCreateSchema),
+    defaultValues: { title: "", subtitle: "", image_url: "" },
+    mode: "onSubmit",
+  });
+  const cuisineImageUrl = cuisineForm.watch("image_url") || "";
+  const collectionImageUrl = collectionForm.watch("image_url") || "";
+
   const cuisineQueryArg = useMemo(
     () => ({
       page,
-      limit: PAGE_SIZE,
+      limit,
       ...(q.trim() ? { q: q.trim() } : {}),
     }),
-    [q, page]
+    [q, page, limit]
   );
 
   const {
@@ -93,10 +114,10 @@ export default function AdminDiningMastersPage() {
   const collectionQueryArg = useMemo(
     () => ({
       page,
-      limit: PAGE_SIZE,
+      limit,
       ...(q.trim() ? { q: q.trim() } : {}),
     }),
-    [q, page]
+    [q, page, limit]
   );
 
   const {
@@ -118,31 +139,28 @@ export default function AdminDiningMastersPage() {
     try {
       const res = await uploadImage(formData).unwrap();
       if (!res.url) return;
-      if (target === "cuisine") setNewCuisine((p) => ({ ...p, image_url: res.url }));
-      else setNewCollection((p) => ({ ...p, image_url: res.url }));
+      if (target === "cuisine") {
+        cuisineForm.setValue("image_url", res.url, { shouldValidate: true, shouldDirty: true });
+      } else {
+        collectionForm.setValue("image_url", res.url, { shouldValidate: true, shouldDirty: true });
+      }
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to upload image"));
     }
   };
 
-  const handleCreateCuisine = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCuisine.name.trim()) {
-      toast.error("Cuisine name is required");
-      return;
-    }
-    if (!newCuisine.image_url.trim()) {
-      toast.error("Cuisine image is required");
-      return;
-    }
+  const onCreateCuisine = async (values: AdminCuisineCreateValues) => {
     try {
       const created = await createCuisine({
-        name: newCuisine.name.trim(),
-        image_url: newCuisine.image_url.trim(),
+        name: values.name.trim(),
+        image_url: values.image_url.trim(),
         is_active: true,
       }).unwrap();
-      toast.success(`Cuisine "${created.name}" added successfully`);
-      setNewCuisine({ name: "", image_url: "" });
+      toast.success(
+        (created as { message?: string }).message ||
+          `Cuisine "${created.name}" added successfully`
+      );
+      cuisineForm.reset({ name: "", image_url: "" });
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to add cuisine"));
     }
@@ -165,25 +183,19 @@ export default function AdminDiningMastersPage() {
     }
   };
 
-  const handleCreateCollection = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCollection.title.trim()) {
-      toast.error("Collection name is required");
-      return;
-    }
-    if (!newCollection.image_url.trim()) {
-      toast.error("Collection image is required");
-      return;
-    }
+  const onCreateCollection = async (values: AdminCollectionCreateValues) => {
     try {
       const created = await createCollection({
-        title: newCollection.title.trim(),
-        subtitle: newCollection.subtitle.trim() || undefined,
-        image_url: newCollection.image_url.trim(),
+        title: values.title.trim(),
+        subtitle: values.subtitle?.trim() || undefined,
+        image_url: values.image_url?.trim() || "",
         is_active: true,
       }).unwrap();
-      toast.success(`Collection "${created.title}" added successfully`);
-      setNewCollection({ title: "", subtitle: "", image_url: "" });
+      toast.success(
+        (created as { message?: string }).message ||
+          `Collection "${created.title}" added successfully`
+      );
+      collectionForm.reset({ title: "", subtitle: "", image_url: "" });
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to add collection"));
     }
@@ -210,28 +222,16 @@ export default function AdminDiningMastersPage() {
   const collectionListLoading = collectionsLoading && collections.length === 0;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-          <span className="bg-rose-500/20 text-rose-500 p-2 rounded-xl">
-            <UtensilsCrossed size={28} />
-          </span>
-          Dining Masters
-        </h1>
-        <p className="text-zinc-400 mt-2">
-          Manage dining catalogs used by Super Admin and the public dining pages. Only{" "}
-          <strong className="text-green-400/90">active</strong> cuisines and collections appear publicly.
-        </p>
-        <div className="mt-4">
-          <SearchInput
-            value={q}
-            onChange={(value) => {
-              setQ(value);
-              setPage(1);
-            }}
-            placeholder="Search this list"
-          />
-        </div>
+    <div className="w-full space-y-6">
+      <div className="admin-list-toolbar">
+        <SearchInput
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search this list"
+        />
       </div>
 
       <div className="flex gap-2 border-b border-white/10">
@@ -269,28 +269,38 @@ export default function AdminDiningMastersPage() {
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <Plus size={18} className="text-rose-500" /> Add cuisine
             </h3>
-            <form onSubmit={handleCreateCuisine} className="space-y-4">
+            <form onSubmit={cuisineForm.handleSubmit(onCreateCuisine)} noValidate className="space-y-4">
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Cuisine name</label>
                 <input
-                  value={newCuisine.name}
-                  onChange={(e) => setNewCuisine((p) => ({ ...p, name: e.target.value }))}
+                  {...cuisineForm.register("name")}
                   placeholder="e.g. Indian"
                   className="input-field w-full"
-                  required
                 />
+                {cuisineForm.formState.errors.name && (
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                    {cuisineForm.formState.errors.name.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Cuisine image</label>
                 <CroppedImageField
-                  value={newCuisine.image_url}
+                  value={cuisineImageUrl}
                   aspect={1}
                   previewClassName="w-full h-40 rounded-xl border border-white/10"
                   emptyClassName="flex flex-col items-center justify-center w-full h-40 border-2 border-zinc-700 border-dashed rounded-xl bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
                   emptyLabel="Add cuisine image"
-                  onRemove={() => setNewCuisine((p) => ({ ...p, image_url: "" }))}
+                  onRemove={() =>
+                    cuisineForm.setValue("image_url", "", { shouldValidate: true, shouldDirty: true })
+                  }
                   onCroppedFile={(file) => handleUploadImage(file, "cuisine")}
                 />
+                {cuisineForm.formState.errors.image_url && (
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                    {cuisineForm.formState.errors.image_url.message}
+                  </p>
+                )}
               </div>
               <p className="text-xs text-zinc-500">New cuisines are active by default.</p>
               <button
@@ -313,7 +323,7 @@ export default function AdminDiningMastersPage() {
             </div>
 
             {cuisineListLoading ? (
-              <div className="p-8 text-center text-zinc-500">Loading cuisines...</div>
+              <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar={false} />
             ) : cuisinesError ? (
               <div className="p-8 text-center space-y-3">
                 <p className="text-rose-400">{extractApiError(cuisinesErrorData, "Failed to load cuisines")}</p>
@@ -324,6 +334,7 @@ export default function AdminDiningMastersPage() {
             ) : cuisines.length === 0 ? (
               <div className="p-8 text-center text-zinc-500">No cuisines yet. Add one using the form.</div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-zinc-900/50 text-zinc-400 border-b border-white/5">
                   <tr>
@@ -383,8 +394,28 @@ export default function AdminDiningMastersPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
-            {cuisinesData?.meta && <Pagination meta={cuisinesData.meta} onPageChange={setPage} />}
+            <div className="admin-list-footer">
+              <Pagination
+                meta={
+                  cuisinesData?.meta ?? {
+                    page,
+                    limit,
+                    total: 0,
+                    total_pages: 0,
+                    has_prev: false,
+                    has_next: false,
+                  }
+                }
+                onPageChange={setPage}
+                onLimitChange={(next) => {
+                  setLimit(next);
+                  setPage(1);
+                }}
+                disabled={cuisinesFetching}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -395,22 +426,28 @@ export default function AdminDiningMastersPage() {
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <Plus size={18} className="text-rose-500" /> Add collection
             </h3>
-            <form onSubmit={handleCreateCollection} className="space-y-4">
+            <form
+              onSubmit={collectionForm.handleSubmit(onCreateCollection)}
+              noValidate
+              className="space-y-4"
+            >
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Collection name</label>
                 <input
-                  value={newCollection.title}
-                  onChange={(e) => setNewCollection((p) => ({ ...p, title: e.target.value }))}
+                  {...collectionForm.register("title")}
                   placeholder="e.g. Hidden Gems"
                   className="input-field w-full"
-                  required
                 />
+                {collectionForm.formState.errors.title && (
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                    {collectionForm.formState.errors.title.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Subtitle</label>
                 <input
-                  value={newCollection.subtitle}
-                  onChange={(e) => setNewCollection((p) => ({ ...p, subtitle: e.target.value }))}
+                  {...collectionForm.register("subtitle")}
                   placeholder="e.g. Secret neighborhood favorites"
                   className="input-field w-full"
                 />
@@ -418,12 +455,14 @@ export default function AdminDiningMastersPage() {
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Collection image</label>
                 <CroppedImageField
-                  value={newCollection.image_url}
+                  value={collectionImageUrl}
                   aspect={3 / 4}
                   previewClassName="w-full h-40 rounded-xl border border-white/10"
                   emptyClassName="flex flex-col items-center justify-center w-full h-40 border-2 border-zinc-700 border-dashed rounded-xl bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
                   emptyLabel="Add collection image"
-                  onRemove={() => setNewCollection((p) => ({ ...p, image_url: "" }))}
+                  onRemove={() =>
+                    collectionForm.setValue("image_url", "", { shouldValidate: true, shouldDirty: true })
+                  }
                   onCroppedFile={(file) => handleUploadImage(file, "collection")}
                 />
               </div>
@@ -450,7 +489,7 @@ export default function AdminDiningMastersPage() {
             </div>
 
             {collectionListLoading ? (
-              <div className="p-8 text-center text-zinc-500">Loading collections...</div>
+              <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar={false} />
             ) : collectionsError ? (
               <div className="p-8 text-center space-y-3">
                 <p className="text-rose-400">{extractApiError(collectionsErrorData, "Failed to load collections")}</p>
@@ -461,6 +500,7 @@ export default function AdminDiningMastersPage() {
             ) : collections.length === 0 ? (
               <div className="p-8 text-center text-zinc-500">No collections yet. Add one using the form.</div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-zinc-900/50 text-zinc-400 border-b border-white/5">
                   <tr>
@@ -528,8 +568,28 @@ export default function AdminDiningMastersPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
-            {collectionsData?.meta && <Pagination meta={collectionsData.meta} onPageChange={setPage} />}
+            <div className="admin-list-footer">
+              <Pagination
+                meta={
+                  collectionsData?.meta ?? {
+                    page,
+                    limit,
+                    total: 0,
+                    total_pages: 0,
+                    has_prev: false,
+                    has_next: false,
+                  }
+                }
+                onPageChange={setPage}
+                onLimitChange={(next) => {
+                  setLimit(next);
+                  setPage(1);
+                }}
+                disabled={collectionsFetching}
+              />
+            </div>
           </div>
         </div>
       )}

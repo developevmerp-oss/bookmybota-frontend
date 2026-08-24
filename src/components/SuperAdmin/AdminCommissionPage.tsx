@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useGetCommissionLedgerQuery } from '@/services/api';
 import { formatDate } from '@/lib/dateFormat';
 import { formatMoney } from '@/lib/currencyFormat';
+import { AdminListShimmer } from '@/components/Shared/Shimmer';
 
 const money = formatMoney;
 
@@ -18,21 +19,15 @@ export default function AdminCommissionPage() {
   });
 
   if (isLoading) {
-    return <div className="text-white p-10 text-center">Loading Fees Ledger...</div>;
+    return <AdminListShimmer rows={6} columns={8} showToolbar showTabs={false} />;
   }
 
   const rows = data?.rows || [];
   const totals = data?.totals;
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Fees & Commission Ledger</h2>
-          <p className="text-zinc-400">
-            Convenience fee from customers + commission % from organizers (confirmed / used bookings).
-          </p>
-        </div>
+    <div className="w-full">
+      <div className="admin-list-toolbar">
         <div className="flex flex-wrap gap-2 items-end">
           <div>
             <label className="block text-xs text-zinc-500 mb-1">From</label>
@@ -80,14 +75,14 @@ export default function AdminCommissionPage() {
           <div className="text-2xl font-bold text-amber-400 mt-1">
             {money(totals?.convenience_fee_total)}
           </div>
-          <div className="text-[10px] text-zinc-500 mt-1">From customers</div>
+          <div className="text-[0.625rem] text-zinc-500 mt-1">From customers</div>
         </div>
         <div className="glass-panel rounded-2xl border border-white/5 p-4">
           <div className="text-xs text-zinc-500 uppercase tracking-wider">Commission</div>
           <div className="text-2xl font-bold text-violet-400 mt-1">
             {money(totals?.commission_total)}
           </div>
-          <div className="text-[10px] text-zinc-500 mt-1">From organizers</div>
+          <div className="text-[0.625rem] text-zinc-500 mt-1">From organizers</div>
         </div>
         <div className="glass-panel rounded-2xl border border-white/5 p-4">
           <div className="text-xs text-zinc-500 uppercase tracking-wider">Platform earned</div>
@@ -103,79 +98,144 @@ export default function AdminCommissionPage() {
         </div>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-x-auto">
-        <table className="w-full text-left min-w-[900px]">
-          <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
-            <tr>
-              {groupBy === 'event' && (
-                <>
-                  <th className="px-6 py-4 font-medium">Event</th>
-                  <th className="px-6 py-4 font-medium">Organizer</th>
-                  <th className="px-6 py-4 font-medium">Rates</th>
-                </>
-              )}
-              {groupBy === 'business' && (
-                <th className="px-6 py-4 font-medium">Organizer</th>
-              )}
-              {groupBy === 'date' && (
-                <th className="px-6 py-4 font-medium">Date</th>
-              )}
-              <th className="px-6 py-4 font-medium">Tickets</th>
-              <th className="px-6 py-4 font-medium">Ticket $</th>
-              <th className="px-6 py-4 font-medium">Convenience</th>
-              <th className="px-6 py-4 font-medium">Commission</th>
-              <th className="px-6 py-4 font-medium">Platform</th>
-              <th className="px-6 py-4 font-medium">Org payout</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
+      {rows.length === 0 ? (
+        <div className="glass-panel rounded-2xl border border-white/5 text-center py-10 text-zinc-500">
+          No fee data yet. Bookings will appear once customers purchase tickets.
+        </div>
+      ) : (
+        <>
+          <div className="admin-card-grid">
             {rows.map((row, idx) => (
-              <tr key={idx} className="hover:bg-white/5 transition-colors">
-                {groupBy === 'event' && (
-                  <>
-                    <td className="px-6 py-4 font-medium text-white">{row.event_name}</td>
-                    <td className="px-6 py-4 text-zinc-400">{row.organizer_name || '—'}</td>
-                    <td className="px-6 py-4 text-zinc-300 text-sm">
-                      <div>{Number(row.convenience_fee_percent || 0).toFixed(2)}% convenience</div>
-                      <div className="text-xs text-zinc-500">
-                        {Number(row.commission_percent || 0).toFixed(2)}% commission
+              <article key={idx} className="admin-data-card">
+                <div className="admin-data-card-header">
+                  {groupBy === 'event' && (
+                    <p className="admin-data-card-title">{row.event_name}</p>
+                  )}
+                  {groupBy === 'business' && (
+                    <p className="admin-data-card-title">{row.organizer_name || '—'}</p>
+                  )}
+                  {groupBy === 'date' && (
+                    <p className="admin-data-card-title">
+                      {row.booking_date ? formatDate(row.booking_date) : '—'}
+                    </p>
+                  )}
+                </div>
+                <div className="admin-data-card-body">
+                  {groupBy === 'event' && (
+                    <>
+                      <div className="admin-data-card-row">
+                        <span className="admin-data-card-label">Organizer</span>
+                        <div className="admin-data-card-value">{row.organizer_name || '—'}</div>
                       </div>
-                    </td>
-                  </>
-                )}
-                {groupBy === 'business' && (
-                  <td className="px-6 py-4 font-medium text-white">
-                    {row.organizer_name || '—'}
-                  </td>
-                )}
-                {groupBy === 'date' && (
-                  <td className="px-6 py-4 font-medium text-white">
-                    {row.booking_date ? formatDate(row.booking_date) : '—'}
-                  </td>
-                )}
-                <td className="px-6 py-4 text-zinc-300">{row.tickets_sold}</td>
-                <td className="px-6 py-4 text-zinc-300">{money(row.ticket_amount)}</td>
-                <td className="px-6 py-4 text-amber-400">{money(row.convenience_fee_total)}</td>
-                <td className="px-6 py-4 text-violet-400">{money(row.commission_total)}</td>
-                <td className="px-6 py-4 text-rose-400 font-medium">
-                  {money(row.platform_earned)}
-                </td>
-                <td className="px-6 py-4 text-emerald-400">{money(row.organizer_payout)}</td>
-              </tr>
+                      <div className="admin-data-card-row">
+                        <span className="admin-data-card-label">Rates</span>
+                        <div className="admin-data-card-value text-sm">
+                          {Number(row.convenience_fee_percent || 0).toFixed(2)}% convenience
+                          <div className="text-xs text-zinc-500">
+                            {Number(row.commission_percent || 0).toFixed(2)}% commission
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Tickets</span>
+                    <div className="admin-data-card-value">{row.tickets_sold}</div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Ticket $</span>
+                    <div className="admin-data-card-value">{money(row.ticket_amount)}</div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Convenience</span>
+                    <div className="admin-data-card-value text-amber-400">{money(row.convenience_fee_total)}</div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Commission</span>
+                    <div className="admin-data-card-value text-violet-400">{money(row.commission_total)}</div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Platform</span>
+                    <div className="admin-data-card-value text-rose-400 font-medium">
+                      {money(row.platform_earned)}
+                    </div>
+                  </div>
+                  <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Org payout</span>
+                    <div className="admin-data-card-value text-emerald-400">{money(row.organizer_payout)}</div>
+                  </div>
+                </div>
+              </article>
             ))}
-            {rows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={groupBy === 'event' ? 9 : 7}
-                  className="text-center py-10 text-zinc-500"
-                >
-                  No fee data yet. Bookings will appear once customers purchase tickets.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="admin-table-desktop glass-panel rounded-2xl border border-white/5 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[900px]">
+                <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
+                  <tr>
+                    {groupBy === 'event' && (
+                      <>
+                        <th className="px-6 py-4 font-medium">Event</th>
+                        <th className="px-6 py-4 font-medium">Organizer</th>
+                        <th className="px-6 py-4 font-medium">Rates</th>
+                      </>
+                    )}
+                    {groupBy === 'business' && (
+                      <th className="px-6 py-4 font-medium">Organizer</th>
+                    )}
+                    {groupBy === 'date' && (
+                      <th className="px-6 py-4 font-medium">Date</th>
+                    )}
+                    <th className="px-6 py-4 font-medium">Tickets</th>
+                    <th className="px-6 py-4 font-medium">Ticket $</th>
+                    <th className="px-6 py-4 font-medium">Convenience</th>
+                    <th className="px-6 py-4 font-medium">Commission</th>
+                    <th className="px-6 py-4 font-medium">Platform</th>
+                    <th className="px-6 py-4 font-medium">Org payout</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {rows.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-white/5 transition-colors">
+                      {groupBy === 'event' && (
+                        <>
+                          <td className="px-6 py-4 font-medium text-white">{row.event_name}</td>
+                          <td className="px-6 py-4 text-zinc-400">{row.organizer_name || '—'}</td>
+                          <td className="px-6 py-4 text-zinc-300 text-sm">
+                            <div>{Number(row.convenience_fee_percent || 0).toFixed(2)}% convenience</div>
+                            <div className="text-xs text-zinc-500">
+                              {Number(row.commission_percent || 0).toFixed(2)}% commission
+                            </div>
+                          </td>
+                        </>
+                      )}
+                      {groupBy === 'business' && (
+                        <td className="px-6 py-4 font-medium text-white">
+                          {row.organizer_name || '—'}
+                        </td>
+                      )}
+                      {groupBy === 'date' && (
+                        <td className="px-6 py-4 font-medium text-white">
+                          {row.booking_date ? formatDate(row.booking_date) : '—'}
+                        </td>
+                      )}
+                      <td className="px-6 py-4 text-zinc-300">{row.tickets_sold}</td>
+                      <td className="px-6 py-4 text-zinc-300">{money(row.ticket_amount)}</td>
+                      <td className="px-6 py-4 text-amber-400">{money(row.convenience_fee_total)}</td>
+                      <td className="px-6 py-4 text-violet-400">{money(row.commission_total)}</td>
+                      <td className="px-6 py-4 text-rose-400 font-medium">
+                        {money(row.platform_earned)}
+                      </td>
+                      <td className="px-6 py-4 text-emerald-400">{money(row.organizer_payout)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

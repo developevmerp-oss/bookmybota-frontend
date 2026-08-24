@@ -72,7 +72,7 @@ export default function AdminEventLayoutDetailPage() {
 
   if (!request) {
     return (
-      <div className="max-w-3xl mx-auto p-8 space-y-3">
+      <div className="w-full p-4 sm:p-6 lg:p-8 space-y-3">
         <p className="text-zinc-300">Event layout request not found.</p>
         <Link href="/admin/event-layouts" className="text-rose-500">
           Back to requests
@@ -84,7 +84,7 @@ export default function AdminEventLayoutDetailPage() {
   const layouts = request.published_layouts || [];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <Link
           href="/admin/event-layouts"

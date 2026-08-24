@@ -100,8 +100,8 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   return (
     <SessionGuard>
     <div className="min-h-screen flex bg-background admin-dashboard-layout">
-      <aside className="w-64 glass-panel border-r border-white/5 fixed h-full z-40 hidden md:flex flex-col">
-        <div className="p-6 border-b border-white/5">
+      <aside className="admin-sidebar w-64 glass-panel border-r border-white/5 fixed inset-y-0 left-0 z-40 hidden md:flex flex-col overflow-hidden">
+        <div className="p-5 border-b border-white/5 shrink-0">
           <h2
             className="text-xl font-bold text-white flex items-center gap-2 min-w-0"
             title={businessName}
@@ -112,7 +112,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
             <span className="truncate text-lg font-bold">{businessName}</span>
           </h2>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="admin-sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 space-y-1">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -120,13 +120,13 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                   isActive
                     ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                    : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                    : "text-zinc-400 hover:bg-white/5 hover:text-white border border-transparent"
                 }`}
               >
-                <Icon size={18} />
+                <Icon size={16} className="shrink-0" />
                 <span className="font-medium text-sm">{item.name}</span>
               </Link>
             );
@@ -140,8 +140,8 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
             onClick={() => setMobileMenuOpen(false)}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
-          <div className="relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-6 animate-fadeIn">
-            <div className="flex items-center justify-between mb-8">
+          <div className="admin-sidebar relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-4 animate-fadeIn overflow-hidden">
+            <div className="flex items-center justify-between mb-4 shrink-0">
               <h2
                 className="text-lg font-bold text-white flex items-center gap-2 truncate"
                 title={businessName}
@@ -158,7 +158,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
                 <X size={20} />
               </button>
             </div>
-            <nav className="flex-1 space-y-2">
+            <nav className="admin-sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 pr-1">
               {navigation.map((item) => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
@@ -167,13 +167,13 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
                     key={item.name}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                       isActive
                         ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                        : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                        : "text-zinc-400 hover:bg-white/5 hover:text-white border border-transparent"
                     }`}
                   >
-                    <Icon size={18} />
+                    <Icon size={16} className="shrink-0" />
                     <span className="font-medium text-sm">{item.name}</span>
                   </Link>
                 );

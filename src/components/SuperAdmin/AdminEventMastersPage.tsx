@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
 import { ListChecks, Plus, Trash2, Tags, FileText } from "lucide-react";
 import {
@@ -22,9 +24,18 @@ import {
   type EventTermsMaster,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  adminEventDocumentCreateSchema,
+  adminEventGenreCreateSchema,
+  adminEventTermCreateSchema,
+  type AdminEventDocumentCreateValues,
+  type AdminEventGenreCreateValues,
+  type AdminEventTermCreateValues,
+} from "@/lib/adminFormSchemas";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 
 function ActiveToggle({
@@ -62,6 +73,7 @@ export default function AdminEventMastersPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const eventCategories = useMemo(
@@ -72,11 +84,11 @@ export default function AdminEventMastersPage() {
   const genreQueryArg = useMemo(
     () => ({
       page,
-      limit: PAGE_SIZE,
+      limit,
       ...(q.trim() ? { q: q.trim() } : {}),
       ...(categoryFilter ? { category_type_id: Number(categoryFilter) } : {}),
     }),
-    [categoryFilter, q, page]
+    [categoryFilter, q, page, limit]
   );
 
   const {
@@ -102,7 +114,7 @@ export default function AdminEventMastersPage() {
     refetch: refetchDocs,
   } = useGetAdminEventDocumentsQuery({
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(q.trim() ? { q: q.trim() } : {}),
   });
   const documents = documentsData?.items ?? [];
@@ -120,14 +132,13 @@ export default function AdminEventMastersPage() {
     refetch: refetchTerms,
   } = useGetAdminEventTermsQuery({
     page,
-    limit: PAGE_SIZE,
+    limit,
     ...(q.trim() ? { q: q.trim() } : {}),
   });
   const terms = termsData?.items ?? [];
   const [createTerm, { isLoading: creatingTerm }] = useCreateAdminEventTermMutation();
   const [updateTerm] = useUpdateAdminEventTermMutation();
   const [deleteTerm] = useDeleteAdminEventTermMutation();
-  const [newTermText, setNewTermText] = useState("");
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
@@ -135,54 +146,67 @@ export default function AdminEventMastersPage() {
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
-  const [newGenre, setNewGenre] = useState({ category_type_id: "", name: "" });
-  const [newDoc, setNewDoc] = useState({
-    name: "",
-    description: "",
-    category_type_id: "",
-    is_required: false,
-    importance_level: 3,
+  const genreForm = useForm<AdminEventGenreCreateValues>({
+    resolver: yupResolver(adminEventGenreCreateSchema),
+    defaultValues: { category_type_id: "", name: "" },
+    mode: "onSubmit",
   });
 
-  const handleCreateGenre = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGenre.category_type_id || !newGenre.name.trim()) {
-      toast.error("Category and genre name are required");
-      return;
-    }
+  const docForm = useForm<AdminEventDocumentCreateValues>({
+    resolver: yupResolver(adminEventDocumentCreateSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      category_type_id: "",
+      is_required: false,
+      importance_level: 3,
+    },
+    mode: "onSubmit",
+  });
+
+  const termForm = useForm<AdminEventTermCreateValues>({
+    resolver: yupResolver(adminEventTermCreateSchema),
+    defaultValues: { text: "" },
+    mode: "onSubmit",
+  });
+
+  const onCreateGenre = async (values: AdminEventGenreCreateValues) => {
     try {
       const created = await createGenre({
-        category_type_id: Number(newGenre.category_type_id),
-        name: newGenre.name.trim(),
+        category_type_id: Number(values.category_type_id),
+        name: values.name.trim(),
         is_active: true,
       }).unwrap();
-      toast.success(`Genre "${created.name}" added successfully`);
-      setNewGenre({ category_type_id: newGenre.category_type_id, name: "" });
+      toast.success(
+        (created as { message?: string }).message ||
+          `Genre "${created.name}" added successfully`
+      );
+      genreForm.reset({ category_type_id: values.category_type_id, name: "" });
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to add genre"));
     }
   };
 
-  const handleCreateDocument = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDoc.name.trim()) {
-      toast.error("Document name is required");
-      return;
-    }
+  const onCreateDocument = async (values: AdminEventDocumentCreateValues) => {
     try {
       const created = await createDocument({
-        name: newDoc.name.trim(),
-        description: newDoc.description.trim() || undefined,
-        category_type_id: newDoc.category_type_id ? Number(newDoc.category_type_id) : null,
-        is_required: newDoc.is_required,
-        importance_level: newDoc.importance_level,
+        name: values.name.trim(),
+        description: values.description?.trim() || undefined,
+        category_type_id: values.category_type_id
+          ? Number(values.category_type_id)
+          : null,
+        is_required: values.is_required ?? false,
+        importance_level: values.importance_level ?? 3,
         is_active: true,
       }).unwrap();
-      toast.success(`Document "${created.name}" added successfully`);
-      setNewDoc({
+      toast.success(
+        (created as { message?: string }).message ||
+          `Document "${created.name}" added successfully`
+      );
+      docForm.reset({
         name: "",
         description: "",
-        category_type_id: "",
+        category_type_id: values.category_type_id ?? "",
         is_required: false,
         importance_level: 3,
       });
@@ -239,16 +263,17 @@ export default function AdminEventMastersPage() {
     }
   };
 
-  const handleAddTerm = async () => {
-    const text = newTermText.trim();
-    if (!text) {
-      toast.error("Enter a terms & conditions point");
-      return;
-    }
+  const onAddTerm = async (values: AdminEventTermCreateValues) => {
     try {
-      await createTerm({ text, is_active: true }).unwrap();
-      toast.success("Terms & conditions point added");
-      setNewTermText("");
+      const created = await createTerm({
+        text: values.text.trim(),
+        is_active: true,
+      }).unwrap();
+      toast.success(
+        (created as { message?: string }).message ||
+          "Terms & conditions point added"
+      );
+      termForm.reset({ text: "" });
     } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to add T&C point"));
     }
@@ -272,27 +297,16 @@ export default function AdminEventMastersPage() {
   const docListLoading = docsLoading && documents.length === 0;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-          <span className="bg-rose-500/20 text-rose-500 p-2 rounded-xl">
-            <ListChecks size={28} />
-          </span>
-          Event Masters
-        </h1>
-        <p className="text-zinc-400 mt-2">
-          Manage category-linked genres, required event documents, and customer-facing terms & conditions. Only <strong className="text-green-400/90">active</strong> items appear in the event organizer form.
-        </p>
-        <div className="mt-4">
-          <SearchInput
-            value={q}
-            onChange={(value) => {
-              setQ(value);
-              setPage(1);
-            }}
-            placeholder="Search this list"
-          />
-        </div>
+    <div className="w-full space-y-6">
+      <div className="admin-list-toolbar">
+        <SearchInput
+          value={q}
+          onChange={(value) => {
+            setQ(value);
+            setPage(1);
+          }}
+          placeholder="Search this list"
+        />
       </div>
 
       <div className="flex gap-2 border-b border-white/10">
@@ -343,15 +357,10 @@ export default function AdminEventMastersPage() {
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <Plus size={18} className="text-rose-500" /> Add genre
             </h3>
-            <form onSubmit={handleCreateGenre} className="space-y-4">
+            <form onSubmit={genreForm.handleSubmit(onCreateGenre)} noValidate className="space-y-4">
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Category</label>
-                <select
-                  value={newGenre.category_type_id}
-                  onChange={(e) => setNewGenre((p) => ({ ...p, category_type_id: e.target.value }))}
-                  className="input-field w-full"
-                  required
-                >
+                <select {...genreForm.register("category_type_id")} className="input-field w-full">
                   <option value="">Select Comedy / Music / Concert</option>
                   {eventCategories.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -359,16 +368,24 @@ export default function AdminEventMastersPage() {
                     </option>
                   ))}
                 </select>
+                {genreForm.formState.errors.category_type_id && (
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                    {genreForm.formState.errors.category_type_id.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Genre name</label>
                 <input
-                  value={newGenre.name}
-                  onChange={(e) => setNewGenre((p) => ({ ...p, name: e.target.value }))}
+                  {...genreForm.register("name")}
                   placeholder="e.g. Stand-up Comedy"
                   className="input-field w-full"
-                  required
                 />
+                {genreForm.formState.errors.name && (
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                    {genreForm.formState.errors.name.message}
+                  </p>
+                )}
               </div>
               <p className="text-xs text-zinc-500">New genres are active by default.</p>
               <button type="submit" disabled={creatingGenre} className="btn-primary w-full disabled:opacity-50">
@@ -404,7 +421,7 @@ export default function AdminEventMastersPage() {
             </div>
 
             {genreListLoading ? (
-              <div className="p-8 text-center text-zinc-500">Loading genres...</div>
+              <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar={false} />
             ) : genresError ? (
               <div className="p-8 text-center space-y-3">
                 <p className="text-rose-400">{extractApiError(genresErrorData, "Failed to load genres")}</p>
@@ -415,6 +432,7 @@ export default function AdminEventMastersPage() {
             ) : genres.length === 0 ? (
               <div className="p-8 text-center text-zinc-500">No genres yet. Add one using the form.</div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-zinc-900/50 text-zinc-400 border-b border-white/5">
                   <tr>
@@ -461,8 +479,28 @@ export default function AdminEventMastersPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
-            {genresData?.meta && <Pagination meta={genresData.meta} onPageChange={setPage} />}
+            <div className="admin-list-footer">
+              <Pagination
+                meta={
+                  genresData?.meta ?? {
+                    page,
+                    limit,
+                    total: 0,
+                    total_pages: 0,
+                    has_prev: false,
+                    has_next: false,
+                  }
+                }
+                onPageChange={setPage}
+                onLimitChange={(next) => {
+                  setLimit(next);
+                  setPage(1);
+                }}
+                disabled={genresFetching}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -473,34 +511,32 @@ export default function AdminEventMastersPage() {
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <Plus size={18} className="text-rose-500" /> Add document type
             </h3>
-            <form onSubmit={handleCreateDocument} className="space-y-4">
+            <form onSubmit={docForm.handleSubmit(onCreateDocument)} noValidate className="space-y-4">
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Document name</label>
                 <input
-                  value={newDoc.name}
-                  onChange={(e) => setNewDoc((p) => ({ ...p, name: e.target.value }))}
+                  {...docForm.register("name")}
                   placeholder="Venue Booking Agreement"
                   className="input-field w-full"
-                  required
                 />
+                {docForm.formState.errors.name && (
+                  <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                    {docForm.formState.errors.name.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Description / examples</label>
                 <textarea
                   rows={3}
-                  value={newDoc.description}
-                  onChange={(e) => setNewDoc((p) => ({ ...p, description: e.target.value }))}
+                  {...docForm.register("description")}
                   className="input-field w-full resize-y min-h-[80px]"
                   placeholder="What organizers should upload..."
                 />
               </div>
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Applies to category</label>
-                <select
-                  value={newDoc.category_type_id}
-                  onChange={(e) => setNewDoc((p) => ({ ...p, category_type_id: e.target.value }))}
-                  className="input-field w-full"
-                >
+                <select {...docForm.register("category_type_id")} className="input-field w-full">
                   <option value="">All event categories</option>
                   {eventCategories.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -516,20 +552,12 @@ export default function AdminEventMastersPage() {
                     type="number"
                     min={1}
                     max={5}
-                    value={newDoc.importance_level}
-                    onChange={(e) =>
-                      setNewDoc((p) => ({ ...p, importance_level: Number(e.target.value) }))
-                    }
+                    {...docForm.register("importance_level", { valueAsNumber: true })}
                     className="input-field w-full"
                   />
                 </div>
                 <label className="flex items-end gap-2 pb-2 text-sm text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newDoc.is_required}
-                    onChange={(e) => setNewDoc((p) => ({ ...p, is_required: e.target.checked }))}
-                    className="rounded"
-                  />
+                  <input type="checkbox" {...docForm.register("is_required")} className="rounded" />
                   Required on submit
                 </label>
               </div>
@@ -550,7 +578,7 @@ export default function AdminEventMastersPage() {
             </div>
 
             {docListLoading ? (
-              <div className="p-8 text-center text-zinc-500">Loading documents...</div>
+              <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar={false} />
             ) : docsError ? (
               <div className="p-8 text-center space-y-3">
                 <p className="text-rose-400">{extractApiError(docsErrorData, "Failed to load documents")}</p>
@@ -572,7 +600,7 @@ export default function AdminEventMastersPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-white">{doc.name}</span>
                           {doc.is_required && (
-                            <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                            <span className="text-[0.625rem] uppercase px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
                               Required
                             </span>
                           )}
@@ -618,7 +646,26 @@ export default function AdminEventMastersPage() {
                 ))}
               </div>
             )}
-            {documentsData?.meta && <Pagination meta={documentsData.meta} onPageChange={setPage} />}
+            <div className="admin-list-footer">
+              <Pagination
+                meta={
+                  documentsData?.meta ?? {
+                    page,
+                    limit,
+                    total: 0,
+                    total_pages: 0,
+                    has_prev: false,
+                    has_next: false,
+                  }
+                }
+                onPageChange={setPage}
+                onLimitChange={(next) => {
+                  setLimit(next);
+                  setPage(1);
+                }}
+                disabled={docsFetching}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -630,23 +677,31 @@ export default function AdminEventMastersPage() {
             <p className="text-zinc-500 text-sm mb-4">
               Super admin master points. Event organizers can tick these on their event. Custom points they type themselves are stored only on that event — never here.
             </p>
-            <div className="flex gap-3">
-              <input
-                value={newTermText}
-                onChange={(e) => setNewTermText(e.target.value)}
-                placeholder="e.g. Tickets are non-refundable after purchase"
-                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
-                onKeyDown={(e) => e.key === "Enter" && handleAddTerm()}
-              />
-              <button
-                type="button"
-                onClick={handleAddTerm}
-                disabled={creatingTerm}
-                className="px-5 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center gap-2"
-              >
-                <Plus size={16} /> Add
-              </button>
-            </div>
+            <form
+              onSubmit={termForm.handleSubmit(onAddTerm)}
+              noValidate
+              className="space-y-2"
+            >
+              <div className="flex gap-3">
+                <input
+                  {...termForm.register("text")}
+                  placeholder="e.g. Tickets are non-refundable after purchase"
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                />
+                <button
+                  type="submit"
+                  disabled={creatingTerm}
+                  className="px-5 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center gap-2"
+                >
+                  <Plus size={16} /> Add
+                </button>
+              </div>
+              {termForm.formState.errors.text && (
+                <p className="text-xs text-rose-400 font-medium">
+                  {termForm.formState.errors.text.message}
+                </p>
+              )}
+            </form>
           </div>
 
           <div className="bg-zinc-900/50 border border-white/10 rounded-2xl overflow-hidden">
@@ -664,7 +719,7 @@ export default function AdminEventMastersPage() {
                 </button>
               </div>
             ) : termsLoading && terms.length === 0 ? (
-              <p className="p-8 text-zinc-500 text-center">Loading…</p>
+              <AdminListShimmer rows={6} columns={3} showTabs={false} showToolbar={false} />
             ) : terms.length === 0 ? (
               <p className="p-8 text-zinc-500 text-center">No T&C points yet. Add the first one above.</p>
             ) : (
@@ -701,7 +756,26 @@ export default function AdminEventMastersPage() {
                 ))}
               </div>
             )}
-            {termsData?.meta && <Pagination meta={termsData.meta} onPageChange={setPage} />}
+            <div className="admin-list-footer">
+              <Pagination
+                meta={
+                  termsData?.meta ?? {
+                    page,
+                    limit,
+                    total: 0,
+                    total_pages: 0,
+                    has_prev: false,
+                    has_next: false,
+                  }
+                }
+                onPageChange={setPage}
+                onLimitChange={(next) => {
+                  setLimit(next);
+                  setPage(1);
+                }}
+                disabled={termsFetching}
+              />
+            </div>
           </div>
         </div>
       )}

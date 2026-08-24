@@ -1,41 +1,43 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { extractApiError } from "@/lib/apiErrors";
 import { useCreateAdminCustomerMutation } from "@/services/api";
+import {
+  adminCustomerFormSchema,
+  type AdminCustomerFormValues,
+} from "@/lib/adminFormSchemas";
 
 export default function AdminCustomerNewPage() {
   const router = useRouter();
   const [createCustomer, { isLoading: saving }] = useCreateAdminCustomerMutation();
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<AdminCustomerFormValues>({
+    resolver: yupResolver(adminCustomerFormSchema),
+    defaultValues: { name: "", phone: "", email: "" },
+    mode: "onSubmit",
+  });
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      toast.error("Name is required.");
-      return;
-    }
-    if (!phone.trim()) {
-      toast.error("Phone is required.");
-      return;
-    }
-    if (!email.trim()) {
-      toast.error("Email is required for login.");
-      return;
-    }
+  const phone = watch("phone");
+
+  const onValid = async (values: AdminCustomerFormValues) => {
     try {
       const res = await createCustomer({
-        name: name.trim(),
-        phone,
-        email: email.trim(),
+        name: values.name.trim(),
+        phone: values.phone,
+        email: values.email.trim(),
       }).unwrap();
       toast.success(res.message || "Customer created. Login credentials were emailed once.");
       router.push(res.data?.id ? `/admin/customers/${res.data.id}` : "/admin/customers");
@@ -45,7 +47,7 @@ export default function AdminCustomerNewPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full">
       <Link
         href="/admin/customers"
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-400 hover:text-white mb-6"
@@ -58,38 +60,39 @@ export default function AdminCustomerNewPage() {
         does not send a new email.
       </p>
 
-      <form onSubmit={onSubmit} className="glass-panel rounded-2xl border border-white/10 p-6 md:p-8">
+      <form
+        onSubmit={handleSubmit(onValid)}
+        className="glass-panel rounded-2xl border border-white/10 p-6 md:p-8"
+        noValidate
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-zinc-500 mb-2">
               Name
             </label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input-field w-full"
-              required
-            />
+            <input {...register("name")} className="input-field w-full" />
+            {errors.name && (
+              <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.name.message}</p>
+            )}
           </div>
           <PhoneInput
-            value={phone}
-            onChange={setPhone}
+            value={phone || ""}
+            onChange={(v) => setValue("phone", v, { shouldValidate: true, shouldDirty: true })}
             variant="dark"
             label="Phone"
             required
+            error={errors.phone?.message}
+            showError={Boolean(errors.phone)}
             labelClassName="block text-xs font-medium uppercase tracking-wider text-zinc-500 mb-2"
           />
           <div className="md:col-span-2">
             <label className="block text-xs font-medium uppercase tracking-wider text-zinc-500 mb-2">
               Email
             </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field w-full"
-              required
-            />
+            <input type="email" {...register("email")} className="input-field w-full" />
+            {errors.email && (
+              <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.email.message}</p>
+            )}
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-8">

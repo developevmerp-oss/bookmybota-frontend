@@ -17,6 +17,8 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import PhoneInput from "@/components/Shared/PhoneInput";
+import { sanitizePhoneInput } from "@/lib/validation";
 
 const SCANNER_REGION_ID = "dining-guest-qr-reader";
 
@@ -321,7 +323,7 @@ export default function DiningScanPage() {
         promo_code: code,
         bill_amount: bill,
         guest_name: walkInName.trim() || undefined,
-        guest_phone: walkInPhone.trim() || undefined,
+        guest_phone: walkInPhone.trim() ? sanitizePhoneInput(walkInPhone) : undefined,
         notes: walkInNotes.trim() || undefined,
       }).unwrap();
       toast.success("Walk-in offer redeemed.");
@@ -695,11 +697,14 @@ export default function DiningScanPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">Guest phone (optional)</label>
-            <input
+            <PhoneInput
+              label="Guest phone (optional)"
+              labelClassName="block text-xs font-semibold text-zinc-400 uppercase mb-2"
+              variant="dark"
               value={walkInPhone}
-              onChange={(e) => setWalkInPhone(e.target.value)}
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
+              onChange={setWalkInPhone}
+              required={false}
+              helperText="9–12 digits if provided"
             />
           </div>
         </div>

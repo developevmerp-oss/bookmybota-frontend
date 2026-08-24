@@ -47,15 +47,75 @@ const textareaClass = `${inputClass} min-h-[96px] resize-y`;
 
 interface OrganizerAccountSetupFormProps {
   backHref?: string;
+  /** Partner module for docs/terms/registration payload. Defaults to event organizer. */
+  module?: "event" | "venue" | "artist";
 }
+
+const MODULE_COPY: Record<
+  "event" | "venue" | "artist",
+  {
+    heading: string;
+    intro: string;
+    detailsTitle: string;
+    nameLabel: string;
+    namePlaceholder: string;
+    addressLabel: string;
+    addressPlaceholder: string;
+    typeMissing: string;
+    submitLabel: string;
+    termsVersion: string;
+  }
+> = {
+  event: {
+    heading: "Account Setup",
+    intro:
+      "Please fill in the below details so that we can setup an account for your organisation in our system and give you access to the Do-It-Yourself portal for listing your event.",
+    detailsTitle: "Organisation Details",
+    nameLabel: "Organisation / Individual Name",
+    namePlaceholder: "Enter your organisation name",
+    addressLabel: "Organisation / Individual Address",
+    addressPlaceholder: "Enter your organisation address",
+    typeMissing: "Event organizer type is not configured. Please contact support.",
+    submitLabel: "Register Business",
+    termsVersion: "event-v1",
+  },
+  venue: {
+    heading: "Venue Account Setup",
+    intro:
+      "Please fill in the below details so that we can setup a venue partner account and give you access to manage layouts and claim events at your property.",
+    detailsTitle: "Venue Details",
+    nameLabel: "Venue Name",
+    namePlaceholder: "Enter your venue name",
+    addressLabel: "Venue Address",
+    addressPlaceholder: "Enter your venue address",
+    typeMissing: "Venue partner type is not configured. Please contact support.",
+    submitLabel: "Register Venue",
+    termsVersion: "venue-v1",
+  },
+  artist: {
+    heading: "Artist Account Setup",
+    intro:
+      "Please fill in the below details so that we can setup an artist partner account and give you access to manage your profile on Book My Bota.",
+    detailsTitle: "Artist Details",
+    nameLabel: "Artist / Act Name",
+    namePlaceholder: "Enter your artist or act name",
+    addressLabel: "City / Base Address",
+    addressPlaceholder: "Enter your city or base address",
+    typeMissing: "Artist partner type is not configured. Please contact support.",
+    submitLabel: "Register Artist",
+    termsVersion: "artist-v1",
+  },
+};
 
 export default function OrganizerAccountSetupForm({
   backHref = "/organizer",
+  module = "event",
 }: OrganizerAccountSetupFormProps) {
   const router = useRouter();
+  const copy = MODULE_COPY[module];
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
-  const { data: partnerDocMasters = [] } = useGetPartnerDocumentMastersQuery("event");
-  const { data: onboardingTerms = [] } = useGetPartnerOnboardingTermsQuery("event");
+  const { data: partnerDocMasters = [] } = useGetPartnerDocumentMastersQuery(module);
+  const { data: onboardingTerms = [] } = useGetPartnerOnboardingTermsQuery(module);
   const [registerBusiness, { isLoading }] = useRegisterBusinessMutation();
 
   const [step, setStep] = useState<StepId>(1);
@@ -67,22 +127,44 @@ export default function OrganizerAccountSetupForm({
   const [adminEmail, setAdminEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneValid, setPhoneValid] = useState(false);
+  const [subtypeId, setSubtypeId] = useState("");
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const eventParentId = useMemo(() => {
+  const needsSubtype = module === "venue" || module === "artist";
+
+  const moduleParentId = useMemo(() => {
     const parent =
-      businessTypes.find((t) => t.module_key === "event" && !t.parent_type_id) ||
-      businessTypes.find((t) => t.module_key === "event");
+      businessTypes.find((t) => t.module_key === module && !t.parent_type_id) ||
+      businessTypes.find((t) => t.module_key === module);
     return parent?.id ?? null;
-  }, [businessTypes]);
+  }, [businessTypes, module]);
+
+  const subtypeOptions = useMemo(() => {
+    if (!needsSubtype || moduleParentId == null) return [];
+    return businessTypes
+      .filter((t) => t.module_key === module && t.parent_type_id === moduleParentId)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [businessTypes, module, moduleParentId, needsSubtype]);
+
+  useEffect(() => {
+    if (!needsSubtype) {
+      setSubtypeId("");
+      return;
+    }
+    if (subtypeId && !subtypeOptions.some((t) => String(t.id) === subtypeId)) {
+      setSubtypeId("");
+    }
+  }, [needsSubtype, subtypeId, subtypeOptions]);
 
   const step1Valid = useMemo(() => {
     return (
-      !!eventParentId &&
+      !!moduleParentId &&
+      (!needsSubtype || !!subtypeId) &&
       orgName.trim().length > 1 &&
       orgAddress.trim().length > 1 &&
       contactName.trim().length > 1 &&
@@ -90,7 +172,16 @@ export default function OrganizerAccountSetupForm({
       !!adminEmail.trim() &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())
     );
-  }, [eventParentId, orgName, orgAddress, contactName, phoneValid, adminEmail]);
+  }, [
+    moduleParentId,
+    needsSubtype,
+    subtypeId,
+    orgName,
+    orgAddress,
+    contactName,
+    phoneValid,
+    adminEmail,
+  ]);
 
   const canOpenStep = (id: StepId) => (id === 1 ? true : step1Done);
 
@@ -141,10 +232,20 @@ export default function OrganizerAccountSetupForm({
       toast.error(message);
       return;
     }
-    if (!eventParentId) {
-      const message = "Event organizer type is not configured. Please contact support.";
+    if (!moduleParentId) {
+      const message = copy.typeMissing;
       setError(message);
       toast.error(message);
+      return;
+    }
+    if (needsSubtype && !subtypeId) {
+      const message =
+        module === "artist"
+          ? "Please select an artist type under Artist, such as Singer or Band."
+          : "Please select a venue type under Venue, such as Banquet Hall or Auditorium.";
+      setError(message);
+      toast.error(message);
+      setStep(1);
       return;
     }
     const docsErr = validateRequiredPartnerDocuments(partnerDocMasters, documents);
@@ -155,18 +256,19 @@ export default function OrganizerAccountSetupForm({
     }
     if (!isValidPhone(phone)) return;
     setError(null);
+    const resolvedTypeId = needsSubtype ? Number(subtypeId) : moduleParentId;
     try {
       const data = await registerBusiness({
         business_name: orgName.trim(),
         address: orgAddress.trim(),
         phone: phone.trim(),
         description: `Contact person: ${contactName.trim()}`,
-        type_id: eventParentId,
+        type_id: resolvedTypeId,
         admin_email: adminEmail.trim(),
-        partner_type: "event",
+        partner_type: module,
         documents,
         registration_terms_accepted: true,
-        registration_terms_version: "event-v1",
+        registration_terms_version: copy.termsVersion,
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
@@ -209,11 +311,10 @@ export default function OrganizerAccountSetupForm({
     <div className="w-full max-w-4xl mx-auto">
       <div className="text-center mb-8 px-1">
         <h1 className="text-3xl md:text-4xl font-extrabold text-[#111111] tracking-tight">
-          Account Setup
+          {copy.heading}
         </h1>
         <p className="mt-3 text-sm md:text-base text-slate-500 max-w-2xl mx-auto leading-relaxed">
-          Please fill in the below details so that we can setup an account for your organisation in
-          our system and give you access to the Do-It-Yourself portal for listing your event.
+          {copy.intro}
         </p>
       </div>
 
@@ -257,28 +358,58 @@ export default function OrganizerAccountSetupForm({
         <div className="bg-white">
           {step === 1 && (
             <>
-              <SectionBlock title="Organisation Details">
+              <SectionBlock title={copy.detailsTitle}>
+                {needsSubtype && (
+                  <div>
+                    <label className={labelClass}>
+                      {module === "artist" ? "Artist type" : "Venue type"}{" "}
+                      <span className="text-[#6900AA]">*</span>
+                    </label>
+                    <select
+                      value={subtypeId}
+                      onChange={(e) => setSubtypeId(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">
+                        {module === "artist"
+                          ? "Select artist type (e.g. Singer, Band)"
+                          : "Select venue type (e.g. Banquet Hall, Auditorium)"}
+                      </option>
+                      {subtypeOptions.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    {subtypeOptions.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        No {module === "artist" ? "artist" : "venue"} types configured yet. Ask Super
+                        Admin to add subtypes under {module === "artist" ? "Artist" : "Venue"}.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className={labelClass}>
-                    Organisation / Individual Name <span className="text-[#6900AA]">*</span>
+                    {copy.nameLabel} <span className="text-[#6900AA]">*</span>
                   </label>
                   <input
                     type="text"
                     value={orgName}
                     onChange={(e) => setOrgName(e.target.value)}
                     className={inputClass}
-                    placeholder="Enter your organisation name"
+                    placeholder={copy.namePlaceholder}
                   />
                 </div>
                 <div>
                   <label className={labelClass}>
-                    Organisation / Individual Address <span className="text-[#6900AA]">*</span>
+                    {copy.addressLabel} <span className="text-[#6900AA]">*</span>
                   </label>
                   <textarea
                     value={orgAddress}
                     onChange={(e) => setOrgAddress(e.target.value)}
                     className={textareaClass}
-                    placeholder="Enter your organisation address"
+                    placeholder={copy.addressPlaceholder}
                     rows={3}
                   />
                 </div>
@@ -336,7 +467,7 @@ export default function OrganizerAccountSetupForm({
             <>
               <SectionBlock title="Upload documents">
                 <PartnerDocumentsFields
-                  module="event"
+                  module={module}
                   value={documents}
                   onChange={setDocuments}
                   variant="light"
@@ -412,7 +543,7 @@ export default function OrganizerAccountSetupForm({
                       <Loader2 size={16} className="animate-spin" /> Registering…
                     </>
                   ) : (
-                    "Register Business"
+                    copy.submitLabel
                   )}
                 </button>
               </>

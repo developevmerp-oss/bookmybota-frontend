@@ -30,6 +30,13 @@ const COLUMNS = [
     ],
   },
   {
+    title: "Venues & Artists",
+    links: [
+      { label: "Partner your venue", href: "/venue" },
+      { label: "Join as artist", href: "/artist" },
+    ],
+  },
+  {
     title: "Support",
     links: [
       { label: "Help Center", href: "/customer/help" },
@@ -49,9 +56,9 @@ export default function Footer() {
       <div className="border-b border-white/10">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-5 lg:px-8 py-6 sm:py-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
           <div>
-            <p className="type-brand font-semibold">List your event or restaurant</p>
+            <p className="type-brand font-semibold">Partner with Book My Bota</p>
             <p className="type-body text-[#B0B0B0] mt-1">
-              Reach more guests across events and dining.
+              Events, dining, venues, and artists — grow with one platform.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -66,6 +73,18 @@ export default function Footer() {
               className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] type-body font-medium text-white hover:bg-white/5"
             >
               List restaurant
+            </Link>
+            <Link
+              href="/venue"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
+            >
+              Partner venue
+            </Link>
+            <Link
+              href="/artist"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
+            >
+              Join as artist
             </Link>
           </div>
         </div>

@@ -232,10 +232,13 @@ export default function PublicEventDetailPage({
   const displayArtists = useMemo((): StaticArtist[] => {
     const rows = event?.artists || [];
     return rows.map((a) => {
+      const role = String(a.role_title || "").trim();
+      const isGuestRole = /^guest$/i.test(role) || /chief\s*guest/i.test(role);
       const unauthorized =
-        a.artist_source === "auto_registered" ||
-        a.artist_source === "external" ||
-        a.artist_is_authorized === false;
+        !isGuestRole &&
+        (a.artist_source === "auto_registered" ||
+          a.artist_source === "external" ||
+          a.artist_is_authorized === false);
       return {
         name: a.name || a.artist_business_name || "Artist",
         role: a.role_title || undefined,
@@ -434,7 +437,17 @@ export default function PublicEventDetailPage({
     aboutExpanded || !aboutLong
       ? aboutText
       : `${aboutText.slice(0, ABOUT_PREVIEW_LEN).replace(/\s+\S*$/, "").trim()}…`;
-  const durationLabel = formatDurationLong(event.duration_minutes);
+  const durationFromShowtimes = (() => {
+    for (const s of showtimes) {
+      if (!s.starts_at || !s.ends_at) continue;
+      const startMs = new Date(s.starts_at).getTime();
+      const endMs = new Date(s.ends_at).getTime();
+      if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) continue;
+      return Math.max(1, Math.round((endMs - startMs) / 60000));
+    }
+    return null;
+  })();
+  const durationLabel = formatDurationLong(event.duration_minutes || durationFromShowtimes);
   const isLive = event.status === "LIVE";
   const hasShowtimes = showtimes.length > 0;
   const canBook =

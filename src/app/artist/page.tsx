@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import ArtistHomePage from "@/components/ArtistAdminPanel/ArtistHomePage";
 
-export default function ArtistHomePage() {
-  redirect("/artist/profile");
+export default function ArtistPage() {
+  return <ArtistHomePage />;
 }

@@ -41,8 +41,23 @@ export function validateEventForm(
     return 'Language is required.';
   }
   if (!body.age_group?.trim()) return 'Age group is required.';
-  if (!body.duration_minutes || body.duration_minutes <= 0) {
-    return 'Duration (minutes) is required and must be greater than 0.';
+  // Duration is derived from show start/end; require it only when showtimes already define a range.
+  {
+    const showtimes = body.showtimes ?? [];
+    let derived: number | null = null;
+    for (const s of showtimes) {
+      if (!s.starts_at || !s.ends_at) continue;
+      const startMs = new Date(s.starts_at).getTime();
+      const endMs = new Date(s.ends_at).getTime();
+      if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) continue;
+      derived = Math.max(1, Math.round((endMs - startMs) / 60000));
+      break;
+    }
+    const minutes = body.duration_minutes && body.duration_minutes > 0 ? body.duration_minutes : derived;
+    if (!minutes || minutes <= 0) {
+      return 'Set venue start and end times so event duration can be calculated.';
+    }
+    body.duration_minutes = minutes;
   }
   if (!body.poster_horizontal_url?.trim()) {
     return 'Horizontal poster is required.';
@@ -74,6 +89,16 @@ export function validateEventForm(
     if (!t.total_count || t.total_count <= 0) return 'Ticket count must be greater than 0.';
     if (t.price === undefined || t.price === null || Number(t.price) < 0) {
       return 'Ticket price must be 0 or greater.';
+    }
+    const maxPer =
+      (t as { max_per_order?: number }).max_per_order == null
+        ? 10
+        : Number((t as { max_per_order?: number }).max_per_order);
+    if (!Number.isFinite(maxPer) || maxPer < 1) {
+      return `Purchase limit for "${t.ticket_type}" must be at least 1.`;
+    }
+    if (maxPer > Number(t.total_count)) {
+      return `Purchase limit for "${t.ticket_type}" cannot exceed total seats.`;
     }
   }
 

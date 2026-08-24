@@ -202,7 +202,25 @@ export default function EventCheckout({
   const [validatePromo, { isLoading: validatingPromo }] = useValidateEventPromoCodeMutation();
 
   const showtimes = event.showtimes || [];
-  const ticketTypes = event.ticket_types || [];
+  const allTicketTypes = event.ticket_types || [];
+  const ticketTypes = useMemo(() => {
+    if (!showtimeId) return allTicketTypes;
+    const scoped = allTicketTypes.filter((t) => t.showtime_id === showtimeId);
+    if (scoped.length) return scoped;
+    const nested = showtimes.find((s) => s.id === showtimeId)?.ticket_types || [];
+    if (nested.length) {
+      return nested.map((t) => ({
+        id: t.id || "",
+        ticket_type: t.ticket_type,
+        total_count: Number(t.total_count),
+        available_count: Number(t.available_count ?? t.total_count),
+        price: t.price,
+        max_per_order: Number((t as { max_per_order?: number }).max_per_order) || 10,
+        showtime_id: showtimeId,
+      }));
+    }
+    return allTicketTypes.filter((t) => !t.showtime_id);
+  }, [allTicketTypes, showtimes, showtimeId]);
 
   const availableTicketModes = useMemo(
     () => ticketModeOptionsForEvent(event.allowed_ticket_modes),
@@ -359,10 +377,14 @@ export default function EventCheckout({
   const setQty = (id: string, next: number, max: number) => {
     setAppliedPromo(null);
     setPromoInput("");
-    setQtyByType((prev) => ({
-      ...prev,
-      [id]: Math.max(0, Math.min(max, next)),
-    }));
+    const clamped = Math.max(0, Math.min(max, next));
+    setQtyByType((prev) => {
+      if (clamped <= 0) {
+        return { ...prev, [id]: 0 };
+      }
+      // One ticket type per order: selecting a new type clears the others (no toast).
+      return { [id]: clamped };
+    });
   };
 
   const requestLeaveConfirmStep = (action: "back" | "exit") => {
@@ -704,6 +726,30 @@ export default function EventCheckout({
   const selectShowtime = (s: (typeof showtimes)[number]) => {
     setShowtimeId(s.id);
     setSelectedDateKey(dateKey(s.starts_at));
+    setQtyByType({});
+    setSelectedSeats([]);
+    setAppliedPromo(null);
+  };
+
+  const applySelectedSeats = (seats: any[]) => {
+    if (!seats.length) {
+      setSelectedSeats([]);
+      return;
+    }
+    const typeIds = [...new Set(seats.map((s) => String(s.ticket_type_id || "")).filter(Boolean))];
+    let next = seats;
+    if (typeIds.length > 1) {
+      const keepType = String(seats[seats.length - 1]?.ticket_type_id || typeIds[0]);
+      next = seats.filter((s) => String(s.ticket_type_id) === keepType);
+    }
+    const typeId = String(next[0]?.ticket_type_id || "");
+    const ticket = ticketTypes.find((t) => t.id === typeId);
+    const maxPerOrder = Math.max(1, Number((ticket as { max_per_order?: number } | undefined)?.max_per_order) || 10);
+    if (next.length > maxPerOrder) {
+      next = next.slice(0, maxPerOrder);
+    }
+    setSelectedSeats(next);
+    setQtyByType({});
   };
 
   const showtimeFillingLabel = (s: (typeof showtimes)[number]) => {
@@ -1011,7 +1057,7 @@ export default function EventCheckout({
                         <VenueLayoutViewer
                           layoutData={activeLayoutData}
                           ticketTypes={ticketTypes}
-                          onSeatsSelected={setSelectedSeats}
+                          onSeatsSelected={applySelectedSeats}
                           initialSelectedSeats={selectedSeats}
                         />
                       </div>
@@ -1040,9 +1086,14 @@ export default function EventCheckout({
                 <p className="text-[1rem] text-slate-500">No ticket types yet.</p>
               ) : (
                 <div className="space-y-3">
+                  <p className="text-[0.8125rem] text-slate-500">
+                    Choose one ticket type. Selecting another type clears your current selection.
+                  </p>
                   {ticketTypes.map((t) => {
                     const available = Number(t.available_count) || 0;
                     const total = Number(t.total_count) || 0;
+                    const maxPerOrder = Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10);
+                    const maxQty = Math.min(available, maxPerOrder);
                     const qty = qtyByType[t.id] || 0;
                     const status = ticketAvail(available, total);
                     const soldOut = available <= 0;
@@ -1074,12 +1125,17 @@ export default function EventCheckout({
                               </span>
                             )}
                           </p>
+                          {!soldOut && (
+                            <p className="mt-1 text-[0.75rem] font-medium text-slate-500 normal-case">
+                              Max {maxPerOrder} per order
+                            </p>
+                          )}
                         </div>
                         <div className="shrink-0">
                           {soldOut ? null : qty === 0 ? (
                             <button
                               type="button"
-                              onClick={() => setQty(t.id, 1, available)}
+                              onClick={() => setQty(t.id, 1, maxQty)}
                               className="min-w-[4.75rem] px-3.5 py-2 rounded-[0.375rem] border-2 border-[#6900AA] text-[#6900AA] text-[1rem] font-bold cursor-pointer hover:bg-[#F7E9FF] transition-colors"
                             >
                               Add
@@ -1088,7 +1144,7 @@ export default function EventCheckout({
                             <div className="flex items-center gap-0 rounded-[0.375rem] border-2 border-[#6900AA] overflow-hidden bg-white">
                               <button
                                 type="button"
-                                onClick={() => setQty(t.id, qty - 1, available)}
+                                onClick={() => setQty(t.id, qty - 1, maxQty)}
                                 className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF]"
                               >
                                 <Minus size={15} />
@@ -1098,8 +1154,8 @@ export default function EventCheckout({
                               </span>
                               <button
                                 type="button"
-                                disabled={qty >= available}
-                                onClick={() => setQty(t.id, qty + 1, available)}
+                                disabled={qty >= maxQty}
+                                onClick={() => setQty(t.id, qty + 1, maxQty)}
                                 className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF] disabled:opacity-40"
                               >
                                 <Plus size={15} />

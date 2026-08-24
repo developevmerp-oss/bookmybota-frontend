@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import VenueHomePage from "@/components/VenueAdminPanel/VenueHomePage";
 
-export default function VenueHomePage() {
-  redirect("/venue/profile");
+export default function VenuePage() {
+  return <VenueHomePage />;
 }

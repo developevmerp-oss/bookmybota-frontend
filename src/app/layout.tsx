@@ -86,7 +86,9 @@ export default function RootLayout({
   const pathname = usePathname();
 
   const isOrganizerRegister = pathname === "/organizer/register";
-  /** Register keeps public chrome; /organizer landing uses partner header like /business */
+  const isVenueRegister = pathname === "/venue/register";
+  const isArtistRegister = pathname === "/artist/register";
+  /** Register keeps public chrome; partner landings use their own headers */
   const isOrganizerMarketing = isOrganizerRegister;
 
   const isAdminOrBusiness =
@@ -110,7 +112,9 @@ export default function RootLayout({
     pathname === "/organizer/login" ||
     pathname === "/venue/login" ||
     pathname === "/artist/login" ||
-    pathname === "/artist/register";
+    isOrganizerRegister ||
+    isVenueRegister ||
+    isArtistRegister;
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
   const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow;
   const showLayoutFooter =

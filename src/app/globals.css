@@ -325,6 +325,31 @@
     animation: fadeIn 0.25s ease-out forwards;
   }
 
+  @keyframes successCheckCircle {
+    from { stroke-dashoffset: 151; }
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes successCheckMark {
+    from { stroke-dashoffset: 48; }
+    to { stroke-dashoffset: 0; }
+  }
+  .success-check-circle {
+    stroke: #22c55e;
+    stroke-width: 3;
+    stroke-dasharray: 151;
+    stroke-dashoffset: 151;
+    animation: successCheckCircle 0.55s ease-out forwards;
+  }
+  .success-check-mark {
+    stroke: #22c55e;
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: successCheckMark 0.35s ease-out 0.4s forwards;
+  }
+
   /* Dining hero animations */
   @keyframes diningHeroFadeUp {
     from {

@@ -29,6 +29,8 @@ import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
 
 const ACCENT = "#6900AA";
+const DEFAULT_DINING_IMAGE =
+  "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -160,26 +162,24 @@ export default function BookingDetailPage({
   const bookingCode = displayBookingCode(booking.id);
   const badge = statusBadge(booking.status);
   const qrData = booking.qr_token || booking.id;
-  const cover =
-    booking.business_cover_image ||
-    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=80";
+  const cover = booking.business_cover_image || DEFAULT_DINING_IMAGE;
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] pt-8 sm:pt-10 pb-16">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+    <div className="min-h-screen bg-[#F5F5F7] pt-8 sm:pt-10 pb-12 sm:pb-16">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <Link
           href="/customer/dashboard"
-          className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-5 sm:mb-6 transition-colors"
+          className="inline-flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-500 hover:text-slate-800 mb-5 sm:mb-6 transition-colors"
         >
           <ArrowLeft size={16} /> Back to My Bookings
         </Link>
 
         <div className="mb-5 sm:mb-6 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-3xl font-bold text-slate-900 tracking-tight">
               Booking Details
             </h1>
-            <p className="mt-1.5 text-sm text-slate-500 flex flex-wrap items-center gap-1.5">
+            <p className="mt-1.5 text-base sm:text-lg lg:text-sm text-slate-500 flex flex-wrap items-center gap-1.5">
               <span>Booking ID: {bookingCode}</span>
               <button
                 type="button"
@@ -192,12 +192,25 @@ export default function BookingDetailPage({
               </button>
             </p>
           </div>
-          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border ${badge.className}`}
-          >
-            {badge.icon && <Check size={14} strokeWidth={2.5} />}
-            {booking.status}
-          </span>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border ${badge.className}`}
+            >
+              {badge.icon && <Check size={14} strokeWidth={2.5} />}
+              {booking.status}
+            </span>
+            {isUpcoming && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-rose-500 hover:text-rose-600 px-4 py-2 border border-rose-300 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {isCancelling ? "Cancelling..." : "Cancel Reservation"}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Ticket card */}
@@ -212,31 +225,33 @@ export default function BookingDetailPage({
                   alt={booking.business_name || "Restaurant"}
                   className="w-full sm:w-[88px] h-36 sm:h-[72px] rounded-xl object-cover shrink-0 bg-slate-100"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&q=80";
+                    const el = e.currentTarget;
+                    if (el.dataset.fallbackApplied === "1") return;
+                    el.dataset.fallbackApplied = "1";
+                    el.src = DEFAULT_DINING_IMAGE;
                   }}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p
-                        className="mb-1 text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5"
+                        className="mb-1 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5"
                         style={{ color: ACCENT }}
                       >
                         <UtensilsCrossed size={14} />
                         Restaurant
                       </p>
-                      <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                      <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-900 truncate">
                         {booking.business_name || "Restaurant"}
                       </h2>
                       {booking.business_address && (
-                        <p className="mt-1 text-sm text-slate-500 flex items-start gap-1.5">
+                        <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500 flex items-start gap-1.5">
                           <MapPin size={14} className="mt-0.5 shrink-0" style={{ color: ACCENT }} />
                           <span className="line-clamp-2">{booking.business_address}</span>
                         </p>
                       )}
                       {booking.business_phone && (
-                        <p className="mt-1 text-sm text-slate-500 flex items-center gap-1.5">
+                        <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500 flex items-center gap-1.5">
                           <Phone size={14} className="shrink-0" style={{ color: ACCENT }} />
                           <a
                             href={`tel:${booking.business_phone}`}
@@ -250,7 +265,7 @@ export default function BookingDetailPage({
                         {booking.business_id && (
                           <Link
                             href={`/restaurant/${booking.business_id}`}
-                            className="text-sm font-semibold inline-flex items-center gap-1 hover:opacity-80"
+                            className="text-base sm:text-lg lg:text-sm font-semibold inline-flex items-center gap-1 hover:opacity-80"
                             style={{ color: ACCENT }}
                           >
                             View restaurant <ExternalLink size={13} />
@@ -261,7 +276,7 @@ export default function BookingDetailPage({
                             href={mapsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm font-semibold inline-flex items-center gap-1 hover:opacity-80"
+                            className="text-base sm:text-lg lg:text-sm font-semibold inline-flex items-center gap-1 hover:opacity-80"
                             style={{ color: ACCENT }}
                           >
                             Get directions <ExternalLink size={13} />
@@ -278,25 +293,25 @@ export default function BookingDetailPage({
                 <div className="p-3.5 sm:p-4 border-b xl:border-b-0 xl:border-r border-slate-100">
                   <div className="flex items-center gap-2 mb-2">
                     <Calendar size={15} style={{ color: ACCENT }} />
-                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-xs sm:text-xs font-bold uppercase tracking-wider text-slate-400">
                       Date
                     </span>
                   </div>
-                  <p className="text-sm sm:text-[15px] font-bold text-slate-900 leading-snug">
+                  <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
                     {formatDateTime12h(booking.booking_time)}
                   </p>
                   {ticketDate.weekday && (
-                    <p className="text-xs text-slate-500 mt-0.5">{ticketDate.weekday}</p>
+                    <p className="text-sm sm:text-base lg:text-xs text-slate-500 mt-0.5">{ticketDate.weekday}</p>
                   )}
                 </div>
                 <div className="p-3.5 sm:p-4 border-b xl:border-b-0 xl:border-r border-slate-100">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock size={15} style={{ color: ACCENT }} />
-                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-xs sm:text-xs font-bold uppercase tracking-wider text-slate-400">
                       Time
                     </span>
                   </div>
-                  <p className="text-sm sm:text-[15px] font-bold text-slate-900 leading-snug">
+                  <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
                     {formatTime12h(booking.booking_time)}
                     {booking.end_time ? ` – ${formatTime12h(booking.end_time)}` : ""}
                   </p>
@@ -304,22 +319,22 @@ export default function BookingDetailPage({
                 <div className="p-3.5 sm:p-4 border-r border-slate-100 xl:border-r">
                   <div className="flex items-center gap-2 mb-2">
                     <Users size={15} style={{ color: ACCENT }} />
-                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-xs sm:text-xs font-bold uppercase tracking-wider text-slate-400">
                       Guests
                     </span>
                   </div>
-                  <p className="text-sm sm:text-[15px] font-bold text-slate-900">
+                  <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900">
                     {booking.guests != null ? `${booking.guests}` : "—"}
                   </p>
                 </div>
                 <div className="p-3.5 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <UtensilsCrossed size={15} style={{ color: ACCENT }} />
-                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="text-xs sm:text-xs font-bold uppercase tracking-wider text-slate-400">
                       Table
                     </span>
                   </div>
-                  <p className="text-sm sm:text-[15px] font-bold text-slate-900">
+                  <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900">
                     {booking.table_number ? `Table ${booking.table_number}` : "Assigned at venue"}
                   </p>
                 </div>
@@ -351,10 +366,10 @@ export default function BookingDetailPage({
                       <Tag size={16} className="mt-0.5 shrink-0 text-emerald-600" />
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-emerald-700 text-sm sm:text-[15px]">
+                          <p className="font-bold text-emerald-700 text-base">
                             {booking.applied_offer.title}
                           </p>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-700">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[0.625rem] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-700">
                             Offer applied
                           </span>
                         </div>
@@ -444,10 +459,10 @@ export default function BookingDetailPage({
                 </div>
               )}
 
-              <p className="mt-4 text-sm font-bold" style={{ color: ACCENT }}>
+              <p className="mt-4 text-base sm:text-lg lg:text-sm font-bold" style={{ color: ACCENT }}>
                 Reservation Pass
               </p>
-              <p className="mt-1.5 text-base sm:text-lg font-bold text-slate-900 tracking-wide">
+              <p className="mt-1.5 text-lg sm:text-xl lg:text-lg font-bold text-slate-900 tracking-wide">
                 {bookingCode}
               </p>
 
@@ -461,7 +476,7 @@ export default function BookingDetailPage({
                 {copied ? "Copied" : "Copy ID"}
               </button>
 
-              <p className="mt-4 text-[11px] sm:text-xs text-slate-500 leading-relaxed max-w-[220px] flex items-start gap-1.5 text-left">
+              <p className="mt-4 text-xs sm:text-sm lg:text-xs text-slate-500 leading-relaxed max-w-[220px] flex items-start gap-1.5 text-left">
                 <Phone size={12} className="mt-0.5 shrink-0" style={{ color: ACCENT }} />
                 {booking.qr_token
                   ? booking.applied_offer?.title
@@ -486,23 +501,11 @@ export default function BookingDetailPage({
               <Headphones size={18} />
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="font-bold text-slate-900 text-sm">Need help?</p>
-              <p className="text-xs text-slate-500 truncate">Visit our support center</p>
+              <p className="font-bold text-slate-900 text-base sm:text-lg lg:text-sm">Need help?</p>
+              <p className="text-sm sm:text-base lg:text-xs text-slate-500 truncate">Visit our support center</p>
             </div>
             <ChevronRight size={18} className="text-slate-400 shrink-0" />
           </Link>
-
-          {isUpcoming && (
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={isCancelling}
-              className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-rose-500 hover:text-rose-600 px-5 py-3 border border-rose-300 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer disabled:opacity-60 w-full sm:w-auto"
-            >
-              <Trash2 size={16} />
-              {isCancelling ? "Cancelling..." : "Cancel Reservation"}
-            </button>
-          )}
         </div>
       </div>
 

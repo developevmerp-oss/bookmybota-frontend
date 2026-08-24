@@ -39,12 +39,36 @@ import {
 } from '@/services/api';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
+import { readSessionForRole } from '@/lib/authStorage';
+import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
 import {
   confirmBookingSchema,
   type ConfirmBookingValues,
 } from '@/lib/loginFormSchema';
+
+/** Same customer session the header Login button uses (token + user in localStorage). */
+function readCustomerSessionFromStorage() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const token =
+      localStorage.getItem('token_customer') ||
+      localStorage.getItem('token_customer');
+    const raw =
+      localStorage.getItem('user_customer') ||
+      localStorage.getItem('user_customer');
+    if (!token || !raw) return null;
+    const user = JSON.parse(raw);
+    if (!user || typeof user !== 'object') return null;
+    return {
+      token,
+      user: { ...user, role: user.role || 'customer' },
+    };
+  } catch {
+    return null;
+  }
+}
 
 // ─── Helpers & Fallback Datasets ──────────────────────────────────────────────
 
@@ -264,6 +288,19 @@ const DEFAULT_REVIEWS: Review[] = [
   { id: 3, user: "Priya Patel", rating: 4.5, date: "1 week ago", text: "Lovely cozy place. Recommended for family dinner. The service is prompt." }
 ];
 
+function SuccessCheckDraw() {
+  return (
+    <svg
+      viewBox="0 0 52 52"
+      className="success-check-draw h-[1em] w-[1em] shrink-0"
+      aria-hidden
+    >
+      <circle className="success-check-circle" cx="26" cy="26" r="24" fill="none" />
+      <path className="success-check-mark" fill="none" d="M14.5 27.2l7.4 7.4 15.6-16.2" />
+    </svg>
+  );
+}
+
 const StarRatingInput = ({ value, onChange }: { value: number, onChange: (val: number) => void }) => {
   return (
     <div className="flex items-center gap-1">
@@ -333,15 +370,55 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   // Load current auth user from localStorage — for customer_id linking only
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
-  useEffect(() => { dispatch(loadFromStorage()); }, [dispatch]);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  useEffect(() => {
+    const syncCustomerAuth = () => {
+      dispatch(loadFromStorage());
+      const session = readSessionForRole('customer');
+      if (session) {
+        dispatch(setCredentials({ user: session.user, token: session.token }));
+      }
+    };
+    syncCustomerAuth();
+    window.addEventListener('auth_changed', syncCustomerAuth);
+    return () => window.removeEventListener('auth_changed', syncCustomerAuth);
+  }, [dispatch]);
 
   // Scroll to top on restaurant change/mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [resolvedParams.id]);
 
+  useEffect(() => {
+    const sentinel = tabsSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setTabsStuck(!entry.isIntersecting),
+      { rootMargin: "-80px 0px 0px 0px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
   // Active Tab: Overview, Menu, Photos, Reviews
   const [activeTab, setActiveTab] = useState("Overview");
+  const [tabsStuck, setTabsStuck] = useState(false);
+  const tabsSentinelRef = useRef<HTMLDivElement>(null);
+  const skipTabStartScroll = useRef(true);
+
+  useEffect(() => {
+    if (skipTabStartScroll.current) {
+      skipTabStartScroll.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      document.getElementById("tab-panel-start")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 40);
+    return () => window.clearTimeout(timer);
+  }, [activeTab]);
 
   // Booking Form State — date/time now driven by pill selectors
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
@@ -400,6 +477,29 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
+  const pendingProceedAfterAuth = useRef(false);
+
+  const getLoggedInCustomer = () => {
+    if (authUser?.role === 'customer') return authUser;
+    return readSessionForRole('customer')?.user ?? null;
+  };
+
+  const proceedToBooking = () => {
+    dispatch(loadFromStorage());
+    const session = readSessionForRole('customer');
+    const customer = session?.user || (authUser?.role === 'customer' ? authUser : null);
+    if (!customer) {
+      pendingProceedAfterAuth.current = true;
+      setAuthModalOpen(true);
+      return;
+    }
+    if (session) {
+      dispatch(setCredentials({ user: session.user, token: session.token }));
+    }
+    setDrawerStep(3);
+    setName(customer.name || '');
+    setPhone(customer.phone || '');
+  };
 
   const [sendCustomerOtp, { isLoading: isSendingOtp }] = useSendCustomerOtpMutation();
   const [verifyCustomerOtp, { isLoading: isVerifyingOtp }] = useVerifyCustomerOtpMutation();
@@ -425,8 +525,27 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     if (authUser && authUser.role === 'customer') {
       setName(authUser.name || '');
       setPhone(authUser.phone || '');
+      if (pendingProceedAfterAuth.current) {
+        pendingProceedAfterAuth.current = false;
+        setDrawerStep(3);
+      }
     }
   }, [authUser]);
+
+  useEffect(() => {
+    if (drawerStep !== 2) return;
+    const customer = getLoggedInCustomer();
+    if (customer) {
+      setDrawerStep(3);
+      setName(customer.name || '');
+      setPhone(customer.phone || '');
+      return;
+    }
+    pendingProceedAfterAuth.current = true;
+    setAuthModalOpen(true);
+    setDrawerStep(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerStep, authUser]);
 
   useEffect(() => {
     if (drawerStep !== 3) return;
@@ -659,8 +778,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     if (availabilityStatus !== 'available') return;
     if (!authUser || authUser.role !== 'customer' || !authUser.customer_id) {
       toast.error('Please sign in to complete your booking.');
-      setDrawerStep(2);
-      setLoginStep(1);
+      pendingProceedAfterAuth.current = true;
+      setAuthModalOpen(true);
       return;
     }
     const phoneErr = getPhoneValidationError(customerPhone);
@@ -807,9 +926,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
     setDrawerStep(1);
     setActiveTab("Book a Table");
-    requestAnimationFrame(() => {
-      document.getElementById("restaurant-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   };
 
   const closeBookingPanel = () => {
@@ -939,7 +1055,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
       {/* ── 1. Breadcrumbs ── */}
       <div className="bg-white border-b border-slate-100 py-3">
-        <div className="max-w-7xl mx-auto px-4 text-xs font-semibold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 text-xs font-semibold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
           <Link href="/" className="hover:text-rose-600 transition-colors">Home</Link>
           <ChevronRight size={10} />
           <Link href="/" className="hover:text-rose-600 transition-colors">{country}</Link>
@@ -952,20 +1068,20 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-2">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-2">
         {/* ── Restaurant header (Zomato: details + actions) ── */}
         <div className="bg-white pt-2">
           <div className="flex flex-col md:flex-row justify-between items-start gap-3 mb-3">
             <div className="min-w-0">
-              <h1 className="text-[32px] md:text-[40px] font-semibold text-slate-900 tracking-tight leading-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-[2.5rem] font-semibold text-slate-900 tracking-tight leading-tight">
                 {profile.name}
               </h1>
-              <p className="text-slate-600 text-base mt-1 font-medium">{cuisines}</p>
-              <p className="text-slate-500 text-sm mt-1 flex items-center gap-1.5">
+              <p className="text-slate-600 text-lg sm:text-xl lg:text-base mt-1 font-medium">{cuisines}</p>
+              <p className="text-slate-500 text-base sm:text-lg lg:text-sm mt-1 flex items-center gap-1.5">
                 <MapPin size={13} className="text-[#6900AA] shrink-0" />
                 <span>{profile.address || 'Address hidden'}</span>
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500">
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base sm:text-lg lg:text-sm text-slate-500">
                 {isOpenNow ? (
                   <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-emerald-600 font-semibold text-xs">
                     Open now
@@ -996,8 +1112,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <Star size={15} className="fill-white" />
               </div>
               <div>
-                <p className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">Dine-out rating</p>
-                <p className="text-slate-500 text-xs font-medium">{reviewsCount} Reviews</p>
+                <p className="text-sm lg:text-xs font-bold text-slate-800 uppercase tracking-wide">Dine-out rating</p>
+                <p className="text-slate-500 text-sm lg:text-xs font-medium">{reviewsCount} Reviews</p>
               </div>
             </div>
           </div>
@@ -1091,7 +1207,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   <div className="absolute bottom-3 right-3 md:hidden bg-black/60 backdrop-blur-[2px] text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 z-10 shadow-md">
                     <ImageIcon size={14} className="text-white" />
                     <span>View Gallery</span>
-                    <span className="text-[10px] text-white/70">({photos.length})</span>
+                    <span className="text-[0.625rem] text-white/70">({photos.length})</span>
                   </div>
                 )}
 
@@ -1106,7 +1222,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white transition-opacity group-hover:bg-black/75">
                     <ImageIcon size={22} className="mb-1" />
                     <span className="font-bold text-sm tracking-wide">View Gallery</span>
-                    <span className="text-[10px] text-white/70">{photos.length > 5 ? '5+' : photos.length} Photos</span>
+                    <span className="text-[0.625rem] text-white/70">{photos.length > 5 ? '5+' : photos.length} Photos</span>
                   </div>
                 )}
               </div>
@@ -1115,30 +1231,43 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         </div>
 
 
-        {/* ── Sticky tabs (below image, like Zomato) ── */}
-        <div id="restaurant-tabs" className="sticky top-16 z-40 bg-white -mx-4 px-4 border-b border-slate-200 mt-6">
+      </div>
+
+        {/* ── Sticky tabs (stick under site header once you scroll to them) ── */}
+        <div ref={tabsSentinelRef} className="h-0 mt-6" aria-hidden />
+        <div
+          id="restaurant-tabs"
+          className={`sticky z-40 bg-white border-b border-slate-200 top-[52px] md:top-[60px] lg:top-[76px] xl:top-[80px] ${
+            tabsStuck ? "shadow-[0_4px_12px_rgba(15,23,42,0.08)]" : ""
+          }`}
+        >
+          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
           <div className="flex gap-6 overflow-x-auto scrollbar-hide">
             {["Overview", "Reviews", "Photos", "Menu", "Book a Table"].map((tab) => (
-          <button
+              <button
                 key={tab}
-            onClick={() => {
+                type="button"
+                onClick={() => {
                   setActiveTab(tab);
                   if (tab === "Book a Table") {
                     setDrawerStep(1);
                   }
                 }}
-                className={`py-3.5 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${activeTab === tab
-                  ? "border-[#6900AA] text-[#6900AA] font-bold"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
-                  }`}
+                className={`py-3.5 text-base sm:text-lg lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === tab
+                    ? "border-[#6900AA] text-[#6900AA] font-bold"
+                    : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
               >
                 {tab}
               </button>
             ))}
           </div>
+          </div>
         </div>
 
         {/* ── Page Body ── */}
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pb-12 sm:pb-16">
         {(() => {
           const hideBookingSidebar =
             activeTab === "Book a Table" && (drawerStep === 3 || drawerStep === 4);
@@ -1146,7 +1275,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         <div className={`grid grid-cols-1 gap-10 items-start pt-8 ${hideBookingSidebar ? '' : 'lg:grid-cols-3'}`}>
 
           {/* Main Column */}
-          <div className={`${hideBookingSidebar ? 'col-span-full' : 'lg:col-span-2'} space-y-8`}>
+          <div
+            id="tab-panel-start"
+            className={`${hideBookingSidebar ? 'col-span-full' : 'lg:col-span-2'} space-y-8 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]`}
+          >
 
             {/* Overview Tab Content */}
             {activeTab === "Overview" && (
@@ -1154,72 +1286,57 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                 {/* Dining Offers — 1 = full-width blue; 2+ = first blue, rest white compact cards */}
                 <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                  <h3 className="text-xl font-bold text-zinc-800">Dining Offers</h3>
+                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Dining Offers</h3>
                   {visibleOffers.length > 1 && (
-                    <p className="text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
+                    <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
                   )}
                   {visibleOffers.length <= 1 && <div className="mb-4" />}
                   {visibleOffers.length > 0 ? (
-                    <div
-                      className={
-                        visibleOffers.length === 1
-                          ? "grid grid-cols-1"
-                          : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
-                      }
-                    >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                       {visibleOffers.map((offer, idx) => {
-                        const isSingle = visibleOffers.length === 1;
-                        const isFeatured = isSingle || idx === 0;
+                        const isFeatured = idx === 0;
                         const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
                         return (
                           <button
                             key={`${offer.id || offer.title}-${idx}`}
                             type="button"
                             onClick={() => handleQuickBook(offer)}
-                            className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer ${
+                            className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
                               isFeatured
                                 ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
                                 : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
-                            } ${
-                              isSingle
-                                ? "w-full p-5 sm:p-6 min-h-[140px]"
-                                : "p-3.5 sm:p-4 min-h-[120px]"
                             }`}
                           >
                             {scheduled && (
-                              <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                              <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
                                 Coming soon
                               </span>
                             )}
                             <p
-                              className={`text-[10px] font-extrabold uppercase tracking-wider ${
+                              className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
                                 isFeatured ? "text-white/85" : "text-[#2563eb]"
                               }`}
                             >
                               {offer.type || "Offer"}
                             </p>
                             <p
-                              className={`font-extrabold mt-1.5 leading-snug ${
+                              className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
                                 isFeatured ? "text-white" : "text-zinc-900"
-                              } ${isSingle ? "text-xl sm:text-2xl" : "text-base sm:text-lg"}`}
+                              }`}
                             >
                               {offer.title}
                             </p>
                             <p
-                              className={`mt-2 leading-snug font-semibold ${
+                              className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
                                 isFeatured ? "text-white/90" : "text-[#2563eb]"
-                              } ${isSingle ? "text-sm" : "text-xs"}`}
+                              }`}
                             >
                               {formatDiningOfferDiscount(offer)}
                               {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
                             </p>
                             <span
-                              className={`pointer-events-none absolute font-black leading-none select-none ${
+                              className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
                                 isFeatured ? "text-white/15" : "text-[#2563eb]/10"
-                              } ${
-                                isSingle
-                                  ? "-bottom-4 -right-1 text-[100px]"
-                                  : "-bottom-3 -right-1 text-[72px]"
                               }`}
                               aria-hidden
                             >
@@ -1237,13 +1354,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {/* Menu — bordered card, cuisine pills, stack preview → lightbox */}
                 <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
                   <div className="flex items-center justify-between gap-3 mb-4">
-                    <h3 className="text-xl font-bold text-zinc-800">Menu</h3>
+                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Menu</h3>
                     {menus.length > 0 && (
                       <button
                         type="button"
                         onClick={() => {
                           setActiveTab("Menu");
-                          window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
                         className="inline-flex items-center gap-0.5 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer whitespace-nowrap"
                       >
@@ -1259,9 +1375,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         key={c}
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-[#e8d9a8] text-[#9a7b2f] text-sm font-medium"
                       >
-                        <span className="text-[10px] leading-none" aria-hidden>✦</span>
+                        <span className="text-[0.625rem] leading-none" aria-hidden>✦</span>
                         {c}
-                        <span className="text-[10px] leading-none" aria-hidden>✦</span>
+                        <span className="text-[0.625rem] leading-none" aria-hidden>✦</span>
                       </span>
                     ))}
                   </div>
@@ -1291,7 +1407,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             </div>
                           </div>
                           <p className="mt-2.5 text-sm font-bold text-zinc-800">Menu</p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-sm lg:text-xs text-zinc-500">
                             {menus.length} {menus.length === 1 ? "page" : "pages"}
                           </p>
                         </button>
@@ -1323,8 +1439,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     />
                                   </div>
                                 </div>
-                                <p className="mt-2.5 text-sm font-bold text-zinc-800">Menu</p>
-                                <p className="text-xs text-zinc-500">
+                                <p className="mt-2.5 text-sm sm:text-base lg:text-sm font-bold text-zinc-800">Menu</p>
+                                <p className="text-sm sm:text-base lg:text-sm text-zinc-500">
                                   {idx + 1} of {menus.length} {menus.length === 1 ? "page" : "pages"}
                                 </p>
                               </button>
@@ -1364,21 +1480,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                 {/* About Venue & Average Cost */}
                 <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                  <h3 className="text-xl font-bold text-zinc-800 mb-3">About the Venue</h3>
-                  <p className="text-slate-500 text-sm leading-relaxed whitespace-pre-wrap">
+                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-3">About the Venue</h3>
+                  <p className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap">
                     {profile.description || 'This venue has not provided a description yet. Enjoy a curated dining experience with premium seats, lovely ambiance, and delicious gourmet specialties.'}
                   </p>
 
-                  <h4 className="text-base font-bold text-zinc-800 mt-6 mb-1">Average Cost</h4>
-                  <p className="text-sm text-slate-600 font-medium">{costText}</p>
-                  <p className="text-xs text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any</p>
+                  <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-1">Average Cost</h4>
+                  <p className="text-base sm:text-lg lg:text-sm text-slate-600 font-medium">{costText}</p>
+                  <p className="text-base  lg:text-sm text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any</p>
 
                   {profile.amenities && profile.amenities.length > 0 && (
                     <>
-                      <h4 className="text-base font-bold text-zinc-800 mt-6 mb-3">More Info</h4>
+                      <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-3">More Info</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
                         {profile.amenities.map((info: string) => (
-                          <div key={info} className="flex items-center gap-2 text-sm text-slate-600">
+                          <div key={info} className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600">
                             <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                               <Check size={10} strokeWidth={3} />
                             </span>
@@ -1395,7 +1511,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {/* Menu Tab Content — uniform gallery cards, 3 per row on desktop */}
             {activeTab === "Menu" && (
               <section className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200">
-                <h3 className="text-lg font-bold text-slate-800 mb-5">Menu Card</h3>
+                <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-5">Menu Card</h3>
                 {menus.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {menus.map((menuUrl, idx) => (
@@ -1431,7 +1547,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {/* Photos Tab Content */}
             {activeTab === "Photos" && (
               <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-800 mb-5">Photos Gallery</h3>
+                <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-5">Photos Gallery</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {photos.map((url, idx) => (
                     <div
@@ -1452,39 +1568,39 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                 {/* Write Review Form */}
                 <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-base font-bold text-slate-800 mb-4">Write a Review</h3>
+                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
                   <form onSubmit={handleAddReview} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Your Name</label>
+                        <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">Your Name</label>
                         <input
                           type="text"
                           required
                           value={newReviewUser}
                           onChange={(e) => setNewReviewUser(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-rose-500"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
                           placeholder="E.g., Priya R."
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-2">Rating</label>
+                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">Rating</label>
                         <div className="h-9 flex items-center">
                           <StarRatingInput value={newReviewRating} onChange={setNewReviewRating} />
                         </div>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Comment</label>
+                      <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">Comment</label>
                       <textarea
                         required
                         rows={3}
                         value={newReviewText}
                         onChange={(e) => setNewReviewText(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-rose-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
                         placeholder="Write details about food, staff, service..."
                       />
                     </div>
-                    <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm">
+                    <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm">
                       Submit Review
                     </button>
                   </form>
@@ -1492,7 +1608,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                 {/* Review Feed */}
                 <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-5 divide-y divide-slate-100">
-                  <h3 className="text-base font-bold text-slate-800 mb-2">User Reviews</h3>
+                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
                   {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one!</p>}
                   {reviews.map((rev: any, idx: number) => (
                     <div key={rev.id} className={`${idx > 0 ? "pt-5" : ""} flex gap-3`}>
@@ -1501,18 +1617,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold text-slate-800">{rev.user_name}</p>
-                          <p className="text-[10px] text-slate-400 font-medium">
+                          <p className="text-baselg:text-xs font-bold text-slate-800">{rev.user_name}</p>
+                          <p className="text-[1rem] sm:text-[0.625rem] text-slate-400 font-medium">
                             {new Date(rev.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5 mt-1">
-                          <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md text-[10px] text-emerald-600 font-bold">
+                          <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md text-sm sm:text-base lg:text-[0.625rem] text-emerald-600 font-bold">
                             <span>{rev.rating}</span>
                             <Star size={8} className="fill-emerald-600" />
                           </div>
                         </div>
-                        <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                        <p className="text-base lg:text-xs text-slate-600 mt-2 leading-relaxed">
                           {rev.text}
                         </p>
 
@@ -1520,12 +1636,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         {rev.replies && rev.replies.length > 0 && (
                           <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100">
                             {rev.replies.map((reply: any) => (
-                              <div key={reply.id} className={`p-3 rounded-xl text-xs ${reply.user_type === 'owner' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
+                              <div key={reply.id} className={`p-3 rounded-xl text-base lg:text-xs ${reply.user_type === 'owner' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
                                 <div className="flex items-center justify-between mb-1">
                                   <span className={`font-bold ${reply.user_type === 'owner' ? 'text-rose-700' : 'text-slate-700'}`}>
-                                    {reply.user_name} {reply.user_type === 'owner' && <span className="ml-1 text-[9px] bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Owner</span>}
+                                    {reply.user_name} {reply.user_type === 'owner' && <span className="ml-1 text-[1rem] lg:text-[0.5625rem] bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Owner</span>}
                                   </span>
-                                  <span className="text-[10px] text-slate-400">
+                                  <span className="text-[1rem] lg:text-[0.625rem] text-slate-400">
                                     {new Date(reply.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                                   </span>
                                 </div>
@@ -1548,7 +1664,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   value={replyUser}
                                   onChange={(e) => setReplyUser(e.target.value)}
                                   placeholder="Your Name"
-                                  className="text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-rose-500 w-1/3"
+                                  className="text-base lg:text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-rose-500 w-1/3"
                                 />
                               </div>
                               <textarea
@@ -1556,19 +1672,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 value={replyText}
                                 onChange={(e) => setReplyText(e.target.value)}
                                 placeholder="Write your reply..."
-                                className="w-full text-xs border border-slate-200 rounded p-2 outline-none focus:border-rose-500 min-h-[60px]"
+                                className="w-full text-base lg:text-xs border border-slate-200 rounded p-2 outline-none focus:border-rose-500 min-h-[60px]"
                               />
                               <div className="flex justify-end gap-2 mt-2">
                                 <button
                                   type="button"
                                   onClick={() => setReplyingToReviewId(null)}
-                                  className="text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5"
+                                  className="text-base lg:text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5"
                                 >
                                   Cancel
                                 </button>
                                 <button
                                   type="submit"
-                                  className="text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg"
+                                  className="text-base lg:text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg"
                                 >
                                   Post Reply
                                 </button>
@@ -1581,7 +1697,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 setReplyText("");
                                 setReplyUser("");
                               }}
-                              className="text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
+                              className="text-base lg:text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
                             >
                               Reply to review
                             </button>
@@ -1605,7 +1721,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
           {/* Right Sidebar Column — hidden on confirm/success for full-width booking flow */}
           {!hideBookingSidebar && (
-          <div ref={bookingWidgetRef} className="lg:col-span-1 space-y-6 lg:sticky lg:top-28">
+          <div ref={bookingWidgetRef} className="lg:col-span-1 space-y-6 lg:sticky lg:top-[140px] xl:top-[144px] z-30 self-start">
 
               {/* Book a Table step 1: animation only on the right */}
               {activeTab === "Book a Table" && drawerStep === 1 ? (
@@ -1617,14 +1733,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               {/* Table Reservation Widget */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-md overflow-hidden">
                 <div className="bg-indigo-50/60 p-4 border-b border-indigo-100/50">
-                  <h3 className="text-sm font-bold text-slate-800 tracking-wide uppercase">Table reservation</h3>
+                  <h3 className="text-base sm:text-lg lg:text-sm font-bold text-slate-800 tracking-wide uppercase">Table reservation</h3>
                   {widgetOfferLabel ? (
-                  <div className="flex items-center gap-1.5 text-xs text-indigo-700 font-bold mt-1">
-                    <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-black shrink-0 shadow-sm">%</span>
+                  <div className="flex items-center gap-1.5 text-base lg:text-xs text-indigo-700 font-bold mt-1">
+                    <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-sm lg:text-[0.625rem] font-black shrink-0 shadow-sm">%</span>
                       <span>{widgetOfferLabel}</span>
                   </div>
                   ) : (
-                    <p className="text-xs text-slate-500 font-medium mt-1">Reserve a table at this venue</p>
+                    <p className="text-base lg:text-xs text-slate-500 font-medium mt-1">Reserve a table at this venue</p>
                   )}
                 </div>
 
@@ -1634,7 +1750,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <select
                         value={selectedDateIndex}
                         onChange={(e) => handleDateSelect(Number(e.target.value))}
-                        className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-xs text-slate-750 focus:outline-none appearance-none font-semibold cursor-pointer"
+                        className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-base lg:text-xs text-slate-750 focus:outline-none appearance-none font-semibold cursor-pointer"
                       >
                         {bookingDates.map((d, idx) => {
                           let label = "";
@@ -1655,7 +1771,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <select
                         value={guests}
                         onChange={(e) => { setGuests(e.target.value); setAvailabilityStatus(null); }}
-                        className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-xs text-slate-750 focus:outline-none appearance-none font-semibold cursor-pointer"
+                        className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-base lg:text-xs text-slate-750 focus:outline-none appearance-none font-semibold cursor-pointer"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                           <option key={num} value={num}>
@@ -1670,7 +1786,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   <button
                     type="button"
                     onClick={() => handleQuickBook()}
-                    className="bg-black hover:bg-zinc-800 text-white rounded-xl w-full py-2.5 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    className="bg-[#6900AA] hover:bg-[#57008E] text-white rounded-xl w-full py-2.5 text-base lg:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     Book a table
                   </button>
@@ -1679,15 +1795,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
               {/* Direction card (replaces Call Venue / Timing) */}
               <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-zinc-800 mb-2">Direction</h3>
-                <p className="text-sm text-zinc-500 leading-relaxed mb-4">
+                <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-zinc-800 mb-2">Direction</h3>
+                <p className="text-base sm:text-lg lg:text-sm text-zinc-500 leading-relaxed mb-4">
                   {profile.address || "Address hidden"}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={handleCopyAddress}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-zinc-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-base lg:text-xs font-semibold text-zinc-700 hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <Copy size={14} className="text-zinc-500" />
                     {copied ? "Copied" : "Copy"}
@@ -1703,7 +1819,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         );
                       }
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-base lg:text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                   >
                     <Navigation size={14} />
                     Direction
@@ -1725,14 +1841,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             <div className="mt-12 pt-10 border-t border-slate-200 animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-xl font-extrabold text-slate-800 tracking-tight">
+                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-extrabold text-slate-800 tracking-tight">
                     {(() => {
                       const rawType = profile?.type_name || "Restaurant";
                       const plural = rawType.toLowerCase().endsWith('s') ? rawType : `${rawType}s`;
                       return `Similar ${plural}`;
                     })()}
                   </h3>
-                  <p className="text-slate-500 text-xs mt-1 font-semibold">
+                  <p className="text-slate-500 text-sm sm:text-base lg:text-xs mt-1 font-semibold">
                     Handpicked recommendations you might also like
                   </p>
                 </div>
@@ -1789,16 +1905,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
 
                       <div className="px-1 pb-1">
-                        <h4 className="font-extrabold text-slate-800 text-[16px] leading-tight truncate group-hover:text-rose-600 transition-colors">
+                        <h4 className="font-extrabold text-slate-800 text-base leading-tight truncate group-hover:text-rose-600 transition-colors">
                           {restaurant.name}
                         </h4>
 
                         <div className="flex items-center gap-1.5 mt-1.5">
-                          <span className="bg-emerald-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <span className="bg-emerald-700 text-white text-[0.625rem] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                             <span>{rating}</span>
-                            <span className="text-[8px]">★</span>
+                            <span className="text-[0.5rem]">★</span>
                           </span>
-                          <span className="text-[9px] text-slate-400 font-bold tracking-wider uppercase">DINING</span>
+                          <span className="text-[0.5625rem] text-slate-400 font-bold tracking-wider uppercase">DINING</span>
                         </div>
 
                         <div className="flex justify-between items-center gap-2 mt-2.5 text-xs text-slate-500 font-medium">
@@ -1806,7 +1922,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           <span className="shrink-0 text-slate-700 font-semibold">{priceForTwo}</span>
                         </div>
 
-                        <div className="text-[11px] text-slate-400 mt-1 font-medium">
+                        <div className="text-xs text-slate-400 mt-1 font-medium">
                           {locality}
                         </div>
                       </div>
@@ -1837,7 +1953,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex items-center justify-between max-w-7xl mx-auto w-full gap-2 sm:gap-4 my-4 relative">
+            <div className="flex-1 flex items-center container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 justify-between w-full gap-2 sm:gap-4 my-4 relative">
               {/* Left Button */}
               {lightboxItems.length > 1 ? (
                 <button
@@ -1897,42 +2013,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
         {/* ── 8. Book a Table flow (inline in Book a Table tab via portal) ── */}
         {activeTab === "Book a Table" && bookTableSlot && createPortal(
-          <div className="w-full bg-white flex flex-col">
-            {/* Panel Header — only for steps after booking details */}
-            {drawerStep !== 1 && (
-            <div className={`p-4 border-b border-slate-100 flex items-center shrink-0 bg-white ${drawerStep === 3 ? 'gap-2' : 'gap-3'}`}>
-              <button
-                onClick={() => {
-                  if (drawerStep > 1 && drawerStep !== 4) {
-                    setDrawerStep(prev => prev - 1);
-                  } else {
-                    closeBookingPanel();
-                  }
-                }}
-                className={drawerStep === 3
-                  ? 'w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors cursor-pointer text-slate-500 shrink-0'
-                  : 'p-1 hover:bg-slate-100 rounded-full transition-colors cursor-pointer text-slate-500'}
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <div className={drawerStep === 3 ? 'flex-1 text-center min-w-0 px-1' : ''}>
-                <h3 className={`font-extrabold text-slate-800 ${drawerStep === 3 ? 'text-sm sm:text-base truncate' : 'text-base'}`}>
-                  {drawerStep === 2 && (loginStep === 3 ? 'Create Account' : loginStep === 2 ? 'Verify OTP' : 'Verify Mobile Number')}
-                  {drawerStep === 3 && 'Review booking details'}
-                  {drawerStep === 4 && 'Booking Confirmed'}
-                </h3>
-                <p className={`text-slate-500 font-semibold ${drawerStep === 3 ? 'text-[10px] sm:text-[11px] truncate' : 'text-[11px]'}`}>{profile.name}{profile.address ? `, ${profile.address.split(',')[0]}` : ''}</p>
-              </div>
-              <button
-                onClick={closeBookingPanel}
-                className={drawerStep === 3
-                  ? 'w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-slate-400 cursor-pointer shrink-0'
-                  : 'ml-auto p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 cursor-pointer'}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            )}
+          <div className="w-full bg-white flex flex-col pb-12 sm:pb-16">
 
             {/* Panel Content */}
             <div className={`${drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : drawerStep === 1 ? 'pt-1 pb-2 bg-white' : 'p-5 bg-white'}`}>
@@ -1977,7 +2058,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 })();
 
                 return (
-                  <div className="space-y-5 max-w-3xl">
+                  <div className="space-y-5">
                     <h4 className="text-xl font-semibold text-slate-900 tracking-tight">
                       Select your booking details
                     </h4>
@@ -2128,12 +2209,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       {isSelectedDayClosed ? (
                         <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
                           <p className="text-xs text-rose-500 font-bold">Closed on this day</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">Please select another date above.</p>
+                          <p className="text-[0.625rem] text-slate-400 mt-0.5">Please select another date above.</p>
                         </div>
                       ) : visibleSlots.length === 0 ? (
                         <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
                           <p className="text-xs text-slate-400 font-medium">No slots available for this selection.</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">Try another date or meal time.</p>
+                          <p className="text-[0.625rem] text-slate-400 mt-0.5">Try another date or meal time.</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
@@ -2151,11 +2232,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400'
                                 }`}
                               >
-                                <span className="text-[13px] font-semibold leading-none">
+                                <span className="text-sm font-semibold leading-none">
                                   {formatSlotLabel(slot)}
                                 </span>
                                 {promoText ? (
-                                  <span className="text-[10px] font-medium text-[#2563EB] mt-1 leading-none">
+                                  <span className="text-[0.625rem] font-medium text-[#2563EB] mt-1 leading-none">
                                     {promoText}
                                   </span>
                                 ) : null}
@@ -2227,10 +2308,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                       <span className="w-2 h-2 rounded-full bg-[#6900AA]" />
                                     )}
                                   </span>
-                                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
+                                  <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
                                     {(offer.type || "Offer").toString()}
                                   </p>
-                                  <p className="text-[15px] font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
+                                  <p className="text-base font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
                                     {offer.title}
                                   </p>
                                   <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
@@ -2265,10 +2346,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   <span className="w-2 h-2 rounded-full bg-[#6900AA]" />
                                 )}
                               </span>
-                              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
+                              <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-slate-400 pl-8 pr-5">
                                 No offer
                               </p>
-                              <p className="text-[15px] font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
+                              <p className="text-base font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
                                 Regular table reservation
                               </p>
                               <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
@@ -2301,7 +2382,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <form onSubmit={handlePhoneLoginSubmit} className="space-y-5">
                         {loginStep === 1 ? (
                           <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Phone Number</label>
+                            <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Phone Number</label>
                             <div className="relative">
                               <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-xs">+251</span>
                               <input
@@ -2333,7 +2414,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <span className="font-medium text-slate-500">OTP sent to +251 {loginPhone}. Demo code <strong>123456</strong>.</span>
                             </div>
 
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Enter OTP</label>
+                            <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Enter OTP</label>
                             <input
                               type="text"
                               required
@@ -2378,7 +2459,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                       <form onSubmit={handleRegisterSubmit} className="space-y-4">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Full Name</label>
+                          <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Full Name</label>
                           <input
                             type="text"
                             required
@@ -2389,7 +2470,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Email Address</label>
+                          <label className="text-[0.625rem] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Email Address</label>
                           <input
                             type="email"
                             required
@@ -2421,6 +2502,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </p>
                     </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setDrawerStep(1)}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer mt-4"
+                  >
+                    <ChevronLeft size={18} />
+                    Back
+                  </button>
                 </div>
               )}
 
@@ -2432,7 +2521,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   </div>
                   )}
                   {availabilityStatus === 'unavailable' && (
-                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center space-y-3">
+                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center space-y-3 max-w-xl mx-auto">
                       <p className="text-xs text-rose-600 font-bold">Sorry, no tables are available for this slot.</p>
                       <button
                         type="button"
@@ -2464,7 +2553,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] gap-5 lg:gap-6 items-start">
                         {/* Left — review booking details */}
                         <div>
-                          <h3 className="text-[15px] font-bold text-zinc-900 mb-3">Review booking details</h3>
+                          <h3 className="text-base font-bold text-zinc-900 mb-3">Review booking details</h3>
                           <div className="rounded-xl border border-zinc-200 bg-white px-4 py-1">
                             <div className="flex items-start gap-3 py-3.5 border-b border-zinc-100">
                               <Calendar size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
@@ -2550,17 +2639,17 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </div>
                   )}
                           </div>
-                          <p className="text-[11px] text-zinc-400 mt-3 leading-relaxed">
+                          <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
                             The restaurant will try to allot the seats for the selected preference but availability of preferred seating is subject to restaurant discretion and no refunds/cancellations are possible.
                           </p>
                       </div>
 
                         {/* Right — editable guest form */}
                         <div>
-                          <h3 className="text-[15px] font-bold text-zinc-900 mb-3">Your details</h3>
-                          <div className="rounded-xl border border-zinc-200 bg-white p-3.5 space-y-3">
+                          <h3 className="text-base font-bold text-zinc-900 mb-3">Your details</h3>
+                          <div className="rounded-xl bg-zinc-50 p-3.5 space-y-3">
                             <div>
-                              <label className={`rounded-lg border bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5 cursor-text focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all ${confirmErrors.name ? 'border-red-400' : 'border-zinc-200'}`}>
+                              <label className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 cursor-text transition-colors ${confirmErrors.name ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
                                 <User size={16} className="text-primary shrink-0" />
                                 <Controller
                                   name="name"
@@ -2584,12 +2673,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 />
                               </label>
                               {confirmErrors.name && (
-                                <p className="text-red-500 text-[11px] font-semibold mt-1.5 px-0.5">{confirmErrors.name.message}</p>
+                                <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.name.message}</p>
                               )}
                         </div>
 
                         <div>
-                              <label className={`rounded-lg border bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5 cursor-text focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all ${confirmErrors.phone ? 'border-red-400' : 'border-zinc-200'}`}>
+                              <label className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 cursor-text transition-colors ${confirmErrors.phone ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
                                 <Phone size={16} className="text-primary shrink-0" />
                                 <Controller
                                   name="phone"
@@ -2615,12 +2704,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 />
                               </label>
                               {confirmErrors.phone && (
-                                <p className="text-red-500 text-[11px] font-semibold mt-1.5 px-0.5">{confirmErrors.phone.message}</p>
+                                <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.phone.message}</p>
                               )}
                         </div>
 
                             <div ref={arrivalFieldRef} className="relative">
-                              <div className={`rounded-lg border bg-zinc-50 px-3 py-2.5 flex items-center gap-2.5 ${confirmErrors.arrivalTime ? 'border-red-400' : 'border-zinc-200'}`}>
+                              <div className={`rounded-none border-b border-zinc-200 px-3 py-2 flex items-center gap-2.5 transition-colors ${confirmErrors.arrivalTime ? 'border-red-400' : 'border-zinc-200'} focus-within:border-[#6900AA]`}>
                                 <Clock size={16} className="text-primary shrink-0" />
                                 <button
                                   type="button"
@@ -2675,11 +2764,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 </ul>
                               )}
                               {confirmErrors.arrivalTime && (
-                                <p className="text-red-500 text-[11px] font-semibold mt-1.5 px-0.5">{confirmErrors.arrivalTime.message}</p>
+                                <p className="text-red-500 text-xs font-semibold mt-1.5 px-0.5">{confirmErrors.arrivalTime.message}</p>
                               )}
                             </div>
 
-                            <p className="text-[11px] text-primary font-medium leading-snug pt-0.5">
+                            <p className="text-xs text-primary font-medium leading-snug pt-0.5">
                               Confirm your name and phone so the restaurant can reach you.
                             </p>
                           </div>
@@ -2692,22 +2781,33 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         >
                           Confirm Booking
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrawerStep(1)}
+                          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
+                        >
+                          <ChevronLeft size={18} />
+                          Back
+                        </button>
                     </form>
                   )}
                 </div>
               )}
 
               {drawerStep === 4 && (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] gap-5 lg:gap-6 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] gap-5 lg:gap-6 items-start">
                     {/* Left — booking confirmed (Zomato-style) */}
+                    <div className="min-w-0">
                     <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <h3 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">Booking confirmed</h3>
-                        <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                          <Check size={12} strokeWidth={3} />
+                      <div className="flex items-center justify-center gap-2 mb-1.5">
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 shrink-0">
+                          <Check size={16} strokeWidth={2.75} className="text-emerald-700" />
                         </span>
-                    </div>
+                        <p className="m-0 text-base sm:text-lg font-bold text-emerald-600 tracking-tight leading-none">
+                          Success
+                        </p>
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight mb-1.5">Booking confirmed</h3>
                       <p className="text-sm text-zinc-500 font-medium leading-relaxed mb-4">
                         <strong className="text-zinc-800">{profile.name}</strong> has confirmed your booking. Have a great meal!
                       </p>
@@ -2763,7 +2863,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       {lastBookingId && (
                         <div className="mt-4 flex items-start gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="text-[11px] text-zinc-400 font-medium mb-0.5">Booking ID</p>
+                            <p className="text-xs text-zinc-400 font-medium mb-0.5">Booking ID</p>
                             <p className="text-xs sm:text-sm font-bold text-zinc-900 break-all leading-relaxed">{lastBookingId}</p>
                           </div>
                           <button
@@ -2786,31 +2886,27 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </div>
                       )}
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                          closeBookingPanel();
-                          handleResetBooking();
-                        }}
-                        className="mt-5 w-full py-3.5 rounded-xl bg-primary hover:bg-[#57008E] text-white text-sm font-bold transition-colors cursor-pointer shadow-sm"
-                      >
-                        Done
-                      </button>
-
                       {lastBookingId && (
                         <button
                           type="button"
                           onClick={() => {
                             closeBookingPanel();
-                            const params = new URLSearchParams({ id: lastBookingId });
-                            if (arrivalTime) params.set('arrival', arrivalTime);
-                            router.push(`/customer/bookings/confirmation?${params.toString()}`);
+                            router.push(`/customer/bookings/${lastBookingId}`);
                           }}
-                          className="mt-2.5 w-full py-3 rounded-xl border border-primary/25 bg-white text-primary text-sm font-semibold hover:bg-primary/5 transition-colors cursor-pointer"
+                          className="mt-5 inline-flex items-center justify-center px-4 py-2 rounded-lg border border-primary bg-white text-primary text-sm font-semibold hover:bg-primary/5 transition-colors cursor-pointer w-fit"
                         >
                           View booking details
                         </button>
                       )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeBookingPanel}
+                      className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft size={18} />
+                      Back
+                    </button>
                     </div>
 
                     {/* Right — venue card + check-in QR */}
@@ -2833,7 +2929,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             <p className="text-xs text-zinc-500 mt-0.5">{city || profile.address}</p>
                           )}
                           <div className="mt-3">
-                            <p className="text-[11px] text-zinc-400 font-medium">Phone</p>
+                            <p className="text-xs text-zinc-400 font-medium">Phone</p>
                             <a
                               href={`tel:${profile.phone || ''}`}
                               className="text-sm font-semibold text-zinc-800 hover:text-primary transition-colors"
@@ -2915,7 +3011,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             <div className="mt-3 w-full rounded-xl bg-primary/5 px-3 py-2.5 flex items-center gap-2.5 text-left">
                               <Clock size={16} className="text-primary shrink-0" />
                               <div className="min-w-0">
-                                <p className="text-[11px] text-zinc-500 leading-tight">Check-in window</p>
+                                <p className="text-xs text-zinc-500 leading-tight">Check-in window</p>
                                 <p className="text-xs font-bold text-zinc-900">{fmt(base - 30)} - {fmt(base + 15)}</p>
                               </div>
                             </div>
@@ -2923,14 +3019,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         })()}
                       </div>
                     </div>
-                  </div>
                 </div>
               )}
-            </div>
 
             {/* Step 1 footer — Zomato-like proceed bar */}
             {drawerStep === 1 && (
-              <div className="mt-8 max-w-3xl">
+              <div className="mt-8">
                 <label className="flex items-start gap-2.5 cursor-pointer select-none mb-4">
                     <div className="relative mt-0.5 shrink-0">
                       <input
@@ -2951,7 +3045,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         )}
                       </div>
                     </div>
-                  <span className="text-[12px] text-slate-500 font-medium leading-relaxed">
+                  <span className="text-xs text-slate-500 font-medium leading-relaxed">
                       I agree to the{' '}
                     <a href="#" className="text-[#6900AA] font-semibold hover:underline" onClick={e => e.preventDefault()}>Terms &amp; Conditions</a>
                       {' '}and{' '}
@@ -2962,18 +3056,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   <button
                     type="button"
                     disabled={!selectedTime || !acceptedTerms}
-                    onClick={() => {
-                      if (!authUser) {
-                        setDrawerStep(2);
-                        setLoginStep(1);
-                        setLoginError(null);
-                      } else {
-                        setDrawerStep(3);
-                        setName(authUser.name || '');
-                        setPhone(authUser.phone || '');
-                      }
-                    }}
-                  className={`w-full py-3.5 rounded-md text-[15px] font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
+                    onClick={proceedToBooking}
+                  className={`w-full py-3.5 rounded-md text-base font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
                     ? 'bg-[#6900AA] hover:bg-[#57008E] text-white cursor-pointer'
                     : 'bg-[#cfcfcf] text-white cursor-not-allowed'
                     }`}
@@ -2982,8 +3066,25 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   </button>
               </div>
             )}
+            </div>
           </div>
         , bookTableSlot)}
+
+        <CustomerAuthModal
+          open={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          onSuccess={() => {
+            dispatch(loadFromStorage());
+            setAuthModalOpen(false);
+            if (pendingProceedAfterAuth.current) {
+              pendingProceedAfterAuth.current = false;
+              const customer = readSessionForRole('customer')?.user;
+              setDrawerStep(3);
+              setName(customer?.name || '');
+              setPhone(customer?.phone || '');
+            }
+          }}
+        />
       </div>
       );
 }

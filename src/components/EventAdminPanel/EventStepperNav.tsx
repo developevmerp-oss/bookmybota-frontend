@@ -20,13 +20,14 @@ export const EVENT_STEPPER_STEPS: Array<{
   { id: "details", label: "Event details", short: "Details" },
   { id: "media", label: "Media", short: "Media" },
   { id: "venue", label: "Venue & tickets", short: "Venue" },
-  { id: "artists", label: "Artists", short: "Artists" },
+  { id: "artists", label: "Lineup", short: "Lineup" },
   { id: "documents", label: "Documents", short: "Docs" },
   { id: "review", label: "Review", short: "Review" },
 ];
 
 interface EventStepperNavProps {
   currentId: EventStepperStepId;
+  /** Steps with properly filled information (green check). */
   completedIds?: EventStepperStepId[];
   onStepClick?: (id: EventStepperStepId) => void;
   allowJump?: boolean;
@@ -39,14 +40,15 @@ export default function EventStepperNav({
   allowJump = false,
 }: EventStepperNavProps) {
   const currentIndex = EVENT_STEPPER_STEPS.findIndex((s) => s.id === currentId);
+  const completedSet = new Set(completedIds);
 
   return (
     <div className="space-y-3">
       <div className="hidden md:flex items-start gap-0 overflow-x-auto pb-1">
         {EVENT_STEPPER_STEPS.map((step, index) => {
-          const done = completedIds.includes(step.id) || index < currentIndex;
+          const done = completedSet.has(step.id);
           const active = step.id === currentId;
-          const clickable = allowJump && (done || index <= currentIndex);
+          const clickable = Boolean(allowJump && onStepClick);
           return (
             <div key={step.id} className="flex items-center min-w-0 flex-1">
               <button
@@ -60,17 +62,25 @@ export default function EventStepperNav({
                 <span
                   className={`h-9 w-9 rounded-full border-2 flex items-center justify-center text-sm font-semibold transition-colors ${
                     active
-                      ? "border-violet-600 bg-violet-600 text-white"
+                      ? done
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-violet-600 bg-violet-600 text-white"
                       : done
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                         : "border-slate-200 bg-white text-slate-400"
                   }`}
                 >
-                  {done && !active ? <Check size={16} /> : index + 1}
+                  {done ? <Check size={16} strokeWidth={2.5} /> : index + 1}
                 </span>
                 <span
                   className={`text-xs font-medium text-center leading-tight ${
-                    active ? "text-violet-700" : done ? "text-emerald-700" : "text-slate-400"
+                    active
+                      ? done
+                        ? "text-emerald-700"
+                        : "text-violet-700"
+                      : done
+                        ? "text-emerald-700"
+                        : "text-slate-400"
                   }`}
                 >
                   {step.label}
@@ -79,7 +89,9 @@ export default function EventStepperNav({
               {index < EVENT_STEPPER_STEPS.length - 1 && (
                 <div
                   className={`h-0.5 w-full max-w-[48px] mx-1 mt-[-18px] shrink-0 ${
-                    index < currentIndex ? "bg-emerald-400" : "bg-slate-200"
+                    done && completedSet.has(EVENT_STEPPER_STEPS[index + 1].id)
+                      ? "bg-emerald-400"
+                      : "bg-slate-200"
                   }`}
                 />
               )}
@@ -96,16 +108,30 @@ export default function EventStepperNav({
           <p className="text-sm font-semibold text-slate-800">
             {EVENT_STEPPER_STEPS[currentIndex]?.label}
           </p>
+          {completedSet.has(currentId) && (
+            <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Step complete</p>
+          )}
         </div>
-        <div className="flex gap-1">
-          {EVENT_STEPPER_STEPS.map((step, index) => (
-            <span
-              key={step.id}
-              className={`h-1.5 w-4 rounded-full ${
-                index <= currentIndex ? "bg-violet-600" : "bg-slate-200"
-              }`}
-            />
-          ))}
+        <div className="flex gap-1.5 items-center">
+          {EVENT_STEPPER_STEPS.map((step, index) => {
+            const done = completedSet.has(step.id);
+            const active = step.id === currentId;
+            return (
+              <span
+                key={step.id}
+                title={step.label}
+                className={`rounded-full flex items-center justify-center transition-all ${
+                  done
+                    ? "h-5 w-5 bg-emerald-500 text-white"
+                    : active
+                      ? "h-2 w-5 bg-violet-600"
+                      : "h-1.5 w-4 bg-slate-200"
+                }`}
+              >
+                {done ? <Check size={11} strokeWidth={3} /> : null}
+              </span>
+            );
+          })}
         </div>
       </div>
     </div>

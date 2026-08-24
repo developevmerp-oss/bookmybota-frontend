@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check } from "lucide-react";
@@ -12,6 +13,7 @@ import {
   useUploadImageMutation,
   useSearchOrganizerVenuesQuery,
   useGetOrganizerVenueLayoutsQuery,
+  useGetOrganizerVenueLayoutQuery,
   useSearchOrganizerArtistsQuery,
   type CityMaster,
   type EventDocumentUpload,
@@ -21,15 +23,28 @@ import {
   type OrganizerArtistSearchResult,
 } from "@/services/api";
 import { fuzzyFilter } from "@/lib/fuzzySearch";
+
+const VenueLayoutMapPreview = dynamic(
+  () => import("@/components/EventAdminPanel/VenueLayoutMapPreview"),
+  {
+    ssr: false,
+    loading: () => <p className="text-xs text-emerald-800">Loading seating map…</p>,
+  }
+);
 import { parseEventLanguages, LANGUAGE_OPTIONS, AGE_GROUP_OPTIONS } from "@/lib/eventValidation";
 import {
   eventDraftSchema,
   eventSubmitSchema,
   validateRequiredDocuments,
+  getCompletedEventStepIds,
+  computeDurationMinutesFromShowtimes,
   type EventFormValues,
   defaultEventFormValues,
   defaultVenue,
   defaultArtist,
+  EVENT_LINEUP_ROLES,
+  isArtistLineupRole,
+  normalizeLineupRole,
   showtimeToIso,
   isShowtimePersistable,
 } from "@/lib/eventFormSchema";
@@ -97,21 +112,24 @@ function ticketsForShow(
     ticket_type: t.ticket_type,
     total_count: Number(t.total_count),
     price: Number(t.price),
+    max_per_order: Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10),
   }));
   if (nested.length) return nested;
   const scoped = all.filter((t) => t.showtime_id === showId).map((t) => ({
     ticket_type: t.ticket_type,
     total_count: Number(t.total_count),
     price: Number(t.price),
+    max_per_order: Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10),
   }));
   if (scoped.length) return scoped;
   const unscoped = all.filter((t) => !t.showtime_id).map((t) => ({
     ticket_type: t.ticket_type,
     total_count: Number(t.total_count),
     price: Number(t.price),
+    max_per_order: Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10),
   }));
   if (showIndex === 0 && unscoped.length) return unscoped;
-  return [{ ticket_type: "", total_count: 100, price: 0 }];
+  return [{ ticket_type: "", total_count: 100, price: 0, max_per_order: 10 }];
 }
 
 function eventToValues(event?: OrganizerEvent | null): EventFormValues {
@@ -140,7 +158,7 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
               : "external",
         artist_business_id: a.artist_business_id || null,
         name: a.name || "",
-        role_title: a.role_title || "",
+        role_title: normalizeLineupRole(a.role_title),
         description: a.description || "",
         image_url: a.image_url || a.artist_business_image || "",
         sort_order: a.sort_order ?? i,
@@ -358,12 +376,23 @@ function VenueNameSearchField({
     });
     setValue(`showtimes.${index}.venue_name`, venue.name, { shouldDirty: true, shouldValidate: true });
     setValue(`showtimes.${index}.venue_address`, venue.address || "", { shouldDirty: true });
-    if (venue.city_id != null) {
-      setValue(`showtimes.${index}.city_id`, venue.city_id, { shouldDirty: true, shouldValidate: true });
-    }
-    if (verified && venue.default_layout_id) {
-      setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
-      setValue(`showtimes.${index}.venue_layout_template_id`, venue.default_layout_id, { shouldDirty: true });
+    setValue(
+      `showtimes.${index}.city_id`,
+      venue.city_id != null ? venue.city_id : null,
+      { shouldDirty: true, shouldValidate: true }
+    );
+    if (verified) {
+      const hasPublished =
+        Boolean(venue.default_layout_id) ||
+        (typeof venue.published_layout_count === "number" && venue.published_layout_count > 0);
+      if (hasPublished) {
+        setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
+        setValue(
+          `showtimes.${index}.venue_layout_template_id`,
+          venue.default_layout_id || null,
+          { shouldDirty: true }
+        );
+      }
     }
     setShowResults(false);
     onVenueSelected();
@@ -513,11 +542,66 @@ function SeatingLayoutFields({
   const layoutMode = watch(`showtimes.${index}.layout_mode`) || "none";
   const layoutId = watch(`showtimes.${index}.venue_layout_template_id`);
 
-  const { data: layoutData } = useGetOrganizerVenueLayoutsQuery(venueBusinessId!, {
-    skip: readOnly || !venueBusinessId || layoutMode !== "standard",
-  });
+  const { data: layoutData, isFetching: layoutsFetching } = useGetOrganizerVenueLayoutsQuery(
+    venueBusinessId!,
+    {
+      skip: readOnly || !venueBusinessId || !isRegisteredPartner,
+    }
+  );
+
+  const selectedLayout = useMemo(
+    () => (layoutData?.layouts || []).find((l) => l.id === layoutId) || null,
+    [layoutData?.layouts, layoutId]
+  );
+
+  const {
+    data: templateDetail,
+    isLoading: templateLoading,
+    isFetching: templateFetching,
+    isError: templateError,
+    error: templateErrorObj,
+  } = useGetOrganizerVenueLayoutQuery(
+    { businessId: venueBusinessId!, templateId: layoutId! },
+    {
+      skip:
+        readOnly ||
+        !venueBusinessId ||
+        !layoutId ||
+        !isRegisteredPartner ||
+        layoutMode !== "standard",
+    }
+  );
+  const showTemplateLoading = (templateLoading || templateFetching) && !templateDetail;
+
+  /** Prefer default published layout when switching to Standard. */
+  useEffect(() => {
+    if (readOnly || !isRegisteredPartner || layoutMode !== "standard") return;
+    if (layoutId) return;
+    const layouts = layoutData?.layouts || [];
+    if (!layouts.length) return;
+    const preferred = layouts.find((l) => l.is_default) || layouts[0];
+    if (preferred?.id) {
+      setValue(`showtimes.${index}.venue_layout_template_id`, preferred.id, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [readOnly, isRegisteredPartner, layoutMode, layoutId, layoutData?.layouts, index, setValue]);
+
+  /** Unregistered / auto venues cannot create layouts — customers book by ticket type (default). */
+  useEffect(() => {
+    if (isRegisteredPartner || readOnly) return;
+    if (layoutMode !== "none") {
+      setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+    }
+    setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+    setValue(`showtimes.${index}.custom_layout_name`, "", { shouldDirty: true });
+    setValue(`showtimes.${index}.custom_layout_notes`, "", { shouldDirty: true });
+    setValue(`showtimes.${index}.custom_layout_images` as never, [] as never, { shouldDirty: true });
+  }, [isRegisteredPartner, readOnly, layoutMode, index, setValue]);
 
   const setLayoutMode = (next: "none" | "standard" | "custom") => {
+    if (!isRegisteredPartner && next !== "none") return;
     setValue(`showtimes.${index}.layout_mode`, next, { shouldDirty: true, shouldValidate: true });
     if (next !== "standard") {
       setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
@@ -536,74 +620,165 @@ function SeatingLayoutFields({
       <div>
         <p className={labelClass}>Seating layout</p>
         <p className="text-xs text-slate-500 mb-2">
-          Optional. Choose a published venue layout, request a custom one, or skip for now.
+          {isRegisteredPartner
+            ? "Optional. Choose a published venue layout, request a custom one, or skip for now."
+            : "Layouts are only available for verified registered venues. New venues use the default booking flow — customers pick ticket types without a seat map."}
         </p>
         <div className="flex flex-wrap gap-4 text-sm">
-          <label className="inline-flex items-center gap-2">
+          <label className={`inline-flex items-center gap-2 ${!isRegisteredPartner ? "opacity-100" : ""}`}>
             <input
               type="radio"
               disabled={readOnly}
-              checked={layoutMode === "none"}
+              checked={layoutMode === "none" || !isRegisteredPartner}
               onChange={() => setLayoutMode("none")}
             />
-            None
+            None (default booking)
           </label>
-          <label className="inline-flex items-center gap-2">
+          <label
+            className={`inline-flex items-center gap-2 ${!isRegisteredPartner ? "opacity-50" : ""}`}
+            title={!isRegisteredPartner ? "Only for verified registered venues" : undefined}
+          >
             <input
               type="radio"
               disabled={readOnly || !isRegisteredPartner}
-              checked={layoutMode === "standard"}
+              checked={isRegisteredPartner && layoutMode === "standard"}
               onChange={() => setLayoutMode("standard")}
             />
             Standard (published layout)
           </label>
-          <label className="inline-flex items-center gap-2">
+          <label
+            className={`inline-flex items-center gap-2 ${!isRegisteredPartner ? "opacity-50" : ""}`}
+            title={!isRegisteredPartner ? "Only for verified registered venues" : undefined}
+          >
             <input
               type="radio"
-              disabled={readOnly}
-              checked={layoutMode === "custom"}
+              disabled={readOnly || !isRegisteredPartner}
+              checked={isRegisteredPartner && layoutMode === "custom"}
               onChange={() => setLayoutMode("custom")}
             />
             Custom request
           </label>
         </div>
         {!isRegisteredPartner && (
-          <p className="text-xs text-slate-500 mt-1">
-            Standard layouts require a verified registered venue. New or unverified venues can still request a custom layout.
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+            This venue is not a verified partner, so seating layouts cannot be created. Customers will book using the
+            default ticket-type flow (no seat selection map).
           </p>
         )}
       </div>
 
-      {layoutMode === "standard" && (
-        <div>
-          <label className={labelClass}>Published layout</label>
-          <select
-            disabled={readOnly || !venueBusinessId}
-            className={inputClass}
-            value={layoutId || ""}
-            onChange={(e) =>
-              setValue(`showtimes.${index}.venue_layout_template_id`, e.target.value || null, {
-                shouldDirty: true,
-                shouldValidate: true,
-              })
-            }
-          >
-            <option value="">Select published layout</option>
-            {(layoutData?.layouts || []).map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-                {l.is_default ? " (default)" : ""}
-                {l.capacity ? ` · ${l.capacity} seats` : ""}
-              </option>
-            ))}
-          </select>
-          {errors.showtimes?.[index]?.venue_layout_template_id && (
-            <p className={errorClass}>{errors.showtimes[index]?.venue_layout_template_id?.message}</p>
+      {isRegisteredPartner && layoutMode === "standard" && (
+        <div className="space-y-3">
+          <div>
+            <label className={labelClass}>Published layouts for this venue</label>
+            <p className="text-xs text-slate-500 mb-2">
+              Pick a layout below. Customers will use this seating map when booking (after you save the event).
+            </p>
+            {layoutsFetching && (
+              <p className="text-xs text-slate-500 mb-2">Loading venue layouts…</p>
+            )}
+            {(layoutData?.layouts || []).length > 0 ? (
+              <div className="grid sm:grid-cols-2 gap-2 mb-2">
+                {(layoutData?.layouts || []).map((l) => {
+                  const active = layoutId === l.id;
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() =>
+                        setValue(`showtimes.${index}.venue_layout_template_id`, l.id, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                      className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                        active
+                          ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
+                          : "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/40"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                        {active ? <Check size={14} className="text-emerald-600 shrink-0" /> : null}
+                        {l.name}
+                        {l.is_default ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">
+                            Default
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {l.capacity ? `${l.capacity} seats` : "Capacity not set"}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            <select
+              disabled={readOnly || !venueBusinessId}
+              className={inputClass}
+              value={layoutId || ""}
+              onChange={(e) =>
+                setValue(`showtimes.${index}.venue_layout_template_id`, e.target.value || null, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            >
+              <option value="">Select published layout</option>
+              {(layoutData?.layouts || []).map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                  {l.is_default ? " (default)" : ""}
+                  {l.capacity ? ` · ${l.capacity} seats` : ""}
+                </option>
+              ))}
+            </select>
+            {errors.showtimes?.[index]?.venue_layout_template_id && (
+              <p className={errorClass}>{errors.showtimes[index]?.venue_layout_template_id?.message}</p>
+            )}
+          </div>
+
+          {selectedLayout && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-900">{selectedLayout.name}</p>
+                <p className="text-xs text-emerald-800">
+                  {selectedLayout.capacity ? `${selectedLayout.capacity} seats · ` : ""}
+                  Preview of this venue&apos;s published layout (read-only).
+                </p>
+              </div>
+              {showTemplateLoading ? (
+                <p className="text-xs text-emerald-800">Loading seating map…</p>
+              ) : templateError ? (
+                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                  Could not load this seating map.
+                  {" "}
+                  {(templateErrorObj as { data?: { error?: string } })?.data?.error ||
+                    "Try selecting the layout again."}
+                </p>
+              ) : (
+                <VenueLayoutMapPreview
+                  seats={templateDetail?.seats_json}
+                  seatingConfig={
+                    (templateDetail?.seating_config as Record<string, unknown> | null | undefined) ?? null
+                  }
+                  height={260}
+                />
+              )}
+            </div>
+          )}
+          {!selectedLayout && (layoutData?.layouts || []).length === 0 && venueBusinessId && !layoutsFetching && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              No published layouts for this venue yet. Ask the venue admin / Super Admin to publish one, or use
+              None / Custom request.
+            </p>
           )}
         </div>
       )}
 
-      {layoutMode === "custom" && (
+      {isRegisteredPartner && layoutMode === "custom" && (
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>Layout name</label>
@@ -688,12 +863,14 @@ function VenueBlock({
   canRemove,
   onRemove,
   cities,
+  hostingType = "single",
 }: {
   index: number;
   readOnly: boolean;
   canRemove: boolean;
   onRemove: () => void;
   cities: CityMaster[];
+  hostingType?: "single" | "tour";
 }) {
   const {
     register,
@@ -708,7 +885,15 @@ function VenueBlock({
     remove,
   } = useFieldArray({ control, name: `showtimes.${index}.ticket_types` });
 
-  const durationType = watch(`showtimes.${index}.duration_type`) || "ONE_DAY";
+  const durationType =
+    hostingType === "single" ? "ONE_DAY" : watch(`showtimes.${index}.duration_type`) || "ONE_DAY";
+
+  useEffect(() => {
+    if (hostingType === "single") {
+      setValue(`showtimes.${index}.duration_type`, "ONE_DAY", { shouldDirty: true });
+    }
+  }, [hostingType, index, setValue]);
+
   const eventDate = watch(`showtimes.${index}.event_date`);
   const startTime = watch(`showtimes.${index}.start_time`);
   const endTime = watch(`showtimes.${index}.end_time`);
@@ -731,9 +916,12 @@ function VenueBlock({
   }, [addModeInitialized, venueBusinessId, venueName, venueAddress, cityId]);
 
   const showManualVenueFields = addingNewVenue && !venueBusinessId;
-  const isVerifiedSelected =
-    venueBusinessId &&
-    venueSource === "registered";
+  const isVerifiedSelected = Boolean(venueBusinessId && venueSource === "registered");
+  /** City master is required; show when adding new venue, or when selected venue has no city yet. */
+  const showCityFields =
+    showManualVenueFields ||
+    (Boolean(venueName.trim()) && cityId == null) ||
+    (Boolean(venueBusinessId) && !isVerifiedSelected && cityId == null);
   const labelClass = "portal-label block text-sm font-semibold mb-1.5";
   const errorClass = "text-rose-600 text-xs mt-1";
   const inputClass = "input-field w-full";
@@ -761,6 +949,7 @@ function VenueBlock({
               setValue(`showtimes.${index}.venue_name`, name, { shouldDirty: true, shouldValidate: true });
               setValue(`showtimes.${index}.venue_source`, "manual", { shouldDirty: true });
               setValue(`showtimes.${index}.venue_business_id`, null, { shouldDirty: true });
+              setValue(`showtimes.${index}.city_id`, null, { shouldDirty: true });
               setAddingNewVenue(true);
             }}
             onVenueSelected={() => setAddingNewVenue(false)}
@@ -803,6 +992,16 @@ function VenueBlock({
                 placeholder="Full address"
               />
             </div>
+          </>
+        )}
+
+        {showCityFields && (
+          <div className="sm:col-span-2 space-y-1">
+            {!showManualVenueFields && cityId == null && (
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Select city from the admin city master to continue.
+              </p>
+            )}
             <CityLocationFields
               index={index}
               readOnly={readOnly}
@@ -811,7 +1010,7 @@ function VenueBlock({
               inputClass={inputClass}
               errorClass={errorClass}
             />
-          </>
+          </div>
         )}
       </div>
 
@@ -824,27 +1023,33 @@ function VenueBlock({
       />
 
       <div>
-        <p className={labelClass}>Event duration</p>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="radio"
-              disabled={readOnly}
-              checked={durationType === "ONE_DAY"}
-              onChange={() => setValue(`showtimes.${index}.duration_type`, "ONE_DAY", { shouldDirty: true })}
-            />
-            One day event
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="radio"
-              disabled={readOnly}
-              checked={durationType === "MULTI_DAY"}
-              onChange={() => setValue(`showtimes.${index}.duration_type`, "MULTI_DAY", { shouldDirty: true })}
-            />
-            Multiple day event
-          </label>
-        </div>
+        <p className={labelClass}>Event schedule</p>
+        {hostingType === "tour" ? (
+          <div className="flex flex-wrap gap-4 text-sm mb-3">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                disabled={readOnly}
+                checked={durationType === "ONE_DAY"}
+                onChange={() => setValue(`showtimes.${index}.duration_type`, "ONE_DAY", { shouldDirty: true })}
+              />
+              One day stop
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                disabled={readOnly}
+                checked={durationType === "MULTI_DAY"}
+                onChange={() => setValue(`showtimes.${index}.duration_type`, "MULTI_DAY", { shouldDirty: true })}
+              />
+              Multiple day stop
+            </label>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 mb-3">
+            Single events use one date with start and end time. Duration is calculated automatically for customers.
+          </p>
+        )}
       </div>
 
       {durationType === "ONE_DAY" ? (
@@ -890,7 +1095,7 @@ function VenueBlock({
           {!readOnly && (
             <button
               type="button"
-              onClick={() => append({ ticket_type: "", total_count: 100, price: 0 })}
+              onClick={() => append({ ticket_type: "", total_count: 100, price: 0, max_per_order: 10 })}
               className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
             >
               <Plus size={14} /> Add type
@@ -898,7 +1103,7 @@ function VenueBlock({
           )}
         </div>
         {ticketFields.map((field, ti) => (
-          <div key={field.id} className="grid sm:grid-cols-4 gap-3 items-start">
+          <div key={field.id} className="grid sm:grid-cols-5 gap-3 items-start">
             <div className="sm:col-span-2">
               <label className={labelClass}>Type name</label>
               <input
@@ -916,6 +1121,17 @@ function VenueBlock({
                 min={1}
                 className={inputClass}
                 {...register(`showtimes.${index}.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Max / order</label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={1}
+                className={inputClass}
+                {...register(`showtimes.${index}.ticket_types.${ti}.max_per_order`, { valueAsNumber: true })}
+                title="Maximum tickets of this type a customer can buy in one purchase"
               />
             </div>
             <div className="flex gap-2">
@@ -959,20 +1175,64 @@ function ArtistBlock({
     formState: { errors },
   } = useFormContext<EventFormValues>();
   const businessId = watch(`artists.${index}.artist_business_id`);
-  const artistName = watch(`artists.${index}.name`) || "";
+  const personName = watch(`artists.${index}.name`) || "";
+  const imageUrl = watch(`artists.${index}.image_url`) || "";
+  const artistSource = watch(`artists.${index}.artist_source`) || "external";
+  const lineupRole = normalizeLineupRole(watch(`artists.${index}.role_title`));
+  const isArtistRole = isArtistLineupRole(lineupRole);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [showResults, setShowResults] = useState(false);
+  const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const labelClass = "portal-label block text-sm font-semibold mb-1.5";
   const errorClass = "text-rose-600 text-xs mt-1";
   const inputClass = "input-field w-full";
+  const isRegistered = Boolean(businessId) && artistSource === "registered";
+
+  const roleLabels = {
+    Artist: {
+      card: `Artist ${index + 1}`,
+      name: "Artist name",
+      namePlaceholder: "Search or type artist name",
+      nameHelp: "Select an existing artist from results, or type a new name to auto-register on save.",
+      picture: "Artist picture",
+      pictureHelpRegistered: "Photo loaded from the registered artist profile. You can replace it for this event.",
+      pictureHelpManual: "Not registered yet — upload a picture manually for the lineup.",
+      descriptionPlaceholder: "Optional bio or notes",
+      autoRegisterNote:
+        "This artist will be auto-registered when you save. Customers will see a small note that they are not platform-authorized. Add a picture below if you have one.",
+    },
+    Guest: {
+      card: `Guest ${index + 1}`,
+      name: "Guest name",
+      namePlaceholder: "Enter guest name",
+      nameHelp: "Guests are listed on this event only — they are not registered as platform artists.",
+      picture: "Guest picture",
+      pictureHelpRegistered: "",
+      pictureHelpManual: "Upload a picture for the guest (optional).",
+      descriptionPlaceholder: "Optional short intro for the guest",
+      autoRegisterNote: "",
+    },
+    "Chief Guest": {
+      card: `Chief Guest ${index + 1}`,
+      name: "Chief guest name",
+      namePlaceholder: "Enter chief guest name",
+      nameHelp: "Chief guests are listed on this event only — they are not registered as platform artists.",
+      picture: "Chief guest picture",
+      pictureHelpRegistered: "",
+      pictureHelpManual: "Upload a picture for the chief guest (optional).",
+      descriptionPlaceholder: "Optional short intro for the chief guest",
+      autoRegisterNote: "",
+    },
+  } as const;
+  const copy = roleLabels[lineupRole];
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(artistName.trim()), 250);
+    const t = setTimeout(() => setDebouncedQ(personName.trim()), 250);
     return () => clearTimeout(t);
-  }, [artistName]);
+  }, [personName]);
 
   const { data: allPartners = [], isFetching } = useSearchOrganizerArtistsQuery(undefined, {
-    skip: readOnly,
+    skip: readOnly || !isArtistRole,
   });
 
   const partners = useMemo(
@@ -983,6 +1243,15 @@ function ArtistBlock({
   const clearArtistSelection = () => {
     setValue(`artists.${index}.artist_business_id`, null, { shouldDirty: true });
     setValue(`artists.${index}.artist_source`, "external", { shouldDirty: true });
+  };
+
+  const onLineupRoleChange = (next: string) => {
+    const role = normalizeLineupRole(next);
+    setValue(`artists.${index}.role_title`, role, { shouldDirty: true, shouldValidate: true });
+    if (role !== "Artist") {
+      clearArtistSelection();
+      setShowResults(false);
+    }
   };
 
   const applyPartner = (artist: OrganizerArtistSearchResult) => {
@@ -998,12 +1267,25 @@ function ArtistBlock({
     setShowResults(false);
   };
 
-  const { onChange: onArtistNameChange, ...artistNameReg } = register(`artists.${index}.name`);
+  const uploadPersonPhoto = async (file: File) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      const res = await uploadImage(formData).unwrap();
+      if (res.url) {
+        setValue(`artists.${index}.image_url`, res.url, { shouldDirty: true });
+      }
+    } catch {
+      toast.error("Failed to upload picture");
+    }
+  };
+
+  const { onChange: onPersonNameChange, ...personNameReg } = register(`artists.${index}.name`);
 
   return (
     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-800">Artist {index + 1}</p>
+        <p className="text-sm font-semibold text-slate-800">{copy.card}</p>
         {!readOnly && (
           <button type="button" onClick={onRemove} className="p-1.5 text-slate-400 hover:text-rose-600">
             <Trash2 size={16} />
@@ -1013,96 +1295,163 @@ function ArtistBlock({
 
       <div className="grid sm:grid-cols-2 gap-3">
         <div className="sm:col-span-2">
-          <label className={labelClass}>Artist name</label>
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              disabled={readOnly}
-              className={`${inputClass} pl-9`}
-              placeholder="Search or type artist name"
-              {...artistNameReg}
-              onFocus={() => setShowResults(true)}
-              onChange={(e) => {
-                onArtistNameChange(e);
-                if (businessId) clearArtistSelection();
-                setShowResults(true);
-              }}
-              onBlur={() => {
-                window.setTimeout(() => setShowResults(false), 150);
-              }}
-            />
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Select an existing artist from results, or type a new name to auto-register on save.
-          </p>
+          <label className={labelClass}>
+            Add as <span className="text-rose-500">*</span>
+          </label>
+          <select
+            disabled={readOnly}
+            className={inputClass}
+            value={lineupRole}
+            onChange={(e) => onLineupRoleChange(e.target.value)}
+          >
+            {EVENT_LINEUP_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
+          {errors.artists?.[index]?.role_title && (
+            <p className={errorClass}>{errors.artists[index]?.role_title?.message}</p>
+          )}
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className={labelClass}>
+            {copy.name} <span className="text-rose-500">*</span>
+          </label>
+          {isArtistRole ? (
+            <>
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  disabled={readOnly}
+                  className={`${inputClass} pl-9`}
+                  placeholder={copy.namePlaceholder}
+                  {...personNameReg}
+                  onFocus={() => setShowResults(true)}
+                  onChange={(e) => {
+                    onPersonNameChange(e);
+                    if (businessId) clearArtistSelection();
+                    setShowResults(true);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => setShowResults(false), 150);
+                  }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">{copy.nameHelp}</p>
+              {businessId && !readOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearArtistSelection();
+                    setShowResults(true);
+                  }}
+                  className="mt-1.5 text-xs text-slate-600 hover:text-rose-600"
+                >
+                  Clear selection — add as new artist
+                </button>
+              )}
+              {showResults && !readOnly && debouncedQ.length >= 2 && (
+                <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm">
+                  {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
+                  {!isFetching && partners.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-slate-500">
+                      No matches — continue to add &quot;{debouncedQ}&quot; as a new artist.
+                    </p>
+                  )}
+                  {partners.map((a) => {
+                    const verified =
+                      a.is_partner_authorized !== false && a.partner_source !== "event_auto";
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyPartner(a)}
+                        className={`w-full text-left px-3 py-2 hover:bg-violet-50 flex items-center gap-3 ${
+                          businessId === a.id ? "bg-violet-50" : ""
+                        }`}
+                      >
+                        <div className="h-10 w-10 rounded-lg overflow-hidden bg-slate-200 shrink-0">
+                          {a.cover_image_url ? (
+                            <img src={a.cover_image_url} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center text-sm font-bold text-slate-500">
+                              {a.name.slice(0, 1).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-800">{a.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {[a.type_name, a.city_name].filter(Boolean).join(" · ") || "Artist"}
+                          </p>
+                          <p className={`text-[11px] ${verified ? "text-emerald-700" : "text-amber-700"}`}>
+                            {verified ? "Verified partner" : "In system — not platform-authorized"}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <input
+                disabled={readOnly}
+                className={inputClass}
+                placeholder={copy.namePlaceholder}
+                {...personNameReg}
+                onChange={onPersonNameChange}
+              />
+              <p className="text-xs text-slate-500 mt-1">{copy.nameHelp}</p>
+            </>
+          )}
           {errors.artists?.[index]?.name && (
             <p className={errorClass}>{errors.artists[index]?.name?.message}</p>
           )}
-
-          {businessId && !readOnly && (
-            <button
-              type="button"
-              onClick={() => {
-                clearArtistSelection();
-                setShowResults(true);
-              }}
-              className="mt-1.5 text-xs text-slate-600 hover:text-rose-600"
-            >
-              Clear selection — add as new artist
-            </button>
-          )}
-
-          {showResults && !readOnly && debouncedQ.length >= 2 && (
-            <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm">
-              {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
-              {!isFetching && partners.length === 0 && (
-                <p className="px-3 py-2 text-xs text-slate-500">
-                  No matches — continue to add &quot;{debouncedQ}&quot; as a new artist.
-                </p>
-              )}
-              {partners.map((a) => {
-                const verified =
-                  a.is_partner_authorized !== false && a.partner_source !== "event_auto";
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => applyPartner(a)}
-                    className={`w-full text-left px-3 py-2 hover:bg-violet-50 ${
-                      businessId === a.id ? "bg-violet-50" : ""
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-slate-800">{a.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {[a.type_name, a.city_name].filter(Boolean).join(" · ") || "Artist"}
-                    </p>
-                    <p className={`text-[11px] ${verified ? "text-emerald-700" : "text-amber-700"}`}>
-                      {verified ? "Verified partner" : "In system — not platform-authorized"}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
-        {!businessId && (
+        {isArtistRole && !businessId && copy.autoRegisterNote && (
           <p className="sm:col-span-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            This artist will be auto-registered when you save. Customers will see a small note that they are not
-            platform-authorized.
+            {copy.autoRegisterNote}
           </p>
         )}
 
-        <div>
-          <label className={labelClass}>Role on lineup</label>
-          <input
-            disabled={readOnly}
-            className={inputClass}
-            {...register(`artists.${index}.role_title`)}
-            placeholder="Headliner, Guest, Opener…"
+        <div className="sm:col-span-2">
+          <label className={labelClass}>
+            {copy.picture}{" "}
+            {isArtistRole && isRegistered ? (
+              <span className="text-slate-400 font-normal">(from profile)</span>
+            ) : null}
+          </label>
+          <CroppedImageField
+            value={imageUrl}
+            aspect={1}
+            disabled={readOnly || uploading}
+            previewClassName="w-28 h-28 rounded-xl"
+            emptyClassName="flex flex-col items-center justify-center h-28 w-28 rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+            onRemove={() => setValue(`artists.${index}.image_url`, "", { shouldDirty: true })}
+            onCroppedFile={(file) => void uploadPersonPhoto(file)}
+            emptyContent={
+              <>
+                <ImagePlus className="text-slate-400 mb-1" size={22} />
+                <span className="text-[10px] portal-muted text-center px-1">
+                  {isArtistRole && isRegistered ? "Add / replace photo" : "Upload photo"}
+                </span>
+              </>
+            }
           />
+          <p className="text-xs text-slate-500 mt-1">
+            {isArtistRole && isRegistered ? copy.pictureHelpRegistered : copy.pictureHelpManual}
+          </p>
         </div>
+
         <div className="sm:col-span-2">
           <label className={labelClass}>Short description</label>
           <textarea
@@ -1110,7 +1459,7 @@ function ArtistBlock({
             rows={2}
             className={inputClass}
             {...register(`artists.${index}.description`)}
-            placeholder="Optional bio or notes"
+            placeholder={copy.descriptionPlaceholder}
           />
         </div>
       </div>
@@ -1184,6 +1533,21 @@ export default function EventForm({
   const posterVertical = watch("poster_vertical_url");
   const galleryImages = watch("gallery_images") || [];
   const allowedTicketModes = watch("allowed_ticket_modes") || [];
+  const watchedValues = watch();
+
+  const { data: masters, isLoading: mastersLoading } = useGetEventMastersQuery(categoryTypeId!, {
+    skip: !categoryTypeId,
+  });
+
+  const completedStepIds = useMemo(() => {
+    return getCompletedEventStepIds({
+      hostingType,
+      values: watchedValues,
+      documents,
+      requiredDocumentIds: (masters?.documents || []).filter((d) => d.is_required).map((d) => d.id),
+      genresConfigured: (masters?.genres?.length || 0) > 0,
+    });
+  }, [hostingType, watchedValues, documents, masters?.documents, masters?.genres]);
 
   const toggleTicketMode = (mode: TicketDeliveryMode) => {
     if (readOnly) return;
@@ -1193,10 +1557,6 @@ export default function EventForm({
       : [...current, mode];
     setValue("allowed_ticket_modes", next, { shouldDirty: true, shouldValidate: true });
   };
-
-  const { data: masters, isLoading: mastersLoading } = useGetEventMastersQuery(categoryTypeId!, {
-    skip: !categoryTypeId,
-  });
 
   const {
     fields: showtimeFields,
@@ -1244,8 +1604,11 @@ export default function EventForm({
           : s.venue_business_id && s.venue_source === "auto_registered"
             ? "auto_registered"
             : "manual";
+      const canUseLayouts = venueSource === "registered" && Boolean(s.venue_business_id);
       const layoutMode =
-        s.layout_mode === "standard" || s.layout_mode === "custom" ? s.layout_mode : "none";
+        canUseLayouts && (s.layout_mode === "standard" || s.layout_mode === "custom")
+          ? s.layout_mode
+          : "none";
       const originalIndex = rawShowtimes.indexOf(s);
       const stopOrderIndex = originalIndex >= 0 ? originalIndex : stopIndex;
       return {
@@ -1272,11 +1635,15 @@ export default function EventForm({
         venue_proposal: null,
         starts_at: range.starts_at,
         ends_at: range.ends_at,
-        duration_type: (s.duration_type === "MULTI_DAY" ? "MULTI_DAY" : "ONE_DAY") as "ONE_DAY" | "MULTI_DAY",
+        duration_type:
+          hostingType === "single"
+            ? "ONE_DAY"
+            : ((s.duration_type === "MULTI_DAY" ? "MULTI_DAY" : "ONE_DAY") as "ONE_DAY" | "MULTI_DAY"),
         ticket_types: (s.ticket_types || []).map((t) => ({
           ticket_type: t.ticket_type.trim(),
           total_count: Number(t.total_count),
           price: Number(t.price),
+          max_per_order: Math.max(1, Number(t.max_per_order) || 10),
         })),
       };
     });
@@ -1295,7 +1662,7 @@ export default function EventForm({
       language: (values.languages || []).join(", "),
       about_event: values.about_event.trim(),
       age_group: values.age_group || "",
-      duration_minutes: values.duration_minutes,
+      duration_minutes: computeDurationMinutesFromShowtimes(values.showtimes) ?? values.duration_minutes ?? null,
       terms_points: {
         selected: selectedTerms,
         custom: customTerms.map((t) => t.trim()).filter(Boolean),
@@ -1315,23 +1682,31 @@ export default function EventForm({
               poster_url: values.poster_horizontal_url || null,
             }
           : null,
-      artists: (draftMode ? draftArtists : values.artists || []).map((a, i) => ({
-        artist_source: (a.artist_source === "registered"
-          ? "registered"
-          : a.artist_source === "auto_registered"
-            ? "auto_registered"
-            : "external") as "registered" | "external" | "auto_registered",
-        artist_business_id:
-          a.artist_source === "registered" || a.artist_source === "auto_registered"
-            ? a.artist_business_id || null
-            : null,
-        name: a.name.trim(),
-        role_title: a.role_title?.trim() || null,
-        description: a.description?.trim() || null,
-        image_url: a.image_url?.trim() || null,
-        documents: Array.isArray(a.documents) ? a.documents : [],
-        sort_order: i,
-      })),
+      artists: (draftMode ? draftArtists : values.artists || []).map((a, i) => {
+        const role = normalizeLineupRole(a.role_title);
+        const isArtist = isArtistLineupRole(role);
+        const source = isArtist
+          ? a.artist_source === "registered"
+            ? "registered"
+            : a.artist_source === "auto_registered"
+              ? "auto_registered"
+              : "external"
+          : "external";
+        return {
+          artist_source: source as "registered" | "external" | "auto_registered",
+          artist_business_id:
+            isArtist && (source === "registered" || source === "auto_registered")
+              ? a.artist_business_id || null
+              : null,
+          name: a.name.trim(),
+          role_title: role,
+          description: a.description?.trim() || null,
+          image_url: a.image_url?.trim() || null,
+          documents: Array.isArray(a.documents) ? a.documents : [],
+          auto_register_artist: isArtist && source === "external",
+          sort_order: i,
+        };
+      }),
       showtimes,
     };
     return payload;
@@ -1518,7 +1893,6 @@ export default function EventForm({
       const ok = await trigger([
         "name",
         "category_type_id",
-        "duration_minutes",
         "genres",
         "languages",
         "age_group",
@@ -1632,11 +2006,10 @@ export default function EventForm({
 
         <EventStepperNav
           currentId={stepId}
-          completedIds={visitedSteps.filter((id) => id !== stepId)}
+          completedIds={completedStepIds}
           allowJump
           onStepClick={(id) => {
-            const targetIndex = EVENT_STEPPER_STEPS.findIndex((s) => s.id === id);
-            if (readOnly || targetIndex <= stepIndex || visitedSteps.includes(id)) goToStep(id);
+            goToStep(id);
           }}
         />
 
@@ -1652,7 +2025,13 @@ export default function EventForm({
               <button
                 type="button"
                 disabled={readOnly}
-                onClick={() => setHostingType("single")}
+                onClick={() => {
+                  setHostingType("single");
+                  const rows = getValues("showtimes") || [];
+                  rows.forEach((_, i) => {
+                    setValue(`showtimes.${i}.duration_type`, "ONE_DAY", { shouldDirty: true });
+                  });
+                }}
                 className={`text-left rounded-2xl border p-5 transition-all ${
                   hostingType === "single"
                     ? "border-violet-500 bg-violet-50 shadow-sm"
@@ -1708,33 +2087,30 @@ export default function EventForm({
             {errors.name && <p className={errorClass}>{errors.name.message}</p>}
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Category <span className="text-rose-500">*</span></label>
-              <select
-                disabled={readOnly}
-                className={inputClass}
-                value={categoryTypeId ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value ? Number(e.target.value) : null;
-                  setValue("category_type_id", val, { shouldDirty: true });
-                  setValue("genres", []);
-                  setDocuments([]);
-                }}
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {errors.category_type_id && <p className={errorClass}>{errors.category_type_id.message}</p>}
-            </div>
-            <div>
-              <label className={labelClass}>Duration (minutes) <span className="text-rose-500">*</span></label>
-              <input disabled={readOnly} type="number" min={1} className={inputClass} {...register("duration_minutes", { valueAsNumber: true })} />
-              {errors.duration_minutes && <p className={errorClass}>{errors.duration_minutes.message}</p>}
-            </div>
+          <div>
+            <label className={labelClass}>Category <span className="text-rose-500">*</span></label>
+            <select
+              disabled={readOnly}
+              className={inputClass}
+              value={categoryTypeId ?? ""}
+              onChange={(e) => {
+                const val = e.target.value ? Number(e.target.value) : null;
+                setValue("category_type_id", val, { shouldDirty: true });
+                setValue("genres", []);
+                setDocuments([]);
+              }}
+            >
+              <option value="">Select category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {errors.category_type_id && <p className={errorClass}>{errors.category_type_id.message}</p>}
           </div>
+
+          <p className="text-xs text-slate-500 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            Event duration is calculated automatically from venue start and end times and shown to customers.
+          </p>
 
           <div>
             <label className={labelClass}>
@@ -2153,6 +2529,7 @@ export default function EventForm({
               canRemove={showtimeFields.length > 1}
               onRemove={() => removeShowtime(i)}
               cities={cities}
+              hostingType={hostingType}
             />
           ))}
           {errors.showtimes && typeof errors.showtimes.message === "string" && (
@@ -2165,9 +2542,9 @@ export default function EventForm({
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="portal-heading text-lg font-semibold">Event artists</h3>
+              <h3 className="portal-heading text-lg font-semibold">Event lineup</h3>
               <p className="portal-muted text-xs mt-1">
-                Optional. Search existing artists or type a new name to add to the lineup.
+                Optional. Add artists, guests, or chief guests. For artists you can search partners or auto-register a new name.
               </p>
             </div>
             {!readOnly && (
@@ -2176,14 +2553,14 @@ export default function EventForm({
                 onClick={() => appendArtist({ ...defaultArtist(), sort_order: artistFields.length })}
                 className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
               >
-                <Plus size={14} /> Add artist
+                <Plus size={14} /> Add person
               </button>
             )}
           </div>
 
           {artistFields.length === 0 && (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-              <p className="text-sm text-slate-600">No artists added yet. You can continue without a lineup.</p>
+              <p className="text-sm text-slate-600">No one added yet. You can continue without a lineup.</p>
             </div>
           )}
 
@@ -2215,7 +2592,11 @@ export default function EventForm({
                   {(genres || []).join(", ") || "No genres"} · {(languages || []).join(", ") || "No languages"}
                 </p>
                 <p className="text-sm text-slate-600">
-                  Age {watch("age_group") || "—"} · {watch("duration_minutes") || "—"} min
+                  Age {watch("age_group") || "—"}
+                  {(() => {
+                    const mins = computeDurationMinutesFromShowtimes(watch("showtimes") || []);
+                    return mins ? ` · ${mins} min` : "";
+                  })()}
                 </p>
                 <p className="text-sm text-slate-600">
                   Ticket modes:{" "}
@@ -2273,7 +2654,7 @@ export default function EventForm({
                       {(show.ticket_types || []).length} ticket type(s)
                       {(show.ticket_types || [])
                         .filter((t) => t.ticket_type)
-                        .map((t) => ` · ${t.ticket_type} (${t.total_count} @ ${t.price})`)
+                        .map((t) => ` · ${t.ticket_type} (${t.total_count} @ ${t.price}, max ${t.max_per_order || 10}/order)`)
                         .join("")}
                     </p>
                   </div>
@@ -2284,24 +2665,28 @@ export default function EventForm({
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Artists</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lineup</p>
                 {(watch("artists") || []).length === 0 ? (
-                  <p className="text-sm text-slate-600">No artists added</p>
+                  <p className="text-sm text-slate-600">No one added</p>
                 ) : (
                   (watch("artists") || []).map((artist, idx) => (
                     <div key={idx} className="rounded-lg bg-white border border-slate-200 px-3 py-2">
                       <p className="font-medium text-slate-900">
-                        {artist.name || `Artist ${idx + 1}`}
+                        {artist.name || `Person ${idx + 1}`}
                         {artist.role_title ? ` · ${artist.role_title}` : ""}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {artist.artist_source === "registered" ? "Registered partner" : "External / guest"}
+                        {artist.role_title === "Artist"
+                          ? artist.artist_source === "registered"
+                            ? "Registered artist partner"
+                            : "Artist (auto-register / external)"
+                          : "Event guest listing only"}
                       </p>
                     </div>
                   ))
                 )}
                 <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("artists")}>
-                  Edit artists
+                  Edit lineup
                 </button>
               </div>
 

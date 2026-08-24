@@ -1,20 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useAppDispatch, useAppSelector } from "@/lib/hooks";
+import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import AuthGate from "@/components/Shared/AuthGate";
-import { clearSessionForRole } from "@/lib/authStorage";
+import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import { KeyRound, LogOut, Menu, Mic2, User, X } from "lucide-react";
 
-export default function ArtistLayout({ children }: { children: React.ReactNode }) {
+function ArtistShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  if (pathname === "/artist/login" || pathname === "/artist/register") {
-    return <>{children}</>;
-  }
 
   const navigation = [
     { name: "Profile", href: "/artist/profile", icon: User },
@@ -111,7 +109,7 @@ export default function ArtistLayout({ children }: { children: React.ReactNode }
             <button
               onClick={() => {
                 clearSessionForRole("artist_admin");
-                router.push("/artist/login");
+                router.push("/artist");
               }}
               className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 hover:text-violet-600 hover:bg-violet-50 border border-slate-200 transition-all"
             >
@@ -124,4 +122,56 @@ export default function ArtistLayout({ children }: { children: React.ReactNode }
       </div>
     </AuthGate>
   );
+}
+
+export default function ArtistLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  const isLoginPage = pathname === "/artist/login";
+  const isPublicLanding =
+    pathname === "/artist" || pathname === "/artist/register" || isLoginPage;
+  const isArtistAdmin = user?.role === "artist_admin";
+
+  useEffect(() => {
+    if (isLoginPage) {
+      setCheckingAuth(false);
+      return;
+    }
+
+    const artist = readSessionForRole("artist_admin");
+    if (artist) {
+      dispatch(setCredentials({ user: artist.user, token: artist.token }));
+    } else {
+      dispatch(loadFromStorage());
+    }
+
+    if (!artist && !isPublicLanding) {
+      router.replace("/artist/login");
+      return;
+    }
+
+    setCheckingAuth(false);
+  }, [dispatch, router, isPublicLanding, isLoginPage, pathname]);
+
+  if (isLoginPage || pathname === "/artist/register") {
+    return <>{children}</>;
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!isArtistAdmin) {
+    return <div className="min-h-screen bg-white">{children}</div>;
+  }
+
+  return <ArtistShell>{children}</ArtistShell>;
 }

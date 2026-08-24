@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Gift, Search, Ticket, UtensilsCrossed } from "lucide-react";
+import { Building2, ChevronDown, Gift, Mic2, Search, Ticket, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import images from "@/Images";
 import CitySelectModal from "./CitySelectModal";
@@ -43,6 +43,18 @@ const BUSINESS_LINKS = [
     label: "Dining",
     description: "Partner your restaurant",
     Icon: UtensilsCrossed,
+  },
+  {
+    href: "/venue",
+    label: "Venue",
+    description: "List & claim your venue",
+    Icon: Building2,
+  },
+  {
+    href: "/artist",
+    label: "Artist",
+    description: "Grow your artist profile",
+    Icon: Mic2,
   },
 ] as const;
 
@@ -120,7 +132,7 @@ function ForBusinessMenu({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 z-[60]"
+          className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 z-[60]"
         >
           {BUSINESS_LINKS.map(({ href, label, description, Icon }) => (
             <Link

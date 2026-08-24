@@ -379,6 +379,7 @@ export interface AdminEvent {
     total_count: number;
     available_count: number;
     price: number | string;
+    max_per_order?: number | null;
     showtime_id?: string | null;
     venue_name?: string | null;
   }>;
@@ -412,6 +413,7 @@ export interface AdminEvent {
       total_count: number;
       available_count?: number;
       price: number | string;
+      max_per_order?: number | null;
     }>;
   }>;
   bookings?: Array<Record<string, unknown>>;
@@ -645,15 +647,16 @@ export interface EventFormPayload {
   };
   /** Which delivery modes customers can choose at purchase. At least one required on submit. */
   allowed_ticket_modes?: Array<'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY'>;
-  ticket_types: Array<{ ticket_type: string; total_count: number; price: number }>;
+  ticket_types: Array<{ ticket_type: string; total_count: number; price: number; max_per_order?: number }>;
   artists?: Array<{
-    artist_source: 'registered' | 'external';
+    artist_source: 'registered' | 'external' | 'auto_registered';
     artist_business_id?: string | null;
     name: string;
     role_title?: string | null;
     description?: string | null;
     image_url?: string | null;
     documents?: Array<{ document_type_id?: number; url: string; document_name?: string }>;
+    auto_register_artist?: boolean;
     sort_order?: number;
   }>;
   showtimes: Array<{
@@ -685,7 +688,7 @@ export interface EventFormPayload {
     starts_at: string;
     ends_at: string;
     duration_type?: 'ONE_DAY' | 'MULTI_DAY';
-    ticket_types?: Array<{ ticket_type: string; total_count: number; price: number }>;
+    ticket_types?: Array<{ ticket_type: string; total_count: number; price: number; max_per_order?: number }>;
   }>;
 }
 
@@ -798,6 +801,20 @@ export interface PublicEvent {
   status?: string;
   rating?: number | string;
   reviews_count?: number;
+}
+
+/** Approved onboarded venue / artist partners for partner landing pages. */
+export interface PublicRegisteredPartner {
+  id: string;
+  name: string;
+  address?: string | null;
+  description?: string | null;
+  cover_image_url?: string | null;
+  city_id?: number | null;
+  city_name?: string | null;
+  city_state?: string | null;
+  type_name?: string | null;
+  published_layout_count?: number | null;
 }
 
 export interface EventTicketTypeStats {
@@ -3007,6 +3024,15 @@ export const api = createApi({
       }) => res.data,
     }),
 
+    getOrganizerVenueLayout: builder.query<
+      VenueLayoutTemplate,
+      { businessId: string; templateId: string }
+    >({
+      query: ({ businessId, templateId }) =>
+        `/events/organizer/venues/${businessId}/layouts/${templateId}`,
+      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
+    }),
+
     searchOrganizerArtists: builder.query<OrganizerArtistSearchResult[], { q?: string } | void>({
       query: (params) => {
         const sp = new URLSearchParams();
@@ -3222,6 +3248,36 @@ export const api = createApi({
       query: () => '/events/public/filters',
       transformResponse: (res: { data: PublicEventFilters }) => res.data,
       providesTags: ['PublicEvents'],
+    }),
+
+    getPublicRegisteredVenues: builder.query<
+      PublicRegisteredPartner[],
+      { q?: string; city?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.append('q', params.q);
+        if (params?.city) sp.append('city', params.city);
+        const qs = sp.toString();
+        return `/events/public/venues${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: PublicRegisteredPartner[] }) => res?.data ?? [],
+      providesTags: ['Businesses'],
+    }),
+
+    getPublicRegisteredArtists: builder.query<
+      PublicRegisteredPartner[],
+      { q?: string; city?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.append('q', params.q);
+        if (params?.city) sp.append('city', params.city);
+        const qs = sp.toString();
+        return `/events/public/artists${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: PublicRegisteredPartner[] }) => res?.data ?? [],
+      providesTags: ['Businesses'],
     }),
 
     getPublicEvent: builder.query<OrganizerEvent, string>({
@@ -3818,6 +3874,7 @@ export const {
   useGetVenueClaimableShowtimesQuery,
   useClaimVenueShowtimeMutation,
   useGetOrganizerVenueLayoutsQuery,
+  useGetOrganizerVenueLayoutQuery,
   useSearchOrganizerArtistsQuery,
   useGetEventLayoutQuery,
   useUpdateEventLayoutMutation,
@@ -3832,6 +3889,8 @@ export const {
   useCloseOrganizerEventMutation,
   useGetPublicEventsQuery,
   useGetPublicEventFiltersQuery,
+  useGetPublicRegisteredVenuesQuery,
+  useGetPublicRegisteredArtistsQuery,
   useGetPublicEventQuery,
   useGetPublicEventLayoutQuery,
   useCreateEventBookingMutation,

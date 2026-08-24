@@ -20,6 +20,17 @@ const ticketSchema = yup.object({
     .typeError('Price must be a number')
     .min(0, 'Price cannot be negative')
     .required('Price is required'),
+  max_per_order: yup
+    .number()
+    .typeError('Purchase limit must be a number')
+    .integer('Purchase limit must be a whole number')
+    .min(1, 'Purchase limit must be at least 1')
+    .required('Purchase limit is required')
+    .test('lte-total', 'Purchase limit cannot exceed total seats', function (value) {
+      const total = Number(this.parent?.total_count);
+      if (!Number.isFinite(total) || value == null) return true;
+      return Number(value) <= total;
+    }),
 });
 
 const showtimeSchema = yup.object({
@@ -72,8 +83,12 @@ const showtimeSchema = yup.object({
 const artistSchema = yup.object({
   artist_source: yup.string().oneOf(['registered', 'external', 'auto_registered']).default('external'),
   artist_business_id: yup.string().nullable().default(null),
-  name: yup.string().trim().required('Artist name is required'),
-  role_title: yup.string().trim().default(''),
+  name: yup.string().trim().required('Name is required'),
+  role_title: yup
+    .string()
+    .oneOf(['Artist', 'Guest', 'Chief Guest'], 'Select Artist, Guest, or Chief Guest')
+    .required('Select Artist, Guest, or Chief Guest')
+    .default('Artist'),
   description: yup.string().trim().default(''),
   image_url: yup.string().trim().default(''),
   documents: yup
@@ -88,6 +103,22 @@ const artistSchema = yup.object({
     .default([]),
   sort_order: yup.number().default(0),
 });
+
+/** Lineup person types shown on the event artists step. */
+export const EVENT_LINEUP_ROLES = ['Artist', 'Guest', 'Chief Guest'] as const;
+export type EventLineupRole = (typeof EVENT_LINEUP_ROLES)[number];
+
+export function normalizeLineupRole(role?: string | null): EventLineupRole {
+  const r = String(role || '').trim();
+  if (r === 'Artist' || r === 'Guest' || r === 'Chief Guest') return r;
+  if (/chief\s*guest/i.test(r)) return 'Chief Guest';
+  if (/^guest$/i.test(r)) return 'Guest';
+  return 'Artist';
+}
+
+export function isArtistLineupRole(role?: string | null): boolean {
+  return normalizeLineupRole(role) === 'Artist';
+}
 
 function showtimeRangeIso(s: {
   duration_type?: string;
@@ -145,9 +176,9 @@ export const eventSubmitSchema = eventDraftSchema.shape({
   age_group: yup.string().trim().required('Age group is required'),
   duration_minutes: yup
     .number()
-    .typeError('Duration is required')
-    .min(1, 'Duration must be greater than 0')
-    .required('Duration is required'),
+    .nullable()
+    .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+    .default(null),
   allowed_ticket_modes: yup
     .array()
     .of(yup.string().oneOf(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']).required())
@@ -259,14 +290,14 @@ export const defaultVenue = (): EventFormValues['showtimes'][number] => ({
   end_time: '',
   starts_at: '',
   ends_at: '',
-  ticket_types: [{ ticket_type: '', total_count: 100, price: 0 }],
+  ticket_types: [{ ticket_type: '', total_count: 100, price: 0, max_per_order: 10 }],
 });
 
 export const defaultArtist = (): EventFormValues['artists'][number] => ({
   artist_source: 'external',
   artist_business_id: null,
   name: '',
-  role_title: '',
+  role_title: 'Artist',
   description: '',
   image_url: '',
   documents: [],
@@ -297,6 +328,23 @@ export function showtimeToIso(s: EventFormValues['showtimes'][number]): { starts
   return { starts_at: start, ends_at: end };
 }
 
+/** Duration in minutes from the first showtime that has valid start and end. */
+export function computeDurationMinutesFromShowtimes(
+  showtimes: EventFormValues['showtimes'] | undefined
+): number | null {
+  if (!showtimes?.length) return null;
+  for (const s of showtimes) {
+    if (!isShowtimePersistable(s)) continue;
+    const { starts_at, ends_at } = showtimeToIso(s);
+    if (!starts_at || !ends_at) continue;
+    const startMs = new Date(starts_at).getTime();
+    const endMs = new Date(ends_at).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) continue;
+    return Math.max(1, Math.round((endMs - startMs) / 60000));
+  }
+  return null;
+}
+
 /** True when a showtime row has enough data to persist (needs valid start datetime). */
 export function isShowtimePersistable(s: EventFormValues['showtimes'][number]): boolean {
   const { starts_at } = showtimeToIso(s);
@@ -317,4 +365,93 @@ export function validateRequiredDocuments(
     }
   }
   return null;
+}
+
+export type EventStepCompletionId =
+  | 'type'
+  | 'details'
+  | 'media'
+  | 'venue'
+  | 'artists'
+  | 'documents'
+  | 'review';
+
+/** Which create-event steps have enough valid data for a green check. */
+export function getCompletedEventStepIds(opts: {
+  hostingType: 'single' | 'tour' | '';
+  values: EventFormValues;
+  documents: Array<{ document_type_id: number; url: string }>;
+  requiredDocumentIds?: number[];
+  genresConfigured?: boolean;
+}): EventStepCompletionId[] {
+  const { hostingType, values, documents } = opts;
+  const genresConfigured = opts.genresConfigured === true;
+  const requiredDocumentIds = opts.requiredDocumentIds || [];
+  const done: EventStepCompletionId[] = [];
+
+  if (hostingType === 'single' || hostingType === 'tour') {
+    done.push('type');
+  }
+
+  const nameOk = Boolean(values.name?.trim());
+  const categoryOk = values.category_type_id != null && Number.isFinite(Number(values.category_type_id));
+  const languagesOk = (values.languages || []).length > 0;
+  const ageOk = Boolean(values.age_group?.trim());
+  const aboutOk = Boolean(values.about_event?.trim());
+  const modesOk = (values.allowed_ticket_modes || []).length > 0;
+  const genresOk = !genresConfigured || (values.genres || []).length > 0;
+  if (nameOk && categoryOk && languagesOk && ageOk && aboutOk && modesOk && genresOk) {
+    done.push('details');
+  }
+
+  if (values.poster_horizontal_url?.trim()) {
+    done.push('media');
+  }
+
+  const showtimes = values.showtimes || [];
+  const venueOk =
+    showtimes.length > 0 &&
+    showtimes.every((s) => {
+      if (!s.venue_name?.trim()) return false;
+      if (s.city_id == null || !Number.isFinite(Number(s.city_id))) return false;
+      if (!isShowtimePersistable(s)) return false;
+      const { starts_at, ends_at } = showtimeToIso(s);
+      if (ends_at) {
+        const endMsg = showtimeEndErrorMessage(validateShowtimeEnd(starts_at, ends_at));
+        if (endMsg) return false;
+      }
+      const tickets = s.ticket_types || [];
+      if (!tickets.length) return false;
+      return tickets.every(
+        (t) =>
+          Boolean(t.ticket_type?.trim()) &&
+          Number(t.total_count) >= 1 &&
+          Number(t.price) >= 0 &&
+          Number.isFinite(Number(t.price)) &&
+          Number(t.max_per_order) >= 1 &&
+          Number(t.max_per_order) <= Number(t.total_count)
+      );
+    });
+  if (venueOk) done.push('venue');
+
+  const artists = values.artists || [];
+  if (artists.length > 0 && artists.every((a) => Boolean(a.name?.trim()))) {
+    done.push('artists');
+  }
+
+  if (requiredDocumentIds.length > 0) {
+    const docsErr = validateRequiredDocuments(
+      documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
+      requiredDocumentIds,
+      Object.fromEntries(requiredDocumentIds.map((id) => [id, 'document']))
+    );
+    if (!docsErr) done.push('documents');
+  }
+
+  const requiredCore: EventStepCompletionId[] = ['type', 'details', 'media', 'venue'];
+  if (requiredCore.every((id) => done.includes(id))) {
+    done.push('review');
+  }
+
+  return done;
 }

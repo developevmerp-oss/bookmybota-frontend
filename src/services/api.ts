@@ -924,6 +924,8 @@ export interface EventBooking {
   items?: EventBookingItem[];
   promo_code?: string | null;
   discount_amount?: number | string;
+  gift_card_id?: string | null;
+  gift_card_amount?: number | string;
   ticket_mode?: string;
   delivery_address_line?: string | null;
   delivery_city?: string | null;
@@ -971,6 +973,158 @@ export interface PlatformOffer {
   restaurant_ids?: string[];
   discount_label?: string;
   scope_label?: string;
+}
+
+export interface GiftCardProduct {
+  id: string;
+  name: string;
+  description?: string | null;
+  denomination: number | string;
+  selling_price: number | string;
+  currency: string;
+  applicable_category: 'ALL' | 'EVENTS' | 'SPORTS' | 'DINING';
+  validity_days: number;
+  allow_partial_usage: boolean;
+  status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED' | string;
+  sort_order?: number;
+  sold_count?: number;
+  sold_value?: number | string;
+  redeemed_value?: number | string;
+  outstanding_balance?: number | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GiftCardMine {
+  id: string;
+  code_last4: string;
+  code_masked: string;
+  initial_balance: number | string;
+  current_balance: number | string;
+  currency: string;
+  status: string;
+  expires_at?: string | null;
+  purchase_for: 'SELF' | 'SOMEONE_ELSE' | string;
+  recipient_name?: string | null;
+  recipient_email?: string | null;
+  sender_name?: string | null;
+  personal_message?: string | null;
+  issued_at?: string | null;
+  activated_at?: string | null;
+  product_name?: string;
+  applicable_category?: string;
+  validity_days?: number;
+  is_owner?: boolean;
+  is_claimed_by_me?: boolean;
+  used_amount?: number | string;
+  transactions?: GiftCardTransaction[];
+}
+
+export interface GiftCardTransaction {
+  id: string;
+  transaction_type: string;
+  amount: number | string;
+  balance_before: number | string;
+  balance_after: number | string;
+  booking_type?: string | null;
+  booking_id?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface GiftCardPurchaseResult {
+  id: string;
+  code: string;
+  code_masked: string;
+  code_last4: string;
+  initial_balance: number;
+  current_balance: number;
+  currency: string;
+  status: string;
+  expires_at?: string | null;
+  purchase_for: string;
+  product_name: string;
+  applicable_category?: string;
+  recipient_name?: string | null;
+  recipient_email?: string | null;
+}
+
+export interface GiftCardPurchaseBody {
+  product_id: string;
+  purchase_for: 'SELF' | 'SOMEONE_ELSE';
+  recipient_name?: string;
+  recipient_email?: string;
+  sender_name?: string;
+  personal_message?: string;
+}
+
+export interface GiftCardRedeemPreview {
+  gift_card_id: string;
+  code_last4: string;
+  code_masked: string;
+  current_balance: number;
+  amount_applicable: number;
+  balance_after: number;
+  currency: string;
+  applicable_category: string;
+  product_name: string;
+}
+
+export interface MerchantGiftCardVerify {
+  gift_card_id: string;
+  code_last4: string;
+  code_masked: string;
+  current_balance: number;
+  currency: string;
+  status: string;
+  expires_at?: string | null;
+  applicable_category: string;
+  product_name: string;
+  customer_name?: string | null;
+}
+
+export interface MerchantGiftCardPreview extends MerchantGiftCardVerify {
+  bill_amount: number;
+  amount_applicable: number;
+  customer_payable: number;
+  balance_after: number;
+}
+
+export interface MerchantGiftCardRedeemResult extends MerchantGiftCardPreview {
+  redemption_id: string;
+  settlement_status: string;
+}
+
+export interface DiningGiftCardRedemptionRow {
+  id: string;
+  business_id: string;
+  gift_card_id: string;
+  code_last4: string;
+  bill_amount: number | string;
+  gift_card_amount: number | string;
+  customer_payable: number | string;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  redeemed_at?: string;
+  settlement_status: string;
+  settlement_amount?: number | string;
+  settlement_notes?: string | null;
+  settled_at?: string | null;
+  settled_by?: string | null;
+  settled_by_email?: string | null;
+  product_name?: string;
+  business_name?: string;
+}
+
+export interface DiningGiftCardSettlementSummary {
+  pending_count: number;
+  approved_count: number;
+  paid_count: number;
+  cancelled_count: number;
+  pending_amount: number;
+  approved_amount: number;
+  paid_amount: number;
 }
 
 export interface OfferRedemption {
@@ -1343,7 +1497,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -2591,6 +2745,234 @@ export const api = createApi({
       providesTags: ['PublicPlatformOffers'],
     }),
 
+    getGiftCardProducts: builder.query<
+      PaginatedList<GiftCardProduct>,
+      (PagedQuery & { status?: string }) | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.status) sp.set('status', params.status);
+        const qs = sp.toString();
+        return `/admin/gift-card-products${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: GiftCardProduct[] }) => unwrapPaginated(res),
+      providesTags: ['GiftCardProducts'],
+    }),
+
+    createGiftCardProduct: builder.mutation<GiftCardProduct, Partial<GiftCardProduct>>({
+      query: (body) => ({
+        url: '/admin/gift-card-products',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: GiftCardProduct }) => res.data,
+      invalidatesTags: ['GiftCardProducts', 'PublicGiftCardProducts'],
+    }),
+
+    updateGiftCardProduct: builder.mutation<GiftCardProduct, Partial<GiftCardProduct> & { id: string }>({
+      query: ({ id, ...body }) => ({
+        url: `/admin/gift-card-products/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      transformResponse: (res: { data: GiftCardProduct }) => res.data,
+      invalidatesTags: ['GiftCardProducts', 'PublicGiftCardProducts'],
+    }),
+
+    patchGiftCardProductStatus: builder.mutation<GiftCardProduct, { id: string; status: string }>({
+      query: ({ id, status }) => ({
+        url: `/admin/gift-card-products/${id}/status`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      transformResponse: (res: { data: GiftCardProduct }) => res.data,
+      invalidatesTags: ['GiftCardProducts', 'PublicGiftCardProducts'],
+    }),
+
+    deleteGiftCardProduct: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/gift-card-products/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['GiftCardProducts', 'PublicGiftCardProducts'],
+    }),
+
+    getPublicGiftCardProducts: builder.query<GiftCardProduct[], void>({
+      query: () => '/gift-cards/products',
+      transformResponse: (res: { data: GiftCardProduct[] }) => res.data || [],
+      providesTags: ['PublicGiftCardProducts'],
+    }),
+
+    purchaseGiftCard: builder.mutation<
+      { message?: string; data: GiftCardPurchaseResult },
+      GiftCardPurchaseBody
+    >({
+      query: (body) => ({
+        url: '/gift-cards/purchase',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['MyGiftCards', 'GiftCardProducts'],
+    }),
+
+    getMyGiftCards: builder.query<GiftCardMine[], void>({
+      query: () => '/gift-cards/mine',
+      transformResponse: (res: { data: GiftCardMine[] }) => res.data || [],
+      providesTags: ['MyGiftCards'],
+    }),
+
+    getMyGiftCard: builder.query<GiftCardMine, string>({
+      query: (id) => `/gift-cards/mine/${id}`,
+      transformResponse: (res: { data: GiftCardMine }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'MyGiftCards', id }],
+    }),
+
+    claimGiftCard: builder.mutation<
+      { message?: string; data: { id: string; code_last4: string; code_masked: string; current_balance: number } },
+      { code: string }
+    >({
+      query: (body) => ({
+        url: '/gift-cards/claim',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['MyGiftCards'],
+    }),
+
+    previewGiftCardRedeem: builder.mutation<
+      GiftCardRedeemPreview,
+      { gift_card_id?: string; code?: string; amount: number; category?: 'EVENTS' | 'SPORTS' | 'DINING' }
+    >({
+      query: (body) => ({
+        url: '/gift-cards/preview-redeem',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: GiftCardRedeemPreview }) => res.data,
+    }),
+
+    merchantVerifyGiftCard: builder.mutation<MerchantGiftCardVerify, { code: string }>({
+      query: (body) => ({
+        url: '/gift-cards/merchant/verify',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: MerchantGiftCardVerify }) => res.data,
+    }),
+
+    merchantPreviewGiftCard: builder.mutation<
+      MerchantGiftCardPreview,
+      { code: string; bill_amount: number }
+    >({
+      query: (body) => ({
+        url: '/gift-cards/merchant/preview',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: MerchantGiftCardPreview }) => res.data,
+    }),
+
+    merchantRedeemGiftCard: builder.mutation<
+      { message?: string; data: MerchantGiftCardRedeemResult },
+      {
+        code: string;
+        bill_amount: number;
+        booking_id?: string;
+        guest_name?: string;
+        guest_phone?: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/gift-cards/merchant/redeem',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'MyGiftCards'],
+    }),
+
+    getMerchantGiftCardRedemptions: builder.query<
+      { data: DiningGiftCardRedemptionRow[]; meta?: { total?: number } },
+      { page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        sp.set('page', String(params?.page || 1));
+        sp.set('limit', String(params?.limit || 10));
+        return `/gift-cards/merchant/redemptions?${sp.toString()}`;
+      },
+      providesTags: ['DiningGiftCardRedemptions'],
+    }),
+
+    getAdminDiningGiftCardRedemptions: builder.query<
+      {
+        items: DiningGiftCardRedemptionRow[];
+        meta: import('@/lib/pagination').PaginationMeta;
+        summary: DiningGiftCardSettlementSummary;
+      },
+      {
+        page?: number;
+        limit?: number;
+        q?: string;
+        business_id?: string;
+        status?: string;
+        from?: string;
+        to?: string;
+      } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.q) sp.set('q', params.q);
+        if (params?.business_id) sp.set('business_id', params.business_id);
+        if (params?.status) sp.set('status', params.status);
+        if (params?.from) sp.set('from', params.from);
+        if (params?.to) sp.set('to', params.to);
+        const qs = sp.toString();
+        return `/admin/dining-gift-card-redemptions${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: {
+        data?: DiningGiftCardRedemptionRow[];
+        meta?: import('@/lib/pagination').PaginationMeta;
+        summary?: DiningGiftCardSettlementSummary;
+      }) => ({
+        items: res.data || [],
+        meta: res.meta || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          total_pages: 0,
+          has_prev: false,
+          has_next: false,
+        },
+        summary: res.summary || {
+          pending_count: 0,
+          approved_count: 0,
+          paid_count: 0,
+          cancelled_count: 0,
+          pending_amount: 0,
+          approved_amount: 0,
+          paid_amount: 0,
+        },
+      }),
+      providesTags: ['AdminDiningGiftCardSettlements'],
+    }),
+
+    patchAdminDiningGiftCardSettlement: builder.mutation<
+      { message?: string; data: DiningGiftCardRedemptionRow },
+      { id: string; settlement_status: string; settlement_notes?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/dining-gift-card-redemptions/${id}/settlement`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['AdminDiningGiftCardSettlements', 'DiningGiftCardRedemptions'],
+    }),
+
     getMarketingCampaigns: builder.query<PaginatedList<any>, PagedQuery | void>({
       query: (params) => `/admin/marketing-campaigns${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
       transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
@@ -3345,6 +3727,8 @@ export const api = createApi({
         customer_id?: string;
         booking_source?: 'ONLINE' | 'WALK_IN' | 'CASH' | 'ORGANIZER';
         promo_code?: string;
+        gift_card_id?: string;
+        gift_card_code?: string;
         ticket_mode?: 'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY';
         delivery_address_line?: string;
         delivery_city?: string;
@@ -3358,7 +3742,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'OrganizerEvents'],
+      invalidatesTags: ['EventBookings', 'PublicEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'OrganizerEvents', 'MyGiftCards'],
     }),
 
     getCustomerEventBookings: builder.query<EventBooking[], string>({
@@ -3875,6 +4259,23 @@ export const {
   useGetOfferEligibleEventsAdminQuery,
   useGetOfferEligibleRestaurantsAdminQuery,
   useGetActivePlatformOffersQuery,
+  useGetGiftCardProductsQuery,
+  useCreateGiftCardProductMutation,
+  useUpdateGiftCardProductMutation,
+  usePatchGiftCardProductStatusMutation,
+  useDeleteGiftCardProductMutation,
+  useGetPublicGiftCardProductsQuery,
+  usePurchaseGiftCardMutation,
+  useGetMyGiftCardsQuery,
+  useGetMyGiftCardQuery,
+  useClaimGiftCardMutation,
+  usePreviewGiftCardRedeemMutation,
+  useMerchantVerifyGiftCardMutation,
+  useMerchantPreviewGiftCardMutation,
+  useMerchantRedeemGiftCardMutation,
+  useGetMerchantGiftCardRedemptionsQuery,
+  useGetAdminDiningGiftCardRedemptionsQuery,
+  usePatchAdminDiningGiftCardSettlementMutation,
   useGetMarketingCampaignsQuery,
   useAssignMarketingCampaignMutation,
   useGetBusinessCampaignsQuery,

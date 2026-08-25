@@ -48,7 +48,12 @@ import { useAppSelector } from "@/lib/hooks";
 import {
   DEFAULT_DINING_FILTERS,
   DiningFilterState,
+  DiningHomeOfferCard,
+  DiningOfferBucket,
+  buildDiningHomeOfferCards,
+  businessMatchesOfferBucket,
   extractCuisines,
+  offerBucketSectionTitle,
 } from "@/lib/diningFilters";
 
 const HERO_ACCENT = "#6900AA";
@@ -99,40 +104,18 @@ const TAB_THEME_COLORS = [
   "#0EA5E9",
 ];
 
-const DINING_OFFER_CARDS = [
-  {
-    id: "weekend",
-    badge: "Weekend Special",
-    title: "Save up to 30% Off",
-    subtitle: "on table bookings at selected venues",
-    cta: "Explore Offers",
-  },
-  {
-    id: "flat20",
-    badge: "Limited Offer",
-    title: "Flat 20% OFF",
-    subtitle: "Up to 200 ETB on dining bookings",
-    cta: "View Offers",
-  },
-  {
-    id: "prime",
-    badge: "BookMyBota Prime",
-    title: "Special Offers",
-    subtitle: "Exclusive deals at premium restaurants",
-    cta: "Grab Deal",
-  },
-] as const;
-
 function OfferPromoCard({
   card,
   locationCity,
   colorIndex = 0,
   className = "",
+  onSelect,
 }: {
-  card: (typeof DINING_OFFER_CARDS)[number];
+  card: DiningHomeOfferCard;
   locationCity: string;
   colorIndex?: number;
   className?: string;
+  onSelect: (bucket: DiningOfferBucket) => void;
 }) {
   const theme = OFFER_THEMES[colorIndex % OFFER_THEMES.length];
   return (
@@ -159,16 +142,11 @@ function OfferPromoCard({
         <h3 className="text-xl sm:text-2xl font-extrabold leading-tight">{card.title}</h3>
         <p className="mt-1.5 text-sm sm:text-base lg:text-sm opacity-80">
           {card.subtitle}
-          {card.id === "weekend" && locationCity ? ` across ${locationCity}.` : "."}
+          {locationCity && locationCity !== "All Cities" ? ` in ${locationCity}.` : "."}
         </p>
         <button
           type="button"
-          onClick={() =>
-            document.getElementById("restaurant-listings")?.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            })
-          }
+          onClick={() => onSelect(card.bucket)}
           className="mt-4 inline-flex items-center gap-1.5 bg-white rounded-full px-4 py-2 text-sm sm:text-base lg:text-sm font-bold shadow-sm hover:shadow-md transition-shadow"
           style={{ color: theme.accent }}
         >
@@ -1137,6 +1115,25 @@ export default function Home() {
   // ── Filtering ──
   const sectionPool = sectionBusinesses.length > 0 ? sectionBusinesses : businesses;
   const cuisineOptions = useMemo(() => extractCuisines(sectionPool), [sectionPool]);
+  const homeOfferCards = useMemo(
+    () => buildDiningHomeOfferCards(sectionPool),
+    [sectionPool]
+  );
+
+  const applyOfferBucket = useCallback((bucket: DiningOfferBucket) => {
+    setDiningFilters((prev) => ({
+      ...prev,
+      offersOnly: true,
+      offerBucket: bucket,
+    }));
+    setCurrentPage(1);
+    requestAnimationFrame(() => {
+      document.getElementById("restaurant-listings")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, []);
 
   const cuisineCards = useMemo(() => {
     const used = new Set<string>();
@@ -1228,10 +1225,22 @@ export default function Home() {
     return cards;
   }, [sectionPool, cuisineOptions, cuisineMasters, activeCity]);
 
-  const filteredRestaurants = useMemo(
-    () => loadedRestaurants.filter((r) => matchesMealOccasion(r, mealOccasion)),
-    [loadedRestaurants, mealOccasion]
-  );
+  const filteredRestaurants = useMemo(() => {
+    const mealFiltered = loadedRestaurants.filter((r) => matchesMealOccasion(r, mealOccasion));
+    if (!diningFilters.offerBucket) return mealFiltered;
+    return mealFiltered.filter((r) =>
+      businessMatchesOfferBucket(r, diningFilters.offerBucket)
+    );
+  }, [loadedRestaurants, mealOccasion, diningFilters.offerBucket]);
+
+  const bucketFilteredFromPool = useMemo(() => {
+    if (!diningFilters.offerBucket) return null;
+    return sectionPool
+      .filter((r) => businessMatchesOfferBucket(r, diningFilters.offerBucket))
+      .filter((r) => matchesMealOccasion(r, mealOccasion));
+  }, [diningFilters.offerBucket, sectionPool, mealOccasion]);
+
+  const displayRestaurants = bucketFilteredFromPool ?? filteredRestaurants;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1252,7 +1261,8 @@ export default function Home() {
     });
   }, [businessesData, currentPage]);
 
-  const hasMoreRestaurants = Boolean(businessesData?.meta?.has_next);
+  const hasMoreRestaurants =
+    !diningFilters.offerBucket && Boolean(businessesData?.meta?.has_next);
   const loadingMore = businessesFetching && currentPage > 1;
 
   const hasActiveFilters =
@@ -1262,6 +1272,7 @@ export default function Home() {
     diningFilters.cuisines.length > 0 ||
     diningFilters.minRating > 0 ||
     diningFilters.offersOnly ||
+    Boolean(diningFilters.offerBucket) ||
     diningFilters.pureVeg ||
     diningFilters.servesAlcohol ||
     diningFilters.maxCost > 0 ||
@@ -1292,10 +1303,18 @@ export default function Home() {
 
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
-  const totalRestaurants = businessesData?.meta?.total ?? filteredRestaurants.length;
+  const totalRestaurants = diningFilters.offerBucket
+    ? displayRestaurants.length
+    : businessesData?.meta?.total ?? filteredRestaurants.length;
   const restaurantCountLabel = `${totalRestaurants} restaurant${totalRestaurants !== 1 ? "s" : ""}`;
 
   const getFilteredSectionTitle = () => {
+    const bucketTitle = offerBucketSectionTitle(diningFilters.offerBucket);
+    if (bucketTitle) {
+      return locationCity && locationCity !== "All Cities"
+        ? `${bucketTitle} in ${locationCity}`
+        : bucketTitle;
+    }
     const city = locationCity;
     if (mealOccasion) {
       const mealLabel = MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label || "Dining";
@@ -1782,9 +1801,9 @@ className={`text-sm font-bold mt-2 transition-colors ${
           </section>
 
           {/* ── 5. Offer Section ────────────────────────────────────────────── */}
-          {showHomeExtras && (
+          {showHomeExtras && homeOfferCards.length > 0 && (
             <section id="dining-offers" className="pt-3 pb-5 sm:pt-2 scroll-mt-24">
-              {DINING_OFFER_CARDS.length > 3 ? (
+              {homeOfferCards.length > 3 ? (
                 <div className="relative">
                   <button
                     type="button"
@@ -1798,12 +1817,13 @@ className={`text-sm font-bold mt-2 transition-colors ${
                     ref={offersRef}
                     className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-1"
                   >
-                    {DINING_OFFER_CARDS.map((card, idx) => (
+                    {homeOfferCards.map((card, idx) => (
                       <OfferPromoCard
                         key={card.id}
                         card={card}
                         locationCity={locationCity}
                         colorIndex={idx}
+                        onSelect={applyOfferBucket}
                         className="shrink-0 snap-start w-[min(86vw,340px)] xl:w-[calc((100%-40px)/3)]"
                       />
                     ))}
@@ -1819,8 +1839,14 @@ className={`text-sm font-bold mt-2 transition-colors ${
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                  {DINING_OFFER_CARDS.map((card, idx) => (
-                    <OfferPromoCard key={card.id} card={card} locationCity={locationCity} colorIndex={idx} />
+                  {homeOfferCards.map((card, idx) => (
+                    <OfferPromoCard
+                      key={card.id}
+                      card={card}
+                      locationCity={locationCity}
+                      colorIndex={idx}
+                      onSelect={applyOfferBucket}
+                    />
                   ))}
                 </div>
               )}
@@ -1945,7 +1971,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
               <Loader2 size={36} className="animate-spin text-[#6900AA]" />
               <p className="text-sm font-medium">Loading top restaurants...</p>
             </div>
-          ) : filteredRestaurants.length === 0 ? (
+          ) : displayRestaurants.length === 0 ? (
             <div className="text-center py-24">
               <div className="text-5xl mb-4">🍽️</div>
               <h3 className="text-lg font-semibold text-slate-600 mb-2">No restaurants found</h3>
@@ -1985,7 +2011,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredRestaurants.map((restaurant) => (
+                {displayRestaurants.map((restaurant) => (
                   <RestaurantCard key={restaurant.id} restaurant={restaurant} />
                 ))}
               </div>

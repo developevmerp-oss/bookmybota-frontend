@@ -454,9 +454,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
   useEffect(() => {
-    if (bookableOffers.length === 0) return;
+    if (bookableOffers.length === 0) {
+      setSelectedOffer(null);
+      setNoOfferSelected(true);
+      return;
+    }
     if (!noOfferSelected && !selectedOffer) {
       setSelectedOffer(bookableOffers[0]);
+      setNoOfferSelected(false);
     }
   }, [profile?.dining_offers]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -797,12 +802,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           ? authUser.customer_id
           : undefined;
 
-      if (!noOfferSelected && !appliedOffer) {
-        toast.error('Selected offer is no longer available. Choose another or book without an offer.');
-        return;
-      }
-
-      if (!noOfferSelected && !appliedOffer) {
+      // No bookable offers → book without an offer (do not treat as a failed selection).
+      const wantsOffer = bookableOffers.length > 0 && !noOfferSelected;
+      if (wantsOffer && !appliedOffer) {
         toast.error('Selected offer is no longer available. Choose another or book without an offer.');
         return;
       }
@@ -815,11 +817,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         booking_source: 'ONLINE',
         guests: Number(guests),
         approx_arrival: approxArrival,
-        ...(noOfferSelected
-          ? { applied_offer: null }
-          : appliedOffer
-            ? { applied_offer: appliedOffer }
-            : {}),
+        applied_offer: wantsOffer && appliedOffer ? appliedOffer : null,
         customer_id: customerIdPayload,
       }).unwrap();
       setBookingSuccess(true);

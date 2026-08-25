@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Clock,
   Crown,
+  Gift,
   Languages,
   Loader2,
   Mic2,
@@ -30,8 +31,11 @@ import { toast } from "sonner";
 import {
   useCreateEventBookingMutation,
   useGetCustomerProfileQuery,
+  useGetMyGiftCardsQuery,
+  usePreviewGiftCardRedeemMutation,
   useValidateEventPromoCodeMutation,
   type AppliedPromoOffer,
+  type GiftCardRedeemPreview,
   useGetEventLayoutQuery,
   useGetPublicEventLayoutQuery,
   type OrganizerEvent,
@@ -159,6 +163,9 @@ export default function EventCheckout({
   const [email, setEmail] = useState("");
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromoOffer | null>(null);
+  const [giftCardInput, setGiftCardInput] = useState("");
+  const [selectedGiftCardId, setSelectedGiftCardId] = useState("");
+  const [appliedGiftCard, setAppliedGiftCard] = useState<GiftCardRedeemPreview | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
@@ -193,6 +200,9 @@ export default function EventCheckout({
 
   const customerId = authUser?.role === "customer" ? authUser.customer_id || "" : "";
   const { data: profile } = useGetCustomerProfileQuery(customerId, { skip: !customerId || isOrganizer });
+  const { data: myGiftCards = [] } = useGetMyGiftCardsQuery(undefined, {
+    skip: !customerId || isOrganizer,
+  });
   const { data: layoutData } = useGetEventLayoutQuery(event.id, { skip: !isOrganizer });
   const { data: publicLayoutData } = useGetPublicEventLayoutQuery(event.id, { skip: isOrganizer });
 
@@ -200,6 +210,7 @@ export default function EventCheckout({
 
   const [createEventBooking] = useCreateEventBookingMutation();
   const [validatePromo, { isLoading: validatingPromo }] = useValidateEventPromoCodeMutation();
+  const [previewGiftCard, { isLoading: validatingGiftCard }] = usePreviewGiftCardRedeemMutation();
 
   const showtimes = event.showtimes || [];
   const allTicketTypes = event.ticket_types || [];
@@ -257,6 +268,9 @@ export default function EventCheckout({
     setEmail("");
     setPromoInput("");
     setAppliedPromo(null);
+    setGiftCardInput("");
+    setSelectedGiftCardId("");
+    setAppliedGiftCard(null);
     setSubmitting(false);
     setAuthModalOpen(false);
     setExpandedCity("");
@@ -371,12 +385,34 @@ export default function EventCheckout({
   const discountAmount = !isOrganizer && appliedPromo ? appliedPromo.discount_amount : 0;
   const netTicketAmount = moneySum([Math.max(0, ticketAmount - discountAmount)]);
   const convenienceFee = moneySum([(ticketAmount * conveniencePct) / 100]);
-  const grandTotal = moneySum([netTicketAmount, convenienceFee]);
+  const orderTotal = moneySum([netTicketAmount, convenienceFee]);
+  const giftCardAmount =
+    !isOrganizer && appliedGiftCard ? Number(appliedGiftCard.amount_applicable) || 0 : 0;
+  const grandTotal = moneySum([Math.max(0, orderTotal - giftCardAmount)]);
   const ticketQty = selectedLines.reduce((sum, l) => sum + l.qty, 0);
+
+  const redeemableGiftCards = useMemo(
+    () =>
+      myGiftCards.filter((c) => {
+        const status = String(c.status || "").toUpperCase();
+        const cat = String(c.applicable_category || "ALL").toUpperCase();
+        const bal = Number(c.current_balance) || 0;
+        return (
+          bal > 0 &&
+          (status === "ACTIVE" || status === "PARTIALLY_USED") &&
+          (cat === "ALL" || cat === "EVENTS") &&
+          (c.is_claimed_by_me || c.purchase_for !== "SOMEONE_ELSE")
+        );
+      }),
+    [myGiftCards]
+  );
 
   const setQty = (id: string, next: number, max: number) => {
     setAppliedPromo(null);
     setPromoInput("");
+    setAppliedGiftCard(null);
+    setGiftCardInput("");
+    setSelectedGiftCardId("");
     const clamped = Math.max(0, Math.min(max, next));
     setQtyByType((prev) => {
       if (clamped <= 0) {
@@ -415,6 +451,7 @@ export default function EventCheckout({
         ...(phone.trim() ? { guest_phone: sanitizePhoneInput(phone) } : {}),
       }).unwrap();
       setAppliedPromo(result);
+      setAppliedGiftCard(null);
       toast.success(`Promo code "${result.promo_code}" applied!`);
     } catch (err) {
       setAppliedPromo(null);
@@ -425,6 +462,37 @@ export default function EventCheckout({
   const handleRemovePromo = () => {
     setAppliedPromo(null);
     setPromoInput("");
+    setAppliedGiftCard(null);
+  };
+
+  const handleApplyGiftCard = async () => {
+    if (orderTotal <= 0) {
+      toast.error("Nothing left to pay.");
+      return;
+    }
+    const payload = selectedGiftCardId
+      ? { gift_card_id: selectedGiftCardId, amount: orderTotal, category: "EVENTS" as const }
+      : giftCardInput.trim()
+        ? { code: giftCardInput.trim(), amount: orderTotal, category: "EVENTS" as const }
+        : null;
+    if (!payload) {
+      toast.error("Select a gift card or enter a code.");
+      return;
+    }
+    try {
+      const result = await previewGiftCard(payload).unwrap();
+      setAppliedGiftCard(result);
+      toast.success(`Gift card applied · ${formatMoney(result.amount_applicable)}`);
+    } catch (err) {
+      setAppliedGiftCard(null);
+      toast.error(extractApiError(err, "Could not apply gift card."));
+    }
+  };
+
+  const handleRemoveGiftCard = () => {
+    setAppliedGiftCard(null);
+    setGiftCardInput("");
+    setSelectedGiftCardId("");
   };
 
   const handleConfirm = async (e: React.FormEvent) => {
@@ -515,6 +583,7 @@ export default function EventCheckout({
           customer_id: customerId,
           booking_source: "ONLINE",
           promo_code: appliedPromo?.promo_code,
+          gift_card_id: appliedGiftCard?.gift_card_id,
           ticket_mode: ticketMode,
           ...deliveryPayload,
         }).unwrap();
@@ -1456,11 +1525,17 @@ export default function EventCheckout({
                   {discountAmount > 0 && (
                     <div className="flex justify-between text-[0.9375rem] text-[#57008E]">
                       <span>Promo discount</span>
-                      <span className="font-semibold">âˆ’{formatMoney(discountAmount)}</span>
+                      <span className="font-semibold">−{formatMoney(discountAmount)}</span>
+                    </div>
+                  )}
+                  {giftCardAmount > 0 && (
+                    <div className="flex justify-between text-[0.9375rem] text-[#57008E]">
+                      <span>Gift card</span>
+                      <span className="font-semibold">−{formatMoney(giftCardAmount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-[1rem] font-bold text-slate-900 pt-2 border-t border-dashed border-slate-200">
-                    <span>Order total</span>
+                    <span>{giftCardAmount > 0 ? "Amount due" : "Order total"}</span>
                     <span>{formatMoney(grandTotal)}</span>
                   </div>
                 </div>
@@ -1507,6 +1582,86 @@ export default function EventCheckout({
                         >
                           {validatingPromo ? <Loader2 size={14} className="animate-spin" /> : "Apply"}
                         </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isOrganizer && (
+                  <div className="px-4 py-3 border-b border-slate-100 space-y-2">
+                    <p className="text-[0.8125rem] font-semibold text-slate-700 flex items-center gap-1.5">
+                      <Gift size={14} className="text-[#6900AA]" />
+                      Gift card
+                    </p>
+                    {appliedGiftCard ? (
+                      <div className="flex items-center justify-between gap-2 bg-[#F7E9FF] border border-[#E3BCFF] rounded-xl px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-[0.875rem] font-bold text-[#6900AA] truncate">
+                            {appliedGiftCard.product_name} · {appliedGiftCard.code_masked}
+                          </p>
+                          <p className="text-[0.8125rem] text-[#57008E]">
+                            Applying {formatMoney(appliedGiftCard.amount_applicable)}
+                            {appliedGiftCard.balance_after > 0
+                              ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
+                              : " · balance will be zero"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveGiftCard}
+                          className="text-[0.875rem] font-semibold text-[#6900AA] hover:underline shrink-0 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {redeemableGiftCards.length > 0 && (
+                          <select
+                            value={selectedGiftCardId}
+                            onChange={(e) => {
+                              setSelectedGiftCardId(e.target.value);
+                              if (e.target.value) setGiftCardInput("");
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[0.875rem] text-slate-800"
+                          >
+                            <option value="">Select from My Gift Cards</option>
+                            {redeemableGiftCards.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.product_name || "Gift Card"} · {c.code_masked} ·{" "}
+                                {formatMoney(Number(c.current_balance))}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={giftCardInput}
+                            onChange={(e) => {
+                              setGiftCardInput(e.target.value.toUpperCase());
+                              if (e.target.value) setSelectedGiftCardId("");
+                            }}
+                            placeholder="Or enter gift card code"
+                            className={`flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none ${accentFocus} text-slate-800 font-mono`}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyGiftCard}
+                            disabled={
+                              validatingGiftCard ||
+                              (!selectedGiftCardId && !giftCardInput.trim()) ||
+                              orderTotal <= 0
+                            }
+                            className="px-3 py-2 rounded-xl border border-slate-200 text-[0.9375rem] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 shrink-0 cursor-pointer"
+                          >
+                            {validatingGiftCard ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              "Apply"
+                            )}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -301,8 +301,16 @@ export default function EventBookingDetailPage({
                 <span>−{formatMoney(booking.discount_amount)}</span>
               </div>
             )}
+            {Number(booking.gift_card_amount || 0) > 0 && (
+              <div className="flex justify-between text-[#6900AA]">
+                <span>Gift card</span>
+                <span>−{formatMoney(booking.gift_card_amount)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-baseline pt-3 border-t border-slate-100">
-              <span className="font-semibold text-slate-800">Total Payable</span>
+              <span className="font-semibold text-slate-800">
+                {Number(booking.gift_card_amount || 0) > 0 ? "Amount paid" : "Total Payable"}
+              </span>
               <span className="text-lg font-extrabold text-[#6900AA]">{formatMoney(booking.grand_total)}</span>
             </div>
           </div>

@@ -2,14 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Camera, ImageUp, Loader2, QrCode, Tag, Users, Clock, UtensilsCrossed } from "lucide-react";
+import { Camera, ImageUp, Loader2, QrCode, Tag, Users, Clock, UtensilsCrossed, Gift } from "lucide-react";
 import { toast } from "sonner";
 import {
   useScanDiningBookingQrMutation,
   useCheckoutDiningBookingMutation,
   useValidateMerchantPromoCodeMutation,
   useRedeemWalkInMerchantPromoMutation,
+  useMerchantVerifyGiftCardMutation,
+  useMerchantPreviewGiftCardMutation,
+  useMerchantRedeemGiftCardMutation,
+  useGetMerchantGiftCardRedemptionsQuery,
   type Booking,
+  type MerchantGiftCardVerify,
+  type MerchantGiftCardPreview,
 } from "@/services/api";
 import { formatDiningOfferDiscount } from "@/lib/diningOffers";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -55,11 +61,26 @@ export default function DiningScanPage() {
   const [walkInNotes, setWalkInNotes] = useState("");
   const [walkInPreview, setWalkInPreview] = useState<{ title?: string; discount_label?: string; promo_code?: string } | null>(null);
 
+  const [gcCode, setGcCode] = useState("");
+  const [gcBill, setGcBill] = useState("");
+  const [gcGuestName, setGcGuestName] = useState("");
+  const [gcGuestPhone, setGcGuestPhone] = useState("");
+  const [gcVerified, setGcVerified] = useState<MerchantGiftCardVerify | null>(null);
+  const [gcPreview, setGcPreview] = useState<MerchantGiftCardPreview | null>(null);
+
   const [scanQr, { isLoading: isScanning }] = useScanDiningBookingQrMutation();
   const [checkout, { isLoading: isCheckingOut }] = useCheckoutDiningBookingMutation();
   const [validatePromo, { isLoading: validatingPromo }] = useValidateMerchantPromoCodeMutation();
   const [validateWalkIn, { isLoading: validatingWalkIn }] = useValidateMerchantPromoCodeMutation();
   const [redeemWalkIn, { isLoading: redeemingWalkIn }] = useRedeemWalkInMerchantPromoMutation();
+  const [verifyGiftCard, { isLoading: verifyingGc }] = useMerchantVerifyGiftCardMutation();
+  const [previewGiftCard, { isLoading: previewingGc }] = useMerchantPreviewGiftCardMutation();
+  const [redeemGiftCard, { isLoading: redeemingGc }] = useMerchantRedeemGiftCardMutation();
+  const { data: gcRedemptionsRes, refetch: refetchGcRedemptions } = useGetMerchantGiftCardRedemptionsQuery({
+    page: 1,
+    limit: 5,
+  });
+  const recentGcRedemptions = gcRedemptionsRes?.data || [];
 
   const resetPromoForm = useCallback(() => {
     setPromoCode("");
@@ -77,6 +98,8 @@ export default function DiningScanPage() {
     setRedemptionNotes("");
     setPromoPreview(null);
     setPromoValidated(false);
+    setGcGuestName(booking.customer_name || booking.guest_name || "");
+    setGcGuestPhone(booking.customer_phone || booking.guest_phone || "");
   }, []);
 
   const stopCamera = useCallback(async () => {
@@ -338,6 +361,83 @@ export default function DiningScanPage() {
     }
   };
 
+  const resetGiftCardForm = () => {
+    setGcVerified(null);
+    setGcPreview(null);
+  };
+
+  const handleVerifyGiftCard = async () => {
+    const code = gcCode.trim();
+    if (!code) {
+      toast.error("Enter a gift card code.");
+      return;
+    }
+    try {
+      const data = await verifyGiftCard({ code }).unwrap();
+      setGcVerified(data);
+      setGcPreview(null);
+      toast.success("Gift card verified");
+    } catch (err) {
+      resetGiftCardForm();
+      toast.error(extractApiError(err, "Could not verify gift card."));
+    }
+  };
+
+  const handlePreviewGiftCard = async () => {
+    const code = gcCode.trim();
+    const bill = Number(gcBill);
+    if (!code) {
+      toast.error("Enter a gift card code.");
+      return;
+    }
+    if (!Number.isFinite(bill) || bill <= 0) {
+      toast.error("Enter the food bill amount.");
+      return;
+    }
+    try {
+      const data = await previewGiftCard({ code, bill_amount: bill }).unwrap();
+      setGcVerified(data);
+      setGcPreview(data);
+      toast.success("Split calculated");
+    } catch (err) {
+      setGcPreview(null);
+      toast.error(extractApiError(err, "Could not preview gift card."));
+    }
+  };
+
+  const handleRedeemGiftCard = async () => {
+    const code = gcCode.trim();
+    const bill = Number(gcBill);
+    if (!code) {
+      toast.error("Enter a gift card code.");
+      return;
+    }
+    if (!Number.isFinite(bill) || bill <= 0) {
+      toast.error("Enter the food bill amount.");
+      return;
+    }
+    if (!gcVerified) {
+      toast.error("Verify the gift card first.");
+      return;
+    }
+    try {
+      const res = await redeemGiftCard({
+        code,
+        bill_amount: bill,
+        booking_id: scanned?.id,
+        guest_name: gcGuestName.trim() || undefined,
+        guest_phone: gcGuestPhone.trim() || undefined,
+      }).unwrap();
+      toast.success(res.message || "Gift card redeemed.");
+      setGcCode("");
+      setGcBill("");
+      resetGiftCardForm();
+      void refetchGcRedemptions();
+    } catch (err) {
+      toast.error(extractApiError(err, "Gift card redemption failed."));
+    }
+  };
+
   if (!user?.business_id) {
     return <p className="text-zinc-400">Loading restaurant account...</p>;
   }
@@ -349,7 +449,7 @@ export default function DiningScanPage() {
       <div>
         <h2 className="text-2xl font-extrabold text-white tracking-tight">Scan guest QR</h2>
         <p className="text-sm text-zinc-400 mt-1">
-          Scan or enter the guest QR to load their details and booking offer. Enter promo code and bill, validate, then redeem.
+          Scan guest QR for offers, redeem walk-in promos, or redeem a BookMyBota Gift Card against the food bill.
         </p>
       </div>
 
@@ -736,6 +836,192 @@ export default function DiningScanPage() {
             Redeem walk-in offer
           </button>
         </div>
+      </div>
+
+      <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Gift size={18} className="text-violet-300" />
+            Gift Card Redemption
+          </h3>
+          <p className="text-sm text-zinc-400 mt-1">
+            Guest pays with a BookMyBota Gift Card at the restaurant. BookMyBota settles the redeemed amount with you later.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+              Gift card code *
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={gcCode}
+                onChange={(e) => {
+                  setGcCode(e.target.value.toUpperCase());
+                  resetGiftCardForm();
+                }}
+                placeholder="BOTA-XXXX-XXXX-XXXX"
+                className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+              <button
+                type="button"
+                onClick={() => void handleVerifyGiftCard()}
+                disabled={verifyingGc}
+                className="btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+              >
+                {verifyingGc && <Loader2 size={16} className="animate-spin" />}
+                Verify
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+              Restaurant bill amount (ETB) *
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={gcBill}
+              onChange={(e) => {
+                setGcBill(e.target.value);
+                setGcPreview(null);
+              }}
+              placeholder="1500"
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+              Link scanned booking
+            </label>
+            <div className="h-[42px] flex items-center rounded-xl border border-white/10 bg-zinc-900/40 px-4 text-sm text-zinc-300">
+              {scanned?.id
+                ? `${scanned.customer_name || scanned.guest_name || "Guest"} · linked`
+                : "Optional — scan guest QR first"}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+              Guest name (optional)
+            </label>
+            <input
+              value={gcGuestName}
+              onChange={(e) => setGcGuestName(e.target.value)}
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+              Guest phone (optional)
+            </label>
+            <input
+              value={gcGuestPhone}
+              onChange={(e) => setGcGuestPhone(e.target.value)}
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500"
+            />
+          </div>
+        </div>
+
+        {gcVerified && (
+          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 space-y-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-violet-300">Gift card</p>
+            <p className="text-sm font-semibold text-white">
+              {gcVerified.product_name} · {gcVerified.code_masked}
+            </p>
+            {gcVerified.customer_name && (
+              <p className="text-xs text-zinc-300">Customer: {gcVerified.customer_name}</p>
+            )}
+            <p className="text-sm text-violet-200">
+              Available balance: {formatMoney(gcVerified.current_balance, { compact: true })}
+            </p>
+            <p className="text-xs text-zinc-400">
+              Status: {gcVerified.status}
+              {gcVerified.expires_at
+                ? ` · Expiry ${formatDate(gcVerified.expires_at)}`
+                : ""}
+            </p>
+          </div>
+        )}
+
+        {gcPreview && (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 space-y-1.5">
+            <div className="flex justify-between text-sm text-zinc-200">
+              <span>Food bill</span>
+              <span className="font-semibold text-white">
+                {formatMoney(gcPreview.bill_amount, { compact: true })}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm text-emerald-300">
+              <span>Redeem from gift card</span>
+              <span className="font-semibold">
+                −{formatMoney(gcPreview.amount_applicable, { compact: true })}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-white pt-1 border-t border-white/10">
+              <span>Customer pays restaurant</span>
+              <span>{formatMoney(gcPreview.customer_payable, { compact: true })}</span>
+            </div>
+            <p className="text-[11px] text-zinc-400">
+              Remaining gift card after redeem:{" "}
+              {formatMoney(gcPreview.balance_after, { compact: true })} · Settlement to restaurant:{" "}
+              {formatMoney(gcPreview.amount_applicable, { compact: true })} (pending)
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void handlePreviewGiftCard()}
+            disabled={previewingGc || !gcVerified}
+            className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+          >
+            {previewingGc && <Loader2 size={16} className="animate-spin" />}
+            Calculate split
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleRedeemGiftCard()}
+            disabled={redeemingGc || !gcVerified || !gcPreview}
+            className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+          >
+            {redeemingGc && <Loader2 size={16} className="animate-spin" />}
+            Redeem Gift Card
+          </button>
+        </div>
+
+        {recentGcRedemptions.length > 0 && (
+          <div className="pt-2 border-t border-white/10">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+              Recent gift card redemptions
+            </p>
+            <ul className="space-y-2">
+              {recentGcRedemptions.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 border border-white/5 px-3 py-2 text-xs"
+                >
+                  <div>
+                    <p className="text-white font-semibold">
+                      ****{row.code_last4} · {formatMoney(row.gift_card_amount, { compact: true })}
+                    </p>
+                    <p className="text-zinc-400">
+                      Bill {formatMoney(row.bill_amount, { compact: true })} · Guest pays{" "}
+                      {formatMoney(row.customer_payable, { compact: true })}
+                      {row.redeemed_at ? ` · ${formatDate(row.redeemed_at)}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300">
+                    {row.settlement_status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

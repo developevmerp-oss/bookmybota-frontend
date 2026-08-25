@@ -76,13 +76,12 @@ function CustomerDropdown({
           <Link href="/customer/change-password" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
           <Link href="/customer/dashboard" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Orders / Reservations</Link>
           {showGiftCards && (
-            <button
-              type="button"
-              onClick={() => toast.message("Coming soon")}
-              className="block w-full text-left px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+            <Link
+              href="/customer/gift-cards"
+              className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
             >
-              Gift Cards
-            </button>
+              My Gift Cards
+            </Link>
           )}
           <button 
             type="button"
@@ -303,7 +302,15 @@ export default function HomeHeader() {
           <ChevronDown size={14} className="shrink-0 text-[#6B6B6B]" />
         </button>
 
-        <ForBusinessMenu size="md" />
+          <ForBusinessMenu size="md" />
+
+          <Link
+            href="/gift-cards"
+            className="inline-flex h-9 items-center gap-1.5 px-3 rounded-full bg-[#F3F3F3] text-[#111111] type-nav-md font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap shrink-0"
+          >
+            <Gift size={16} className="shrink-0" />
+            Gift Cards
+          </Link>
 
         {!authReady ? (
           <span className="w-9 h-9 shrink-0" />
@@ -363,31 +370,32 @@ export default function HomeHeader() {
 
           <ForBusinessMenu size="lg" />
 
+          {!isAuthPage && (
+            <Link
+              href="/gift-cards"
+              className="inline-flex h-11 items-center gap-2 px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap"
+            >
+              <Gift size={18} className="shrink-0" />
+              Gift Cards
+            </Link>
+          )}
+
           {!authReady ? (
             <span className="w-[88px] h-9" />
           ) : customer ? (
-            <>
+            <CustomerDropdown onLogout={handleLogout} showGiftCards>
               <Link
-                href="/gift-cards"
-                className="inline-flex h-11 items-center gap-2 px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap"
+                href="/customer/profile"
+                className="inline-flex h-13 items-center gap-2 pl-1 pr-3 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors relative z-10"
               >
-                <Gift size={18} className="shrink-0" />
-                Gift Cards
+                <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white type-nav-md font-semibold flex items-center justify-center">
+                  {initial}
+                </span>
+                <span className="type-nav-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
+                  {displayName}
+                </span>
               </Link>
-              <CustomerDropdown onLogout={handleLogout}>
-                <Link
-                  href="/customer/profile"
-                  className="inline-flex h-13 items-center gap-2 pl-1 pr-3 rounded-full border border-[#E3BCFF] bg-[#F7E9FF] hover:bg-[#EFD7FF] transition-colors relative z-10"
-                >
-                  <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white type-nav-md font-semibold flex items-center justify-center">
-                    {initial}
-                  </span>
-                  <span className="type-nav-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
-                    {displayName}
-                  </span>
-                </Link>
-              </CustomerDropdown>
-            </>
+            </CustomerDropdown>
           ) : isAuthPage ? null : (
             <button
               type="button"

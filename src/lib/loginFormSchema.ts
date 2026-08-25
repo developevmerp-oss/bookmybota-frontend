@@ -19,7 +19,7 @@ export const phoneLoginSchema = yup.object({
 
 export const otpVerifySchema = yup.object({
   otp: yup
-    .string()s
+    .string()
     .required('OTP is required.')
     .matches(/^\d{6}$/, 'Enter the 6-digit OTP.'),
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Building2, MapPin, Mic2 } from "lucide-react";
 import type { PublicRegisteredPartner } from "@/services/api";
 
@@ -25,9 +26,9 @@ function PartnerCard({
           : "Registered venue")
       : partner.type_name || "Registered artist";
 
-  return (
+  const card = (
     <div
-      className="w-full group bg-white rounded-2xl overflow-hidden border shadow-[0_8px_24px_rgba(105,0,170,0.06)]"
+      className="w-full group bg-white rounded-2xl overflow-hidden border shadow-[0_8px_24px_rgba(105,0,170,0.06)] h-full"
       style={{ borderColor: BRAND_BORDER }}
     >
       <div className="relative aspect-[3/4] overflow-hidden" style={{ backgroundColor: BRAND_SOFT }}>
@@ -38,10 +39,7 @@ function PartnerCard({
             className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-500"
           />
         ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{ color: BRAND }}
-          >
+          <div className="w-full h-full flex items-center justify-center" style={{ color: BRAND }}>
             {kind === "venue" ? (
               <Building2 size={40} strokeWidth={1.4} />
             ) : (
@@ -73,9 +71,37 @@ function PartnerCard({
         {kind === "artist" && partner.description ? (
           <p className="mt-1 text-[11px] text-[#9ca3af] line-clamp-2">{partner.description}</p>
         ) : null}
+        {kind === "artist" ? (
+          <p className="mt-2 text-[11px] font-semibold" style={{ color: BRAND }}>
+            View free dates &amp; inquire →
+          </p>
+        ) : null}
+        {kind === "venue" ? (
+          <p className="mt-2 text-[11px] font-semibold" style={{ color: BRAND }}>
+            View free dates &amp; inquire →
+          </p>
+        ) : null}
       </div>
     </div>
   );
+
+  if (kind === "artist") {
+    return (
+      <Link href={`/artists/${partner.id}`} className="block h-full">
+        {card}
+      </Link>
+    );
+  }
+
+  if (kind === "venue") {
+    return (
+      <Link href={`/venues/${partner.id}`} className="block h-full">
+        {card}
+      </Link>
+    );
+  }
+
+  return card;
 }
 
 export default function PartnerDirectorySection({
@@ -85,6 +111,7 @@ export default function PartnerDirectorySection({
   partners,
   isLoading,
   emptyMessage,
+  showHeader = true,
 }: {
   title: string;
   subtitle: string;
@@ -92,22 +119,29 @@ export default function PartnerDirectorySection({
   partners: PublicRegisteredPartner[];
   isLoading?: boolean;
   emptyMessage?: string;
+  showHeader?: boolean;
 }) {
   return (
     <section
       id="partners"
-      className="bg-white py-16 md:py-20 scroll-mt-24 border-t border-[#F3E8FF]"
+      className={`scroll-mt-24 border-t border-[#F3E8FF] ${
+        showHeader ? "bg-white py-16 md:py-20" : "bg-[#faf7fc] py-8 md:py-10 border-t-0"
+      }`}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#111111]">
-            {title}
-          </h2>
-          <p className="mt-4 text-sm md:text-base text-[#5c5c5c] leading-relaxed">{subtitle}</p>
-        </div>
+        {showHeader ? (
+          <div className="text-center max-w-3xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#111111]">
+              {title}
+            </h2>
+            <p className="mt-4 text-sm md:text-base text-[#5c5c5c] leading-relaxed">{subtitle}</p>
+          </div>
+        ) : null}
 
         {isLoading ? (
-          <div className="mt-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+          <div
+            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5`}
+          >
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
@@ -122,11 +156,13 @@ export default function PartnerDirectorySection({
             ))}
           </div>
         ) : partners.length === 0 ? (
-          <p className="mt-12 text-center text-sm text-[#888]">
+          <p className={`${showHeader ? "mt-12" : ""} text-center text-sm text-[#888]`}>
             {emptyMessage || "No registered partners to show yet."}
           </p>
         ) : (
-          <div className="mt-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+          <div
+            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5`}
+          >
             {partners.map((p) => (
               <PartnerCard key={p.id} partner={p} kind={kind} />
             ))}

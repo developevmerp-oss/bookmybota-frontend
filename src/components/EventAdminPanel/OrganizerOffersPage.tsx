@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -17,7 +19,12 @@ import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
-import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
+import { formatOfferDiscount } from "@/lib/currencyFormat";
+import {
+  buildEventOfferFormSchema,
+  emptyEventOfferFormValues,
+  type EventOfferFormValues,
+} from "@/lib/eventOfferFormSchema";
 
 /** YYYY-MM-DD for the day before a given date string */
 function dayBefore(dateStr: string): string {
@@ -29,17 +36,235 @@ function dayBefore(dateStr: string): string {
   return `${y}-${m}-${day}`;
 }
 
-const EMPTY_FORM = {
-  eventId: "",
-  title: "",
-  description: "",
-  discount_type: "PERCENT" as "PERCENT" | "FLAT",
-  discount_value: "",
-  promo_code: "",
-  valid_from: "",
-  valid_until: "",
-  is_active: true,
+const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
+
+type OfferFormPanelProps = {
+  editing: EventOffer | null;
+  eligibleEvents: OfferEligibleEvent[];
+  initialValues: EventOfferFormValues;
+  onCancel: () => void;
+  onSaved: () => void;
 };
+
+function OfferFormPanel({
+  editing,
+  eligibleEvents,
+  initialValues,
+  onCancel,
+  onSaved,
+}: OfferFormPanelProps) {
+  const [createOffer, { isLoading: creating }] = useCreateEventOfferMutation();
+  const [updateOffer, { isLoading: updating }] = useUpdateEventOfferMutation();
+  const saving = creating || updating;
+
+  const startDateByEventId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ev of eligibleEvents) {
+      if (ev.starts_on) map.set(ev.id, ev.starts_on);
+    }
+    return map;
+  }, [eligibleEvents]);
+
+  const resolver = useMemo(
+    () =>
+      async (
+        values: EventOfferFormValues,
+        context: unknown,
+        options: Parameters<ReturnType<typeof yupResolver>>[2]
+      ) => {
+        const eventStartDate = startDateByEventId.get(values.eventId) || "";
+        return yupResolver(buildEventOfferFormSchema(eventStartDate))(
+          values,
+          context,
+          options as never
+        );
+      },
+    [startDateByEventId]
+  );
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<EventOfferFormValues>({
+    resolver: resolver as never,
+    defaultValues: initialValues,
+    mode: "onBlur",
+  });
+
+  const eventId = watch("eventId");
+  const validFrom = watch("valid_from");
+  const validUntil = watch("valid_until");
+
+  const selectedEvent = useMemo(
+    () => eligibleEvents.find((ev) => ev.id === eventId),
+    [eligibleEvents, eventId]
+  );
+  const eventStartDate = selectedEvent?.starts_on || "";
+  const lastOfferDate = eventStartDate ? dayBefore(eventStartDate) : "";
+
+  useEffect(() => {
+    reset(initialValues);
+  }, [initialValues, reset]);
+
+  const onSubmit = handleSubmit(async (values) => {
+    const discount_value = Number(values.discount_value);
+    const payload = {
+      title: values.title.trim(),
+      description: values.description.trim() || undefined,
+      discount_type: values.discount_type,
+      discount_value,
+      promo_code: values.promo_code.trim() || undefined,
+      valid_from: values.valid_from || undefined,
+      valid_until: values.valid_until || undefined,
+      is_active: values.is_active,
+    };
+
+    try {
+      if (editing) {
+        await updateOffer({ offerId: editing.id, ...payload }).unwrap();
+        toast.success("Offer updated.");
+      } else {
+        await createOffer({ eventId: values.eventId, ...payload }).unwrap();
+        toast.success("Offer created.");
+      }
+      onSaved();
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to save offer"));
+    }
+  });
+
+  return (
+    <form onSubmit={onSubmit} className="glass-panel rounded-2xl p-5 space-y-4" noValidate>
+      <h3 className="portal-heading font-semibold">{editing ? "Edit offer" : "Create offer"}</h3>
+
+      {!editing && (
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Event</label>
+          <select
+            className="portal-select"
+            {...register("eventId", {
+              onChange: () => {
+                setValue("valid_from", "");
+                setValue("valid_until", "");
+              },
+            })}
+          >
+            <option value="">Select event</option>
+            {eligibleEvents.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.name} ({ev.status.replace("_", " ")})
+              </option>
+            ))}
+          </select>
+          {errors.eventId && <p className={fieldErrorClass}>{errors.eventId.message}</p>}
+          {eventStartDate && (
+            <p className="text-xs portal-muted mt-1">
+              Offers run before the event. Valid until must be before <strong>{eventStartDate}</strong>
+              {lastOfferDate ? ` (latest: ${lastOfferDate})` : ""}.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div>
+        <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Title</label>
+        <input className="input-field" placeholder="Early bird 20% off" {...register("title")} />
+        {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
+      </div>
+
+      <div>
+        <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Description</label>
+        <textarea className="input-field resize-none" rows={2} {...register("description")} />
+        {errors.description && <p className={fieldErrorClass}>{errors.description.message}</p>}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Discount type</label>
+          <select className="portal-select" {...register("discount_type")}>
+            <option value="PERCENT">Percent (%)</option>
+            <option value="FLAT">Flat amount (ETB)</option>
+          </select>
+          {errors.discount_type && <p className={fieldErrorClass}>{errors.discount_type.message}</p>}
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Value</label>
+          <input type="number" min={1} className="input-field" {...register("discount_value")} />
+          {errors.discount_value && (
+            <p className={fieldErrorClass}>{errors.discount_value.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Promo code</label>
+          <input
+            className="input-field"
+            placeholder="SAVE20"
+            {...register("promo_code", {
+              onChange: (e) =>
+                setValue("promo_code", String(e.target.value || "").toUpperCase(), {
+                  shouldDirty: true,
+                }),
+            })}
+          />
+          {errors.promo_code && <p className={fieldErrorClass}>{errors.promo_code.message}</p>}
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Valid from</label>
+          <input
+            type="date"
+            className="input-field"
+            max={lastOfferDate || validUntil || undefined}
+            {...register("valid_from")}
+          />
+          <p className="text-[10px] portal-muted mt-1">When the offer starts (optional)</p>
+          {errors.valid_from && <p className={fieldErrorClass}>{errors.valid_from.message}</p>}
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Valid until</label>
+          <input
+            type="date"
+            className="input-field"
+            min={validFrom || undefined}
+            max={lastOfferDate || undefined}
+            {...register("valid_until")}
+          />
+          <p className="text-[10px] portal-muted mt-1">Must be before event day</p>
+          {errors.valid_until && <p className={fieldErrorClass}>{errors.valid_until.message}</p>}
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm portal-muted">
+        <input type="checkbox" {...register("is_active")} />
+        Active offer
+      </label>
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold disabled:opacity-50"
+        >
+          {saving && <Loader2 size={14} className="inline animate-spin mr-1" />}
+          {editing ? "Update" : "Create"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 rounded-xl border border-slate-200 text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default function OrganizerOffersPage() {
   const [q, setQ] = useState("");
@@ -51,39 +276,27 @@ export default function OrganizerOffersPage() {
   });
   const offers = offersData?.items ?? [];
   const { data: eligibleEvents = [] } = useGetOfferEligibleEventsQuery();
-  const [createOffer, { isLoading: creating }] = useCreateEventOfferMutation();
-  const [updateOffer, { isLoading: updating }] = useUpdateEventOfferMutation();
   const [deleteOffer] = useDeleteEventOfferMutation();
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EventOffer | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-
-  const selectedEvent = useMemo<OfferEligibleEvent | undefined>(
-    () => eligibleEvents.find((ev) => ev.id === form.eventId),
-    [eligibleEvents, form.eventId]
+  const [formKey, setFormKey] = useState(0);
+  const [initialValues, setInitialValues] = useState<EventOfferFormValues>(
+    emptyEventOfferFormValues()
   );
-  const eventStartDate = selectedEvent?.starts_on || "";
-  /** Latest allowed date for offer validity — must be before event day */
-  const lastOfferDate = eventStartDate ? dayBefore(eventStartDate) : "";
 
   const openCreate = () => {
     setEditing(null);
-    const eventId = eligibleEvents[0]?.id || "";
-    setForm({
-      ...EMPTY_FORM,
-      eventId,
-      valid_from: "",
-      valid_until: "",
-    });
+    setInitialValues(emptyEventOfferFormValues(eligibleEvents[0]?.id || ""));
+    setFormKey((k) => k + 1);
     setShowForm(true);
   };
 
   const openEdit = (offer: EventOffer) => {
     setEditing(offer);
-    setForm({
+    setInitialValues({
       eventId: offer.event_id,
       title: offer.title,
       description: offer.description || "",
@@ -94,69 +307,13 @@ export default function OrganizerOffersPage() {
       valid_until: offer.valid_until?.slice(0, 10) || "",
       is_active: offer.is_active,
     });
+    setFormKey((k) => k + 1);
     setShowForm(true);
   };
 
-  const handleEventChange = (eventId: string) => {
-    setForm((f) => ({
-      ...f,
-      eventId,
-      valid_from: "",
-      valid_until: "",
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const discount_value = Number(form.discount_value);
-    if (!form.title.trim() || !form.eventId || !discount_value) {
-      toast.error("Event, title and discount are required.");
-      return;
-    }
-    if (form.valid_from && form.valid_until && form.valid_from > form.valid_until) {
-      toast.error("Valid until must be on or after valid from.");
-      return;
-    }
-    if (!form.valid_until) {
-      toast.error("Valid until date is required.");
-      return;
-    }
-    if (eventStartDate && form.valid_until >= eventStartDate) {
-      toast.error(`Valid until must be before the event date (${eventStartDate}).`);
-      return;
-    }
-    if (eventStartDate && form.valid_from && form.valid_from >= eventStartDate) {
-      toast.error(`Valid from must be before the event date (${eventStartDate}).`);
-      return;
-    }
-    const payload = {
-      title: form.title.trim(),
-      description: form.description.trim() || undefined,
-      discount_type: form.discount_type,
-      discount_value,
-      promo_code: form.promo_code.trim() || undefined,
-      valid_from: form.valid_from || undefined,
-      valid_until: form.valid_until || undefined,
-      is_active: form.is_active,
-    };
-    try {
-      if (editing) {
-        await updateOffer({ offerId: editing.id, ...payload }).unwrap();
-        toast.success("Offer updated.");
-      } else {
-        await createOffer({ eventId: form.eventId, ...payload }).unwrap();
-        toast.success("Offer created.");
-      }
-      setShowForm(false);
-      setEditing(null);
-      setForm(EMPTY_FORM);
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to save offer"));
-    }
-  };
-
-  const handleDelete = (id: string) => {
-    setPendingDeleteId(id);
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
   };
 
   const discountLabel = (o: EventOffer) => formatOfferDiscount(o.discount_type, o.discount_value);
@@ -200,147 +357,14 @@ export default function OrganizerOffersPage() {
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="glass-panel rounded-2xl p-5 space-y-4">
-          <h3 className="portal-heading font-semibold">
-            {editing ? "Edit offer" : "Create offer"}
-          </h3>
-          {!editing && (
-            <div>
-              <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Event</label>
-              <select
-                value={form.eventId}
-                onChange={(e) => handleEventChange(e.target.value)}
-                className="portal-select"
-                required
-              >
-                <option value="">Select event</option>
-                {eligibleEvents.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.name} ({ev.status.replace("_", " ")})
-                  </option>
-                ))}
-              </select>
-              {eventStartDate && (
-                <p className="text-xs portal-muted mt-1">
-                  Offers run before the event. Valid until must be before{" "}
-                  <strong>{eventStartDate}</strong>
-                  {lastOfferDate ? ` (latest: ${lastOfferDate})` : ""}.
-                </p>
-              )}
-            </div>
-          )}
-          <div>
-            <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Title</label>
-            <input
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              className="input-field"
-              placeholder="Early bird 20% off"
-              required
-            />
-          </div>
-          <div>
-            <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="input-field resize-none"
-              rows={2}
-            />
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Discount type</label>
-              <select
-                value={form.discount_type}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    discount_type: e.target.value as "PERCENT" | "FLAT",
-                  }))
-                }
-                className="portal-select"
-              >
-                <option value="PERCENT">Percent (%)</option>
-                <option value="FLAT">Flat amount (ETB)</option>
-              </select>
-            </div>
-            <div>
-              <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Value</label>
-              <input
-                type="number"
-                min={1}
-                value={form.discount_value}
-                onChange={(e) => setForm((f) => ({ ...f, discount_value: e.target.value }))}
-                className="input-field"
-                required
-              />
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-4">
-            <div>
-              <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Promo code</label>
-              <input
-                value={form.promo_code}
-                onChange={(e) => setForm((f) => ({ ...f, promo_code: e.target.value.toUpperCase() }))}
-                className="input-field"
-                placeholder="SAVE20"
-              />
-            </div>
-            <div>
-              <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Valid from</label>
-              <input
-                type="date"
-                value={form.valid_from}
-                onChange={(e) => setForm((f) => ({ ...f, valid_from: e.target.value }))}
-                className="input-field"
-                max={lastOfferDate || form.valid_until || undefined}
-              />
-              <p className="text-[10px] portal-muted mt-1">When the offer starts (optional)</p>
-            </div>
-            <div>
-              <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Valid until</label>
-              <input
-                type="date"
-                value={form.valid_until}
-                onChange={(e) => setForm((f) => ({ ...f, valid_until: e.target.value }))}
-                className="input-field"
-                min={form.valid_from || undefined}
-                max={lastOfferDate || undefined}
-                required
-              />
-              <p className="text-[10px] portal-muted mt-1">Must be before event day</p>
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-sm portal-muted">
-            <input
-              type="checkbox"
-              checked={form.is_active}
-              onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
-            />
-            Active offer
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={creating || updating}
-              className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold disabled:opacity-50"
-            >
-              {(creating || updating) && <Loader2 size={14} className="inline animate-spin mr-1" />}
-              {editing ? "Update" : "Create"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setEditing(null);
-              }}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+        <OfferFormPanel
+          key={formKey}
+          editing={editing}
+          eligibleEvents={eligibleEvents}
+          initialValues={initialValues}
+          onCancel={closeForm}
+          onSaved={closeForm}
+        />
       )}
 
       {isLoading ? (
@@ -360,8 +384,7 @@ export default function OrganizerOffersPage() {
                   {o.promo_code ? ` · Code: ${o.promo_code}` : ""}
                 </p>
                 <p className="text-xs portal-muted mt-1">
-                  Status: {o.event_status?.replace("_", " ")} ·{" "}
-                  {o.is_active ? "Active" : "Inactive"}
+                  Status: {o.event_status?.replace("_", " ")} · {o.is_active ? "Active" : "Inactive"}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -374,7 +397,7 @@ export default function OrganizerOffersPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDelete(o.id)}
+                  onClick={() => setPendingDeleteId(o.id)}
                   className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50"
                 >
                   <Trash2 size={16} />

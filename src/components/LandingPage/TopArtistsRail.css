@@ -26,6 +26,20 @@
   text-align: center;
 }
 
+.top-artists-slot-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.top-artists-slot-link:hover .top-artists-avatar-inner {
+  border-color: #57008e;
+}
+
+.top-artists-slot-link:hover .top-artists-name {
+  color: #6900aa;
+}
+
 .top-artists-avatar {
   width: 96px;
   aspect-ratio: 1;

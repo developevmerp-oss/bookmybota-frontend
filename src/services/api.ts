@@ -817,6 +817,67 @@ export interface PublicRegisteredPartner {
   published_layout_count?: number | null;
 }
 
+export interface ArtistAvailabilitySlot {
+  id: string;
+  slot_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  notes?: string | null;
+  is_booked?: boolean;
+  created_at?: string;
+}
+
+export interface PublicArtistProfile extends PublicRegisteredPartner {
+  phone?: string | null;
+  slots?: ArtistAvailabilitySlot[];
+}
+
+export interface ArtistBookingInquiry {
+  id: string;
+  artist_business_id: string;
+  slot_id?: string | null;
+  customer_id?: string | null;
+  event_date: string;
+  event_time?: string | null;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  event_type?: string | null;
+  event_location?: string | null;
+  message?: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | string;
+  artist_notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type VenueAvailabilitySlot = ArtistAvailabilitySlot;
+
+export interface PublicVenueProfile extends PublicRegisteredPartner {
+  phone?: string | null;
+  slots?: VenueAvailabilitySlot[];
+}
+
+export interface VenueBookingInquiry {
+  id: string;
+  venue_business_id: string;
+  slot_id?: string | null;
+  customer_id?: string | null;
+  event_date: string;
+  event_time?: string | null;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  event_type?: string | null;
+  guest_count?: number | null;
+  event_location?: string | null;
+  message?: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | string;
+  venue_notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface EventTicketTypeStats {
   id: string;
   ticket_type: string;
@@ -1497,7 +1558,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -3704,6 +3765,149 @@ export const api = createApi({
       providesTags: ['Businesses'],
     }),
 
+    getPublicArtist: builder.query<PublicArtistProfile, string>({
+      query: (id) => `/artists/public/${id}`,
+      transformResponse: (res: { data: PublicArtistProfile }) => res.data,
+      providesTags: (_r, _e, id) => [
+        { type: 'ArtistSlots', id },
+        { type: 'Businesses', id },
+      ],
+    }),
+
+    createArtistInquiry: builder.mutation<
+      ArtistBookingInquiry,
+      {
+        artistId: string;
+        event_date: string;
+        event_time?: string;
+        contact_name: string;
+        contact_email: string;
+        contact_phone: string;
+        event_type?: string;
+        event_location?: string;
+        message?: string;
+      }
+    >({
+      query: ({ artistId, ...body }) => ({
+        url: `/artists/public/${artistId}/inquiries`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: ArtistBookingInquiry }) => res.data,
+      invalidatesTags: ['ArtistInquiries', 'ArtistSlots'],
+    }),
+
+    getArtistMySlots: builder.query<ArtistAvailabilitySlot[], void>({
+      query: () => `/artists/me/slots`,
+      transformResponse: (res: { data?: ArtistAvailabilitySlot[] }) => res?.data ?? [],
+      providesTags: ['ArtistSlots'],
+    }),
+
+    createArtistMySlots: builder.mutation<
+      ArtistAvailabilitySlot[],
+      { dates: string[]; start_time?: string; end_time?: string }
+    >({
+      query: (body) => ({ url: `/artists/me/slots`, method: 'POST', body }),
+      transformResponse: (res: { data?: ArtistAvailabilitySlot[] }) => res?.data ?? [],
+      invalidatesTags: ['ArtistSlots'],
+    }),
+
+    deleteArtistMySlot: builder.mutation<{ message?: string }, string>({
+      query: (slotId) => ({ url: `/artists/me/slots/${slotId}`, method: 'DELETE' }),
+      invalidatesTags: ['ArtistSlots'],
+    }),
+
+    getArtistMyInquiries: builder.query<ArtistBookingInquiry[], void>({
+      query: () => `/artists/me/inquiries`,
+      transformResponse: (res: { data?: ArtistBookingInquiry[] }) => res?.data ?? [],
+      providesTags: ['ArtistInquiries'],
+    }),
+
+    updateArtistMyInquiry: builder.mutation<
+      ArtistBookingInquiry,
+      { inquiryId: string; status: 'ACCEPTED' | 'DECLINED'; artist_notes?: string }
+    >({
+      query: ({ inquiryId, ...body }) => ({
+        url: `/artists/me/inquiries/${inquiryId}`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: ArtistBookingInquiry }) => res.data,
+      invalidatesTags: ['ArtistInquiries', 'ArtistSlots'],
+    }),
+
+    getPublicVenue: builder.query<PublicVenueProfile, string>({
+      query: (id) => `/venues/public/${id}`,
+      transformResponse: (res: { data: PublicVenueProfile }) => res.data,
+      providesTags: (_r, _e, id) => [
+        { type: 'VenueSlots', id },
+        { type: 'Businesses', id },
+      ],
+    }),
+
+    createVenueInquiry: builder.mutation<
+      VenueBookingInquiry,
+      {
+        venueId: string;
+        event_date: string;
+        event_time?: string;
+        contact_name: string;
+        contact_email: string;
+        contact_phone: string;
+        event_type?: string;
+        guest_count?: number;
+        event_location?: string;
+        message?: string;
+      }
+    >({
+      query: ({ venueId, ...body }) => ({
+        url: `/venues/public/${venueId}/inquiries`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: VenueBookingInquiry }) => res.data,
+      invalidatesTags: ['VenueInquiries', 'VenueSlots'],
+    }),
+
+    getVenueMySlots: builder.query<VenueAvailabilitySlot[], void>({
+      query: () => `/venues/me/slots`,
+      transformResponse: (res: { data?: VenueAvailabilitySlot[] }) => res?.data ?? [],
+      providesTags: ['VenueSlots'],
+    }),
+
+    createVenueMySlots: builder.mutation<
+      VenueAvailabilitySlot[],
+      { dates: string[]; start_time?: string; end_time?: string }
+    >({
+      query: (body) => ({ url: `/venues/me/slots`, method: 'POST', body }),
+      transformResponse: (res: { data?: VenueAvailabilitySlot[] }) => res?.data ?? [],
+      invalidatesTags: ['VenueSlots'],
+    }),
+
+    deleteVenueMySlot: builder.mutation<{ message?: string }, string>({
+      query: (slotId) => ({ url: `/venues/me/slots/${slotId}`, method: 'DELETE' }),
+      invalidatesTags: ['VenueSlots'],
+    }),
+
+    getVenueMyInquiries: builder.query<VenueBookingInquiry[], void>({
+      query: () => `/venues/me/inquiries`,
+      transformResponse: (res: { data?: VenueBookingInquiry[] }) => res?.data ?? [],
+      providesTags: ['VenueInquiries'],
+    }),
+
+    updateVenueMyInquiry: builder.mutation<
+      VenueBookingInquiry,
+      { inquiryId: string; status: 'ACCEPTED' | 'DECLINED'; venue_notes?: string }
+    >({
+      query: ({ inquiryId, ...body }) => ({
+        url: `/venues/me/inquiries/${inquiryId}`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: VenueBookingInquiry }) => res.data,
+      invalidatesTags: ['VenueInquiries', 'VenueSlots'],
+    }),
+
     getPublicEvent: builder.query<OrganizerEvent, string>({
       query: (id) => `/events/public/${id}`,
       transformResponse: (res: { data: OrganizerEvent }) => res.data,
@@ -4335,6 +4539,20 @@ export const {
   useGetPublicEventFiltersQuery,
   useGetPublicRegisteredVenuesQuery,
   useGetPublicRegisteredArtistsQuery,
+  useGetPublicArtistQuery,
+  useCreateArtistInquiryMutation,
+  useGetArtistMySlotsQuery,
+  useCreateArtistMySlotsMutation,
+  useDeleteArtistMySlotMutation,
+  useGetArtistMyInquiriesQuery,
+  useUpdateArtistMyInquiryMutation,
+  useGetPublicVenueQuery,
+  useCreateVenueInquiryMutation,
+  useGetVenueMySlotsQuery,
+  useCreateVenueMySlotsMutation,
+  useDeleteVenueMySlotMutation,
+  useGetVenueMyInquiriesQuery,
+  useUpdateVenueMyInquiryMutation,
   useGetPublicEventQuery,
   useGetPublicEventLayoutQuery,
   useCreateEventBookingMutation,

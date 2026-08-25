@@ -44,11 +44,20 @@ export function storageKeysForRole(role: UserRole | string) {
   }
 }
 
+/** Partner admin panels use singular `/artist` and `/venue` — not plural customer listings. */
+export function isArtistAdminPath(pathname: string): boolean {
+  return pathname === '/artist' || pathname.startsWith('/artist/');
+}
+
+export function isVenueAdminPath(pathname: string): boolean {
+  return pathname === '/venue' || pathname.startsWith('/venue/');
+}
+
 export function storageKeysForPath(pathname: string) {
   if (pathname.startsWith('/admin')) return storageKeysForRole('super_admin');
   if (pathname.startsWith('/organizer')) return storageKeysForRole('event_admin');
-  if (pathname.startsWith('/venue')) return storageKeysForRole('venue_admin');
-  if (pathname.startsWith('/artist')) return storageKeysForRole('artist_admin');
+  if (isVenueAdminPath(pathname)) return storageKeysForRole('venue_admin');
+  if (isArtistAdminPath(pathname)) return storageKeysForRole('artist_admin');
   if (pathname.startsWith('/business')) return storageKeysForRole('business_admin');
   if (pathname.startsWith('/customer')) return storageKeysForRole('customer');
   return storageKeysForRole('customer');

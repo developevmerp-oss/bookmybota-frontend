@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
 import HomeHeader from "@/components/LandingPage/HomeHeader";
+import { isArtistAdminPath, isVenueAdminPath } from "@/lib/authStorage";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -94,8 +95,8 @@ export default function RootLayout({
   const isAdminOrBusiness =
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/business") ||
-    pathname?.startsWith("/artist") ||
-    pathname?.startsWith("/venue") ||
+    isArtistAdminPath(pathname || "") ||
+    isVenueAdminPath(pathname || "") ||
     (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerMarketing);
     
 

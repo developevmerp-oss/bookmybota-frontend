@@ -89,6 +89,7 @@ function CustomerDropdown({
             className="block w-full text-left px-4 py-2.5 type-nav-md font-medium text-red-600 hover:bg-[#F7E9FF] transition-colors cursor-pointer"
           >
             Log out
+            
           </button>
         </div>
       </div>

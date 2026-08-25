@@ -2,9 +2,19 @@ import {
   CONTRACT_DYNAMIC_FIELDS,
   replaceContractPlaceholders,
   htmlWithMergedValues,
+  isLegacyListContractBody,
+  buildProseContractHtml,
+  DEFAULT_CONTRACT_BODY,
 } from './contractPlaceholdersShared';
 
-export { CONTRACT_DYNAMIC_FIELDS, replaceContractPlaceholders, htmlWithMergedValues };
+export {
+  CONTRACT_DYNAMIC_FIELDS,
+  replaceContractPlaceholders,
+  htmlWithMergedValues,
+  isLegacyListContractBody,
+  buildProseContractHtml,
+  DEFAULT_CONTRACT_BODY,
+};
 export type { ContractDynamicData } from './contractPlaceholdersShared';
 
 export interface EventContractRecord {
@@ -32,7 +42,23 @@ export function mergeContractHtml(contract: EventContractRecord): string {
     commissionPercent: contract.dynamic_data?.commissionPercent ?? contract.commission_percent,
     convenienceFeePercent: contract.dynamic_data?.convenienceFeePercent ?? contract.convenience_fee_percent,
     contractNumber: contract.dynamic_data?.contractNumber ?? contract.contract_number,
+    eventName: contract.dynamic_data?.eventName ?? contract.event_name,
+    organizerName: contract.dynamic_data?.organizerName ?? contract.organizer_name,
+    platformName: contract.dynamic_data?.platformName ?? 'BookMyBota',
   };
+  // Bullet / labeled-list bodies → continuous written paragraphs (same fields).
+  if (isLegacyListContractBody(contract.body_html) || !contract.body_html?.trim()) {
+    return buildProseContractHtml(data);
+  }
+  // Prefer prose whenever the stored body still looks like a field checklist.
+  const plain = contract.body_html.replace(/<[^>]+>/g, ' ');
+  if (
+    /Category\s*:/i.test(plain) &&
+    /Language\s*:/i.test(plain) &&
+    /Convenience fee/i.test(plain)
+  ) {
+    return buildProseContractHtml(data);
+  }
   return htmlWithMergedValues(contract.body_html, data);
 }
 

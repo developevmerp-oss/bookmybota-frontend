@@ -70,7 +70,7 @@ function CustomerDropdown({
   return (
     <div className="relative group">
       {children}
-      <div className="absolute right-0 top-full pt-1 w-56 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+      <div className="absolute right-0 top-full pt-1 w-64 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
         <div className="rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 overflow-hidden">
           <Link href="/customer/profile" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Profile</Link>
           <Link href="/customer/change-password" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
@@ -83,6 +83,17 @@ function CustomerDropdown({
               My Gift Cards
             </Link>
           )}
+          <Link href="/customer/help" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Help Centre</Link>
+          <button
+            type="button"
+            onClick={() => toast.message("Coming soon")}
+            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+          >
+            <span>Offers</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7E9FF] text-[#6900AA]">
+              Soon
+            </span>
+          </button>
           <button 
             type="button"
             onClick={onLogout} 

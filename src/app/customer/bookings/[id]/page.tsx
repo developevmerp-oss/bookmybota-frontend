@@ -192,9 +192,9 @@ export default function BookingDetailPage({
               </button>
             </p>
           </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex flex-col items-stretch gap-2 shrink-0">
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border ${badge.className}`}
+              className={`flex w-full items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border ${badge.className}`}
             >
               {badge.icon && <Check size={14} strokeWidth={2.5} />}
               {booking.status}
@@ -204,7 +204,7 @@ export default function BookingDetailPage({
                 type="button"
                 onClick={handleCancel}
                 disabled={isCancelling}
-                className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-rose-500 hover:text-rose-600 px-4 py-2 border border-rose-300 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 text-sm font-semibold text-rose-500 hover:text-rose-600 px-4 py-2 border border-rose-300 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer disabled:opacity-60"
               >
                 <Trash2 size={16} />
                 {isCancelling ? "Cancelling..." : "Cancel Reservation"}

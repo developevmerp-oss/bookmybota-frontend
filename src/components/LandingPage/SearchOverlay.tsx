@@ -2,8 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clapperboard, Search, Tent, UtensilsCrossed, X } from "lucide-react";
-import type { PublicEvent } from "@/services/api";
+import { Building2, Clapperboard, Mic2, Search, Tent, UtensilsCrossed, X } from "lucide-react";
+import {
+  useGetPublicRegisteredArtistsQuery,
+  useGetPublicRegisteredVenuesQuery,
+  type PublicEvent,
+} from "@/services/api";
 import { isComedyEvent, isMusicEvent, isOutdoorEvent } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 
@@ -13,7 +17,7 @@ type SearchOverlayProps = {
   onClose: () => void;
 };
 
-type TrendKind = "event" | "live" | "dining" | "category";
+type TrendKind = "event" | "live" | "dining" | "category" | "artist" | "venue";
 
 type TrendItem = {
   id: string;
@@ -36,6 +40,8 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const { events, fallbackEvents, dining, categories, isLoadingEvents } = useHomeCatalog(city);
+  const { data: artists = [] } = useGetPublicRegisteredArtistsQuery();
+  const { data: venues = [] } = useGetPublicRegisteredVenuesQuery();
   const pool = events.length > 0 ? events : fallbackEvents;
 
   useEffect(() => {
@@ -105,8 +111,30 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
         push({ id: d.id, label: d.name, href: `/restaurant/${d.id}`, kind: "dining" });
       }
     }
+    for (const a of artists) {
+      const hay = `${a.name} ${a.type_name || ""} ${a.city_name || ""}`.toLowerCase();
+      if (hay.includes(q)) {
+        push({
+          id: `artist-${a.id}`,
+          label: a.type_name ? `${a.name} · ${a.type_name}` : a.name,
+          href: `/artists/${a.id}`,
+          kind: "artist",
+        });
+      }
+    }
+    for (const v of venues) {
+      const hay = `${v.name} ${v.type_name || ""} ${v.city_name || ""}`.toLowerCase();
+      if (hay.includes(q)) {
+        push({
+          id: `venue-${v.id}`,
+          label: v.type_name ? `${v.name} · ${v.type_name}` : v.name,
+          href: `/venues/${v.id}`,
+          kind: "venue",
+        });
+      }
+    }
     return items.slice(0, 12);
-  }, [query, trending, pool, categories, dining]);
+  }, [query, trending, pool, categories, dining, artists, venues]);
 
   const go = (href: string) => {
     onClose();
@@ -127,6 +155,8 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
   const iconFor = (kind: TrendKind) => {
     if (kind === "dining") return UtensilsCrossed;
     if (kind === "live") return Tent;
+    if (kind === "artist") return Mic2;
+    if (kind === "venue") return Building2;
     return Clapperboard;
   };
 
@@ -149,7 +179,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for events, dining, plays, sports..."
+              placeholder="Search for events, dining, artists, venues..."
               className="w-full h-12 sm:h-[52px] pl-12 pr-5 rounded-full bg-[#EEEEEE] type-card-title text-[#111111] placeholder:text-[#9A9A9A] outline-none focus:ring-2 focus:ring-[#6900AA]"
             />
           </div>

@@ -371,7 +371,7 @@ export default function VenueLandingPage() {
 
         <PartnerDirectorySection
           title="Registered venues on Book My Bota"
-          subtitle="Spaces already onboarded and approved — the same partners organizers discover when creating events."
+          subtitle="Browse free dates and send a booking inquiry — the same partners organizers discover when creating events."
           kind="venue"
           partners={registeredVenues}
           isLoading={venuesLoading}

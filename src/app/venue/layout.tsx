@@ -8,7 +8,7 @@ import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import AuthGate from "@/components/Shared/AuthGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
-import { Building2, ClipboardList, KeyRound, LogOut, Menu, Ticket, User, X } from "lucide-react";
+import { Building2, CalendarDays, ClipboardList, Inbox, KeyRound, LogOut, Menu, Ticket, User, X } from "lucide-react";
 
 function VenueShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,6 +17,8 @@ function VenueShell({ children }: { children: React.ReactNode }) {
 
   const navigation = [
     { name: "Profile", href: "/venue/profile", icon: User },
+    { name: "Availability", href: "/venue/availability", icon: CalendarDays },
+    { name: "Inquiries", href: "/venue/inquiries", icon: Inbox },
     { name: "Claim Events", href: "/venue/claim-events", icon: Ticket },
     { name: "Layout Requests", href: "/venue/layout-requests", icon: ClipboardList },
     { name: "Change Password", href: "/venue/change-password", icon: KeyRound },

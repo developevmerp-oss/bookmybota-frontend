@@ -1,6 +1,8 @@
 import { clearCredentials } from '@/features/auth/authSlice';
 import {
   clearSessionForRole,
+  isArtistAdminPath,
+  isVenueAdminPath,
   loginPathForRole,
   readSessionForRole,
   storageKeysForPath,
@@ -25,8 +27,8 @@ type AuthErrorData = { code?: string; error?: string } | undefined;
 export function resolveRoleFromPath(pathname: string): UserRole {
   if (pathname.startsWith('/admin')) return 'super_admin';
   if (pathname.startsWith('/organizer')) return 'event_admin';
-  if (pathname.startsWith('/venue')) return 'venue_admin';
-  if (pathname.startsWith('/artist')) return 'artist_admin';
+  if (isVenueAdminPath(pathname)) return 'venue_admin';
+  if (isArtistAdminPath(pathname)) return 'artist_admin';
   if (pathname.startsWith('/business')) return 'business_admin';
   if (pathname.startsWith('/customer')) return 'customer';
   return 'customer';
@@ -37,8 +39,8 @@ export function isProtectedPath(pathname: string): boolean {
     pathname.startsWith('/admin') ||
     pathname.startsWith('/business') ||
     pathname.startsWith('/organizer') ||
-    pathname.startsWith('/venue') ||
-    pathname.startsWith('/artist') ||
+    isVenueAdminPath(pathname) ||
+    isArtistAdminPath(pathname) ||
     pathname.startsWith('/customer')
   );
 }

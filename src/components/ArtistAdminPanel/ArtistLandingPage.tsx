@@ -366,14 +366,14 @@ export default function ArtistLandingPage() {
             </div>
             <p className="mt-4 text-xs text-[#888]">
               Complete account setup (details + documents). After Super Admin approval, sign in to
-              manage your artist profile.
+              manage your artist profile, free dates, and booking inquiries.
             </p>
           </div>
         </section>
 
         <PartnerDirectorySection
           title="Registered artists on Book My Bota"
-          subtitle="Performers already onboarded and approved — the same artists organizers find when building event lineups."
+          subtitle="Performers already onboarded and approved — open a profile to see free dates and send a booking inquiry."
           kind="artist"
           partners={registeredArtists}
           isLoading={artistsLoading}

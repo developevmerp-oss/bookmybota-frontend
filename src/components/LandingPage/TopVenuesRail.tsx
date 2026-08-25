@@ -2,48 +2,48 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Mic2 } from "lucide-react";
-import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
+import { Building2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useGetPublicRegisteredVenuesQuery, type PublicRegisteredPartner } from "@/services/api";
 import "./TopArtistsRail.css";
 
 const VISIBLE = 6;
 
-function ArtistCard({ artist }: { artist: PublicRegisteredPartner }) {
-  const role = artist.type_name || "Artist";
-  const place = [artist.city_name, artist.city_state].filter(Boolean).join(", ");
+function VenueCard({ venue }: { venue: PublicRegisteredPartner }) {
+  const role = venue.type_name || "Venue";
+  const place = [venue.city_name, venue.city_state].filter(Boolean).join(", ");
 
   return (
     <Link
-      href={`/artists/${artist.id}`}
+      href={`/venues/${venue.id}`}
       className="top-artists-slot top-artists-slot-link"
-      title={`View ${artist.name} availability and send an inquiry`}
+      title={`View ${venue.name} availability and send an inquiry`}
     >
       <div className="top-artists-avatar">
         <div className="top-artists-avatar-inner">
-          {artist.cover_image_url ? (
+          {venue.cover_image_url ? (
             <img
-              src={artist.cover_image_url}
-              alt={artist.name}
+              src={venue.cover_image_url}
+              alt={venue.name}
               className="w-full h-full object-cover"
               loading="lazy"
               draggable={false}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-[#F7E9FF] text-[#6900AA]">
-              <Mic2 size={32} strokeWidth={1.4} />
+              <Building2 size={32} strokeWidth={1.4} />
             </div>
           )}
         </div>
       </div>
-      <p className="top-artists-name">{artist.name}</p>
+      <p className="top-artists-name">{venue.name}</p>
       <p className="top-artists-role">{place ? `${role} · ${place}` : role}</p>
     </Link>
   );
 }
 
-export default function TopArtistsRail() {
+export default function TopVenuesRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { data: artists = [], isLoading } = useGetPublicRegisteredArtistsQuery();
+  const { data: venues = [], isLoading } = useGetPublicRegisteredVenuesQuery();
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -55,9 +55,9 @@ export default function TopArtistsRail() {
     <section className="bg-white py-6 sm:py-8 lg:py-10">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="type-section font-semibold tracking-tight text-[#111111]">Top Artists</h2>
+          <h2 className="type-section font-semibold tracking-tight text-[#111111]">Top Venues</h2>
           <Link
-            href="/artists"
+            href="/venues"
             className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
           >
             See All ›
@@ -74,17 +74,17 @@ export default function TopArtistsRail() {
               </div>
             ))}
           </div>
-        ) : artists.length === 0 ? (
+        ) : venues.length === 0 ? (
           <p className="text-sm text-[#6b6b6b] py-6">
-            No registered artists yet. After artists are approved, they will appear here with free
+            No registered venues yet. After venues are approved, they will appear here with free
             dates you can inquire about.
           </p>
         ) : (
           <div className="relative">
-            {artists.length > 5 ? (
+            {venues.length > 5 ? (
               <button
                 type="button"
-                aria-label="Previous artists"
+                aria-label="Previous venues"
                 onClick={() => scrollBy(-1)}
                 className="flex absolute left-0 md:-left-2 lg:-left-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
               >
@@ -97,15 +97,15 @@ export default function TopArtistsRail() {
               className="top-artists-rail"
               style={{ ["--artists-visible" as string]: VISIBLE }}
             >
-              {artists.map((artist) => (
-                <ArtistCard key={artist.id} artist={artist} />
+              {venues.map((venue) => (
+                <VenueCard key={venue.id} venue={venue} />
               ))}
             </div>
 
-            {artists.length > 5 ? (
+            {venues.length > 5 ? (
               <button
                 type="button"
-                aria-label="Next artists"
+                aria-label="Next venues"
                 onClick={() => scrollBy(1)}
                 className="flex absolute right-0 md:-right-2 lg:-right-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
               >

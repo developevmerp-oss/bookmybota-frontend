@@ -19,6 +19,7 @@ const NAV = [
   { href: "/customer/profile", icon: User, label: "My Profile" },
   { href: "/customer/change-password", icon: Lock, label: "Change Password" },
   { href: "/customer/dashboard", icon: Calendar, label: "My Orders / Reservations" },
+  { href: "/customer/gift-cards", icon: Gift, label: "My Gift Cards" },
   { href: "/customer/help", icon: HelpCircle, label: "Help Centre" },
   { href: "#gift-cards", icon: Gift, label: "Gift Cards", soon: true, mobileOnly: true },
   { href: "/offers", icon: Tag, label: "Offers", soon: true },
@@ -46,7 +47,11 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
               <h1 className="px-3 pt-2 pb-3 text-3xl border-b border-slate-200 mb-3 font-extrabold text-[#111111]">My Account</h1>
               <nav className="flex flex-col gap-1">
                 {NAV.map((item) => {
-                  const active = !item.soon && pathname === item.href;
+                  const active =
+                    !item.soon &&
+                    (pathname === item.href ||
+                      (item.href !== "/customer/dashboard" &&
+                        pathname.startsWith(item.href + "/")));
                   const Icon = item.icon;
                   return (
                     <Link

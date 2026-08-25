@@ -222,7 +222,7 @@ export default function DiningFiltersBar({
     let n = 0;
     if (filters.cuisines.length > 0) n += 1;
     if (filters.minRating > 0) n += 1;
-    if (filters.offersOnly) n += 1;
+    if (filters.offersOnly || filters.offerBucket) n += 1;
     if (filters.pureVeg) n += 1;
     if (filters.servesAlcohol) n += 1;
     if (filters.maxCost > 0) n += 1;
@@ -271,8 +271,21 @@ export default function DiningFiltersBar({
   if (filters.servesAlcohol) {
     activeChips.push({ label: "Serves Alcohol", onClear: () => onChange({ ...filters, servesAlcohol: false }) });
   }
-  if (filters.offersOnly) {
-    activeChips.push({ label: "Offers", onClear: () => onChange({ ...filters, offersOnly: false }) });
+  if (filters.offersOnly || filters.offerBucket) {
+    const offerLabel =
+      filters.offerBucket === "percent_upto_20"
+        ? "Up to 20% Off"
+        : filters.offerBucket === "percent_upto_50"
+          ? "Up to 50% Off"
+          : filters.offerBucket === "percent_high"
+            ? "Over 50% Off"
+            : filters.offerBucket === "flat"
+              ? "Flat ETB Offers"
+              : "Offers";
+    activeChips.push({
+      label: offerLabel,
+      onClear: () => onChange({ ...filters, offersOnly: false, offerBucket: null }),
+    });
   }
 
   const tabs: { id: FilterTab; label: string }[] = [
@@ -397,8 +410,14 @@ export default function DiningFiltersBar({
 
         <button
           type="button"
-          onClick={() => onChange({ ...filters, offersOnly: !filters.offersOnly })}
-          className={chipClass(filters.offersOnly)}
+          onClick={() =>
+            onChange({
+              ...filters,
+              offersOnly: !filters.offersOnly && !filters.offerBucket,
+              offerBucket: null,
+            })
+          }
+          className={chipClass(filters.offersOnly || Boolean(filters.offerBucket))}
         >
           Offers
         </button>
@@ -615,8 +634,14 @@ export default function DiningFiltersBar({
                 {tab === "offers" && (
                   <RadioRow
                     label="Offers available"
-                    selected={draft.offersOnly}
-                    onSelect={() => setDraft({ ...draft, offersOnly: !draft.offersOnly })}
+                    selected={draft.offersOnly || Boolean(draft.offerBucket)}
+                    onSelect={() =>
+                      setDraft({
+                        ...draft,
+                        offersOnly: !draft.offersOnly && !draft.offerBucket,
+                        offerBucket: null,
+                      })
+                    }
                   />
                 )}
               </div>

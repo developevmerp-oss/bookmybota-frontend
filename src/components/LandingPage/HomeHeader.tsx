@@ -367,14 +367,13 @@ export default function HomeHeader() {
             <span className="w-[88px] h-9" />
           ) : customer ? (
             <>
-              <button
-                type="button"
-                onClick={() => toast.message("Coming soon")}
-                className="inline-flex h-11 items-center gap-2 px-4 rounded-full bg-[#F3F3F3] text-[#111111] type-nav-md font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap cursor-pointer"
+              <Link
+                href="/gift-cards"
+                className="inline-flex h-11 items-center gap-2 px-4 rounded-full bg-[#F3F3F3] text-[#111111] text-sm font-medium hover:bg-[#F7E9FF] hover:text-[#6900AA] transition-colors whitespace-nowrap"
               >
                 <Gift size={18} className="shrink-0" />
                 Gift Cards
-              </button>
+              </Link>
               <CustomerDropdown onLogout={handleLogout}>
                 <Link
                   href="/customer/profile"

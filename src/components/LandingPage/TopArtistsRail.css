@@ -17,7 +17,7 @@
 
 .top-artists-slot {
   flex: 0 0 auto;
-  width: 6.75rem;
+  width: 10rem;
   min-width: 0;
   scroll-snap-align: start;
   display: flex;
@@ -41,7 +41,7 @@
 }
 
 .top-artists-avatar {
-  width: 96px;
+  width: 152px;
   aspect-ratio: 1;
   flex-shrink: 0;
 }
@@ -52,7 +52,6 @@
   border-radius: 9999px;
   overflow: hidden;
   background: #f7f7f7;
-  border: 2px solid #6900aa;
   box-sizing: border-box;
 }
 
@@ -84,15 +83,15 @@
 
 @media (min-width: 640px) {
   .top-artists-rail {
-    gap: 0.4rem;
+    gap: 0.6rem;
   }
 
   .top-artists-slot {
-    width: 7.25rem;
+    width: 11rem;
   }
 
   .top-artists-avatar {
-    width: 104px;
+    width: 172px;
   }
 
   .top-artists-name {
@@ -107,15 +106,15 @@
 /* Tablet: keep artists close together */
 @media (min-width: 768px) {
   .top-artists-rail {
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
 
   .top-artists-slot {
-    width: 7.75rem;
+    width: 12rem;
   }
 
   .top-artists-avatar {
-    width: 112px;
+    width: 188px;
   }
 
   .top-artists-name {
@@ -131,14 +130,14 @@
 /* Desktop: 6 artists evenly in the row */
 @media (min-width: 1024px) {
   .top-artists-rail {
-    gap: 1rem;
+    gap: 1.25rem;
   }
 
   .top-artists-slot {
-    width: calc((100% - (var(--artists-visible, 6) - 1) * 1rem) / var(--artists-visible, 6));
+    width: calc((100% - (var(--artists-visible, 6) - 1) * 1.25rem) / var(--artists-visible, 6));
   }
 
   .top-artists-avatar {
-    width: min(124px, 100%);
+    width: min(210px, 100%);
   }
 }

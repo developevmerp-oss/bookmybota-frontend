@@ -859,10 +859,10 @@ export default function Home() {
   const scrollCollections = (direction: "left" | "right") => {
     if (!collectionsRef.current) return;
     const amount = Math.max(collectionsRef.current.clientWidth * 0.7, 236);
-    collectionsRef.current.scrollBy({
+      collectionsRef.current.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
-    });
+      });
   };
 
   const scrollCuisines = (direction: "left" | "right") => {
@@ -934,7 +934,7 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const params = new URLSearchParams(window.location.search);
+      const params = new URLSearchParams(window.location.search);
     const filterParam = params.get("filter");
     const cityParam = params.get("city");
     const searchParam = params.get("search");
@@ -952,14 +952,14 @@ export default function Home() {
     setLocationCity(nextCity);
     setLocationLabel(nextCity || "All Cities");
 
-    if (cityParam && cityParam !== "All Cities") {
+      if (cityParam && cityParam !== "All Cities") {
       localStorage.setItem("selected_city", cityParam);
       window.dispatchEvent(new Event("selected_city_changed"));
     }
 
-    if (searchParam) {
-      setSearchQuery(searchParam);
-      setSearchInput(searchParam);
+      if (searchParam) {
+        setSearchQuery(searchParam);
+        setSearchInput(searchParam);
     }
   }, []);
 
@@ -1220,7 +1220,7 @@ export default function Home() {
     });
 
     if (cuisineMasters.length === 0 && !activeCity) {
-      EXPLORE_CUISINES.forEach((known) => pushKnown(known));
+    EXPLORE_CUISINES.forEach((known) => pushKnown(known));
     }
     return cards;
   }, [sectionPool, cuisineOptions, cuisineMasters, activeCity]);
@@ -1327,11 +1327,11 @@ export default function Home() {
       const label = activeCategories[0];
       const lower = label.toLowerCase();
       let name = label;
-      if (lower === "bar") name = "Bars";
-      else if (lower === "cafe") name = "Cafes";
-      else if (lower === "restaurant") name = "Restaurants";
+    if (lower === "bar") name = "Bars";
+    else if (lower === "cafe") name = "Cafes";
+    else if (lower === "restaurant") name = "Restaurants";
       else if (!name.endsWith("s")) name = `${name}s`;
-      return (city && city !== "All Cities") ? `${name} in ${city}` : `${name} Near You`;
+    return (city && city !== "All Cities") ? `${name} in ${city}` : `${name} Near You`;
     }
     return (city && city !== "All Cities")
       ? `${activeCategories.length} categories in ${city}`
@@ -1413,11 +1413,11 @@ export default function Home() {
               >
                 mood for?
               </span>
-            </h1>
+              </h1>
             <p className="mt-3 sm:mt-4 text-white/90 text-base sm:text-xl font-medium max-w-2xl">
               Discover top restaurants, cafes &amp; bars — book your table in seconds.
-            </p>
-          </div>
+              </p>
+            </div>
 
           <div className="w-full max-w-3xl mt-5 sm:mt-8 lg:mt-10 dining-hero-fade-up dining-hero-delay-1">
             <div ref={locationRef} className="relative z-50 text-left">
@@ -1538,14 +1538,14 @@ export default function Home() {
                 </button>
               </p>
             )}
-          </div>
+      </div>
 
           <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-start gap-x-8 sm:gap-x-12 gap-y-3 text-white/90 text-sm sm:text-base font-medium dining-hero-fade-up dining-hero-delay-2">
             <span>{heroRestaurantStat} Restaurants</span>
             <span>1M+ Happy Diners</span>
             <span>50+ Cities</span>
-          </div>
-        </div>
+              </div>
+            </div>
       </section> */}
 
       {/* ── Explore Dining categories ─────────────────────────────────────── */}
@@ -1611,13 +1611,13 @@ export default function Home() {
                 card.title
               );
               const isActive = exploreCardId === card.id;
-              return (
+                    return (
                 <div
                   key={card.id}
                   className="text-center flex flex-col items-center justify-center transition-all shrink-0"
                 >
-                <button
-                  type="button"
+                            <button
+                              type="button"
                   onClick={() => {
                     setExploreCardId(card.id);
                     if (resolvedCategory) {
@@ -1638,7 +1638,7 @@ export default function Home() {
                   }`}>
                     <img
                       src={card.image}
-                      alt={card.title}
+                              alt={card.title}
                       className={`w-full h-full block rounded-xl transition-all ${
                         isActive ? "opacity-100" : "opacity-90 hover:opacity-100"
                       }`}
@@ -1655,15 +1655,15 @@ className={`text-sm font-bold mt-2 transition-colors ${
 {card.title}
 </p>
 
-</div>
+                            </div>
 
                 
-              );
-            })}
-          </div>
-          
-        </div>
-      </section>
+                    );
+                  })}
+              </div>
+
+            </div>
+          </section>
 
       {showHomeExtras && (
       <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
@@ -1680,11 +1680,11 @@ className={`text-sm font-bold mt-2 transition-colors ${
                 >
                   All collections <ChevronRight size={16} />
                 </Link>
-              </div>
+                    </div>
               <p className="text-sm text-slate-500 mt-0.5">
                 Explore curated lists of top restaurants, cafes and bars
               </p>
-            </div>
+              </div>
 
             {/* Desktop: title + subtitle left, All collections right */}
             <div className="hidden lg:flex items-center justify-between mb-2">
@@ -1722,18 +1722,18 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   {collections.map((col) => (
                     <CollectionCard key={col.id} collection={col} city={activeCity} />
                   ))}
-                </div>
+              </div>
               </div>
 
               {collectionsScroll.right && (
-                <button
-                  type="button"
+              <button
+                type="button"
                   onClick={() => scrollCollections("right")}
                   className="absolute right-0 top-1/2 z-20 translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
                   aria-label="Scroll right"
-                >
+              >
                   <ChevronRight size={22} strokeWidth={1.75} />
-                </button>
+              </button>
               )}
             </div>
           </section>
@@ -1742,24 +1742,24 @@ className={`text-sm font-bold mt-2 transition-colors ${
        
         {/* <div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <div className="relative">
+          <div className="relative">
               <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory py-1 px-1 pr-4">
-                {filters.map((f) => {
-                  const isActive = activeFilter.toLowerCase() === f.label.toLowerCase();
-                  const theme = getDiningTypeVisual(f.label);
-                  const displayName = f.label.toLowerCase() === "all" ? "All Dining" : f.label;
-                  const TypeIcon = theme.Icon;
-                  return (
-                    <button
-                      key={f.label}
-                      type="button"
-                      onClick={() => {
-                        setActiveFilter(f.label);
-                        const element = document.getElementById("restaurant-listings");
-                        if (element) {
-                          element.scrollIntoView({ behavior: "smooth" });
-                        }
-                      }}
+            {filters.map((f) => {
+              const isActive = activeFilter.toLowerCase() === f.label.toLowerCase();
+              const theme = getDiningTypeVisual(f.label);
+              const displayName = f.label.toLowerCase() === "all" ? "All Dining" : f.label;
+              const TypeIcon = theme.Icon;
+              return (
+                <button
+                  key={f.label}
+                  type="button"
+                  onClick={() => {
+                    setActiveFilter(f.label);
+                    const element = document.getElementById("restaurant-listings");
+                    if (element) {
+                      element.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
                       className={`shrink-0 snap-start inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[12px] sm:text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
                         isActive
                           ? "text-white"
@@ -1768,13 +1768,13 @@ className={`text-sm font-bold mt-2 transition-colors ${
                       style={isActive ? { backgroundColor: "#6900AA" } : undefined}
                     >
                       <TypeIcon size={16} color={isActive ? "#ffffff" : theme.accent} />
-                      {displayName}
-                    </button>
-                  );
-                })}
-              </div>
+                    {displayName}
+                </button>
+              );
+            })}
             </div>
           </div>
+        </div>
         </div> */}
         
       </div>
@@ -2010,11 +2010,11 @@ className={`text-sm font-bold mt-2 transition-colors ${
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {displayRestaurants.map((restaurant) => (
-                  <RestaurantCard key={restaurant.id} restaurant={restaurant} />
-                ))}
-              </div>
+                <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+              ))}
+            </div>
               {hasMoreRestaurants && (
                 <div className="mt-8 flex justify-center">
                   <button
@@ -2036,7 +2036,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
               )}
             </>
           )}
-          </section>
+        </section>
         </div>
       </div>
       </div>
@@ -2068,7 +2068,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   >
                     <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                   </button>
-                </div>
+    </div>
               </div>
               <div
                 ref={cuisinesRef}

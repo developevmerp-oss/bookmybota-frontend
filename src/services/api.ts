@@ -3998,8 +3998,8 @@ export const api = createApi({
         result?.items
           ? [
             ...result.items.map((g) => ({ type: 'EventMasters' as const, id: `genre-${g.id}` })),
-              { type: 'EventMasters', id: 'GENRE_LIST' },
-            ]
+            { type: 'EventMasters', id: 'GENRE_LIST' },
+          ]
           : [{ type: 'EventMasters', id: 'GENRE_LIST' }],
     }),
 
@@ -4252,8 +4252,8 @@ export const api = createApi({
         result?.items
           ? [
             ...result.items.map((d) => ({ type: 'EventMasters' as const, id: `doc-${d.id}` })),
-              { type: 'EventMasters', id: 'DOC_LIST' },
-            ]
+            { type: 'EventMasters', id: 'DOC_LIST' },
+          ]
           : [{ type: 'EventMasters', id: 'DOC_LIST' }],
     }),
 

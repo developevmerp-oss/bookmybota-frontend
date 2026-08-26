@@ -142,6 +142,9 @@ export default function AdminEventMastersPage() {
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    variant?: "danger" | "success" | "warning";
     run: () => Promise<void>;
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -215,21 +218,28 @@ export default function AdminEventMastersPage() {
     }
   };
 
-  const toggleGenreActive = async (genre: EventGenreMaster) => {
+  const toggleGenreActive = (genre: EventGenreMaster) => {
     const next = !genre.is_active;
-    try {
-      await updateGenre({
-        id: genre.id,
-        body: { is_active: next },
-      }).unwrap();
-      toast.success(
-        next
-          ? `"${genre.name}" is now active — organizers can see it`
-          : `"${genre.name}" is inactive — hidden from organizers`
-      );
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, "Failed to update genre status"));
-    }
+    setPendingConfirm({
+      title: next ? "Enable genre?" : "Disable genre?",
+      body: next
+        ? `Enable "${genre.name}"? Organizers will be able to see it.`
+        : `Disable "${genre.name}"? It will be hidden from organizers until you enable it again.`,
+      confirmLabel: next ? "Enable" : "Disable",
+      danger: false,
+      variant: next ? "success" : "warning",
+      run: async () => {
+        await updateGenre({
+          id: genre.id,
+          body: { is_active: next },
+        }).unwrap();
+        toast.success(
+          next
+            ? `"${genre.name}" is now active — organizers can see it`
+            : `"${genre.name}" is inactive — hidden from organizers`
+        );
+      },
+    });
   };
 
   const toggleDocRequired = async (doc: EventDocumentMaster) => {
@@ -246,21 +256,28 @@ export default function AdminEventMastersPage() {
     }
   };
 
-  const toggleDocActive = async (doc: EventDocumentMaster) => {
+  const toggleDocActive = (doc: EventDocumentMaster) => {
     const next = !doc.is_active;
-    try {
-      await updateDocument({
-        id: doc.id,
-        body: { is_active: next },
-      }).unwrap();
-      toast.success(
-        next
-          ? `"${doc.name}" is active — organizers can see it`
-          : `"${doc.name}" is inactive — hidden from organizers`
-      );
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, "Failed to update document status"));
-    }
+    setPendingConfirm({
+      title: next ? "Enable document?" : "Disable document?",
+      body: next
+        ? `Enable "${doc.name}"? Organizers will be able to see it.`
+        : `Disable "${doc.name}"? It will be hidden from organizers until you enable it again.`,
+      confirmLabel: next ? "Enable" : "Disable",
+      danger: false,
+      variant: next ? "success" : "warning",
+      run: async () => {
+        await updateDocument({
+          id: doc.id,
+          body: { is_active: next },
+        }).unwrap();
+        toast.success(
+          next
+            ? `"${doc.name}" is active — organizers can see it`
+            : `"${doc.name}" is inactive — hidden from organizers`
+        );
+      },
+    });
   };
 
   const onAddTerm = async (values: AdminEventTermCreateValues) => {
@@ -279,18 +296,26 @@ export default function AdminEventMastersPage() {
     }
   };
 
-  const toggleTermActive = async (term: EventTermsMaster) => {
+  const toggleTermActive = (term: EventTermsMaster) => {
     const next = !term.is_active;
-    try {
-      await updateTerm({ id: term.id, body: { is_active: next } }).unwrap();
-      toast.success(
-        next
-          ? "T&C point is active — organizers can select it"
-          : "T&C point is inactive — hidden from organizers"
-      );
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, "Failed to update T&C status"));
-    }
+    const preview = term.text.length > 60 ? `${term.text.slice(0, 60)}…` : term.text;
+    setPendingConfirm({
+      title: next ? "Enable T&C point?" : "Disable T&C point?",
+      body: next
+        ? `Enable "${preview}"? Organizers will be able to select it.`
+        : `Disable "${preview}"? It will be hidden from organizers until you enable it again.`,
+      confirmLabel: next ? "Enable" : "Disable",
+      danger: false,
+      variant: next ? "success" : "warning",
+      run: async () => {
+        await updateTerm({ id: term.id, body: { is_active: next } }).unwrap();
+        toast.success(
+          next
+            ? "T&C point is active — organizers can select it"
+            : "T&C point is inactive — hidden from organizers"
+        );
+      },
+    });
   };
 
   const genreListLoading = genresLoading && genres.length === 0;
@@ -783,8 +808,9 @@ export default function AdminEventMastersPage() {
         open={!!pendingConfirm}
         title={pendingConfirm?.title || ""}
         body={pendingConfirm?.body || ""}
-        confirmLabel="Delete"
-        danger
+        confirmLabel={pendingConfirm?.confirmLabel || "Delete"}
+        danger={pendingConfirm?.danger ?? true}
+        variant={pendingConfirm?.variant}
         busy={confirmBusy}
         onCancel={() => !confirmBusy && setPendingConfirm(null)}
         onConfirm={async () => {
@@ -794,7 +820,7 @@ export default function AdminEventMastersPage() {
             await pendingConfirm.run();
             setPendingConfirm(null);
           } catch (err: unknown) {
-            toast.error(extractApiError(err, "Delete failed"));
+            toast.error(extractApiError(err, "Action failed"));
           } finally {
             setConfirmBusy(false);
           }

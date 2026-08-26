@@ -33,6 +33,7 @@ import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 
 const DEFAULT_DINING_IMAGE =
   "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
@@ -220,9 +221,11 @@ export default function CustomerDashboard() {
 
   if (diningLoading || eventsLoading || !user) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
-        Loading Dashboard...
-      </div>
+      <CustomerAccountLayout>
+        <div className="flex items-center justify-center text-slate-500 py-20">
+          Loading Dashboard...
+        </div>
+      </CustomerAccountLayout>
     );
   }
 
@@ -240,8 +243,8 @@ export default function CustomerDashboard() {
   const welcomeName = user.name || user.email?.split("@")[0] || "there";
 
   return (
-    <div className="min-h-screen bg-[#F7F6FB] pt-10 pb-16">
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
+    <CustomerAccountLayout>
+      <div>
         <div className="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl sm:text-4xl lg:text-3xl font-extrabold text-black mb-2">
@@ -492,6 +495,6 @@ export default function CustomerDashboard() {
           }
         }}
       />
-    </div>
+    </CustomerAccountLayout>
   );
 }

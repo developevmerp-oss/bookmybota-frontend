@@ -66,6 +66,9 @@ export default function AdminCitiesPage() {
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    variant?: "danger" | "success" | "warning";
     run: () => Promise<void>;
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -177,18 +180,25 @@ export default function AdminCitiesPage() {
     }
   };
 
-  const toggleActive = async (city: CityMaster) => {
+  const toggleActive = (city: CityMaster) => {
     const next = !city.is_active;
-    try {
-      await updateCity({ id: city.id, body: { is_active: next } }).unwrap();
-      toast.success(
-        next
-          ? `"${city.name}" is now active — visible in city pickers`
-          : `"${city.name}" is inactive — hidden from city pickers`
-      );
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, "Failed to update city status"));
-    }
+    setPendingConfirm({
+      title: next ? "Enable city?" : "Disable city?",
+      body: next
+        ? `Enable "${city.name}"? It will be visible in city pickers.`
+        : `Disable "${city.name}"? It will be hidden from city pickers until you enable it again.`,
+      confirmLabel: next ? "Enable" : "Disable",
+      danger: false,
+      variant: next ? "success" : "warning",
+      run: async () => {
+        await updateCity({ id: city.id, body: { is_active: next } }).unwrap();
+        toast.success(
+          next
+            ? `"${city.name}" is now active — visible in city pickers`
+            : `"${city.name}" is inactive — hidden from city pickers`
+        );
+      },
+    });
   };
 
   const togglePopular = async (city: CityMaster) => {
@@ -216,6 +226,8 @@ export default function AdminCitiesPage() {
     setPendingConfirm({
       title: "Delete city?",
       body: `Remove "${city.name}" from the city master? This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
       run: async () => {
         await deleteCity(city.id).unwrap();
         toast.success(`City "${city.name}" deleted`);
@@ -553,8 +565,9 @@ export default function AdminCitiesPage() {
         open={!!pendingConfirm}
         title={pendingConfirm?.title || ""}
         body={pendingConfirm?.body || ""}
-        confirmLabel="Delete"
-        danger
+        confirmLabel={pendingConfirm?.confirmLabel || "Delete"}
+        danger={pendingConfirm?.danger ?? true}
+        variant={pendingConfirm?.variant}
         busy={confirmBusy}
         onCancel={() => !confirmBusy && setPendingConfirm(null)}
         onConfirm={async () => {
@@ -564,7 +577,7 @@ export default function AdminCitiesPage() {
             await pendingConfirm.run();
             setPendingConfirm(null);
           } catch (err: unknown) {
-            toast.error(extractApiError(err, "Failed to delete city"));
+            toast.error(extractApiError(err, "Action failed"));
           } finally {
             setConfirmBusy(false);
           }

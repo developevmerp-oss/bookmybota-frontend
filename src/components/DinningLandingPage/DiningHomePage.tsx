@@ -9,10 +9,14 @@ import {
   Navigation,
   Loader2,
   X,
-  Percent,
   UtensilsCrossed,
+  Bookmark,
+  Users,
+  Tag,
+  ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { IconType } from "react-icons";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
@@ -59,6 +63,57 @@ import {
 const HERO_ACCENT = "#6900AA";
 const PAGE_MUTED = "#f6f7f8";
 const DINING_LIST_LIMIT = 12;
+
+const EXPLORE_DINING_CARDS = [
+  {
+    id: "all-dining",
+    title: "All dining",
+    image: "/images/dining-category-all.png",
+    match: null as readonly string[] | null,
+  },
+  {
+    id: "bar",
+    title: "Bar",
+    image: "/images/dining-category-bar.png",
+    match: ["bar"] as const,
+  },
+  {
+    id: "restaurant",
+    title: "Restaurant",
+    image: "/images/dining-category-restaurant.png",
+    match: ["restaurant"] as const,
+  },
+  {
+    id: "bar-grill",
+    title: "Bar & Grill",
+    image: "/images/dining-category-bar-grill.png",
+    match: ["grill", "bar & grill", "bar and grill"] as const,
+  },
+  {
+    id: "cafe",
+    title: "Cafe",
+    image: "/images/dining-category-cafe.png",
+    match: ["cafe", "café", "coffee"] as const,
+  },
+  {
+    id: "pub",
+    title: "Pub",
+    image: "/images/dining-category-pub.png",
+    match: ["pub"] as const,
+  },
+  {
+    id: "fine-dining",
+    title: "Fine dining",
+    image: "/images/dining-category-fine-dining.png",
+    match: ["fine dining", "fine-dining", "fine"] as const,
+  },
+  {
+    id: "general-restaurant",
+    title: "General restaurant",
+    image: "/images/dining-category-general.png",
+    match: ["general restaurant", "general"] as const,
+  },
+] as const;
 
 type MealOccasion = "lunch" | "breakfast" | "dinner" | "fastfood";
 
@@ -570,8 +625,17 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
   const imageSrc = restaurant.cover_image_url || getFallbackImageForType(restaurant.type_name);
   const rating = Number(restaurant.rating || 4.2).toFixed(1);
-  const cuisine = restaurant.cuisine || "Italian, Chinese, Continental";
-  
+  const cuisine =
+    restaurant.cuisine ||
+    restaurant.type_name ||
+    "Italian, Chinese, Continental";
+  const cuisineLine = cuisine
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" • ");
+
   const getLocality = (addr: string) => {
     const parts = addr.split(",");
     if (parts.length >= 2) {
@@ -580,81 +644,149 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
     return addr;
   };
 
-  const idHash = typeof restaurant.id === 'number' 
-    ? restaurant.id 
-    : (restaurant.id ? restaurant.id.toString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0);
+  const idHash =
+    typeof restaurant.id === "number"
+      ? restaurant.id
+      : restaurant.id
+        ? restaurant.id.toString().split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+        : 0;
 
-  const getPriceForTwo = (id: number) => {
-    const bases = [1200, 1500, 2000, 2400, 1800];
-    return `${formatMoney(bases[id % bases.length], { compact: true })} for two`;
-  };
+  const priceForTwo = restaurant.average_cost
+    ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
+    : (() => {
+        const bases = [1200, 1500, 2000, 2400, 1800];
+        return `${formatMoney(bases[idHash % bases.length], { compact: true })} for two`;
+      })();
 
-  const getDistance = (id: number) => {
+  const distance = (() => {
     const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
-    return `${dists[id % dists.length]} km`;
-  };
+    return `${dists[idHash % dists.length]} km away`;
+  })();
 
   const isPromoted = !!restaurant.is_promoted;
   const offerLabel = listingOfferLabel(restaurant.dining_offers);
 
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("dining_saved_restaurants");
+      const ids: string[] = raw ? JSON.parse(raw) : [];
+      setSaved(ids.includes(String(restaurant.id)));
+    } catch {
+      setSaved(false);
+    }
+  }, [restaurant.id]);
+
+  const toggleSave = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const raw = localStorage.getItem("dining_saved_restaurants");
+      const ids: string[] = raw ? JSON.parse(raw) : [];
+      const id = String(restaurant.id);
+      const next = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
+      localStorage.setItem("dining_saved_restaurants", JSON.stringify(next));
+      setSaved(next.includes(id));
+    } catch {
+      setSaved((v) => !v);
+    }
+  };
+
   return (
-    <Link
-      href={`/restaurant/${restaurant.id}`}
-      className="group block bg-white hover:shadow-xl rounded-2xl p-3 transition-all duration-300 hover:-translate-y-1.5 border border-slate-100/80"
-    >
-      <div className="relative h-56 rounded-xl overflow-hidden bg-slate-100 mb-3.5">
-        <img
-          src={imageSrc}
-          alt={restaurant.name}
-          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src =
-              "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-        
+    <div className="group flex h-full flex-col bg-[#F5F5F5] rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-xl transition-shadow duration-300 p-3">
+      <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+        <Link href={`/restaurant/${restaurant.id}`} className="absolute inset-0 block">
+          <img
+            src={imageSrc}
+            alt={restaurant.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src =
+                "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+        </Link>
+
         {isPromoted && (
-          <span className="absolute top-3 left-3 bg-black/40 backdrop-blur-[2px] text-white text-sm font-semibold px-2 py-0.5 rounded shadow-sm">
+          <span className="absolute top-3 left-3 z-[1] bg-white/80 text-[#6900AA] text-xs font-semibold px-2.5 py-1 rounded-md shadow-sm">
             Promoted
           </span>
         )}
 
+        <button
+          type="button"
+          onClick={toggleSave}
+          aria-label={saved ? "Remove from saved" : "Save restaurant"}
+          aria-pressed={saved}
+          className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          <Bookmark
+            size={18}
+            className={saved ? "fill-[#6900AA] text-[#6900AA]" : "fill-none text-[#6900AA]"}
+            strokeWidth={2.25}
+          />
+        </button>
+
         {offerLabel && (
-          <div
-            className="absolute bottom-3 left-0 text-white text-xs sm:text-sm lg:text-xs font-bold px-2.5 py-1 rounded-r-md flex items-center gap-1 shadow-md"
-            style={{ backgroundColor: HERO_ACCENT, boxShadow: "0 6px 14px rgba(105,0,170,0.28)" }}
+          <span
+            className="absolute bottom-3 left-3 z-[1] inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full text-[#9F1239] text-xs font-bold px-3 py-1.5 shadow-md pointer-events-none"
+            style={{
+              background: "linear-gradient(90deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%)",
+            }}
           >
-            <Percent size={11} className="text-white shrink-0" />
-            <span>{offerLabel}</span>
-          </div>
+            <Tag
+              size={13}
+              className="shrink-0 fill-[#9F1239] text-[#9F1239]"
+              strokeWidth={0}
+            />
+            <span className="truncate">{offerLabel}</span>
+          </span>
         )}
       </div>
 
-      <div className="px-1 pb-1">
-        <div className="flex justify-between items-start gap-2 mb-1.5">
-          <h3 className="font-bold text-slate-800 text-lg sm:text-xl lg:text-lg leading-tight truncate flex-1 group-hover:text-rose-600 transition-colors">
+      <Link
+        href={`/restaurant/${restaurant.id}`}
+        className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-[#F5F5F5]"
+      >
+        <div className="flex justify-between items-start gap-2 mb-2">
+          <h3 className="font-bold text-[#292929] text-lg sm:text-xl leading-tight truncate flex-1 group-hover:text-[#6900AA] transition-colors">
             {restaurant.name}
           </h3>
-          <div className="shrink-0 flex items-center gap-0.5 bg-emerald-700 text-white text-sm font-black px-1.5 py-0.5 rounded-md shadow-sm">
-            <span>{rating}</span>
-            <span className="text-[9px]">★</span>
+          <div className="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-1.5 py-0.5 rounded-md">
+            <span className="text-[10px]">★</span>
+            <span>{rating}+</span>
           </div>
         </div>
 
-        <div className="flex justify-between items-center gap-4 mb-1 text-sm sm:text-base lg:text-sm text-slate-500">
-          <span className="truncate flex-1 font-medium">{cuisine}</span>
-          <span className="shrink-0 whitespace-nowrap font-medium text-slate-650">
-            {getPriceForTwo(idHash)}
-          </span>
+        <div className="space-y-1.5 text-sm text-[#292929]">
+          <p className="flex items-center gap-1.5 min-w-0">
+            <UtensilsCrossed size={14} className="shrink-0 text-[#6900AA]" />
+            <span className="truncate font-medium">{cuisineLine}</span>
+          </p>
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <p className="flex items-center gap-1.5 min-w-0 flex-1">
+              <MapPin size={14} className="shrink-0 text-[#6900AA]" />
+              <span className="truncate font-medium">{getLocality(restaurant.address)}</span>
+            </p>
+            <span className="shrink-0 font-medium whitespace-nowrap text-[#292929]">{distance}</span>
+          </div>
+          <p className="flex items-center gap-1.5 min-w-0">
+            <Users size={14} className="shrink-0 text-[#6900AA]" />
+            <span className="truncate font-medium">{priceForTwo}</span>
+          </p>
         </div>
 
-        <div className="flex justify-between items-center gap-4 text-sm sm:text-base lg:text-sm text-slate-400">
-          <span className="truncate flex-1 font-medium">{getLocality(restaurant.address)}</span>
-          <span className="shrink-0 whitespace-nowrap font-medium">{getDistance(idHash)}</span>
+        <div className="mt-auto pt-3 w-full">
+          <span
+            className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-[#6900AA] bg-[#F5F5F5] px-3.5 py-2.5 text-sm font-semibold text-[#6900AA] group-hover:bg-[#EFEFEF] transition-colors [transform:translateZ(0)] [backface-visibility:hidden]"
+          >
+            <span>View Booking</span>
+            <ArrowRight size={16} className="shrink-0" />
+          </span>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
 
@@ -662,7 +794,7 @@ function CollectionCard({
   collection,
   city,
 }: {
-  collection: Collection;
+  collection: Collection;    
   city?: string;
 }) {
   const subtitle = collection.places_count !== undefined 
@@ -1034,6 +1166,20 @@ export default function Home() {
         { label: "Bar", emoji: "🍺" },
       ]),
   ];
+
+  const exploreDiningFilterCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const card of EXPLORE_DINING_CARDS) {
+      if (!card.match) continue;
+      const name = resolveExploreTypeName(card.match, businessTypes, card.title) || card.title;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(name);
+    }
+    return out;
+  }, [businessTypes]);
 
   // ── Auto-detect on mount ──
   const detectCurrentLocation = useCallback(async () => {
@@ -1555,56 +1701,7 @@ export default function Home() {
             Explore Dining
           </h2>
           <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pt-1.5 pb-1">
-            {([
-              {
-                id: "all-dining",
-                title: "All dining",
-                image: "/images/dining-category-all.png",
-                match: null as readonly string[] | null,
-              },
-              {
-                id: "bar",
-                title: "Bar",
-                image: "/images/dining-category-bar.png",
-                match: ["bar"] as const,
-              },
-              {
-                id: "restaurant",
-                title: "Restaurant",
-                image: "/images/dining-category-restaurant.png",
-                match: ["restaurant"] as const,
-              },
-              {
-                id: "bar-grill",
-                title: "Bar & Grill",
-                image: "/images/dining-category-bar-grill.png",
-                match: ["grill", "bar & grill", "bar and grill"] as const,
-              },
-              {
-                id: "cafe",
-                title: "Cafe",
-                image: "/images/dining-category-cafe.png",
-                match: ["cafe", "café", "coffee"] as const,
-              },
-              {
-                id: "pub",
-                title: "Pub",
-                image: "/images/dining-category-pub.png",
-                match: ["pub"] as const,
-              },
-              {
-                id: "fine-dining",
-                title: "Fine dining",
-                image: "/images/dining-category-fine-dining.png",
-                match: ["fine dining", "fine-dining", "fine"] as const,
-              },
-              {
-                id: "general-restaurant",
-                title: "General restaurant",
-                image: "/images/dining-category-general.png",
-                match: ["general restaurant", "general"] as const,
-              },
-            ] as const).map((card) => {
+            {EXPLORE_DINING_CARDS.map((card) => {
               const resolvedCategory = resolveExploreTypeName(
                 card.match,
                 businessTypes,
@@ -1791,7 +1888,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
               filters={diningFilters}
               onChange={setDiningFilters}
               onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
-              categories={filters.map((f) => f.label)}
+              categories={exploreDiningFilterCategories}
               categoriesSelected={activeCategories}
               onCategoriesChange={(next) => {
                 setActiveCategories(next);
@@ -2117,3 +2214,4 @@ className={`text-sm font-bold mt-2 transition-colors ${
     </div>
   );
 }
+// comment

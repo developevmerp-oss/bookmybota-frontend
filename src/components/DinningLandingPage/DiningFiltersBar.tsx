@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import type { DiningFilterState, SortOption } from "@/lib/diningFilters";
 import { useGetDiningCuisinesQuery } from "@/services/api";
 
@@ -20,6 +20,8 @@ interface DiningFiltersBarProps {
 
 const ACCENT = "#6900AA";
 const EMPTY_CATEGORIES: string[] = [];
+const PANEL_TITLE = "text-sm font-medium text-slate-400 mb-1";
+const PANEL_VALUE = "text-xl font-bold text-slate-900 mb-6";
 
 type FilterTab =
   | "sort"
@@ -39,12 +41,22 @@ const SORT_OPTIONS: { label: string; value: SortOption }[] = [
   { label: "Cost for two: High to Low", value: "costDesc" },
 ];
 
-const RATING_OPTIONS = [
-  { label: "Any rating", value: 0 },
-  { label: "Rating 3.5+", value: 3.5 },
-  { label: "Rating 4+", value: 4 },
-  { label: "Rating 4.5+", value: 4.5 },
-];
+/** Same rating range as before — UI only changes. */
+const RATING_STOPS = [
+  { value: 0, label: "Any", display: "Any" },
+  { value: 3.5, label: "3.5", display: "3.5+" },
+  { value: 4, label: "4.0", display: "4.0+" },
+  { value: 4.5, label: "4.5", display: "4.5+" },
+] as const;
+
+/** Same cost caps as before — UI only changes. */
+const COST_STOPS = [
+  { value: 0, label: "0" },
+  { value: 500, label: "500" },
+  { value: 1000, label: "1000" },
+  { value: 2000, label: "2000" },
+  { value: -1, label: "Any" },
+] as const;
 
 const COST_OPTIONS = [
   { label: "Any cost", value: 0 },
@@ -74,17 +86,17 @@ function RadioRow({
     <button
       type="button"
       onClick={onSelect}
-      className="w-full flex items-center justify-between gap-3 py-3 text-left cursor-pointer"
+      className="w-full flex items-center justify-between gap-3 py-3.5 text-left cursor-pointer"
     >
-      <span className={`text-sm ${selected ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+      <span className={`text-base ${selected ? "font-semibold text-slate-800" : "text-slate-600"}`}>
         {label}
       </span>
       <span
-        className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center shrink-0 ${
+        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
           selected ? "border-[#6900AA]" : "border-slate-300"
         }`}
       >
-        {selected && <span className="w-2 h-2 rounded-full bg-[#6900AA]" />}
+        {selected && <span className="w-2.5 h-2.5 rounded-full bg-[#6900AA]" />}
       </span>
     </button>
   );
@@ -103,19 +115,204 @@ function CheckboxRow({
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-center justify-between gap-3 py-3 text-left cursor-pointer"
+      className="w-full min-w-0 flex items-center justify-between gap-2 py-3 text-left cursor-pointer"
     >
-      <span className={`text-sm ${checked ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+      <span className={`text-base truncate ${checked ? "font-semibold text-slate-800" : "text-slate-600"}`}>
         {label}
       </span>
       <span
-        className={`w-[18px] h-[18px] rounded-[4px] border-2 flex items-center justify-center shrink-0 ${
+        className={`w-5 h-5 rounded-[4px] border flex items-center justify-center shrink-0 ${
           checked ? "border-[#6900AA] bg-[#6900AA]" : "border-slate-300 bg-white"
         }`}
       >
-        {checked && <span className="w-2.5 h-2.5 rounded-[2px] bg-white" />}
+        {checked && <Check size={13} strokeWidth={3} className="text-white" />}
       </span>
     </button>
+  );
+}
+
+function SliderTooltip({
+  label,
+  pct,
+  edge,
+}: {
+  label: string;
+  pct: number;
+  edge?: "start" | "end" | "center";
+}) {
+  const side = edge ?? (pct <= 2 ? "start" : pct >= 98 ? "end" : "center");
+  const style: CSSProperties =
+    side === "start"
+      ? { left: 0, transform: "none" }
+      : side === "end"
+        ? { left: "100%", transform: "translateX(-100%)" }
+        : { left: `${pct}%`, transform: "translateX(-50%)" };
+  const arrowClass =
+    side === "start"
+      ? "left-3"
+      : side === "end"
+        ? "right-3 left-auto"
+        : "left-1/2 -translate-x-1/2";
+
+  return (
+    <div className="absolute z-20 top-0 pointer-events-none" style={style}>
+      <div className="bg-slate-800 text-white text-sm font-semibold px-2.5 py-1 rounded-md relative whitespace-nowrap">
+        {label}
+        <span
+          className={`absolute top-full w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-slate-800 ${arrowClass}`}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Zomato-style discrete rating slider — same stops; UI matches Cost for 2. */
+function RatingSlider({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  const idx = Math.max(
+    0,
+    RATING_STOPS.findIndex((s) => s.value === value)
+  );
+  const selected = RATING_STOPS[idx] ?? RATING_STOPS[0];
+  const pct = RATING_STOPS.length <= 1 ? 0 : (idx / (RATING_STOPS.length - 1)) * 100;
+
+  return (
+    <div className="overflow-visible">
+      <p className={PANEL_TITLE}>Rating</p>
+      <p className={PANEL_VALUE}>{selected.display}</p>
+      <div className="relative pt-11 pb-10 px-6 sm:px-8 overflow-visible">
+        <SliderTooltip label={selected.display} pct={pct} />
+
+        <div className="relative h-1.5 rounded-full bg-slate-200">
+          <div
+            className="absolute top-0 bottom-0 left-0 rounded-full"
+            style={{ width: `${pct}%`, backgroundColor: ACCENT }}
+          />
+          {RATING_STOPS.map((stop, i) => {
+            const left = (i / (RATING_STOPS.length - 1)) * 100;
+            const isActive = i === idx;
+            return (
+              <button
+                key={stop.value}
+                type="button"
+                aria-label={`Rating ${stop.display}`}
+                onClick={() => onChange(stop.value)}
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer p-2"
+                style={{ left: `${left}%` }}
+              >
+                <span
+                  className={`block rounded-full border-[3px] border-white shadow-md transition-transform ${
+                    isActive ? "w-5 h-5" : "w-3.5 h-3.5 opacity-70"
+                  }`}
+                  style={{ backgroundColor: ACCENT }}
+                />
+              </button>
+            );
+          })}
+        </div>
+        {RATING_STOPS.map((stop, i) => {
+          const left = (i / (RATING_STOPS.length - 1)) * 100;
+          return (
+            <span
+              key={`label-${stop.value}`}
+              className="absolute top-[52px] text-sm text-slate-500 font-medium -translate-x-1/2"
+              style={{ left: `${left}%` }}
+            >
+              {stop.label}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Zomato-style cost range UI — still maps to the same maxCost values. */
+function CostRangeSlider({
+  maxCost,
+  onChange,
+}: {
+  maxCost: number;
+  onChange: (next: number) => void;
+}) {
+  const rightIdx =
+    maxCost <= 0
+      ? COST_STOPS.length - 1
+      : Math.max(
+          1,
+          COST_STOPS.findIndex((s) => s.value === maxCost)
+        );
+  const leftPct = 0;
+  const rightPct = (rightIdx / (COST_STOPS.length - 1)) * 100;
+  const rightStop = COST_STOPS[rightIdx] ?? COST_STOPS[COST_STOPS.length - 1];
+  const rightTooltip =
+    rightStop.value === -1 ? "Any" : `${rightStop.label} ETB`;
+  const rangeLabel =
+    rightStop.value === -1 ? "0 ETB - Any" : `0 ETB - ${rightStop.label} ETB`;
+
+  return (
+    <div className="overflow-visible">
+      <p className={PANEL_TITLE}>Cost for two</p>
+      <p className={PANEL_VALUE}>{rangeLabel}</p>
+      <div className="relative pt-11 pb-4 px-6 sm:px-8 overflow-visible">
+        <SliderTooltip label="0 ETB" pct={leftPct} edge="start" />
+        <SliderTooltip label={rightTooltip} pct={rightPct} edge={rightPct >= 98 ? "end" : "center"} />
+
+        <div className="relative h-1.5 rounded-full bg-slate-200">
+          <div
+            className="absolute top-0 bottom-0 rounded-full"
+            style={{
+              left: `${leftPct}%`,
+              width: `${Math.max(0, rightPct - leftPct)}%`,
+              backgroundColor: ACCENT,
+            }}
+          />
+          <span
+            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-[3px] border-white shadow-md z-[5]"
+            style={{ left: `${leftPct}%`, backgroundColor: ACCENT }}
+            aria-hidden
+          />
+          {COST_STOPS.map((stop, i) => {
+            const left = (i / (COST_STOPS.length - 1)) * 100;
+            const isRight = i === rightIdx;
+            return (
+              <button
+                key={`${stop.value}-${stop.label}`}
+                type="button"
+                aria-label={
+                  stop.value === -1
+                    ? "Any cost"
+                    : stop.value === 0
+                      ? "Cost from 0 ETB"
+                      : `Cost up to ${stop.label} ETB`
+                }
+                onClick={() => {
+                  if (i === 0) {
+                    onChange(0);
+                    return;
+                  }
+                  onChange(stop.value === -1 ? 0 : stop.value);
+                }}
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer p-2"
+                style={{ left: `${left}%` }}
+              >
+                <span
+                  className={`block rounded-full border-[3px] border-white shadow-md transition-transform ${
+                    i === 0 || isRight ? "w-5 h-5" : "w-3.5 h-3.5 opacity-70"
+                  }`}
+                  style={{ backgroundColor: ACCENT }}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -474,50 +671,59 @@ export default function DiningFiltersBar({
           />
           <div className="relative w-full sm:w-[min(92vw,720px)] h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">Filter</h3>
+              <h3 className="text-xl font-bold text-slate-900">Filter</h3>
               <button
                 type="button"
                 onClick={() => setShowFilter(false)}
                 className="p-1 rounded-full hover:bg-slate-100"
                 aria-label="Close"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
             <div className="flex flex-col sm:flex-row min-h-0 flex-1 overflow-hidden">
-              <div className="sm:w-[34%] border-b sm:border-b-0 sm:border-r border-slate-100 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full">
+              <div className="sm:w-[34%] bg-slate-100 border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full">
                 <div className="flex sm:flex-col">
                   {tabs.map((item) => {
                     const active = tab === item.id;
+                    const sortHint =
+                      item.id === "sort" && draft.sort !== "relevance"
+                        ? SORT_OPTIONS.find((o) => o.value === draft.sort)?.label.split(":")[0]
+                        : null;
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => setTab(item.id)}
-                        className={`relative shrink-0 text-left px-4 py-3 text-sm whitespace-nowrap ${
-                          active ? "font-semibold text-slate-900 bg-slate-50" : "text-slate-600"
+                        className={`relative shrink-0 text-left px-4 py-3.5 text-base whitespace-nowrap transition-colors ${
+                          active
+                            ? "font-semibold text-slate-900 bg-white"
+                            : "font-medium text-slate-600 bg-transparent hover:bg-slate-50/80"
                         }`}
                       >
                         {active && (
                           <span
-                            className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r hidden sm:block"
+                            className="absolute left-0 top-0 bottom-0 w-[3px] hidden sm:block"
                             style={{ backgroundColor: ACCENT }}
                           />
                         )}
-                        {item.label}
+                        <span className="block">{item.label}</span>
+                        {sortHint && (
+                          <span className="block text-sm font-medium mt-0.5" style={{ color: ACCENT }}>
+                            {sortHint}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-3 min-h-0 h-full">
+              <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-4 min-h-0 h-full bg-white">
                 {tab === "sort" && (
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Sort by
-                    </p>
+                    <p className="text-lg font-bold text-slate-900 mb-2">Sort by</p>
                     {SORT_OPTIONS.map((opt) => (
                       <RadioRow
                         key={opt.value}
@@ -531,88 +737,70 @@ export default function DiningFiltersBar({
 
                 {tab === "category" && (
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Category
-                    </p>
-                    {normalizedCategories.map((c) => {
-                      const label = c.toLowerCase() === "all" ? "All Dining" : c;
-                      const checked = draftCategories.some(
-                        (selected) => selected.toLowerCase() === c.toLowerCase()
-                      );
-                      return (
-                        <CheckboxRow
-                          key={c}
-                          label={label}
-                          checked={checked}
-                          onToggle={() =>
-                            setDraftCategories((prev) =>
-                              checked
-                                ? prev.filter((selected) => selected.toLowerCase() !== c.toLowerCase())
-                                : [...prev, c]
-                            )
-                          }
-                        />
-                      );
-                    })}
+                    <p className="text-lg font-bold text-slate-900 mb-2">Category</p>
+                    <div className="grid grid-cols-2 gap-x-4">
+                      {normalizedCategories.map((c) => {
+                        const label = c.toLowerCase() === "all" ? "All Dining" : c;
+                        const checked = draftCategories.some(
+                          (selected) => selected.toLowerCase() === c.toLowerCase()
+                        );
+                        return (
+                          <CheckboxRow
+                            key={c}
+                            label={label}
+                            checked={checked}
+                            onToggle={() =>
+                              setDraftCategories((prev) =>
+                                checked
+                                  ? prev.filter((selected) => selected.toLowerCase() !== c.toLowerCase())
+                                  : [...prev, c]
+                              )
+                            }
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
                 {tab === "cuisine" && (
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Cuisine
-                    </p>
-                    {cuisineList.map((c) => (
-                      <CheckboxRow
-                        key={c}
-                        label={c}
-                        checked={draft.cuisines.some((selected) => selected.toLowerCase() === c.toLowerCase())}
-                        onToggle={() =>
-                          setDraft((prev) => {
-                            const exists = prev.cuisines.some((selected) => selected.toLowerCase() === c.toLowerCase());
-                            return {
-                              ...prev,
-                              cuisines: exists
-                                ? prev.cuisines.filter((selected) => selected.toLowerCase() !== c.toLowerCase())
-                                : [...prev.cuisines, c],
-                            };
-                          })
-                        }
-                      />
-                    ))}
+                    <p className="text-lg font-bold text-slate-900 mb-2">Cuisine</p>
+                    <div className="grid grid-cols-2 gap-x-4">
+                      {cuisineList.map((c) => (
+                        <CheckboxRow
+                          key={c}
+                          label={c}
+                          checked={draft.cuisines.some((selected) => selected.toLowerCase() === c.toLowerCase())}
+                          onToggle={() =>
+                            setDraft((prev) => {
+                              const exists = prev.cuisines.some((selected) => selected.toLowerCase() === c.toLowerCase());
+                              return {
+                                ...prev,
+                                cuisines: exists
+                                  ? prev.cuisines.filter((selected) => selected.toLowerCase() !== c.toLowerCase())
+                                  : [...prev.cuisines, c],
+                              };
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {tab === "ratings" && (
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Rating
-                    </p>
-                    {RATING_OPTIONS.filter((opt) => opt.value > 0).map((opt) => (
-                      <RadioRow
-                        key={opt.value}
-                        label={opt.label}
-                        selected={draft.minRating === opt.value}
-                        onSelect={() => setDraft({ ...draft, minRating: opt.value })}
-                      />
-                    ))}
-                  </div>
+                  <RatingSlider
+                    value={draft.minRating}
+                    onChange={(minRating) => setDraft({ ...draft, minRating })}
+                  />
                 )}
 
                 {tab === "cost" && (
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Cost for 2
-                    </p>
-                    {COST_OPTIONS.filter((opt) => opt.value > 0).map((opt) => (
-                      <RadioRow
-                        key={opt.value}
-                        label={opt.label}
-                        selected={draft.maxCost === opt.value}
-                        onSelect={() => setDraft({ ...draft, maxCost: opt.value })}
-                      />
-                    ))}
-                  </div>
+                  <CostRangeSlider
+                    maxCost={draft.maxCost}
+                    onChange={(next) => setDraft({ ...draft, maxCost: next })}
+                  />
                 )}
 
                 {tab === "veg" && (
@@ -647,7 +835,7 @@ export default function DiningFiltersBar({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-6 px-5 py-3 border-t border-slate-100 shrink-0">
+            <div className="flex items-center justify-end gap-6 px-5 py-3.5 border-t border-slate-100 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -656,7 +844,7 @@ export default function DiningFiltersBar({
                   if (!onCategoriesChange) onCategoryChange?.("All");
                   setShowFilter(false);
                 }}
-                className="text-sm sm:text-base lg:text-sm font-bold"
+                className="text-base font-bold cursor-pointer"
                 style={{ color: ACCENT }}
               >
                 Reset
@@ -664,7 +852,7 @@ export default function DiningFiltersBar({
               <button
                 type="button"
                 onClick={applyDraft}
-                className="text-sm sm:text-base lg:text-sm font-bold"
+                className="text-base font-bold cursor-pointer"
                 style={{ color: ACCENT }}
               >
                 Apply

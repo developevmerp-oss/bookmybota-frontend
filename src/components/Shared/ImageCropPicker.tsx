@@ -213,8 +213,8 @@ export function ImageCropModal({
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-xl">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+      <div className="bg-[#F5F5F5] rounded-2xl w-full max-w-3xl overflow-hidden shadow-xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E5]">
           <p className="font-semibold text-slate-800">Crop image</p>
           <button type="button" onClick={onCancel} className="p-1 text-slate-500 hover:text-slate-800">
             <X size={18} />
@@ -223,7 +223,7 @@ export function ImageCropModal({
         <div className="p-4 space-y-3">
           <div
             ref={stageRef}
-            className="relative mx-auto bg-slate-900 flex items-center justify-center overflow-hidden rounded-lg py-2"
+            className="relative mx-auto bg-[#E8E8E8] flex items-center justify-center overflow-hidden rounded-lg py-2"
             style={{ minHeight: 280 }}
           >
             <div className="relative overflow-hidden" style={{ width: disp.w || undefined, height: disp.h || undefined }}>
@@ -273,16 +273,16 @@ export function ImageCropModal({
             Drag the box to move it. Drag the corners or edges to resize. Click outside the box and drag to draw a new crop area.
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t bg-slate-50">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-[#E5E5E5] bg-[#EFEFEF]">
           {onPickAnother ? (
-            <button type="button" onClick={onPickAnother} className="px-4 py-2 text-sm rounded-xl border">
+            <button type="button" onClick={onPickAnother} className="px-4 py-2 text-sm rounded-xl border bg-[#F5F5F5]">
               Choose another photo
             </button>
           ) : (
             <span />
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={onCancel} className="px-4 py-2 text-sm rounded-xl border">
+            <button type="button" onClick={onCancel} className="px-4 py-2 text-sm rounded-xl border bg-[#F5F5F5]">
               Cancel
             </button>
             <button

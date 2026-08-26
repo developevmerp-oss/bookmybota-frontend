@@ -2773,20 +2773,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </div>
                       </div>
 
-                        <button
-                          type="submit"
-                        className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-primary hover:bg-[#57008E] text-white text-sm font-bold transition-colors cursor-pointer shadow-sm"
-                        >
-                          Confirm Booking
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDrawerStep(1)}
-                          className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
-                        >
-                          <ChevronLeft size={18} />
-                          Back
-                        </button>
+                        <div className="flex flex-col items-start gap-3">
+                          <button
+                            type="submit"
+                            className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-primary hover:bg-[#57008E] text-white text-sm font-bold transition-colors cursor-pointer shadow-sm"
+                          >
+                            Confirm Booking
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDrawerStep(1)}
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
+                          >
+                            <ChevronLeft size={18} />
+                            Back
+                          </button>
+                        </div>
                     </form>
                   )}
                 </div>

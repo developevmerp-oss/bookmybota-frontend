@@ -36,7 +36,7 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
 
   return (
     <div className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] py-8">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           <aside className="w-full lg:w-[260px] shrink-0">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-col h-fit">

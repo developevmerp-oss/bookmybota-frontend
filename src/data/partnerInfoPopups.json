@@ -1,0 +1,197 @@
+{
+  "organizer.host.performances": {
+    "title": "Performances",
+    "description": "Host concerts, live music, theatre, comedy nights, and stage shows on Book My Bota. Reach audiences looking for unforgettable live performances in their city."
+  },
+  "organizer.host.experiences": {
+    "title": "Experiences",
+    "description": "List workshops, festivals, immersive nights, and pop-up experiences. Give guests something memorable beyond a standard ticketed show."
+  },
+  "organizer.host.expositions": {
+    "title": "Expositions",
+    "description": "Showcase exhibitions, art shows, fairs, and cultural events. Attract visitors who want to explore, learn, and discover something new."
+  },
+  "organizer.host.parties": {
+    "title": "Parties",
+    "description": "Promote club nights, private parties, and celebration events. Fill the floor with guests who discover your night out on Book My Bota."
+  },
+  "organizer.host.sports": {
+    "title": "Sports",
+    "description": "Run tournaments, matches, fitness meets, and sporting spectacles. Sell tickets and manage entry for fans ready to cheer."
+  },
+  "organizer.host.conferences": {
+    "title": "Conferences",
+    "description": "Organise talks, summits, corporate meets, and community gatherings. Handle registrations and check-in with confidence."
+  },
+  "organizer.service.online-sales": {
+    "title": "Online Sales & Marketing",
+    "description": "Reach Book My Bota audiences with powerful listings, discovery placements, and promotions that help your event sell out faster."
+  },
+  "organizer.service.pricing": {
+    "title": "Pricing",
+    "description": "Set flexible ticket tiers, early-bird offers, and custom pricing for every show so you stay in control of revenue and demand."
+  },
+  "organizer.service.fnb": {
+    "title": "Food & beverages, stalls and the works!",
+    "description": "Coordinate F&B, stalls, and add-ons alongside ticket sales so guests get a complete event experience from entry to exit."
+  },
+  "organizer.service.on-ground": {
+    "title": "On ground support & gate entry management",
+    "description": "Smooth check-in with scanning tools and operational support so queues move fast and your team stays focused on the show."
+  },
+  "organizer.service.reports": {
+    "title": "Reports & business insights",
+    "description": "Track sales, attendance signals, and performance in one place with clear reports that help you plan the next event better."
+  },
+  "organizer.service.pos": {
+    "title": "POS, RFID, Turnstiles & more...",
+    "description": "Use modern entry tech — POS, RFID, turnstiles and more — so guests move from ticket to seat faster and safer."
+  },
+
+  "business.host.fine-dining": {
+    "title": "Fine Dining",
+    "description": "Upscale restaurants get curated reservations and premium visibility with diners searching for special nights out."
+  },
+  "business.host.casual-dining": {
+    "title": "Casual Dining",
+    "description": "Family restaurants and everyday favourites attract more walk-ins and table bookings from nearby diners."
+  },
+  "business.host.cafes": {
+    "title": "Cafés & Bakeries",
+    "description": "Coffee shops, bakeries, and dessert spots thrive on discovery — get found by guests craving their next favourite stop."
+  },
+  "business.host.qsr": {
+    "title": "Quick Service",
+    "description": "QSR and takeaway spots grow with offers and gift-card traffic that convert browsers into paying guests."
+  },
+  "business.host.bars": {
+    "title": "Bars & Lounges",
+    "description": "Nightlife venues promote tables, events, and exclusive deals to guests looking for the night's best spot."
+  },
+  "business.host.multi-outlet": {
+    "title": "Multi-outlet Brands",
+    "description": "Chains manage bookings, offers, and reviews across locations from one dining partner dashboard."
+  },
+  "business.service.discovery": {
+    "title": "Online discovery & bookings",
+    "description": "Appear where diners already browse restaurants, events, and experiences — and convert interest into confirmed bookings."
+  },
+  "business.service.offers": {
+    "title": "Offers & promotions",
+    "description": "Publish limited-time deals and track redemptions in real time so every campaign is measurable."
+  },
+  "business.service.gift-cards": {
+    "title": "Gift card acceptance",
+    "description": "Redeem Book My Bota gift cards at your venue and grow prepaid guest spend with simple settlement."
+  },
+  "business.service.qr": {
+    "title": "QR scan at the venue",
+    "description": "Validate offers and cards quickly with on-ground scanning tools — no paperwork, no friction."
+  },
+  "business.service.reviews": {
+    "title": "Reviews & reputation",
+    "description": "Collect and respond to diner feedback from your partner dashboard to build lasting trust."
+  },
+  "business.service.reports": {
+    "title": "Reports & insights",
+    "description": "See bookings, peak hours, and campaign performance in one place so you can grow what works."
+  },
+
+  "venue.host.auditoriums": {
+    "title": "Auditoriums & Halls",
+    "description": "Theaters, cultural halls, and large seated venues connect with organizers looking for trusted performance spaces."
+  },
+  "venue.host.banquet": {
+    "title": "Banquet & Wedding Spaces",
+    "description": "Banquet halls and celebration venues attract private events that need reliable layouts and booking workflows."
+  },
+  "venue.host.outdoor": {
+    "title": "Outdoor & Amphitheaters",
+    "description": "Open grounds, amphitheaters, and festival sites host large-scale shows with clear availability for organizers."
+  },
+  "venue.host.clubs": {
+    "title": "Clubs & Nightvenues",
+    "description": "Clubs, lounges, and nightlife spaces hosting live acts get discovered by organizers building lineups."
+  },
+  "venue.host.conference": {
+    "title": "Conference Centers",
+    "description": "Meeting halls and multi-purpose corporate spaces support talks, summits, and business gatherings."
+  },
+  "venue.host.unique": {
+    "title": "Unique Spaces",
+    "description": "Galleries, rooftops, cafés, and specialty spaces stand out as distinctive venues for creative events."
+  },
+  "venue.service.claim": {
+    "title": "Claim event showtimes",
+    "description": "See unclaimed events listed at your venue and claim them as the venue partner so you stay in the loop."
+  },
+  "venue.service.layouts": {
+    "title": "Published seating layouts",
+    "description": "Upload theater, banquet, or custom layouts once — organizers can select a published plan for every show."
+  },
+  "venue.service.requests": {
+    "title": "Layout request workflow",
+    "description": "Fulfill custom seating requests from organizers in one place and keep floor-plan changes organised."
+  },
+  "venue.service.discovery": {
+    "title": "Organizer discovery",
+    "description": "Verified partners show up when organizers search for registered venues across Book My Bota."
+  },
+  "venue.service.onboarding": {
+    "title": "Partner onboarding",
+    "description": "Complete documents and approval to become a platform-authorized venue partner."
+  },
+  "venue.service.visibility": {
+    "title": "Citywide visibility",
+    "description": "Connect your space to events customers already browse and book on Book My Bota."
+  },
+
+  "artist.host.singers": {
+    "title": "Singers & Vocalists",
+    "description": "Solo acts, playback artists, and live vocalists get discovered by organizers casting the right voice for each show."
+  },
+  "artist.host.bands": {
+    "title": "Bands & Ensembles",
+    "description": "Bands, orchestras, and group stage acts showcase profiles that help organizers book complete lineups."
+  },
+  "artist.host.djs": {
+    "title": "DJs & Electronic",
+    "description": "Club nights, festivals, and electronic sets find the right DJ partners through verified artist profiles."
+  },
+  "artist.host.comedy": {
+    "title": "Comedy & Spoken Word",
+    "description": "Stand-up, open mics, and storytelling nights connect comics and hosts with venues and organizers."
+  },
+  "artist.host.dance": {
+    "title": "Dance & Performance",
+    "description": "Dance crews, cultural acts, and stage performers reach partners looking for high-energy shows."
+  },
+  "artist.host.special": {
+    "title": "Special Acts",
+    "description": "Magicians, hosts, and unique entertainment acts stand out with polished profiles and clear availability."
+  },
+  "artist.service.profile": {
+    "title": "Artist profile hub",
+    "description": "Keep your public-facing details, photos, and bio in one place that organizers can trust."
+  },
+  "artist.service.discovery": {
+    "title": "Organizer discovery",
+    "description": "Verified artists appear in organizer search when teams are building lineups and casting shows."
+  },
+  "artist.service.visibility": {
+    "title": "Event visibility",
+    "description": "Get featured on event pages that customers already browse and book on Book My Bota."
+  },
+  "artist.service.shareable": {
+    "title": "Shareable presence",
+    "description": "Share a polished profile that partners and promoters can trust when recommending you."
+  },
+  "artist.service.onboarding": {
+    "title": "Partner onboarding",
+    "description": "Complete documents and terms to become a platform-authorized artist on Book My Bota."
+  },
+  "artist.service.reach": {
+    "title": "Cross-city reach",
+    "description": "Connect with organizers hosting shows across Book My Bota cities and grow your touring footprint."
+  }
+}

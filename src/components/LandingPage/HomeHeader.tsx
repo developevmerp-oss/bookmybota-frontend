@@ -300,7 +300,7 @@ export default function HomeHeader() {
           className="flex w-full max-w-[17.5rem] min-w-0 relative cursor-pointer"
         >
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A9A9A] pointer-events-none" />
-          <span className="w-full h-10 pl-9 pr-3 rounded-lg bg-[#F7F7F7] type-nav-md text-[#9A9A9A] flex items-center text-left truncate whitespace-nowrap overflow-hidden">
+          <span className="w-full h-10 pl-9 pr-3 rounded-full border border-[#E5E5E5] bg-[#F7F7F7] type-nav-md text-[#9A9A9A] flex items-center text-left truncate whitespace-nowrap overflow-hidden">
             Search for Events, Dining and Experiences
           </span>
         </button>
@@ -335,7 +335,7 @@ export default function HomeHeader() {
               <span className="w-7 h-7 rounded-full bg-[#7A00C6] text-white type-nav font-semibold flex items-center justify-center">
                 {initial}
               </span>
-              <span className="type-nav-md font-medium text-[#111111] max-w-[90px] truncate whitespace-nowrap">
+              <span className="type-nav font-medium text-[#111111] max-w-[90px] truncate whitespace-nowrap">
                 {displayName}
               </span>
             </Link>
@@ -364,8 +364,8 @@ export default function HomeHeader() {
           onClick={() => setSearchOpen(true)}
           className="flex min-w-0 w-[min(32rem,36%)] relative cursor-pointer"
         >
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A9A9A] pointer-events-none" />
-          <span className="w-full h-15 pl-13 pr-4 rounded-lg bg-[#F7F7F7] type-nav-lg text-[#9A9A9A] flex items-center text-left truncate whitespace-nowrap overflow-hidden text-ellipsis">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#838181] pointer-events-none" />
+          <span className="w-full h-10 pl-13 pr-4 rounded-full border border-[#E5E5E5] bg-[#F7F7F7] type-nav-md text-[838181] flex items-center text-left truncate whitespace-nowrap overflow-hidden text-ellipsis">
             Search for Events, Dining and Experiences
           </span>
         </button>
@@ -403,7 +403,7 @@ export default function HomeHeader() {
                 <span className="w-9 h-9 rounded-full bg-[#7A00C6] ml-1 text-white type-nav-md font-semibold flex items-center justify-center">
                   {initial}
                 </span>
-                <span className="type-nav-lg font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
+                <span className="type-nav-md font-medium text-[#111111] max-w-[110px] truncate whitespace-nowrap">
                   {displayName}
                 </span>
               </Link>

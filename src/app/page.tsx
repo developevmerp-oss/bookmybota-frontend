@@ -29,15 +29,15 @@ export default function Home() {
 
   return (
     <div className=" bg-white text-[#111111] overflow-x-hidden">
-      {/* Hero + category tiles share one viewport below the sticky header (lg+) */}
-      <div className="flex flex-col lg:h-[calc(100dvh-5.75rem)] xl:h-[calc(100dvh-6.75rem)]">
+      {/* Hero + category tiles — tiles keep fixed aspect; do not stretch when banner is hidden */}
+      <div className="flex flex-col">
         <PromoBannerCarousel city={city} />
         <LiveCategoryTiles city={city} />
       </div>
       <PopularDiningRail city={city} />
       <TopArtistsRail />
       <TopVenuesRail />
-      {/* <RecommendedMoviesRail /> */}
+      <RecommendedMoviesRail />
       <PopularEventsRail city={city} />
       <SpecialOffersRail />
       <EventsNearYouRail city={city} />

@@ -120,20 +120,20 @@ export default function GiftCardsBrowsePage() {
         />
 
         <div className="relative container mx-auto">
-          <div className="flex flex-col lg:flex-row items-stretch">
-            <div className="max-w-2xl w-full lg:w-1/2 order-2 lg:order-1 px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-25 flex flex-col justify-center">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#E3BCFF] text-[#6900AA] text-xs font-bold uppercase tracking-wide mb-4 w-fit">
+          <div className="flex flex-col lg:flex-row lg:items-center">
+            <div className="max-w-2xl w-full lg:w-[48%] order-2 lg:order-1 px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-11 xl:py-12 flex flex-col justify-center">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#E3BCFF] text-[#6900AA] text-[11px] sm:text-xs font-bold uppercase tracking-wide mb-2.5 sm:mb-3 w-fit">
                 <Sparkles size={14} />
                 BookMyBota Gift Cards
               </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-extrabold text-[#111111] tracking-tight leading-[1.15]">
+              <h1 className="text-[1.55rem] sm:text-[2rem] lg:text-[2.15rem] xl:text-[2.35rem] font-extrabold text-[#111111] tracking-tight leading-[1.15]">
                 Give the gift of experiences
               </h1>
-              <p className="mt-3 text-slate-600 text-[15px] sm:text-base leading-relaxed">
+              <p className="mt-2 sm:mt-2.5 text-slate-600 text-[13px] sm:text-[15px] leading-relaxed">
                 Choose a denomination, buy for yourself or someone else. Redeem on Events at
                 checkout, or at restaurants via partner Scan (dining bills are paid at the venue).
               </p>
-              <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2.5 text-sm text-slate-700">
+              <ul className="mt-4 sm:mt-5 flex flex-col sm:flex-row flex-wrap gap-x-5 gap-y-2 text-[13px] sm:text-sm text-slate-700">
                 {["Instant digital delivery", "Valid up to 365 days", "Use with promo codes"].map(
                   (item) => (
                     <li key={item} className="inline-flex items-center gap-1.5">
@@ -147,34 +147,38 @@ export default function GiftCardsBrowsePage() {
               </ul>
             </div>
 
-            <div className="relative mt-4 order-1 lg:order-2 w-full lg:w-1/2 min-h-[320px] sm:min-h-[380px] lg:min-h-full self-stretch">
-              <Image
-                src={heroSrc(images.gifthero)}
-                alt="BookMyBota gift cards"
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover object-center"
-              />
+            <div className="relative order-1 lg:order-2 w-full lg:w-[52%] flex items-center justify-center px-3 sm:px-5 lg:px-4 xl:px-6 py-3 sm:py-4 lg:py-5">
+              <div className="relative w-full max-w-[560px] lg:max-w-[520px] xl:max-w-[580px] aspect-[16/10] sm:aspect-[16/9] lg:aspect-[5/3]">
+                <Image
+                  src={heroSrc(images.gifthero)}
+                  alt="BookMyBota gift cards"
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 52vw"
+                  className="object-contain object-center"
+                />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-10 sm:pb-14">
-        <div className="flex flex-col items-center text-center mb-8 sm:mb-10">
-          <h2 className="flex items-center justify-center gap-2.5 text-2xl sm:text-3xl font-extrabold text-[#1a1a2e] tracking-tight">
-            <Sparkles size={18} className="text-[#6900AA] shrink-0" fill="currentColor" />
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-10 sm:pb-14">
+        <div className="flex flex-col items-center text-center mb-6 sm:mb-10 px-1">
+          <h2 className="flex items-center justify-center gap-2 sm:gap-2.5 text-xl sm:text-3xl font-extrabold text-[#1a1a2e] tracking-tight">
+            <Sparkles size={16} className="text-[#6900AA] shrink-0 sm:hidden" fill="currentColor" />
+            <Sparkles size={18} className="text-[#6900AA] shrink-0 hidden sm:block" fill="currentColor" />
             Choose a gift card
-            <Sparkles size={18} className="text-[#6900AA] shrink-0" fill="currentColor" />
+            <Sparkles size={16} className="text-[#6900AA] shrink-0 sm:hidden" fill="currentColor" />
+            <Sparkles size={18} className="text-[#6900AA] shrink-0 hidden sm:block" fill="currentColor" />
           </h2>
-          <p className="mt-2 text-slate-500 text-[15px]">
+          <p className="mt-2 text-slate-500 text-[13px] sm:text-[15px] max-w-md">
             Select a value and make someone&apos;s day extra special.
           </p>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-20 text-slate-500 gap-2 items-center">
+          <div className="flex justify-center py-16 sm:py-20 text-slate-500 gap-2 items-center">
             <Loader2 className="animate-spin" size={20} />
             Loading gift cards…
           </div>
@@ -183,7 +187,7 @@ export default function GiftCardsBrowsePage() {
         ) : products.length === 0 ? (
           <p className="text-center text-slate-500 py-16">No gift cards are available right now.</p>
         ) : (
-          <div className="flex flex-wrap justify-start gap-5">
+          <div className="flex flex-wrap justify-center sm:justify-start gap-4 sm:gap-5">
             {products.map((p, index) => {
               const amount = Number(p.denomination);
               const price = Number(p.selling_price ?? amount);
@@ -195,10 +199,10 @@ export default function GiftCardsBrowsePage() {
               return (
                 <article
                   key={p.id}
-                  className="group flex flex-col w-full max-w-[260px] sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-3.75rem)/4)] lg:max-w-none rounded-2xl border border-slate-200/70 shadow-[0_6px_20px_rgba(17,17,17,0.07)] overflow-hidden bg-[#F7F7F8] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] transition-shadow duration-300"
+                  className="group flex flex-col w-full min-[420px]:w-[calc((100%-1rem)/2)] sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-3.75rem)/4)] xl:w-[calc((100%-5rem)/5)] rounded-2xl border border-slate-200/70 shadow-[0_6px_20px_rgba(17,17,17,0.07)] overflow-hidden bg-[#F7F7F8] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] transition-shadow duration-300"
                 >
                   {/* Colored header + wave */}
-                  <div className={`relative ${theme.header} px-4 pt-5 sm:pt-6 pb-12 sm:pb-14 min-h-[9.5rem] sm:min-h-[10.5rem]`}>
+                  <div className={`relative ${theme.header} px-3.5 sm:px-4 pt-4 sm:pt-6 pb-11 sm:pb-14 min-h-[8.75rem] sm:min-h-[10.5rem]`}>
                     <div className="relative z-[1] flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p
@@ -209,20 +213,20 @@ export default function GiftCardsBrowsePage() {
                         </p>
                         <p className="mt-1.5 flex items-baseline gap-1.5 leading-none">
                           <span
-                            className="text-[2rem] font-extrabold tracking-tight"
+                            className="text-[1.75rem] sm:text-[2rem] font-extrabold tracking-tight"
                             style={{ color: theme.accent }}
                           >
                             {amountNum}
                           </span>
                           <span
-                            className="text-base font-bold"
+                            className="text-sm sm:text-base font-bold"
                             style={{ color: theme.accentMuted }}
                           >
                             ETB
                           </span>
                         </p>
                         <span
-                          className={`mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${theme.pillBg}`}
+                          className={`mt-2.5 sm:mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${theme.pillBg}`}
                           style={{ color: theme.accent }}
                         >
                           <Clock size={11} strokeWidth={2.25} />
@@ -230,7 +234,7 @@ export default function GiftCardsBrowsePage() {
                         </span>
                       </div>
 
-                      <div className="relative shrink-0 w-[5.5rem] h-[5.5rem] sm:w-[6rem] sm:h-[6rem] -mr-1 mt-0">
+                      <div className="relative shrink-0 w-[4.5rem] h-[4.5rem] sm:w-[6rem] sm:h-[6rem] -mr-0.5 sm:-mr-1 mt-0">
                         <Image
                           src={heroSrc(images.giftbox)}
                           alt=""
@@ -244,35 +248,35 @@ export default function GiftCardsBrowsePage() {
                   </div>
 
                   {/* Body */}
-                  <div className="px-4 pb-4 pt-1 flex flex-col flex-1 items-center text-center -mt-1">
-                    <div className="flex w-full justify-around gap-1 mb-3.5">
+                  <div className="px-3.5 sm:px-4 pb-4 pt-1 flex flex-col flex-1 items-center text-center -mt-1">
+                    <div className="flex w-full justify-around gap-1 mb-3 sm:mb-3.5">
                       {[
                         { Icon: Ticket, label: "Events" },
                         { Icon: Trophy, label: "Sports" },
                         { Icon: UtensilsCrossed, label: "Dining" },
                       ].map(({ Icon, label }) => (
-                        <div key={label} className="flex flex-col items-center pt-5 gap-1 min-w-0">
+                        <div key={label} className="flex flex-col items-center pt-3 sm:pt-5 gap-1 min-w-0">
                           <Icon
-                            size={28}
+                            size={24}
+                            className="sm:hidden"
                             strokeWidth={1.6}
                             style={{ color: theme.accentMuted }}
                           />
-                          <span className="text-[14px] text-slate-500 font-medium">{label}</span>
+                          <Icon
+                            size={28}
+                            className="hidden sm:block"
+                            strokeWidth={1.6}
+                            style={{ color: theme.accentMuted }}
+                          />
+                          <span className="text-[12px] sm:text-[14px] text-slate-500 font-medium">{label}</span>
                         </div>
                       ))}
                     </div>
 
-                    {/* <h3 className="font-bold text-[#222222] text-[13px] sm:text-[14px] leading-snug">
-                      BookMyBota Gift Card {amountLabel}
-                    </h3>
-                    <p className="mt-1 text-[11px] sm:text-[12px] text-slate-500 leading-relaxed line-clamp-2">
-                      {p.description?.trim() || "Give the gift of Events, Sports & Dining"}
-                    </p> */}
-
-                    <div className="mt-auto pt-4 w-full">
+                    <div className="mt-auto pt-3 sm:pt-4 w-full">
                       <Link
                         href={`/gift-cards/buy/${p.id}`}
-                        className="inline-flex w-full items-center justify-center gap-2 h-10 rounded-full border bg-white text-sm font-semibold will-change-transform hover:scale-[1.06] active:scale-[0.98] transition-[transform,background-color,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] origin-center"
+                        className="inline-flex w-full items-center justify-center gap-2 h-10 sm:h-10 rounded-full border bg-white text-[13px] sm:text-sm font-semibold will-change-transform hover:scale-[1.04] active:scale-[0.98] transition-[transform,background-color,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] origin-center"
                         style={{ borderColor: theme.accent, color: theme.accent }}
                       >
                         Buy for {formatMoney(price, { compact: true })}
@@ -286,23 +290,24 @@ export default function GiftCardsBrowsePage() {
           </div>
         )}
 
-        <div className="mt-10 mx-auto max-w-5xl sm:mt-12 rounded-2xl border border-[#E3BCFF] bg-[#e8d9ff] px-5 sm:px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#6900AA]">
-              <Gift size={30} strokeWidth={1.75} />
+        <div className="mt-8 sm:mt-12 mx-auto max-w-5xl rounded-2xl border border-[#E3BCFF] bg-[#e8d9ff] px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3 sm:gap-3.5 min-w-0">
+            <span className="inline-flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#6900AA]">
+              <Gift size={26} className="sm:hidden" strokeWidth={1.75} />
+              <Gift size={30} className="hidden sm:block" strokeWidth={1.75} />
             </span>
             <div className="min-w-0">
-              <p className="font-bold text-[#6900AA] text-[15px] leading-snug">
+              <p className="font-bold text-[#6900AA] text-[14px] sm:text-[15px] leading-snug">
                 Already have a gift card?
               </p>
-              <p className="mt-0.5 text-sm text-slate-500 leading-snug">
+              <p className="mt-0.5 text-[13px] sm:text-sm text-slate-500 leading-snug">
                 Redeem your gift card and start exploring amazing experiences.
               </p>
             </div>
           </div>
           <Link
             href="/customer/gift-cards"
-            className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl border border-[#6900AA] bg-white text-sm font-semibold text-[#6900AA] hover:text-white hover:bg-[#6900aa] transition-colors shrink-0"
+            className="inline-flex items-center justify-center gap-1.5 h-10 w-full sm:w-auto px-4 rounded-xl border border-[#6900AA] bg-white text-sm font-semibold text-[#6900AA] hover:text-white hover:bg-[#6900aa] transition-colors shrink-0"
           >
             Redeem a gift card
             <ArrowRight size={16} />

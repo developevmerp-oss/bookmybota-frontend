@@ -1,74 +1,55 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import React, { useCallback, useRef, useState, type ReactNode } from "react";
+import ReactCrop, {
+  centerCrop,
+  convertToPixelCrop,
+  makeAspectCrop,
+  type Crop,
+  type PercentCrop,
+  type PixelCrop,
+} from "react-image-crop";
 import { Pencil, X } from "lucide-react";
+import { enforceAspectCrop } from "@/lib/imageCropAspect";
+import "react-image-crop/dist/ReactCrop.css";
+import "./ImageCropPicker.css";
 
-type Box = { x: number; y: number; w: number; h: number };
-type Handle = "move" | "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "draw";
-
-const MIN = 40;
-
-function clampBox(box: Box, maxW: number, maxH: number, aspect?: number): Box {
-  let { x, y, w, h } = box;
+function createInitialCrop(width: number, height: number, aspect?: number): PercentCrop {
   if (aspect && aspect > 0) {
-    h = w / aspect;
-    if (h < MIN / Math.max(aspect, 0.01)) {
-      h = MIN;
-      w = h * aspect;
-    }
-    if (w < MIN) {
-      w = MIN;
-      h = w / aspect;
-    }
-    if (w > maxW) {
-      w = maxW;
-      h = w / aspect;
-    }
-    if (h > maxH) {
-      h = maxH;
-      w = h * aspect;
-    }
-  } else {
-    w = Math.max(MIN, Math.min(w, maxW));
-    h = Math.max(MIN, Math.min(h, maxH));
+    return centerCrop(
+      makeAspectCrop({ unit: "%", width: 90 }, aspect, width, height),
+      width,
+      height
+    );
   }
-  x = Math.max(0, Math.min(x, maxW - w));
-  y = Math.max(0, Math.min(y, maxH - h));
-  return { x, y, w, h };
+  return centerCrop({ unit: "%", width: 90, height: 90, x: 0, y: 0 }, width, height);
 }
 
-function initialBox(dw: number, dh: number, aspect?: number): Box {
-  if (aspect && aspect > 0) {
-    let w = dw;
-    let h = w / aspect;
-    if (h > dh) {
-      h = dh;
-      w = h * aspect;
-    }
-    w *= 0.85;
-    h = w / aspect;
-    return clampBox({ x: (dw - w) / 2, y: (dh - h) / 2, w, h }, dw, dh, aspect);
+async function cropImageToBlob(image: HTMLImageElement, crop: PixelCrop): Promise<Blob> {
+  if (!crop.width || !crop.height) {
+    throw new Error("Select a crop area first.");
   }
-  const w = dw * 0.8;
-  const h = dh * 0.8;
-  return { x: (dw - w) / 2, y: (dh - h) / 2, w, h };
-}
 
-function cropToBlob(img: HTMLImageElement, disp: { w: number; h: number }, box: Box): Promise<Blob> {
-  const sx = (box.x / disp.w) * img.naturalWidth;
-  const sy = (box.y / disp.h) * img.naturalHeight;
-  const sw = (box.w / disp.w) * img.naturalWidth;
-  const sh = (box.h / disp.h) * img.naturalHeight;
+  const scaleX = image.naturalWidth / image.width;
+  const scaleY = image.naturalHeight / image.height;
+  const sx = crop.x * scaleX;
+  const sy = crop.y * scaleY;
+  const sw = Math.max(1, crop.width * scaleX);
+  const sh = Math.max(1, crop.height * scaleY);
+
   const outW = Math.min(1600, Math.max(320, Math.round(sw)));
   const outH = Math.max(320, Math.round((outW * sh) / sw));
+
   const canvas = document.createElement("canvas");
   canvas.width = outW;
   canvas.height = outH;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return Promise.reject(new Error("Canvas not available"));
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+  if (!ctx) throw new Error("Canvas not available");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, sx, sy, sw, sh, 0, 0, outW, outH);
+
   return new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Crop failed"))), "image/jpeg", 0.92);
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Crop failed"))), "image/jpeg", 0.92);
   });
 }
 
@@ -86,133 +67,64 @@ export function ImageCropModal({
   onPickAnother?: () => void;
 }) {
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const [disp, setDisp] = useState({ w: 0, h: 0 });
-  const [box, setBox] = useState<Box | null>(null);
+  const prevPixelRef = useRef<PixelCrop | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [busy, setBusy] = useState(false);
-  const drag = useRef<{
-    handle: Handle;
-    startX: number;
-    startY: number;
-    orig: Box;
-  } | null>(null);
 
-  const layoutImage = () => {
+  const lockedAspect = aspect && aspect > 0 ? aspect : undefined;
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    const next = createInitialCrop(width, height, lockedAspect);
+    const pixel = convertToPixelCrop(next, width, height);
+    prevPixelRef.current = pixel;
+    setCrop(pixel);
+    setCompletedCrop(pixel);
+  };
+
+  const applyCropChange = (pixel: PixelCrop) => {
     const img = imgRef.current;
-    const stage = stageRef.current;
-    if (!img || !stage || !img.naturalWidth) return;
-    const maxW = Math.min(stage.clientWidth, 720);
-    const maxH = Math.min(window.innerHeight * 0.55, 480);
-    const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
-    const w = Math.max(1, img.naturalWidth * scale);
-    const h = Math.max(1, img.naturalHeight * scale);
-    setDisp({ w, h });
-    setBox((prev) => (prev ? clampBox(prev, w, h, aspect) : initialBox(w, h, aspect)));
-  };
-
-  useEffect(() => {
-    layoutImage();
-    window.addEventListener("resize", layoutImage);
-    return () => window.removeEventListener("resize", layoutImage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, aspect]);
-
-  const applyHandle = (handle: Handle, dx: number, dy: number, orig: Box): Box => {
-    let { x, y, w, h } = orig;
-    const maxW = disp.w;
-    const maxH = disp.h;
-    if (handle === "move") {
-      x += dx;
-      y += dy;
-      return clampBox({ x, y, w, h }, maxW, maxH, aspect);
-    }
-    if (handle === "draw") {
-      w = Math.abs(dx);
-      h = aspect ? w / aspect : Math.abs(dy);
-      x = dx < 0 ? orig.x + dx : orig.x;
-      y = dy < 0 && !aspect ? orig.y + dy : orig.y;
-      if (aspect && dy < 0) y = orig.y - h;
-      return clampBox({ x, y, w, h }, maxW, maxH, aspect);
+    if (!img || !img.width || !img.height) {
+      setCrop(pixel);
+      return;
     }
 
-    if (handle.includes("e")) w = orig.w + dx;
-    if (handle.includes("s")) h = orig.h + dy;
-    if (handle.includes("w")) {
-      w = orig.w - dx;
-      x = orig.x + dx;
+    if (!lockedAspect) {
+      prevPixelRef.current = pixel;
+      setCrop(pixel);
+      return;
     }
-    if (handle.includes("n")) {
-      h = orig.h - dy;
-      y = orig.y + dy;
-    }
-    if (aspect) {
-      if (handle === "e" || handle === "w") h = w / aspect;
-      else if (handle === "n" || handle === "s") w = h * aspect;
-      else h = w / aspect;
-      if (handle.includes("n")) y = orig.y + orig.h - h;
-      if (handle.includes("w")) x = orig.x + orig.w - w;
-    }
-    return clampBox({ x, y, w, h }, maxW, maxH, aspect);
-  };
 
-  const onPointerDown = (handle: Handle) => (e: React.PointerEvent) => {
-    if (!box) return;
-    e.preventDefault();
-    e.stopPropagation();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { handle, startX: e.clientX, startY: e.clientY, orig: box };
-  };
-
-  const onStageDown = (e: React.PointerEvent) => {
-    if (!disp.w) return;
-    if ((e.target as HTMLElement).closest("[data-crop-box]")) return;
-    const host = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - host.left;
-    const y = e.clientY - host.top;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { handle: "draw", startX: e.clientX, startY: e.clientY, orig: { x, y, w: 0, h: 0 } };
-    setBox({ x, y, w: MIN, h: aspect ? MIN / Math.max(aspect, 0.01) : MIN });
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!drag.current) return;
-    const dx = e.clientX - drag.current.startX;
-    const dy = e.clientY - drag.current.startY;
-    setBox(applyHandle(drag.current.handle, dx, dy, drag.current.orig));
-  };
-
-  const onPointerUp = () => {
-    drag.current = null;
+    const prev = prevPixelRef.current || pixel;
+    const next = enforceAspectCrop(prev, pixel, lockedAspect, img.width, img.height);
+    prevPixelRef.current = next;
+    setCrop(next);
   };
 
   const confirm = async () => {
     const img = imgRef.current;
-    if (!img || !box) return;
+    if (!img) return;
+
+    const pixel =
+      completedCrop && completedCrop.width > 0 && completedCrop.height > 0
+        ? completedCrop
+        : crop
+          ? convertToPixelCrop(crop, img.width, img.height)
+          : null;
+
+    if (!pixel) return;
+
     setBusy(true);
     try {
-      onConfirm(await cropToBlob(img, disp, box));
+      onConfirm(await cropImageToBlob(img, pixel));
     } finally {
       setBusy(false);
     }
   };
 
-  const handles: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
-  const handleStyle = (h: Handle): React.CSSProperties => {
-    const map: Record<string, React.CSSProperties> = {
-      nw: { left: -6, top: -6, cursor: "nwse-resize" },
-      n: { left: "50%", top: -6, marginLeft: -6, cursor: "ns-resize" },
-      ne: { right: -6, top: -6, cursor: "nesw-resize" },
-      e: { right: -6, top: "50%", marginTop: -6, cursor: "ew-resize" },
-      se: { right: -6, bottom: -6, cursor: "nwse-resize" },
-      s: { left: "50%", bottom: -6, marginLeft: -6, cursor: "ns-resize" },
-      sw: { left: -6, bottom: -6, cursor: "nesw-resize" },
-      w: { left: -6, top: "50%", marginTop: -6, cursor: "ew-resize" },
-    };
-    return map[h] || {};
-  };
-
   return (
-    <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4">
+    <div className="image-crop-modal fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4">
       <div className="bg-[#F5F5F5] rounded-2xl w-full max-w-3xl overflow-hidden shadow-xl">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E5]">
           <p className="font-semibold text-slate-800">Crop image</p>
@@ -220,59 +132,49 @@ export function ImageCropModal({
             <X size={18} />
           </button>
         </div>
+
         <div className="p-4 space-y-3">
-          <div
-            ref={stageRef}
-            className="relative mx-auto bg-[#E8E8E8] flex items-center justify-center overflow-hidden rounded-lg py-2"
-            style={{ minHeight: 280 }}
-          >
-            <div className="relative overflow-hidden" style={{ width: disp.w || undefined, height: disp.h || undefined }}>
+          <div className="relative mx-auto bg-[#E8E8E8] flex items-center justify-center overflow-auto rounded-lg py-3 px-2 max-h-[60vh]">
+            <ReactCrop
+              crop={crop}
+              // Do NOT pass `aspect` here — library hides/breaks edge handles when aspect is set.
+              // We enforce aspect ourselves in onChange so left/right/up/down all work.
+              keepSelection
+              minWidth={40}
+              minHeight={40}
+              onChange={(pixel) => applyCropChange(pixel)}
+              onComplete={(pixel) => {
+                const img = imgRef.current;
+                if (!img || !lockedAspect) {
+                  setCompletedCrop(pixel);
+                  prevPixelRef.current = pixel;
+                  return;
+                }
+                const prev = prevPixelRef.current || pixel;
+                const next = enforceAspectCrop(prev, pixel, lockedAspect, img.width, img.height);
+                prevPixelRef.current = next;
+                setCrop(next);
+                setCompletedCrop(next);
+              }}
+              className="max-w-full"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 ref={imgRef}
                 src={src}
                 alt="Crop"
+                onLoad={onImageLoad}
+                className="select-none block max-w-full max-h-[55vh]"
                 draggable={false}
-                onLoad={layoutImage}
-                className="select-none block max-w-full"
-                style={{ width: disp.w || "auto", height: disp.h || "auto" }}
               />
-              {box && disp.w > 0 && (
-                <div
-                  className="absolute inset-0 touch-none"
-                  onPointerDown={onStageDown}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                >
-                  <div
-                    data-crop-box
-                    className="absolute border-2 border-white cursor-move"
-                    style={{
-                      left: box.x,
-                      top: box.y,
-                      width: box.w,
-                      height: box.h,
-                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)",
-                    }}
-                    onPointerDown={onPointerDown("move")}
-                  >
-                    {handles.map((h) => (
-                      <span
-                        key={h}
-                        className="absolute w-3 h-3 bg-white border border-slate-700 rounded-sm"
-                        style={handleStyle(h)}
-                        onPointerDown={onPointerDown(h)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            </ReactCrop>
           </div>
           <p className="text-xs text-slate-500 text-center">
-            Drag the box to move it. Drag the corners or edges to resize. Click outside the box and drag to draw a new crop area.
+            Drag the box to move it. Resize from corners or from the top, bottom, left, and right edges
+            {lockedAspect ? " (aspect ratio stays locked)." : "."}
           </p>
         </div>
+
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-[#E5E5E5] bg-[#EFEFEF]">
           {onPickAnother ? (
             <button type="button" onClick={onPickAnother} className="px-4 py-2 text-sm rounded-xl border bg-[#F5F5F5]">
@@ -287,8 +189,8 @@ export function ImageCropModal({
             </button>
             <button
               type="button"
-              disabled={busy || !box}
-              onClick={confirm}
+              disabled={busy || !completedCrop?.width}
+              onClick={() => void confirm()}
               className="px-4 py-2 text-sm rounded-xl bg-rose-600 text-white font-semibold disabled:opacity-50"
             >
               {busy ? "Cropping..." : "Use this crop"}

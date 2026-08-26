@@ -1,0 +1,41 @@
+/* Make mid-edge handles easy to see/grab (library shows them when aspect prop is omitted). */
+.image-crop-modal {
+  --rc-drag-handle-size: 14px;
+  --rc-drag-handle-mobile-size: 22px;
+  --rc-drag-bar-size: 12px;
+  --rc-drag-handle-bg-colour: #ffffff;
+  --rc-border-color: #111111;
+}
+
+/* Keep mid-edge handles visible on touch devices too */
+@media (pointer: coarse) {
+  .image-crop-modal .ReactCrop .ord-n,
+  .image-crop-modal .ReactCrop .ord-e,
+  .image-crop-modal .ReactCrop .ord-s,
+  .image-crop-modal .ReactCrop .ord-w {
+    display: block !important;
+  }
+}
+
+.image-crop-modal .ReactCrop__drag-handle {
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+
+.image-crop-modal .ReactCrop__drag-bar {
+  z-index: 1;
+}
+
+/* Larger mid-edge handles for left/right/up/down */
+.image-crop-modal .ReactCrop__drag-handle.ord-n,
+.image-crop-modal .ReactCrop__drag-handle.ord-s {
+  width: 28px;
+  height: 12px;
+}
+
+.image-crop-modal .ReactCrop__drag-handle.ord-e,
+.image-crop-modal .ReactCrop__drag-handle.ord-w {
+  width: 12px;
+  height: 28px;
+}

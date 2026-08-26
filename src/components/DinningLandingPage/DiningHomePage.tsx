@@ -636,12 +636,13 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
     .slice(0, 2)
     .join(" • ");
 
-  const getLocality = (addr: string) => {
+  const getLocality = (addr?: string | null) => {
+    if (!addr || typeof addr !== "string") return "Address not available";
     const parts = addr.split(",");
     if (parts.length >= 2) {
       return `${parts[0].trim()}, ${parts[1].trim()}`;
     }
-    return addr;
+    return addr.trim() || "Address not available";
   };
 
   const idHash =

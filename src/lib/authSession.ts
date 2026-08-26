@@ -45,6 +45,38 @@ export function isProtectedPath(pathname: string): boolean {
   );
 }
 
+/**
+ * Customer account / private routes — leave these after logout.
+ * Public browse pages (/, /events, /gift-cards, dining, etc.) stay put.
+ */
+export function isCustomerPrivatePath(pathname: string): boolean {
+  if (!pathname.startsWith('/customer')) return false;
+  // Post-checkout receipts stay reachable without login
+  if (pathname.startsWith('/customer/bookings/confirmation')) return false;
+  if (pathname.startsWith('/customer/event-bookings/confirmation')) return false;
+  return true;
+}
+
+/**
+ * Customer logout: clear session; redirect home only from private account pages.
+ */
+export function logoutCustomer(
+  dispatch: AppDispatch,
+  options?: { pathname?: string }
+): void {
+  if (typeof window === 'undefined') return;
+
+  const pathname = options?.pathname ?? window.location.pathname;
+  clearSessionForRole('customer');
+  dispatch(clearCredentials());
+  window.dispatchEvent(new Event('auth_changed'));
+  window.dispatchEvent(new Event('storage'));
+
+  if (isCustomerPrivatePath(pathname)) {
+    window.location.replace('/');
+  }
+}
+
 export function isLoginAuthRequest(url: string): boolean {
   return LOGIN_AUTH_ENDPOINTS.some((ep) => url.includes(ep));
 }

@@ -1114,7 +1114,7 @@ export default function Home() {
   const activeCity =
     locationCity && locationCity !== "All Cities" ? locationCity : undefined;
 
-  const { data: businessTypes = [] } = useGetBusinessTypesQuery();
+  const { data: businessTypes = [] } = useGetBusinessTypesQuery('dining');
   const {
     data: businessesData,
     isLoading: businessesLoading,

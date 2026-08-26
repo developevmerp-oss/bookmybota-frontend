@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery, useGetCollectionsQuery, useGetCitiesQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
+import { extractApiError } from '@/lib/apiErrors';
 import { isValidPhone } from '@/lib/validation';
 import PhoneInput from '@/components/Shared/PhoneInput';
 import ImageCropPicker, { CroppedImageField } from '@/components/Shared/ImageCropPicker';
@@ -119,7 +120,7 @@ export default function ProfilePage() {
       }).unwrap();
       toast.success('Profile saved successfully!');
     } catch (err) {
-      console.error(err);
+      toast.error(extractApiError(err, 'Failed to save profile'));
     }
   };
 

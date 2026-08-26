@@ -96,7 +96,10 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
 
       return {
         key: tile.key,
-        href: `/events?category=${encodeURIComponent(matchedCategory?.slug || tile.fallbackSlug)}`,
+        href:
+          tile.key === "movie"
+            ? "/movies"
+            : `/events?category=${encodeURIComponent(matchedCategory?.slug || tile.fallbackSlug)}`,
         title: tile.title,
         count: matchedEvents.length,
         image: tile.image,

@@ -2121,11 +2121,21 @@ export const api = createApi({
       { success: boolean },
       { bizId: string; body: Partial<BusinessSettings> }
     >({
-      query: ({ bizId, body }) => ({
-        url: `/businesses/${bizId}/settings`,
-        method: 'PUT',
-        body,
-      }),
+      query: ({ bizId, body }) => {
+        const payload: Record<string, unknown> = { ...body };
+        // JSONB columns: node-pg serializes JS arrays as PG arrays (`{...}`), which is invalid JSON.
+        if (Array.isArray(body.gallery_images)) {
+          payload.gallery_images = JSON.stringify(body.gallery_images);
+        }
+        if (Array.isArray(body.menu_images)) {
+          payload.menu_images = JSON.stringify(body.menu_images);
+        }
+        return {
+          url: `/businesses/${bizId}/settings`,
+          method: 'PUT',
+          body: payload,
+        };
+      },
       invalidatesTags: (_result, _error, { bizId }) => [
         { type: 'BusinessSettings', id: bizId },
         'Businesses',

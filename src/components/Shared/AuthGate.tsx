@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   homePathForRole,
   loginPathForRole,
@@ -11,12 +11,11 @@ import {
 } from "@/lib/authStorage";
 import { isTokenExpired } from "@/lib/authSession";
 import { useAppDispatch } from "@/lib/hooks";
-import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
+import { loadFromStorage, setCredentials, clearCredentials } from "@/features/auth/authSlice";
 
 type Mode =
   /** Must be logged in with one of `roles` */
   | "require"
-  /** Must NOT be logged in as one of `guestRoles` (defaults to all roles if omitted) */
   | "guest";
 
 interface AuthGateProps {
@@ -43,6 +42,7 @@ const defaultLoading = (
  * Client-side route guard.
  * - guest: login/register — bounce only if a matching guestRoles session exists
  * - require: private areas — bounce missing/wrong role to that role's login page
+ *   Re-checks on auth_changed / storage so logout leaves private pages.
  */
 export default function AuthGate({
   mode,
@@ -52,6 +52,7 @@ export default function AuthGate({
   loading,
 }: AuthGateProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useAppDispatch();
   const [ready, setReady] = useState(false);
 
@@ -59,53 +60,67 @@ export default function AuthGate({
   const guestRolesKey = (guestRoles ?? []).join(",");
 
   useEffect(() => {
-    if (mode === "guest") {
-      // undefined → legacy: bounce if any role is logged in
-      // [] → never bounce (shared pages like forgot-password)
-      // [role] → bounce only if that role already has a session
-      const checkRoles: UserRole[] =
-        guestRoles === undefined
-          ? (["super_admin", "event_admin", "business_admin", "customer"] as UserRole[])
-          : guestRoles;
+    const runGate = () => {
+      if (mode === "guest") {
+        const checkRoles: UserRole[] =
+          guestRoles === undefined
+            ? (["super_admin", "event_admin", "business_admin", "customer"] as UserRole[])
+            : guestRoles;
 
-      for (const role of checkRoles) {
-        const session = readSessionForRole(role);
-        if (session) {
-          dispatch(setCredentials({ user: session.user, token: session.token }));
-          router.replace(homePathForRole(session.user.role));
-          return;
+        for (const role of checkRoles) {
+          const session = readSessionForRole(role);
+          if (session) {
+            dispatch(setCredentials({ user: session.user, token: session.token }));
+            router.replace(homePathForRole(session.user.role));
+            return;
+          }
         }
+        setReady(true);
+        return;
       }
+
+      // require mode
+      dispatch(loadFromStorage());
+
+      const allowed = rolesKey.split(",").filter(Boolean) as UserRole[];
+      let matched: ReturnType<typeof readSessionForRole> = null;
+      for (const role of allowed) {
+        matched = readSessionForRole(role);
+        if (matched) break;
+      }
+
+      if (!matched) {
+        setReady(false);
+        dispatch(clearCredentials());
+        const loginRole = allowed[0] || "customer";
+        router.replace(loginPathForRole(loginRole));
+        return;
+      }
+
+      if (isTokenExpired(matched.token)) {
+        setReady(false);
+        clearSessionForRole(matched.user.role);
+        dispatch(clearCredentials());
+        router.replace(loginPathForRole(matched.user.role));
+        return;
+      }
+
+      dispatch(setCredentials({ user: matched.user, token: matched.token }));
       setReady(true);
-      return;
-    }
+    };
 
-    // require mode
-    dispatch(loadFromStorage());
+    runGate();
 
-    const allowed = rolesKey.split(",").filter(Boolean) as UserRole[];
-    let matched: ReturnType<typeof readSessionForRole> = null;
-    for (const role of allowed) {
-      matched = readSessionForRole(role);
-      if (matched) break;
-    }
+    if (mode !== "require") return;
 
-    if (!matched) {
-      // Other roles may remain logged in; only this panel requires its own session.
-      const loginRole = allowed[0] || "customer";
-      router.replace(loginPathForRole(loginRole));
-      return;
-    }
-
-    if (isTokenExpired(matched.token)) {
-      clearSessionForRole(matched.user.role);
-      router.replace(loginPathForRole(matched.user.role));
-      return;
-    }
-
-    dispatch(setCredentials({ user: matched.user, token: matched.token }));
-    setReady(true);
-  }, [mode, rolesKey, guestRolesKey, guestRoles, router, dispatch]);
+    const onAuthChange = () => runGate();
+    window.addEventListener("auth_changed", onAuthChange);
+    window.addEventListener("storage", onAuthChange);
+    return () => {
+      window.removeEventListener("auth_changed", onAuthChange);
+      window.removeEventListener("storage", onAuthChange);
+    };
+  }, [mode, rolesKey, guestRolesKey, guestRoles, router, dispatch, pathname]);
 
   if (!ready) return <>{loading ?? defaultLoading}</>;
   return <>{children}</>;

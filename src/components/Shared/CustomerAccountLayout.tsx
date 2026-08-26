@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Calendar,
   Gift,
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/lib/hooks";
-import { clearCredentials } from "@/features/auth/authSlice";
+import { logoutCustomer } from "@/lib/authSession";
 
 const NAV = [
   { href: "/customer/profile", icon: User, label: "My Profile" },
@@ -27,15 +27,11 @@ const NAV = [
 
 export default function CustomerAccountLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const dispatch = useAppDispatch();
 
   const handleLogout = () => {
-    dispatch(clearCredentials());
-    localStorage.removeItem("token_customer");
-    localStorage.removeItem("user_customer");
-    window.dispatchEvent(new Event("auth_changed"));
-    router.push("/");
+    logoutCustomer(dispatch, { pathname: pathname || "/" });
+    toast.success("Logged out successfully");
   };
 
   return (

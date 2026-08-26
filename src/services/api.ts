@@ -1967,8 +1967,14 @@ export const api = createApi({
       providesTags: [{ type: 'CityMasters', id: 'PUBLIC_LIST' }],
     }),
 
-    getBusinessTypes: builder.query<BusinessType[], void>({
-      query: () => '/businesses/types',
+    getBusinessTypes: builder.query<
+      BusinessType[],
+      'dining' | 'event' | 'venue' | 'artist' | 'cinema' | void
+    >({
+      query: (module) => {
+        const qs = module ? `?module=${module}` : '';
+        return `/businesses/types${qs}`;
+      },
       transformResponse: (res: { data: BusinessType[] }) => res.data || [],
     }),
 

@@ -726,10 +726,10 @@ export default function EventCheckout({
             const done = step > s.n;
             const active = step === s.n;
             const clickable = canNavigateToStep(s.n);
-            return (
+  return (
               <li key={s.n} className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-                <button
-                  type="button"
+      <button
+        type="button"
                   onClick={() => navigateToStep(s.n)}
                   disabled={!clickable}
                   aria-current={active ? "step" : undefined}
@@ -857,19 +857,19 @@ export default function EventCheckout({
                 />
               </Link>
               <div className="w-full max-w-[36rem] mx-auto px-12 sm:px-16 flex items-center gap-2.5">
-                <button
-                  type="button"
+              <button
+                type="button"
                   onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
                   aria-label="Back to event"
                   className="h-9 w-9 rounded-full text-slate-700 flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0"
-                >
-                  <ArrowLeft size={18} />
-                </button>
+              >
+                <ArrowLeft size={18} />
+              </button>
                 <p className="min-w-0 flex-1 text-[1.0625rem] sm:text-[1.1875rem] font-bold text-slate-900 truncate text-center sm:text-left">
                   {event.name}
                 </p>
-              </div>
             </div>
+          </div>
             {pageStepper}
           </div>
         )}
@@ -887,15 +887,15 @@ export default function EventCheckout({
                 <Shield size={12} className="text-[#6900AA]" />
                 Secure Booking
               </span>
-              <button
-                type="button"
-                onClick={onClose}
+          <button
+            type="button"
+            onClick={onClose}
                 className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 cursor-pointer"
-                aria-label="Close"
-              >
+            aria-label="Close"
+          >
                 <X size={14} />
-              </button>
-            </div>
+          </button>
+        </div>
 
             <p className="mt-4 text-[0.8125rem] font-bold uppercase tracking-[0.14em] text-slate-400">
               Step {step} of {CHECKOUT_STEPS.length}
@@ -993,13 +993,13 @@ export default function EventCheckout({
                         <div className="px-3 pb-3 space-y-2.5 border-t border-slate-100 pt-3">
                           {venues.map((venue) =>
                             venue.showtimes.map((s) => {
-                              const active = showtimeId === s.id;
+                  const active = showtimeId === s.id;
                               const status = showtimeFillingLabel(s);
                               const chip = dateChip(s.starts_at);
-                              return (
-                                <button
-                                  key={s.id}
-                                  type="button"
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
                                   onClick={() => selectShowtime(s)}
                                   className={`w-full text-left rounded-[0.625rem] border px-3.5 py-3 cursor-pointer transition-colors ${
                                     active
@@ -1039,9 +1039,9 @@ export default function EventCheckout({
                                       {venue.address}
                                     </p>
                                   )}
-                                </button>
-                              );
-                            })
+                    </button>
+                  );
+                })
                           )}
                         </div>
                       )}
@@ -1120,7 +1120,7 @@ export default function EventCheckout({
                               .filter(Boolean)
                               .join(" Â· ")}
                           </p>
-                        </div>
+                      </div>
                       </div>
                       <div className="flex-1 overflow-hidden relative flex flex-col p-2 sm:p-4">
                         <VenueLayoutViewer
@@ -1159,16 +1159,16 @@ export default function EventCheckout({
                     Choose one ticket type. Selecting another type clears your current selection.
                   </p>
                   {ticketTypes.map((t) => {
-                    const available = Number(t.available_count) || 0;
+                  const available = Number(t.available_count) || 0;
                     const total = Number(t.total_count) || 0;
                     const maxPerOrder = Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10);
                     const maxQty = Math.min(available, maxPerOrder);
-                    const qty = qtyByType[t.id] || 0;
+                  const qty = qtyByType[t.id] || 0;
                     const status = ticketAvail(available, total);
                     const soldOut = available <= 0;
-                    return (
-                      <div
-                        key={t.id}
+                  return (
+                    <div
+                      key={t.id}
                         className={`rounded-[0.75rem] px-4 py-3.5 flex items-center justify-between gap-3 bg-white shadow-[0_0.125rem_0.75rem_rgba(15,23,42,0.06)] border ${
                           qty > 0
                             ? "border-[#6900AA]"
@@ -1199,20 +1199,20 @@ export default function EventCheckout({
                               Max {maxPerOrder} per order
                             </p>
                           )}
-                        </div>
+                      </div>
                         <div className="shrink-0">
                           {soldOut ? null : qty === 0 ? (
-                            <button
-                              type="button"
+                        <button
+                          type="button"
                               onClick={() => setQty(t.id, 1, maxQty)}
                               className="min-w-[4.75rem] px-3.5 py-2 rounded-[0.375rem] border-2 border-[#6900AA] text-[#6900AA] text-[1rem] font-bold cursor-pointer hover:bg-[#F7E9FF] transition-colors"
-                            >
+                        >
                               Add
-                            </button>
+                        </button>
                           ) : (
                             <div className="flex items-center gap-0 rounded-[0.375rem] border-2 border-[#6900AA] overflow-hidden bg-white">
-                              <button
-                                type="button"
+                        <button
+                          type="button"
                                 onClick={() => setQty(t.id, qty - 1, maxQty)}
                                 className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF]"
                               >
@@ -1228,12 +1228,12 @@ export default function EventCheckout({
                                 className="w-9 h-9 flex items-center justify-center text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF] disabled:opacity-40"
                               >
                                 <Plus size={15} />
-                              </button>
+                        </button>
                             </div>
                           )}
-                        </div>
                       </div>
-                    );
+                    </div>
+                  );
                   })}
                 </div>
               )}
@@ -1458,7 +1458,7 @@ export default function EventCheckout({
                   <p className="text-[1.0625rem] sm:text-[1.125rem] font-extrabold text-slate-900 leading-snug">
                     {event.name}
                   </p>
-                  {selectedShowtime && (
+                {selectedShowtime && (
                     <p className="mt-1.5 text-[0.875rem] sm:text-[0.9375rem] text-slate-500 leading-relaxed">
                       {formatDateTime12h(selectedShowtime.starts_at).replace(", ", " | ")}
                       {event.language
@@ -1468,19 +1468,19 @@ export default function EventCheckout({
                       {[selectedShowtime.venue_name, selectedShowtime.venue_address]
                         .filter(Boolean)
                         .join(", ")}
-                    </p>
-                  )}
+                  </p>
+                )}
                 </div>
 
                 <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-2 text-[0.9375rem] text-slate-700 min-w-0">
                     <Ticket size={14} className="text-[#6900AA] shrink-0" />
-                    <span>
+                      <span>
                       Ticket Mode:{" "}
                       <strong>
                         {ticketModeLabel(ticketMode)} ({ticketQty})
                       </strong>
-                    </span>
+                      </span>
                   </span>
                   <button
                     type="button"
@@ -1605,7 +1605,7 @@ export default function EventCheckout({
                               ? ` · ${formatMoney(appliedGiftCard.balance_after)} left after`
                               : " · balance will be zero"}
                           </p>
-                        </div>
+                  </div>
                         <button
                           type="button"
                           onClick={handleRemoveGiftCard}
@@ -1661,8 +1661,8 @@ export default function EventCheckout({
                               "Apply"
                             )}
                           </button>
-                        </div>
-                      </div>
+                </div>
+                </div>
                     )}
                   </div>
                 )}
@@ -1700,7 +1700,7 @@ export default function EventCheckout({
               </aside>
             </form>
           )}
-        </div>
+              </div>
 
         <div
           className={
@@ -1968,23 +1968,23 @@ export default function EventCheckout({
             </div>
 
             <div className="px-5 py-5 space-y-5">
-              <div>
+                <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
                   <span className="text-[#6900AA]">*</span> Your name
-                </label>
-                <input
+                  </label>
+                  <input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   className="w-full rounded-[0.375rem] border border-slate-300 px-3 py-2.5 text-[1.0625rem] text-slate-900 focus:outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]/30"
                   placeholder="Full name"
-                />
-              </div>
+                  />
+                </div>
 
-              <div>
+                <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
                   <span className="text-[#6900AA]">*</span> Your email
-                </label>
-                <input
+                  </label>
+                  <input
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
@@ -1994,12 +1994,12 @@ export default function EventCheckout({
                 <p className="mt-1.5 text-[0.875rem] text-slate-500">
                   To access the ticket(s) on other devices, login with this email
                 </p>
-              </div>
+                </div>
 
-              <div>
+                <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
                   <span className="text-[#6900AA]">*</span> Mobile Number
-                </label>
+                  </label>
                 <div className="flex items-center gap-2 rounded-[0.375rem] border border-slate-300 px-3 bg-white focus-within:border-[#6900AA] focus-within:ring-1 focus-within:ring-[#6900AA]/30">
                   <span className="inline-flex items-center gap-1 text-[1rem] font-semibold text-slate-700 shrink-0">
                     +251
@@ -2019,25 +2019,25 @@ export default function EventCheckout({
                 <p className="mt-1.5 text-[0.875rem] text-slate-500">
                   This number will only be used for sending ticket(s)
                 </p>
-              </div>
+        </div>
 
-              <button
-                type="button"
+            <button
+              type="button"
                 onClick={() =>
                   toast.message("Tickets are non-transferable and subject to event terms.")
                 }
                 className="text-[1rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
               >
                 *Terms &amp; Conditions
-              </button>
+            </button>
 
-              <button
-                type="button"
+            <button
+              type="button"
                 onClick={saveContactDetails}
                 className={`w-full py-3 rounded-[0.5rem] ${accentBtn} text-white text-[1.125rem] font-bold cursor-pointer`}
-              >
+            >
                 Submit
-              </button>
+            </button>
             </div>
           </div>
         </div>
@@ -2068,13 +2068,13 @@ export default function EventCheckout({
                 : "Your ticket selection may not be available later if you cancel."}
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
+            <button
                 type="button"
                 onClick={confirmCancelTransaction}
                 className="py-2.5 rounded-[0.5rem] border border-[#6900AA] text-[#6900AA] text-[1.0625rem] font-bold cursor-pointer hover:bg-[#F7E9FF]"
               >
                 Yes, Cancel
-              </button>
+            </button>
               <button
                 type="button"
                 onClick={() => setCancelTxnOpen(false)}
@@ -2082,9 +2082,9 @@ export default function EventCheckout({
               >
                 No
               </button>
-            </div>
-          </div>
         </div>
+      </div>
+    </div>
       )}
     </>
   );

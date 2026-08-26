@@ -11,6 +11,8 @@ import eventNetworking from "./EventLandingPage/networking.png";
 import eventCulturalCelebration from "./EventLandingPage/cultural-celebration.png";
 import eventConcert from "./EventLandingPage/concert.png";
 import eventStadium from "./EventLandingPage/stadium.png";
+import gifthero from './Giftpage/hero.png';
+import giftbox from './Giftpage/box.png';
 
 const images = {
   logo,
@@ -26,6 +28,8 @@ const images = {
   eventCulturalCelebration,
   eventConcert,
   eventStadium,
+  gifthero,
+  giftbox,
 };
 
 export default images;

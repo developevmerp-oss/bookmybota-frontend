@@ -86,9 +86,9 @@ export default function TopArtistsRail() {
                 type="button"
                 aria-label="Previous artists"
                 onClick={() => scrollBy(-1)}
-                className="flex absolute left-0 md:-left-2 lg:-left-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                className="flex absolute left-1 sm:-left-2 top-[76px] sm:top-[86px] md:top-[94px] lg:top-[105px] -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full items-center justify-center cursor-pointer bg-white/95 border border-[#EDEDED] text-[#111111] shadow-md hover:bg-[#F7E9FF]"
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={20} />
               </button>
             ) : null}
 
@@ -107,9 +107,9 @@ export default function TopArtistsRail() {
                 type="button"
                 aria-label="Next artists"
                 onClick={() => scrollBy(1)}
-                className="flex absolute right-0 md:-right-2 lg:-right-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                className="flex absolute right-1 sm:-right-2 top-[76px] sm:top-[86px] md:top-[94px] lg:top-[105px] -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full items-center justify-center cursor-pointer bg-white/95 border border-[#EDEDED] text-[#111111] shadow-md hover:bg-[#F7E9FF]"
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={20} />
               </button>
             ) : null}
           </div>

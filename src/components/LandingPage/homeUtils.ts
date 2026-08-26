@@ -27,15 +27,58 @@ export function formatEventDateLine(iso?: string) {
   return `${weekday}, ${day} ${month} onwards`;
 }
 
+/** Parts for the small date badge on poster images. */
+export function eventDateParts(iso?: string) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return {
+    day: String(d.getDate()).padStart(2, "0"),
+    month: d.toLocaleString("en-GB", { month: "short" }).toUpperCase(),
+    weekday: d.toLocaleString("en-GB", { weekday: "short" }),
+  };
+}
+
+/** Location line for cards: venue (+ city). Never organizer. */
 export function eventPlaceLine(event: PublicEvent, fallbackCity?: string) {
-  const venue = event.venue_name?.trim() || event.organizer_name?.trim();
+  const venue = event.venue_name?.trim() || "";
   const city =
     event.city_name?.trim() ||
-    (fallbackCity && fallbackCity !== "All Cities" && fallbackCity !== "Ethiopia" ? fallbackCity : "");
-  if (venue && city) return `${venue}: ${city}`;
+    (fallbackCity && fallbackCity !== "All Cities" && fallbackCity !== "Ethiopia"
+      ? fallbackCity.trim()
+      : "");
+  if (venue && city && venue.toLowerCase() !== city.toLowerCase()) {
+    return `${venue}: ${city}`;
+  }
   if (venue) return venue;
   if (city) return city;
   return "";
+}
+
+/** Pick next showtime venue/city from a full public event detail payload. */
+export function venueFromEventDetail(
+  detail?: {
+    showtimes?: Array<{
+      starts_at: string;
+      ends_at?: string;
+      venue_name?: string | null;
+      venue_business_name?: string | null;
+      city_name?: string | null;
+    }>;
+  } | null
+) {
+  const shows = detail?.showtimes ?? [];
+  if (!shows.length) return { venue_name: "", city_name: "" };
+  const now = Date.now();
+  const sorted = [...shows].sort(
+    (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+  );
+  const next =
+    sorted.find((s) => new Date(s.ends_at || s.starts_at).getTime() >= now) || sorted[0];
+  return {
+    venue_name: (next.venue_name || next.venue_business_name || "").trim(),
+    city_name: (next.city_name || "").trim(),
+  };
 }
 
 export function isMusicEvent(event: PublicEvent) {

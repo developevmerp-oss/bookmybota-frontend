@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Calendar,
   Gift,
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/lib/hooks";
-import { clearCredentials } from "@/features/auth/authSlice";
+import { logoutCustomer } from "@/lib/authSession";
 
 const NAV = [
   { href: "/customer/profile", icon: User, label: "My Profile" },
@@ -27,20 +27,16 @@ const NAV = [
 
 export default function CustomerAccountLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const dispatch = useAppDispatch();
 
   const handleLogout = () => {
-    dispatch(clearCredentials());
-    localStorage.removeItem("token_customer");
-    localStorage.removeItem("user_customer");
-    window.dispatchEvent(new Event("auth_changed"));
-    router.push("/");
+    logoutCustomer(dispatch, { pathname: pathname || "/" });
+    toast.success("Logged out successfully");
   };
 
   return (
     <div className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] py-8">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           <aside className="w-full lg:w-[260px] shrink-0">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-col h-fit">

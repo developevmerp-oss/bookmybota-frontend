@@ -9,6 +9,8 @@ import images from "@/Images";
 import CitySelectModal from "./CitySelectModal";
 import SearchOverlay from "./SearchOverlay";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
+import { useAppDispatch } from "@/lib/hooks";
+import { logoutCustomer } from "@/lib/authSession";
 
 type StoredCustomer = {
   name?: string;
@@ -70,7 +72,7 @@ function CustomerDropdown({
   return (
     <div className="relative group">
       {children}
-      <div className="absolute right-0 top-full pt-1 w-56 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+      <div className="absolute right-0 top-full pt-1 w-64 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
         <div className="rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 overflow-hidden">
           <Link href="/customer/profile" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Profile</Link>
           <Link href="/customer/change-password" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
@@ -83,13 +85,24 @@ function CustomerDropdown({
               My Gift Cards
             </Link>
           )}
+          <Link href="/customer/help" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Help Centre</Link>
+          <button
+            type="button"
+            onClick={() => toast.message("Coming soon")}
+            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+          >
+            <span>Offers</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7E9FF] text-[#6900AA]">
+              Soon
+            </span>
+          </button>
           <button 
             type="button"
             onClick={onLogout} 
             className="block w-full text-left px-4 py-2.5 type-nav-md font-medium text-red-600 hover:bg-[#F7E9FF] transition-colors cursor-pointer"
           >
             Log out
-            
+
           </button>
         </div>
       </div>
@@ -170,6 +183,7 @@ function ForBusinessMenu({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
 
 export default function HomeHeader() {
   const pathname = usePathname();
+  const dispatch = useAppDispatch();
   const [city, setCity] = useState("");
   const [cityOpen, setCityOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -210,10 +224,7 @@ export default function HomeHeader() {
   const handleLogout = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    localStorage.removeItem("token_customer");
-    localStorage.removeItem("user_customer");
-    window.dispatchEvent(new Event("auth_changed"));
-    window.dispatchEvent(new Event("storage"));
+    logoutCustomer(dispatch, { pathname: pathname || "/" });
     toast.success("Logged out successfully");
   };
 

@@ -70,6 +70,9 @@ export default function AdminDiningMastersPage() {
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    variant?: "danger" | "success" | "warning";
     run: () => Promise<void>;
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -166,21 +169,28 @@ export default function AdminDiningMastersPage() {
     }
   };
 
-  const toggleCuisineActive = async (cuisine: DiningCuisineMaster) => {
+  const toggleCuisineActive = (cuisine: DiningCuisineMaster) => {
     const next = !cuisine.is_active;
-    try {
-      await updateCuisine({
-        id: cuisine.id,
-        body: { is_active: next },
-      }).unwrap();
-      toast.success(
-        next
-          ? `"${cuisine.name}" is now active — dining partners can see it`
-          : `"${cuisine.name}" is inactive — hidden from dining partners`
-      );
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, "Failed to update cuisine status"));
-    }
+    setPendingConfirm({
+      title: next ? "Enable cuisine?" : "Disable cuisine?",
+      body: next
+        ? `Enable "${cuisine.name}"? Dining partners will be able to see it.`
+        : `Disable "${cuisine.name}"? It will be hidden from dining partners until you enable it again.`,
+      confirmLabel: next ? "Enable" : "Disable",
+      danger: false,
+      variant: next ? "success" : "warning",
+      run: async () => {
+        await updateCuisine({
+          id: cuisine.id,
+          body: { is_active: next },
+        }).unwrap();
+        toast.success(
+          next
+            ? `"${cuisine.name}" is now active — dining partners can see it`
+            : `"${cuisine.name}" is inactive — hidden from dining partners`
+        );
+      },
+    });
   };
 
   const onCreateCollection = async (values: AdminCollectionCreateValues) => {
@@ -201,28 +211,35 @@ export default function AdminDiningMastersPage() {
     }
   };
 
-  const toggleCollectionActive = async (collection: Collection) => {
-    const next = !collection.is_active;
-    try {
-      await updateCollection({
-        id: collection.id,
-        body: { is_active: next },
-      }).unwrap();
-      toast.success(
-        next
-          ? `"${collection.title}" is now active — visible on dining homepage`
-          : `"${collection.title}" is inactive — hidden from dining homepage`
-      );
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, "Failed to update collection status"));
-    }
+  const toggleCollectionActive = (collection: Collection) => {
+    const next = collection.is_active === false;
+    setPendingConfirm({
+      title: next ? "Enable collection?" : "Disable collection?",
+      body: next
+        ? `Enable "${collection.title}"? It will be visible on the dining homepage.`
+        : `Disable "${collection.title}"? It will be hidden from the dining homepage until you enable it again.`,
+      confirmLabel: next ? "Enable" : "Disable",
+      danger: false,
+      variant: next ? "success" : "warning",
+      run: async () => {
+        await updateCollection({
+          id: collection.id,
+          body: { is_active: next },
+        }).unwrap();
+        toast.success(
+          next
+            ? `"${collection.title}" is now active — visible on dining homepage`
+            : `"${collection.title}" is inactive — hidden from dining homepage`
+        );
+      },
+    });
   };
 
   const cuisineListLoading = cuisinesLoading && cuisines.length === 0;
   const collectionListLoading = collectionsLoading && collections.length === 0;
 
   return (
-    <div className="w-full space-y-6">
+    <div data-admin-page="dining-masters" className="w-full space-y-6">
       <div className="admin-list-toolbar">
         <SearchInput
           value={q}
@@ -598,8 +615,9 @@ export default function AdminDiningMastersPage() {
         open={!!pendingConfirm}
         title={pendingConfirm?.title || ""}
         body={pendingConfirm?.body || ""}
-        confirmLabel="Delete"
-        danger
+        confirmLabel={pendingConfirm?.confirmLabel || "Delete"}
+        danger={pendingConfirm?.danger ?? true}
+        variant={pendingConfirm?.variant}
         busy={confirmBusy}
         onCancel={() => !confirmBusy && setPendingConfirm(null)}
         onConfirm={async () => {
@@ -609,7 +627,7 @@ export default function AdminDiningMastersPage() {
             await pendingConfirm.run();
             setPendingConfirm(null);
           } catch (err: unknown) {
-            toast.error(extractApiError(err, "Delete failed"));
+            toast.error(extractApiError(err, "Action failed"));
           } finally {
             setConfirmBusy(false);
           }

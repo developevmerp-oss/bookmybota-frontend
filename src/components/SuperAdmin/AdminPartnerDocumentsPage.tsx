@@ -95,6 +95,9 @@ export default function AdminPartnerDocumentsPage() {
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string;
     body: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    variant?: "danger" | "success" | "warning";
     run: () => Promise<void>;
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -289,21 +292,28 @@ export default function AdminPartnerDocumentsPage() {
                       <div className="flex items-center gap-2 mr-2">
                         <ActiveToggle
                           active={!!doc.is_active}
-                          onToggle={async () => {
+                          onToggle={() => {
                             const next = !doc.is_active;
-                            try {
-                              await updateDocument({
-                                id: doc.id,
-                                body: { is_active: next },
-                              }).unwrap();
-                              toast.success(
-                                next
-                                  ? `"${doc.name}" is active — shown on onboarding`
-                                  : `"${doc.name}" is inactive — hidden from forms`
-                              );
-                            } catch (err: unknown) {
-                              toast.error(extractApiError(err, "Failed to update status"));
-                            }
+                            setPendingConfirm({
+                              title: next ? "Enable document?" : "Disable document?",
+                              body: next
+                                ? `Enable "${doc.name}"? It will be shown on onboarding.`
+                                : `Disable "${doc.name}"? It will be hidden from forms until you enable it again.`,
+                              confirmLabel: next ? "Enable" : "Disable",
+                              danger: false,
+                              variant: next ? "success" : "warning",
+                              run: async () => {
+                                await updateDocument({
+                                  id: doc.id,
+                                  body: { is_active: next },
+                                }).unwrap();
+                                toast.success(
+                                  next
+                                    ? `"${doc.name}" is active — shown on onboarding`
+                                    : `"${doc.name}" is inactive — hidden from forms`
+                                );
+                              },
+                            });
                           }}
                         />
                         <span className={`text-xs ${doc.is_active ? "text-green-400" : "text-zinc-500"}`}>
@@ -420,12 +430,30 @@ export default function AdminPartnerDocumentsPage() {
               <div className="flex items-center gap-2">
                 <ActiveToggle
                   active={!!term.is_active}
-                  onToggle={async () => {
-                    try {
-                      await updateTerm({ id: term.id, body: { is_active: !term.is_active } }).unwrap();
-                    } catch (err: unknown) {
-                      toast.error(extractApiError(err, "Failed to update term"));
-                    }
+                  onToggle={() => {
+                    const next = !term.is_active;
+                    const preview =
+                      term.text.length > 60 ? `${term.text.slice(0, 60)}…` : term.text;
+                    setPendingConfirm({
+                      title: next ? "Enable term?" : "Disable term?",
+                      body: next
+                        ? `Enable "${preview}"? It will be shown on onboarding.`
+                        : `Disable "${preview}"? It will be hidden until you enable it again.`,
+                      confirmLabel: next ? "Enable" : "Disable",
+                      danger: false,
+                      variant: next ? "success" : "warning",
+                      run: async () => {
+                        await updateTerm({
+                          id: term.id,
+                          body: { is_active: next },
+                        }).unwrap();
+                        toast.success(
+                          next
+                            ? "Term is active — shown on onboarding"
+                            : "Term is inactive — hidden from onboarding"
+                        );
+                      },
+                    });
                   }}
                 />
                 <button
@@ -452,8 +480,9 @@ export default function AdminPartnerDocumentsPage() {
         open={!!pendingConfirm}
         title={pendingConfirm?.title || ""}
         body={pendingConfirm?.body || ""}
-        confirmLabel="Delete"
-        danger
+        confirmLabel={pendingConfirm?.confirmLabel || "Delete"}
+        danger={pendingConfirm?.danger ?? true}
+        variant={pendingConfirm?.variant}
         busy={confirmBusy}
         onCancel={() => !confirmBusy && setPendingConfirm(null)}
         onConfirm={async () => {
@@ -463,7 +492,7 @@ export default function AdminPartnerDocumentsPage() {
             await pendingConfirm.run();
             setPendingConfirm(null);
           } catch (err: unknown) {
-            toast.error(extractApiError(err, "Delete failed"));
+            toast.error(extractApiError(err, "Action failed"));
           } finally {
             setConfirmBusy(false);
           }

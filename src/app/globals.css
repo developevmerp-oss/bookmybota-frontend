@@ -451,6 +451,9 @@ html.admin-theme .super-admin-shell .admin-page-content {
   max-width: none;
   min-width: 0;
 }
+html.admin-theme .super-admin-shell .admin-page-content:has([data-admin-page="dining-masters"]) {
+  background-color: #f5f5f5;
+}
 html.admin-theme .super-admin-shell .admin-list-toolbar {
   display: flex;
   flex-direction: column;
@@ -956,15 +959,16 @@ html.admin-theme .admin-dashboard-layout table .portal-table-muted {
 }
 
 .contract-value-chip {
-  display: inline-block;
-  padding: 2px 8px;
-  margin: 0 2px;
-  border-radius: 6px;
-  background: #ecfdf5;
-  color: #047857;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  border: 1px solid #6ee7b7;
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #111111;
+  font-size: inherit;
+  font-weight: 700;
+  border: none;
+  vertical-align: baseline;
 }
 
 .contract-editor-body:empty:before {
@@ -973,9 +977,42 @@ html.admin-theme .admin-dashboard-layout table .portal-table-muted {
   pointer-events: none;
 }
 
+/* Signed / preview document — values as bold black text, not pills */
 .contract-document-body .contract-value-chip,
 .contract-document-body .contract-token-chip {
+  display: inline !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #111111 !important;
+  font-weight: 700 !important;
+  font-size: inherit !important;
+}
+
+.contract-document-body p {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.contract-document-body h1,
+.contract-document-body h2,
+.contract-document-body h3 {
+  color: #0f172a;
+}
+
+/* Keep editor chips as visible blue pills while drafting */
+.contract-editor .contract-token-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 2px;
+  border-radius: 6px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.8125rem;
   font-weight: 600;
+  border: 1px solid #93c5fd;
 }
 
 /* Landing type scale — rem only, sized by role */

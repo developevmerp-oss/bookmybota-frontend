@@ -108,32 +108,32 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
   }, [categories, pool, dining]);
 
   return (
-    <section className="bg-white py-5 sm:py-6 lg:py-3 lg:pb-4 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
-      <div className="container mx-auto px-4 md:px-5 lg:px-8 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
-        <h2 className="type-section font-semibold text-[#111111] mb-3 sm:mb-4 lg:mb-3 shrink-0">
+    <section className="bg-white py-5 sm:py-6 lg:py-4 lg:pb-5">
+      <div className="container mx-auto px-4 md:px-5 lg:px-8">
+        <h2 className="type-section font-semibold text-[#111111] mb-3 sm:mb-4 lg:mb-3">
           The Best of Live Events
         </h2>
 
         {isLoadingFilters ? (
-          <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 lg:flex-1 lg:min-h-0 lg:content-stretch">
+          <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 items-start">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="w-[calc((100%-0.625rem)/2)] sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)] aspect-[3/4] sm:aspect-[5/7] rounded-2xl bg-[#F7F7F7]"
+                className="w-[calc((100%-0.625rem)/2)] sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)] aspect-[3/4] sm:aspect-[5/7] rounded-2xl bg-[#F7F7F7] shrink-0"
               />
             ))}
           </div>
         ) : cards.length === 0 ? (
           <p className="type-body text-[#6B6B6B] py-6">No event categories yet.</p>
         ) : (
-          <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 lg:flex-1 lg:min-h-0 lg:content-stretch">
+          <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 items-start">
             {cards.map((card) => {
               const lines = titleLines(card.title);
               return (
                 <Link
                   key={card.key}
                   href={card.href}
-                  className="w-[calc((100%-0.625rem)/2)] sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)] aspect-[3/4] sm:aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden relative group"
+                  className="w-[calc((100%-0.625rem)/2)] sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)] aspect-[3/4] sm:aspect-[5/7] h-auto rounded-xl sm:rounded-2xl overflow-hidden relative group shrink-0"
                 >
                   <img
                     src={card.image}

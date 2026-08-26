@@ -35,12 +35,12 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
   };
 
   return (
-    <div className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          <aside className="w-full lg:w-[260px] shrink-0">
+    <div className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] py-4 sm:py-6 lg:py-8">
+      <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
+          <aside className="w-full lg:w-[240px] shrink-0">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-col h-fit">
-              <h1 className="px-3 pt-2 pb-3 text-3xl border-b border-slate-200 mb-3 font-extrabold text-[#111111]">My Account</h1>
+              <h1 className="px-3 pt-2 pb-3 text-2xl sm:text-3xl border-b border-slate-200 mb-3 font-extrabold text-[#111111]">My Account</h1>
               <nav className="flex flex-col gap-1">
                 {NAV.map((item) => {
                   const active =

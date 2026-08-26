@@ -195,6 +195,12 @@ export default function BookingsManager() {
                     <td className="py-4 px-6">
                       <div className="font-semibold text-white text-sm">{booking.customer_name}</div>
                       <div className="text-xs text-zinc-500 mt-0.5">{booking.customer_phone}</div>
+                      {booking.special_request?.trim() ? (
+                        <p className="text-[11px] text-amber-300/90 mt-1.5 leading-snug max-w-[220px]">
+                          <span className="font-semibold text-amber-400">Request:</span>{" "}
+                          {booking.special_request.trim()}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="py-4 px-6">
                       <div className="text-sm font-semibold text-white">
@@ -239,6 +245,12 @@ export default function BookingsManager() {
                       {booking.applied_offer?.title ? (
                         <div>
                           <p className="text-sm font-semibold text-white">{booking.applied_offer.title}</p>
+                          {(booking.applied_offer.source === "platform" ||
+                            String(booking.applied_offer.type || "").toLowerCase().includes("bookmybota")) && (
+                            <p className="text-[10px] uppercase tracking-wider text-violet-400 font-bold mt-0.5">
+                              BookMyBota
+                            </p>
+                          )}
                           {booking.applied_offer.promo_code && (
                             <p className="text-[11px] font-mono text-rose-400 mt-0.5">{booking.applied_offer.promo_code}</p>
                           )}

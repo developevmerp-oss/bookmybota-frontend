@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Lock,
   LogOut,
+  Bookmark,
   Tag,
   User,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const NAV = [
   { href: "/customer/profile", icon: User, label: "My Profile" },
   { href: "/customer/change-password", icon: Lock, label: "Change Password" },
   { href: "/customer/dashboard", icon: Calendar, label: "My Orders / Reservations" },
+  { href: "/customer/wishlist", icon: Bookmark, label: "My Wishlist" },
   { href: "/customer/gift-cards", icon: Gift, label: "My Gift Cards" },
   { href: "/customer/help", icon: HelpCircle, label: "Help Centre" },
   { href: "#gift-cards", icon: Gift, label: "Gift Cards", soon: true, mobileOnly: true },

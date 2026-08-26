@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Camera, ImageUp, Loader2, QrCode, Tag, Users, Clock, UtensilsCrossed, Gift } from "lucide-react";
+import { Camera, ImageUp, Loader2, QrCode, Tag, Users, Clock, UtensilsCrossed, Gift, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import {
   useScanDiningBookingQrMutation,
   useCheckoutDiningBookingMutation,
   useValidateMerchantPromoCodeMutation,
+  useValidatePlatformPromoCodeMutation,
   useRedeemWalkInMerchantPromoMutation,
   useMerchantVerifyGiftCardMutation,
   useMerchantPreviewGiftCardMutation,
@@ -71,6 +72,8 @@ export default function DiningScanPage() {
   const [scanQr, { isLoading: isScanning }] = useScanDiningBookingQrMutation();
   const [checkout, { isLoading: isCheckingOut }] = useCheckoutDiningBookingMutation();
   const [validatePromo, { isLoading: validatingPromo }] = useValidateMerchantPromoCodeMutation();
+  const [validatePlatformPromo, { isLoading: validatingPlatformPromo }] =
+    useValidatePlatformPromoCodeMutation();
   const [validateWalkIn, { isLoading: validatingWalkIn }] = useValidateMerchantPromoCodeMutation();
   const [redeemWalkIn, { isLoading: redeemingWalkIn }] = useRedeemWalkInMerchantPromoMutation();
   const [verifyGiftCard, { isLoading: verifyingGc }] = useMerchantVerifyGiftCardMutation();
@@ -241,7 +244,39 @@ export default function DiningScanPage() {
       toast.error("Enter the total food bill amount.");
       return;
     }
+    const isPlatform =
+      String(scanned?.applied_offer?.source || "").toLowerCase() === "platform" ||
+      String(scanned?.applied_offer?.type || "").toLowerCase().includes("bookmybota");
     try {
+      if (isPlatform) {
+        const result = await validatePlatformPromo({
+          restaurant_id: scanned?.business_id,
+          promo_code: code,
+          bill_amount: bill,
+          booking_id: scanned?.id,
+          guest_phone: scanned?.customer_phone || scanned?.guest_phone || undefined,
+        }).unwrap();
+        const bookingCode = scanned?.applied_offer?.promo_code?.trim().toUpperCase();
+        if (bookingCode && result.promo_code?.toUpperCase() !== bookingCode) {
+          setPromoPreview(null);
+          setPromoValidated(false);
+          toast.error("This code does not match the BookMyBota offer selected at booking.");
+          return;
+        }
+        const discountLabel =
+          result.discount_type === "FLAT"
+            ? `${Math.round(Number(result.discount_value) || 0)} ETB OFF`
+            : `${result.discount_value}% OFF`;
+        setPromoPreview({
+          title: result.title,
+          promo_code: result.promo_code,
+          discount_label: `${discountLabel} (−${formatMoney(result.discount_amount)} on this bill)`,
+        });
+        setPromoValidated(true);
+        toast.success(`Valid BookMyBota offer: ${discountLabel}`);
+        return;
+      }
+
       const result = await validatePromo({ promo_code: code, bill_amount: bill }).unwrap();
       const bookingCode = scanned?.applied_offer?.promo_code?.trim().toUpperCase();
       if (bookingCode && result.promo_code?.toUpperCase() !== bookingCode) {
@@ -443,6 +478,9 @@ export default function DiningScanPage() {
   }
 
   const offer = scanned?.applied_offer;
+  const isPlatformOffer =
+    String(offer?.source || "").toLowerCase() === "platform" ||
+    String(offer?.type || "").toLowerCase().includes("bookmybota");
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -549,6 +587,17 @@ export default function DiningScanPage() {
             </span>
           </div>
 
+          {scanned.special_request?.trim() ? (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
+              <p className="text-[11px] uppercase tracking-wider text-amber-300 font-bold flex items-center gap-1.5">
+                <MessageSquare size={13} /> Special request
+              </p>
+              <p className="text-sm text-white mt-1.5 leading-relaxed whitespace-pre-wrap">
+                {scanned.special_request.trim()}
+              </p>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-xl bg-white/5 border border-white/5 p-3">
               <p className="text-[11px] text-zinc-500 flex items-center gap-1"><Clock size={12} /> Time</p>
@@ -578,17 +627,24 @@ export default function DiningScanPage() {
                   <p className="text-sm font-mono text-rose-300 mt-0.5">{offer.promo_code}</p>
                 )}
                 <p className="text-xs text-zinc-300 mt-0.5">
-                  {offer.type || "Offer"}
+                  {isPlatformOffer ? "BookMyBota platform offer" : offer.type || "Merchant offer"}
                 </p>
                 <p className="text-xs text-emerald-300 mt-1">
                   {formatDiningOfferDiscount(offer as Parameters<typeof formatDiningOfferDiscount>[0])}
                 </p>
+                {isPlatformOffer && offer.min_bill_amount != null && Number(offer.min_bill_amount) > 0 && (
+                  <p className="text-xs text-amber-300 mt-1">
+                    Min bill {formatMoney(Number(offer.min_bill_amount))} to redeem
+                  </p>
+                )}
                 <p className="text-xs text-zinc-400 mt-2">
-                  Apply this discount on the food bill at your restaurant. BookMyBota does not charge the guest online for dining.
+                  {isPlatformOffer
+                    ? "Apply this BookMyBota discount on the food bill. BookMyBota funds the discount — enter bill amount, validate the code, then redeem."
+                    : "Apply this discount on the food bill at your restaurant. BookMyBota does not charge the guest online for dining."}
                 </p>
               </>
             ) : (
-              <p className="text-sm text-zinc-400 mt-1">No merchant offer is attached to this booking.</p>
+              <p className="text-sm text-zinc-400 mt-1">No offer is attached to this booking.</p>
             )}
           </div>
 
@@ -673,10 +729,12 @@ export default function DiningScanPage() {
                       <button
                         type="button"
                         onClick={() => void handleValidateBookingPromo()}
-                        disabled={validatingPromo}
+                        disabled={validatingPromo || validatingPlatformPromo}
                         className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
                       >
-                        {validatingPromo && <Loader2 size={16} className="animate-spin" />}
+                        {(validatingPromo || validatingPlatformPromo) && (
+                          <Loader2 size={16} className="animate-spin" />
+                        )}
                         Validate code
                       </button>
                     )}

@@ -10,14 +10,13 @@ import {
   Loader2,
   X,
   UtensilsCrossed,
-  Bookmark,
   Users,
   Tag,
   ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import type { IconType } from "react-icons";
+import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -667,32 +666,6 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
   const isPromoted = !!restaurant.is_promoted;
   const offerLabel = listingOfferLabel(restaurant.dining_offers);
 
-  const [saved, setSaved] = useState(false);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("dining_saved_restaurants");
-      const ids: string[] = raw ? JSON.parse(raw) : [];
-      setSaved(ids.includes(String(restaurant.id)));
-    } catch {
-      setSaved(false);
-    }
-  }, [restaurant.id]);
-
-  const toggleSave = (e: ReactMouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      const raw = localStorage.getItem("dining_saved_restaurants");
-      const ids: string[] = raw ? JSON.parse(raw) : [];
-      const id = String(restaurant.id);
-      const next = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
-      localStorage.setItem("dining_saved_restaurants", JSON.stringify(next));
-      setSaved(next.includes(id));
-    } catch {
-      setSaved((v) => !v);
-    }
-  };
-
   return (
     <div className="group flex h-full flex-col bg-[#F5F5F5] rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-xl transition-shadow duration-300 p-3">
       <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
@@ -715,19 +688,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
           </span>
         )}
 
-        <button
-          type="button"
-          onClick={toggleSave}
-          aria-label={saved ? "Remove from saved" : "Save restaurant"}
-          aria-pressed={saved}
-          className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer"
-        >
-          <Bookmark
-            size={18}
-            className={saved ? "fill-[#6900AA] text-[#6900AA]" : "fill-none text-[#6900AA]"}
-            strokeWidth={2.25}
-          />
-        </button>
+        <DiningWishlistButton businessId={String(restaurant.id)} />
 
         {offerLabel && (
           <span

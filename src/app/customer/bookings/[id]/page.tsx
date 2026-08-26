@@ -391,6 +391,17 @@ export default function BookingDetailPage({
                 )}
               </div>
 
+              {booking.special_request?.trim() ? (
+                <div className="mt-4 rounded-xl bg-amber-50/80 border border-amber-100 p-3 sm:p-3.5">
+                  <p className="text-[0.625rem] font-bold uppercase tracking-wider text-amber-700/80">
+                    Special request
+                  </p>
+                  <p className="text-sm text-slate-800 mt-1 leading-relaxed whitespace-pre-wrap">
+                    {booking.special_request.trim()}
+                  </p>
+                </div>
+              ) : null}
+
               {/* Footer meta */}
               <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-x-5 sm:gap-y-2 text-xs sm:text-sm text-slate-500">
                 <span className="inline-flex items-center gap-1.5">

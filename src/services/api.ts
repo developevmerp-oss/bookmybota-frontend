@@ -1036,6 +1036,20 @@ export interface PlatformOffer {
   scope_label?: string;
 }
 
+/** Platform offer eligible for a specific dining restaurant + customer */
+export interface DiningEligiblePlatformOffer {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  discount_type: string;
+  discount_value: number;
+  max_discount?: number | null;
+  min_order_amount: number;
+  customer_eligibility: string;
+  discount_label: string;
+}
+
 export interface GiftCardProduct {
   id: string;
   name: string;
@@ -1429,6 +1443,8 @@ export interface Booking {
   qr_token?: string;
   applied_offer?: {
     id?: string;
+    offer_id?: string;
+    source?: 'merchant' | 'platform' | string;
     type?: string;
     title?: string;
     validity?: string;
@@ -1443,6 +1459,7 @@ export interface Booking {
   offer_redeemed_by?: string | null;
   bill_amount?: number | string | null;
   offer_redemption_notes?: string | null;
+  special_request?: string | null;
 }
 
 export interface DiningOfferRedemption {
@@ -1558,7 +1575,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -2483,7 +2500,14 @@ export const api = createApi({
     }),
 
     createBooking: builder.mutation<
-      { message?: string; booking_id?: string; table_assigned?: string; qr_token?: string; applied_offer?: Booking['applied_offer'] },
+      {
+        message?: string;
+        booking_id?: string;
+        table_assigned?: string;
+        qr_token?: string;
+        applied_offer?: Booking['applied_offer'];
+        special_request?: string | null;
+      },
       {
         business_id: string;
         customer_name: string;
@@ -2493,7 +2517,20 @@ export const api = createApi({
         guests: number;
         customer_id?: string;
         approx_arrival?: string;
-        applied_offer?: { type?: string; title?: string; validity?: string; promo_code?: string; id?: string } | null;
+        special_request?: string | null;
+        applied_offer?: {
+          type?: string;
+          title?: string;
+          validity?: string;
+          promo_code?: string;
+          id?: string;
+          offer_id?: string;
+          source?: 'merchant' | 'platform' | string;
+          discount_type?: string;
+          discount_value?: number;
+          max_discount?: number | null;
+          min_bill_amount?: number;
+        } | null;
       }
     >({
       query: (body) => ({
@@ -2579,7 +2616,7 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: ['Bookings', 'DiningOfferRedemptions'],
+      invalidatesTags: ['Bookings', 'DiningOfferRedemptions', 'OfferRedemptions', 'PublicPlatformOffers'],
     }),
 
     validateMerchantPromoCode: builder.mutation<
@@ -2822,6 +2859,42 @@ export const api = createApi({
       providesTags: ['PublicPlatformOffers'],
     }),
 
+    getDiningEligiblePlatformOffers: builder.query<
+      DiningEligiblePlatformOffer[],
+      { restaurant_id: string; guest_phone?: string }
+    >({
+      query: ({ restaurant_id, guest_phone }) => {
+        const sp = new URLSearchParams({ restaurant_id });
+        if (guest_phone) sp.set('guest_phone', guest_phone);
+        return `/platform-offers/dining-eligible?${sp.toString()}`;
+      },
+      transformResponse: (res: { data: DiningEligiblePlatformOffer[] }) => res.data || [],
+      providesTags: ['PublicPlatformOffers'],
+    }),
+
+    validatePlatformPromoCode: builder.mutation<
+      AppliedPromoOffer & { discount_label?: string; max_discount?: number | null; min_order_amount?: number },
+      {
+        event_id?: string;
+        restaurant_id?: string;
+        business_id?: string;
+        promo_code?: string;
+        offer_id?: string;
+        ticket_amount?: number;
+        bill_amount?: number;
+        guest_phone?: string;
+        skip_min_order?: boolean;
+        booking_id?: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/platform-offers/validate',
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: AppliedPromoOffer & { discount_label?: string } }) => res.data,
+    }),
+
     getGiftCardProducts: builder.query<
       PaginatedList<GiftCardProduct>,
       (PagedQuery & { status?: string }) | void
@@ -2899,6 +2972,42 @@ export const api = createApi({
       query: () => '/gift-cards/mine',
       transformResponse: (res: { data: GiftCardMine[] }) => res.data || [],
       providesTags: ['MyGiftCards'],
+    }),
+
+    getDiningWishlist: builder.query<(Business & { wishlisted_at?: string })[], void>({
+      query: () => '/wishlist/dining',
+      transformResponse: (res: { data: (Business & { wishlisted_at?: string })[] }) => res.data || [],
+      providesTags: ['DiningWishlist'],
+    }),
+
+    getDiningWishlistIds: builder.query<string[], void>({
+      query: () => '/wishlist/dining/ids',
+      transformResponse: (res: { data: string[] }) => res.data || [],
+      providesTags: ['DiningWishlist'],
+    }),
+
+    toggleDiningWishlist: builder.mutation<
+      { message?: string; data: { business_id: string; wishlisted: boolean } },
+      { business_id: string }
+    >({
+      query: (body) => ({
+        url: '/wishlist/dining/toggle',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['DiningWishlist'],
+    }),
+
+    syncDiningWishlist: builder.mutation<
+      { message?: string; data: { added: number } },
+      { business_ids: string[] }
+    >({
+      query: (body) => ({
+        url: '/wishlist/dining/sync',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['DiningWishlist'],
     }),
 
     getMyGiftCard: builder.query<GiftCardMine, string>({
@@ -4479,6 +4588,8 @@ export const {
   useGetOfferEligibleEventsAdminQuery,
   useGetOfferEligibleRestaurantsAdminQuery,
   useGetActivePlatformOffersQuery,
+  useGetDiningEligiblePlatformOffersQuery,
+  useValidatePlatformPromoCodeMutation,
   useGetGiftCardProductsQuery,
   useCreateGiftCardProductMutation,
   useUpdateGiftCardProductMutation,
@@ -4488,6 +4599,10 @@ export const {
   usePurchaseGiftCardMutation,
   useGetMyGiftCardsQuery,
   useGetMyGiftCardQuery,
+  useGetDiningWishlistQuery,
+  useGetDiningWishlistIdsQuery,
+  useToggleDiningWishlistMutation,
+  useSyncDiningWishlistMutation,
   useClaimGiftCardMutation,
   usePreviewGiftCardRedeemMutation,
   useMerchantVerifyGiftCardMutation,

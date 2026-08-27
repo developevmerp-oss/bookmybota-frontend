@@ -138,7 +138,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Artist Partners", href: "/admin/businesses/artist", icon: Mic2 },
     { name: "Cinema Partners", href: "/admin/businesses/cinema", icon: Clapperboard },
     { name: "Movies", href: "/admin/movies", icon: Film },
-    { name: "Venue Layouts", href: "/admin/venue-layouts", icon: Map },
+    { name: "Venue & Cinema Layouts", href: "/admin/venue-layouts", icon: Map },
     { name: "Event Layouts", href: "/admin/event-layouts", icon: Map },
     { name: "Events", href: "/admin/events", icon: CalendarDays },
     { name: "Event Contracts", href: "/admin/event-contracts", icon: FileSignature },

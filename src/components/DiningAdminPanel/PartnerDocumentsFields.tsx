@@ -13,7 +13,7 @@ import { extractApiError } from "@/lib/apiErrors";
 type Variant = "light" | "dark";
 
 interface PartnerDocumentsFieldsProps {
-  module: "dining" | "event" | "venue" | "artist";
+  module: "dining" | "event" | "venue" | "artist" | "cinema";
   value: PartnerDocumentUpload[];
   onChange: (docs: PartnerDocumentUpload[]) => void;
   variant?: Variant;

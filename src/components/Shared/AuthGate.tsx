@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   homePathForRole,
   loginPathForRole,
@@ -43,6 +43,7 @@ const defaultLoading = (
  * - guest: login/register — bounce only if a matching guestRoles session exists
  * - require: private areas — bounce missing/wrong role to that role's login page
  *   Re-checks on auth_changed / storage so logout leaves private pages.
+ *   Does not re-run on every pathname change (that blanked the admin shell on Back).
  */
 export default function AuthGate({
   mode,
@@ -52,7 +53,6 @@ export default function AuthGate({
   loading,
 }: AuthGateProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const dispatch = useAppDispatch();
   const [ready, setReady] = useState(false);
 
@@ -120,7 +120,7 @@ export default function AuthGate({
       window.removeEventListener("auth_changed", onAuthChange);
       window.removeEventListener("storage", onAuthChange);
     };
-  }, [mode, rolesKey, guestRolesKey, guestRoles, router, dispatch, pathname]);
+  }, [mode, rolesKey, guestRolesKey, guestRoles, router, dispatch]);
 
   if (!ready) return <>{loading ?? defaultLoading}</>;
   return <>{children}</>;

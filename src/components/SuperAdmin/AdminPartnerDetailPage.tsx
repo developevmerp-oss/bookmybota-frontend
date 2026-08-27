@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   Archive,
   ArrowLeft,
@@ -40,6 +40,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 
 export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPageProps) {
   const params = useParams();
+  const router = useRouter();
   const id = String(params.id ?? "");
   const isDining = module === "dining";
   const isVenue = module === "venue";
@@ -70,9 +71,19 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         : isCinema
           ? "Cinema name"
           : "Organizer name";
-  const typeLabel = isArtist ? "Artist type" : isDining || isVenue ? "Venue type" : "Module";
+  const typeLabel = isArtist
+    ? "Artist type"
+    : isCinema
+      ? "Cinema type"
+      : isDining || isVenue
+        ? "Venue type"
+        : "Module";
   const typeValue = hasSubtype ? biz?.type_name : isCinema ? "Cinema" : "Event";
   const moduleBadge = isArtist ? "Artist" : isCinema ? "Cinema" : "Event";
+
+  const goToList = () => {
+    router.push(listHref);
+  };
 
   if (isLoading) {
     return <div className="text-white p-10 text-center">Loading partner...</div>;
@@ -82,9 +93,13 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
     return (
       <div className="text-center py-16">
         <p className="text-zinc-400 mb-4">Partner not found.</p>
-        <Link href={listHref} className="text-rose-500 hover:text-rose-400">
+        <button
+          type="button"
+          onClick={goToList}
+          className="text-rose-500 hover:text-rose-400 cursor-pointer"
+        >
           Back to list
-        </Link>
+        </button>
       </div>
     );
   }
@@ -95,7 +110,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const isArchived = !!biz.deleted_at;
   const archiveBlocked = isDining
     ? (biz.upcoming_booking_count ?? 0) > 0
-    : isVenue || isArtist
+    : isVenue || isArtist || isCinema
       ? false
       : (biz.live_event_count ?? 0) > 0;
   const actionBusy = isArchiving || isUnarchiving || confirmBusy;
@@ -141,23 +156,36 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
               ? `Archive "${biz.name}"? After archive, they cannot log in. Layout request history is kept.`
               : isArtist
                 ? `Archive "${biz.name}"? After archive, they cannot log in. Artist profile history is kept.`
-                : `You cannot archive this organizer if any event is still LIVE. Close live events first. After archive, "${biz.name}" cannot log in. Booking and fee history is kept.`,
+                : isCinema
+                  ? `Archive "${biz.name}"? After archive, they cannot log in. Cinema partner history is kept.`
+                  : `You cannot archive this organizer if any event is still LIVE. Close live events first. After archive, "${biz.name}" cannot log in. Booking and fee history is kept.`,
           confirmLabel: "Archive",
           danger: true,
         };
 
   return (
     <div className="w-full space-y-6">
-      <Link
-        href={listHref}
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-400 hover:text-white"
+      <button
+        type="button"
+        onClick={goToList}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-400 hover:text-white cursor-pointer"
       >
         <ArrowLeft size={16} /> Back to {listLabel}
-      </Link>
+      </button>
       {isVenue && (
         <div>
           <Link href={`/admin/venue-layouts?business_id=${biz.id}`} className="btn-secondary inline-flex items-center gap-2">
             Review venue layouts
+          </Link>
+        </div>
+      )}
+      {isCinema && (
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/admin/venue-layouts?business_id=${biz.id}`} className="btn-secondary inline-flex items-center gap-2">
+            Review screen layouts
+          </Link>
+          <Link href="/admin/movies" className="btn-secondary inline-flex items-center gap-2">
+            Movie catalog
           </Link>
         </div>
       )}

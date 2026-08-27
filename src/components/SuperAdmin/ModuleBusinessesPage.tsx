@@ -97,7 +97,13 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
           ? "cinema partner"
           : "event organizer";
   const actionBusy = isToggling || isArchiving || isUnarchiving || confirmBusy;
-  const typeLabel = isArtist ? "Artist Type" : isDining || isVenue ? "Venue Type" : "Module";
+  const typeLabel = isArtist
+    ? "Artist Type"
+    : isCinema
+      ? "Cinema Type"
+      : isDining || isVenue
+        ? "Venue Type"
+        : "Module";
   const emptyLabel = isDining
     ? "dining businesses"
     : isVenue
@@ -231,7 +237,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
     );
 
   const typeNode = (biz: Business) => {
-    if (isDining || isVenue || isArtist) {
+    if (isDining || isVenue || isArtist || isCinema) {
       return <span>{biz.type_name || "Unspecified"}</span>;
     }
     return (
@@ -245,7 +251,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
     const isArchived = !!biz.deleted_at;
     const archiveBlocked = isDining
       ? (biz.upcoming_booking_count ?? 0) > 0
-      : isVenue || isArtist
+      : isVenue || isArtist || isCinema
         ? false
         : (biz.live_event_count ?? 0) > 0;
 

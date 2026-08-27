@@ -3,8 +3,8 @@ export default function MovieShowtimesPlaceholderPage() {
     <div className="max-w-3xl mx-auto glass-panel rounded-2xl border border-white/10 p-8 text-center space-y-3">
       <h2 className="text-xl font-bold text-white">Showtimes</h2>
       <p className="text-zinc-400 text-sm">
-        Showtime scheduling is coming soon. You will be able to publish screening times and manage
-        seat inventory from here.
+        Coming next. After screens have an approved seat layout and Super Admin has movies in the
+        catalog, you will publish daily shows here (date, time, language, format, prices).
       </p>
     </div>
   );

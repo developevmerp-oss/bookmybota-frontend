@@ -64,7 +64,6 @@ import {
 import { extractApiError } from "@/lib/apiErrors";
 import ImageCropPicker, { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import EventStepperNav, {
-  EVENT_STEPPER_STEPS,
   type EventStepperStepId,
 } from "@/components/EventAdminPanel/EventStepperNav";
 import {
@@ -72,6 +71,18 @@ import {
   normalizeAllowedTicketModes,
   type TicketDeliveryMode,
 } from "@/lib/eventTicketMode";
+import {
+  getEventStepperSteps,
+  getSportExtraFields,
+  getSportMeta,
+  isSportMetaComplete,
+  isSportsCategory,
+  SPORT_GENDER_CATEGORIES,
+  SPORT_MATCH_FORMATS,
+  defaultSportMeta,
+  type EventCategoryMeta,
+  type SportMeta,
+} from "@/lib/eventCategoryConfig";
 
 function normalizeFormDocuments(docs?: EventDocumentUpload[] | string[]): EventDocumentUpload[] {
   if (!docs?.length) return [];
@@ -152,6 +163,10 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     age_group: event.age_group || "",
     duration_minutes: event.duration_minutes ?? null,
     allowed_ticket_modes: normalizeAllowedTicketModes(event.allowed_ticket_modes),
+    category_meta:
+      event.category_meta && typeof event.category_meta === "object"
+        ? (event.category_meta as EventCategoryMeta)
+        : {},
     artists:
       event.artists?.map((a, i) => ({
         artist_source:
@@ -1615,7 +1630,7 @@ export default function EventForm({
   );
   const [stepId, setStepId] = useState<EventStepperStepId>(event ? "details" : "type");
   const [visitedSteps, setVisitedSteps] = useState<EventStepperStepId[]>(() =>
-    event ? EVENT_STEPPER_STEPS.map((s) => s.id) : []
+    event ? getEventStepperSteps(event.category_slug).map((s) => s.id) : []
   );
 
   const categories = useMemo(
@@ -1643,6 +1658,7 @@ export default function EventForm({
   const categoryTypeId = watch("category_type_id");
   const genres = watch("genres") || [];
   const languages = watch("languages") || [];
+  const categoryMeta = (watch("category_meta") || {}) as EventCategoryMeta;
   const posterHorizontal = watch("poster_horizontal_url");
   const posterVertical = watch("poster_vertical_url");
   const galleryImages = watch("gallery_images") || [];
@@ -1652,6 +1668,20 @@ export default function EventForm({
   const durationHours = Math.floor(Math.max(0, durationMinutesTotal) / 60);
   const durationMinutesPart = Math.max(0, durationMinutesTotal) % 60;
   const watchedValues = watch();
+
+  const categorySlug = useMemo(() => {
+    if (!categoryTypeId) return event?.category_slug || "";
+    return categories.find((c) => c.id === categoryTypeId)?.slug || "";
+  }, [categories, categoryTypeId, event?.category_slug]);
+
+  const steps = useMemo(() => getEventStepperSteps(categorySlug), [categorySlug]);
+  const isSports = isSportsCategory(categorySlug);
+  const sportMeta = getSportMeta(categoryMeta);
+  const primarySportGenre = genres[0] || "";
+  const sportExtraFields = useMemo(
+    () => getSportExtraFields(primarySportGenre),
+    [primarySportGenre]
+  );
 
   const { data: masters, isLoading: mastersLoading } = useGetEventMastersQuery(categoryTypeId!, {
     skip: !categoryTypeId,
@@ -1670,6 +1700,19 @@ export default function EventForm({
     [masters?.documents]
   );
 
+  useEffect(() => {
+    const allowed = new Set(steps.map((s) => s.id));
+    if (!allowed.has(stepId)) {
+      setStepId("details");
+    }
+    setVisitedSteps((prev) => {
+      const next = prev.filter((id) => allowed.has(id));
+      if (!next.includes("details") && allowed.has("details")) next.push("details");
+      if (next.length === prev.length && next.every((id, i) => id === prev[i])) return prev;
+      return next;
+    });
+  }, [steps, stepId]);
+
   const completedStepIds = useMemo(() => {
     return getCompletedEventStepIds({
       hostingType,
@@ -1677,8 +1720,34 @@ export default function EventForm({
       documents,
       requiredDocumentIds: eventDocuments.filter((d) => d.is_required).map((d) => d.id),
       genresConfigured: (masters?.genres?.length || 0) > 0,
+      categorySlug,
     });
-  }, [hostingType, watchedValues, documents, eventDocuments, masters?.genres]);
+  }, [hostingType, watchedValues, documents, eventDocuments, masters?.genres, categorySlug]);
+
+  const updateSportMeta = (patch: Partial<SportMeta>) => {
+    const next: EventCategoryMeta = {
+      ...categoryMeta,
+      sport: {
+        ...defaultSportMeta(),
+        ...sportMeta,
+        ...patch,
+        extras: {
+          ...(sportMeta.extras || {}),
+          ...(patch.extras || {}),
+        },
+      },
+    };
+    setValue("category_meta", next, { shouldDirty: true });
+  };
+
+  const updateSportExtra = (key: string, value: string) => {
+    updateSportMeta({
+      extras: {
+        ...(sportMeta.extras || {}),
+        [key]: value,
+      },
+    });
+  };
 
   const toggleTicketMode = (mode: TicketDeliveryMode) => {
     if (readOnly) return;
@@ -1807,6 +1876,7 @@ export default function EventForm({
       allowed_ticket_modes: normalizeAllowedTicketModes(values.allowed_ticket_modes, {
         expandEmpty: false,
       }),
+      category_meta: values.category_meta ?? {},
       ticket_types,
       hosting_type: hostingType,
       tour_id: (event as { tour_id?: string | null } | undefined)?.tour_id || null,
@@ -1875,7 +1945,12 @@ export default function EventForm({
   const validateMasters = (forSubmit: boolean) => {
     if (!forSubmit || !masters) return null;
     if (masters.genres.length > 0 && (!genres || genres.length === 0)) {
-      return "Select at least one genre for this category.";
+      return isSports
+        ? "Select at least one sport type for this event."
+        : "Select at least one genre for this category.";
+    }
+    if (isSports && !isSportMetaComplete(getValues("category_meta") as EventCategoryMeta)) {
+      return "Home team and away team are required for sport events.";
     }
     const requiredDocs = eventDocuments.filter((d) => d.is_required);
     const eventDocsErr = validateRequiredDocuments(
@@ -2023,7 +2098,7 @@ export default function EventForm({
   const errorClass = "text-rose-600 text-xs mt-1";
   const inputClass = "input-field w-full";
 
-  const stepIndex = EVENT_STEPPER_STEPS.findIndex((s) => s.id === stepId);
+  const stepIndex = steps.findIndex((s) => s.id === stepId);
   const isFirstStep = stepIndex <= 0;
   const isLastStep = stepId === "review";
 
@@ -2092,6 +2167,18 @@ export default function EventForm({
       }
       return true;
     }
+    if (stepId === "sport") {
+      const values = getValues();
+      if (!(values.genres || []).length) {
+        toast.error("Select at least one sport type.");
+        return false;
+      }
+      if (!isSportMetaComplete(values.category_meta as EventCategoryMeta)) {
+        toast.error("Home team and away team are required.");
+        return false;
+      }
+      return true;
+    }
     if (stepId === "media") {
       const ok = await trigger(["poster_horizontal_url", "youtube_url"]);
       if (!ok || !getValues("poster_horizontal_url")?.trim()) {
@@ -2153,12 +2240,12 @@ export default function EventForm({
     const ok = await validateCurrentStep();
     if (!ok) return;
     markVisited(stepId);
-    const next = EVENT_STEPPER_STEPS[stepIndex + 1];
+    const next = steps[stepIndex + 1];
     if (next) setStepId(next.id);
   };
 
   const goBack = () => {
-    const prev = EVENT_STEPPER_STEPS[stepIndex - 1];
+    const prev = steps[stepIndex - 1];
     if (prev) setStepId(prev.id);
   };
 
@@ -2173,6 +2260,7 @@ export default function EventForm({
         <EventStepperNav
           currentId={stepId}
           completedIds={completedStepIds}
+          steps={steps}
           allowJump
           onStepClick={(id) => {
             goToStep(id);
@@ -2263,6 +2351,7 @@ export default function EventForm({
                 const val = e.target.value ? Number(e.target.value) : null;
                 setValue("category_type_id", val, { shouldDirty: true });
                 setValue("genres", []);
+                setValue("category_meta", {}, { shouldDirty: true });
                 setDocuments([]);
               }}
             >
@@ -2348,12 +2437,15 @@ export default function EventForm({
 
           <div>
             <label className={labelClass}>
-              Genres {masters?.genres?.length ? <span className="text-rose-500">*</span> : null}
+              {isSports ? "Sport type" : "Genres"}{" "}
+              {masters?.genres?.length ? <span className="text-rose-500">*</span> : null}
             </label>
             {!categoryTypeId ? (
-              <p className="portal-muted text-sm">Select a category to see available genres.</p>
+              <p className="portal-muted text-sm">
+                Select a category to see available {isSports ? "sport types" : "genres"}.
+              </p>
             ) : mastersLoading ? (
-              <p className="portal-muted text-sm">Loading genres...</p>
+              <p className="portal-muted text-sm">Loading {isSports ? "sport types" : "genres"}...</p>
             ) : masters?.genres?.length ? (
               <div className="flex flex-wrap gap-2">
                 {masters.genres.map((g) => (
@@ -2373,7 +2465,9 @@ export default function EventForm({
                 ))}
               </div>
             ) : (
-              <p className="text-amber-700 text-sm">No genres configured. Ask Super Admin to add genres.</p>
+              <p className="text-amber-700 text-sm">
+                No {isSports ? "sport types" : "genres"} configured. Ask Super Admin to add them.
+              </p>
             )}
           </div>
 
@@ -2476,6 +2570,154 @@ export default function EventForm({
             </div>
           </div>
         </section>
+        )}
+
+        {stepId === "sport" && (
+          <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+            <div>
+              <h3 className="portal-heading text-lg font-semibold">Sport details</h3>
+              <p className="portal-muted text-sm mt-1">
+                Teams, tournament, and format for this match. Extra fields adapt to the selected sport type.
+              </p>
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Sport type <span className="text-rose-500">*</span>
+              </label>
+              {!categoryTypeId ? (
+                <p className="portal-muted text-sm">Select a category in Event details first.</p>
+              ) : mastersLoading ? (
+                <p className="portal-muted text-sm">Loading sport types...</p>
+              ) : masters?.genres?.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {masters.genres.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => toggleGenre(g.name)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        genres.includes(g.name)
+                          ? "bg-violet-500/20 text-violet-700 border-violet-500/40"
+                          : "portal-muted border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-amber-700 text-sm">No sport types configured. Ask Super Admin to add them.</p>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>
+                  Home team <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  disabled={readOnly}
+                  className={inputClass}
+                  value={sportMeta.home_team || ""}
+                  onChange={(e) => updateSportMeta({ home_team: e.target.value })}
+                  placeholder="e.g. Mumbai City FC"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>
+                  Away team <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  disabled={readOnly}
+                  className={inputClass}
+                  value={sportMeta.away_team || ""}
+                  onChange={(e) => updateSportMeta({ away_team: e.target.value })}
+                  placeholder="e.g. Bengaluru FC"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Tournament / league</label>
+              <input
+                disabled={readOnly}
+                className={inputClass}
+                value={sportMeta.tournament_name || ""}
+                onChange={(e) => updateSportMeta({ tournament_name: e.target.value })}
+                placeholder="e.g. ISL 2026"
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Match format</label>
+                <select
+                  disabled={readOnly}
+                  className={inputClass}
+                  value={sportMeta.match_format || ""}
+                  onChange={(e) =>
+                    updateSportMeta({
+                      match_format: e.target.value as SportMeta["match_format"],
+                    })
+                  }
+                >
+                  <option value="">Select format</option>
+                  {SPORT_MATCH_FORMATS.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Gender category</label>
+                <select
+                  disabled={readOnly}
+                  className={inputClass}
+                  value={sportMeta.gender_category || ""}
+                  onChange={(e) =>
+                    updateSportMeta({
+                      gender_category: e.target.value as SportMeta["gender_category"],
+                    })
+                  }
+                >
+                  <option value="">Select category</option>
+                  {SPORT_GENDER_CATEGORIES.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {sportExtraFields.length > 0 && (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">
+                  {primarySportGenre
+                    ? `${primarySportGenre} specifics`
+                    : "Sport-specific details"}
+                </p>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {sportExtraFields.map((field) => (
+                    <div key={field.key} className={sportExtraFields.length === 1 ? "sm:col-span-2" : ""}>
+                      <label className={labelClass}>{field.label}</label>
+                      <input
+                        disabled={readOnly}
+                        type={field.type === "number" ? "number" : "text"}
+                        className={inputClass}
+                        value={sportMeta.extras?.[field.key] || ""}
+                        onChange={(e) => updateSportExtra(field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
         )}
 
         {stepId === "media" && (
@@ -2770,9 +3012,13 @@ export default function EventForm({
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="portal-heading text-lg font-semibold">Event lineup</h3>
+              <h3 className="portal-heading text-lg font-semibold">
+                {isSports ? "Teams / players" : "Event lineup"}
+              </h3>
               <p className="portal-muted text-xs mt-1">
-                Optional. Add artists, guests, or chief guests. For artists you can search partners or auto-register a new name.
+                {isSports
+                  ? "Optional. Add players, coaches, or officials. Search registered partners or add a new name."
+                  : "Optional. Add artists, guests, or chief guests. For artists you can search partners or auto-register a new name."}
               </p>
             </div>
         {!readOnly && (
@@ -2781,14 +3027,18 @@ export default function EventForm({
                 onClick={() => appendArtist({ ...defaultArtist(), sort_order: artistFields.length })}
                 className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
               >
-                <Plus size={14} /> Add person
+                <Plus size={14} /> {isSports ? "Add player" : "Add person"}
               </button>
             )}
           </div>
 
           {artistFields.length === 0 && (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-              <p className="text-sm text-slate-600">No one added yet. You can continue without a lineup.</p>
+              <p className="text-sm text-slate-600">
+                {isSports
+                  ? "No players added yet. You can continue without a roster."
+                  : "No one added yet. You can continue without a lineup."}
+              </p>
             </div>
           )}
 
@@ -2870,6 +3120,45 @@ export default function EventForm({
                   Edit details
                 </button>
               </div>
+
+              {isSports && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sport</p>
+                  <p className="font-semibold text-slate-900">
+                    {(sportMeta.home_team || "Home").trim()} vs {(sportMeta.away_team || "Away").trim()}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    {(genres || []).join(", ") || "No sport type"}
+                    {sportMeta.tournament_name ? ` · ${sportMeta.tournament_name}` : ""}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    {sportMeta.match_format
+                      ? SPORT_MATCH_FORMATS.find((f) => f.id === sportMeta.match_format)?.label ||
+                        sportMeta.match_format
+                      : "Format not set"}
+                    {" · "}
+                    {sportMeta.gender_category
+                      ? SPORT_GENDER_CATEGORIES.find((g) => g.id === sportMeta.gender_category)
+                          ?.label || sportMeta.gender_category
+                      : "Gender not set"}
+                  </p>
+                  {sportExtraFields.some((f) => sportMeta.extras?.[f.key]?.trim()) && (
+                    <p className="text-sm text-slate-600">
+                      {sportExtraFields
+                        .filter((f) => sportMeta.extras?.[f.key]?.trim())
+                        .map((f) => `${f.label}: ${sportMeta.extras?.[f.key]}`)
+                        .join(" · ")}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="text-sm text-violet-700 font-medium"
+                    onClick={() => goToStep("sport")}
+                  >
+                    Edit sport details
+                  </button>
+                </div>
+              )}
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Media</p>
@@ -2981,7 +3270,9 @@ export default function EventForm({
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lineup</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {isSports ? "Teams / players" : "Lineup"}
+                </p>
                 {(watch("artists") || []).length === 0 ? (
                   <p className="text-sm text-slate-600">No one added</p>
                 ) : (
@@ -3002,7 +3293,7 @@ export default function EventForm({
                   ))
                 )}
                 <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("artists")}>
-                  Edit lineup
+                  {isSports ? "Edit teams / players" : "Edit lineup"}
                 </button>
               </div>
 
@@ -3134,7 +3425,7 @@ export default function EventForm({
                 type="button"
                 onClick={() => {
                   markVisited(stepId);
-                  const next = EVENT_STEPPER_STEPS[stepIndex + 1];
+                  const next = steps[stepIndex + 1];
                   if (next) setStepId(next.id);
                 }}
                 className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-1.5"

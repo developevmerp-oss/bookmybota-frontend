@@ -367,6 +367,9 @@ export interface AdminEvent {
   duration_minutes?: number;
   /** Ticket delivery modes customers may choose for this event. */
   allowed_ticket_modes?: Array<'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY'>;
+  /** Category-specific extras (e.g. sport match details). */
+  category_meta?: Record<string, unknown> | null;
+  category_slug?: string | null;
   tickets_sold?: number;
   convenience_fee_earned?: number | string;
   commission_earned?: number | string;
@@ -649,6 +652,8 @@ export interface EventFormPayload {
   };
   /** Which delivery modes customers can choose at purchase. At least one required on submit. */
   allowed_ticket_modes?: Array<'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY'>;
+  /** Category-specific extras (e.g. sport.match details). */
+  category_meta?: Record<string, unknown> | null;
   ticket_types: Array<{ ticket_type: string; total_count: number; price: number; max_per_order?: number }>;
   artists?: Array<{
     artist_source: 'registered' | 'external' | 'auto_registered';

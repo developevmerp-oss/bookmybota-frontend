@@ -187,7 +187,8 @@ export default function OrganizerAccountSetupForm({
       contactName.trim().length > 1 &&
       phoneValid &&
       !!adminEmail.trim() &&
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim())
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim()) &&
+      (module !== "artist" || !!coverImageUrl.trim())
     );
   }, [
     moduleParentId,
@@ -198,6 +199,8 @@ export default function OrganizerAccountSetupForm({
     contactName,
     phoneValid,
     adminEmail,
+    module,
+    coverImageUrl,
   ]);
 
   const canOpenStep = (id: StepId) => (id === 1 ? true : step1Done);
@@ -213,7 +216,10 @@ export default function OrganizerAccountSetupForm({
 
   const handleSaveStep1 = () => {
     if (!step1Valid) {
-      const message = "Please fill all required General Information fields.";
+      const message =
+        module === "artist" && !coverImageUrl.trim()
+          ? "Please upload an artist image and fill all required fields."
+          : "Please fill all required General Information fields.";
       setError(message);
       toast.error(message);
       return;
@@ -226,7 +232,10 @@ export default function OrganizerAccountSetupForm({
 
   const handleProceedStep1 = () => {
     if (!step1Valid) {
-      const message = "Please fill all required General Information fields.";
+      const message =
+        module === "artist" && !coverImageUrl.trim()
+          ? "Please upload an artist image and fill all required fields."
+          : "Please fill all required General Information fields.";
       setError(message);
       toast.error(message);
       return;
@@ -434,7 +443,8 @@ export default function OrganizerAccountSetupForm({
                 {(module === "artist" || module === "venue") && (
                   <div>
                     <label className={labelClass}>
-                      {module === "artist" ? "Profile photo" : "Venue cover image"}
+                      {module === "artist" ? "Artist image" : "Venue cover image"}{" "}
+                      {module === "artist" ? <span className="text-[#6900AA]">*</span> : null}
                     </label>
                     <CroppedImageField
                       value={coverImageUrl}
@@ -442,12 +452,12 @@ export default function OrganizerAccountSetupForm({
                       disabled={uploadingImage}
                       previewClassName={
                         module === "artist"
-                          ? "w-32 h-32 rounded-2xl"
+                          ? "w-36 h-36 rounded-2xl border border-slate-200"
                           : "w-full max-w-sm aspect-video rounded-2xl"
                       }
                       emptyClassName={
                         module === "artist"
-                          ? "flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
+                          ? "flex flex-col items-center justify-center w-36 h-36 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA] bg-slate-50"
                           : "flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
                       }
                       onRemove={() => setCoverImageUrl("")}
@@ -458,7 +468,9 @@ export default function OrganizerAccountSetupForm({
                           const res = await uploadImage(formData).unwrap();
                           if (res.url) {
                             setCoverImageUrl(res.url);
-                            toast.success("Image uploaded");
+                            toast.success(
+                              module === "artist" ? "Artist image uploaded" : "Image uploaded"
+                            );
                           }
                         } catch (err) {
                           toast.error(extractApiError(err, "Failed to upload image"));
@@ -466,16 +478,21 @@ export default function OrganizerAccountSetupForm({
                       }}
                       emptyContent={
                         <>
-                          <ImagePlus className="text-slate-400 mb-1" size={20} />
-                          <span className="text-[10px] text-slate-500">
-                            {uploadingImage ? "Uploading…" : "Add photo"}
+                          <ImagePlus className="text-slate-400 mb-1" size={22} />
+                          <span className="text-[10px] text-slate-500 text-center px-2">
+                            {uploadingImage
+                              ? "Uploading…"
+                              : module === "artist"
+                                ? "Upload artist image"
+                                : "Add photo"}
                           </span>
                         </>
                       }
                     />
                     <p className="mt-1.5 text-xs text-slate-400">
-                      Shown on the public {module === "artist" ? "artist" : "venue"} listing and
-                      profile page.
+                      {module === "artist"
+                        ? "Square photo of the artist — shown on public listings and your profile."
+                        : "Shown on the public venue listing and profile page."}
                     </p>
                   </div>
                 )}

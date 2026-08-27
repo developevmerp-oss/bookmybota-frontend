@@ -210,6 +210,7 @@ export const eventDraftSchema = yup.object({
     .array()
     .of(yup.string().oneOf(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']).required())
     .default([]),
+  category_meta: yup.object().default({}),
   showtimes: yup.array().of(showtimeSchema).default([]),
   artists: yup.array().of(artistSchema).default([]),
 });
@@ -379,6 +380,7 @@ export function defaultEventFormValues(): EventFormValues {
     age_group: '',
     duration_minutes: null,
     allowed_ticket_modes: [],
+    category_meta: {},
     showtimes: [defaultVenue()],
     artists: [],
   };
@@ -430,6 +432,7 @@ export function validateRequiredDocuments(
 export type EventStepCompletionId =
   | 'type'
   | 'details'
+  | 'sport'
   | 'media'
   | 'venue'
   | 'artists'
@@ -443,11 +446,13 @@ export function getCompletedEventStepIds(opts: {
   documents: Array<{ document_type_id: number; url: string }>;
   requiredDocumentIds?: number[];
   genresConfigured?: boolean;
+  categorySlug?: string | null;
 }): EventStepCompletionId[] {
   const { hostingType, values, documents } = opts;
   const genresConfigured = opts.genresConfigured === true;
   const requiredDocumentIds = opts.requiredDocumentIds || [];
   const done: EventStepCompletionId[] = [];
+  const isSports = String(opts.categorySlug || '').toLowerCase() === 'sports';
 
   if (hostingType === 'single' || hostingType === 'tour') {
     done.push('type');
@@ -462,6 +467,16 @@ export function getCompletedEventStepIds(opts: {
   const genresOk = !genresConfigured || (values.genres || []).length > 0;
   if (nameOk && categoryOk && languagesOk && ageOk && aboutOk && modesOk && genresOk) {
     done.push('details');
+  }
+
+  if (isSports) {
+    const sport =
+      values.category_meta &&
+      typeof values.category_meta === 'object' &&
+      (values.category_meta as { sport?: { home_team?: string; away_team?: string } }).sport;
+    if (sport?.home_team?.trim() && sport?.away_team?.trim() && (values.genres || []).length > 0) {
+      done.push('sport');
+    }
   }
 
   if (values.poster_horizontal_url?.trim()) {

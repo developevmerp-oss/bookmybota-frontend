@@ -14,7 +14,7 @@ import {
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 
-export default function ArtistProfilePage() {
+export default function MovieProfilePage() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   useEffect(() => {
@@ -43,26 +43,27 @@ export default function ArtistProfilePage() {
   }, [settings]);
 
   if (isLoading || !user) {
-    return <div className="text-white p-10 text-center">Loading artist profile...</div>;
+    return <div className="text-white p-10 text-center">Loading cinema profile...</div>;
   }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white">Artist profile</h2>
+        <h2 className="text-2xl font-bold text-white">Cinema profile</h2>
         <p className="text-zinc-400 mt-1">
-          Basic artist information used by Super Admin during approval and later event bookings.
+          Basic cinema information used by Super Admin during approval and shown on your partner
+          listing.
         </p>
       </div>
       <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">Profile photo</label>
+          <label className="block text-sm font-medium text-zinc-400 mb-2">Cover image</label>
           <CroppedImageField
             value={coverImageUrl}
-            aspect={1}
+            aspect={16 / 9}
             disabled={uploading}
-            previewClassName="w-32 h-32 rounded-2xl border border-white/10"
-            emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-white/20 hover:border-violet-400"
+            previewClassName="w-full max-w-sm aspect-video rounded-2xl border border-white/10"
+            emptyClassName="flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-2xl border border-dashed border-white/20 hover:border-fuchsia-400"
             onRemove={() => setCoverImageUrl("")}
             onCroppedFile={async (file) => {
               const fd = new FormData();
@@ -71,17 +72,17 @@ export default function ArtistProfilePage() {
                 const res = await uploadImage(fd).unwrap();
                 if (res.url) {
                   setCoverImageUrl(res.url);
-                  toast.success("Photo uploaded");
+                  toast.success("Image uploaded");
                 }
               } catch (err) {
-                toast.error(extractApiError(err, "Failed to upload photo"));
+                toast.error(extractApiError(err, "Failed to upload image"));
               }
             }}
             emptyContent={
               <>
                 <ImagePlus className="text-zinc-400 mb-1" size={20} />
                 <span className="text-[10px] text-zinc-500">
-                  {uploading ? "Uploading…" : "Add photo"}
+                  {uploading ? "Uploading…" : "Add cover"}
                 </span>
               </>
             }
@@ -89,7 +90,7 @@ export default function ArtistProfilePage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-2">Artist / stage name</label>
+            <label className="block text-sm font-medium text-zinc-400 mb-2">Cinema name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} className="input-field" />
           </div>
           <PhoneInput
@@ -103,7 +104,7 @@ export default function ArtistProfilePage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">Address / base city</label>
+          <label className="block text-sm font-medium text-zinc-400 mb-2">Address</label>
           <textarea
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -112,13 +113,12 @@ export default function ArtistProfilePage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">Bio / description</label>
+          <label className="block text-sm font-medium text-zinc-400 mb-2">Description</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white"
             rows={4}
-            placeholder="Genre, experience, performance style..."
           />
         </div>
         <div className="flex justify-end">
@@ -135,7 +135,7 @@ export default function ArtistProfilePage() {
                     cover_image_url: coverImageUrl || "",
                   },
                 }).unwrap();
-                toast.success("Artist profile saved");
+                toast.success("Cinema profile saved");
               } catch {
                 toast.error("Failed to save profile");
               }

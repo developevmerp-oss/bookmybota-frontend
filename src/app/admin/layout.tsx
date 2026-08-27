@@ -29,6 +29,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   KeyRound,
+  Clapperboard,
 } from "lucide-react";
 import AuthGate from "@/components/Shared/AuthGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
@@ -134,6 +135,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Event Organizers", href: "/admin/businesses/event", icon: Store },
     { name: "Venue Partners", href: "/admin/businesses/venue", icon: Store },
     { name: "Artist Partners", href: "/admin/businesses/artist", icon: Mic2 },
+    { name: "Cinema Partners", href: "/admin/businesses/cinema", icon: Clapperboard },
     { name: "Venue Layouts", href: "/admin/venue-layouts", icon: Map },
     { name: "Event Layouts", href: "/admin/event-layouts", icon: Map },
     { name: "Events", href: "/admin/events", icon: CalendarDays },

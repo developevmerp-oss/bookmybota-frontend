@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
 import HomeHeader from "@/components/LandingPage/HomeHeader";
-import { isArtistAdminPath, isVenueAdminPath } from "@/lib/authStorage";
+import { isArtistAdminPath, isMovieAdminPath, isVenueAdminPath } from "@/lib/authStorage";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -89,20 +89,32 @@ export default function RootLayout({
   const isOrganizerRegister = pathname === "/organizer/register";
   const isVenueRegister = pathname === "/venue/register";
   const isArtistRegister = pathname === "/artist/register";
-  /** Register keeps public chrome; partner landings use their own headers */
-  const isOrganizerMarketing = isOrganizerRegister;
+  const isMovieRegister = pathname === "/movie/register";
+  const isVenueLogin = pathname === "/venue/login";
+  const isArtistLogin = pathname === "/artist/login";
+  const isMovieLogin = pathname === "/movie/login";
+  /** Partner login/register keep the public navbar (same as organizer register). */
+  const isPartnerPublicAuth =
+    isOrganizerRegister ||
+    isVenueRegister ||
+    isArtistRegister ||
+    isMovieRegister ||
+    isVenueLogin ||
+    isArtistLogin ||
+    isMovieLogin;
 
   const isAdminOrBusiness =
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/business") ||
-    isArtistAdminPath(pathname || "") ||
-    isVenueAdminPath(pathname || "") ||
-    (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerMarketing);
+    (isArtistAdminPath(pathname || "") && !isArtistRegister && !isArtistLogin) ||
+    (isVenueAdminPath(pathname || "") && !isVenueRegister && !isVenueLogin) ||
+    (isMovieAdminPath(pathname || "") && !isMovieRegister && !isMovieLogin) ||
+    (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerRegister);
     
 
   const isLandingPage = pathname === "/";
   const isEventsPublicPage = pathname === "/events" || Boolean(pathname?.startsWith("/events/"));
-  const isOrganizerMarketingPage = isOrganizerMarketing;
+  const isOrganizerMarketingPage = isOrganizerRegister;
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/register" ||
@@ -111,11 +123,8 @@ export default function RootLayout({
     pathname === "/admin/login" ||
     pathname === "/business/login" ||
     pathname === "/organizer/login" ||
-    pathname === "/venue/login" ||
-    pathname === "/artist/login" ||
-    isOrganizerRegister ||
-    isVenueRegister ||
-    isArtistRegister;
+    pathname === "/movie/login" ||
+    isPartnerPublicAuth;
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
   const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow;
   const showLayoutFooter =

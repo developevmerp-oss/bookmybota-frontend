@@ -68,7 +68,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const { data, isLoading, isFetching } = useGetAdminBusinessesQuery({
-    module: module as "dining" | "event" | "venue" | "artist",
+    module: module as "dining" | "event" | "venue" | "artist" | "cinema",
     tab,
     page,
     limit,
@@ -85,6 +85,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
   const isDining = module === "dining";
   const isVenue = module === "venue";
   const isArtist = module === "artist";
+  const isCinema = module === "cinema";
   const listBase = `/admin/businesses/${module}`;
   const label = isDining
     ? "dining business"
@@ -92,7 +93,9 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
       ? "venue partner"
       : isArtist
         ? "artist partner"
-        : "event organizer";
+        : isCinema
+          ? "cinema partner"
+          : "event organizer";
   const actionBusy = isToggling || isArchiving || isUnarchiving || confirmBusy;
   const typeLabel = isArtist ? "Artist Type" : isDining || isVenue ? "Venue Type" : "Module";
   const emptyLabel = isDining
@@ -101,7 +104,9 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
       ? "venue partners"
       : isArtist
         ? "artist partners"
-        : "event organizers";
+        : isCinema
+          ? "cinema partners"
+          : "event organizers";
 
   const closeConfirm = () => {
     if (confirmBusy) return;

@@ -6,6 +6,14 @@ import {
   validateShowtimeEnd,
 } from './dateFormat';
 import { parseYouTubeId } from './youtube';
+import { countChars } from './eventDocumentScope';
+
+/** About event limit — characters so the counter rises as the user types. */
+export const MAX_ABOUT_EVENT_CHARS = 2500;
+/** @deprecated use MAX_ABOUT_EVENT_CHARS */
+export const MAX_ABOUT_EVENT_WORDS = MAX_ABOUT_EVENT_CHARS;
+const MAX_ABOUT_CHARS = MAX_ABOUT_EVENT_CHARS;
+const aboutCharsTest = (value: string | undefined) => countChars(value) <= MAX_ABOUT_CHARS;
 
 const ticketSchema = yup.object({
   ticket_type: yup.string().trim().required('Ticket type name is required'),
@@ -25,7 +33,7 @@ const ticketSchema = yup.object({
     .typeError('Purchase limit must be a number')
     .integer('Purchase limit must be a whole number')
     .min(1, 'Purchase limit must be at least 1')
-    .required('Purchase limit is required')
+    .default(10)
     .test('lte-total', 'Purchase limit cannot exceed total seats', function (value) {
       const total = Number(this.parent?.total_count);
       if (!Number.isFinite(total) || value == null) return true;
@@ -140,6 +148,38 @@ function showtimeRangeIso(s: {
   };
 }
 
+/** Add minutes to an ISO datetime; returns ISO string. */
+export function addMinutesToIso(iso: string, minutes: number): string {
+  if (!iso || !Number.isFinite(minutes) || minutes <= 0) return '';
+  const startMs = new Date(iso).getTime();
+  if (Number.isNaN(startMs)) return '';
+  return new Date(startMs + minutes * 60000).toISOString();
+}
+
+/**
+ * Resolve showtime start/end ISO.
+ * When end is blank, derive it from start + durationMinutes (single-event flow).
+ */
+export function showtimeToIso(
+  s: {
+    duration_type?: string;
+    event_date?: string;
+    start_time?: string;
+    end_time?: string;
+    starts_at?: string;
+    ends_at?: string;
+  },
+  durationMinutes?: number | null
+): { starts_at: string; ends_at: string } {
+  const { start, end } = showtimeRangeIso(s);
+  if (end) return { starts_at: start, ends_at: end };
+  const mins = Number(durationMinutes) || 0;
+  if (start && mins > 0) {
+    return { starts_at: start, ends_at: addMinutesToIso(start, mins) };
+  }
+  return { starts_at: start, ends_at: end };
+}
+
 export const eventDraftSchema = yup.object({
   name: yup.string().trim().default(''),
   category_type_id: yup.number().nullable().default(null),
@@ -155,13 +195,21 @@ export const eventDraftSchema = yup.object({
       return Boolean(parseYouTubeId(value));
     }),
   languages: yup.array().of(yup.string().required()).default([]),
-  about_event: yup.string().default(''),
+  about_event: yup
+    .string()
+    .default('')
+    .test('max-chars', `About event cannot exceed ${MAX_ABOUT_CHARS} characters.`, aboutCharsTest),
   age_group: yup.string().default(''),
-  duration_minutes: yup.number().nullable().default(null),
+  duration_minutes: yup
+    .number()
+    .nullable()
+    .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+    .min(1, 'Duration must be at least 1 minute')
+    .default(null),
   allowed_ticket_modes: yup
     .array()
     .of(yup.string().oneOf(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']).required())
-    .default(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']),
+    .default([]),
   showtimes: yup.array().of(showtimeSchema).default([]),
   artists: yup.array().of(artistSchema).default([]),
 });
@@ -172,13 +220,18 @@ export const eventSubmitSchema = eventDraftSchema.shape({
   genres: yup.array().of(yup.string().required()).min(1, 'Select at least one genre'),
   poster_horizontal_url: yup.string().trim().required('Horizontal poster is required'),
   languages: yup.array().of(yup.string().required()).min(1, 'Select at least one language'),
-  about_event: yup.string().trim().required('About event is required'),
+  about_event: yup
+    .string()
+    .trim()
+    .required('About event is required')
+    .test('max-chars', `About event cannot exceed ${MAX_ABOUT_CHARS} characters.`, aboutCharsTest),
   age_group: yup.string().trim().required('Age group is required'),
   duration_minutes: yup
     .number()
     .nullable()
     .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
-    .default(null),
+    .default(null)
+    .test('positive-or-null', 'Duration must be at least 1 minute', (v) => v == null || Number(v) >= 1),
   allowed_ticket_modes: yup
     .array()
     .of(yup.string().oneOf(['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY']).required())
@@ -227,13 +280,14 @@ export const eventSubmitSchema = eventDraftSchema.shape({
     .required()
     .test('venue-tickets-dates', function (showtimes) {
       if (!showtimes?.length) return true;
+      const durationMinutes = Number(this.parent?.duration_minutes) || 0;
       for (const s of showtimes) {
         if (!s.ticket_types?.length) {
           return this.createError({
             message: `Add at least one ticket type for venue "${s.venue_name || 'this venue'}".`,
           });
         }
-        const { start, end } = showtimeRangeIso(s);
+        const { starts_at: start, ends_at: end } = showtimeToIso(s, durationMinutes);
         if (!start) {
           return this.createError({
             message: `Set start date and time for venue "${s.venue_name || 'this venue'}".`,
@@ -241,7 +295,7 @@ export const eventSubmitSchema = eventDraftSchema.shape({
         }
         if (!end) {
           return this.createError({
-            message: `Set end time for venue "${s.venue_name || 'this venue'}".`,
+            message: `Set end time, or set event duration (hours/minutes), for venue "${s.venue_name || 'this venue'}".`,
           });
         }
         const msg = showtimeEndErrorMessage(validateShowtimeEnd(start, end));
@@ -290,7 +344,14 @@ export const defaultVenue = (): EventFormValues['showtimes'][number] => ({
   end_time: '',
   starts_at: '',
   ends_at: '',
-  ticket_types: [{ ticket_type: '', total_count: 100, price: 0, max_per_order: 10 }],
+  ticket_types: [],
+});
+
+export const defaultTicketType = (): EventFormValues['showtimes'][number]['ticket_types'][number] => ({
+  ticket_type: '',
+  total_count: NaN,
+  price: NaN,
+  max_per_order: 10,
 });
 
 export const defaultArtist = (): EventFormValues['artists'][number] => ({
@@ -317,37 +378,36 @@ export function defaultEventFormValues(): EventFormValues {
     about_event: '',
     age_group: '',
     duration_minutes: null,
-    allowed_ticket_modes: ['M_TICKET', 'BOX_OFFICE', 'PHYSICAL_DELIVERY'],
+    allowed_ticket_modes: [],
     showtimes: [defaultVenue()],
     artists: [],
   };
 }
 
-export function showtimeToIso(s: EventFormValues['showtimes'][number]): { starts_at: string; ends_at: string } {
-  const { start, end } = showtimeRangeIso(s);
-  return { starts_at: start, ends_at: end };
-}
-
 /** Duration in minutes from the first showtime that has valid start and end. */
 export function computeDurationMinutesFromShowtimes(
-  showtimes: EventFormValues['showtimes'] | undefined
+  showtimes: EventFormValues['showtimes'] | undefined,
+  fallbackDurationMinutes?: number | null
 ): number | null {
-  if (!showtimes?.length) return null;
+  if (!showtimes?.length) return Number(fallbackDurationMinutes) > 0 ? Number(fallbackDurationMinutes) : null;
   for (const s of showtimes) {
-    if (!isShowtimePersistable(s)) continue;
-    const { starts_at, ends_at } = showtimeToIso(s);
+    if (!isShowtimePersistable(s, fallbackDurationMinutes)) continue;
+    const { starts_at, ends_at } = showtimeToIso(s, fallbackDurationMinutes);
     if (!starts_at || !ends_at) continue;
     const startMs = new Date(starts_at).getTime();
     const endMs = new Date(ends_at).getTime();
     if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) continue;
     return Math.max(1, Math.round((endMs - startMs) / 60000));
   }
-  return null;
+  return Number(fallbackDurationMinutes) > 0 ? Number(fallbackDurationMinutes) : null;
 }
 
 /** True when a showtime row has enough data to persist (needs valid start datetime). */
-export function isShowtimePersistable(s: EventFormValues['showtimes'][number]): boolean {
-  const { starts_at } = showtimeToIso(s);
+export function isShowtimePersistable(
+  s: EventFormValues['showtimes'][number],
+  durationMinutes?: number | null
+): boolean {
+  const { starts_at } = showtimeToIso(s, durationMinutes);
   if (!starts_at) return false;
   const ms = new Date(starts_at).getTime();
   return !Number.isNaN(ms);
@@ -397,7 +457,7 @@ export function getCompletedEventStepIds(opts: {
   const categoryOk = values.category_type_id != null && Number.isFinite(Number(values.category_type_id));
   const languagesOk = (values.languages || []).length > 0;
   const ageOk = Boolean(values.age_group?.trim());
-  const aboutOk = Boolean(values.about_event?.trim());
+  const aboutOk = Boolean(values.about_event?.trim()) && countChars(values.about_event) <= MAX_ABOUT_CHARS;
   const modesOk = (values.allowed_ticket_modes || []).length > 0;
   const genresOk = !genresConfigured || (values.genres || []).length > 0;
   if (nameOk && categoryOk && languagesOk && ageOk && aboutOk && modesOk && genresOk) {
@@ -409,13 +469,14 @@ export function getCompletedEventStepIds(opts: {
   }
 
   const showtimes = values.showtimes || [];
+  const durationMinutes = Number(values.duration_minutes) || 0;
   const venueOk =
     showtimes.length > 0 &&
     showtimes.every((s) => {
       if (!s.venue_name?.trim()) return false;
       if (s.city_id == null || !Number.isFinite(Number(s.city_id))) return false;
-      if (!isShowtimePersistable(s)) return false;
-      const { starts_at, ends_at } = showtimeToIso(s);
+      if (!isShowtimePersistable(s, durationMinutes)) return false;
+      const { starts_at, ends_at } = showtimeToIso(s, durationMinutes);
       if (ends_at) {
         const endMsg = showtimeEndErrorMessage(validateShowtimeEnd(starts_at, ends_at));
         if (endMsg) return false;
@@ -427,9 +488,7 @@ export function getCompletedEventStepIds(opts: {
           Boolean(t.ticket_type?.trim()) &&
           Number(t.total_count) >= 1 &&
           Number(t.price) >= 0 &&
-          Number.isFinite(Number(t.price)) &&
-          Number(t.max_per_order) >= 1 &&
-          Number(t.max_per_order) <= Number(t.total_count)
+          Number.isFinite(Number(t.price))
       );
     });
   if (venueOk) done.push('venue');

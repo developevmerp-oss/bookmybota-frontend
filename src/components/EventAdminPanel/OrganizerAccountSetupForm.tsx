@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Loader2 } from "lucide-react";
+import { CheckCircle, ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import PartnerDocumentsFields, {
   validateRequiredPartnerDocuments,
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import PhoneInput from "@/components/Shared/PhoneInput";
+import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { isValidPhone } from "@/lib/validation";
 import { extractApiError } from "@/lib/apiErrors";
 import {
@@ -15,6 +16,7 @@ import {
   useGetPartnerDocumentMastersQuery,
   useGetPartnerOnboardingTermsQuery,
   useRegisterBusinessMutation,
+  useUploadImageMutation,
   type PartnerDocumentUpload,
 } from "@/services/api";
 
@@ -48,11 +50,11 @@ const textareaClass = `${inputClass} min-h-[96px] resize-y`;
 interface OrganizerAccountSetupFormProps {
   backHref?: string;
   /** Partner module for docs/terms/registration payload. Defaults to event organizer. */
-  module?: "event" | "venue" | "artist";
+  module?: "event" | "venue" | "artist" | "cinema";
 }
 
 const MODULE_COPY: Record<
-  "event" | "venue" | "artist",
+  "event" | "venue" | "artist" | "cinema",
   {
     heading: string;
     intro: string;
@@ -105,6 +107,19 @@ const MODULE_COPY: Record<
     submitLabel: "Register Artist",
     termsVersion: "artist-v1",
   },
+  cinema: {
+    heading: "Movie Admin Account Setup",
+    intro:
+      "Please fill in the below details so that we can setup a cinema partner account and give you access to the Do-It-Yourself portal for listing movies and showtimes.",
+    detailsTitle: "Cinema / Theatre Details",
+    nameLabel: "Cinema / Theatre Name",
+    namePlaceholder: "Enter your cinema or theatre name",
+    addressLabel: "Cinema Address",
+    addressPlaceholder: "Enter your cinema address",
+    typeMissing: "Cinema partner type is not configured. Please contact support.",
+    submitLabel: "Register Cinema",
+    termsVersion: "cinema-v1",
+  },
 };
 
 export default function OrganizerAccountSetupForm({
@@ -117,6 +132,7 @@ export default function OrganizerAccountSetupForm({
   const { data: partnerDocMasters = [] } = useGetPartnerDocumentMastersQuery(module);
   const { data: onboardingTerms = [] } = useGetPartnerOnboardingTermsQuery(module);
   const [registerBusiness, { isLoading }] = useRegisterBusinessMutation();
+  const [uploadImage, { isLoading: uploadingImage }] = useUploadImageMutation();
 
   const [step, setStep] = useState<StepId>(1);
   const [step1Done, setStep1Done] = useState(false);
@@ -128,6 +144,7 @@ export default function OrganizerAccountSetupForm({
   const [phone, setPhone] = useState("");
   const [phoneValid, setPhoneValid] = useState(false);
   const [subtypeId, setSubtypeId] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -267,6 +284,7 @@ export default function OrganizerAccountSetupForm({
         admin_email: adminEmail.trim(),
         partner_type: module,
         documents,
+        cover_image_url: coverImageUrl.trim() || undefined,
         registration_terms_accepted: true,
         registration_terms_version: copy.termsVersion,
       }).unwrap();
@@ -413,6 +431,54 @@ export default function OrganizerAccountSetupForm({
                     rows={3}
                   />
                 </div>
+                {(module === "artist" || module === "venue") && (
+                  <div>
+                    <label className={labelClass}>
+                      {module === "artist" ? "Profile photo" : "Venue cover image"}
+                    </label>
+                    <CroppedImageField
+                      value={coverImageUrl}
+                      aspect={module === "artist" ? 1 : 16 / 9}
+                      disabled={uploadingImage}
+                      previewClassName={
+                        module === "artist"
+                          ? "w-32 h-32 rounded-2xl"
+                          : "w-full max-w-sm aspect-video rounded-2xl"
+                      }
+                      emptyClassName={
+                        module === "artist"
+                          ? "flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
+                          : "flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
+                      }
+                      onRemove={() => setCoverImageUrl("")}
+                      onCroppedFile={async (file) => {
+                        const formData = new FormData();
+                        formData.append("image", file);
+                        try {
+                          const res = await uploadImage(formData).unwrap();
+                          if (res.url) {
+                            setCoverImageUrl(res.url);
+                            toast.success("Image uploaded");
+                          }
+                        } catch (err) {
+                          toast.error(extractApiError(err, "Failed to upload image"));
+                        }
+                      }}
+                      emptyContent={
+                        <>
+                          <ImagePlus className="text-slate-400 mb-1" size={20} />
+                          <span className="text-[10px] text-slate-500">
+                            {uploadingImage ? "Uploading…" : "Add photo"}
+                          </span>
+                        </>
+                      }
+                    />
+                    <p className="mt-1.5 text-xs text-slate-400">
+                      Shown on the public {module === "artist" ? "artist" : "venue"} listing and
+                      profile page.
+                    </p>
+                  </div>
+                )}
               </SectionBlock>
 
               <SectionBlock title="Contact Person Details">

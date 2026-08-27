@@ -26,7 +26,7 @@ import {
 } from "@/services/api";
 
 interface AdminPartnerDetailPageProps {
-  module: "dining" | "event" | "venue" | "artist";
+  module: "dining" | "event" | "venue" | "artist" | "cinema";
 }
 
 function Field({ label, value }: { label: string; value?: string | null }) {
@@ -44,6 +44,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const isDining = module === "dining";
   const isVenue = module === "venue";
   const isArtist = module === "artist";
+  const isCinema = module === "cinema";
   const hasSubtype = isDining || isVenue || isArtist;
   const listHref = `/admin/businesses/${module}`;
   const { data: biz, isLoading } = useGetAdminBusinessQuery(id, { skip: !id });
@@ -57,17 +58,21 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
       ? "venue partners"
       : isArtist
         ? "artist partners"
-        : "event organizers";
+        : isCinema
+          ? "cinema partners"
+          : "event organizers";
   const nameLabel = isDining
     ? "Business name"
     : isVenue
       ? "Venue name"
       : isArtist
         ? "Artist name"
-        : "Organizer name";
+        : isCinema
+          ? "Cinema name"
+          : "Organizer name";
   const typeLabel = isArtist ? "Artist type" : isDining || isVenue ? "Venue type" : "Module";
-  const typeValue = hasSubtype ? biz?.type_name : "Event";
-  const moduleBadge = isArtist ? "Artist" : "Event";
+  const typeValue = hasSubtype ? biz?.type_name : isCinema ? "Cinema" : "Event";
+  const moduleBadge = isArtist ? "Artist" : isCinema ? "Cinema" : "Event";
 
   if (isLoading) {
     return <div className="text-white p-10 text-center">Loading partner...</div>;

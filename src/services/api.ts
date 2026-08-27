@@ -160,7 +160,7 @@ export interface PartnerDocumentMaster {
   id: number;
   name: string;
   slug: string;
-  module: 'dining' | 'event' | 'venue' | 'artist' | 'both';
+  module: 'dining' | 'event' | 'venue' | 'artist' | 'cinema' | 'both';
   description?: string | null;
   is_required: boolean;
   accept?: string;
@@ -170,7 +170,7 @@ export interface PartnerDocumentMaster {
 
 export interface PartnerOnboardingTerm {
   id: number;
-  module: 'dining' | 'event' | 'venue' | 'artist' | 'both';
+  module: 'dining' | 'event' | 'venue' | 'artist' | 'cinema' | 'both';
   text: string;
   is_active: boolean;
   sort_order: number;
@@ -508,6 +508,8 @@ export interface EventDocumentMaster {
   importance_level: number;
   is_active: boolean;
   sort_order: number;
+  /** Where organizers upload: event (Documents tab), venue, or artist */
+  applies_to?: 'event' | 'venue' | 'artist' | string;
   category_name?: string;
 }
 
@@ -1524,7 +1526,7 @@ export interface Analytics {
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'super_admin' | 'business_admin' | 'event_admin' | 'venue_admin' | 'artist_admin' | 'customer';
+  role: 'super_admin' | 'business_admin' | 'event_admin' | 'venue_admin' | 'artist_admin' | 'movie_admin' | 'customer';
   business_id?: string;
   customer_id?: string;
   name?: string;
@@ -1744,7 +1746,7 @@ export const api = createApi({
         type_id?: number;
         admin_email: string;
         admin_password?: string;
-        partner_type?: 'dining' | 'event' | 'venue' | 'artist';
+        partner_type?: 'dining' | 'event' | 'venue' | 'artist' | 'cinema';
         documents?: PartnerDocumentUpload[];
         cover_image_url?: string;
         collection_ids?: number[];
@@ -1997,7 +1999,7 @@ export const api = createApi({
 
     getPartnerDocumentMasters: builder.query<
       PartnerDocumentMaster[],
-      'dining' | 'event' | 'venue' | 'artist' | void
+      'dining' | 'event' | 'venue' | 'artist' | 'cinema' | void
     >({
       query: (module) => {
         const qs = module ? `?module=${module}` : '';
@@ -2009,7 +2011,7 @@ export const api = createApi({
 
     getPartnerOnboardingTerms: builder.query<
       PartnerOnboardingTerm[],
-      'dining' | 'event' | 'venue' | 'artist' | void
+      'dining' | 'event' | 'venue' | 'artist' | 'cinema' | void
     >({
       query: (module) => {
         const qs = module ? `?module=${module}` : '';
@@ -2021,7 +2023,7 @@ export const api = createApi({
 
     getAdminPartnerDocuments: builder.query<
       PaginatedList<PartnerDocumentMaster>,
-      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'both'; q?: string; page?: number; limit?: number } | void
+      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'cinema' | 'both'; q?: string; page?: number; limit?: number } | void
     >({
       query: (params) =>
         `/admin/partner-documents${toListQuery({
@@ -2046,7 +2048,7 @@ export const api = createApi({
       {
         name: string;
         description?: string;
-        module?: 'dining' | 'event' | 'venue' | 'artist' | 'both';
+        module?: 'dining' | 'event' | 'venue' | 'artist' | 'cinema' | 'both';
         is_required?: boolean;
         is_active?: boolean;
         sort_order?: number;
@@ -2085,7 +2087,7 @@ export const api = createApi({
 
     getAdminPartnerOnboardingTerms: builder.query<
       PartnerOnboardingTerm[],
-      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'both' } | void
+      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'cinema' | 'both' } | void
     >({
       query: (params) => {
         const qs = params?.module ? `?module=${params.module}` : '';
@@ -2097,7 +2099,7 @@ export const api = createApi({
 
     createAdminPartnerOnboardingTerm: builder.mutation<
       PartnerOnboardingTerm,
-      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'both'; text: string; is_active?: boolean; sort_order?: number }
+      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'cinema' | 'both'; text: string; is_active?: boolean; sort_order?: number }
     >({
       query: (body) => ({ url: '/admin/partner-onboarding-terms', method: 'POST', body }),
       transformResponse: (res: { data?: PartnerOnboardingTerm }) => res?.data ?? ({} as PartnerOnboardingTerm),
@@ -4388,6 +4390,7 @@ export const api = createApi({
         name: string;
         description?: string;
         category_type_id?: number | null;
+        applies_to?: 'event' | 'venue' | 'artist' | string;
         is_required?: boolean;
         importance_level?: number;
         is_active?: boolean;

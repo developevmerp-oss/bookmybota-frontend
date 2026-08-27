@@ -10,6 +10,7 @@ import {
 } from "@/services/api";
 import { isComedyEvent, isMusicEvent, isOutdoorEvent } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
+import { lockBodyScroll } from "@/lib/lockBodyScroll";
 
 type SearchOverlayProps = {
   open: boolean;
@@ -47,15 +48,14 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockBodyScroll();
     const t = window.setTimeout(() => inputRef.current?.focus(), 50);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
+      unlock();
       window.clearTimeout(t);
       window.removeEventListener("keydown", onKey);
     };

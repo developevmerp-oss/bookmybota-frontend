@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Navigation, Pagination } from "swiper/modules";
@@ -12,6 +12,7 @@ import {
   Loader2,
   Star,
   ThumbsUp,
+  Ticket,
 } from "lucide-react";
 import { FaMapMarkerAlt } from "react-icons/fa";
 import "swiper/css";
@@ -26,6 +27,7 @@ import { MOVIE_CATALOG } from "@/components/MovieLandingPage/movieCatalog";
 import "./MovieLandingPage.css";
 
 const PAGE_BG = "#f6f7f8";
+const BRAND = "#6900AA";
 const MOVIE_KEYWORDS = ["movie", "movies", "film", "cinema"];
 const DEFAULT_LANGUAGES = ["Amharic", "English", "Oromiffa", "Tigrigna", "Somali"];
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
@@ -54,8 +56,11 @@ type MovieCardData = {
   votes?: string;
   likes?: string;
   promoted?: boolean;
+  comingSoon?: boolean;
   href?: string;
 };
+
+type ViewAllKey = "now-showing" | "coming-soon" | "top-rated" | null;
 
 const SHOWCASE_MOVIES: MovieCardData[] = MOVIE_CATALOG.filter((m) => !m.comingSoon).map((m) => ({
   id: m.id,
@@ -83,16 +88,17 @@ const COMING_SOON_MOVIES: MovieCardData[] = MOVIE_CATALOG.filter((m) => m.coming
   rating: m.rating,
   votes: m.votes,
   likes: m.likes,
+  comingSoon: true,
   href: `/movies/${m.id}`,
 }));
 
-/** Static promo banners — layout matches BMS-style movie hero (peek + pills). */
+/** Static promo banners — same slide content, new layout. */
 const HERO_SLIDES = [
   {
     id: "toxic",
     href: "/movies/s1",
     image:
-      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=1400&h=700&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=1600&h=800&fit=crop&q=80",
     poster: "/images/movies/toxic-poster.png",
     eyebrow: "ROCKING STAR YASH",
     title: "TOXIC",
@@ -106,7 +112,7 @@ const HERO_SLIDES = [
     id: "now-showing",
     href: "#movies-listing",
     image:
-      "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1400&h=700&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600&h=800&fit=crop&q=80",
     poster:
       "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&h=750&fit=crop&q=80",
     eyebrow: "NOW SHOWING",
@@ -114,14 +120,14 @@ const HERO_SLIDES = [
     tagline: "Book tickets for the latest movies near you",
     promoTitle: "Your next favourite film awaits",
     promoSub: "Explore showtimes across Ethiopia.",
-    accent: "#6900AA",
+    accent: BRAND,
     panel: "#1A0A2E",
   },
   {
     id: "weekend",
     href: "#movies-listing",
     image:
-      "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=1400&h=700&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=1600&h=800&fit=crop&q=80",
     poster:
       "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=500&h=750&fit=crop&q=80",
     eyebrow: "WEEKEND PICKS",
@@ -138,6 +144,12 @@ function formatCount(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M+`;
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K+`;
   return `${n}+`;
+}
+
+function ratingValue(rating?: string) {
+  if (!rating) return 0;
+  const n = Number.parseFloat(rating);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function mapEventToMovie(event: PublicEvent): MovieCardData {
@@ -161,69 +173,14 @@ function mapEventToMovie(event: PublicEvent): MovieCardData {
   };
 }
 
-function HeroBannerCard({
-  slide,
-}: {
-  slide: (typeof HERO_SLIDES)[number];
-}) {
+function HeroBannerCard({ slide }: { slide: (typeof HERO_SLIDES)[number] }) {
   return (
-    <Link
-      href={slide.href}
-      className="movie-hero-card relative block h-full w-full overflow-hidden rounded-xl sm:rounded-2xl"
-    >
+    <Link href={slide.href} className="relative block overflow-hidden min-h-48 sm:min-h-56 lg:min-h-80">
       <img
         src={slide.image}
-        alt=""
+        alt={slide.title}
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `linear-gradient(105deg, ${slide.accent}ee 0%, ${slide.accent}99 42%, rgba(0,0,0,0.55) 68%, ${slide.panel} 100%)`,
-        }}
-      />
-      <div className="relative z-[1] flex h-full">
-        <div className="flex min-w-0 flex-1 items-end sm:items-center px-4 sm:px-7 lg:px-10 pb-8 sm:pb-0">
-          <div className="flex items-end sm:items-center gap-3 sm:gap-5 max-w-xl">
-            <div className="hidden sm:block shrink-0 w-[4.5rem] sm:w-[5.5rem] lg:w-[6.5rem] aspect-[2/3] rounded-md overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.45)] ring-1 ring-white/20">
-              <img
-                src={slide.poster}
-                alt={slide.title}
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div className="min-w-0 text-white">
-              <p className="text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-white/85">
-                {slide.eyebrow}
-              </p>
-              <h2
-                className="mt-1 text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-none"
-                style={{ textShadow: "0 2px 18px rgba(0,0,0,0.35)" }}
-              >
-                {slide.title}
-              </h2>
-              <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-sm text-white/80 font-medium tracking-wide uppercase">
-                {slide.tagline}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div
-          className="hidden md:flex w-[34%] lg:w-[32%] shrink-0 flex-col justify-center px-5 lg:px-8"
-          style={{ backgroundColor: slide.panel }}
-        >
-          <p className="text-white text-xl lg:text-2xl xl:text-[1.65rem] font-bold leading-snug">
-            {slide.promoTitle}
-          </p>
-          <p className="mt-2 text-white/70 text-sm lg:text-base">{slide.promoSub}</p>
-          <span
-            className="mt-5 inline-flex w-fit items-center rounded-full px-3.5 py-1.5 text-xs font-bold text-white"
-            style={{ backgroundColor: slide.accent }}
-          >
-            Book tickets
-          </span>
-        </div>
-      </div>
     </Link>
   );
 }
@@ -231,8 +188,8 @@ function HeroBannerCard({
 function MovieCard({ movie }: { movie: MovieCardData }) {
   const inner = (
     <>
-      <div className="movie-card-poster relative rounded-lg overflow-hidden bg-slate-200  transition-[transform,box-shadow] duration-300 group-hover:-translate-y-1 ">
-        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg">
+      <div className="relative rounded-xl overflow-hidden bg-slate-200 transition-transform duration-300 group-hover:-translate-y-1">
+        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl">
           {movie.poster ? (
             <img
               src={movie.poster}
@@ -245,8 +202,13 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
           )}
 
           {movie.promoted && (
-            <span className="absolute top-1.5 right-1.5 z-[2] rounded-md bg-[#E11D48] backdrop-blur-[2px] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+            <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/70 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-red-600">
               PROMOTED
+            </span>
+          )}
+          {movie.comingSoon && !movie.promoted && (
+            <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/70 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-green-600">
+              Coming Soon
             </span>
           )}
 
@@ -254,15 +216,15 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
             <div className="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-1.5 bg-black/45 backdrop-blur-[2px] px-2 py-1.5 text-white">
               {movie.likes ? (
                 <>
-                  <ThumbsUp size={12} className="shrink-0 text-[#22C55E]" fill="currentColor" />
-                  <span className="text-[10px] sm:text-[11px] font-medium truncate">{movie.likes}</span>
+                  <ThumbsUp className="size-3 shrink-0 text-[#22C55E]" fill="currentColor" />
+                  <span className="text-xs font-medium truncate">{movie.likes}</span>
                 </>
               ) : (
                 <>
-                  <Star size={12} className="shrink-0 text-[#EF4444]" fill="currentColor" />
-                  <span className="text-[10px] sm:text-[11px] font-semibold shrink-0">{movie.rating}</span>
+                  <Star className="size-3 shrink-0 text-[#EF4444]" fill="currentColor" />
+                  <span className="text-xs font-semibold shrink-0">{movie.rating}</span>
                   {movie.votes && (
-                    <span className="text-[10px] sm:text-[11px] text-white/90 truncate">{movie.votes}</span>
+                    <span className="text-xs text-white/90 truncate">{movie.votes}</span>
                   )}
                 </>
               )}
@@ -270,14 +232,14 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
           )}
         </div>
       </div>
-      <h3 className="mt-2 text-[13px] sm:text-sm font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+      <h3 className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
         {movie.title}
       </h3>
       {movie.certification && (
-        <p className="mt-0.5 text-[11px] sm:text-xs text-slate-500">{movie.certification}</p>
+        <p className="mt-0.5 text-xs sm:text-sm text-slate-500">{movie.certification}</p>
       )}
       {movie.language && (
-        <p className="mt-0.5 text-[11px] sm:text-xs text-slate-500 line-clamp-1">{movie.language}</p>
+        <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{movie.language}</p>
       )}
     </>
   );
@@ -291,18 +253,138 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
   );
 }
 
-function ComingSoonBanner() {
+function HScroll({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canScroll, setCanScroll] = useState({ left: false, right: false });
+
+  const updateScroll = useCallback(() => {
+    const el = ref.current;
+    if (!el) {
+      setCanScroll({ left: false, right: false });
+      return;
+    }
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const canOverflow = maxScroll > 2;
+    setCanScroll({
+      left: canOverflow && el.scrollLeft > 2,
+      right: canOverflow && el.scrollLeft < maxScroll - 2,
+    });
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    updateScroll();
+    const t = window.setTimeout(updateScroll, 150);
+    el.addEventListener("scroll", updateScroll, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateScroll) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", updateScroll);
+    return () => {
+      window.clearTimeout(t);
+      el.removeEventListener("scroll", updateScroll);
+      ro?.disconnect();
+      window.removeEventListener("resize", updateScroll);
+    };
+  }, [updateScroll]);
+
+  const scrollBy = (dir: -1 | 1) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.75, 360), behavior: "smooth" });
+  };
+
+  const btnClass =
+    "absolute z-20 top-1/3 -translate-y-1/2 hidden md:flex size-9 items-center justify-center rounded-full bg-white text-slate-900 shadow-md hover:bg-[#F7E9FF] cursor-pointer";
+
+  return (
+    <div className="relative">
+      <div ref={ref} className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-1">
+        {children}
+      </div>
+      {canScroll.left && (
+        <button type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)} className={`${btnClass} left-0`}>
+          <ChevronLeft className="size-4" />
+        </button>
+      )}
+      {canScroll.right && (
+        <button type="button" aria-label="Scroll right" onClick={() => scrollBy(1)} className={`${btnClass} right-0`}>
+          <ChevronRight className="size-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function OfferShapeCard({
+  href,
+  title,
+  subtitle,
+  cta,
+  tone,
+}: {
+  href: string;
+  title: string;
+  subtitle: string;
+  cta: string;
+  tone: "peach" | "mint";
+}) {
+  const isPeach = tone === "peach";
   return (
     <Link
-      href="#coming-soon"
-      className="movie-coming-soon-banner flex items-center justify-between gap-3 rounded-lg bg-white px-4 sm:px-5 py-3.5 sm:py-4 shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
+      href={href}
+      className={`rounded-2xl p-5 sm:p-6 min-h-40 flex flex-col items-start justify-between ${
+        isPeach ? "bg-orange-100 text-orange-950" : "bg-sky-100 text-sky-950"
+      }`}
     >
-      <span className="text-base sm:text-lg font-bold text-[#111111]">Coming Soon</span>
-      <span className="inline-flex items-center gap-1 text-sm font-medium text-[#6900AA] shrink-0">
-        Explore Upcoming Movies
-        <ChevronRight size={16} />
+      <div>
+        <p className="text-lg sm:text-xl font-bold leading-snug">{title}</p>
+        <p className={`mt-1 text-sm sm:text-base ${isPeach ? "text-orange-900/70" : "text-sky-900/70"}`}>
+          {subtitle}
+        </p>
+      </div>
+      <span
+        className={`mt-4 inline-flex w-fit items-center rounded-lg bg-white px-3 py-1.5 text-sm font-semibold ${
+          isPeach ? "text-orange-700" : "text-sky-700"
+        }`}
+      >
+        {cta}
       </span>
     </Link>
+  );
+}
+
+function MovieRail({
+  title,
+  movies,
+  onSeeAll,
+}: {
+  title: string;
+  movies: MovieCardData[];
+  onSeeAll: () => void;
+}) {
+  if (!movies.length) return null;
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900">{title}</h2>
+        <button
+          type="button"
+          onClick={onSeeAll}
+          className="inline-flex items-center gap-0.5 text-sm sm:text-base font-semibold text-[#6900AA] hover:text-[#57008E] cursor-pointer shrink-0"
+        >
+          See All
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+      <HScroll>
+        {movies.map((movie) => (
+          <div key={movie.id} className="shrink-0 w-1/2 sm:w-1/3 lg:w-1/4">
+            <MovieCard movie={movie} />
+          </div>
+        ))}
+      </HScroll>
+    </div>
   );
 }
 
@@ -330,8 +412,7 @@ function FilterSection({
           className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer text-left"
         >
           <ChevronDown
-            size={14}
-            className={`shrink-0 transition-transform ${
+            className={`size-3.5 shrink-0 transition-transform ${
               open ? "rotate-180 text-[#6900AA]" : "text-slate-400"
             }`}
           />
@@ -339,11 +420,7 @@ function FilterSection({
             {title}
           </span>
         </button>
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
-        >
+        <button type="button" onClick={onClear} className="text-xs sm:text-sm text-slate-400 hover:text-slate-600 cursor-pointer">
           Clear
         </button>
       </div>
@@ -368,7 +445,7 @@ export default function MovieLandingPage() {
     genres: false,
     formats: false,
   });
-  const [showAll, setShowAll] = useState(false);
+  const [viewAll, setViewAll] = useState<ViewAllKey>(null);
 
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
 
@@ -433,9 +510,7 @@ export default function MovieLandingPage() {
       const langOk =
         selectedLanguages.length === 0 ||
         (movie.language
-          ? selectedLanguages.some((l) =>
-              movie.language!.toLowerCase().includes(l.toLowerCase())
-            )
+          ? selectedLanguages.some((l) => movie.language!.toLowerCase().includes(l.toLowerCase()))
           : true);
       const genreOk =
         selectedGenres.length === 0 ||
@@ -449,7 +524,12 @@ export default function MovieLandingPage() {
     });
   }, [sourceMovies, selectedLanguages, selectedGenres, selectedFormats]);
 
-  const visibleMovies = showAll ? movies : movies.slice(0, 6);
+  const topRatedMovies = useMemo(() => {
+    return [...movies]
+      .filter((m) => ratingValue(m.rating) > 0)
+      .sort((a, b) => ratingValue(b.rating) - ratingValue(a.rating));
+  }, [movies]);
+
   const hasActiveFilters =
     selectedLanguages.length > 0 || selectedGenres.length > 0 || selectedFormats.length > 0;
   const headingCity = city || "Ethiopia";
@@ -461,28 +541,29 @@ export default function MovieLandingPage() {
     setSelectedLanguages((prev) =>
       prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]
     );
-    setShowAll(false);
   };
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres((prev) =>
       prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
     );
-    setShowAll(false);
   };
 
   const toggleFormat = (format: string) => {
     setSelectedFormats((prev) =>
       prev.includes(format) ? prev.filter((f) => f !== format) : [...prev, format]
     );
-    setShowAll(false);
   };
 
   const clearAll = () => {
     setSelectedLanguages([]);
     setSelectedGenres([]);
     setSelectedFormats([]);
-    setShowAll(false);
+  };
+
+  const openViewAll = (key: Exclude<ViewAllKey, null>) => {
+    setViewAll(key);
+    document.getElementById("movies-listing")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const bindSwiperNav = (swiper: SwiperType) => {
@@ -503,39 +584,41 @@ export default function MovieLandingPage() {
     });
   };
 
+  const viewAllTitle =
+    viewAll === "now-showing"
+      ? `Movies In ${headingCity}`
+      : viewAll === "coming-soon"
+        ? "Upcoming Movies"
+        : viewAll === "top-rated"
+          ? "Top Rated Movies"
+          : "";
+
+  const viewAllMovies =
+    viewAll === "now-showing"
+      ? movies
+      : viewAll === "coming-soon"
+        ? COMING_SOON_MOVIES
+        : viewAll === "top-rated"
+          ? topRatedMovies
+          : [];
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAGE_BG }}>
-      {/* Hero banner — BMS-style centered peek carousel */}
-      <section className="pt-4 sm:pt-5 lg:pt-6 overflow-x-hidden">
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
-          <div className="movie-hero-swiper relative">
+      <section className="pt-4 sm:pt-5">
+        <div className="movie-hero-swiper relative">
             <Swiper
               modules={[Autoplay, Navigation, Pagination]}
-              className="movie-hero-swiper-el w-full"
+              className="w-full"
               speed={650}
-              centeredSlides
-              slidesPerView={1.08}
-              spaceBetween={12}
-              breakpoints={{
-                480: { slidesPerView: 1.1, spaceBetween: 14 },
-                640: { slidesPerView: 1.12, spaceBetween: 16 },
-                1024: { slidesPerView: 1.16, spaceBetween: 18 },
-                1280: { slidesPerView: 1.2, spaceBetween: 20 },
-              }}
+              slidesPerView={1}
+              spaceBetween={0}
               autoplay={
                 HERO_SLIDES.length > 1
-                  ? {
-                      delay: 4500,
-                      disableOnInteraction: false,
-                      pauseOnMouseEnter: true,
-                    }
+                  ? { delay: 4500, disableOnInteraction: false, pauseOnMouseEnter: true }
                   : false
               }
               pagination={HERO_SLIDES.length > 1 ? { clickable: true } : false}
-              navigation={{
-                prevEl: prevRef.current,
-                nextEl: nextRef.current,
-              }}
+              navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
               onBeforeInit={(swiper: SwiperType) => {
                 const nav = swiper.params?.navigation;
                 if (nav && typeof nav !== "boolean") {
@@ -551,9 +634,7 @@ export default function MovieLandingPage() {
             >
               {HERO_SLIDES.map((slide) => (
                 <SwiperSlide key={slide.id} className="!h-auto">
-                  <div className="h-[168px] sm:h-[240px] md:h-[280px] lg:h-[320px] xl:h-[340px]">
-                    <HeroBannerCard slide={slide} />
-                  </div>
+                  <HeroBannerCard slide={slide} />
                 </SwiperSlide>
               ))}
             </Swiper>
@@ -568,7 +649,7 @@ export default function MovieLandingPage() {
                 heroNav.prev ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
             >
-              <ChevronLeft size={22} strokeWidth={2.25} />
+              <ChevronLeft className="size-5" strokeWidth={2.25} />
             </button>
             <button
               ref={nextRef}
@@ -580,20 +661,22 @@ export default function MovieLandingPage() {
                 heroNav.next ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
             >
-              <ChevronRight size={22} strokeWidth={2.25} />
+              <ChevronRight className="size-5" strokeWidth={2.25} />
             </button>
           </div>
-        </div>
       </section>
 
-      {/* Filters + movies */}
-      <section id="movies-listing" className="pt-6 sm:pt-8 pb-12 sm:pb-16">
+      <section id="movies-listing" className="pt-6 sm:pt-8 pb-12 sm:pb-16 scroll-mt-24">
         <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 flex items-center gap-2 min-w-0 mb-4 sm:mb-5">
+            <span className="truncate">Movies In {headingCity}</span>
+            <FaMapMarkerAlt className="size-4 shrink-0 text-[#6900AA]" aria-hidden />
+          </h2>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 lg:gap-6">
             <aside className="lg:col-span-1 lg:sticky lg:top-24 self-start space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                  <h2 className="text-base font-bold text-slate-900">Filters</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">Filters</h2>
                   <button
                     type="button"
                     onClick={clearAll}
@@ -620,7 +703,7 @@ export default function MovieLandingPage() {
                           key={lang}
                           type="button"
                           onClick={() => toggleLanguage(lang)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
+                          className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold border cursor-pointer transition-colors ${
                             active
                               ? "bg-[#6900AA] border-[#6900AA] text-white"
                               : "bg-white border-[#D4B3F0] text-[#6900AA] hover:bg-[#F7E9FF]"
@@ -639,22 +722,22 @@ export default function MovieLandingPage() {
                   onToggle={() => setOpenFilters((p) => ({ ...p, genres: !p.genres }))}
                   onClear={() => setSelectedGenres([])}
                 >
-                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  <div className="flex flex-wrap gap-2">
                     {GENRES.map((genre) => {
                       const active = selectedGenres.includes(genre);
                       return (
-                        <label
+                        <button
                           key={genre}
-                          className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer"
+                          type="button"
+                          onClick={() => toggleGenre(genre)}
+                          className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold border cursor-pointer transition-colors ${
+                            active
+                              ? "bg-[#6900AA] border-[#6900AA] text-white"
+                              : "bg-white border-[#D4B3F0] text-[#6900AA] hover:bg-[#F7E9FF]"
+                          }`}
                         >
-                          <input
-                            type="checkbox"
-                            checked={active}
-                            onChange={() => toggleGenre(genre)}
-                            className="accent-[#6900AA] h-3.5 w-3.5"
-                          />
                           {genre}
-                        </label>
+                        </button>
                       );
                     })}
                   </div>
@@ -675,10 +758,10 @@ export default function MovieLandingPage() {
                           key={format}
                           type="button"
                           onClick={() => toggleFormat(format)}
-                          className={`px-2.5 py-1.5 text-[11px] rounded-md border cursor-pointer transition-colors ${
+                          className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold border cursor-pointer transition-colors ${
                             active
                               ? "border-[#6900AA] bg-[#6900AA] text-white"
-                              : "border-slate-200 bg-white text-[#6900AA]"
+                              : "border-[#D4B3F0] bg-white text-[#6900AA] hover:bg-[#F7E9FF]"
                           }`}
                         >
                           {format}
@@ -691,92 +774,114 @@ export default function MovieLandingPage() {
 
               <Link
                 href={cinemasHref}
-                className="flex w-full items-center justify-center rounded-lg border border-[#6900AA] bg-white py-2.5 text-sm font-semibold text-[#6900AA] hover:bg-[#F7E9FF] transition-colors"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#6900AA] bg-white py-2.5 text-sm sm:text-base font-semibold text-[#6900AA] hover:bg-[#F7E9FF] transition-colors"
               >
+                <Ticket className="size-4" />
                 Browse by Cinemas
               </Link>
             </aside>
 
             <div className="lg:col-span-3 min-w-0">
-              <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 flex items-center gap-2 min-w-0">
-                  <span className="truncate">Movies In {headingCity}</span>
-                  <FaMapMarkerAlt size={16} className="shrink-0 text-[#6900AA]" aria-hidden />
-                </h2>
-                {movies.length > 6 && (
+              {viewAll ? (
+                <div>
                   <button
                     type="button"
-                    onClick={() => setShowAll((v) => !v)}
-                    className="shrink-0 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] cursor-pointer"
+                    onClick={() => setViewAll(null)}
+                    className="inline-flex items-center gap-1 mb-4 text-sm sm:text-base font-semibold text-[#6900AA] hover:text-[#57008E] cursor-pointer"
                   >
-                    {showAll ? "Show less" : "View All"}
+                    <ChevronLeft className="size-4" />
+                    Back
                   </button>
-                )}
-              </div>
-
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-3">
-                {languageOptions.map((lang) => {
-                  const active = selectedLanguages.includes(lang);
-                  return (
-                    <button
-                      key={`pill-${lang}`}
-                      type="button"
-                      onClick={() => toggleLanguage(lang)}
-                      className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold border cursor-pointer transition-colors ${
-                        active
-                          ? "bg-[#6900AA] border-[#6900AA] text-white"
-                          : "bg-white border-slate-200 text-slate-600 hover:border-[#D4B3F0] hover:text-[#6900AA]"
-                      }`}
-                    >
-                      {lang}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mb-5 sm:mb-6">
-                <ComingSoonBanner />
-              </div>
-
-              {isLoading && apiMovies.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
-                  <Loader2 size={32} className="animate-spin text-[#6900AA]" />
-                  <p className="text-sm font-medium">Loading movies...</p>
-                </div>
-              ) : movies.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                  <p className="text-slate-600 font-medium">No movies match these filters</p>
-                  <p className="text-slate-400 text-sm mt-1">
-                    Try clearing filters or choosing another language.
-                  </p>
-                  {hasActiveFilters && (
-                    <button
-                      type="button"
-                      onClick={clearAll}
-                      className="mt-4 text-sm font-semibold text-[#6900AA] cursor-pointer"
-                    >
-                      Clear All
-                    </button>
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 mb-4 sm:mb-5 flex items-center gap-2">
+                    <span className="truncate">{viewAllTitle}</span>
+                    {viewAll === "now-showing" && (
+                      <FaMapMarkerAlt className="size-4 shrink-0 text-[#6900AA]" aria-hidden />
+                    )}
+                  </h2>
+                  {viewAllMovies.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
+                      <p className="text-slate-600 font-medium">No movies match these filters</p>
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={clearAll}
+                          className="mt-4 text-sm font-semibold text-[#6900AA] cursor-pointer"
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-6">
+                      {viewAllMovies.map((movie) => (
+                        <MovieCard key={movie.id} movie={movie} />
+                      ))}
+                    </div>
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-2.5 gap-y-5 sm:gap-x-3.5 sm:gap-y-6 pr-2 pb-2">
-                  {visibleMovies.map((movie) => (
-                    <MovieCard key={movie.id} movie={movie} />
-                  ))}
+                <div className="space-y-8 sm:space-y-10">
+                  {isLoading && apiMovies.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+                      <Loader2 className="size-8 animate-spin text-[#6900AA]" />
+                      <p className="text-sm sm:text-base font-medium">Loading movies...</p>
+                    </div>
+                  ) : movies.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
+                      <p className="text-slate-600 font-medium">No movies match these filters</p>
+                      <p className="text-slate-400 text-sm sm:text-base mt-1">
+                        Try clearing filters or choosing another language.
+                      </p>
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={clearAll}
+                          className="mt-4 text-sm font-semibold text-[#6900AA] cursor-pointer"
+                        >
+                          Clear All
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <MovieRail
+                      title="Now Showing"
+                      movies={movies}
+                      onSeeAll={() => openViewAll("now-showing")}
+                    />
+                  )}
+
+                  <div id="coming-soon" className="scroll-mt-28">
+                    <MovieRail
+                      title="Upcoming Movies"
+                      movies={COMING_SOON_MOVIES}
+                      onSeeAll={() => openViewAll("coming-soon")}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <OfferShapeCard
+                      href="#movies-listing"
+                      title="Weekend Movie Marathon"
+                      subtitle="Book the latest titles and enjoy the big screen."
+                      cta="Grab Offer"
+                      tone="peach"
+                    />
+                    <OfferShapeCard
+                      href="/gift-cards"
+                      title="Gift the magic of movies"
+                      subtitle="Buy gift cards for friends and family."
+                      cta="Buy Gift Card"
+                      tone="mint"
+                    />
+                  </div>
+
+                  <MovieRail
+                    title="Top Rated Movies"
+                    movies={topRatedMovies}
+                    onSeeAll={() => openViewAll("top-rated")}
+                  />
                 </div>
               )}
-
-              <div id="coming-soon" className="mt-8 sm:mt-10 scroll-mt-28">
-                <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 mb-4">
-                  Upcoming Movies
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-2.5 gap-y-5 sm:gap-x-3.5 sm:gap-y-6 pr-2 pb-2">
-                  {COMING_SOON_MOVIES.map((movie) => (
-                    <MovieCard key={movie.id} movie={movie} />
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>

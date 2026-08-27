@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Check,
   ChevronLeft,
   ChevronRight,
+  Link2,
+  RefreshCcw,
   Share2,
   Star,
   ThumbsDown,
   ThumbsUp,
+  Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,28 +24,78 @@ import {
 
 const BRAND = "#6900AA";
 
+const OFFER_TONES = [
+  { card: "bg-orange-50/70", icon: "bg-[#F84464] text-white", Icon: Link2 },
+  { card: "bg-violet-50/70", icon: "bg-[#6900AA] text-white", Icon: Ticket },
+  { card: "bg-sky-50/70", icon: "bg-orange-400 text-white", Icon: RefreshCcw },
+] as const;
+
+const REVIEW_ACCENTS = ["border-l-[#6900AA]", "border-l-amber-500", "border-l-emerald-500"];
+
 function SectionShell({
   children,
   className = "",
+  muted = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  muted?: boolean;
 }) {
   return (
-    <section className={`py-6 sm:py-8 ${className}`}>
+    <section className={`py-8 sm:py-10 lg:py-12 ${muted ? "bg-slate-50" : "bg-white"} ${className}`}>
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">{children}</div>
     </section>
   );
 }
 
-function HScroll({
-  children,
-  arrowTopClass = "top-1/2 -translate-y-1/2",
+function SectionHeading({
+  title,
+  action,
 }: {
-  children: React.ReactNode;
-  /** Override vertical position when cards have text below (e.g. posters). */
-  arrowTopClass?: string;
+  title: string;
+  action?: React.ReactNode;
 }) {
+  return (
+    <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+      <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">{title}</h2>
+      {action}
+    </div>
+  );
+}
+
+function ViewAllButton({
+  label,
+  onClick,
+  href,
+}: {
+  label: string;
+  onClick?: () => void;
+  href?: string;
+}) {
+  const className =
+    "inline-flex items-center gap-0.5 text-sm sm:text-base font-semibold shrink-0 hover:opacity-80";
+  if (href) {
+    return (
+      <Link href={href} className={className} style={{ color: BRAND }}>
+        {label}
+        <ChevronRight className="size-4" />
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className={`${className} cursor-pointer`}
+      style={{ color: BRAND }}
+      onClick={onClick}
+    >
+      {label}
+      <ChevronRight className="size-4" />
+    </button>
+  );
+}
+
+function HScroll({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canScroll, setCanScroll] = useState({ left: false, right: false });
 
@@ -85,7 +137,7 @@ function HScroll({
   };
 
   const btnClass =
-    "absolute z-20 hidden md:flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hover:bg-[#F7E9FF] transition-shadow cursor-pointer";
+    "absolute z-20 top-1/2 -translate-y-1/2 hidden md:flex size-9 items-center justify-center rounded-full bg-white text-slate-900 shadow-md hover:shadow-lg hover:bg-[#F7E9FF] transition-shadow cursor-pointer";
 
   return (
     <div className="relative">
@@ -100,9 +152,9 @@ function HScroll({
           type="button"
           aria-label="Scroll left"
           onClick={() => scrollBy(-1)}
-          className={`${btnClass} left-0 -translate-x-1/2 ${arrowTopClass}`}
+          className={`${btnClass} left-0 -translate-x-1/2`}
         >
-          <ChevronLeft size={18} strokeWidth={1.75} />
+          <ChevronLeft className="size-4" strokeWidth={1.75} />
         </button>
       )}
       {canScroll.right && (
@@ -110,55 +162,83 @@ function HScroll({
           type="button"
           aria-label="Scroll right"
           onClick={() => scrollBy(1)}
-          className={`${btnClass} right-0 translate-x-1/2 ${arrowTopClass}`}
+          className={`${btnClass} right-0 translate-x-1/2`}
         >
-          <ChevronRight size={18} strokeWidth={1.75} />
+          <ChevronRight className="size-4" strokeWidth={1.75} />
         </button>
       )}
     </div>
   );
 }
 
-function AboutSection({ text }: { text: string }) {
+function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
+  if (!offers.length) return null;
   return (
     <SectionShell>
-      <h2 className="text-xl sm:text-2xl font-bold text-[#111111] mb-3 sm:mb-4">About the movie</h2>
-      <p className="text-sm sm:text-base text-slate-600 leading-relaxed whitespace-pre-wrap max-w-4xl">
-        {text}
-      </p>
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 lg:p-8">
+        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111] mb-4 sm:mb-5">
+          Top offers for you
+        </h2>
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:w-4/5">
+          {offers.map((offer, i) => {
+            const tone = OFFER_TONES[i % OFFER_TONES.length];
+            const Icon = tone.Icon;
+            const isLast = i === offers.length - 1;
+            return (
+              <button
+                key={offer.id}
+                type="button"
+                onClick={() => toast.message(offer.title)}
+                className={`text-left rounded-2xl ${tone.card} px-4 py-3.5 sm:px-5 sm:py-4 cursor-pointer hover:brightness-[0.98] ${
+                  isLast ? "lg:translate-x-8" : ""
+                }`}
+              >
+                <span className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 inline-flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-lg ${tone.icon}`}
+                  >
+                    <Icon className="size-4 sm:size-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm sm:text-base font-bold text-[#111111] leading-snug">
+                      {offer.title}
+                    </span>
+                    <span className="block mt-0.5 text-xs sm:text-sm text-slate-600">
+                      {offer.subtitle || "Tap to view details"}
+                    </span>
+                    <span
+                      className="mt-2 inline-flex items-center gap-0.5 text-xs sm:text-sm font-semibold"
+                      style={{ color: BRAND }}
+                    >
+                      View details
+                      <ChevronRight className="size-3.5" />
+                    </span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <img
+          src="/images/movies/offers-popcorn.png"
+          alt=""
+          aria-hidden
+          className="pointer-events-none mx-auto mt-4 w-2/3 sm:w-1/2 lg:z-0 lg:m-0 lg:absolute lg:-right-8 lg:bottom-0 lg:top-7 lg:w-[400px] lg:object-contain lg:object-right"
+        />
+      </div>
     </SectionShell>
   );
 }
 
-function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
-  if (!offers.length) return null;
+function AboutSection({ text }: { text: string }) {
   return (
-    <SectionShell className="pt-0 sm:pt-2">
-      <h2 className="text-lg sm:text-xl font-bold text-[#111111] mb-3 sm:mb-4">Top offers for you</h2>
-      <HScroll>
-        {offers.map((offer) => (
-          <button
-            key={offer.id}
-            type="button"
-            onClick={() => toast.message(offer.title)}
-            className="shrink-0 w-[min(100%,20rem)] sm:w-[22rem] text-left rounded-xl border border-dashed border-slate-300 bg-[#FFF8E8] px-3.5 py-3 sm:px-4 sm:py-3.5 cursor-pointer hover:bg-[#FFF3D6] transition-colors"
-          >
-            <span className="flex items-start gap-3">
-              <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#F84464]/40 bg-white">
-                <Check size={14} className="text-[#F84464]" strokeWidth={3} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm sm:text-[15px] font-bold text-[#111111] leading-snug">
-                  {offer.title}
-                </span>
-                <span className="block mt-0.5 text-xs sm:text-sm text-slate-500">
-                  {offer.subtitle || "Tap to view details"}
-                </span>
-              </span>
-            </span>
-          </button>
-        ))}
-      </HScroll>
+    <SectionShell>
+      <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111] mb-3 sm:mb-4">
+        About the movie
+      </h2>
+      <p className="text-sm sm:text-base text-slate-600 leading-relaxed whitespace-pre-wrap">
+        {text}
+      </p>
     </SectionShell>
   );
 }
@@ -166,15 +246,26 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
 function CastSection({ cast }: { cast: MoviePerson[] }) {
   if (!cast.length) return null;
   return (
-    <SectionShell className="pt-0 sm:pt-2">
-      <h2 className="text-xl sm:text-2xl font-bold text-[#111111] mb-3 sm:mb-4">Cast</h2>
-      <HScroll arrowTopClass="top-[5rem] sm:top-[5.65rem] -translate-y-1/2">
+    <SectionShell muted>
+      <SectionHeading
+        title="Cast"
+        action={
+          <ViewAllButton
+            label="View all"
+            onClick={() => toast.message("Full cast coming soon")}
+          />
+        }
+      />
+      <HScroll>
         {cast.map((person) => (
-          <article key={`${person.name}-${person.role}`} className="shrink-0 w-[7.5rem] sm:w-[8.5rem]">
-            <div className="aspect-[3/4] rounded-xl overflow-hidden bg-slate-200">
+          <article
+            key={`${person.name}-${person.role}`}
+            className="shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
+          >
+            <div className="aspect-square rounded-xl overflow-hidden bg-slate-200">
               <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
             </div>
-            <p className="mt-2 text-sm font-bold text-[#111111] leading-snug line-clamp-1">
+            <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-1">
               {person.name}
             </p>
             {person.role && (
@@ -190,18 +281,26 @@ function CastSection({ cast }: { cast: MoviePerson[] }) {
 function CrewSection({ crew }: { crew: MoviePerson[] }) {
   if (!crew.length) return null;
   return (
-    <SectionShell className="pt-0 sm:pt-2">
-      <h2 className="text-xl sm:text-2xl font-bold text-[#111111] mb-3 sm:mb-4">Crew</h2>
-      <HScroll arrowTopClass="top-[2.75rem] sm:top-[3.125rem] -translate-y-1/2">
+    <SectionShell>
+      <SectionHeading
+        title="Crew"
+        action={
+          <ViewAllButton
+            label="View all"
+            onClick={() => toast.message("Full crew coming soon")}
+          />
+        }
+      />
+      <HScroll>
         {crew.map((person) => (
           <article
             key={`${person.name}-${person.role}`}
-            className="shrink-0 w-[6.5rem] sm:w-[7.25rem] text-center"
+            className="shrink-0 w-1/4 sm:w-1/5 md:w-1/6 text-center"
           >
-            <div className="mx-auto h-[5.5rem] w-[5.5rem] sm:h-[6.25rem] sm:w-[6.25rem] rounded-full overflow-hidden bg-slate-200 ring-1 ring-slate-200">
+            <div className="mx-auto w-4/5 aspect-square rounded-full overflow-hidden bg-slate-200 ring-1 ring-slate-200">
               <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
             </div>
-            <p className="mt-2 text-sm font-bold text-[#111111] leading-snug line-clamp-2">
+            <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-2">
               {person.name}
             </p>
             {person.role && (
@@ -224,23 +323,24 @@ function ReviewsSection({
   countLabel: string;
 }) {
   if (!reviews.length) return null;
+  const summaryLabel = /reviews?/i.test(countLabel)
+    ? countLabel.replace(/reviews?/i, "reviews")
+    : `${countLabel} reviews`;
   return (
-    <SectionShell className="pt-0 sm:pt-2">
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <h2 className="text-xl sm:text-2xl font-bold text-[#111111]">Top reviews</h2>
-        <button
-          type="button"
-          className="text-sm font-semibold cursor-pointer shrink-0"
-          style={{ color: BRAND }}
+    <SectionShell>
+      <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
+        <div>
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">Top reviews</h2>
+          <p className="mt-1 text-sm sm:text-base text-slate-500">Summary of {summaryLabel}.</p>
+        </div>
+        <ViewAllButton
+          label={countLabel}
           onClick={() => toast.message("All reviews coming soon")}
-        >
-          {countLabel} ›
-        </button>
+        />
       </div>
-      <p className="text-sm text-slate-500 mb-3">Summary of {countLabel.replace(/reviews?/i, "reviews")}.</p>
 
       {tags.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-3 sm:mb-4">
           {tags.map((t) => (
             <span
               key={t.tag}
@@ -253,48 +353,59 @@ function ReviewsSection({
         </div>
       )}
 
-      <HScroll>
-        {reviews.map((review) => (
-          <article
-            key={review.id}
-            className="shrink-0 w-[min(100%,18rem)] sm:w-[20rem] rounded-xl border border-slate-200 bg-white p-3.5 sm:p-4"
-          >
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">
-                {review.userName.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="text-sm font-semibold text-[#111111]">{review.userName}</span>
-              <span className="ml-auto inline-flex items-center gap-1 text-sm font-bold text-[#111111]">
-                <Star size={13} className="text-[#F84464]" fill="currentColor" />
-                {review.rating}
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mb-1.5">{review.text}</p>
-            {review.tags && review.tags.length > 0 && (
-              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed mb-3">
-                {review.tags.join(" ")}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+        {reviews.map((review, i) => {
+          const booked = /booked on bookmybota/i.test(review.text);
+          const body = booked ? null : review.text;
+          return (
+            <article
+              key={review.id}
+              className={`rounded-2xl border border-slate-200 border-l-4 bg-white p-4 sm:p-5 shadow-sm ${REVIEW_ACCENTS[i % REVIEW_ACCENTS.length]}`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex size-8 sm:size-9 items-center justify-center rounded-full bg-[#F7E9FF] text-xs sm:text-sm font-bold text-[#6900AA]">
+                  {review.userName.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1 text-sm sm:text-base font-semibold text-[#111111] truncate">
+                  {review.userName}
+                </span>
+                <span className="inline-flex items-center gap-1 text-sm sm:text-base font-bold text-[#111111] shrink-0">
+                  <Star className="size-3.5 text-[#F84464]" fill="currentColor" />
+                  {review.rating}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-400 mb-2">
+                {booked ? review.text : "Booked on BookMyBota"}
               </p>
-            )}
-            <div className="flex items-center gap-3 text-xs text-slate-500">
-              <span className="inline-flex items-center gap-1">
-                <ThumbsUp size={13} /> {review.likes ?? 0}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <ThumbsDown size={13} /> 0
-              </span>
-              <span className="ml-auto">{review.timeAgo}</span>
-              <button
-                type="button"
-                aria-label="Share review"
-                className="cursor-pointer hover:text-slate-700"
-                onClick={() => toast.message("Share coming soon")}
-              >
-                <Share2 size={13} />
-              </button>
-            </div>
-          </article>
-        ))}
-      </HScroll>
+              {body && (
+                <p className="text-xs sm:text-sm text-slate-600 mb-2 leading-relaxed">{body}</p>
+              )}
+              {review.tags && review.tags.length > 0 && (
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed mb-4">
+                  {review.tags.join(" ")}
+                </p>
+              )}
+              <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400">
+                <span className="inline-flex items-center gap-1">
+                  <ThumbsUp className="size-3.5" /> {review.likes ?? 0}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <ThumbsDown className="size-3.5" /> 0
+                </span>
+                <span className="ml-auto">{review.timeAgo}</span>
+                <button
+                  type="button"
+                  aria-label="Share review"
+                  className="cursor-pointer hover:text-slate-600"
+                  onClick={() => toast.message("Share coming soon")}
+                >
+                  <Share2 className="size-3.5" />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </SectionShell>
   );
 }
@@ -303,46 +414,49 @@ function YouMightAlsoLike({ currentId }: { currentId: string }) {
   const list = MOVIE_CATALOG.filter((m) => m.id !== currentId).slice(0, 8);
   if (!list.length) return null;
   return (
-    <SectionShell className="pt-0 sm:pt-2 pb-10 sm:pb-14">
-      <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-[#111111]">You might also like</h2>
-        <Link
-          href="/movies"
-          className="text-sm font-semibold shrink-0"
-          style={{ color: BRAND }}
-        >
-          View All ›
-        </Link>
-      </div>
-      <HScroll arrowTopClass="top-[6.4rem] sm:top-[7.1rem] -translate-y-1/2">
+    <SectionShell className="pb-12 sm:pb-16">
+      <SectionHeading title="You might also like" action={<ViewAllButton label="View all" href="/movies" />} />
+      <HScroll>
         {list.map((m) => (
-          <Link key={m.id} href={`/movies/${m.id}`} className="group shrink-0 w-[8.5rem] sm:w-[9.5rem]">
-            <div className="aspect-[2/3] rounded-lg overflow-hidden bg-slate-200 shadow-[0_6px_16px_rgba(0,0,0,0.12)]">
+          <Link
+            key={m.id}
+            href={`/movies/${m.id}`}
+            className="group shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
+          >
+            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-slate-200">
               <img
                 src={m.poster}
                 alt={m.title}
                 className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
               />
+              {(m.rating || m.likes) && (
+                <div className="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-1.5 bg-black/45 backdrop-blur-[2px] px-2 py-1.5 text-white">
+                  {m.likes ? (
+                    <>
+                      <ThumbsUp className="size-3 shrink-0 text-[#22C55E]" fill="currentColor" />
+                      <span className="text-xs font-medium truncate">{m.likes}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Star className="size-3 shrink-0 text-[#EF4444]" fill="currentColor" />
+                      <span className="text-xs font-semibold shrink-0">{m.rating}</span>
+                      {m.votes && (
+                        <span className="text-xs text-white/90 truncate">{m.votes}</span>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-            {(m.rating || m.likes) && (
-              <div className="mt-2 flex items-center gap-1 text-xs text-slate-700">
-                {m.likes ? (
-                  <>
-                    <ThumbsUp size={12} className="text-[#22C55E]" fill="currentColor" />
-                    <span className="truncate">{m.likes}</span>
-                  </>
-                ) : (
-                  <>
-                    <Star size={12} className="text-[#F84464]" fill="currentColor" />
-                    <span className="font-semibold shrink-0">{m.rating?.replace("/10", "")}</span>
-                    {m.votes && <span className="text-slate-500 truncate">{m.votes}</span>}
-                  </>
-                )}
-              </div>
-            )}
-            <p className="mt-1 text-sm font-semibold text-[#111111] line-clamp-2 leading-snug group-hover:text-[#F84464] transition-colors">
+            <h3 className="mt-2 text-sm font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
               {m.title}
-            </p>
+            </h3>
+            {m.certification && (
+              <p className="mt-0.5 text-xs text-slate-500">{m.certification}</p>
+            )}
+            {m.languages.length > 0 && (
+              <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{m.languages.join(", ")}</p>
+            )}
           </Link>
         ))}
       </HScroll>
@@ -357,8 +471,8 @@ export default function MovieDetailSections({ movie }: { movie: MovieDetailData 
 
   return (
     <div className="bg-white">
-      <AboutSection text={about} />
       <OffersSection offers={movie.offers || []} />
+      <AboutSection text={about} />
       <CastSection cast={movie.cast || []} />
       <CrewSection crew={movie.crew || []} />
       <ReviewsSection

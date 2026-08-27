@@ -89,6 +89,10 @@ export default function RootLayout({
   const isOrganizerRegister = pathname === "/organizer/register";
   const isVenueRegister = pathname === "/venue/register";
   const isArtistRegister = pathname === "/artist/register";
+  const isBusinessRegister = pathname === "/business/register";
+  /** Public partner register pages use the main customer HomeHeader */
+  const isPartnerRegisterPage =
+    isOrganizerRegister || isVenueRegister || isArtistRegister || isBusinessRegister;
   const isMovieRegister = pathname === "/movie/register";
   const isVenueLogin = pathname === "/venue/login";
   const isArtistLogin = pathname === "/artist/login";
@@ -105,12 +109,11 @@ export default function RootLayout({
 
   const isAdminOrBusiness =
     pathname?.startsWith("/admin") ||
-    pathname?.startsWith("/business") ||
-    (isArtistAdminPath(pathname || "") && !isArtistRegister && !isArtistLogin) ||
-    (isVenueAdminPath(pathname || "") && !isVenueRegister && !isVenueLogin) ||
+    (Boolean(pathname?.startsWith("/business")) && !isBusinessRegister) ||
+    ((isArtistAdminPath(pathname || "") && !isArtistRegister && !isArtistLogin) && !isArtistRegister) ||
+    ((isVenueAdminPath(pathname || "") && !isVenueRegister) && !isVenueRegister && !isVenueLogin) ||
     (isMovieAdminPath(pathname || "") && !isMovieRegister && !isMovieLogin) ||
     (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerRegister);
-    
 
   const isLandingPage = pathname === "/";
   const isEventsPublicPage = pathname === "/events" || Boolean(pathname?.startsWith("/events/"));
@@ -124,7 +127,14 @@ export default function RootLayout({
     pathname === "/business/login" ||
     pathname === "/organizer/login" ||
     pathname === "/movie/login" ||
+
+    pathname === "/venue/login" ||
+    pathname === "/artist/login" ||
+    isOrganizerRegister ||
+    isVenueRegister ||
+    isArtistRegister;
     isPartnerPublicAuth;
+    isPartnerRegisterPage;
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
   const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow;
   const showLayoutFooter =

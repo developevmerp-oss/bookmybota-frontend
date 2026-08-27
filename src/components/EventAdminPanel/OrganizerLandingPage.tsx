@@ -27,35 +27,35 @@ const FEATURE_SLIDES = [
     title: "Ticket scanning made easy",
     description: "Experience the ease of managing entry at an event.",
     image: "https://assets-in.bmscdn.com/static/2021/06/des-sli-fiv.jpeg",
-    bg: "#45423E",
+    bg: "#2F4858",
   },
   {
     id: "mticket",
     title: "Take advantage of our M-ticket feature",
     description: "Lets your audience skip the box office queue and head straight to the gate.",
     image: "https://assets-in.bmscdn.com/static/2021/06/des-sli-f.jpeg",
-    bg: "#9A6848",
+    bg: "#A15C38",
   },
   {
     id: "dashboard",
     title: "Introducing an event management tool",
     description: "Experience the ease of event creation and publishing.",
     image: "https://assets-in.bmscdn.com/static/2021/06/des-lap-sli-six.png",
-    bg: "#5C4A6E",
+    bg: "#6900AA",
   },
   {
     id: "artist",
     title: "Empower the artist within you",
     description: "List your own performances, gigs and more with Book My Bota.",
     image: "https://assets-in.bmscdn.com/static/2021/06/sli-o.jpeg",
-    bg: "#3E613D",
+    bg: "#2D6A4F",
   },
   {
     id: "workshop",
     title: "Conduct workshops and much more",
     description: "Share your skills with people around the world — from home!",
     image: "https://assets-in.bmscdn.com/static/2021/06/des-sli-th.jpeg",
-    bg: "#536E7A",
+    bg: "#1D4E89",
   },
 ];
 
@@ -65,36 +65,42 @@ const HOST_CATEGORIES = [
     infoId: "organizer.host.performances",
     Icon: Guitar,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/perf.png",
+    blurb: "Music, Dance, Theatre & more",
   },
   {
     label: "Experiences",
     infoId: "organizer.host.experiences",
     Icon: PartyPopper,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/experiencess.png",
+    blurb: "Unique activities & immersive experiences",
   },
   {
     label: "Expositions",
     infoId: "organizer.host.expositions",
     Icon: BookOpen,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/expositionss.png",
+    blurb: "Art, Culture & Exhibitions",
   },
   {
     label: "Parties",
     infoId: "organizer.host.parties",
     Icon: Mic2,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/partiess.png",
+    blurb: "Private parties & social gatherings",
   },
   {
     label: "Sports",
     infoId: "organizer.host.sports",
     Icon: CalendarDays,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/sport.png",
+    blurb: "Matches, Tournaments & sports events",
   },
   {
     label: "Conferences",
     infoId: "organizer.host.conferences",
     Icon: Building2,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/conferencess.png",
+    blurb: "Business, Education & networking events",
   },
 ];
 
@@ -104,36 +110,42 @@ const SERVICES = [
     infoId: "organizer.service.online-sales",
     Icon: Rocket,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/online-saless.png",
+    blurb: "Reach audiences and sell tickets online with powerful discovery tools.",
   },
   {
     label: "Pricing",
     infoId: "organizer.service.pricing",
     Icon: Calculator,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/pricings.png",
+    blurb: "Flexible ticket tiers and offers so you stay in control of revenue.",
   },
   {
-    label: "Food & beverages, stalls and the works!",
+    label: "Food & Beverages",
     infoId: "organizer.service.fnb",
     Icon: Truck,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/food.png",
+    blurb: "Coordinate F&B, stalls and add-ons alongside ticket sales.",
   },
   {
-    label: "On ground support & gate entry management",
+    label: "On-ground Support",
     infoId: "organizer.service.on-ground",
     Icon: Handshake,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/on-ground-support.png",
+    blurb: "Smooth check-in and gate management on event day.",
   },
   {
-    label: "Reports & business insights",
+    label: "Reports & Insights",
     infoId: "organizer.service.reports",
     Icon: BarChart3,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/report.png",
+    blurb: "Track sales and performance with clear business reports.",
   },
   {
-    label: "POS, RFID, Turnstiles & more...",
+    label: "Smart Access Solutions",
     infoId: "organizer.service.pos",
     Icon: Smartphone,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/rfids.png",
+    blurb: "POS, RFID, turnstiles and more for faster, safer entry.",
   },
 ];
 
@@ -188,11 +200,11 @@ export default function OrganizerLandingPage() {
       primaryCtaLabel="List your show"
       secondaryLoginLabel="Organizer Login"
       slides={FEATURE_SLIDES}
-      hostTitle="What can you host???"
-      hostSubtitle="As the home for entertainment in your city, Book My Bota enables your event with end-to-end solutions from the time you register to the completion of the event. Let's look at what you can host."
+      hostTitle="What can you host?"
+      hostSubtitle="From local gatherings to global events, Book My Bota helps you create unforgettable experiences across every category."
       hostTiles={HOST_CATEGORIES}
       servicesTitle="What are the services we offer?"
-      servicesSubtitle="After collaborating with event organisers across dining nights, concerts, and conferences, we're well equipped to bring your vision to life."
+      servicesSubtitle="Everything you need to run successful events, all in one place."
       servicesTiles={SERVICES}
       servicesFootnote="Apart from these must-haves for any event, we also support a host of other services like SEO for your event, custom pricing for your tickets, and dedicated organizer tools to manage bookings and guest experience."
       testimonials={TESTIMONIALS}

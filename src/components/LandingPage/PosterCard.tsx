@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Star } from "lucide-react";
-import type { Business, PublicEvent } from "@/services/api";
+import { Building2, Calendar, Star } from "lucide-react";
+import type { Business, PublicEvent, PublicRegisteredPartner } from "@/services/api";
 import { useGetPublicEventQuery } from "@/services/api";
 import { normalizePriceRange } from "@/lib/currencyFormat";
 import {
@@ -183,6 +183,77 @@ export function ShowcaseEventPosterCard({
             {eventType}
           </p>
         )}
+      </div>
+    </Link>
+  );
+}
+
+function venuePlaceLine(venue: PublicRegisteredPartner) {
+  const locality = localityFromAddress(venue.address || undefined);
+  const city = venue.city_name?.trim() || "";
+  if (locality && city && locality.toLowerCase() !== city.toLowerCase()) {
+    return `${locality}: ${city}`;
+  }
+  if (locality) return locality;
+  if (city && venue.city_state?.trim()) return `${city}, ${venue.city_state.trim()}`;
+  if (city) return city;
+  return venue.city_state?.trim() || "";
+}
+
+/** Same poster card layout as events — used on Top Venues rail. */
+export function VenuePosterCard({
+  venue,
+  className = "",
+}: {
+  venue: PublicRegisteredPartner;
+  className?: string;
+}) {
+  const adaptive = useAdaptiveCard();
+  const fillSlot = Boolean(adaptive);
+  const fluid = Boolean(adaptive?.fluid);
+  const horizontal = Boolean(adaptive?.horizontal);
+  const columns = adaptive?.columns ?? 0;
+  const widthClass = fillSlot
+    ? "w-full"
+    : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px]";
+  const image = venue.cover_image_url?.trim() || "";
+  const placeLine = venuePlaceLine(venue);
+  const venueType = venue.type_name?.trim() || "Venue";
+
+  return (
+    <Link
+      href={`/venues/${venue.id}`}
+      className={`${widthClass} group block h-full ${cardShell} ${className}`}
+      title={`View ${venue.name} availability and send an inquiry`}
+    >
+      <div
+        className={`relative ${posterMediaClass(fluid, horizontal, columns)} overflow-hidden bg-[#F3F4F6]`}
+      >
+        {image ? (
+          <img
+            src={image}
+            alt={venue.name}
+            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 ease-out"
+            loading="lazy"
+            draggable={false}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-300">
+            <Building2 size={32} strokeWidth={1.5} />
+          </div>
+        )}
+      </div>
+
+      <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">
+        <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+          {venue.name}
+        </h3>
+        {placeLine ? (
+          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">{placeLine}</p>
+        ) : null}
+        <p className="mt-0.5 type-card-caption text-[#6900AA]/80 font-medium line-clamp-1">
+          {venueType}
+        </p>
       </div>
     </Link>
   );

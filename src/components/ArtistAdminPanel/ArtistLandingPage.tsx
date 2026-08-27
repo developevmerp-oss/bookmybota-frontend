@@ -28,7 +28,7 @@ const FEATURE_SLIDES = [
     description:
       "List your own performances, gigs and more with Book My Bota — and get discovered by organizers.",
     image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=900&q=80",
-    bg: "#3E613D",
+    bg: "#2D6A4F",
   },
   {
     id: "profile",
@@ -36,7 +36,7 @@ const FEATURE_SLIDES = [
     description:
       "Showcase your bio, photos, and performance style so fans and partners see you at your best.",
     image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=900&q=80",
-    bg: "#9A6848",
+    bg: "#A15C38",
   },
   {
     id: "lineup",
@@ -44,7 +44,7 @@ const FEATURE_SLIDES = [
     description:
       "When organizers add you to an event, your name reaches Book My Bota audiences across the city.",
     image: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=900&q=80",
-    bg: "#45423E",
+    bg: "#2F4858",
   },
   {
     id: "trust",
@@ -52,7 +52,7 @@ const FEATURE_SLIDES = [
     description:
       "Verified partners stand out. Complete onboarding to become a platform-authorized artist.",
     image: "https://images.unsplash.com/photo-1501386767018-ba696c028ced?w=900&q=80",
-    bg: "#536E7A",
+    bg: "#1D4E89",
   },
 ];
 
@@ -61,31 +61,37 @@ const ARTIST_TYPES = [
     label: "Singers & Vocalists",
     infoId: "artist.host.singers",
     Icon: Mic2,
+    blurb: "Solo artists & vocal performers",
   },
   {
     label: "Bands & Ensembles",
     infoId: "artist.host.bands",
     Icon: Guitar,
+    blurb: "Live bands & group acts",
   },
   {
     label: "DJs & Electronic",
     infoId: "artist.host.djs",
     Icon: Music2,
+    blurb: "Club sets & electronic nights",
   },
   {
     label: "Comedy & Spoken Word",
     infoId: "artist.host.comedy",
     Icon: Sparkles,
+    blurb: "Stand-up, poetry & open mics",
   },
   {
     label: "Dance & Performance",
     infoId: "artist.host.dance",
     Icon: Users,
+    blurb: "Dance crews & stage acts",
   },
   {
     label: "Special Acts",
     infoId: "artist.host.special",
     Icon: Star,
+    blurb: "Unique & specialty performers",
   },
 ];
 
@@ -94,31 +100,37 @@ const SERVICES = [
     label: "Artist profile hub",
     infoId: "artist.service.profile",
     Icon: Mic2,
+    blurb: "Showcase bio, photos and your performance style.",
   },
   {
     label: "Organizer discovery",
     infoId: "artist.service.discovery",
     Icon: CalendarDays,
+    blurb: "Get found by organizers booking live talent.",
   },
   {
     label: "Event visibility",
     infoId: "artist.service.visibility",
     Icon: Ticket,
+    blurb: "Appear on lineups seen by citywide audiences.",
   },
   {
     label: "Shareable presence",
     infoId: "artist.service.shareable",
     Icon: Share2,
+    blurb: "Share a polished profile with partners and fans.",
   },
   {
     label: "Partner onboarding",
     infoId: "artist.service.onboarding",
     Icon: Handshake,
+    blurb: "Complete verification and become an authorized artist.",
   },
   {
     label: "Cross-city reach",
     infoId: "artist.service.reach",
     Icon: Building2,
+    blurb: "Grow bookings beyond your home city.",
   },
 ];
 

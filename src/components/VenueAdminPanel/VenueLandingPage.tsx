@@ -26,7 +26,7 @@ const FEATURE_SLIDES = [
     description:
       "When organizers list your space, claim those showtimes and stay in the loop on what is running at your property.",
     image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=900&q=80",
-    bg: "#45423E",
+    bg: "#2F4858",
   },
   {
     id: "layouts",
@@ -34,7 +34,7 @@ const FEATURE_SLIDES = [
     description:
       "Share theater, banquet, or mixed layouts so organizers can pick a published plan for every show.",
     image: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=900&q=80",
-    bg: "#9A6848",
+    bg: "#A15C38",
   },
   {
     id: "requests",
@@ -42,7 +42,7 @@ const FEATURE_SLIDES = [
     description:
       "Review organizer seating requests, fulfill them with your plans, and keep the floor plan process smooth.",
     image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=900&q=80",
-    bg: "#3E613D",
+    bg: "#2D6A4F",
   },
   {
     id: "trust",
@@ -50,7 +50,7 @@ const FEATURE_SLIDES = [
     description:
       "Authorized venues stand out in organizer search and appear as platform-trusted spaces to customers.",
     image: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=900&q=80",
-    bg: "#536E7A",
+    bg: "#1D4E89",
   },
 ];
 
@@ -59,31 +59,37 @@ const VENUE_TYPES = [
     label: "Auditoriums & Halls",
     infoId: "venue.host.auditoriums",
     Icon: Building2,
+    blurb: "Theatres, halls & seated venues",
   },
   {
     label: "Banquet & Wedding Spaces",
     infoId: "venue.host.banquet",
     Icon: Sofa,
+    blurb: "Celebrations & private functions",
   },
   {
     label: "Outdoor & Amphitheaters",
     infoId: "venue.host.outdoor",
     Icon: MapPin,
+    blurb: "Open-air stages & lawn venues",
   },
   {
     label: "Clubs & Nightvenues",
     infoId: "venue.host.clubs",
     Icon: Users,
+    blurb: "Nightlife & late-evening spaces",
   },
   {
     label: "Conference Centers",
     infoId: "venue.host.conference",
     Icon: LayoutGrid,
+    blurb: "Meetings, summits & corporate",
   },
   {
     label: "Unique Spaces",
     infoId: "venue.host.unique",
     Icon: ShieldCheck,
+    blurb: "One-of-a-kind hosting spaces",
   },
 ];
 
@@ -92,31 +98,37 @@ const SERVICES = [
     label: "Claim event showtimes",
     infoId: "venue.service.claim",
     Icon: Ticket,
+    blurb: "Claim organizer showtimes running at your property.",
   },
   {
     label: "Published seating layouts",
     infoId: "venue.service.layouts",
     Icon: LayoutGrid,
+    blurb: "Publish layouts organizers can reuse for every show.",
   },
   {
     label: "Layout request workflow",
     infoId: "venue.service.requests",
     Icon: ClipboardList,
+    blurb: "Review and fulfill custom seating requests smoothly.",
   },
   {
     label: "Organizer discovery",
     infoId: "venue.service.discovery",
     Icon: Building2,
+    blurb: "Get found by organizers searching trusted venues.",
   },
   {
     label: "Partner onboarding",
     infoId: "venue.service.onboarding",
     Icon: Handshake,
+    blurb: "Complete verification and go live as a partner.",
   },
   {
     label: "Citywide visibility",
     infoId: "venue.service.visibility",
     Icon: MapPin,
+    blurb: "Stand out to partners and audiences across the city.",
   },
 ];
 

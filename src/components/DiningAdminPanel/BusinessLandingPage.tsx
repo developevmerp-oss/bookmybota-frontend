@@ -26,28 +26,28 @@ const FEATURE_SLIDES = [
     title: "Fill every table with ease",
     description: "List your restaurant on Book My Bota and let diners discover, book, and walk in ready to enjoy.",
     image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=900&q=80",
-    bg: "#45423E",
+    bg: "#2F4858",
   },
   {
     id: "offers",
     title: "Run offers that actually convert",
     description: "Promote weekday specials, happy hours, and gift-card redemptions from one dining dashboard.",
     image: "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=900&q=80",
-    bg: "#9A6848",
+    bg: "#A15C38",
   },
   {
     id: "scan",
     title: "Scan & redeem in seconds",
     description: "Validate offers and gift cards at the door with a simple phone-based scan flow.",
     image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=900&q=80",
-    bg: "#3E613D",
+    bg: "#2D6A4F",
   },
   {
     id: "insights",
     title: "Understand what diners love",
     description: "Track bookings, redemptions, and reviews so you can grow what works.",
     image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=900&q=80",
-    bg: "#536E7A",
+    bg: "#1D4E89",
   },
 ];
 
@@ -56,31 +56,37 @@ const HOST_CATEGORIES = [
     label: "Fine Dining",
     infoId: "business.host.fine-dining",
     Icon: Wine,
+    blurb: "Upscale nights & special occasions",
   },
   {
     label: "Casual Dining",
     infoId: "business.host.casual-dining",
     Icon: Utensils,
+    blurb: "Family favourites & everyday dining",
   },
   {
     label: "Cafés & Bakeries",
     infoId: "business.host.cafes",
     Icon: Coffee,
+    blurb: "Coffee, desserts & daytime spots",
   },
   {
     label: "Quick Service",
     infoId: "business.host.qsr",
     Icon: Soup,
+    blurb: "Fast service & takeaway traffic",
   },
   {
     label: "Bars & Lounges",
     infoId: "business.host.bars",
     Icon: Store,
+    blurb: "Nightlife, tables & exclusive deals",
   },
   {
     label: "Multi-outlet Brands",
     infoId: "business.host.multi-outlet",
     Icon: Users,
+    blurb: "Manage locations from one dashboard",
   },
 ];
 
@@ -89,31 +95,37 @@ const SERVICES = [
     label: "Online discovery & bookings",
     infoId: "business.service.discovery",
     Icon: CalendarCheck,
+    blurb: "Get found by diners and convert interest into bookings.",
   },
   {
     label: "Offers & promotions",
     infoId: "business.service.offers",
     Icon: Tag,
+    blurb: "Run weekday specials and campaigns that convert.",
   },
   {
     label: "Gift card acceptance",
     infoId: "business.service.gift-cards",
     Icon: Ticket,
+    blurb: "Accept Book My Bota gift cards at your venue.",
   },
   {
     label: "QR scan at the venue",
     infoId: "business.service.qr",
     Icon: QrCode,
+    blurb: "Validate offers and cards with a simple phone scan.",
   },
   {
     label: "Reviews & reputation",
     infoId: "business.service.reviews",
     Icon: BadgePercent,
+    blurb: "Build trust with guest feedback in one place.",
   },
   {
     label: "Reports & insights",
     infoId: "business.service.reports",
     Icon: BarChart3,
+    blurb: "Track bookings, redemptions and what works.",
   },
 ];
 

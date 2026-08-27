@@ -36,8 +36,8 @@ export default function Home() {
       </div>
       <PopularDiningRail city={city} />
       <TopArtistsRail />
-      <TopVenuesRail />
       <RecommendedMoviesRail />
+      <TopVenuesRail />
       <PopularEventsRail city={city} />
       <SpecialOffersRail />
       <EventsNearYouRail city={city} />

@@ -2,53 +2,22 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import { Building2, ChevronLeft, ChevronRight } from "lucide-react";
-import { useGetPublicRegisteredVenuesQuery, type PublicRegisteredPartner } from "@/services/api";
-import "./TopArtistsRail.css";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
+import AdaptiveCardRow from "./AdaptiveCardRow";
+import { VenuePosterCard } from "./PosterCard";
 
-const VISIBLE = 6;
-
-function VenueCard({ venue }: { venue: PublicRegisteredPartner }) {
-  const role = venue.type_name || "Venue";
-  const place = [venue.city_name, venue.city_state].filter(Boolean).join(", ");
-
-  return (
-    <Link
-      href={`/venues/${venue.id}`}
-      className="top-artists-slot top-artists-slot-link"
-      title={`View ${venue.name} availability and send an inquiry`}
-    >
-      <div className="top-artists-avatar">
-        <div className="top-artists-avatar-inner">
-          {venue.cover_image_url ? (
-            <img
-              src={venue.cover_image_url}
-              alt={venue.name}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              draggable={false}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-[#F7E9FF] text-[#6900AA]">
-              <Building2 size={32} strokeWidth={1.4} />
-            </div>
-          )}
-        </div>
-      </div>
-      <p className="top-artists-name">{venue.name}</p>
-      <p className="top-artists-role">{place ? `${role} · ${place}` : role}</p>
-    </Link>
-  );
-}
+const MIN_VISIBLE = 5;
 
 export default function TopVenuesRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { data: venues = [], isLoading } = useGetPublicRegisteredVenuesQuery();
+  const showArrows = venues.length > MIN_VISIBLE;
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.7, 280), behavior: "smooth" });
+    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
   };
 
   return (
@@ -65,12 +34,18 @@ export default function TopVenuesRail() {
         </div>
 
         {isLoading ? (
-          <div className="flex gap-4 overflow-hidden py-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex flex-col items-center w-[6.75rem] sm:w-[7.75rem] shrink-0">
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#F7E9FF] animate-pulse" />
-                <div className="mt-3 h-3 w-16 bg-slate-100 rounded animate-pulse" />
-                <div className="mt-2 h-2.5 w-12 bg-slate-50 rounded animate-pulse" />
+          <div className="flex gap-3 sm:gap-4 overflow-hidden py-1">
+            {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
+              <div
+                key={i}
+                className="snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px] rounded-2xl border border-[#EAEAEA] overflow-hidden bg-white"
+              >
+                <div className="aspect-[3/4] bg-[#F3F4F6] animate-pulse" />
+                <div className="px-3.5 pt-3.5 pb-4 space-y-2">
+                  <div className="h-4 w-4/5 bg-slate-100 rounded animate-pulse" />
+                  <div className="h-3 w-3/5 bg-slate-50 rounded animate-pulse" />
+                  <div className="h-3 w-1/3 bg-[#F7E9FF] rounded animate-pulse" />
+                </div>
               </div>
             ))}
           </div>
@@ -81,33 +56,29 @@ export default function TopVenuesRail() {
           </p>
         ) : (
           <div className="relative">
-            {venues.length > 5 ? (
+            {showArrows ? (
               <button
                 type="button"
                 aria-label="Previous venues"
                 onClick={() => scrollBy(-1)}
-                className="flex absolute left-0 md:-left-2 lg:-left-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
               >
                 <ChevronLeft size={18} />
               </button>
             ) : null}
 
-            <div
-              ref={scrollerRef}
-              className="top-artists-rail"
-              style={{ ["--artists-visible" as string]: VISIBLE }}
-            >
+            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {venues.map((venue) => (
-                <VenueCard key={venue.id} venue={venue} />
+                <VenuePosterCard key={venue.id} venue={venue} />
               ))}
-            </div>
+            </AdaptiveCardRow>
 
-            {venues.length > 5 ? (
+            {showArrows ? (
               <button
                 type="button"
                 aria-label="Next venues"
                 onClick={() => scrollBy(1)}
-                className="flex absolute right-0 md:-right-2 lg:-right-3 top-[36%] -translate-y-1/2 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
               >
                 <ChevronRight size={18} />
               </button>

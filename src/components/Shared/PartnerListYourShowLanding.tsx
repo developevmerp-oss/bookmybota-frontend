@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowUpRight,
+  CalendarCheck,
   ChevronLeft,
   ChevronRight,
-  Info,
   Quote,
   ShieldCheck,
   X,
@@ -42,6 +43,8 @@ export type PartnerTile = {
   infoId: string;
   Icon: LucideIcon;
   iconSrc?: string;
+  /** Short line under the title on host/service cards */
+  blurb?: string;
 };
 
 export type PartnerTestimonial = {
@@ -63,9 +66,12 @@ export type PartnerListYourShowLandingProps = {
   hostTitle: string;
   hostSubtitle: string;
   hostTiles: PartnerTile[];
+  hostEyebrow?: string;
   servicesTitle: string;
   servicesSubtitle: string;
   servicesTiles: PartnerTile[];
+  servicesEyebrow?: string;
+  servicesBannerText?: string;
   servicesFootnote?: string;
   securityTitle?: string;
   securitySubtitle?: string;
@@ -175,44 +181,135 @@ function InfoPopupModal({
   );
 }
 
-function TileGrid({
+const HOST_ICON_TONES = [
+  { bg: "bg-[#F3E8FF]", fg: "text-[#6900AA]" },
+  { bg: "bg-[#FFEDD5]", fg: "text-[#C2410C]" },
+  { bg: "bg-[#DBEAFE]", fg: "text-[#1D4ED8]" },
+  { bg: "bg-[#FCE7F3]", fg: "text-[#BE185D]" },
+  { bg: "bg-[#DCFCE7]", fg: "text-[#15803D]" },
+  { bg: "bg-[#EDE9FE]", fg: "text-[#6D28D9]" },
+];
+
+const SERVICE_ICON_TONES = [
+  { bg: "bg-[#F3E8FF]", fg: "text-[#6900AA]" },
+  { bg: "bg-[#FFEDD5]", fg: "text-[#C2410C]" },
+  { bg: "bg-[#FEE2E2]", fg: "text-[#DC2626]" },
+  { bg: "bg-[#DCFCE7]", fg: "text-[#15803D]" },
+  { bg: "bg-[#DBEAFE]", fg: "text-[#1D4ED8]" },
+  { bg: "bg-[#EDE9FE]", fg: "text-[#6D28D9]" },
+];
+
+function SectionHeading({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="text-center max-w-3xl mx-auto">
+      <p className="text-[11px] sm:text-xs font-bold tracking-[0.18em] uppercase text-[#6900AA]">
+        {eyebrow}
+      </p>
+      <h2 className="mt-3 text-[1.75rem] sm:text-[2.15rem] md:text-[2.45rem] font-bold tracking-tight text-[#1a1a2e] leading-tight">
+        {title}
+      </h2>
+      <span className="mt-3 mx-auto block h-[3px] w-12 rounded-full bg-[#6900AA]" aria-hidden />
+      <p className="mt-4 text-[14px] sm:text-[15px] text-[#6B7280] leading-relaxed">{subtitle}</p>
+    </div>
+  );
+}
+
+function HostCardsGrid({
   tiles,
-  tone,
   onOpenInfo,
 }: {
   tiles: PartnerTile[];
-  tone: "host" | "service";
   onOpenInfo: (tile: PartnerTile) => void;
 }) {
-  const bg = tone === "host" ? "bg-[#006eff2b]" : "bg-[#F7E9FF]";
   return (
-    <div className="mt-12 flex flex-wrap justify-center gap-5 md:gap-6">
-      {tiles.map((tile) => {
-        const { label, Icon, iconSrc } = tile;
+    <div className="mt-10 sm:mt-12 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      {tiles.map((tile, i) => {
+        const tone = HOST_ICON_TONES[i % HOST_ICON_TONES.length];
+        const { label, Icon, iconSrc, blurb } = tile;
         return (
-          <div
+          <button
             key={label}
-            className={`group w-full sm:w-[calc((100%-1.25rem)/2)] lg:w-[calc((100%-3rem)/3)] ${bg} rounded-md px-6 py-12 flex flex-col items-center text-center min-h-[220px] transition-[box-shadow,transform] duration-300 ease-out shadow-none hover:shadow-[8px_10px_24px_rgba(17,17,17,0.18)] hover:-translate-y-1`}
+            type="button"
+            onClick={() => onOpenInfo(tile)}
+            className="group flex flex-col items-center text-center rounded-2xl border border-[#E8E8EE] bg-white px-3 py-6 sm:px-4 sm:py-7 shadow-[0_1px_2px_rgba(17,17,17,0.04)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.08)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300 cursor-pointer"
           >
-            {iconSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={iconSrc} alt="" className="h-14 w-14 object-contain" />
-            ) : (
-              <Icon size={48} strokeWidth={1.35} className="text-[#222]" />
-            )}
-            <p className="mt-6 text-[17px] font-bold text-[#222] leading-snug px-2">{label}</p>
-            <button
-              type="button"
-              aria-label={`More info about ${label}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenInfo(tile);
-              }}
-              className="mt-5 inline-flex h-8 w-8 items-center justify-center rounded-full text-[#E11D48] transition-colors cursor-pointer"
+            <span
+              className={`inline-flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full ${tone.bg}`}
             >
-              <Info size={28} strokeWidth={1.5} />
-            </button>
-          </div>
+              {iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={iconSrc} alt="" className="h-8 w-8 sm:h-9 sm:w-9 object-contain" />
+              ) : (
+                <Icon size={28} strokeWidth={1.5} className={tone.fg} />
+              )}
+            </span>
+            <p className="mt-4 text-[14px] sm:text-[15px] font-bold text-[#1a1a2e] leading-snug">
+              {label}
+            </p>
+            {blurb ? (
+              <p className="mt-1.5 text-[12px] sm:text-[13px] text-[#6B7280] leading-snug line-clamp-3">
+                {blurb}
+              </p>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ServiceCardsGrid({
+  tiles,
+  onOpenInfo,
+}: {
+  tiles: PartnerTile[];
+  onOpenInfo: (tile: PartnerTile) => void;
+}) {
+  return (
+    <div className="mt-10 sm:mt-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+      {tiles.map((tile, i) => {
+        const tone = SERVICE_ICON_TONES[i % SERVICE_ICON_TONES.length];
+        const { label, Icon, iconSrc, blurb } = tile;
+        return (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onOpenInfo(tile)}
+            className="group flex items-center gap-3.5 sm:gap-4 rounded-2xl border border-[#E8E8EE] bg-white px-4 py-4 sm:px-5 sm:py-5 text-left shadow-[0_1px_2px_rgba(17,17,17,0.04)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.08)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300 cursor-pointer"
+          >
+            <span
+              className={`shrink-0 inline-flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-xl ${tone.bg}`}
+            >
+              {iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={iconSrc} alt="" className="h-7 w-7 sm:h-8 sm:w-8 object-contain" />
+              ) : (
+                <Icon size={24} strokeWidth={1.5} className={tone.fg} />
+              )}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] sm:text-[15px] font-bold text-[#1a1a2e] leading-snug">
+                {label}
+              </span>
+              {blurb ? (
+                <span className="mt-1 block text-[12px] sm:text-[13px] text-[#6B7280] leading-snug line-clamp-2">
+                  {blurb}
+                </span>
+              ) : null}
+            </span>
+            <ChevronRight
+              size={18}
+              className="shrink-0 text-[#9CA3AF] group-hover:text-[#6900AA] transition-colors"
+            />
+          </button>
         );
       })}
     </div>
@@ -231,9 +328,12 @@ export default function PartnerListYourShowLanding({
   hostTitle,
   hostSubtitle,
   hostTiles,
+  hostEyebrow = "Explore possibilities",
   servicesTitle,
   servicesSubtitle,
   servicesTiles,
+  servicesEyebrow = "We've got you covered",
+  servicesBannerText = "From planning to performance, we make every event a success.",
   servicesFootnote,
   securityTitle = "Sit back and watch your event come to life",
   securitySubtitle = "Events may be all fun and games, but we take it seriously. We ensure our customer's security so that you don't have to.",
@@ -244,9 +344,22 @@ export default function PartnerListYourShowLanding({
   loginOpen,
   onCloseLogin,
 }: PartnerListYourShowLandingProps) {
-  const [slide, setSlide] = useState(0);
+  const n = slides.length;
+  /** Middle copy of tripled track — starts on first real slide */
+  const [index, setIndex] = useState(n);
+  const [animate, setAnimate] = useState(true);
+  const [paused, setPaused] = useState(false);
   const [testimonial, setTestimonial] = useState(0);
   const [infoPopup, setInfoPopup] = useState<ActiveInfoPopup | null>(null);
+  const [narrow, setNarrow] = useState(false);
+  const jumpingRef = useRef(false);
+
+  const extendedSlides = useMemo(() => {
+    if (n === 0) return [];
+    return [...slides, ...slides, ...slides];
+  }, [slides, n]);
+
+  const realSlide = n > 0 ? ((index % n) + n) % n : 0;
 
   const openInfo = useCallback((tile: PartnerTile) => {
     setInfoPopup({
@@ -270,12 +383,30 @@ export default function PartnerListYourShowLanding({
   }, [loginOpen, onCloseLogin]);
 
   useEffect(() => {
-    if (slides.length <= 1) return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  /** Keep index on middle copy after mount / slides change */
+  useEffect(() => {
+    if (n <= 0) return;
+    setAnimate(false);
+    setIndex(n);
+    const t = window.setTimeout(() => setAnimate(true), 40);
+    return () => window.clearTimeout(t);
+  }, [n]);
+
+  useEffect(() => {
+    if (n <= 1 || paused) return;
     const id = window.setInterval(() => {
-      setSlide((s) => (s + 1) % slides.length);
-    }, 5500);
+      setAnimate(true);
+      setIndex((i) => i + 1);
+    }, 4500);
     return () => window.clearInterval(id);
-  }, [slides.length, slide]);
+  }, [n, paused, index]);
 
   useEffect(() => {
     if (testimonials.length <= 1) return;
@@ -285,26 +416,56 @@ export default function PartnerListYourShowLanding({
     return () => window.clearInterval(id);
   }, [testimonials.length]);
 
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const sync = () => setNarrow(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
   const goPrev = useCallback(() => {
-    setSlide((s) => (s - 1 + slides.length) % slides.length);
-  }, [slides.length]);
+    if (n <= 1) return;
+    setAnimate(true);
+    setIndex((i) => i - 1);
+  }, [n]);
 
   const goNext = useCallback(() => {
-    setSlide((s) => (s + 1) % slides.length);
-  }, [slides.length]);
+    if (n <= 1) return;
+    setAnimate(true);
+    setIndex((i) => i + 1);
+  }, [n]);
+
+  const goToReal = useCallback(
+    (real: number) => {
+      if (n <= 0) return;
+      setAnimate(true);
+      setIndex(n + real);
+    },
+    [n]
+  );
+
+  const onTrackTransitionEnd = useCallback(() => {
+    if (n <= 0 || jumpingRef.current) return;
+    if (index >= n * 2) {
+      jumpingRef.current = true;
+      setAnimate(false);
+      setIndex(index - n);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setAnimate(true);
+          jumpingRef.current = false;
+        });
+      });
+    } else if (index < n) {
+      jumpingRef.current = true;
+      setAnimate(false);
+      setIndex(index + n);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setAnimate(true);
+          jumpingRef.current = false;
+        });
+      });
+    }
+  }, [index, n]);
 
   const activeQuote = testimonials[testimonial];
-  const slideW = narrow ? 88 : 72;
-  const gapPx = narrow ? 10 : 16;
+  /** Center card slightly narrower so side peeks show more (BMS-style) */
+  const slideW = narrow ? 40 : 53;
+  const gapPx = narrow ? 10 : 14;
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] flex flex-col font-sans text-[#222] overflow-x-hidden">
@@ -331,14 +492,18 @@ export default function PartnerListYourShowLanding({
       </header>
 
       <div className="pt-[72px] flex-1">
-        {/* Hero carousel — BookMyShow list-your-show center-mode (full width) */}
-        <section className="bg-white pt-3 sm:pt-4 pb-2 sm:pb-3 w-full">
-          <div className="relative w-full">
+        {/* Hero — full-bleed infinite BMS-style carousel */}
+        <section
+          className="bg-white pt-3 sm:pt-4 pb-3 w-full overflow-hidden"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          <div className="relative w-full max-w-none">
             <button
               type="button"
               onClick={goPrev}
               aria-label="Previous"
-              className="absolute left-2 sm:left-4 md:left-6 top-1/2 -translate-y-1/2 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-full bg-black/45 hover:bg-black/60 text-white flex items-center justify-center cursor-pointer transition-colors"
+              className="absolute left-2 sm:left-4 md:left-5 top-1/2 -translate-y-1/2 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-full bg-black/45 hover:bg-black/60 text-white flex items-center justify-center cursor-pointer transition-colors"
             >
               <ChevronLeft size={22} strokeWidth={2.25} />
             </button>
@@ -346,43 +511,49 @@ export default function PartnerListYourShowLanding({
               type="button"
               onClick={goNext}
               aria-label="Next"
-              className="absolute right-2 sm:right-4 md:right-6 top-1/2 -translate-y-1/2 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-full bg-black/45 hover:bg-black/60 text-white flex items-center justify-center cursor-pointer transition-colors"
+              className="absolute right-2 sm:right-4 md:right-5 top-1/2 -translate-y-1/2 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-full bg-black/45 hover:bg-black/60 text-white flex items-center justify-center cursor-pointer transition-colors"
             >
               <ChevronRight size={22} strokeWidth={2.25} />
             </button>
 
-            <div className="relative overflow-hidden">
+            <div className="relative w-full overflow-hidden">
               <div
-                className="flex transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform"
+                className={`flex will-change-transform ${
+                  animate ? "transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" : ""
+                }`}
                 style={{
                   gap: `${gapPx}px`,
-                  transform: `translateX(calc((100% - ${slideW}%) / 2 - ${slide} * (${slideW}% + ${gapPx}px)))`,
+                  transform: `translateX(calc((100% - ${slideW}%) / 2 - ${index} * (${slideW}% + ${gapPx}px)))`,
+                }}
+                onTransitionEnd={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  onTrackTransitionEnd();
                 }}
               >
-                {slides.map((s, i) => {
-                  const bg = s.bg || "#45423E";
-                  const isActive = i === slide;
+                {extendedSlides.map((s, i) => {
+                  const bg = s.bg || "#6900AA";
+                  const isActive = i === index;
                   return (
                     <article
-                      key={s.id}
-                      className={`relative shrink-0 rounded-md overflow-hidden transition-[opacity,transform] duration-500 ${
-                        isActive ? "opacity-100 scale-100" : "opacity-80 scale-[0.985]"
+                      key={`${s.id}-${i}`}
+                      className={`relative shrink-0 rounded-md overflow-hidden ${
+                        isActive ? "opacity-100" : "opacity-85"
                       }`}
                       style={{
                         width: `${slideW}%`,
                         backgroundColor: bg,
-                        minHeight: narrow ? 240 : 360,
+                        minHeight: narrow ? 210 : 310,
                       }}
                     >
-                      <div className="flex flex-col sm:flex-row h-full min-h-[240px] sm:min-h-[320px] md:min-h-[360px] pb-9">
-                        <div className="flex-1 px-5 py-6 sm:px-8 sm:py-8 md:px-11 md:py-10 flex flex-col justify-center z-10">
-                          <h1 className="text-[1.4rem] sm:text-[1.85rem] md:text-[2.2rem] font-bold text-white leading-tight tracking-tight max-w-md">
+                      <div className="flex flex-col sm:flex-row h-full min-h-[210px] sm:min-h-[280px] md:min-h-[310px] pb-8">
+                        <div className="flex-1 px-5 py-5 sm:px-8 sm:py-7 md:px-10 md:py-8 flex flex-col justify-center z-10">
+                          <h1 className="text-[1.3rem] sm:text-[1.7rem] md:text-[2rem] font-bold text-white leading-tight tracking-tight max-w-md">
                             {s.title}
                           </h1>
-                          <p className="mt-2.5 sm:mt-3 text-[13px] sm:text-[15px] md:text-[16px] text-white/90 leading-relaxed max-w-md">
+                          <p className="mt-2 sm:mt-2.5 text-[13px] sm:text-[14px] md:text-[15px] text-white/90 leading-relaxed max-w-md">
                             {s.description}
                           </p>
-                          <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3 sm:gap-4">
+                          <div className="mt-4 sm:mt-5 flex flex-wrap items-center gap-3 sm:gap-4">
                             <a
                               href={s.knowMoreHref || "#services"}
                               className="text-sm font-semibold text-white hover:underline underline-offset-4"
@@ -398,12 +569,12 @@ export default function PartnerListYourShowLanding({
                             </Link>
                           </div>
                         </div>
-                        <div className="relative w-full sm:w-[44%] md:w-[46%] h-[180px] sm:h-auto sm:min-h-[320px] md:min-h-[360px] p-3 sm:p-4 md:p-5 flex items-center justify-center">
+                        <div className="relative w-full sm:w-[44%] md:w-[46%] h-[155px] sm:h-auto sm:min-h-[280px] md:min-h-[310px] p-3 sm:p-3.5 md:p-4 flex items-center justify-center">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={s.image}
                             alt=""
-                            className="w-full h-full max-h-[240px] sm:max-h-[290px] md:max-h-[320px] object-cover rounded-[4px]"
+                            className="w-full h-full max-h-[200px] sm:max-h-[250px] md:max-h-[275px] object-cover rounded-[4px]"
                           />
                         </div>
                       </div>
@@ -419,9 +590,9 @@ export default function PartnerListYourShowLanding({
                       key={s.id}
                       type="button"
                       aria-label={`Go to slide ${i + 1}`}
-                      onClick={() => setSlide(i)}
+                      onClick={() => goToReal(i)}
                       className={`rounded-full transition-all cursor-pointer ${
-                        i === slide
+                        i === realSlide
                           ? "h-2 w-2 sm:h-2.5 sm:w-2.5 bg-white"
                           : "h-1.5 w-1.5 sm:h-2 sm:w-2 bg-white/45 hover:bg-white/70"
                       }`}
@@ -435,21 +606,17 @@ export default function PartnerListYourShowLanding({
 
         {/* What can you host */}
         <section className="bg-white py-14 md:py-16">
-          <div className="max-w-[1000px] mx-auto px-4 sm:px-6 text-center">
-            <h2 className="text-[1.75rem] md:text-[2.15rem] font-bold tracking-tight text-[#222]">
-              {hostTitle}
-            </h2>
-            <p className="mt-4 text-[14px] md:text-[15px] text-[#666] leading-relaxed max-w-3xl mx-auto">
-              {hostSubtitle}
-            </p>
-            <TileGrid tiles={hostTiles} tone="host" onOpenInfo={openInfo} />
-            <div className="mt-12">
+          <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+            <SectionHeading eyebrow={hostEyebrow} title={hostTitle} subtitle={hostSubtitle} />
+            <HostCardsGrid tiles={hostTiles} onOpenInfo={openInfo} />
+            <div className="mt-10 sm:mt-12 flex justify-center">
               <Link
                 href={registerHref}
-                className="inline-flex items-center justify-center h-12 px-12 rounded-md text-white font-bold text-[15px] hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: BRAND }}
+                className="inline-flex items-center justify-center gap-2 h-11 sm:h-12 px-7 sm:px-8 rounded-xl border-2 text-[14px] sm:text-[15px] font-bold hover:bg-[#F7E9FF] transition-colors"
+                style={{ borderColor: BRAND, color: BRAND }}
               >
                 {primaryCtaLabel}
+                <ArrowUpRight size={18} strokeWidth={2.25} />
               </Link>
             </div>
           </div>
@@ -458,38 +625,51 @@ export default function PartnerListYourShowLanding({
         {middleSlot}
 
         {/* Services */}
-        <section id="services" className="bg-white py-14 md:py-16 scroll-mt-24 border-t border-[#F0F0F0]">
-          <div className="max-w-[1000px] mx-auto px-4 sm:px-6 text-center">
-            <h2 className="text-[1.75rem] md:text-[2.15rem] font-bold tracking-tight text-[#222]">
-              {servicesTitle}
-            </h2>
-            <p className="mt-4 text-[14px] md:text-[15px] text-[#666] leading-relaxed max-w-3xl mx-auto">
-              {servicesSubtitle}
-            </p>
-            <TileGrid tiles={servicesTiles} tone="service" onOpenInfo={openInfo} />
+        <section id="services" className="bg-[#F7F4FB] py-14 md:py-16 scroll-mt-24">
+          <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+            <SectionHeading
+              eyebrow={servicesEyebrow}
+              title={servicesTitle}
+              subtitle={servicesSubtitle}
+            />
+            <ServiceCardsGrid tiles={servicesTiles} onOpenInfo={openInfo} />
+
+            <div className="mt-10 sm:mt-12 rounded-2xl border border-[#E8E0F2] bg-white px-5 py-5 sm:px-7 sm:py-6 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-6 shadow-[0_2px_12px_rgba(105,0,170,0.04)]">
+              <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                <span className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#F3E8FF] text-[#6900AA]">
+                  <CalendarCheck size={22} strokeWidth={1.75} />
+                </span>
+                <p className="text-[14px] sm:text-[15px] font-semibold text-[#1a1a2e] leading-snug">
+                  {servicesBannerText}
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                <Link
+                  href={registerHref}
+                  className="inline-flex items-center justify-center h-11 px-6 rounded-xl text-white text-[14px] font-bold hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: BRAND }}
+                >
+                  {primaryCtaLabel}
+                </Link>
+                <button
+                  type="button"
+                  onClick={onOpenLogin}
+                  className="inline-flex items-center justify-center h-11 px-6 rounded-xl border-2 text-[14px] font-bold hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+                  style={{ borderColor: BRAND, color: BRAND }}
+                >
+                  {secondaryLoginLabel}
+                </button>
+              </div>
+            </div>
+
             {servicesFootnote ? (
-              <p className="mt-12 text-[14px] text-[#666] leading-relaxed max-w-3xl mx-auto">
+              <p className="mt-8 text-center text-[13px] sm:text-[14px] text-[#6B7280] leading-relaxed max-w-3xl mx-auto">
                 {servicesFootnote}
               </p>
             ) : null}
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href={registerHref}
-                className="inline-flex items-center justify-center h-12 px-12 rounded-md text-white font-bold text-[15px] hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: BRAND }}
-              >
-                {primaryCtaLabel}
-              </Link>
-              <button
-                type="button"
-                onClick={onOpenLogin}
-                className="inline-flex items-center justify-center h-12 px-10 rounded-md border-2 font-bold text-[15px] hover:bg-[#F7E9FF] transition-colors cursor-pointer"
-                style={{ borderColor: BRAND, color: BRAND }}
-              >
-                {secondaryLoginLabel}
-              </button>
-            </div>
-            {crossLinks ? <div className="mt-8 text-[13px] text-[#888]">{crossLinks}</div> : null}
+            {crossLinks ? (
+              <div className="mt-6 text-center text-[13px] text-[#888]">{crossLinks}</div>
+            ) : null}
           </div>
         </section>
       </div>

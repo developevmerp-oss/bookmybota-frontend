@@ -1,29 +1,15 @@
 "use client";
 
 import { Check } from "lucide-react";
+import {
+  getEventStepperSteps,
+  type EventStepperStepDef,
+  type EventStepperStepId,
+} from "@/lib/eventCategoryConfig";
 
-export type EventStepperStepId =
-  | "type"
-  | "details"
-  | "media"
-  | "venue"
-  | "artists"
-  | "documents"
-  | "review";
+export type { EventStepperStepId };
 
-export const EVENT_STEPPER_STEPS: Array<{
-  id: EventStepperStepId;
-  label: string;
-  short: string;
-}> = [
-  { id: "type", label: "Event type", short: "Type" },
-  { id: "details", label: "Event details", short: "Details" },
-  { id: "media", label: "Media", short: "Media" },
-  { id: "venue", label: "Venue & tickets", short: "Venue" },
-  { id: "artists", label: "Lineup", short: "Lineup" },
-  { id: "documents", label: "Documents", short: "Docs" },
-  { id: "review", label: "Review", short: "Review" },
-];
+export const EVENT_STEPPER_STEPS = getEventStepperSteps(null);
 
 interface EventStepperNavProps {
   currentId: EventStepperStepId;
@@ -31,6 +17,8 @@ interface EventStepperNavProps {
   completedIds?: EventStepperStepId[];
   onStepClick?: (id: EventStepperStepId) => void;
   allowJump?: boolean;
+  /** Category-aware step list. Defaults to non-sport steps. */
+  steps?: EventStepperStepDef[];
 }
 
 export default function EventStepperNav({
@@ -38,14 +26,15 @@ export default function EventStepperNav({
   completedIds = [],
   onStepClick,
   allowJump = false,
+  steps = EVENT_STEPPER_STEPS,
 }: EventStepperNavProps) {
-  const currentIndex = EVENT_STEPPER_STEPS.findIndex((s) => s.id === currentId);
+  const currentIndex = steps.findIndex((s) => s.id === currentId);
   const completedSet = new Set(completedIds);
 
   return (
     <div className="space-y-3">
       <div className="hidden md:flex items-start gap-0 overflow-x-auto pb-1">
-        {EVENT_STEPPER_STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const done = completedSet.has(step.id);
           const active = step.id === currentId;
           const clickable = Boolean(allowJump && onStepClick);
@@ -86,10 +75,10 @@ export default function EventStepperNav({
                   {step.label}
                 </span>
               </button>
-              {index < EVENT_STEPPER_STEPS.length - 1 && (
+              {index < steps.length - 1 && (
                 <div
                   className={`h-0.5 w-full max-w-[48px] mx-1 mt-[-18px] shrink-0 ${
-                    done && completedSet.has(EVENT_STEPPER_STEPS[index + 1].id)
+                    done && completedSet.has(steps[index + 1].id)
                       ? "bg-emerald-400"
                       : "bg-slate-200"
                   }`}
@@ -103,17 +92,17 @@ export default function EventStepperNav({
       <div className="md:hidden flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
         <div>
           <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
-            Step {currentIndex + 1} of {EVENT_STEPPER_STEPS.length}
+            Step {Math.max(1, currentIndex + 1)} of {steps.length}
           </p>
           <p className="text-sm font-semibold text-slate-800">
-            {EVENT_STEPPER_STEPS[currentIndex]?.label}
+            {steps[currentIndex]?.label || "Event"}
           </p>
           {completedSet.has(currentId) && (
             <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Step complete</p>
           )}
         </div>
         <div className="flex gap-1.5 items-center">
-          {EVENT_STEPPER_STEPS.map((step, index) => {
+          {steps.map((step) => {
             const done = completedSet.has(step.id);
             const active = step.id === currentId;
             return (

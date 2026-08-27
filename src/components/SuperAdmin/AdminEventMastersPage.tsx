@@ -161,6 +161,7 @@ export default function AdminEventMastersPage() {
       name: "",
       description: "",
       category_type_id: "",
+      applies_to: "event",
       is_required: false,
       importance_level: 3,
     },
@@ -198,6 +199,7 @@ export default function AdminEventMastersPage() {
         category_type_id: values.category_type_id
           ? Number(values.category_type_id)
           : null,
+        applies_to: values.applies_to || "event",
         is_required: values.is_required ?? false,
         importance_level: values.importance_level ?? 3,
         is_active: true,
@@ -210,6 +212,7 @@ export default function AdminEventMastersPage() {
         name: "",
         description: "",
         category_type_id: values.category_type_id ?? "",
+        applies_to: values.applies_to || "event",
         is_required: false,
         importance_level: 3,
       });
@@ -560,6 +563,14 @@ export default function AdminEventMastersPage() {
                 />
               </div>
               <div>
+                <label className="block text-sm text-zinc-400 mb-1.5">Show upload on</label>
+                <select {...docForm.register("applies_to")} className="input-field w-full">
+                  <option value="event">Documents tab (general)</option>
+                  <option value="venue">Venue & tickets tab</option>
+                  <option value="artist">Lineup / artist tab</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Applies to category</label>
                 <select {...docForm.register("category_type_id")} className="input-field w-full">
                   <option value="">All event categories</option>
@@ -631,7 +642,13 @@ export default function AdminEventMastersPage() {
                           )}
                         </div>
                         <p className="text-xs text-zinc-500 mt-1">
-                          {doc.category_name ? `${doc.category_name} only` : "All event categories"}
+                          {(doc.applies_to === "venue"
+                            ? "Venue tab"
+                            : doc.applies_to === "artist"
+                              ? "Artist / lineup tab"
+                              : "Documents tab") +
+                            " · " +
+                            (doc.category_name ? `${doc.category_name} only` : "All event categories")}
                         </p>
                         {doc.description && (
                           <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{doc.description}</p>

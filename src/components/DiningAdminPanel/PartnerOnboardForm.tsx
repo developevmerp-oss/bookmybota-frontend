@@ -106,13 +106,17 @@ export default function PartnerOnboardForm({
     partnerType === "venue" || selectedParent?.module_key === "venue";
   const isArtistParent =
     partnerType === "artist" || selectedParent?.module_key === "artist";
-  const resolvedModule: "dining" | "event" | "venue" | "artist" = isEventParent
+  const isCinemaParent =
+    partnerType === "cinema" || selectedParent?.module_key === "cinema";
+  const resolvedModule: "dining" | "event" | "venue" | "artist" | "cinema" = isEventParent
     ? "event"
-    : isVenueParent
-      ? "venue"
-      : isArtistParent
-        ? "artist"
-        : "dining";
+    : isCinemaParent
+      ? "cinema"
+      : isVenueParent
+        ? "venue"
+        : isArtistParent
+          ? "artist"
+          : "dining";
   const isDining = resolvedModule === "dining";
   const isVenue = resolvedModule === "venue";
   const isArtist = resolvedModule === "artist";
@@ -141,6 +145,12 @@ export default function PartnerOnboardForm({
         businessTypes.find((t) => t.module_key === "event" && !t.parent_type_id) ||
         businessTypes.find((t) => t.id === editingBusiness.type_id);
       nextParent = eventParent ? String(eventParent.id) : editingBusiness.type_id ? String(editingBusiness.type_id) : "";
+      nextVenue = "";
+    } else if (partnerType === "cinema") {
+      const cinemaParent =
+        businessTypes.find((t) => t.module_key === "cinema" && !t.parent_type_id) ||
+        businessTypes.find((t) => t.id === editingBusiness.type_id);
+      nextParent = cinemaParent ? String(cinemaParent.id) : editingBusiness.type_id ? String(editingBusiness.type_id) : "";
       nextVenue = "";
     } else if (partnerType === "venue" || partnerType === "artist" || partnerType === "dining") {
       const child = businessTypes.find((t) => t.id === editingBusiness.type_id);
@@ -227,18 +237,20 @@ export default function PartnerOnboardForm({
             ? resolvePartnerFromParentId(businessTypes, values.parent_type_id)
             : partnerType === "event"
               ? { partner_type: "event" as const, type_id: parseInt(values.parent_type_id, 10) }
-              : partnerType === "venue"
-                ? { partner_type: "venue" as const, type_id: parseInt(values.parent_type_id, 10) }
-                : partnerType === "artist"
-                  ? { partner_type: "artist" as const, type_id: parseInt(values.parent_type_id, 10) }
-                  : null;
+              : partnerType === "cinema"
+                ? { partner_type: "cinema" as const, type_id: parseInt(values.parent_type_id, 10) }
+                : partnerType === "venue"
+                  ? { partner_type: "venue" as const, type_id: parseInt(values.parent_type_id, 10) }
+                  : partnerType === "artist"
+                    ? { partner_type: "artist" as const, type_id: parseInt(values.parent_type_id, 10) }
+                    : null;
         const data = await registerBusiness({
           business_name: values.business_name,
           address: values.address,
           phone: values.phone,
           description: values.description || "",
           type_id: selectedPartner
-            ? selectedPartner.partner_type === "event"
+            ? selectedPartner.partner_type === "event" || selectedPartner.partner_type === "cinema"
               ? selectedPartner.type_id
               : parseInt(values.venue_type_id, 10)
             : parseInt(values.venue_type_id, 10),
@@ -282,7 +294,9 @@ export default function PartnerOnboardForm({
             ? "Venue partner updated"
             : isArtist
               ? "Artist partner updated"
-              : "Event organizer updated"
+              : isCinemaParent
+                ? "Cinema partner updated"
+                : "Event organizer updated"
       );
       router.push(backHref);
     } catch (err: unknown) {

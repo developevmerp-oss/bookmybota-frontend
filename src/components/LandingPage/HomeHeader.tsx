@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, ChevronDown, Gift, Mic2, Search, Ticket, UtensilsCrossed } from "lucide-react";
+import { Building2, ChevronDown, Clapperboard, Gift, Mic2, Search, Ticket, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import images from "@/Images";
 import CitySelectModal from "./CitySelectModal";
@@ -57,6 +57,12 @@ const BUSINESS_LINKS = [
     label: "Artist",
     description: "Grow your artist profile",
     Icon: Mic2,
+  },
+  {
+    href: "/movie",
+    label: "Movies",
+    description: "List your cinema",
+    Icon: Clapperboard,
   },
 ] as const;
 

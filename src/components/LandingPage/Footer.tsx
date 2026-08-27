@@ -34,6 +34,7 @@ const COLUMNS = [
     links: [
       { label: "Partner your venue", href: "/venue" },
       { label: "Join as artist", href: "/artist" },
+      { label: "List your cinema", href: "/movie" },
     ],
   },
   {
@@ -85,6 +86,12 @@ export default function Footer() {
               className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
             >
               Join as artist
+            </Link>
+            <Link
+              href="/movie"
+              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
+            >
+              List cinema
             </Link>
           </div>
         </div>

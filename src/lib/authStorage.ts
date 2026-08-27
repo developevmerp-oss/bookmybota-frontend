@@ -6,6 +6,7 @@ export type UserRole =
   | 'event_admin'
   | 'venue_admin'
   | 'artist_admin'
+  | 'movie_admin'
   | 'customer';
 
 export interface StoredAuthUser {
@@ -21,6 +22,7 @@ export interface StoredAuthUser {
 const ROLE_PRIORITY: UserRole[] = [
   'super_admin',
   'event_admin',
+  'movie_admin',
   'venue_admin',
   'artist_admin',
   'business_admin',
@@ -39,12 +41,14 @@ export function storageKeysForRole(role: UserRole | string) {
       return { tokenKey: 'token_venue_admin', userKey: 'user_venue_admin' };
     case 'artist_admin':
       return { tokenKey: 'token_artist_admin', userKey: 'user_artist_admin' };
+    case 'movie_admin':
+      return { tokenKey: 'token_movie_admin', userKey: 'user_movie_admin' };
     default:
       return { tokenKey: 'token_customer', userKey: 'user_customer' };
   }
 }
 
-/** Partner admin panels use singular `/artist` and `/venue` — not plural customer listings. */
+/** Partner admin panels use singular paths — not plural customer listings. */
 export function isArtistAdminPath(pathname: string): boolean {
   return pathname === '/artist' || pathname.startsWith('/artist/');
 }
@@ -53,9 +57,14 @@ export function isVenueAdminPath(pathname: string): boolean {
   return pathname === '/venue' || pathname.startsWith('/venue/');
 }
 
+export function isMovieAdminPath(pathname: string): boolean {
+  return pathname === '/movie' || pathname.startsWith('/movie/');
+}
+
 export function storageKeysForPath(pathname: string) {
   if (pathname.startsWith('/admin')) return storageKeysForRole('super_admin');
   if (pathname.startsWith('/organizer')) return storageKeysForRole('event_admin');
+  if (isMovieAdminPath(pathname)) return storageKeysForRole('movie_admin');
   if (isVenueAdminPath(pathname)) return storageKeysForRole('venue_admin');
   if (isArtistAdminPath(pathname)) return storageKeysForRole('artist_admin');
   if (pathname.startsWith('/business')) return storageKeysForRole('business_admin');
@@ -71,6 +80,8 @@ export function homePathForRole(role: UserRole | string) {
       return '/business';
     case 'event_admin':
       return '/organizer';
+    case 'movie_admin':
+      return '/movie';
     case 'venue_admin':
       return '/venue';
     case 'artist_admin':
@@ -91,6 +102,8 @@ export function loginPathForRole(role: UserRole | string) {
       return '/business/login';
     case 'event_admin':
       return '/organizer/login';
+    case 'movie_admin':
+      return '/movie/login';
     case 'venue_admin':
       return '/venue/login';
     case 'artist_admin':
@@ -119,7 +132,7 @@ export function readSessionForRole(role: UserRole): { user: StoredAuthUser; toke
 
 /**
  * Find any active logged-in session (for /login redirect).
- * Priority: super_admin → event_admin → business_admin → customer
+ * Priority: super_admin → event_admin → movie_admin → business_admin → customer
  */
 export function getActiveSession(): { user: StoredAuthUser; token: string } | null {
   if (typeof window === 'undefined') return null;

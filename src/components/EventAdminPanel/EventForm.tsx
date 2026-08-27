@@ -16,6 +16,7 @@ import {
   useGetOrganizerVenueLayoutQuery,
   useSearchOrganizerArtistsQuery,
   type CityMaster,
+  type EventDocumentMaster,
   type EventDocumentUpload,
   type EventFormPayload,
   type OrganizerEvent,
@@ -42,17 +43,15 @@ import {
   defaultEventFormValues,
   defaultVenue,
   defaultArtist,
+  defaultTicketType,
+  MAX_ABOUT_EVENT_CHARS,
   EVENT_LINEUP_ROLES,
   isArtistLineupRole,
   normalizeLineupRole,
   showtimeToIso,
   isShowtimePersistable,
 } from "@/lib/eventFormSchema";
-import {
-  TICKET_MODE_OPTIONS,
-  normalizeAllowedTicketModes,
-  type TicketDeliveryMode,
-} from "@/lib/eventTicketMode";
+import { countChars, filterDocumentsByAppliesTo, resolveDocumentAppliesTo } from "@/lib/eventDocumentScope";
 import {
   formatDate,
   formatDateTime12h,
@@ -68,6 +67,11 @@ import EventStepperNav, {
   EVENT_STEPPER_STEPS,
   type EventStepperStepId,
 } from "@/components/EventAdminPanel/EventStepperNav";
+import {
+  TICKET_MODE_OPTIONS,
+  normalizeAllowedTicketModes,
+  type TicketDeliveryMode,
+} from "@/lib/eventTicketMode";
 
 function normalizeFormDocuments(docs?: EventDocumentUpload[] | string[]): EventDocumentUpload[] {
   if (!docs?.length) return [];
@@ -129,7 +133,7 @@ function ticketsForShow(
     max_per_order: Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10),
   }));
   if (showIndex === 0 && unscoped.length) return unscoped;
-  return [{ ticket_type: "", total_count: 100, price: 0, max_per_order: 10 }];
+  return [];
 }
 
 function eventToValues(event?: OrganizerEvent | null): EventFormValues {
@@ -161,10 +165,17 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
         role_title: normalizeLineupRole(a.role_title),
         description: a.description || "",
         image_url: a.image_url || a.artist_business_image || "",
+        documents: Array.isArray(a.documents)
+          ? a.documents.map((d) => ({
+              document_type_id: Number(d.document_type_id) || 0,
+              url: String(d.url || ""),
+              document_name: String(d.document_name || ""),
+            }))
+          : [],
         sort_order: a.sort_order ?? i,
       })) || [],
     showtimes:
-      event.showtimes?.map((s, i) => {
+      (event.showtimes?.map((s, i) => {
         const durationType =
           s.duration_type || inferDurationType(s.starts_at, s.ends_at || s.starts_at);
         return {
@@ -193,7 +204,8 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
             ? ((s as { custom_layout_images?: string[] }).custom_layout_images || [])
             : [],
           location_id: (s as { location_id?: number | null }).location_id ?? null,
-          venue_proposal: (s as { venue_proposal?: unknown }).venue_proposal || null,
+          venue_proposal: ((s as { venue_proposal?: EventFormValues["showtimes"][number]["venue_proposal"] })
+            .venue_proposal || null) as EventFormValues["showtimes"][number]["venue_proposal"],
           duration_type: durationType,
           event_date: toDateInput(s.starts_at),
           start_time: toTimeInput(s.starts_at),
@@ -202,7 +214,7 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
           ends_at: toDatetimeLocal(s.ends_at),
           ticket_types: ticketsForShow(event, s.id, i),
         };
-      }) || [defaultVenue()],
+      }) as EventFormValues["showtimes"]) || [defaultVenue()],
   };
 }
 
@@ -857,6 +869,85 @@ function SeatingLayoutFields({
   );
 }
 
+function EventDocUploadsList({
+  docs,
+  documents,
+  readOnly,
+  uploading,
+  onUpload,
+  onRemove,
+  emptyMessage,
+}: {
+  docs: EventDocumentMaster[];
+  documents: EventDocumentUpload[];
+  readOnly: boolean;
+  uploading: boolean;
+  onUpload: (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => void;
+  onRemove: (documentTypeId: number) => void;
+  emptyMessage?: string;
+}) {
+  if (!docs.length) {
+    return emptyMessage ? <p className="portal-muted text-sm">{emptyMessage}</p> : null;
+  }
+  return (
+    <div className="space-y-3">
+      {docs.map((doc) => {
+        const uploadedUrl = documents.find((d) => d.document_type_id === doc.id)?.url;
+        return (
+          <div key={doc.id} className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold text-slate-800">{doc.name}</span>
+              {doc.is_required && (
+                <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">
+                  Required
+                </span>
+              )}
+            </div>
+            {doc.description && (
+              <p className="portal-muted text-xs leading-relaxed">{doc.description}</p>
+            )}
+            {uploadedUrl ? (
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                <FileText size={16} className="text-violet-600 shrink-0" />
+                <a
+                  href={uploadedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-slate-800 truncate flex-1 hover:text-violet-700"
+                >
+                  View uploaded file
+                </a>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(doc.id)}
+                    className="text-slate-400 hover:text-rose-600"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ) : (
+              !readOnly && (
+                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-violet-400 cursor-pointer">
+                  <Upload size={16} /> Upload PDF or image
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => onUpload(e, doc.id)}
+                  />
+                </label>
+              )
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function VenueBlock({
   index,
   readOnly,
@@ -864,6 +955,11 @@ function VenueBlock({
   onRemove,
   cities,
   hostingType = "single",
+  venueDocuments = [],
+  documents = [],
+  uploading = false,
+  onDocumentUpload,
+  onDocumentRemove,
 }: {
   index: number;
   readOnly: boolean;
@@ -871,6 +967,11 @@ function VenueBlock({
   onRemove: () => void;
   cities: CityMaster[];
   hostingType?: "single" | "tour";
+  venueDocuments?: EventDocumentMaster[];
+  documents?: EventDocumentUpload[];
+  uploading?: boolean;
+  onDocumentUpload?: (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => void;
+  onDocumentRemove?: (documentTypeId: number) => void;
 }) {
   const {
     register,
@@ -1022,71 +1123,73 @@ function VenueBlock({
         errorClass={errorClass}
       />
 
-      <div>
-        <p className={labelClass}>Event schedule</p>
-        {hostingType === "tour" ? (
-          <div className="flex flex-wrap gap-4 text-sm mb-3">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                disabled={readOnly}
-                checked={durationType === "ONE_DAY"}
-                onChange={() => setValue(`showtimes.${index}.duration_type`, "ONE_DAY", { shouldDirty: true })}
-              />
-              One day stop
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                disabled={readOnly}
-                checked={durationType === "MULTI_DAY"}
-                onChange={() => setValue(`showtimes.${index}.duration_type`, "MULTI_DAY", { shouldDirty: true })}
-              />
-              Multiple day stop
-            </label>
+      {hostingType === "tour" ? (
+        <>
+          <div>
+            <p className={labelClass}>Stop schedule</p>
+            <div className="flex flex-wrap gap-4 text-sm mb-3">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  disabled={readOnly}
+                  checked={durationType === "ONE_DAY"}
+                  onChange={() => setValue(`showtimes.${index}.duration_type`, "ONE_DAY", { shouldDirty: true })}
+                />
+                One day stop
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  disabled={readOnly}
+                  checked={durationType === "MULTI_DAY"}
+                  onChange={() => setValue(`showtimes.${index}.duration_type`, "MULTI_DAY", { shouldDirty: true })}
+                />
+                Multiple day stop
+              </label>
+            </div>
           </div>
-        ) : (
-          <p className="text-xs text-slate-500 mb-3">
-            Single events use one date with start and end time. Duration is calculated automatically for customers.
-          </p>
-        )}
-      </div>
 
-      {durationType === "ONE_DAY" ? (
-        <div className="grid sm:grid-cols-3 gap-3">
-          <div>
-            <label className={labelClass}>Date (mm-dd-yyyy)</label>
-            <input disabled={readOnly} type="date" className={inputClass} {...register(`showtimes.${index}.event_date`)} />
-            {eventDate && <p className="text-xs text-slate-600 mt-1">{formatDate(eventDate)}</p>}
-          </div>
-          <div>
-            <label className={labelClass}>Start time</label>
-            <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.start_time`)} />
-            {startTime && eventDate && (
-              <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${startTime}`)}</p>
-            )}
-          </div>
-          <div>
-            <label className={labelClass}>End time</label>
-            <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.end_time`)} />
-            {endTime && eventDate && (
-              <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${endTime}`)}</p>
-            )}
-          </div>
-        </div>
+          {durationType === "ONE_DAY" ? (
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Date</label>
+                <input disabled={readOnly} type="date" className={inputClass} {...register(`showtimes.${index}.event_date`)} />
+                {eventDate && <p className="text-xs text-slate-600 mt-1">{formatDate(eventDate)}</p>}
+              </div>
+              <div>
+                <label className={labelClass}>Start time</label>
+                <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.start_time`)} />
+                {startTime && eventDate && (
+                  <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${startTime}`)}</p>
+                )}
+              </div>
+              <div>
+                <label className={labelClass}>End time</label>
+                <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.end_time`)} />
+                {endTime && eventDate && (
+                  <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${endTime}`)}</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Start date & time</label>
+                <input disabled={readOnly} type="datetime-local" className={inputClass} {...register(`showtimes.${index}.starts_at`)} />
+                {startsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(startsAt)}</p>}
+              </div>
+              <div>
+                <label className={labelClass}>End date & time</label>
+                <input disabled={readOnly} type="datetime-local" className={inputClass} {...register(`showtimes.${index}.ends_at`)} />
+                {endsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(endsAt)}</p>}
+              </div>
+            </div>
+          )}
+        </>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Start date & time</label>
-            <input disabled={readOnly} type="datetime-local" className={inputClass} {...register(`showtimes.${index}.starts_at`)} />
-            {startsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(startsAt)}</p>}
-          </div>
-          <div>
-            <label className={labelClass}>End date & time</label>
-            <input disabled={readOnly} type="datetime-local" className={inputClass} {...register(`showtimes.${index}.ends_at`)} />
-            {endsAt && <p className="text-xs text-slate-600 mt-1">{formatDateTime12h(endsAt)}</p>}
-          </div>
-        </div>
+        <p className="text-xs text-slate-500 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          Event date, start time, and duration are set in the <strong>Event details</strong> step.
+        </p>
       )}
 
       <div className="space-y-3 pt-2 border-t border-slate-200">
@@ -1095,16 +1198,19 @@ function VenueBlock({
           {!readOnly && (
             <button
               type="button"
-              onClick={() => append({ ticket_type: "", total_count: 100, price: 0, max_per_order: 10 })}
+              onClick={() => append(defaultTicketType())}
               className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
             >
               <Plus size={14} /> Add type
             </button>
           )}
         </div>
+        {ticketFields.length === 0 && (
+          <p className="text-xs text-slate-500">No ticket type selected yet. Click Add type to create one.</p>
+        )}
         {ticketFields.map((field, ti) => (
-          <div key={field.id} className="grid sm:grid-cols-5 gap-3 items-start">
-            <div className="sm:col-span-2">
+          <div key={field.id} className="grid sm:grid-cols-3 gap-3 items-start">
+            <div>
               <label className={labelClass}>Type name</label>
               <input
                 disabled={readOnly}
@@ -1123,17 +1229,6 @@ function VenueBlock({
                 {...register(`showtimes.${index}.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
               />
             </div>
-            <div>
-              <label className={labelClass}>Max / order</label>
-              <input
-                disabled={readOnly}
-                type="number"
-                min={1}
-                className={inputClass}
-                {...register(`showtimes.${index}.ticket_types.${ti}.max_per_order`, { valueAsNumber: true })}
-                title="Maximum tickets of this type a customer can buy in one purchase"
-              />
-            </div>
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className={labelClass}>Price (ETB)</label>
@@ -1146,7 +1241,7 @@ function VenueBlock({
                   {...register(`showtimes.${index}.ticket_types.${ti}.price`, { valueAsNumber: true })}
                 />
               </div>
-              {!readOnly && ticketFields.length > 1 && (
+              {!readOnly && (
                 <button type="button" onClick={() => remove(ti)} className="p-2.5 text-slate-400 hover:text-rose-600 self-end">
                   <Trash2 size={16} />
                 </button>
@@ -1155,6 +1250,25 @@ function VenueBlock({
           </div>
         ))}
       </div>
+
+      {index === 0 && venueDocuments.length > 0 && onDocumentUpload && onDocumentRemove && (
+        <div className="space-y-3 pt-2 border-t border-slate-200">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Venue documents</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Upload venue-related documents here. They are not listed on the Documents step.
+            </p>
+          </div>
+          <EventDocUploadsList
+            docs={venueDocuments}
+            documents={documents}
+            readOnly={readOnly}
+            uploading={uploading}
+            onUpload={onDocumentUpload}
+            onRemove={onDocumentRemove}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1533,21 +1647,38 @@ export default function EventForm({
   const posterVertical = watch("poster_vertical_url");
   const galleryImages = watch("gallery_images") || [];
   const allowedTicketModes = watch("allowed_ticket_modes") || [];
+  const aboutEvent = watch("about_event") || "";
+  const durationMinutesTotal = Number(watch("duration_minutes") || 0);
+  const durationHours = Math.floor(Math.max(0, durationMinutesTotal) / 60);
+  const durationMinutesPart = Math.max(0, durationMinutesTotal) % 60;
   const watchedValues = watch();
 
   const { data: masters, isLoading: mastersLoading } = useGetEventMastersQuery(categoryTypeId!, {
     skip: !categoryTypeId,
   });
 
+  const eventDocuments = useMemo(
+    () => filterDocumentsByAppliesTo(masters?.documents, "event"),
+    [masters?.documents]
+  );
+  const venueDocuments = useMemo(
+    () => filterDocumentsByAppliesTo(masters?.documents, "venue"),
+    [masters?.documents]
+  );
+  const artistDocuments = useMemo(
+    () => filterDocumentsByAppliesTo(masters?.documents, "artist"),
+    [masters?.documents]
+  );
+
   const completedStepIds = useMemo(() => {
     return getCompletedEventStepIds({
       hostingType,
       values: watchedValues,
       documents,
-      requiredDocumentIds: (masters?.documents || []).filter((d) => d.is_required).map((d) => d.id),
+      requiredDocumentIds: eventDocuments.filter((d) => d.is_required).map((d) => d.id),
       genresConfigured: (masters?.genres?.length || 0) > 0,
     });
-  }, [hostingType, watchedValues, documents, masters?.documents, masters?.genres]);
+  }, [hostingType, watchedValues, documents, eventDocuments, masters?.genres]);
 
   const toggleTicketMode = (mode: TicketDeliveryMode) => {
     if (readOnly) return;
@@ -1594,10 +1725,13 @@ export default function EventForm({
     const draftMode = opts?.forDraft === true;
     const rawShowtimes = values.showtimes || [];
     const persistableShowtimes = draftMode
-      ? rawShowtimes.filter(isShowtimePersistable)
+      ? rawShowtimes.filter((s) => isShowtimePersistable(s, values.duration_minutes))
       : rawShowtimes;
     const showtimes = persistableShowtimes.map((s, stopIndex) => {
-      const range = showtimeToIso(s);
+      const range = showtimeToIso(
+        hostingType === "single" ? { ...s, end_time: "" } : s,
+        values.duration_minutes
+      );
       const venueSource =
         s.venue_business_id && s.venue_source === "registered"
           ? "registered"
@@ -1662,12 +1796,17 @@ export default function EventForm({
       language: (values.languages || []).join(", "),
       about_event: values.about_event.trim(),
       age_group: values.age_group || "",
-      duration_minutes: computeDurationMinutesFromShowtimes(values.showtimes) ?? values.duration_minutes ?? null,
+      duration_minutes:
+        values.duration_minutes ??
+        computeDurationMinutesFromShowtimes(values.showtimes, values.duration_minutes) ??
+        null,
       terms_points: {
         selected: selectedTerms,
         custom: customTerms.map((t) => t.trim()).filter(Boolean),
       },
-      allowed_ticket_modes: normalizeAllowedTicketModes(values.allowed_ticket_modes),
+      allowed_ticket_modes: normalizeAllowedTicketModes(values.allowed_ticket_modes, {
+        expandEmpty: false,
+      }),
       ticket_types,
       hosting_type: hostingType,
       tour_id: (event as { tour_id?: string | null } | undefined)?.tour_id || null,
@@ -1738,11 +1877,27 @@ export default function EventForm({
     if (masters.genres.length > 0 && (!genres || genres.length === 0)) {
       return "Select at least one genre for this category.";
     }
-    const requiredDocs = masters.documents.filter((d) => d.is_required);
-    return validateRequiredDocuments(
+    const requiredDocs = eventDocuments.filter((d) => d.is_required);
+    const eventDocsErr = validateRequiredDocuments(
       documents.filter((d) => d.document_type_id > 0),
       requiredDocs.map((d) => d.id),
       Object.fromEntries(requiredDocs.map((d) => [d.id, d.name]))
+    );
+    if (eventDocsErr) return eventDocsErr;
+
+    const requiredVenueDocs = venueDocuments.filter((d) => d.is_required);
+    const venueDocsErr = validateRequiredDocuments(
+      documents.filter((d) => d.document_type_id > 0),
+      requiredVenueDocs.map((d) => d.id),
+      Object.fromEntries(requiredVenueDocs.map((d) => [d.id, d.name]))
+    );
+    if (venueDocsErr) return venueDocsErr;
+
+    const requiredArtistDocs = artistDocuments.filter((d) => d.is_required);
+    return validateRequiredDocuments(
+      documents.filter((d) => d.document_type_id > 0),
+      requiredArtistDocs.map((d) => d.id),
+      Object.fromEntries(requiredArtistDocs.map((d) => [d.id, d.name]))
     );
   };
 
@@ -1923,6 +2078,17 @@ export default function EventForm({
       if (!(values.allowed_ticket_modes || []).length) {
         toast.error("Select at least one ticket delivery mode for customers.");
         return false;
+      }
+      if (hostingType === "single") {
+        const show = values.showtimes?.[0];
+        if (!show?.event_date || !show?.start_time) {
+          toast.error("Set event date and start time.");
+          return false;
+        }
+        if (!Number(values.duration_minutes) || Number(values.duration_minutes) < 1) {
+          toast.error("Set event duration (hours and/or minutes).");
+          return false;
+        }
       }
       return true;
     }
@@ -2109,8 +2275,76 @@ export default function EventForm({
           </div>
 
           <p className="text-xs text-slate-500 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            Event duration is calculated automatically from venue start and end times and shown to customers.
+            Set event duration below. For single events, end time is calculated from start time + duration.
           </p>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Duration (hours)</label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={0}
+                className={inputClass}
+                value={durationHours}
+                onChange={(e) => {
+                  const hours = Math.max(0, Number(e.target.value) || 0);
+                  const next = hours * 60 + durationMinutesPart;
+                  setValue("duration_minutes", next > 0 ? next : null, { shouldDirty: true });
+                }}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Duration (minutes)</label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={0}
+                max={59}
+                className={inputClass}
+                value={durationMinutesPart}
+                onChange={(e) => {
+                  const mins = Math.min(59, Math.max(0, Number(e.target.value) || 0));
+                  const next = durationHours * 60 + mins;
+                  setValue("duration_minutes", next > 0 ? next : null, { shouldDirty: true });
+                }}
+              />
+            </div>
+          </div>
+
+          {hostingType === "single" && (
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Event schedule</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Date and start time. End time is calculated from the duration above.
+                </p>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Event date <span className="text-rose-500">*</span></label>
+                  <input
+                    disabled={readOnly}
+                    type="date"
+                    className={inputClass}
+                    {...register("showtimes.0.event_date")}
+                  />
+                  {watch("showtimes.0.event_date") && (
+                    <p className="text-xs text-slate-600 mt-1">{formatDate(watch("showtimes.0.event_date"))}</p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelClass}>Start time <span className="text-rose-500">*</span></label>
+                  <input
+                    disabled={readOnly}
+                    type="time"
+                    className={inputClass}
+                    {...register("showtimes.0.start_time")}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className={labelClass}>
@@ -2223,8 +2457,23 @@ export default function EventForm({
 
           <div>
             <label className={labelClass}>About event <span className="text-rose-500">*</span></label>
-            <textarea disabled={readOnly} rows={4} className={`${inputClass} resize-y min-h-[100px]`} {...register("about_event")} placeholder="Describe the event..." />
-            {errors.about_event && <p className={errorClass}>{errors.about_event.message}</p>}
+            <textarea
+              disabled={readOnly}
+              rows={4}
+              className={`${inputClass} resize-y min-h-[100px]`}
+              {...register("about_event")}
+              placeholder="Describe the event..."
+            />
+            <div className="mt-1.5 flex items-center justify-between gap-3">
+              <p
+                className={`text-xs ${
+                  countChars(aboutEvent) > MAX_ABOUT_EVENT_CHARS ? "text-rose-600 font-semibold" : "text-slate-500"
+                }`}
+              >
+                {countChars(aboutEvent)} / {MAX_ABOUT_EVENT_CHARS} characters
+              </p>
+              {errors.about_event && <p className={errorClass}>{errors.about_event.message}</p>}
+            </div>
           </div>
         </section>
         )}
@@ -2344,51 +2593,25 @@ export default function EventForm({
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
           <div>
             <h3 className="portal-heading text-lg font-semibold">Event-specific documents</h3>
-            <p className="portal-muted text-sm mt-1">Upload documents required by Super Admin for each event.</p>
+            <p className="portal-muted text-sm mt-1">
+              General event documents only. Venue and artist documents are uploaded in their own steps.
+            </p>
           </div>
           {!categoryTypeId ? (
             <p className="portal-muted text-sm">Select a category to see the document checklist.</p>
           ) : mastersLoading ? (
             <p className="portal-muted text-sm">Loading document requirements...</p>
-          ) : masters?.documents?.length ? (
-            <div className="space-y-4">
-              {masters.documents.map((doc) => {
-                const uploadedUrl = documents.find((d) => d.document_type_id === doc.id)?.url;
-                return (
-                  <div key={doc.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="portal-heading font-semibold">{doc.name}</span>
-                        {doc.is_required && (
-                          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Required</span>
-                        )}
-                      </div>
-                      {doc.description && <p className="portal-muted text-sm mt-1.5 leading-relaxed">{doc.description}</p>}
-                    </div>
-                    {uploadedUrl ? (
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-white border border-slate-200">
-                        <FileText size={16} className="text-violet-600 shrink-0" />
-                        <a href={uploadedUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-800 truncate flex-1 hover:text-violet-700">View uploaded file</a>
-                        {!readOnly && (
-                          <button type="button" onClick={() => setDocuments((p) => p.filter((d) => d.document_type_id !== doc.id))} className="text-slate-400 hover:text-rose-600">
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      !readOnly && (
-                        <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-violet-400 cursor-pointer">
-                          <Upload size={16} /> Upload PDF or image
-                          <input type="file" accept="image/*,.pdf" className="hidden" disabled={uploading} onChange={(e) => handleDocumentUpload(e, doc.id)} />
-                        </label>
-                      )
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          ) : eventDocuments.length ? (
+            <EventDocUploadsList
+              docs={eventDocuments}
+              documents={documents}
+              readOnly={readOnly}
+              uploading={uploading}
+              onUpload={handleDocumentUpload}
+              onRemove={(id) => setDocuments((p) => p.filter((d) => d.document_type_id !== id))}
+            />
           ) : (
-            <p className="text-amber-700 text-sm">No document types configured yet.</p>
+            <p className="text-amber-700 text-sm">No general event document types configured yet.</p>
           )}
         </section>
 
@@ -2518,8 +2741,8 @@ export default function EventForm({
           </div>
           <p className="portal-muted text-xs">
             {hostingType === "tour"
-              ? "Add each tour city stop as a venue. Each stop has its own ticket types and show times. Dates display as MM-DD-YYYY."
-              : "Each venue has its own ticket types and show times. City is selected from Admin city master. Dates display as MM-DD-YYYY."}
+              ? "Add each tour city stop as a venue. Each stop has its own ticket types and show times."
+              : "Add venue details and ticket types here. Event date and times are set in Event details."}
           </p>
           {showtimeFields.map((field, i) => (
             <VenueBlock
@@ -2530,6 +2753,11 @@ export default function EventForm({
               onRemove={() => removeShowtime(i)}
               cities={cities}
               hostingType={hostingType}
+              venueDocuments={venueDocuments}
+              documents={documents}
+              uploading={uploading}
+              onDocumentUpload={handleDocumentUpload}
+              onDocumentRemove={(id) => setDocuments((p) => p.filter((d) => d.document_type_id !== id))}
             />
           ))}
           {errors.showtimes && typeof errors.showtimes.message === "string" && (
@@ -2567,6 +2795,25 @@ export default function EventForm({
           {artistFields.map((field, i) => (
             <ArtistBlock key={field.id} index={i} readOnly={readOnly} onRemove={() => removeArtist(i)} />
           ))}
+
+          {artistDocuments.length > 0 && (
+            <div className="space-y-3 pt-2 border-t border-slate-200">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Artist documents</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Upload artist-related documents here. They are not listed on the Documents step.
+                </p>
+              </div>
+              <EventDocUploadsList
+                docs={artistDocuments}
+                documents={documents}
+                readOnly={readOnly}
+                uploading={uploading}
+                onUpload={handleDocumentUpload}
+                onRemove={(id) => setDocuments((p) => p.filter((d) => d.document_type_id !== id))}
+              />
+            </div>
+          )}
         </section>
         )}
 
@@ -2594,35 +2841,104 @@ export default function EventForm({
                 <p className="text-sm text-slate-600">
                   Age {watch("age_group") || "—"}
                   {(() => {
-                    const mins = computeDurationMinutesFromShowtimes(watch("showtimes") || []);
+                    const mins =
+                      Number(watch("duration_minutes") || 0) ||
+                      computeDurationMinutesFromShowtimes(watch("showtimes") || [], watch("duration_minutes"));
                     return mins ? ` · ${mins} min` : "";
                   })()}
                 </p>
+                {hostingType === "single" &&
+                watch("showtimes.0.event_date") &&
+                watch("showtimes.0.start_time") ? (
+                  <p className="text-sm text-slate-600">
+                    Schedule: {formatDate(watch("showtimes.0.event_date"))} ·{" "}
+                    {formatTime12h(
+                      `${watch("showtimes.0.event_date")}T${watch("showtimes.0.start_time")}`
+                    )}
+                    {durationMinutesTotal > 0 ? ` · ${durationHours}h ${durationMinutesPart}m` : ""}
+                  </p>
+                ) : null}
                 <p className="text-sm text-slate-600">
                   Ticket modes:{" "}
-                  {(allowedTicketModes.length
+                  {allowedTicketModes.length
                     ? TICKET_MODE_OPTIONS.filter((o) => allowedTicketModes.includes(o.id))
-                    : TICKET_MODE_OPTIONS
-                  )
-                    .map((o) => o.label)
-                    .join(", ") || "None selected"}
+                        .map((o) => o.label)
+                        .join(", ")
+                    : "None selected"}
                 </p>
                 <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("details")}>
                   Edit details
                 </button>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Media</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1.5">Horizontal poster</p>
+                    {posterHorizontal ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={posterHorizontal}
+                        alt="Horizontal poster"
+                        className="w-full h-28 object-cover rounded-lg border border-slate-200 bg-white"
+                      />
+                    ) : (
+                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-400">
+                        Missing
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1.5">Vertical poster</p>
+                    {posterVertical ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={posterVertical}
+                        alt="Vertical poster"
+                        className="w-full h-28 object-cover rounded-lg border border-slate-200 bg-white"
+                      />
+                    ) : (
+                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-400">
+                        Optional
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1.5">
+                    Gallery photos {galleryImages.length ? `(${galleryImages.length})` : ""}
+                  </p>
+                  {galleryImages.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {galleryImages.map((url, i) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={`${url}-${i}`}
+                          src={url}
+                          alt={`Gallery ${i + 1}`}
+                          className="h-16 w-16 rounded-lg object-cover border border-slate-200 bg-white"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">No gallery photos yet</p>
+                  )}
+                </div>
                 <p className="text-sm text-slate-600">
-                  Horizontal poster: {posterHorizontal ? "Uploaded" : "Missing"}
-                </p>
-                <p className="text-sm text-slate-600">
-                  Vertical poster: {posterVertical ? "Uploaded" : "Optional / not set"}
-                </p>
-                <p className="text-sm text-slate-600">Gallery photos: {galleryImages.length}</p>
-                <p className="text-sm text-slate-600">
-                  YouTube: {watch("youtube_url")?.trim() ? "Linked" : "Not set"}
+                  YouTube:{" "}
+                  {watch("youtube_url")?.trim() ? (
+                    <a
+                      href={watch("youtube_url")}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-violet-700 underline break-all"
+                    >
+                      {watch("youtube_url")}
+                    </a>
+                  ) : (
+                    "Not set"
+                  )}
                 </p>
                 <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("media")}>
                   Edit media
@@ -2690,14 +3006,61 @@ export default function EventForm({
                 </button>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 sm:col-span-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Documents & T&amp;C</p>
-                <p className="text-sm text-slate-600">
-                  Uploaded documents: {documents.filter((d) => d.url).length}
-                  {masters?.documents?.length
-                    ? ` / ${masters.documents.length} listed for this category`
-                    : ""}
-                </p>
+                {(() => {
+                  const uploaded = documents.filter((d) => d.url?.trim());
+                  if (!uploaded.length) {
+                    return <p className="text-sm text-slate-500">No documents uploaded yet</p>;
+                  }
+                  const masterById = new Map((masters?.documents || []).map((d) => [d.id, d]));
+                  const isImageUrl = (url: string) =>
+                    /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(url) ||
+                    /\/image\//i.test(url) ||
+                    url.includes("cloudinary") ||
+                    url.startsWith("data:image");
+                  return (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {uploaded.map((doc, idx) => {
+                        const master = masterById.get(doc.document_type_id);
+                        const label =
+                          doc.document_name ||
+                          master?.name ||
+                          `Document ${idx + 1}`;
+                        const scope = master ? resolveDocumentAppliesTo(master) : "event";
+                        return (
+                          <div
+                            key={`${doc.document_type_id}-${idx}`}
+                            className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2"
+                          >
+                            {isImageUrl(doc.url) ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={doc.url}
+                                alt={label}
+                                className="h-28 w-full rounded-md object-cover border border-slate-100"
+                              />
+                            ) : (
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-200 bg-slate-50 text-slate-500 hover:border-violet-300 hover:text-violet-700"
+                              >
+                                <FileText size={22} />
+                                <span className="text-[11px]">Open file</span>
+                              </a>
+                            )}
+                            <div>
+                              <p className="text-sm font-medium text-slate-800 truncate">{label}</p>
+                              <p className="text-[11px] text-slate-500 capitalize">{scope} document</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 <p className="text-sm text-slate-600">
                   T&amp;C points: {selectedTerms.length} master + {customTerms.length} custom
                 </p>

@@ -6,7 +6,7 @@ import PartnerOnboardForm from "@/components/DiningAdminPanel/PartnerOnboardForm
 import { useGetAdminBusinessQuery } from "@/services/api";
 
 interface AdminPartnerFormPageProps {
-  module: "dining" | "event" | "venue" | "artist";
+  module: "dining" | "event" | "venue" | "artist" | "cinema";
   mode: "create" | "edit";
 }
 
@@ -16,6 +16,7 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
   const isDining = module === "dining";
   const isVenue = module === "venue";
   const isArtist = module === "artist";
+  const isCinema = module === "cinema";
   const listHref = `/admin/businesses/${module}`;
   const detailHref = id ? `${listHref}/${id}` : listHref;
   const { data: biz, isLoading } = useGetAdminBusinessQuery(id, {
@@ -28,21 +29,27 @@ export default function AdminPartnerFormPage({ module, mode }: AdminPartnerFormP
       ? "Onboard Venue Partner"
       : isArtist
         ? "Onboard Artist Partner"
-        : "Onboard Event Organizer";
+        : isCinema
+          ? "Onboard Cinema Partner"
+          : "Onboard Event Organizer";
   const createSubtitle = isDining
     ? "Select parent category and venue type. A temporary password is auto-generated and emailed to the admin."
     : isVenue
       ? "Select the Venue parent and a venue type. A temporary password is auto-generated and emailed to the venue admin."
       : isArtist
         ? "Select the Artist parent and an artist type. A temporary password is auto-generated and emailed to the artist admin."
-        : "Select the Event parent — venue type stays disabled. A temporary password is auto-generated and emailed to the organizer.";
+        : isCinema
+          ? "Select the Cinema parent — subtype stays disabled. A temporary password is auto-generated and emailed to the movie admin."
+          : "Select the Event parent — venue type stays disabled. A temporary password is auto-generated and emailed to the organizer.";
   const editTitle = isDining
     ? "Edit Dining Partner"
     : isVenue
       ? "Edit Venue Partner"
       : isArtist
         ? "Edit Artist Partner"
-        : "Edit Event Organizer";
+        : isCinema
+          ? "Edit Cinema Partner"
+          : "Edit Event Organizer";
 
   if (mode === "create") {
     return (

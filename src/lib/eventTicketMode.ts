@@ -38,8 +38,11 @@ export function normalizeTicketMode(value?: string | null): TicketDeliveryMode {
 
 const MODE_IDS = new Set<TicketDeliveryMode>(TICKET_MODE_OPTIONS.map((o) => o.id));
 
-/** Event-allowed modes; empty/invalid → all three (legacy events). */
-export function normalizeAllowedTicketModes(raw?: string[] | null): TicketDeliveryMode[] {
+/** Event-allowed modes; empty/invalid → all three (legacy events when reading). */
+export function normalizeAllowedTicketModes(
+  raw?: string[] | null,
+  options?: { expandEmpty?: boolean }
+): TicketDeliveryMode[] {
   const list = Array.isArray(raw)
     ? raw
         .map((v) => String(v || "").trim().toUpperCase())
@@ -47,7 +50,7 @@ export function normalizeAllowedTicketModes(raw?: string[] | null): TicketDelive
     : [];
   const unique = [...new Set(list)];
   if (unique.length === 0) {
-    return TICKET_MODE_OPTIONS.map((o) => o.id);
+    return options?.expandEmpty === false ? [] : TICKET_MODE_OPTIONS.map((o) => o.id);
   }
   return TICKET_MODE_OPTIONS.map((o) => o.id).filter((id) => unique.includes(id));
 }

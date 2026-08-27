@@ -203,6 +203,7 @@ export const adminEventDocumentCreateSchema = yup.object({
   name: yup.string().trim().required('Document name is required.'),
   description: yup.string().trim().default(''),
   category_type_id: yup.string().default(''),
+  applies_to: yup.string().oneOf(['event', 'venue', 'artist']).default('event'),
   is_required: yup.boolean().default(false),
   importance_level: yup.number().default(3),
 });

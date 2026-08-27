@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Building2, ChevronDown, ChevronUp, Locate, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGetCitiesQuery, type CityMaster } from "@/services/api";
+import { lockBodyScroll } from "@/lib/lockBodyScroll";
 
 type CitySelectModalProps = {
   open: boolean;
@@ -68,14 +69,13 @@ export default function CitySelectModal({
     if (!open) return;
     setQuery("");
     setShowOtherCities(true);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockBodyScroll();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
+      unlock();
       window.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);

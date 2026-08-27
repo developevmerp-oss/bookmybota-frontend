@@ -15,6 +15,7 @@ import { useAppDispatch } from "@/lib/hooks";
 import { setCredentials } from "@/features/auth/authSlice";
 import { extractApiError, extractApiSuccessMessage } from "@/lib/apiErrors";
 import { sanitizePhoneInput, PHONE_MIN_DIGITS } from "@/lib/validation";
+import { lockBodyScroll } from "@/lib/lockBodyScroll";
 import {
   phoneLoginSchema,
   otpVerifySchema,
@@ -93,11 +94,10 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockBodyScroll();
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
+      unlock();
       window.removeEventListener("keydown", onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

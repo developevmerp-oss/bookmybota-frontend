@@ -224,6 +224,7 @@ export interface VenueLayoutRequest {
   hall_is_indoor?: boolean | null;
   venue_name?: string | null;
   venue_address?: string | null;
+  partner_module?: string | null;
   layout_name: string;
   layout_type: string;
   capacity: number;
@@ -277,6 +278,7 @@ export interface VenueLayoutRequest {
   hall_is_indoor?: boolean | null;
   venue_name?: string | null;
   venue_address?: string | null;
+  partner_module?: string | null;
   layout_name: string;
   layout_type: string;
   capacity: number;
@@ -316,6 +318,63 @@ export interface VenueLayoutTemplate {
   hall_name?: string | null;
   rejection_reason?: string | null;
   published_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Movie {
+  id: string;
+  title: string;
+  slug: string;
+  description?: string | null;
+  poster_url?: string | null;
+  banner_url?: string | null;
+  trailer_url?: string | null;
+  duration_minutes?: number | null;
+  certificate?: string | null;
+  release_date?: string | null;
+  languages?: string[];
+  genres?: string[];
+  cast_text?: string | null;
+  director?: string | null;
+  status: 'draft' | 'coming_soon' | 'now_showing' | 'archived';
+  is_active?: boolean;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CinemaScreen {
+  id: string;
+  business_id: string;
+  name: string;
+  screen_type?: string | null;
+  capacity: number;
+  hall_id?: string | null;
+  hall_name?: string | null;
+  venue_layout_template_id?: string | null;
+  layout_template_id?: string | null;
+  layout_name?: string | null;
+  layout_status?: string | null;
+  layout_is_default?: boolean | null;
+  layout_seat_count?: number | null;
+  layout_seating_config?: Record<string, unknown> | null;
+  layout_seats_json?: unknown[] | null;
+  layout_request_id?: string | null;
+  layout_request_status?: string | null;
+  layout_request_name?: string | null;
+  layout_request_updated_at?: string | null;
+  pending_template_id?: string | null;
+  pending_template_name?: string | null;
+  pending_template_capacity?: number | null;
+  pending_rejection_reason?: string | null;
+  pending_seat_count?: number | null;
+  pending_seating_config?: Record<string, unknown> | null;
+  pending_seats_json?: unknown[] | null;
+  layout_request_comments?: string | null;
+  latest_rejection_reason?: string | null;
+  description?: string | null;
+  is_active?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -1582,7 +1641,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'CinemaScreens'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1805,7 +1864,7 @@ export const api = createApi({
 
     getAdminBusinesses: builder.query<
       PaginatedList<Business>,
-      { module?: 'dining' | 'event' | 'venue' | 'artist'; tab?: 'active' | 'archived'; q?: string; page?: number; limit?: number } | void
+      { module?: 'dining' | 'event' | 'venue' | 'artist' | 'cinema'; tab?: 'active' | 'archived'; q?: string; page?: number; limit?: number } | void
     >({
       query: (params) =>
         `/admin/businesses${toListQuery({
@@ -2178,6 +2237,7 @@ export const api = createApi({
       {
         bizId: string;
         request_id?: string;
+        hall_id?: string;
         hall_name: string;
         hall_description?: string;
         hall_capacity?: number;
@@ -2198,6 +2258,7 @@ export const api = createApi({
       invalidatesTags: (_result, _error, arg) => [
         { type: 'BusinessSettings', id: `${arg?.bizId}-venue-layouts` },
         'VenueLayouts',
+        'CinemaScreens',
       ],
     }),
 
@@ -2422,7 +2483,7 @@ export const api = createApi({
         method: 'POST',
       }),
       transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      invalidatesTags: ['VenueLayouts'],
+      invalidatesTags: ['VenueLayouts', 'CinemaScreens'],
     }),
 
     rejectVenueLayoutTemplate: builder.mutation<
@@ -2435,7 +2496,7 @@ export const api = createApi({
         body: { reason },
       }),
       transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      invalidatesTags: ['VenueLayouts'],
+      invalidatesTags: ['VenueLayouts', 'CinemaScreens'],
     }),
 
     getApprovedVenueLayout: builder.query<VenueLayoutTemplate | null, string>({
@@ -4233,6 +4294,114 @@ export const api = createApi({
       ],
     }),
 
+    // ── Movies (Super Admin catalog + Movie Admin browse) ─────────────────────
+
+    getAdminMovies: builder.query<
+      PaginatedList<Movie>,
+      { q?: string; status?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/movies${toListQuery({
+          q: params?.q,
+          status: params?.status,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: Movie[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+              ...result.items.map((m) => ({ type: 'Movies' as const, id: m.id })),
+              { type: 'Movies', id: 'LIST' },
+            ]
+          : [{ type: 'Movies', id: 'LIST' }],
+    }),
+
+    getAdminMovie: builder.query<Movie, string>({
+      query: (id) => `/admin/movies/${id}`,
+      transformResponse: (res: { data: Movie }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'Movies', id }],
+    }),
+
+    createAdminMovie: builder.mutation<Movie, Partial<Movie> & { title: string }>({
+      query: (body) => ({ url: '/admin/movies', method: 'POST', body }),
+      transformResponse: (res: { data: Movie }) => res.data,
+      invalidatesTags: [{ type: 'Movies', id: 'LIST' }, { type: 'Movies', id: 'PARTNER_LIST' }, 'Movies'],
+    }),
+
+    updateAdminMovie: builder.mutation<Movie, { id: string; body: Partial<Movie> }>({
+      query: ({ id, body }) => ({ url: `/admin/movies/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data: Movie }) => res.data,
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'Movies', id },
+        { type: 'Movies', id: 'LIST' },
+        { type: 'Movies', id: 'PARTNER_LIST' },
+      ],
+    }),
+
+    deleteAdminMovie: builder.mutation<Movie, string>({
+      query: (id) => ({ url: `/admin/movies/${id}`, method: 'DELETE' }),
+      transformResponse: (res: { data: Movie }) => res.data,
+      invalidatesTags: [{ type: 'Movies', id: 'LIST' }, { type: 'Movies', id: 'PARTNER_LIST' }, 'Movies'],
+    }),
+
+    getPartnerMovieCatalog: builder.query<
+      PaginatedList<Movie>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/movies/catalog${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: Movie[] }) => unwrapPaginated(res),
+      providesTags: [{ type: 'Movies', id: 'PARTNER_LIST' }],
+    }),
+
+    getCinemaScreens: builder.query<CinemaScreen[], string>({
+      query: (bizId) => `/businesses/${bizId}/cinema-screens`,
+      transformResponse: (res: { data?: CinemaScreen[] }) => res?.data ?? [],
+      providesTags: (_r, _e, bizId) => [{ type: 'CinemaScreens', id: bizId }, 'CinemaScreens'],
+    }),
+
+    createCinemaScreen: builder.mutation<
+      CinemaScreen,
+      {
+        bizId: string;
+        name: string;
+        screen_type?: string;
+        capacity?: number;
+        description?: string;
+        is_active?: boolean;
+      }
+    >({
+      query: ({ bizId, ...body }) => ({
+        url: `/businesses/${bizId}/cinema-screens`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: CinemaScreen }) => res.data,
+      invalidatesTags: (_r, _e, arg) => [{ type: 'CinemaScreens', id: arg.bizId }, 'CinemaScreens'],
+    }),
+
+    updateCinemaScreen: builder.mutation<
+      CinemaScreen,
+      {
+        bizId: string;
+        screenId: string;
+        body: Partial<CinemaScreen>;
+      }
+    >({
+      query: ({ bizId, screenId, body }) => ({
+        url: `/businesses/${bizId}/cinema-screens/${screenId}`,
+        method: 'PUT',
+        body,
+      }),
+      transformResponse: (res: { data: CinemaScreen }) => res.data,
+      invalidatesTags: (_r, _e, arg) => [{ type: 'CinemaScreens', id: arg.bizId }, 'CinemaScreens'],
+    }),
+
     // ── Admin City Masters ────────────────────────────────────────────────────
 
     getAdminCities: builder.query<
@@ -4707,6 +4876,15 @@ export const {
   useCreateAdminDiningCuisineMutation,
   useUpdateAdminDiningCuisineMutation,
   useDeleteAdminDiningCuisineMutation,
+  useGetAdminMoviesQuery,
+  useGetAdminMovieQuery,
+  useCreateAdminMovieMutation,
+  useUpdateAdminMovieMutation,
+  useDeleteAdminMovieMutation,
+  useGetPartnerMovieCatalogQuery,
+  useGetCinemaScreensQuery,
+  useCreateCinemaScreenMutation,
+  useUpdateCinemaScreenMutation,
   useGetCitiesQuery,
   useGetAdminCitiesQuery,
   useCreateAdminCityMutation,

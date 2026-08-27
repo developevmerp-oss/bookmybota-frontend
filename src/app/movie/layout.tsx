@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MonitorPlay,
   User,
   X,
 } from "lucide-react";
@@ -31,6 +32,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
 
   const navigation = [
     { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
+    { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
     { name: "Movies", href: "/movie/movies", icon: Film },
     { name: "Showtimes", href: "/movie/showtimes", icon: Clapperboard },
     { name: "Profile", href: "/movie/profile", icon: User },

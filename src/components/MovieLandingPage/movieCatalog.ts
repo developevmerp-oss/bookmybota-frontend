@@ -1,5 +1,6 @@
 export type MovieDetailData = {
   id: string;
+  slug?: string;
   title: string;
   poster: string;
   landscape?: string;
@@ -156,9 +157,10 @@ const DEFAULT_REVIEW_TAGS = [
 export const MOVIE_CATALOG: MovieDetailData[] = [
   {
     id: "s1",
+    slug: "toxic-a-fairy-tale-for-grown-ups",
     title: "Toxic: A Fairy Tale for Grown-ups",
-    poster: "/images/movies/toxic-poster.png",
-    landscape: "/images/movies/toxic-poster.png",
+    poster: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&h=750&fit=crop&q=80",
+    landscape: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=1600&h=800&fit=crop&q=80",
     certification: "A",
     languages: ["Kannada", "Telugu", "Tamil", "Hindi", "Malayalam", "English"],
     genres: ["Action", "Crime", "Period", "Thriller"],
@@ -181,6 +183,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s2",
+    slug: "tom-and-cherry",
     title: "Tom & Cherry",
     poster: "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=500&h=750&fit=crop&q=80",
     certification: "UA 7+",
@@ -196,6 +199,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s3",
+    slug: "get-set-go",
     title: "Get Set Go",
     poster: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=500&h=750&fit=crop&q=80",
     certification: "UA16+",
@@ -212,6 +216,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s4",
+    slug: "jindagi-once-more",
     title: "Jindagi Once More",
     poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500&h=750&fit=crop&q=80",
     certification: "U",
@@ -228,6 +233,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s5",
+    slug: "spider-man-brand-new-day",
     title: "Spider-Man: Brand New Day",
     poster: "https://images.unsplash.com/photo-1635805737707-575885ab0820?w=500&h=750&fit=crop&q=80",
     certification: "UA",
@@ -244,6 +250,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s6",
+    slug: "insidious-out-of-the-further",
     title: "Insidious: Out of The Further",
     poster: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=500&h=750&fit=crop&q=80",
     certification: "A",
@@ -260,6 +267,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "u1",
+    slug: "desert-mirage",
     title: "Desert Mirage",
     poster: "https://images.unsplash.com/photo-1440404653325-ab127d49abb1?w=500&h=750&fit=crop&q=80",
     certification: "UA",
@@ -275,6 +283,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "u2",
+    slug: "the-night-express",
     title: "The Night Express",
     poster: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&h=750&fit=crop&q=80",
     certification: "UA16+",
@@ -291,6 +300,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "u3",
+    slug: "marham-poetry-music-night",
     title: "Marham: Poetry & Music Night",
     poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500&h=750&fit=crop&q=80",
     certification: "U",
@@ -306,8 +316,69 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
 ];
 
-export function getCatalogMovie(id: string) {
-  return MOVIE_CATALOG.find((m) => m.id === id) || null;
+export function getCatalogMovie(idOrSlug: string) {
+  const key = idOrSlug.trim().toLowerCase();
+  if (!key) return null;
+  return (
+    MOVIE_CATALOG.find((movie) => {
+      const id = movie.id.toLowerCase();
+      const slug = (movie.slug || "").toLowerCase();
+      return id === key || slug === key;
+    }) || null
+  );
+}
+
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+
+const FALLBACK_POSTER =
+  "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&h=750&fit=crop&q=80";
+
+/** Map API movie record to customer detail shape. */
+export function mapApiMovieToDetail(movie: {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string | null;
+  poster_url?: string | null;
+  banner_url?: string | null;
+  trailer_url?: string | null;
+  duration_minutes?: number | null;
+  certificate?: string | null;
+  release_date?: string | null;
+  languages?: string[];
+  genres?: string[];
+  formats?: string[];
+  cast_text?: string | null;
+  director?: string | null;
+  status?: string;
+}): MovieDetailData {
+  const poster = resolveMediaUrl(movie.poster_url) || FALLBACK_POSTER;
+  const landscape = resolveMediaUrl(movie.banner_url) || resolveMediaUrl(movie.poster_url) || undefined;
+  const comingSoon = movie.status === "coming_soon";
+  return {
+    id: movie.id,
+    slug: movie.slug,
+    title: movie.title,
+    poster,
+    landscape,
+    certification: movie.certificate?.trim() || undefined,
+    languages: movie.languages || [],
+    genres: movie.genres || [],
+    formats: movie.formats?.length ? movie.formats : ["2D"],
+    duration: formatDurationShort(movie.duration_minutes),
+    releaseDate: comingSoon
+      ? "Coming Soon"
+      : formatReleaseShort(movie.release_date || undefined),
+    synopsis: movie.description?.trim() || undefined,
+    trailerUrl: movie.trailer_url?.trim() || undefined,
+    trailersCount: movie.trailer_url ? 1 : 0,
+    inCinemas: movie.status === "now_showing",
+    comingSoon,
+  };
+}
+
+export function movieDetailPath(movie: Pick<MovieDetailData, "id" | "slug">) {
+  return `/movies/${movie.slug || movie.id}`;
 }
 
 /** Fill showcase extras for catalog titles that don't define their own. */

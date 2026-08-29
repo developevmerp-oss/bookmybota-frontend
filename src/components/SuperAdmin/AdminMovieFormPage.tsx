@@ -35,6 +35,7 @@ type FormState = {
   release_date: string;
   languages: string;
   genres: string;
+  formats: string;
   cast_text: string;
   director: string;
   status: Movie["status"];
@@ -51,6 +52,7 @@ const emptyForm: FormState = {
   release_date: "",
   languages: "",
   genres: "",
+  formats: "",
   cast_text: "",
   director: "",
   status: "draft",
@@ -106,6 +108,7 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
       release_date: movie.release_date ? String(movie.release_date).slice(0, 10) : "",
       languages: joinCsv(movie.languages),
       genres: joinCsv(movie.genres),
+      formats: joinCsv(movie.formats),
       cast_text: movie.cast_text || "",
       director: movie.director || "",
       status: movie.status || "draft",
@@ -146,6 +149,7 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
       release_date: form.release_date || null,
       languages: splitCsv(form.languages),
       genres: splitCsv(form.genres),
+      formats: splitCsv(form.formats),
       cast_text: form.cast_text.trim() || null,
       director: form.director.trim() || null,
       status: form.status,
@@ -294,6 +298,17 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
               onChange={(e) => setField("genres", e.target.value)}
             />
             <p className="mt-1 text-xs text-slate-400">Comma-separated</p>
+          </div>
+
+          <div>
+            <FieldLabel>Formats</FieldLabel>
+            <input
+              className="input-field w-full"
+              placeholder="2D, 3D, IMAX 2D"
+              value={form.formats}
+              onChange={(e) => setField("formats", e.target.value)}
+            />
+            <p className="mt-1 text-xs text-slate-400">Comma-separated screen formats</p>
           </div>
 
           <div>

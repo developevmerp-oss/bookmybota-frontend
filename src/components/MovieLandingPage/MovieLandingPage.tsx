@@ -18,31 +18,16 @@ import { FaMapMarkerAlt } from "react-icons/fa";
 import "swiper/css";
 import "swiper/css/pagination";
 import {
-  useGetPublicEventFiltersQuery,
-  useGetPublicEventsQuery,
-  type PublicEvent,
+  useGetPublicMoviesQuery,
+  useGetPublicMovieFiltersQuery,
+  type Movie,
 } from "@/services/api";
-import { eventPortrait } from "@/components/LandingPage/homeUtils";
-import { MOVIE_CATALOG } from "@/components/MovieLandingPage/movieCatalog";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import "./MovieLandingPage.css";
 
 const PAGE_BG = "#f6f7f8";
 const BRAND = "#6900AA";
-const MOVIE_KEYWORDS = ["movie", "movies", "film", "cinema"];
-const DEFAULT_LANGUAGES = ["Amharic", "English", "Oromiffa", "Tigrigna", "Somali"];
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
-const GENRES = [
-  "Action",
-  "Comedy",
-  "Drama",
-  "Horror",
-  "Thriller",
-  "Romance",
-  "Animation",
-  "Adventure",
-  "Crime",
-  "Sci-Fi",
-];
 
 type MovieCardData = {
   id: string;
@@ -62,38 +47,8 @@ type MovieCardData = {
 
 type ViewAllKey = "now-showing" | "coming-soon" | "top-rated" | null;
 
-const SHOWCASE_MOVIES: MovieCardData[] = MOVIE_CATALOG.filter((m) => !m.comingSoon).map((m) => ({
-  id: m.id,
-  title: m.title,
-  poster: m.poster,
-  certification: m.certification,
-  language: m.languages.join(", "),
-  genres: m.genres,
-  formats: m.formats,
-  rating: m.rating,
-  votes: m.votes,
-  likes: m.likes,
-  promoted: m.id === "s1",
-  href: `/movies/${m.id}`,
-}));
-
-const COMING_SOON_MOVIES: MovieCardData[] = MOVIE_CATALOG.filter((m) => m.comingSoon).map((m) => ({
-  id: m.id,
-  title: m.title,
-  poster: m.poster,
-  certification: m.certification,
-  language: m.languages.join(", "),
-  genres: m.genres,
-  formats: m.formats,
-  rating: m.rating,
-  votes: m.votes,
-  likes: m.likes,
-  comingSoon: true,
-  href: `/movies/${m.id}`,
-}));
-
-/** Static promo banners — same slide content, new layout. */
-const HERO_SLIDES = [
+/** Static promo banners when no catalog banners are available yet. */
+const FALLBACK_HERO_SLIDES = [
   {
     id: "toxic",
     href: "/movies/s1",
@@ -140,10 +95,53 @@ const HERO_SLIDES = [
   },
 ] as const;
 
-function formatCount(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M+`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K+`;
-  return `${n}+`;
+type HeroSlide = {
+  id: string;
+  href: string;
+  image: string;
+  poster?: string;
+  eyebrow: string;
+  title: string;
+  tagline: string;
+  promoTitle: string;
+  promoSub: string;
+  accent: string;
+  panel: string;
+};
+
+function mapCatalogMovieToCard(movie: Movie): MovieCardData {
+  return {
+    id: movie.id,
+    title: movie.title,
+    poster: resolveMediaUrl(movie.poster_url),
+    certification: movie.certificate?.trim() || undefined,
+    language: (movie.languages || []).join(", ") || undefined,
+    genres: movie.genres || [],
+    formats: movie.formats || [],
+    comingSoon: movie.status === "coming_soon",
+    href: `/movies/${movie.slug || movie.id}`,
+  };
+}
+
+function buildHeroSlides(movies: Movie[]): HeroSlide[] {
+  const featured = movies
+    .filter((movie) => movie.status === "now_showing" && (movie.banner_url || movie.poster_url))
+    .slice(0, 3);
+  if (featured.length === 0) return [...FALLBACK_HERO_SLIDES];
+
+  return featured.map((movie) => ({
+    id: movie.id,
+    href: `/movies/${movie.slug || movie.id}`,
+    image: resolveMediaUrl(movie.banner_url) || resolveMediaUrl(movie.poster_url),
+    poster: resolveMediaUrl(movie.poster_url) || undefined,
+    eyebrow: "NOW SHOWING",
+    title: movie.title.toUpperCase(),
+    tagline: (movie.genres || []).slice(0, 3).join(" · ") || "Book tickets in cinemas near you",
+    promoTitle: movie.director ? `Directed by ${movie.director}` : "Now in cinemas",
+    promoSub: movie.duration_minutes ? `${movie.duration_minutes} min` : "Grab your seats today.",
+    accent: BRAND,
+    panel: "#1A0A2E",
+  }));
 }
 
 function ratingValue(rating?: string) {
@@ -152,28 +150,7 @@ function ratingValue(rating?: string) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function mapEventToMovie(event: PublicEvent): MovieCardData {
-  const ratingNum = Number(event.rating);
-  const votesNum = Number(event.reviews_count);
-  const hasRating = Number.isFinite(ratingNum) && ratingNum > 0;
-  const hasVotes = Number.isFinite(votesNum) && votesNum > 0;
-  const genre = event.category_name?.trim();
-  return {
-    id: event.id,
-    title: event.name,
-    poster: eventPortrait(event),
-    certification: event.age_group?.trim() || undefined,
-    language: event.language?.trim() || undefined,
-    genres: genre && !MOVIE_KEYWORDS.some((k) => genre.toLowerCase().includes(k)) ? [genre] : [],
-    formats: ["2D"],
-    rating: hasRating ? `${ratingNum.toFixed(1)}/10` : undefined,
-    votes: hasRating && hasVotes ? `${formatCount(votesNum)} Votes` : undefined,
-    likes: !hasRating && hasVotes ? `${formatCount(votesNum)} Likes` : undefined,
-    href: `/movies/${event.id}`,
-  };
-}
-
-function HeroBannerCard({ slide }: { slide: (typeof HERO_SLIDES)[number] }) {
+function HeroBannerCard({ slide }: { slide: HeroSlide }) {
   return (
     <Link href={slide.href} className="relative block overflow-hidden min-h-48 sm:min-h-56 lg:min-h-80">
       <img
@@ -432,10 +409,6 @@ function FilterSection({
 export default function MovieLandingPage() {
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
-  const [heroNav, setHeroNav] = useState({
-    prev: false,
-    next: HERO_SLIDES.length > 1,
-  });
   const [city, setCity] = useState("");
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
@@ -447,26 +420,39 @@ export default function MovieLandingPage() {
   });
   const [viewAll, setViewAll] = useState<ViewAllKey>(null);
 
-  const { data: filterOptions } = useGetPublicEventFiltersQuery();
-
-  const movieCategory = useMemo(() => {
-    return filterOptions?.categories?.find((c) => {
-      const slug = (c.slug || "").toLowerCase();
-      const name = (c.name || "").toLowerCase();
-      return MOVIE_KEYWORDS.some((k) => slug.includes(k) || name.includes(k));
-    });
-  }, [filterOptions]);
-
-  const queryArg = useMemo(
+  const moviesQueryArg = useMemo(
     () => ({
+      page: 1,
+      limit: 100,
       ...(city ? { city } : {}),
-      ...(movieCategory?.slug ? { category: movieCategory.slug } : {}),
       ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
+      ...(selectedGenres.length ? { genre: selectedGenres.join(",") } : {}),
+      ...(selectedFormats.length ? { format: selectedFormats.join(",") } : {}),
     }),
-    [city, movieCategory, selectedLanguages]
+    [city, selectedLanguages, selectedGenres, selectedFormats]
   );
 
-  const { data: eventsData, isLoading } = useGetPublicEventsQuery(queryArg);
+  const filtersQueryArg = useMemo(() => (city ? { city } : undefined), [city]);
+
+  const { data: moviesData, isLoading, isFetching } = useGetPublicMoviesQuery(moviesQueryArg);
+  const { data: filterOptions } = useGetPublicMovieFiltersQuery(filtersQueryArg);
+  const catalogMovies = moviesData?.items ?? [];
+  const hasCinemasInCity = moviesData?.meta?.has_cinemas_in_city;
+  const noCinemasInCity = Boolean(city && hasCinemasInCity === false);
+
+  const heroSlides = useMemo(() => buildHeroSlides(catalogMovies), [catalogMovies]);
+
+  const [heroNav, setHeroNav] = useState({
+    prev: false,
+    next: heroSlides.length > 1,
+  });
+
+  useEffect(() => {
+    setHeroNav((prev) => ({
+      ...prev,
+      next: heroSlides.length > 1,
+    }));
+  }, [heroSlides.length]);
 
   useEffect(() => {
     const applyCity = () => {
@@ -482,47 +468,28 @@ export default function MovieLandingPage() {
     };
   }, []);
 
-  const languageOptions = useMemo(() => {
-    const fromApi = filterOptions?.languages || [];
-    const merged = [...DEFAULT_LANGUAGES];
-    fromApi.forEach((lang) => {
-      if (!merged.some((l) => l.toLowerCase() === lang.toLowerCase())) merged.push(lang);
-    });
-    return merged;
+  const languageOptions = useMemo(() => filterOptions?.languages ?? [], [filterOptions]);
+
+  const genreOptions = useMemo(() => filterOptions?.genres ?? [], [filterOptions]);
+
+  const formatOptions = useMemo(() => {
+    const fromApi = filterOptions?.formats ?? [];
+    if (fromApi.length > 0) return fromApi;
+    return [...FORMATS];
   }, [filterOptions]);
 
-  const apiMovies = useMemo(() => {
-    const list = eventsData ?? [];
-    const filtered = movieCategory?.slug
-      ? list
-      : list.filter((e) => {
-          const slug = (e.category_slug || "").toLowerCase();
-          const name = (e.category_name || "").toLowerCase();
-          return MOVIE_KEYWORDS.some((k) => slug.includes(k) || name.includes(k));
-        });
-    return filtered.map(mapEventToMovie);
-  }, [eventsData, movieCategory]);
+  const nowShowingSource = useMemo(
+    () => catalogMovies.filter((movie) => movie.status === "now_showing").map(mapCatalogMovieToCard),
+    [catalogMovies]
+  );
 
-  const sourceMovies = apiMovies.length > 0 ? apiMovies : SHOWCASE_MOVIES;
+  const comingSoonSource = useMemo(
+    () => catalogMovies.filter((movie) => movie.status === "coming_soon").map(mapCatalogMovieToCard),
+    [catalogMovies]
+  );
 
-  const movies = useMemo(() => {
-    return sourceMovies.filter((movie) => {
-      const langOk =
-        selectedLanguages.length === 0 ||
-        (movie.language
-          ? selectedLanguages.some((l) => movie.language!.toLowerCase().includes(l.toLowerCase()))
-          : true);
-      const genreOk =
-        selectedGenres.length === 0 ||
-        movie.genres.length === 0 ||
-        movie.genres.some((g) => selectedGenres.some((s) => s.toLowerCase() === g.toLowerCase()));
-      const formatOk =
-        selectedFormats.length === 0 ||
-        !movie.formats?.length ||
-        movie.formats.some((f) => selectedFormats.includes(f));
-      return langOk && genreOk && formatOk;
-    });
-  }, [sourceMovies, selectedLanguages, selectedGenres, selectedFormats]);
+  const movies = nowShowingSource;
+  const comingSoonMovies = comingSoonSource;
 
   const topRatedMovies = useMemo(() => {
     return [...movies]
@@ -577,7 +544,7 @@ export default function MovieLandingPage() {
   };
 
   const syncHeroNav = (swiper: SwiperType) => {
-    const multi = HERO_SLIDES.length > 1;
+    const multi = heroSlides.length > 1;
     setHeroNav({
       prev: multi && !swiper.isBeginning,
       next: multi && !swiper.isEnd,
@@ -597,7 +564,7 @@ export default function MovieLandingPage() {
     viewAll === "now-showing"
       ? movies
       : viewAll === "coming-soon"
-        ? COMING_SOON_MOVIES
+        ? comingSoonMovies
         : viewAll === "top-rated"
           ? topRatedMovies
           : [];
@@ -613,11 +580,11 @@ export default function MovieLandingPage() {
               slidesPerView={1}
               spaceBetween={0}
               autoplay={
-                HERO_SLIDES.length > 1
+                heroSlides.length > 1
                   ? { delay: 4500, disableOnInteraction: false, pauseOnMouseEnter: true }
                   : false
               }
-              pagination={HERO_SLIDES.length > 1 ? { clickable: true } : false}
+              pagination={heroSlides.length > 1 ? { clickable: true } : false}
               navigation={{ prevEl: prevRef.current, nextEl: nextRef.current }}
               onBeforeInit={(swiper: SwiperType) => {
                 const nav = swiper.params?.navigation;
@@ -632,7 +599,7 @@ export default function MovieLandingPage() {
               }}
               onSlideChange={syncHeroNav}
             >
-              {HERO_SLIDES.map((slide) => (
+              {heroSlides.map((slide) => (
                 <SwiperSlide key={slide.id} className="!h-auto">
                   <HeroBannerCard slide={slide} />
                 </SwiperSlide>
@@ -723,7 +690,7 @@ export default function MovieLandingPage() {
                   onClear={() => setSelectedGenres([])}
                 >
                   <div className="flex flex-wrap gap-2">
-                    {GENRES.map((genre) => {
+                    {genreOptions.map((genre) => {
                       const active = selectedGenres.includes(genre);
                       return (
                         <button
@@ -751,7 +718,7 @@ export default function MovieLandingPage() {
                   last
                 >
                   <div className="flex flex-wrap gap-2">
-                    {FORMATS.map((format) => {
+                    {formatOptions.map((format) => {
                       const active = selectedFormats.includes(format);
                       return (
                         <button
@@ -821,16 +788,33 @@ export default function MovieLandingPage() {
                 </div>
               ) : (
                 <div className="space-y-8 sm:space-y-10">
-                  {isLoading && apiMovies.length === 0 ? (
+                  {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
                       <Loader2 className="size-8 animate-spin text-[#6900AA]" />
                       <p className="text-sm sm:text-base font-medium">Loading movies...</p>
                     </div>
-                  ) : movies.length === 0 ? (
+                  ) : noCinemasInCity ? (
                     <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                      <p className="text-slate-600 font-medium">No movies match these filters</p>
+                      <p className="text-slate-600 font-medium">No cinemas in {headingCity} yet</p>
                       <p className="text-slate-400 text-sm sm:text-base mt-1">
-                        Try clearing filters or choosing another language.
+                        Try another city or browse cinemas near you.
+                      </p>
+                      <Link
+                        href={cinemasHref}
+                        className="mt-4 inline-flex text-sm font-semibold text-[#6900AA] hover:text-[#57008E]"
+                      >
+                        Browse by Cinemas
+                      </Link>
+                    </div>
+                  ) : movies.length === 0 && comingSoonMovies.length === 0 ? (
+                    <div className={`text-center py-16 bg-white rounded-2xl border border-slate-200 ${isFetching ? "opacity-70" : ""}`}>
+                      <p className="text-slate-600 font-medium">
+                        {hasActiveFilters ? "No movies match these filters" : "No movies available yet"}
+                      </p>
+                      <p className="text-slate-400 text-sm sm:text-base mt-1">
+                        {hasActiveFilters
+                          ? "Try clearing filters or choosing another language."
+                          : "Check back soon for the latest titles in cinemas."}
                       </p>
                       {hasActiveFilters && (
                         <button
@@ -843,17 +827,19 @@ export default function MovieLandingPage() {
                       )}
                     </div>
                   ) : (
+                    <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
                     <MovieRail
                       title="Now Showing"
                       movies={movies}
                       onSeeAll={() => openViewAll("now-showing")}
                     />
+                    </div>
                   )}
 
-                  <div id="coming-soon" className="scroll-mt-28">
+                  <div id="coming-soon" className={`scroll-mt-28 ${isFetching ? "opacity-70 transition-opacity" : ""}`}>
                     <MovieRail
                       title="Upcoming Movies"
-                      movies={COMING_SOON_MOVIES}
+                      movies={comingSoonMovies}
                       onSeeAll={() => openViewAll("coming-soon")}
                     />
                   </div>

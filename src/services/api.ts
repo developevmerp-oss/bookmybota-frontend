@@ -30,7 +30,9 @@ import {
   toListQuery,
   bizIdOf,
   pagedBizQuery,
+  EMPTY_PAGE_META,
   type PaginatedList,
+  type PaginationMeta,
   type PagedQuery,
   type PagedBizQuery,
 } from '@/lib/pagination';
@@ -335,6 +337,7 @@ export interface Movie {
   release_date?: string | null;
   languages?: string[];
   genres?: string[];
+  formats?: string[];
   cast_text?: string | null;
   director?: string | null;
   status: 'draft' | 'coming_soon' | 'now_showing' | 'archived';
@@ -343,6 +346,30 @@ export interface Movie {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface PublicMoviesQuery {
+  q?: string;
+  status?: 'now_showing' | 'coming_soon';
+  language?: string;
+  genre?: string;
+  format?: string;
+  city?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PublicMovieFilters {
+  languages: string[];
+  genres: string[];
+  formats: string[];
+  city?: string;
+  has_cinemas_in_city?: boolean;
+}
+
+export type PublicMoviesMeta = PaginationMeta & {
+  city?: string;
+  has_cinemas_in_city?: boolean;
+};
 
 export interface CinemaScreen {
   id: string;
@@ -4326,7 +4353,7 @@ export const api = createApi({
     createAdminMovie: builder.mutation<Movie, Partial<Movie> & { title: string }>({
       query: (body) => ({ url: '/admin/movies', method: 'POST', body }),
       transformResponse: (res: { data: Movie }) => res.data,
-      invalidatesTags: [{ type: 'Movies', id: 'LIST' }, { type: 'Movies', id: 'PARTNER_LIST' }, 'Movies'],
+      invalidatesTags: [{ type: 'Movies', id: 'LIST' }, { type: 'Movies', id: 'PARTNER_LIST' }, { type: 'Movies', id: 'PUBLIC_LIST' }, { type: 'Movies', id: 'PUBLIC_FILTERS' }, 'Movies'],
     }),
 
     updateAdminMovie: builder.mutation<Movie, { id: string; body: Partial<Movie> }>({
@@ -4336,13 +4363,15 @@ export const api = createApi({
         { type: 'Movies', id },
         { type: 'Movies', id: 'LIST' },
         { type: 'Movies', id: 'PARTNER_LIST' },
+        { type: 'Movies', id: 'PUBLIC_LIST' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
       ],
     }),
 
     deleteAdminMovie: builder.mutation<Movie, string>({
       query: (id) => ({ url: `/admin/movies/${id}`, method: 'DELETE' }),
       transformResponse: (res: { data: Movie }) => res.data,
-      invalidatesTags: [{ type: 'Movies', id: 'LIST' }, { type: 'Movies', id: 'PARTNER_LIST' }, 'Movies'],
+      invalidatesTags: [{ type: 'Movies', id: 'LIST' }, { type: 'Movies', id: 'PARTNER_LIST' }, { type: 'Movies', id: 'PUBLIC_LIST' }, { type: 'Movies', id: 'PUBLIC_FILTERS' }, 'Movies'],
     }),
 
     getPartnerMovieCatalog: builder.query<
@@ -4357,6 +4386,53 @@ export const api = createApi({
         })}`,
       transformResponse: (res: { data?: Movie[] }) => unwrapPaginated(res),
       providesTags: [{ type: 'Movies', id: 'PARTNER_LIST' }],
+    }),
+
+    getPublicMovies: builder.query<
+      PaginatedList<Movie> & { meta: PublicMoviesMeta },
+      PublicMoviesQuery | void
+    >({
+      query: (params) =>
+        `/movies${toListQuery({
+          q: params?.q,
+          status: params?.status,
+          language: params?.language,
+          genre: params?.genre,
+          format: params?.format,
+          city: params?.city,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: Movie[]; meta?: PublicMoviesMeta }) => ({
+        items: res?.data ?? [],
+        meta:
+          res?.meta ?? {
+            ...EMPTY_PAGE_META,
+            total: res?.data?.length ?? 0,
+            limit: Math.max(res?.data?.length ?? 0, 1),
+            total_pages: res?.data?.length ? 1 : 0,
+          },
+      }),
+      providesTags: [{ type: 'Movies', id: 'PUBLIC_LIST' }],
+    }),
+
+    getPublicMovieFilters: builder.query<PublicMovieFilters, { city?: string } | void>({
+      query: (params) =>
+        `/movies/filters${toListQuery({
+          city: params?.city,
+        })}`,
+      transformResponse: (res: { data?: PublicMovieFilters }) =>
+        res?.data ?? { languages: [], genres: [], formats: [] },
+      providesTags: [{ type: 'Movies', id: 'PUBLIC_FILTERS' }],
+    }),
+
+    getPublicMovie: builder.query<Movie, string>({
+      query: (idOrSlug) => `/movies/${encodeURIComponent(idOrSlug)}`,
+      transformResponse: (res: { data?: Movie }) => {
+        if (!res?.data) throw new Error('Movie not found');
+        return res.data;
+      },
+      providesTags: (_r, _e, idOrSlug) => [{ type: 'Movies', id: `PUBLIC_${idOrSlug}` }],
     }),
 
     getCinemaScreens: builder.query<CinemaScreen[], string>({
@@ -4882,6 +4958,9 @@ export const {
   useUpdateAdminMovieMutation,
   useDeleteAdminMovieMutation,
   useGetPartnerMovieCatalogQuery,
+  useGetPublicMoviesQuery,
+  useGetPublicMovieFiltersQuery,
+  useGetPublicMovieQuery,
   useGetCinemaScreensQuery,
   useCreateCinemaScreenMutation,
   useUpdateCinemaScreenMutation,

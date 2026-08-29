@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import {
   MOVIE_CATALOG,
+  movieDetailPath,
   type MovieDetailData,
   type MovieOfferItem,
   type MoviePerson,
@@ -420,7 +421,7 @@ function YouMightAlsoLike({ currentId }: { currentId: string }) {
         {list.map((m) => (
           <Link
             key={m.id}
-            href={`/movies/${m.id}`}
+            href={movieDetailPath(m)}
             className="group shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
           >
             <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-slate-200">

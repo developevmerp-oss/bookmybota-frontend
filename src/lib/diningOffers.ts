@@ -157,6 +157,35 @@ export function formatDiningOfferDiscount(offer: DiningOffer): string {
   return offer.title || "Offer";
 }
 
+export function calculateDiningOfferDiscountAmount(
+  billAmount: number,
+  offer: {
+    discount_type?: string;
+    discount_value?: number;
+    max_discount?: number | null;
+  }
+): number {
+  const gross = Math.round((Number(billAmount) || 0) * 100) / 100;
+  if (gross <= 0) return 0;
+
+  const discountType = offer.discount_type || "PERCENT";
+  const discountValue = Number(offer.discount_value) || 0;
+  let discount = 0;
+
+  if (discountType === "FLAT") {
+    discount = Math.min(discountValue, gross);
+  } else {
+    discount = Math.min(gross, (gross * discountValue) / 100);
+    const maxDiscount =
+      offer.max_discount != null ? Number(offer.max_discount) : null;
+    if (maxDiscount != null && maxDiscount > 0) {
+      discount = Math.min(discount, maxDiscount);
+    }
+  }
+
+  return Math.round(discount * 100) / 100;
+}
+
 export function businessHasCustomerVisibleOffer(raw: unknown): boolean {
   return normalizeDiningOffers(raw).some(isDiningOfferCustomerVisible);
 }

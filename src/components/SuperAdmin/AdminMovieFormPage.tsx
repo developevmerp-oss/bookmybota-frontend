@@ -2,18 +2,29 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateAdminMovieMutation,
   useGetAdminMovieQuery,
+  useGetPublicMovieMastersQuery,
   useUpdateAdminMovieMutation,
   useUploadImageMutation,
   type Movie,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
+import MultiSelectPills, {
+  idsFromMasterNames,
+  namesFromMasterIds,
+  orphanMasterNames,
+} from "@/components/Shared/MultiSelectPills";
+import MovieCastCrewEditor, {
+  parseMovieCastCrewFromApi,
+  serializeMovieCastCrew,
+  type MovieCastCrewFormMember,
+} from "@/components/SuperAdmin/MovieCastCrewEditor";
 
 const STATUS_OPTIONS: Movie["status"][] = ["draft", "coming_soon", "now_showing", "archived"];
 
@@ -33,11 +44,6 @@ type FormState = {
   duration_minutes: string;
   certificate: string;
   release_date: string;
-  languages: string;
-  genres: string;
-  formats: string;
-  cast_text: string;
-  director: string;
   status: Movie["status"];
 };
 
@@ -50,24 +56,8 @@ const emptyForm: FormState = {
   duration_minutes: "",
   certificate: "",
   release_date: "",
-  languages: "",
-  genres: "",
-  formats: "",
-  cast_text: "",
-  director: "",
   status: "draft",
 };
-
-function splitCsv(value: string): string[] {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-function joinCsv(value?: string[] | null): string {
-  return Array.isArray(value) ? value.join(", ") : "";
-}
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -75,6 +65,15 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
       {children}
       {required ? <span className="text-rose-500"> *</span> : null}
     </label>
+  );
+}
+
+function OrphanNotice({ label, names }: { label: string; names: string[] }) {
+  if (!names.length) return null;
+  return (
+    <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+      Legacy {label} not in masters: {names.join(", ")}. Re-select from the options below to save.
+    </p>
   );
 }
 
@@ -89,14 +88,25 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
   const { data: movie, isLoading } = useGetAdminMovieQuery(movieId || "", {
     skip: !isEdit || !movieId,
   });
+  const { data: masters, isLoading: mastersLoading } = useGetPublicMovieMastersQuery();
   const [createMovie, { isLoading: creating }] = useCreateAdminMovieMutation();
   const [updateMovie, { isLoading: updating }] = useUpdateAdminMovieMutation();
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [selectedLanguageIds, setSelectedLanguageIds] = useState<number[]>([]);
+  const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
+  const [selectedFormatIds, setSelectedFormatIds] = useState<number[]>([]);
+  const [castMembers, setCastMembers] = useState<MovieCastCrewFormMember[]>([]);
+  const [crewMembers, setCrewMembers] = useState<MovieCastCrewFormMember[]>([]);
   const [hydrated, setHydrated] = useState(!isEdit);
 
+  const languageMasters = masters?.languages ?? [];
+  const genreMasters = masters?.genres ?? [];
+  const formatMasters = masters?.formats ?? [];
+  const crewRoleMasters = masters?.crew_roles ?? [];
+
   useEffect(() => {
-    if (!isEdit || !movie) return;
+    if (!isEdit || !movie || mastersLoading || !masters) return;
     setForm({
       title: movie.title || "",
       description: movie.description || "",
@@ -106,15 +116,28 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
       duration_minutes: movie.duration_minutes != null ? String(movie.duration_minutes) : "",
       certificate: movie.certificate || "",
       release_date: movie.release_date ? String(movie.release_date).slice(0, 10) : "",
-      languages: joinCsv(movie.languages),
-      genres: joinCsv(movie.genres),
-      formats: joinCsv(movie.formats),
-      cast_text: movie.cast_text || "",
-      director: movie.director || "",
       status: movie.status || "draft",
     });
+    setCastMembers(parseMovieCastCrewFromApi(movie.cast));
+    setCrewMembers(parseMovieCastCrewFromApi(movie.crew));
+    setSelectedLanguageIds(idsFromMasterNames(masters.languages, movie.languages));
+    setSelectedGenreIds(idsFromMasterNames(masters.genres, movie.genres));
+    setSelectedFormatIds(idsFromMasterNames(masters.formats, movie.formats));
     setHydrated(true);
-  }, [isEdit, movie]);
+  }, [isEdit, movie, masters, mastersLoading]);
+
+  const orphanLanguages = useMemo(
+    () => orphanMasterNames(languageMasters, isEdit ? movie?.languages : []),
+    [languageMasters, isEdit, movie?.languages]
+  );
+  const orphanGenres = useMemo(
+    () => orphanMasterNames(genreMasters, isEdit ? movie?.genres : []),
+    [genreMasters, isEdit, movie?.genres]
+  );
+  const orphanFormats = useMemo(
+    () => orphanMasterNames(formatMasters, isEdit ? movie?.formats : []),
+    [formatMasters, isEdit, movie?.formats]
+  );
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -132,12 +155,28 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     }
   };
 
+  const uploadPersonImage = async (file: File) => {
+    const fd = new FormData();
+    fd.append("image", file);
+    try {
+      const res = await uploadImage(fd).unwrap();
+      return res.url || null;
+    } catch (err) {
+      toast.error(extractApiError(err, "Photo upload failed"));
+      return null;
+    }
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) {
       toast.error("Title is required");
       return;
     }
+    const languages = namesFromMasterIds(languageMasters, selectedLanguageIds);
+    const genres = namesFromMasterIds(genreMasters, selectedGenreIds);
+    const formats = namesFromMasterIds(formatMasters, selectedFormatIds);
+
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -147,11 +186,11 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
       duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
       certificate: form.certificate.trim() || null,
       release_date: form.release_date || null,
-      languages: splitCsv(form.languages),
-      genres: splitCsv(form.genres),
-      formats: splitCsv(form.formats),
-      cast_text: form.cast_text.trim() || null,
-      director: form.director.trim() || null,
+      languages,
+      genres,
+      formats,
+      cast: serializeMovieCastCrew(castMembers),
+      crew: serializeMovieCastCrew(crewMembers),
       status: form.status,
     };
     try {
@@ -170,8 +209,12 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
 
   const saving = creating || updating;
 
-  if (isEdit && isLoading) {
+  if (isEdit && (isLoading || mastersLoading)) {
     return <div className="text-slate-500 p-10 text-center">Loading movie…</div>;
+  }
+
+  if (!isEdit && mastersLoading) {
+    return <div className="text-slate-500 p-10 text-center">Loading movie masters…</div>;
   }
 
   if (isEdit && !movie && !isLoading) {
@@ -188,6 +231,12 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
   if (!hydrated) {
     return <div className="text-slate-500 p-10 text-center">Loading…</div>;
   }
+
+  const masterLink = (
+    <Link href="/admin/movie-masters" className="text-rose-600 hover:text-rose-500 font-semibold">
+      Movie Masters
+    </Link>
+  );
 
   return (
     <div className="w-full">
@@ -270,45 +319,51 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
           </div>
 
           <div>
-            <FieldLabel>Director</FieldLabel>
-            <input
-              className="input-field w-full"
-              value={form.director}
-              onChange={(e) => setField("director", e.target.value)}
-            />
-          </div>
-
-          <div>
             <FieldLabel>Languages</FieldLabel>
-            <input
-              className="input-field w-full"
-              placeholder="English, Hindi"
-              value={form.languages}
-              onChange={(e) => setField("languages", e.target.value)}
+            <MultiSelectPills
+              options={languageMasters.map((item) => ({ id: item.id, name: item.name }))}
+              selectedIds={selectedLanguageIds}
+              onChange={setSelectedLanguageIds}
+              tone="light"
             />
-            <p className="mt-1 text-xs text-slate-400">Comma-separated</p>
+            {!languageMasters.length ? (
+              <p className="mt-2 text-xs text-slate-400">
+                No languages yet. Add them in {masterLink}.
+              </p>
+            ) : null}
+            <OrphanNotice label="languages" names={orphanLanguages} />
           </div>
 
           <div>
             <FieldLabel>Genres</FieldLabel>
-            <input
-              className="input-field w-full"
-              placeholder="Action, Sci-Fi"
-              value={form.genres}
-              onChange={(e) => setField("genres", e.target.value)}
+            <MultiSelectPills
+              options={genreMasters.map((item) => ({ id: item.id, name: item.name }))}
+              selectedIds={selectedGenreIds}
+              onChange={setSelectedGenreIds}
+              tone="light"
             />
-            <p className="mt-1 text-xs text-slate-400">Comma-separated</p>
+            {!genreMasters.length ? (
+              <p className="mt-2 text-xs text-slate-400">
+                No genres yet. Add them in {masterLink}.
+              </p>
+            ) : null}
+            <OrphanNotice label="genres" names={orphanGenres} />
           </div>
 
           <div>
             <FieldLabel>Formats</FieldLabel>
-            <input
-              className="input-field w-full"
-              placeholder="2D, 3D, IMAX 2D"
-              value={form.formats}
-              onChange={(e) => setField("formats", e.target.value)}
+            <MultiSelectPills
+              options={formatMasters.map((item) => ({ id: item.id, name: item.name }))}
+              selectedIds={selectedFormatIds}
+              onChange={setSelectedFormatIds}
+              tone="light"
             />
-            <p className="mt-1 text-xs text-slate-400">Comma-separated screen formats</p>
+            {!formatMasters.length ? (
+              <p className="mt-2 text-xs text-slate-400">
+                No formats yet. Add them in {masterLink}.
+              </p>
+            ) : null}
+            <OrphanNotice label="formats" names={orphanFormats} />
           </div>
 
           <div>
@@ -321,14 +376,26 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
             />
           </div>
 
-          <div>
-            <FieldLabel>Cast</FieldLabel>
-            <textarea
-              className="input-field w-full min-h-[96px]"
-              value={form.cast_text}
-              onChange={(e) => setField("cast_text", e.target.value)}
-            />
-          </div>
+          <MovieCastCrewEditor
+            kind="cast"
+            title="Cast"
+            description="Add actors with photo, name, and on-screen role (e.g. as Raya)."
+            members={castMembers}
+            onChange={setCastMembers}
+            onUploadImage={uploadPersonImage}
+            uploading={uploading}
+          />
+
+          <MovieCastCrewEditor
+            kind="crew"
+            title="Crew"
+            description="Add crew credits with photo, name, and position from Movie Masters."
+            members={crewMembers}
+            onChange={setCrewMembers}
+            crewRoleOptions={crewRoleMasters.map((item) => ({ id: item.id, name: item.name }))}
+            onUploadImage={uploadPersonImage}
+            uploading={uploading}
+          />
 
           <div className="md:col-span-2">
             <FieldLabel>Description</FieldLabel>

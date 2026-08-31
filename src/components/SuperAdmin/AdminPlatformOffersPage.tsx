@@ -18,6 +18,7 @@ import {
   useDeletePlatformOfferMutation,
   useGetOfferEligibleEventsAdminQuery,
   useGetOfferEligibleRestaurantsAdminQuery,
+  useGetOfferEligibleMoviesAdminQuery,
   useGetOfferRedemptionsQuery,
   useGetPlatformOffersQuery,
   usePatchPlatformOfferStatusMutation,
@@ -78,6 +79,7 @@ const EMPTY_FORM: AdminPlatformOfferValues = {
   sort_order: "0",
   event_ids: [],
   restaurant_ids: [],
+  movie_ids: [],
 };
 
 function statusBadge(status?: string) {
@@ -122,6 +124,7 @@ function offerToForm(o: PlatformOffer): AdminPlatformOfferValues {
     sort_order: String(o.sort_order ?? 0),
     event_ids: o.event_ids || [],
     restaurant_ids: o.restaurant_ids || [],
+    movie_ids: o.movie_ids || [],
   };
 }
 
@@ -153,6 +156,7 @@ export default function AdminPlatformOffersPage() {
   const category = watch("category");
   const eventIds = watch("event_ids") ?? [];
   const restaurantIds = watch("restaurant_ids") ?? [];
+  const movieIds = watch("movie_ids") ?? [];
 
   const listArg = {
     page,
@@ -175,6 +179,9 @@ export default function AdminPlatformOffersPage() {
   });
   const { data: eligibleRestaurants = [] } =
     useGetOfferEligibleRestaurantsAdminQuery(undefined, { skip: !formOpen });
+  const { data: eligibleMovies = [] } = useGetOfferEligibleMoviesAdminQuery(undefined, {
+    skip: !formOpen,
+  });
 
   const [createOffer, { isLoading: creating }] = useCreatePlatformOfferMutation();
   const [updateOffer, { isLoading: updating }] = useUpdatePlatformOfferMutation();
@@ -218,6 +225,7 @@ export default function AdminPlatformOffersPage() {
       sort_order: Number(values.sort_order) || 0,
       event_ids: values.event_ids ?? [],
       restaurant_ids: values.restaurant_ids ?? [],
+      movie_ids: values.movie_ids ?? [],
     };
     try {
       if (editingId) {
@@ -264,8 +272,9 @@ export default function AdminPlatformOffersPage() {
     }
   };
 
-  const toggleId = (field: "event_ids" | "restaurant_ids", id: string) => {
-    const list = field === "event_ids" ? eventIds : restaurantIds;
+  const toggleId = (field: "event_ids" | "restaurant_ids" | "movie_ids", id: string) => {
+    const list =
+      field === "event_ids" ? eventIds : field === "restaurant_ids" ? restaurantIds : movieIds;
     const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
     setValue(field, next, { shouldDirty: true });
   };
@@ -274,6 +283,8 @@ export default function AdminPlatformOffersPage() {
     applyTo === "SELECTED_ITEMS" && (category === "EVENTS" || category === "ALL");
   const showRestaurantPicker =
     applyTo === "SELECTED_ITEMS" && (category === "DINING" || category === "ALL");
+  const showMoviePicker =
+    applyTo === "SELECTED_ITEMS" && (category === "MOVIES" || category === "ALL");
 
   return (
     <div className="w-full space-y-6">
@@ -613,9 +624,10 @@ export default function AdminPlatformOffersPage() {
                     {...register("category")}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
-                    <option value="ALL">All (Events + Dining)</option>
+                    <option value="ALL">All categories</option>
                     <option value="EVENTS">Events only</option>
                     <option value="DINING">Dining only</option>
+                    <option value="MOVIES">Movies only</option>
                   </select>
                 </div>
                 <div>
@@ -688,6 +700,31 @@ export default function AdminPlatformOffersPage() {
                       {r.name}
                     </label>
                   ))}
+                </div>
+              )}
+
+              {showMoviePicker && (
+                <div className="border border-white/10 rounded-xl p-4 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-semibold text-zinc-400 uppercase mb-2">
+                    Select Movies
+                  </p>
+                  {eligibleMovies.length === 0 ? (
+                    <p className="text-sm text-zinc-500">No eligible movies.</p>
+                  ) : (
+                    eligibleMovies.map((movie) => (
+                      <label
+                        key={movie.id}
+                        className="flex items-center gap-2 py-1 text-sm text-zinc-300 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={movieIds.includes(movie.id)}
+                          onChange={() => toggleId("movie_ids", movie.id)}
+                        />
+                        {movie.title}
+                      </label>
+                    ))
+                  )}
                 </div>
               )}
 

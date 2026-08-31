@@ -15,6 +15,7 @@ import {
 import { extractApiError } from "@/lib/apiErrors";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
+import VenueProfileLayoutSummary from "@/components/venue/VenueProfileLayoutSummary";
 
 const VenueLayoutBuilder = dynamic(
   () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
@@ -56,6 +57,9 @@ export default function AdminVenueLayoutBuilderPage() {
   const zones = useMemo(() => specZones(request?.spec_json), [request]);
   const images = useMemo(() => specImages(request?.spec_json), [request]);
   const notes = typeof request?.spec_json?.notes === "string" ? request.spec_json.notes : "";
+  const venueMetaSnapshot = request?.spec_json?.venue_meta_snapshot as
+    | Record<string, unknown>
+    | undefined;
   const templates = request?.templates ?? [];
 
   const sections = zones.map((zone, idx) => ({
@@ -142,7 +146,16 @@ export default function AdminVenueLayoutBuilderPage() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Venue notes</p>
-            <p className="text-sm text-zinc-300">{notes || "No extra notes."}</p>
+            <p className="text-sm text-zinc-300 whitespace-pre-line">{notes || "No extra notes."}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <VenueProfileLayoutSummary
+              compact
+              venueMeta={request.venue_meta}
+              venueTypeSlug={request.venue_type_slug}
+              venueTypeName={request.venue_type_name}
+              specSnapshot={venueMetaSnapshot}
+            />
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Requested zones</p>

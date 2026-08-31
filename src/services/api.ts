@@ -114,6 +114,7 @@ export interface Business {
   documents?: PartnerDocumentUpload[];
   registration_terms_accepted_at?: string | null;
   registration_terms_version?: string | null;
+  venue_meta?: Record<string, unknown> | null;
   approval_status?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   approval_notes?: string | null;
   approved_at?: string | null;
@@ -214,6 +215,9 @@ export interface BusinessSettings {
   amenities?: string[];
   average_cost?: number;
   collection_ids?: number[];
+  venue_meta?: Record<string, unknown> | null;
+  venue_type_slug?: string | null;
+  venue_type_name?: string | null;
 }
 
 export interface VenueLayoutRequest {
@@ -249,6 +253,9 @@ export interface VenueLayoutRequest {
   approved_count?: number;
   rejected_count?: number;
   rejection_reason?: string | null;
+  venue_meta?: Record<string, unknown> | null;
+  venue_type_slug?: string | null;
+  venue_type_name?: string | null;
 }
 
 export interface VenueLayoutTemplate {
@@ -303,6 +310,9 @@ export interface VenueLayoutRequest {
   approved_count?: number;
   rejected_count?: number;
   rejection_reason?: string | null;
+  venue_meta?: Record<string, unknown> | null;
+  venue_type_slug?: string | null;
+  venue_type_name?: string | null;
 }
 
 export interface VenueLayoutTemplate {
@@ -577,6 +587,7 @@ export interface CityMaster {
   slug?: string;
   state?: string | null;
   country?: string | null;
+  country_id?: number | null;
   icon_url?: string | null;
   is_popular: boolean;
   is_active: boolean;
@@ -1844,6 +1855,8 @@ export const api = createApi({
         collection_ids?: number[];
         registration_terms_accepted?: boolean;
         registration_terms_version?: string;
+        city_id?: number | null;
+        venue_meta?: Record<string, unknown> | null;
       }
     >({
       query: (body) => ({
@@ -2066,11 +2079,12 @@ export const api = createApi({
       providesTags: [{ type: 'DiningMasters', id: 'PUBLIC_LIST' }],
     }),
 
-    getCities: builder.query<CityMaster[], { q?: string; popular?: boolean } | void>({
+    getCities: builder.query<CityMaster[], { q?: string; popular?: boolean; country_id?: number } | void>({
       query: (params) => {
         const sp = new URLSearchParams();
         if (params?.q) sp.set('q', params.q);
         if (params?.popular) sp.set('popular', 'true');
+        if (params?.country_id) sp.set('country_id', String(params.country_id));
         const qs = sp.toString();
         return `/cities${qs ? `?${qs}` : ''}`;
       },

@@ -10,8 +10,23 @@ export function resolveMediaUrl(url?: string | null): string {
   return url;
 }
 
+/** Store uploads as /uploads/... paths when possible (stable across hosts). */
+export function normalizeUploadPath(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+  if (url.startsWith('/uploads/')) return url;
+  if (url.startsWith('uploads/')) return `/${url}`;
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.startsWith('/uploads/')) return parsed.pathname;
+  } catch {
+    /* relative or invalid */
+  }
+  return url;
+}
+
 export function extractUploadUrl(payload: unknown): string {
   if (!payload || typeof payload !== 'object') return '';
   const record = payload as { url?: string; data?: { url?: string } };
-  return resolveMediaUrl(record.url || record.data?.url || '');
+  return normalizeUploadPath(record.url || record.data?.url || '');
 }

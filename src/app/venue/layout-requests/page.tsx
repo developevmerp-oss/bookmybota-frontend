@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Eye, ImagePlus, Plus, Trash2, Upload, X } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -8,6 +9,7 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import {
   useApproveVenueLayoutTemplateMutation,
   useCreateVenueLayoutRequestMutation,
+  useGetBusinessSettingsQuery,
   useGetVenueLayoutRequestsQuery,
   useGetVenueLayoutTemplateQuery,
   useGetVenueLayoutTemplatesQuery,
@@ -16,8 +18,12 @@ import {
   type VenueLayoutRequest,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
-import { extractUploadUrl, resolveMediaUrl } from "@/lib/mediaUrl";
+import { extractUploadUrl, normalizeUploadPath, resolveMediaUrl } from "@/lib/mediaUrl";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
+import {
+  buildLayoutRequestDefaults,
+  buildVenueMetaSnapshot,
+} from "@/lib/venueLayoutRequestHelpers";
 
 type ZoneRow = { name: string; capacity: string };
 type SaveMode = "draft" | "submit" | null;
@@ -73,6 +79,7 @@ export default function VenueLayoutRequestsPage() {
   }, [dispatch]);
 
   const bizId = user?.business_id ?? "";
+  const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const { data: requests = [], isLoading } = useGetVenueLayoutRequestsQuery(bizId, { skip: !bizId });
   const { data: layoutOptions = [], isLoading: loadingOptions } = useGetVenueLayoutTemplatesQuery(bizId, { skip: !bizId });
   const [createRequest] = useCreateVenueLayoutRequestMutation();
@@ -101,20 +108,34 @@ export default function VenueLayoutRequestsPage() {
   );
 
   const totalZoneCapacity = useMemo(() => zoneTotal(zones), [zones]);
+  const profileDefaults = useMemo(() => buildLayoutRequestDefaults(settings), [settings]);
+  const prefilledFromProfile = useRef(false);
   const busy = saveMode !== null;
+
+  const applyProfileDefaults = () => {
+    const defaults = buildLayoutRequestDefaults(settings);
+    setHallName(defaults.hallName);
+    setHallDescription(defaults.hallDescription);
+    setHallCapacity(defaults.hallCapacity);
+    setLayoutName(defaults.layoutName);
+    setLayoutType(defaults.layoutType);
+    setCapacity(defaults.capacity);
+    setZones(defaults.zones);
+    setNotes(defaults.notes);
+    setIsIndoor(defaults.isIndoor);
+    setReferenceImages(defaults.referenceImages);
+  };
+
+  useEffect(() => {
+    if (!settings || editingRequestId || prefilledFromProfile.current) return;
+    applyProfileDefaults();
+    prefilledFromProfile.current = true;
+  }, [settings, editingRequestId]);
 
   const resetForm = () => {
     setEditingRequestId(null);
-    setHallName(emptyForm.hallName);
-    setHallDescription(emptyForm.hallDescription);
-    setHallCapacity(emptyForm.hallCapacity);
-    setLayoutName(emptyForm.layoutName);
-    setLayoutType(emptyForm.layoutType);
-    setCapacity(emptyForm.capacity);
-    setZones([{ name: "", capacity: "" }]);
-    setNotes(emptyForm.notes);
-    setIsIndoor(emptyForm.isIndoor);
-    setReferenceImages([]);
+    prefilledFromProfile.current = false;
+    applyProfileDefaults();
   };
 
   const loadRequestIntoForm = (request: VenueLayoutRequest) => {
@@ -134,6 +155,7 @@ export default function VenueLayoutRequestsPage() {
     setNotes(specString(spec, "notes"));
     setIsIndoor(request.hall_is_indoor !== false && spec.is_indoor !== false);
     setReferenceImages(specImages(spec));
+    prefilledFromProfile.current = true;
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -148,8 +170,13 @@ export default function VenueLayoutRequestsPage() {
     notes: notes.trim(),
     reference_images: referenceImages
       .filter((url) => !url.startsWith("blob:"))
-      .map((url) => resolveMediaUrl(url)),
+      .map((url) => normalizeUploadPath(url)),
     intake_mode: "structured_request",
+    venue_meta_snapshot: buildVenueMetaSnapshot(settings),
+    sellable_capacity: profileDefaults.sellableCapacity,
+    gross_capacity: profileDefaults.grossCapacity,
+    venue_type_slug: settings?.venue_type_slug || null,
+    venue_type_name: settings?.venue_type_name || null,
   });
 
   const validate = (mode: SaveMode) => {
@@ -173,6 +200,14 @@ export default function VenueLayoutRequestsPage() {
       const filledZones = zones.filter((zone) => zone.name.trim() && Number(zone.capacity) > 0);
       if (filledZones.length === 0) {
         toast.error("Add at least one section or zone with seating capacity.");
+        return false;
+      }
+      const sellable =
+        profileDefaults.sellableCapacity ?? (Number(capacity) || 0);
+      if (sellable > 0 && totalZoneCapacity > sellable) {
+        toast.error(
+          `Zone total (${totalZoneCapacity}) exceeds sellable capacity (${sellable}). Reduce zones or update your venue profile.`
+        );
         return false;
       }
     }
@@ -222,17 +257,19 @@ export default function VenueLayoutRequestsPage() {
     }));
     setReferenceImages((prev) => [...prev, ...pending.map((item) => item.preview)]);
     try {
+      const replacements = new Map<string, string>();
       for (const item of pending) {
         const formData = new FormData();
         formData.append("image", item.file);
         const res = await uploadImage(formData).unwrap();
-        const url = extractUploadUrl(res);
-        if (!url) throw new Error("Upload returned no image URL.");
-        setReferenceImages((prev) =>
-          prev.map((entry) => (entry === item.preview ? url : entry))
-        );
-        URL.revokeObjectURL(item.preview);
+        const url = normalizeUploadPath(res.url || extractUploadUrl(res));
+        if (!url || url.startsWith("blob:")) throw new Error("Upload returned no image URL.");
+        replacements.set(item.preview, url);
       }
+      setReferenceImages((prev) => prev.map((entry) => replacements.get(entry) ?? entry));
+      window.setTimeout(() => {
+        for (const item of pending) URL.revokeObjectURL(item.preview);
+      }, 250);
       toast.success(list.length === 1 ? "Reference image uploaded" : `${list.length} images uploaded`);
     } catch (err: unknown) {
       setReferenceImages((prev) => prev.filter((entry) => !pending.some((item) => item.preview === entry)));
@@ -246,9 +283,36 @@ export default function VenueLayoutRequestsPage() {
       <div>
         <h2 className="text-2xl font-bold text-white">Layout requests</h2>
         <p className="text-zinc-400 mt-1">
-          Describe the hall, add zones with seating capacity, and attach reference images. Super Admin uses this to build the reusable layout.
+          Your venue profile details (sections, rows, stage, balcony, damaged seats) are used to pre-fill this request.
+          Super Admin uses it to build the reusable seating layout.
         </p>
       </div>
+
+      {!profileDefaults.profileComplete && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Complete your{" "}
+          <Link href="/venue/profile" className="font-semibold underline hover:text-amber-50">
+            venue profile
+          </Link>{" "}
+          first (sections, rows, seats per row, capacity) so layout requests are pre-filled accurately.
+        </div>
+      )}
+
+      {profileDefaults.profileComplete && !editingRequestId && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          Pre-filled from your venue profile
+          {profileDefaults.sellableCapacity != null ? (
+            <>
+              {" "}
+              · sellable capacity <strong>{profileDefaults.sellableCapacity}</strong>
+              {profileDefaults.grossCapacity != null && profileDefaults.grossCapacity !== profileDefaults.sellableCapacity
+                ? ` (${profileDefaults.grossCapacity} gross)`
+                : ""}
+            </>
+          ) : null}
+          . Review zones and images, then submit for Super Admin.
+        </div>
+      )}
 
       <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
         <div className="px-6 py-5 border-b border-white/10">
@@ -343,7 +407,19 @@ export default function VenueLayoutRequestsPage() {
                 <p className="text-xs text-zinc-500 mt-1">Add each zone with its own seating capacity.</p>
               </div>
               {totalZoneCapacity > 0 && (
-                <span className="text-xs font-medium text-zinc-400">Zone total: {totalZoneCapacity}</span>
+                <span
+                  className={`text-xs font-medium ${
+                    profileDefaults.sellableCapacity != null &&
+                    totalZoneCapacity > profileDefaults.sellableCapacity
+                      ? "text-rose-400"
+                      : "text-zinc-400"
+                  }`}
+                >
+                  Zone total: {totalZoneCapacity}
+                  {profileDefaults.sellableCapacity != null
+                    ? ` / ${profileDefaults.sellableCapacity} sellable`
+                    : ""}
+                </span>
               )}
             </div>
             <div className="rounded-xl border border-white/10 overflow-hidden">
@@ -437,7 +513,11 @@ export default function VenueLayoutRequestsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {referenceImages.map((url, idx) => (
                   <div key={`${url}-${idx}`} className="relative group rounded-xl overflow-hidden border border-white/10 bg-white">
-                    <img src={resolveMediaUrl(url)} alt={`Reference ${idx + 1}`} className="w-full h-28 object-cover" />
+                    <img
+                      src={resolveMediaUrl(url)}
+                      alt={`Reference ${idx + 1}`}
+                      className="w-full h-28 object-contain bg-slate-100 p-1"
+                    />
                     <button
                       type="button"
                       onClick={() => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -13,6 +14,13 @@ import {
 } from "@/services/api";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
+import VenueMetaFields from "@/components/VenueAdminPanel/VenueMetaFields";
+import VenueLocationFields from "@/components/VenueAdminPanel/VenueLocationFields";
+import {
+  defaultVenueMeta,
+  VENUE_TYPE_LABELS,
+  type VenueMeta,
+} from "@/lib/venueCategoryConfig";
 
 export default function VenueProfilePage() {
   const dispatch = useAppDispatch();
@@ -32,6 +40,16 @@ export default function VenueProfilePage() {
   const [phoneValid, setPhoneValid] = useState(true);
   const [description, setDescription] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [countryId, setCountryId] = useState<number | "">("");
+  const [cityId, setCityId] = useState<number | "">("");
+  const [venueMeta, setVenueMeta] = useState<VenueMeta>(() => defaultVenueMeta());
+
+  const venueTypeSlug = settings?.venue_type_slug || "";
+  const venueTypeLabel =
+    settings?.venue_type_name ||
+    VENUE_TYPE_LABELS[venueTypeSlug] ||
+    venueTypeSlug ||
+    "Venue";
 
   useEffect(() => {
     if (!settings) return;
@@ -40,21 +58,71 @@ export default function VenueProfilePage() {
     setPhone(settings.phone || "");
     setDescription(settings.description || "");
     setCoverImageUrl(settings.cover_image_url || "");
+    setCityId(settings.city_id ?? "");
+    const meta =
+      settings.venue_meta && typeof settings.venue_meta === "object"
+        ? (settings.venue_meta as VenueMeta)
+        : defaultVenueMeta();
+    setVenueMeta(meta);
+    setCountryId(meta.registration?.country_id ?? "");
   }, [settings]);
+
+  const contactName = useMemo(() => {
+    const match = description.match(/Contact person:\s*(.+)/i);
+    return match?.[1]?.trim() || "";
+  }, [description]);
 
   if (isLoading || !user) {
     return <div className="text-white p-10 text-center">Loading venue profile...</div>;
   }
+
+  const saveProfile = async () => {
+    try {
+      await updateSettings({
+        bizId,
+        body: {
+          name,
+          address,
+          phone,
+          description,
+          cover_image_url: coverImageUrl || "",
+          city_id: cityId ? Number(cityId) : null,
+          venue_meta: {
+            ...venueMeta,
+            registration: {
+              country_id: countryId ? Number(countryId) : null,
+            },
+          },
+        },
+      }).unwrap();
+      toast.success("Venue profile saved");
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to save profile"));
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white">Venue profile</h2>
         <p className="text-zinc-400 mt-1">
-          Basic venue information used by Super Admin during approval and later layout setup.
+          Basic venue information and {venueTypeLabel.toLowerCase()}-specific details used for
+          layouts, approvals, and event linking.
         </p>
+        <Link
+          href="/venue/layout-requests"
+          className="inline-block mt-2 text-sm font-medium text-amber-400 hover:text-amber-300"
+        >
+          Request a seating layout from these details →
+        </Link>
       </div>
-      <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
+
+      <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Venue type</p>
+          <p className="text-white font-medium mt-1">{venueTypeLabel}</p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-zinc-400 mb-2">Cover image</label>
           <CroppedImageField
@@ -87,6 +155,7 @@ export default function VenueProfilePage() {
             }
           />
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-2">Venue name</label>
@@ -102,8 +171,9 @@ export default function VenueProfilePage() {
             required={false}
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">Address</label>
+          <label className="block text-sm font-medium text-zinc-400 mb-2">Venue address</label>
           <textarea
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -111,6 +181,22 @@ export default function VenueProfilePage() {
             rows={2}
           />
         </div>
+
+        <VenueLocationFields
+          variant="dark"
+          countryId={countryId}
+          cityId={cityId}
+          onCountryChange={setCountryId}
+          onCityChange={setCityId}
+        />
+
+        {contactName ? (
+          <div>
+            <label className="block text-sm font-medium text-zinc-400 mb-2">Contact person</label>
+            <p className="text-sm text-zinc-300">{contactName}</p>
+          </div>
+        ) : null}
+
         <div>
           <label className="block text-sm font-medium text-zinc-400 mb-2">Description</label>
           <textarea
@@ -120,25 +206,24 @@ export default function VenueProfilePage() {
             rows={4}
           />
         </div>
-        <div className="flex justify-end">
+      </div>
+
+      <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Venue-specific details</h3>
+          <p className="text-sm text-zinc-400 mt-1">
+            Capacity, seating layout, zones, and blueprint uploads for your {venueTypeLabel.toLowerCase()}.
+          </p>
+        </div>
+        <VenueMetaFields
+          variant="dark"
+          venueTypeSlug={venueTypeSlug}
+          value={venueMeta}
+          onChange={setVenueMeta}
+        />
+        <div className="flex justify-end pt-2">
           <button
-            onClick={async () => {
-              try {
-                await updateSettings({
-                  bizId,
-                  body: {
-                    name,
-                    address,
-                    phone,
-                    description,
-                    cover_image_url: coverImageUrl || "",
-                  },
-                }).unwrap();
-                toast.success("Venue profile saved");
-              } catch {
-                toast.error("Failed to save profile");
-              }
-            }}
+            onClick={() => void saveProfile()}
             disabled={saving || !phoneValid}
             className="btn-primary disabled:opacity-50"
           >

@@ -62,6 +62,10 @@ import {
   toTimeInput,
 } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  getTicketCapacitySummary,
+  validateShowtimeTickets,
+} from "@/lib/eventTicketLayoutValidation";
 import ImageCropPicker, { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import EventStepperNav, {
   type EventStepperStepId,
@@ -600,6 +604,25 @@ function SeatingLayoutFields({
   );
   const showTemplateLoading = (templateLoading || templateFetching) && !templateDetail;
 
+  useEffect(() => {
+    if (layoutMode === "standard" && selectedLayout?.capacity != null) {
+      setValue(`showtimes.${index}.layout_capacity_snapshot`, Number(selectedLayout.capacity) || null, {
+        shouldDirty: false,
+      });
+    } else if (layoutMode !== "standard") {
+      setValue(`showtimes.${index}.layout_capacity_snapshot`, null, { shouldDirty: false });
+      setValue(`showtimes.${index}.layout_seat_count_snapshot`, null, { shouldDirty: false });
+    }
+  }, [layoutMode, selectedLayout, index, setValue]);
+
+  useEffect(() => {
+    if (layoutMode !== "standard" || !templateDetail) return;
+    const seatCount = Number((templateDetail as { seat_count?: number }).seat_count);
+    if (Number.isFinite(seatCount) && seatCount > 0) {
+      setValue(`showtimes.${index}.layout_seat_count_snapshot`, seatCount, { shouldDirty: false });
+    }
+  }, [layoutMode, templateDetail, index, setValue]);
+
   /** Prefer default published layout when switching to Standard. */
   useEffect(() => {
     if (readOnly || !isRegisteredPartner || layoutMode !== "standard") return;
@@ -1020,6 +1043,49 @@ function VenueBlock({
   const venueAddress = watch(`showtimes.${index}.venue_address`) || "";
   const cityId = watch(`showtimes.${index}.city_id`);
   const venueSource = watch(`showtimes.${index}.venue_source`) || "manual";
+  const layoutMode = watch(`showtimes.${index}.layout_mode`) || "none";
+  const customLayoutCapacity = watch(`showtimes.${index}.custom_layout_capacity`);
+  const layoutCapacitySnapshot = watch(`showtimes.${index}.layout_capacity_snapshot`);
+  const layoutSeatCountSnapshot = watch(`showtimes.${index}.layout_seat_count_snapshot`);
+  const ticketTypes = watch(`showtimes.${index}.ticket_types`) || [];
+  const ticketCapacitySummary = useMemo(
+    () =>
+      getTicketCapacitySummary({
+        venue_name: venueName,
+        layout_mode: layoutMode,
+        custom_layout_capacity: customLayoutCapacity,
+        layout_capacity_snapshot: layoutCapacitySnapshot,
+        layout_seat_count_snapshot: layoutSeatCountSnapshot,
+        ticket_types: ticketTypes,
+      }),
+    [
+      venueName,
+      layoutMode,
+      customLayoutCapacity,
+      layoutCapacitySnapshot,
+      layoutSeatCountSnapshot,
+      ticketTypes,
+    ]
+  );
+  const ticketValidationMessage = useMemo(
+    () =>
+      validateShowtimeTickets({
+        venue_name: venueName,
+        layout_mode: layoutMode,
+        custom_layout_capacity: customLayoutCapacity,
+        layout_capacity_snapshot: layoutCapacitySnapshot,
+        layout_seat_count_snapshot: layoutSeatCountSnapshot,
+        ticket_types: ticketTypes,
+      }),
+    [
+      venueName,
+      layoutMode,
+      customLayoutCapacity,
+      layoutCapacitySnapshot,
+      layoutSeatCountSnapshot,
+      ticketTypes,
+    ]
+  );
   const [addingNewVenue, setAddingNewVenue] = useState(false);
   const [addModeInitialized, setAddModeInitialized] = useState(false);
 
@@ -1208,23 +1274,62 @@ function VenueBlock({
       )}
 
       <div className="space-y-3 pt-2 border-t border-slate-200">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-slate-800">Ticket types for this venue</p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Ticket types for this venue</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Total seats across all types must fit within the layout capacity when a layout is selected.
+            </p>
+          </div>
           {!readOnly && (
             <button
               type="button"
               onClick={() => append(defaultTicketType())}
-              className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
+              className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1 shrink-0"
             >
               <Plus size={14} /> Add type
             </button>
           )}
         </div>
+
+        {(layoutMode === "standard" || layoutMode === "custom") && (
+          <div
+            className={`rounded-lg border px-3 py-2.5 text-xs ${
+              ticketCapacitySummary.overCapacity
+                ? "border-rose-200 bg-rose-50 text-rose-800"
+                : ticketCapacitySummary.layoutCapacity != null
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+          >
+            {layoutMode === "standard" && ticketCapacitySummary.layoutCapacity == null ? (
+              <p>Select a published layout above to see seat capacity limits.</p>
+            ) : layoutMode === "custom" && ticketCapacitySummary.layoutCapacity == null ? (
+              <p>Enter expected capacity in the custom layout section above.</p>
+            ) : (
+              <p>
+                Layout capacity: <strong>{ticketCapacitySummary.layoutCapacity}</strong>
+                {" · "}
+                Tickets allocated: <strong>{ticketCapacitySummary.totalTickets}</strong>
+                {ticketCapacitySummary.remaining != null ? (
+                  <>
+                    {" · "}
+                    Remaining: <strong>{ticketCapacitySummary.remaining}</strong>
+                  </>
+                ) : null}
+              </p>
+            )}
+            {ticketValidationMessage ? (
+              <p className="mt-1 font-medium">{ticketValidationMessage}</p>
+            ) : null}
+          </div>
+        )}
+
         {ticketFields.length === 0 && (
           <p className="text-xs text-slate-500">No ticket type selected yet. Click Add type to create one.</p>
         )}
         {ticketFields.map((field, ti) => (
-          <div key={field.id} className="grid sm:grid-cols-3 gap-3 items-start">
+          <div key={field.id} className="grid sm:grid-cols-4 gap-3 items-start rounded-lg border border-slate-200 bg-white p-3">
             <div>
               <label className={labelClass}>Type name</label>
               <input
@@ -1244,20 +1349,36 @@ function VenueBlock({
                 {...register(`showtimes.${index}.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
               />
             </div>
+            <div>
+              <label className={labelClass}>Price (ETB)</label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={0}
+                step="0.01"
+                className={inputClass}
+                {...register(`showtimes.${index}.ticket_types.${ti}.price`, { valueAsNumber: true })}
+              />
+            </div>
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className={labelClass}>Price (ETB)</label>
+                <label className={labelClass}>Max per order</label>
                 <input
                   disabled={readOnly}
                   type="number"
-                  min={0}
-                  step="0.01"
+                  min={1}
                   className={inputClass}
-                  {...register(`showtimes.${index}.ticket_types.${ti}.price`, { valueAsNumber: true })}
+                  {...register(`showtimes.${index}.ticket_types.${ti}.max_per_order`, {
+                    valueAsNumber: true,
+                  })}
                 />
               </div>
               {!readOnly && (
-                <button type="button" onClick={() => remove(ti)} className="p-2.5 text-slate-400 hover:text-rose-600 self-end">
+                <button
+                  type="button"
+                  onClick={() => remove(ti)}
+                  className="p-2.5 text-slate-400 hover:text-rose-600 self-end"
+                >
                   <Trash2 size={16} />
                 </button>
               )}

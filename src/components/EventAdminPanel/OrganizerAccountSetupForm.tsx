@@ -19,6 +19,8 @@ import {
   useUploadImageMutation,
   type PartnerDocumentUpload,
 } from "@/services/api";
+import VenueLocationFields from "@/components/VenueAdminPanel/VenueLocationFields";
+import { CANONICAL_VENUE_TYPE_SLUGS, defaultVenueMeta, type VenueMeta } from "@/lib/venueCategoryConfig";
 
 type StepId = 1 | 2;
 
@@ -145,6 +147,9 @@ export default function OrganizerAccountSetupForm({
   const [phoneValid, setPhoneValid] = useState(false);
   const [subtypeId, setSubtypeId] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [countryId, setCountryId] = useState<number | "">("");
+  const [cityId, setCityId] = useState<number | "">("");
+  const [venueMeta, setVenueMeta] = useState<VenueMeta>(() => defaultVenueMeta());
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -164,6 +169,7 @@ export default function OrganizerAccountSetupForm({
     if (!needsSubtype || moduleParentId == null) return [];
     return businessTypes
       .filter((t) => t.module_key === module && t.parent_type_id === moduleParentId)
+      .filter((t) => module !== "venue" || CANONICAL_VENUE_TYPE_SLUGS.has(String(t.slug || "").toLowerCase()))
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [businessTypes, module, moduleParentId, needsSubtype]);
@@ -179,7 +185,7 @@ export default function OrganizerAccountSetupForm({
   }, [needsSubtype, subtypeId, subtypeOptions]);
 
   const step1Valid = useMemo(() => {
-    return (
+    const base =
       !!moduleParentId &&
       (!needsSubtype || !!subtypeId) &&
       orgName.trim().length > 1 &&
@@ -188,8 +194,11 @@ export default function OrganizerAccountSetupForm({
       phoneValid &&
       !!adminEmail.trim() &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim()) &&
-      (module !== "artist" || !!coverImageUrl.trim())
-    );
+      (module !== "artist" || !!coverImageUrl.trim());
+    if (module === "venue") {
+      return base && !!countryId && !!cityId;
+    }
+    return base;
   }, [
     moduleParentId,
     needsSubtype,
@@ -201,6 +210,8 @@ export default function OrganizerAccountSetupForm({
     adminEmail,
     module,
     coverImageUrl,
+    countryId,
+    cityId,
   ]);
 
   const canOpenStep = (id: StepId) => (id === 1 ? true : step1Done);
@@ -296,6 +307,17 @@ export default function OrganizerAccountSetupForm({
         cover_image_url: coverImageUrl.trim() || undefined,
         registration_terms_accepted: true,
         registration_terms_version: copy.termsVersion,
+        ...(module === "venue"
+          ? {
+              city_id: Number(cityId),
+              venue_meta: {
+                ...venueMeta,
+                registration: {
+                  country_id: countryId ? Number(countryId) : null,
+                },
+              },
+            }
+          : {}),
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
@@ -400,7 +422,7 @@ export default function OrganizerAccountSetupForm({
                       <option value="">
                         {module === "artist"
                           ? "Select artist type (e.g. Singer, Band)"
-                          : "Select venue type (e.g. Banquet Hall, Auditorium)"}
+                          : "Select venue type (e.g. Stadium, Auditorium / Theatre)"}
                       </option>
                       {subtypeOptions.map((t) => (
                         <option key={t.id} value={t.id}>
@@ -440,6 +462,14 @@ export default function OrganizerAccountSetupForm({
                     rows={3}
                   />
                 </div>
+                {module === "venue" && (
+                  <VenueLocationFields
+                    countryId={countryId}
+                    cityId={cityId}
+                    onCountryChange={setCountryId}
+                    onCityChange={setCityId}
+                  />
+                )}
                 {(module === "artist" || module === "venue") && (
                   <div>
                     <label className={labelClass}>

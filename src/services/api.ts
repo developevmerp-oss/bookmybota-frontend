@@ -871,6 +871,7 @@ export interface EventArtistItem {
   role_title?: string | null;
   description?: string | null;
   image_url?: string | null;
+  documents?: any[];
   sort_order?: number;
 }
 

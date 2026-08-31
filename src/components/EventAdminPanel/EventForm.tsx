@@ -180,8 +180,8 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
         role_title: normalizeLineupRole(a.role_title),
         description: a.description || "",
         image_url: a.image_url || a.artist_business_image || "",
-        documents: Array.isArray(a.documents)
-          ? a.documents.map((d) => ({
+        documents: Array.isArray((a as any).documents)
+          ? (a as any).documents.map((d: any) => ({
               document_type_id: Number(d.document_type_id) || 0,
               url: String(d.url || ""),
               document_name: String(d.document_name || ""),

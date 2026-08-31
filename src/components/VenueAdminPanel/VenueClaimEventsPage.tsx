@@ -13,7 +13,7 @@ export default function VenueClaimEventsPage() {
   const [businessId, setBusinessId] = useState<string | null>(null);
   useEffect(() => {
     const session = readSessionForRole("venue_admin");
-    setBusinessId(session?.business_id || null);
+    setBusinessId(session?.user?.business_id || null);
   }, []);
 
   const { data: showtimes = [], isLoading, refetch } = useGetVenueClaimableShowtimesQuery(businessId!, {

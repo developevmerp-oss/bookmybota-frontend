@@ -83,7 +83,7 @@ export default function CategoryNavBar() {
                     activeSlug.includes(item.key) ||
                     q === item.key);
             return (
-              <Link key={item.label} href={href} className={linkClass(active)}>
+              <Link key={item.label} href={href as string} className={linkClass(active)}>
                 {item.label}
                 {active && (
                   <span className="absolute left-0 right-0 -bottom-1.5 h-[2px] bg-[#6900AA]" />

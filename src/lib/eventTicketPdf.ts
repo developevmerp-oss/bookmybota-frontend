@@ -134,7 +134,7 @@ function drawWrappedText(
   lineHeight: number
 ): number {
   const lines = doc.splitTextToSize(text || "—", maxWidth);
-  lines.forEach((line, i) => doc.text(line, x, y + i * lineHeight));
+  lines.forEach((line: string, i: number) => doc.text(line, x, y + i * lineHeight));
   return y + lines.length * lineHeight;
 }
 

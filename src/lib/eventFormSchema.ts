@@ -470,11 +470,9 @@ export function getCompletedEventStepIds(opts: {
   }
 
   if (isSports) {
-    const sport =
-      values.category_meta &&
-      typeof values.category_meta === 'object' &&
-      (values.category_meta as { sport?: { home_team?: string; away_team?: string } }).sport;
-    if (sport?.home_team?.trim() && sport?.away_team?.trim() && (values.genres || []).length > 0) {
+    const meta = values.category_meta as Record<string, any> | undefined;
+    const sport = meta && typeof meta === 'object' ? meta.sport : undefined;
+    if (sport && typeof sport === 'object' && sport.home_team?.trim() && sport.away_team?.trim() && (values.genres || []).length > 0) {
       done.push('sport');
     }
   }

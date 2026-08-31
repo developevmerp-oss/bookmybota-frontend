@@ -10,7 +10,7 @@ interface PaginationProps {
   meta: PaginationMeta;
   onPageChange: (page: number) => void;
   onLimitChange?: (limit: number) => void;
-  pageSizeOptions?: number[];
+  pageSizeOptions?: readonly number[];
   disabled?: boolean;
   className?: string;
 }

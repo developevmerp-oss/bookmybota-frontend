@@ -29,7 +29,6 @@ export default function Home() {
 
   return (
     <div className=" bg-white text-[#111111] overflow-x-hidden">
-      {/* Hero + category tiles — tiles keep fixed aspect; do not stretch when banner is hidden */}
       <div className="flex flex-col">
         <PromoBannerCarousel city={city} />
         <LiveCategoryTiles city={city} />

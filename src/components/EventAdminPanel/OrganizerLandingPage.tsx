@@ -120,28 +120,28 @@ const SERVICES = [
     blurb: "Flexible ticket tiers and offers so you stay in control of revenue.",
   },
   {
-    label: "Food & Beverages",
+    label: "Food & beverages, stalls and the works!",
     infoId: "organizer.service.fnb",
     Icon: Truck,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/food.png",
     blurb: "Coordinate F&B, stalls and add-ons alongside ticket sales.",
   },
   {
-    label: "On-ground Support",
+    label: "On ground support & gate entry management",
     infoId: "organizer.service.on-ground",
     Icon: Handshake,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/on-ground-support.png",
     blurb: "Smooth check-in and gate management on event day.",
   },
   {
-    label: "Reports & Insights",
+    label: "Reports & business insights",
     infoId: "organizer.service.reports",
     Icon: BarChart3,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/report.png",
     blurb: "Track sales and performance with clear business reports.",
   },
   {
-    label: "Smart Access Solutions",
+    label: "POS, RFID, Turnstiles & more...",
     infoId: "organizer.service.pos",
     Icon: Smartphone,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/rfids.png",
@@ -185,6 +185,7 @@ export default function OrganizerLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
       expectedRole="event_admin"
       loginTitle="Event Admin Login"
       loginSubtitle="Sign in to manage your events"
@@ -197,16 +198,16 @@ export default function OrganizerLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your show"
-      secondaryLoginLabel="Organizer Login"
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
       slides={FEATURE_SLIDES}
-      hostTitle="What can you host?"
-      hostSubtitle="From local gatherings to global events, Book My Bota helps you create unforgettable experiences across every category."
+      hostTitle="What can you host???"
+      hostSubtitle="As the purveyor of entertainment, Book My Bota enables your event with end to end solutions from the time you register to the completion of the event. Let's look at what you can host."
       hostTiles={HOST_CATEGORIES}
       servicesTitle="What are the services we offer?"
-      servicesSubtitle="Everything you need to run successful events, all in one place."
+      servicesSubtitle="After successful collaborations with the best event organisers over the past decade and a half, we're well equipped to bring your vision to life."
       servicesTiles={SERVICES}
-      servicesFootnote="Apart from these must-haves for any event, we also support a host of other services like SEO for your event, custom pricing for your tickets, and dedicated organizer tools to manage bookings and guest experience."
+      servicesFootnote="Apart from these must haves for any event, we also support a host of other services like SEO for your event, custom pricing for your tickets and this and also this."
       testimonials={TESTIMONIALS}
       securityTitle="Sit back and watch your event come to life"
       securitySubtitle="Events may be all fun and games, but we take it seriously. We ensure our customer's security so that you don't have to."

@@ -194,7 +194,7 @@ export default function SpecialOffersRail() {
   }
 
   return (
-    <section className="bg-white py-6 sm:py-8 lg:py-10">
+    <section id="offers" className="bg-white py-6 sm:py-8 lg:py-10 scroll-mt-28">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <h2 className="type-section font-semibold tracking-tight text-[#111111]">

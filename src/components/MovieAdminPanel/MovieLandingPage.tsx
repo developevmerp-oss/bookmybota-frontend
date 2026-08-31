@@ -75,6 +75,7 @@ export default function MovieLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
       expectedRole="movie_admin"
       loginTitle="Movie Admin Login"
       loginSubtitle="Sign in to manage your cinema listings"
@@ -87,8 +88,8 @@ export default function MovieLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="Register your cinema"
-      secondaryLoginLabel="Movie Admin Login"
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
       slides={FEATURE_SLIDES}
       hostTitle="What can you list?"
       hostSubtitle="From multiplex chains to independent screens, Book My Bota helps cinema partners onboard, get approved, and manage movie listings from one portal."

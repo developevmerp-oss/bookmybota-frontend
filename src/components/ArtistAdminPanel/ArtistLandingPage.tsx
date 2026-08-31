@@ -166,6 +166,7 @@ export default function ArtistLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
       expectedRole="artist_admin"
       loginTitle="Artist Admin Login"
       loginSubtitle="Sign in to manage your artist profile"
@@ -178,8 +179,8 @@ export default function ArtistLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your show"
-      secondaryLoginLabel="Artist Login"
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
       slides={FEATURE_SLIDES}
       hostTitle="What can you host???"
       hostSubtitle="From solo singers to full bands and specialty acts — Book My Bota helps performers get in front of organizers who are building lineups every week."

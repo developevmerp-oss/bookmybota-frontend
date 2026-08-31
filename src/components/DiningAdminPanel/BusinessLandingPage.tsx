@@ -159,6 +159,7 @@ export default function BusinessLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
       expectedRole="business_admin"
       loginTitle="Dining Admin Login"
       loginSubtitle="Sign in to manage your restaurant"
@@ -171,8 +172,8 @@ export default function BusinessLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your restaurant"
-      secondaryLoginLabel="Dining Login"
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
       slides={FEATURE_SLIDES}
       hostTitle="What can you host???"
       hostSubtitle="Book My Bota helps restaurants grow with end-to-end dining tools — from the moment you register to every cover you serve. Let's look at who can partner."

@@ -163,6 +163,7 @@ export default function VenueLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
       expectedRole="venue_admin"
       loginTitle="Venue Admin Login"
       loginSubtitle="Sign in to manage layouts and claim events"
@@ -175,8 +176,8 @@ export default function VenueLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your venue"
-      secondaryLoginLabel="Venue Login"
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
       slides={FEATURE_SLIDES}
       hostTitle="What can you host???"
       hostSubtitle="From auditoriums to banquet halls and outdoor grounds — list your space so organizers can book shows where your guests already gather."

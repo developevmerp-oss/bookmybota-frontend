@@ -193,5 +193,38 @@
   "artist.service.reach": {
     "title": "Cross-city reach",
     "description": "Connect with organizers hosting shows across Book My Bota cities and grow your touring footprint."
+  },
+
+  "list-your-show.host.dining": {
+    "title": "Dining",
+    "description": "Partner your restaurant, café, or bar on Book My Bota. Accept table bookings, run offers, and reach diners browsing dining experiences in their city."
+  },
+  "list-your-show.host.concert": {
+    "title": "Concert",
+    "description": "List live concerts and stage shows. Sell tickets, manage entry, and reach audiences searching for the next big performance."
+  },
+  "list-your-show.host.comedy": {
+    "title": "Comedy",
+    "description": "Host stand-up nights, open mics, and comedy specials. Promote your show to fans looking for a great laugh."
+  },
+  "list-your-show.host.music": {
+    "title": "Music",
+    "description": "From indie gigs to festival stages — list music events, manage bookings, and grow your live music audience."
+  },
+  "list-your-show.host.movie": {
+    "title": "Movie",
+    "description": "List your cinema, publish showtimes, and sell tickets for the latest screenings on Book My Bota."
+  },
+  "list-your-show.host.sports": {
+    "title": "Sports",
+    "description": "Run tournaments, matches, and sporting events. Sell tickets and manage entry for fans ready to cheer."
+  },
+  "list-your-show.host.artist": {
+    "title": "Artist",
+    "description": "Build your artist profile, showcase your talent, and get booked for concerts, gigs, and live performances."
+  },
+  "list-your-show.host.venue": {
+    "title": "Venue",
+    "description": "Partner your venue on Book My Bota. Publish layouts, claim showtimes, and connect with organizers hosting events at your space."
   }
 }

@@ -348,6 +348,8 @@ export interface Movie {
   languages?: string[];
   genres?: string[];
   formats?: string[];
+  cast?: MovieCastCrewMember[];
+  crew?: MovieCastCrewMember[];
   cast_text?: string | null;
   director?: string | null;
   status: 'draft' | 'coming_soon' | 'now_showing' | 'archived';
@@ -579,6 +581,29 @@ export interface DiningCuisineMaster {
   is_active: boolean;
   sort_order: number;
   created_at?: string;
+}
+
+export interface MovieCastCrewMember {
+  name: string;
+  role: string;
+  image_url?: string | null;
+  sort_order?: number;
+}
+
+export interface MovieMasterItem {
+  id: number;
+  name: string;
+  slug?: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
+export interface MovieMastersResponse {
+  languages: MovieMasterItem[];
+  genres: MovieMasterItem[];
+  formats: MovieMasterItem[];
+  crew_roles: MovieMasterItem[];
 }
 
 export interface CityMaster {
@@ -1123,7 +1148,7 @@ export interface PlatformOffer {
   discount_value: number;
   max_discount?: number | null;
   min_order_amount: number;
-  category: 'ALL' | 'EVENTS' | 'DINING';
+  category: 'ALL' | 'EVENTS' | 'DINING' | 'MOVIES';
   apply_to: 'ENTIRE_CATEGORY' | 'SELECTED_ITEMS';
   customer_eligibility: 'ALL' | 'NEW' | 'EXISTING';
   usage_limit?: number | null;
@@ -1137,12 +1162,27 @@ export interface PlatformOffer {
   redemption_count?: number;
   event_ids?: string[];
   restaurant_ids?: string[];
+  movie_ids?: string[];
   discount_label?: string;
   scope_label?: string;
 }
 
 /** Platform offer eligible for a specific dining restaurant + customer */
 export interface DiningEligiblePlatformOffer {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  discount_type: string;
+  discount_value: number;
+  max_discount?: number | null;
+  min_order_amount: number;
+  customer_eligibility: string;
+  discount_label: string;
+}
+
+/** Platform offer eligible for a specific movie + customer */
+export interface MovieEligiblePlatformOffer {
   id: string;
   name: string;
   code: string;
@@ -1680,7 +1720,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'CinemaScreens'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -2730,7 +2770,17 @@ export const api = createApi({
     }),
 
     validateMerchantPromoCode: builder.mutation<
-      { discount_label?: string; promo_code?: string; title?: string; discount_type?: string; discount_value?: number },
+      {
+        discount_label?: string;
+        promo_code?: string;
+        title?: string;
+        discount_type?: string;
+        discount_value?: number;
+        max_discount?: number | null;
+        bill_amount?: number;
+        discount_amount?: number;
+        final_amount?: number;
+      },
       { promo_code: string; bill_amount?: number | null }
     >({
       query: (body) => ({
@@ -2742,6 +2792,12 @@ export const api = createApi({
         discount_label?: string;
         promo_code?: string;
         title?: string;
+        discount_type?: string;
+        discount_value?: number;
+        max_discount?: number | null;
+        bill_amount?: number;
+        discount_amount?: number;
+        final_amount?: number;
       },
     }),
 
@@ -2901,7 +2957,7 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'PlatformOffers', id }],
     }),
 
-    createPlatformOffer: builder.mutation<PlatformOffer, Partial<PlatformOffer> & { event_ids?: string[]; restaurant_ids?: string[] }>({
+    createPlatformOffer: builder.mutation<PlatformOffer, Partial<PlatformOffer> & { event_ids?: string[]; restaurant_ids?: string[]; movie_ids?: string[] }>({
       query: (body) => ({
         url: '/admin/platform-offers',
         method: 'POST',
@@ -2911,7 +2967,7 @@ export const api = createApi({
       invalidatesTags: ['PlatformOffers', 'PublicPlatformOffers'],
     }),
 
-    updatePlatformOffer: builder.mutation<PlatformOffer, Partial<PlatformOffer> & { id: string; event_ids?: string[]; restaurant_ids?: string[] }>({
+    updatePlatformOffer: builder.mutation<PlatformOffer, Partial<PlatformOffer> & { id: string; event_ids?: string[]; restaurant_ids?: string[]; movie_ids?: string[] }>({
       query: ({ id, ...body }) => ({
         url: `/admin/platform-offers/${id}`,
         method: 'PUT',
@@ -2963,6 +3019,16 @@ export const api = createApi({
       transformResponse: (res: { data: Array<{ id: string; name: string }> }) => res.data || [],
     }),
 
+    getOfferEligibleMoviesAdmin: builder.query<
+      Array<{ id: string; title: string; slug?: string; status?: string }>,
+      void
+    >({
+      query: () => '/admin/platform-offers/eligible-movies',
+      transformResponse: (
+        res: { data: Array<{ id: string; title: string; slug?: string; status?: string }> }
+      ) => res.data || [],
+    }),
+
     getActivePlatformOffers: builder.query<PlatformOffer[], void>({
       query: () => '/platform-offers/active',
       transformResponse: (res: { data: PlatformOffer[] }) => res.data || [],
@@ -2979,6 +3045,19 @@ export const api = createApi({
         return `/platform-offers/dining-eligible?${sp.toString()}`;
       },
       transformResponse: (res: { data: DiningEligiblePlatformOffer[] }) => res.data || [],
+      providesTags: ['PublicPlatformOffers'],
+    }),
+
+    getMovieEligiblePlatformOffers: builder.query<
+      MovieEligiblePlatformOffer[],
+      { movie_id: string; guest_phone?: string }
+    >({
+      query: ({ movie_id, guest_phone }) => {
+        const sp = new URLSearchParams({ movie_id });
+        if (guest_phone) sp.set('guest_phone', guest_phone);
+        return `/platform-offers/movies-eligible?${sp.toString()}`;
+      },
+      transformResponse: (res: { data: MovieEligiblePlatformOffer[] }) => res.data || [],
       providesTags: ['PublicPlatformOffers'],
     }),
 
@@ -3118,6 +3197,42 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['DiningWishlist'],
+    }),
+
+    getMovieWishlist: builder.query<Movie[], void>({
+      query: () => '/wishlist/movies',
+      transformResponse: (res: { data: Movie[] }) => res.data || [],
+      providesTags: ['MovieWishlist'],
+    }),
+
+    getMovieWishlistIds: builder.query<string[], void>({
+      query: () => '/wishlist/movies/ids',
+      transformResponse: (res: { data: string[] }) => res.data || [],
+      providesTags: ['MovieWishlist'],
+    }),
+
+    toggleMovieWishlist: builder.mutation<
+      { message?: string; data: { movie_id: string; wishlisted: boolean } },
+      { movie_id: string }
+    >({
+      query: (body) => ({
+        url: '/wishlist/movies/toggle',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['MovieWishlist'],
+    }),
+
+    syncMovieWishlist: builder.mutation<
+      { message?: string; data: { added: number } },
+      { movie_ids: string[] }
+    >({
+      query: (body) => ({
+        url: '/wishlist/movies/sync',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['MovieWishlist'],
     }),
 
     getMyGiftCard: builder.query<GiftCardMine, string>({
@@ -4389,6 +4504,242 @@ export const api = createApi({
       invalidatesTags: [{ type: 'Movies', id: 'LIST' }, { type: 'Movies', id: 'PARTNER_LIST' }, { type: 'Movies', id: 'PUBLIC_LIST' }, { type: 'Movies', id: 'PUBLIC_FILTERS' }, 'Movies'],
     }),
 
+    getPublicMovieMasters: builder.query<MovieMastersResponse, void>({
+      query: () => '/movies/masters',
+      transformResponse: (res: { data?: MovieMastersResponse }) =>
+        res?.data ?? { languages: [], genres: [], formats: [], crew_roles: [] },
+      providesTags: [{ type: 'MovieMasters', id: 'PUBLIC' }],
+    }),
+
+    getAdminMovieLanguages: builder.query<
+      PaginatedList<MovieMasterItem>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/movie-languages${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: MovieMasterItem[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items?.length
+          ? [
+              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `lang-${item.id}` })),
+              { type: 'MovieMasters', id: 'LANGUAGE_LIST' },
+            ]
+          : [{ type: 'MovieMasters', id: 'LANGUAGE_LIST' }],
+    }),
+
+    createAdminMovieLanguage: builder.mutation<
+      MovieMasterItem,
+      { name: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({ url: '/admin/movie-languages', method: 'POST', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'LANGUAGE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+        'MovieMasters',
+      ],
+    }),
+
+    updateAdminMovieLanguage: builder.mutation<
+      MovieMasterItem,
+      { id: number; body: Partial<MovieMasterItem> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/movie-languages/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'MovieMasters', id: `lang-${id}` },
+        { type: 'MovieMasters', id: 'LANGUAGE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+      ],
+    }),
+
+    deleteAdminMovieLanguage: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/movie-languages/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'LANGUAGE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+        'MovieMasters',
+      ],
+    }),
+
+    getAdminMovieGenres: builder.query<
+      PaginatedList<MovieMasterItem>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/movie-genres${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: MovieMasterItem[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items?.length
+          ? [
+              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `genre-${item.id}` })),
+              { type: 'MovieMasters', id: 'GENRE_LIST' },
+            ]
+          : [{ type: 'MovieMasters', id: 'GENRE_LIST' }],
+    }),
+
+    createAdminMovieGenre: builder.mutation<
+      MovieMasterItem,
+      { name: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({ url: '/admin/movie-genres', method: 'POST', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'GENRE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+        'MovieMasters',
+      ],
+    }),
+
+    updateAdminMovieGenre: builder.mutation<
+      MovieMasterItem,
+      { id: number; body: Partial<MovieMasterItem> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/movie-genres/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'MovieMasters', id: `genre-${id}` },
+        { type: 'MovieMasters', id: 'GENRE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+      ],
+    }),
+
+    deleteAdminMovieGenre: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/movie-genres/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'GENRE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+        'MovieMasters',
+      ],
+    }),
+
+    getAdminMovieFormats: builder.query<
+      PaginatedList<MovieMasterItem>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/movie-formats${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: MovieMasterItem[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items?.length
+          ? [
+              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `format-${item.id}` })),
+              { type: 'MovieMasters', id: 'FORMAT_LIST' },
+            ]
+          : [{ type: 'MovieMasters', id: 'FORMAT_LIST' }],
+    }),
+
+    createAdminMovieFormat: builder.mutation<
+      MovieMasterItem,
+      { name: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({ url: '/admin/movie-formats', method: 'POST', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'FORMAT_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+        'MovieMasters',
+      ],
+    }),
+
+    updateAdminMovieFormat: builder.mutation<
+      MovieMasterItem,
+      { id: number; body: Partial<MovieMasterItem> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/movie-formats/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'MovieMasters', id: `format-${id}` },
+        { type: 'MovieMasters', id: 'FORMAT_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+      ],
+    }),
+
+    deleteAdminMovieFormat: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/movie-formats/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'FORMAT_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        { type: 'Movies', id: 'PUBLIC_FILTERS' },
+        'MovieMasters',
+      ],
+    }),
+
+    getAdminMovieCrewRoles: builder.query<
+      PaginatedList<MovieMasterItem>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/movie-crew-roles${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: MovieMasterItem[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items?.length
+          ? [
+              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `crew-role-${item.id}` })),
+              { type: 'MovieMasters', id: 'CREW_ROLE_LIST' },
+            ]
+          : [{ type: 'MovieMasters', id: 'CREW_ROLE_LIST' }],
+    }),
+
+    createAdminMovieCrewRole: builder.mutation<
+      MovieMasterItem,
+      { name: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({ url: '/admin/movie-crew-roles', method: 'POST', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'CREW_ROLE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        'MovieMasters',
+      ],
+    }),
+
+    updateAdminMovieCrewRole: builder.mutation<
+      MovieMasterItem,
+      { id: number; body: Partial<MovieMasterItem> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/movie-crew-roles/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'MovieMasters', id: `crew-role-${id}` },
+        { type: 'MovieMasters', id: 'CREW_ROLE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+      ],
+    }),
+
+    deleteAdminMovieCrewRole: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/movie-crew-roles/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'CREW_ROLE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        'MovieMasters',
+      ],
+    }),
+
     getPartnerMovieCatalog: builder.query<
       PaginatedList<Movie>,
       { q?: string; page?: number; limit?: number } | void
@@ -4448,6 +4799,20 @@ export const api = createApi({
         return res.data;
       },
       providesTags: (_r, _e, idOrSlug) => [{ type: 'Movies', id: `PUBLIC_${idOrSlug}` }],
+    }),
+
+    getRelatedPublicMovies: builder.query<
+      Movie[],
+      { idOrSlug: string; limit?: number }
+    >({
+      query: ({ idOrSlug, limit }) => {
+        const sp = new URLSearchParams();
+        if (limit) sp.set('limit', String(limit));
+        const qs = sp.toString();
+        return `/movies/${encodeURIComponent(idOrSlug)}/related${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: Movie[] }) => res?.data ?? [],
+      providesTags: (_r, _e, arg) => [{ type: 'Movies', id: `RELATED_${arg.idOrSlug}` }],
     }),
 
     getCinemaScreens: builder.query<CinemaScreen[], string>({
@@ -4855,6 +5220,7 @@ export const {
   useGetOfferRedemptionsQuery,
   useGetOfferEligibleEventsAdminQuery,
   useGetOfferEligibleRestaurantsAdminQuery,
+  useGetOfferEligibleMoviesAdminQuery,
   useGetActivePlatformOffersQuery,
   useGetDiningEligiblePlatformOffersQuery,
   useValidatePlatformPromoCodeMutation,
@@ -4871,6 +5237,10 @@ export const {
   useGetDiningWishlistIdsQuery,
   useToggleDiningWishlistMutation,
   useSyncDiningWishlistMutation,
+  useGetMovieWishlistQuery,
+  useGetMovieWishlistIdsQuery,
+  useToggleMovieWishlistMutation,
+  useSyncMovieWishlistMutation,
   useClaimGiftCardMutation,
   usePreviewGiftCardRedeemMutation,
   useMerchantVerifyGiftCardMutation,
@@ -4972,10 +5342,29 @@ export const {
   useCreateAdminMovieMutation,
   useUpdateAdminMovieMutation,
   useDeleteAdminMovieMutation,
+  useGetPublicMovieMastersQuery,
+  useGetAdminMovieLanguagesQuery,
+  useCreateAdminMovieLanguageMutation,
+  useUpdateAdminMovieLanguageMutation,
+  useDeleteAdminMovieLanguageMutation,
+  useGetAdminMovieGenresQuery,
+  useCreateAdminMovieGenreMutation,
+  useUpdateAdminMovieGenreMutation,
+  useDeleteAdminMovieGenreMutation,
+  useGetAdminMovieFormatsQuery,
+  useCreateAdminMovieFormatMutation,
+  useUpdateAdminMovieFormatMutation,
+  useDeleteAdminMovieFormatMutation,
+  useGetAdminMovieCrewRolesQuery,
+  useCreateAdminMovieCrewRoleMutation,
+  useUpdateAdminMovieCrewRoleMutation,
+  useDeleteAdminMovieCrewRoleMutation,
   useGetPartnerMovieCatalogQuery,
   useGetPublicMoviesQuery,
   useGetPublicMovieFiltersQuery,
   useGetPublicMovieQuery,
+  useGetRelatedPublicMoviesQuery,
+  useGetMovieEligiblePlatformOffersQuery,
   useGetCinemaScreensQuery,
   useCreateCinemaScreenMutation,
   useUpdateCinemaScreenMutation,

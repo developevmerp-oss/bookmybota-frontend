@@ -9,6 +9,7 @@ import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { extractApiError } from "@/lib/apiErrors";
 import { PAGE_SIZE } from "@/lib/pagination";
 
 export default function DiningOfferRedemptionsPage() {
@@ -21,7 +22,7 @@ export default function DiningOfferRedemptionsPage() {
     dispatch(loadFromStorage());
   }, [dispatch]);
 
-  const { data, isLoading } = useGetMerchantOfferRedemptionsQuery(
+  const { data, isLoading, isError, error } = useGetMerchantOfferRedemptionsQuery(
     { page, limit: PAGE_SIZE, ...(q.trim() ? { q: q.trim() } : {}) },
     { skip: !user?.business_id }
   );
@@ -111,6 +112,12 @@ export default function DiningOfferRedemptionsPage() {
                 <td colSpan={5} className="p-8 text-center text-zinc-400">
                   <Loader2 className="animate-spin inline mr-2" size={18} />
                   Loading redemptions…
+                </td>
+              </tr>
+            ) : isError ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-rose-400">
+                  {extractApiError(error, "Could not load offer redemptions.")}
                 </td>
               </tr>
             ) : items.length === 0 ? (

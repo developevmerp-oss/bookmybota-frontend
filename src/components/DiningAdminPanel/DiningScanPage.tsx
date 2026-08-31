@@ -18,7 +18,7 @@ import {
   type MerchantGiftCardVerify,
   type MerchantGiftCardPreview,
 } from "@/services/api";
-import { formatDiningOfferDiscount } from "@/lib/diningOffers";
+import { formatDiningOfferDiscount, calculateDiningOfferDiscountAmount } from "@/lib/diningOffers";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
@@ -28,6 +28,75 @@ import PhoneInput from "@/components/Shared/PhoneInput";
 import { sanitizePhoneInput } from "@/lib/validation";
 
 const SCANNER_REGION_ID = "dining-guest-qr-reader";
+
+type PromoBillPreview = {
+  title?: string;
+  discount_label?: string;
+  promo_code?: string;
+  bill_amount: number;
+  discount_amount: number;
+  final_amount: number;
+};
+
+function buildPromoBillPreview(
+  bill: number,
+  result: {
+    title?: string;
+    discount_label?: string;
+    promo_code?: string;
+    discount_type?: string;
+    discount_value?: number;
+    max_discount?: number | null;
+    discount_amount?: number;
+    final_amount?: number;
+  }
+): PromoBillPreview {
+  const discountAmount =
+    result.discount_amount != null && Number.isFinite(Number(result.discount_amount))
+      ? Number(result.discount_amount)
+      : calculateDiningOfferDiscountAmount(bill, result);
+  const finalAmount =
+    result.final_amount != null && Number.isFinite(Number(result.final_amount))
+      ? Number(result.final_amount)
+      : Math.max(0, Math.round((bill - discountAmount) * 100) / 100);
+
+  return {
+    title: result.title,
+    discount_label: result.discount_label,
+    promo_code: result.promo_code,
+    bill_amount: bill,
+    discount_amount: discountAmount,
+    final_amount: finalAmount,
+  };
+}
+
+function OfferBillBreakdown({ preview }: { preview: PromoBillPreview }) {
+  return (
+    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 space-y-1.5">
+      <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Promo validated</p>
+      {preview.title && <p className="text-sm font-semibold text-white">{preview.title}</p>}
+      {preview.discount_label && (
+        <p className="text-xs text-emerald-300">{preview.discount_label}</p>
+      )}
+      <div className="flex justify-between text-sm text-zinc-200 pt-1">
+        <span>Total bill</span>
+        <span className="font-semibold text-white">
+          {formatMoney(preview.bill_amount, { compact: true })}
+        </span>
+      </div>
+      <div className="flex justify-between text-sm text-emerald-300">
+        <span>Discount</span>
+        <span className="font-semibold">
+          −{formatMoney(preview.discount_amount, { compact: true })}
+        </span>
+      </div>
+      <div className="flex justify-between text-sm font-bold text-white pt-1 border-t border-white/10">
+        <span>Guest pays</span>
+        <span>{formatMoney(preview.final_amount, { compact: true })}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function DiningScanPage() {
   const dispatch = useAppDispatch();
@@ -48,11 +117,7 @@ export default function DiningScanPage() {
   const [promoCode, setPromoCode] = useState("");
   const [billAmount, setBillAmount] = useState("");
   const [redemptionNotes, setRedemptionNotes] = useState("");
-  const [promoPreview, setPromoPreview] = useState<{
-    title?: string;
-    discount_label?: string;
-    promo_code?: string;
-  } | null>(null);
+  const [promoPreview, setPromoPreview] = useState<PromoBillPreview | null>(null);
   const [promoValidated, setPromoValidated] = useState(false);
 
   const [walkInCode, setWalkInCode] = useState("");
@@ -60,7 +125,7 @@ export default function DiningScanPage() {
   const [walkInName, setWalkInName] = useState("");
   const [walkInPhone, setWalkInPhone] = useState("");
   const [walkInNotes, setWalkInNotes] = useState("");
-  const [walkInPreview, setWalkInPreview] = useState<{ title?: string; discount_label?: string; promo_code?: string } | null>(null);
+  const [walkInPreview, setWalkInPreview] = useState<PromoBillPreview | null>(null);
 
   const [gcCode, setGcCode] = useState("");
   const [gcBill, setGcBill] = useState("");
@@ -267,11 +332,15 @@ export default function DiningScanPage() {
           result.discount_type === "FLAT"
             ? `${Math.round(Number(result.discount_value) || 0)} ETB OFF`
             : `${result.discount_value}% OFF`;
-        setPromoPreview({
-          title: result.title,
-          promo_code: result.promo_code,
-          discount_label: `${discountLabel} (−${formatMoney(result.discount_amount)} on this bill)`,
-        });
+        setPromoPreview(
+          buildPromoBillPreview(bill, {
+            title: result.title,
+            promo_code: result.promo_code,
+            discount_label: discountLabel,
+            discount_amount: Number(result.discount_amount) || 0,
+            final_amount: Math.max(0, bill - (Number(result.discount_amount) || 0)),
+          })
+        );
         setPromoValidated(true);
         toast.success(`Valid BookMyBota offer: ${discountLabel}`);
         return;
@@ -285,7 +354,7 @@ export default function DiningScanPage() {
         toast.error("This code does not match the offer selected at booking.");
         return;
       }
-      setPromoPreview(result);
+      setPromoPreview(buildPromoBillPreview(bill, result));
       setPromoValidated(true);
       toast.success(`Valid: ${result.discount_label || result.title}`);
     } catch (err) {
@@ -351,13 +420,14 @@ export default function DiningScanPage() {
       toast.error("Enter a promo code.");
       return;
     }
-    const bill = walkInBill.trim() ? Number(walkInBill) : undefined;
+    const bill = Number(walkInBill);
+    if (!Number.isFinite(bill) || bill <= 0) {
+      toast.error("Enter the food bill amount.");
+      return;
+    }
     try {
-      const result = await validateWalkIn({
-        promo_code: code,
-        ...(bill != null && Number.isFinite(bill) ? { bill_amount: bill } : {}),
-      }).unwrap();
-      setWalkInPreview(result);
+      const result = await validateWalkIn({ promo_code: code, bill_amount: bill }).unwrap();
+      setWalkInPreview(buildPromoBillPreview(bill, result));
       toast.success(`Valid: ${result.discount_label || result.title}`);
     } catch (err) {
       setWalkInPreview(null);
@@ -481,6 +551,11 @@ export default function DiningScanPage() {
   const isPlatformOffer =
     String(offer?.source || "").toLowerCase() === "platform" ||
     String(offer?.type || "").toLowerCase().includes("bookmybota");
+  const showWalkInPromo =
+    !scanned ||
+    scanned.status === "COMPLETED" ||
+    scanned.status === "CANCELLED" ||
+    !offer?.title;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -716,13 +791,7 @@ export default function DiningScanPage() {
                     />
                   </div>
 
-                  {promoPreview && promoValidated && (
-                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-                      <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Promo validated</p>
-                      <p className="text-sm font-semibold text-white mt-1">{promoPreview.title}</p>
-                      <p className="text-xs text-emerald-300 mt-0.5">{promoPreview.discount_label}</p>
-                    </div>
-                  )}
+                  {promoPreview && promoValidated && <OfferBillBreakdown preview={promoPreview} />}
 
                   <div className="flex flex-wrap gap-2">
                     {offer.promo_code && (
@@ -814,6 +883,7 @@ export default function DiningScanPage() {
         </div>
       )}
 
+      {showWalkInPromo && (
       <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
         <div>
           <h3 className="text-lg font-bold text-white">Walk-in promo redemption</h3>
@@ -841,7 +911,10 @@ export default function DiningScanPage() {
               type="number"
               min="0"
               value={walkInBill}
-              onChange={(e) => setWalkInBill(e.target.value)}
+              onChange={(e) => {
+                setWalkInBill(e.target.value);
+                setWalkInPreview(null);
+              }}
               placeholder="1500"
               className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
             />
@@ -867,12 +940,7 @@ export default function DiningScanPage() {
           </div>
         </div>
 
-        {walkInPreview && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-            <p className="text-sm font-semibold text-white">{walkInPreview.title}</p>
-            <p className="text-xs text-emerald-300 mt-0.5">{walkInPreview.discount_label}</p>
-          </div>
-        )}
+        {walkInPreview && <OfferBillBreakdown preview={walkInPreview} />}
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -887,7 +955,7 @@ export default function DiningScanPage() {
           <button
             type="button"
             onClick={() => void handleRedeemWalkIn()}
-            disabled={redeemingWalkIn}
+            disabled={redeemingWalkIn || !walkInPreview}
             className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
           >
             {redeemingWalkIn && <Loader2 size={16} className="animate-spin" />}
@@ -895,6 +963,7 @@ export default function DiningScanPage() {
           </button>
         </div>
       </div>
+      )}
 
       <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
         <div>

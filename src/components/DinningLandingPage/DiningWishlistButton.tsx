@@ -28,7 +28,7 @@ let guestWishlistSyncStarted = false;
 export default function DiningWishlistButton({ businessId, className }: Props) {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
-  const isCustomer = authUser?.role === "customer" && Boolean(authUser.customer_id);
+  const isCustomer = authUser?.role === "customer";
 
   const [authOpen, setAuthOpen] = useState(false);
   const [guestSaved, setGuestSaved] = useState(false);

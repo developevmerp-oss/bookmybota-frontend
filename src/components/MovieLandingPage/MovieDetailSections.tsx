@@ -14,8 +14,9 @@ import {
   Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useGetRelatedPublicMoviesQuery } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
-  MOVIE_CATALOG,
   movieDetailPath,
   type MovieDetailData,
   type MovieOfferItem,
@@ -96,19 +97,20 @@ function ViewAllButton({
   );
 }
 
-function HScroll({ children }: { children: React.ReactNode }) {
+function useHorizontalScroll(itemCount: number) {
   const ref = useRef<HTMLDivElement>(null);
-  const [canScroll, setCanScroll] = useState({ left: false, right: false });
+  const [canScroll, setCanScroll] = useState({ left: false, right: false, overflow: false });
 
   const updateScroll = useCallback(() => {
     const el = ref.current;
     if (!el) {
-      setCanScroll({ left: false, right: false });
+      setCanScroll({ left: false, right: false, overflow: false });
       return;
     }
     const maxScroll = el.scrollWidth - el.clientWidth;
     const canOverflow = maxScroll > 2;
     setCanScroll({
+      overflow: canOverflow,
       left: canOverflow && el.scrollLeft > 2,
       right: canOverflow && el.scrollLeft < maxScroll - 2,
     });
@@ -129,13 +131,57 @@ function HScroll({ children }: { children: React.ReactNode }) {
       ro?.disconnect();
       window.removeEventListener("resize", updateScroll);
     };
-  }, [updateScroll]);
+  }, [updateScroll, itemCount]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = ref.current;
     if (!el) return;
     el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.75, 360), behavior: "smooth" });
   };
+
+  return { ref, canScroll, scrollBy };
+}
+
+const HEADER_ARROW_CLASS =
+  "inline-flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm hover:bg-[#F7E9FF] transition-colors cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-white";
+
+function HeaderScrollArrows({
+  canScroll,
+  onScrollLeft,
+  onScrollRight,
+}: {
+  canScroll: { left: boolean; right: boolean; overflow: boolean };
+  onScrollLeft: () => void;
+  onScrollRight: () => void;
+}) {
+  if (!canScroll.overflow) return null;
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <button
+        type="button"
+        aria-label="Scroll left"
+        onClick={onScrollLeft}
+        disabled={!canScroll.left}
+        className={HEADER_ARROW_CLASS}
+      >
+        <ChevronLeft className="size-4" strokeWidth={1.75} />
+      </button>
+      <button
+        type="button"
+        aria-label="Scroll right"
+        onClick={onScrollRight}
+        disabled={!canScroll.right}
+        className={HEADER_ARROW_CLASS}
+      >
+        <ChevronRight className="size-4" strokeWidth={1.75} />
+      </button>
+    </div>
+  );
+}
+
+function HScroll({ children }: { children: React.ReactNode }) {
+  const childCount = Array.isArray(children) ? children.length : 1;
+  const { ref, canScroll, scrollBy } = useHorizontalScroll(childCount);
 
   const btnClass =
     "absolute z-20 top-1/2 -translate-y-1/2 hidden md:flex size-9 items-center justify-center rounded-full bg-white text-slate-900 shadow-md hover:shadow-lg hover:bg-[#F7E9FF] transition-shadow cursor-pointer";
@@ -169,6 +215,41 @@ function HScroll({ children }: { children: React.ReactNode }) {
         </button>
       )}
     </div>
+  );
+}
+
+function HeaderCarouselSection({
+  title,
+  muted = false,
+  itemCount,
+  children,
+}: {
+  title: string;
+  muted?: boolean;
+  itemCount: number;
+  children: React.ReactNode;
+}) {
+  const { ref, canScroll, scrollBy } = useHorizontalScroll(itemCount);
+
+  return (
+    <SectionShell muted={muted}>
+      <SectionHeading
+        title={title}
+        action={
+          <HeaderScrollArrows
+            canScroll={canScroll}
+            onScrollLeft={() => scrollBy(-1)}
+            onScrollRight={() => scrollBy(1)}
+          />
+        }
+      />
+      <div
+        ref={ref}
+        className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-1"
+      >
+        {children}
+      </div>
+    </SectionShell>
   );
 }
 
@@ -247,70 +328,48 @@ function AboutSection({ text }: { text: string }) {
 function CastSection({ cast }: { cast: MoviePerson[] }) {
   if (!cast.length) return null;
   return (
-    <SectionShell muted>
-      <SectionHeading
-        title="Cast"
-        action={
-          <ViewAllButton
-            label="View all"
-            onClick={() => toast.message("Full cast coming soon")}
-          />
-        }
-      />
-      <HScroll>
-        {cast.map((person) => (
-          <article
-            key={`${person.name}-${person.role}`}
-            className="shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
-          >
-            <div className="aspect-square rounded-xl overflow-hidden bg-slate-200">
-              <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
-            </div>
-            <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-1">
-              {person.name}
-            </p>
-            {person.role && (
-              <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
-            )}
-          </article>
-        ))}
-      </HScroll>
-    </SectionShell>
+    <HeaderCarouselSection title="Cast" muted itemCount={cast.length}>
+      {cast.map((person) => (
+        <article
+          key={`${person.name}-${person.role}`}
+          className="shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
+        >
+          <div className="aspect-square rounded-xl overflow-hidden bg-slate-200">
+            <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
+          </div>
+          <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-1">
+            {person.name}
+          </p>
+          {person.role && (
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
+          )}
+        </article>
+      ))}
+    </HeaderCarouselSection>
   );
 }
 
 function CrewSection({ crew }: { crew: MoviePerson[] }) {
   if (!crew.length) return null;
   return (
-    <SectionShell>
-      <SectionHeading
-        title="Crew"
-        action={
-          <ViewAllButton
-            label="View all"
-            onClick={() => toast.message("Full crew coming soon")}
-          />
-        }
-      />
-      <HScroll>
-        {crew.map((person) => (
-          <article
-            key={`${person.name}-${person.role}`}
-            className="shrink-0 w-1/4 sm:w-1/5 md:w-1/6 text-center"
-          >
-            <div className="mx-auto w-4/5 aspect-square rounded-full overflow-hidden bg-slate-200 ring-1 ring-slate-200">
-              <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
-            </div>
-            <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-2">
-              {person.name}
-            </p>
-            {person.role && (
-              <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
-            )}
-          </article>
-        ))}
-      </HScroll>
-    </SectionShell>
+    <HeaderCarouselSection title="Crew" itemCount={crew.length}>
+      {crew.map((person) => (
+        <article
+          key={`${person.name}-${person.role}`}
+          className="shrink-0 w-1/4 sm:w-1/5 md:w-1/6 text-center"
+        >
+          <div className="mx-auto w-4/5 aspect-square rounded-full overflow-hidden bg-slate-200 ring-1 ring-slate-200">
+            <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
+          </div>
+          <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-2">
+            {person.name}
+          </p>
+          {person.role && (
+            <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
+          )}
+        </article>
+      ))}
+    </HeaderCarouselSection>
   );
 }
 
@@ -411,61 +470,63 @@ function ReviewsSection({
   );
 }
 
-function YouMightAlsoLike({ currentId }: { currentId: string }) {
-  const list = MOVIE_CATALOG.filter((m) => m.id !== currentId).slice(0, 8);
-  if (!list.length) return null;
+function YouMightAlsoLike({ idOrSlug, currentId }: { idOrSlug: string; currentId: string }) {
+  const { data: related = [], isLoading } = useGetRelatedPublicMoviesQuery(
+    { idOrSlug, limit: 8 },
+    { skip: !idOrSlug }
+  );
+
+  const list = related.filter((m) => m.id !== currentId);
+  if (isLoading || !list.length) return null;
+
   return (
     <SectionShell className="pb-12 sm:pb-16">
       <SectionHeading title="You might also like" action={<ViewAllButton label="View all" href="/movies" />} />
       <HScroll>
-        {list.map((m) => (
-          <Link
-            key={m.id}
-            href={movieDetailPath(m)}
-            className="group shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
-          >
-            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-slate-200">
-              <img
-                src={m.poster}
-                alt={m.title}
-                className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-              />
-              {(m.rating || m.likes) && (
-                <div className="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-1.5 bg-black/45 backdrop-blur-[2px] px-2 py-1.5 text-white">
-                  {m.likes ? (
-                    <>
-                      <ThumbsUp className="size-3 shrink-0 text-[#22C55E]" fill="currentColor" />
-                      <span className="text-xs font-medium truncate">{m.likes}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Star className="size-3 shrink-0 text-[#EF4444]" fill="currentColor" />
-                      <span className="text-xs font-semibold shrink-0">{m.rating}</span>
-                      {m.votes && (
-                        <span className="text-xs text-white/90 truncate">{m.votes}</span>
-                      )}
-                    </>
-                  )}
-                </div>
+        {list.map((m) => {
+          const poster = resolveMediaUrl(m.poster_url);
+          const languages = m.languages || [];
+          return (
+            <Link
+              key={m.id}
+              href={movieDetailPath({ id: m.id, slug: m.slug })}
+              className="group shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
+            >
+              <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-slate-200">
+                {poster ? (
+                  <img
+                    src={poster}
+                    alt={m.title}
+                    className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-slate-200" />
+                )}
+              </div>
+              <h3 className="mt-2 text-sm font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+                {m.title}
+              </h3>
+              {m.certificate && (
+                <p className="mt-0.5 text-xs text-slate-500">{m.certificate}</p>
               )}
-            </div>
-            <h3 className="mt-2 text-sm font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
-              {m.title}
-            </h3>
-            {m.certification && (
-              <p className="mt-0.5 text-xs text-slate-500">{m.certification}</p>
-            )}
-            {m.languages.length > 0 && (
-              <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{m.languages.join(", ")}</p>
-            )}
-          </Link>
-        ))}
+              {languages.length > 0 && (
+                <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{languages.join(", ")}</p>
+              )}
+            </Link>
+          );
+        })}
       </HScroll>
     </SectionShell>
   );
 }
 
-export default function MovieDetailSections({ movie }: { movie: MovieDetailData }) {
+export default function MovieDetailSections({
+  movie,
+  idOrSlug,
+}: {
+  movie: MovieDetailData;
+  idOrSlug: string;
+}) {
   const about =
     movie.synopsis ||
     `${movie.title} is now showing. Check formats, languages, and book your tickets on BookMyBota.`;
@@ -481,7 +542,7 @@ export default function MovieDetailSections({ movie }: { movie: MovieDetailData 
         tags={movie.reviewTags || []}
         countLabel={movie.reviewsCountLabel || "reviews"}
       />
-      <YouMightAlsoLike currentId={movie.id} />
+      <YouMightAlsoLike idOrSlug={idOrSlug} currentId={movie.id} />
     </div>
   );
 }

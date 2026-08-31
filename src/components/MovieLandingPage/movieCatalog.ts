@@ -154,6 +154,10 @@ const DEFAULT_REVIEW_TAGS = [
   { tag: "#Wholesome", count: 2100 },
 ];
 
+const DEFAULT_RATING = "8.2/10";
+const DEFAULT_VOTES = "1.2K+ Votes";
+const DEFAULT_REVIEWS_COUNT_LABEL = "1.2K reviews";
+
 export const MOVIE_CATALOG: MovieDetailData[] = [
   {
     id: "s1",
@@ -333,6 +337,22 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 const FALLBACK_POSTER =
   "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&h=750&fit=crop&q=80";
 
+const FALLBACK_PERSON =
+  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop&q=80";
+
+function mapCastCrewMembers(
+  items: Array<{ name?: string; role?: string; image_url?: string | null }> | undefined | null
+): MoviePerson[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item?.name?.trim())
+    .map((item) => ({
+      name: String(item.name).trim(),
+      role: item.role?.trim() ? String(item.role).trim() : undefined,
+      image: resolveMediaUrl(item.image_url) || FALLBACK_PERSON,
+    }));
+}
+
 /** Map API movie record to customer detail shape. */
 export function mapApiMovieToDetail(movie: {
   id: string;
@@ -348,6 +368,8 @@ export function mapApiMovieToDetail(movie: {
   languages?: string[];
   genres?: string[];
   formats?: string[];
+  cast?: Array<{ name?: string; role?: string; image_url?: string | null; sort_order?: number }>;
+  crew?: Array<{ name?: string; role?: string; image_url?: string | null; sort_order?: number }>;
   cast_text?: string | null;
   director?: string | null;
   status?: string;
@@ -374,6 +396,8 @@ export function mapApiMovieToDetail(movie: {
     trailersCount: movie.trailer_url ? 1 : 0,
     inCinemas: movie.status === "now_showing",
     comingSoon,
+    cast: mapCastCrewMembers(movie.cast),
+    crew: mapCastCrewMembers(movie.crew),
   };
 }
 
@@ -382,15 +406,35 @@ export function movieDetailPath(movie: Pick<MovieDetailData, "id" | "slug">) {
 }
 
 /** Fill showcase extras for catalog titles that don't define their own. */
-export function withMovieExtras(movie: MovieDetailData): MovieDetailData {
+export function withMovieExtras(
+  movie: MovieDetailData,
+  options?: {
+    fillCastCrew?: boolean;
+    fillOffers?: boolean;
+    fillReviews?: boolean;
+    fillRating?: boolean;
+  }
+): MovieDetailData {
+  const fillCastCrew = options?.fillCastCrew ?? true;
+  const fillOffers = options?.fillOffers ?? true;
+  const fillReviews = options?.fillReviews ?? true;
+  const fillRating = options?.fillRating ?? true;
   return {
     ...movie,
-    cast: movie.cast?.length ? movie.cast : DEFAULT_CAST,
-    crew: movie.crew?.length ? movie.crew : DEFAULT_CREW,
-    offers: movie.offers?.length ? movie.offers : DEFAULT_OFFERS,
-    reviews: movie.reviews?.length ? movie.reviews : DEFAULT_REVIEWS,
-    reviewTags: movie.reviewTags?.length ? movie.reviewTags : DEFAULT_REVIEW_TAGS,
-    reviewsCountLabel: movie.reviewsCountLabel || "1.2K reviews",
+    cast: movie.cast?.length ? movie.cast : fillCastCrew ? DEFAULT_CAST : [],
+    crew: movie.crew?.length ? movie.crew : fillCastCrew ? DEFAULT_CREW : [],
+    offers: movie.offers?.length ? movie.offers : fillOffers ? DEFAULT_OFFERS : [],
+    reviews: movie.reviews?.length ? movie.reviews : fillReviews ? DEFAULT_REVIEWS : [],
+    reviewTags: movie.reviewTags?.length
+      ? movie.reviewTags
+      : fillReviews
+        ? DEFAULT_REVIEW_TAGS
+        : [],
+    reviewsCountLabel:
+      movie.reviewsCountLabel || (fillReviews ? DEFAULT_REVIEWS_COUNT_LABEL : ""),
+    rating: movie.rating || (fillRating ? DEFAULT_RATING : undefined),
+    votes: movie.votes || (fillRating ? DEFAULT_VOTES : undefined),
+    likes: movie.likes,
   };
 }
 

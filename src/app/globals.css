@@ -763,6 +763,7 @@ html.admin-theme .admin-dashboard-layout .text-zinc-500 {
   color: #9ca3af !important;
 }
 
+html.admin-theme .admin-dashboard-layout .bg-zinc-900\/40,
 html.admin-theme .admin-dashboard-layout .bg-zinc-900\/50,
 html.admin-theme .admin-dashboard-layout .bg-white\/5 {
   background-color: var(--accent) !important;

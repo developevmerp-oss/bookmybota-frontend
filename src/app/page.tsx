@@ -39,7 +39,7 @@ export default function Home() {
       <TopVenuesRail />
       <PopularEventsRail city={city} />
       <SpecialOffersRail />
-      <EventsNearYouRail city={city} />
+      {/* <EventsNearYouRail city={city} /> */}
       {/* <SportsStadiumBanner /> */}
       <PopularSportsEventsRail />
       <Footer />

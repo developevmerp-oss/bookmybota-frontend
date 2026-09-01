@@ -1291,16 +1291,16 @@ export default function EventCheckout({
                             <p className="mt-1.5 text-[0.9375rem] text-slate-500 leading-relaxed">
                               {option.description}
                             </p>
-                            <button
-                              type="button"
+                            <span
+                              role="presentation"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setTicketModeDetailsOpen(option.id);
                               }}
-                              className="mt-2 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                              className="mt-2 inline-block text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                             >
                               View details
-                            </button>
+                            </span>
                           </div>
                         </div>
                       </button>

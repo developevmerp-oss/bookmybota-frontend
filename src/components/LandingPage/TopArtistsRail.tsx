@@ -4,6 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Mic2 } from "lucide-react";
 import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./TopArtistsRail.css";
 
 const VISIBLE = 6;
@@ -44,6 +45,7 @@ function ArtistCard({ artist }: { artist: PublicRegisteredPartner }) {
 export default function TopArtistsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { data: artists = [], isLoading } = useGetPublicRegisteredArtistsQuery();
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [artists.length, isLoading]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -81,7 +83,7 @@ export default function TopArtistsRail() {
           </p>
         ) : (
           <div className="relative">
-            {artists.length > 5 ? (
+            {scrollEdges.left && (
               <button
                 type="button"
                 aria-label="Previous artists"
@@ -90,7 +92,7 @@ export default function TopArtistsRail() {
               >
                 <ChevronLeft size={20} />
               </button>
-            ) : null}
+            )}
 
             <div
               ref={scrollerRef}
@@ -102,7 +104,7 @@ export default function TopArtistsRail() {
               ))}
             </div>
 
-            {artists.length > 5 ? (
+            {scrollEdges.right && (
               <button
                 type="button"
                 aria-label="Next artists"
@@ -111,7 +113,7 @@ export default function TopArtistsRail() {
               >
                 <ChevronRight size={20} />
               </button>
-            ) : null}
+            )}
           </div>
         )}
       </div>

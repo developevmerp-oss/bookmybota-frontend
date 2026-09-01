@@ -4,6 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import { VenuePosterCard } from "./PosterCard";
 
@@ -12,7 +13,7 @@ const MIN_VISIBLE = 5;
 export default function TopVenuesRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { data: venues = [], isLoading } = useGetPublicRegisteredVenuesQuery();
-  const showArrows = venues.length > MIN_VISIBLE;
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [venues.length, isLoading]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -56,7 +57,7 @@ export default function TopVenuesRail() {
           </p>
         ) : (
           <div className="relative">
-            {showArrows ? (
+            {scrollEdges.left && (
               <button
                 type="button"
                 aria-label="Previous venues"
@@ -65,7 +66,7 @@ export default function TopVenuesRail() {
               >
                 <ChevronLeft size={18} />
               </button>
-            ) : null}
+            )}
 
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {venues.map((venue) => (
@@ -73,7 +74,7 @@ export default function TopVenuesRail() {
               ))}
             </AdaptiveCardRow>
 
-            {showArrows ? (
+            {scrollEdges.right && (
               <button
                 type="button"
                 aria-label="Next venues"
@@ -82,7 +83,7 @@ export default function TopVenuesRail() {
               >
                 <ChevronRight size={18} />
               </button>
-            ) : null}
+            )}
           </div>
         )}
       </div>

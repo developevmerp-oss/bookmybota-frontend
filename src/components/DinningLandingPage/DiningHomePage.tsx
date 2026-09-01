@@ -63,6 +63,7 @@ import {
   extractCuisines,
   offerBucketSectionTitle,
 } from "@/lib/diningFilters";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./DiningHomePage.css";
 
 const HERO_ACCENT = "#6900AA";
@@ -942,8 +943,12 @@ export default function Home() {
 
   const collectionsRef = useRef<HTMLDivElement>(null);
   const cuisinesRef = useRef<HTMLDivElement>(null);
+  const stickyCuisinesRef = useRef<HTMLDivElement>(null);
+  const cuisineStickySentinelRef = useRef<HTMLDivElement>(null);
   const offersRef = useRef<HTMLDivElement>(null);
   const [collectionsScroll, setCollectionsScroll] = useState({ left: false, right: false });
+  const [showStickyCuisineNames, setShowStickyCuisineNames] = useState(false);
+  const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
 
   const bindBannerNav = useCallback((swiper: SwiperType) => {
     const nav = swiper.params?.navigation;
@@ -979,9 +984,10 @@ export default function Home() {
   };
 
   const scrollCuisines = (direction: "left" | "right") => {
-    if (!cuisinesRef.current) return;
-    const amount = Math.max(cuisinesRef.current.clientWidth * 0.7, 160);
-    cuisinesRef.current.scrollBy({
+    const el = (showStickyCuisineNames ? stickyCuisinesRef : cuisinesRef).current;
+    if (!el) return;
+    const amount = Math.max(el.clientWidth * 0.7, 160);
+    el.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
     });
@@ -1407,6 +1413,52 @@ export default function Home() {
     diningFilters.bookTable;
   const showHomeExtras = !hasActiveFilters;
 
+  const cuisinesScroll = useHorizontalScrollEdges(cuisinesRef, [
+    cuisineCards.length,
+    exploreCardId,
+  ]);
+  const stickyCuisinesScroll = useHorizontalScrollEdges(stickyCuisinesRef, [
+    cuisineCards.length,
+    exploreCardId,
+    showStickyCuisineNames,
+  ]);
+  const offersScroll = useHorizontalScrollEdges(offersRef, [
+    homeOfferCards.length,
+    showHomeExtras,
+  ]);
+
+  useEffect(() => {
+    const measureHeader = () => {
+      const header = document.querySelector("header");
+      setSiteHeaderHeight(header?.getBoundingClientRect().height ?? 0);
+    };
+    measureHeader();
+    window.addEventListener("resize", measureHeader);
+    return () => window.removeEventListener("resize", measureHeader);
+  }, []);
+
+  useEffect(() => {
+    const sentinel = cuisineStickySentinelRef.current;
+    if (!sentinel || exploreCardId !== "restaurant" || cuisineCards.length === 0) {
+      setShowStickyCuisineNames(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyCuisineNames(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0,
+        rootMargin: siteHeaderHeight > 0 ? `-${siteHeaderHeight}px 0px 0px 0px` : "-120px 0px 0px 0px",
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [exploreCardId, cuisineCards.length, siteHeaderHeight]);
+
   useEffect(() => {
     if (!showHomeExtras) {
       setCollectionsScroll({ left: false, right: false });
@@ -1475,7 +1527,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* ── Top banner slider (movies-style, auto every 3s) ──────────────── */}
-      <section className="w-full overflow-hidden pt-3">
+      <section className="w-full overflow-hidden ">
         <div className="dining-hero-swiper relative w-full">
           <Swiper
             modules={[Autoplay, SwiperNavigation, Pagination]}
@@ -1801,6 +1853,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   Explore Cuisines
                 </h2>
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  {cuisinesScroll.left && (
                   <button
                     type="button"
                     aria-label="Previous cuisines"
@@ -1809,6 +1862,8 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   >
                     <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                   </button>
+                  )}
+                  {cuisinesScroll.right && (
                   <button
                     type="button"
                     aria-label="Next cuisines"
@@ -1817,6 +1872,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   >
                     <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                   </button>
+                  )}
                 </div>
               </div>
               <div
@@ -1858,7 +1914,67 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   );
                 })}
               </div>
+              <div ref={cuisineStickySentinelRef} className="h-px w-full" aria-hidden />
             </section>
+          </div>
+        </div>
+      )}
+
+      {exploreCardId === "restaurant" && cuisineCards.length > 0 && (
+        <div
+          className={`dining-sticky-cuisine-names fixed left-0 right-0 z-40 bg-white border-b border-slate-100 shadow-[0_2px_8px_rgba(15,23,42,0.06)] transition-[opacity,transform] duration-200 ${
+            showStickyCuisineNames
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 -translate-y-1 pointer-events-none"
+          }`}
+          style={siteHeaderHeight > 0 ? { top: siteHeaderHeight } : undefined}
+          aria-hidden={!showStickyCuisineNames}
+        >
+          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
+            <div className="relative py-2.5 sm:py-3">
+              {stickyCuisinesScroll.left && (
+                <button
+                  type="button"
+                  aria-label="Previous cuisines"
+                  onClick={() => scrollCuisines("left")}
+                  className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm items-center justify-center text-slate-600 hover:bg-slate-50"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              )}
+              {stickyCuisinesScroll.right && (
+                <button
+                  type="button"
+                  aria-label="Next cuisines"
+                  onClick={() => scrollCuisines("right")}
+                  className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm items-center justify-center text-slate-600 hover:bg-slate-50"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+              <div
+                ref={stickyCuisinesRef}
+                className="flex items-center gap-5 sm:gap-6 md:gap-8 overflow-x-auto scrollbar-hide scroll-smooth px-0.5"
+              >
+                {cuisineCards.map((item) => {
+                  const isActive = diningFilters.cuisines.some(
+                    (selected) => selected.toLowerCase() === item.name.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={`sticky-${item.name}`}
+                      type="button"
+                      onClick={() => handleCuisineSelect(item.name)}
+                      className={`shrink-0 text-sm sm:text-base font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                        isActive ? "text-[#6900AA]" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {item.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2003,6 +2119,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
             <section id="dining-offers" className="pt-3 pb-5 sm:pt-2 scroll-mt-24">
               {homeOfferCards.length > 3 ? (
                 <div className="relative">
+                  {offersScroll.left && (
                   <button
                     type="button"
                     aria-label="Previous offers"
@@ -2011,6 +2128,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   >
                     <ChevronLeft size={18} />
                   </button>
+                  )}
                   <div
                     ref={offersRef}
                     className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-1"
@@ -2026,6 +2144,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
                       />
                     ))}
                   </div>
+                  {offersScroll.right && (
                   <button
                     type="button"
                     aria-label="Next offers"
@@ -2034,6 +2153,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   >
                     <ChevronRight size={18} />
                   </button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">

@@ -226,5 +226,30 @@
   "list-your-show.host.venue": {
     "title": "Venue",
     "description": "Partner your venue on Book My Bota. Publish layouts, claim showtimes, and connect with organizers hosting events at your space."
+  },
+
+  "list-your-show.feature.registration": {
+    "title": "Partner registration & onboarding",
+    "description": "Register your business, submit documents, and get verified by our team — the same trusted onboarding flow for dining, events, movies, venues, and artists."
+  },
+  "list-your-show.feature.discovery": {
+    "title": "Online discovery & visibility",
+    "description": "Get found by customers and partners browsing Book My Bota — whether they search for restaurants, shows, cinemas, venues, or live talent."
+  },
+  "list-your-show.feature.dashboard": {
+    "title": "Dedicated partner portal",
+    "description": "Manage listings, bookings, profiles, and day-to-day operations from one secure dashboard tailored to your partner type."
+  },
+  "list-your-show.feature.login": {
+    "title": "Secure partner login",
+    "description": "Sign in with role-based access so your team can manage the business safely — separate portals for dining, events, movies, venues, and artists."
+  },
+  "list-your-show.feature.offers": {
+    "title": "Offers & promotions",
+    "description": "Run offers, campaigns, and special deals to attract more guests — from dining specials and event tickets to movie showtimes and artist bookings."
+  },
+  "list-your-show.feature.reports": {
+    "title": "Reports & business insights",
+    "description": "Track bookings, sales signals, and performance in clear reports so every partner — restaurant, organizer, cinema, venue, or artist — can plan smarter."
   }
 }

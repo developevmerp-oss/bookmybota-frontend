@@ -20,6 +20,13 @@ import {
 } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
+import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
+import {
+  PARTNER_CATEGORY_TYPES,
+  type PartnerCategoryKey,
+} from "@/data/partnerCategoryTypes";
+
+type OrganizerCategory = Extract<PartnerCategoryKey, "concert" | "comedy" | "sports" | "music">;
 
 const FEATURE_SLIDES = [
   {
@@ -58,6 +65,15 @@ const FEATURE_SLIDES = [
     bg: "#1D4E89",
   },
 ];
+
+const HERO_IMAGE = FEATURE_SLIDES[0].image;
+
+const CATEGORY_HERO_IMAGES: Record<OrganizerCategory, string> = {
+  concert: FEATURE_SLIDES[1].image,
+  comedy: "https://images.unsplash.com/photo-1527224857830-43d7b7b4e8f6?w=1200&q=80",
+  sports: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80",
+  music: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200&q=80",
+};
 
 const HOST_CATEGORIES = [
   {
@@ -170,9 +186,14 @@ const TESTIMONIALS = [
   },
 ];
 
-export default function OrganizerLandingPage() {
+export default function OrganizerLandingPage({
+  category,
+}: {
+  category?: OrganizerCategory;
+} = {}) {
   const router = useRouter();
   const [loginOpen, setLoginOpen] = useState(false);
+  const categoryConfig = category ? PARTNER_CATEGORY_TYPES[category] : null;
 
   const openLogin = () => {
     const session = readSessionForRole("event_admin");
@@ -186,6 +207,9 @@ export default function OrganizerLandingPage() {
   return (
     <PartnerListYourShowLanding
       layout="bms"
+      centeredPartnerHeader
+      showBackButton
+      loginHref="/organizer/login"
       expectedRole="event_admin"
       loginTitle="Event Admin Login"
       loginSubtitle="Sign in to manage your events"
@@ -200,17 +224,20 @@ export default function OrganizerLandingPage() {
       }
       primaryCtaLabel="List your business"
       secondaryLoginLabel="Login your business"
-      slides={FEATURE_SLIDES}
-      hostTitle="What can you host???"
-      hostSubtitle="As the purveyor of entertainment, Book My Bota enables your event with end to end solutions from the time you register to the completion of the event. Let's look at what you can host."
-      hostTiles={HOST_CATEGORIES}
+      heroImage={category ? CATEGORY_HERO_IMAGES[category] : HERO_IMAGE}
+      heroImageAlt={
+        categoryConfig
+          ? `${categoryConfig.title} partner on Book My Bota`
+          : "Event organizer partner on Book My Bota"
+      }
+      imageCards={PARTNER_VENUE_TYPE_CARDS}
+      categoryTypesTitle={categoryConfig ? `${categoryConfig.title} Types` : undefined}
+      categoryTypes={categoryConfig?.types}
       servicesTitle="What are the services we offer?"
       servicesSubtitle="After successful collaborations with the best event organisers over the past decade and a half, we're well equipped to bring your vision to life."
       servicesTiles={SERVICES}
       servicesFootnote="Apart from these must haves for any event, we also support a host of other services like SEO for your event, custom pricing for your tickets and this and also this."
       testimonials={TESTIMONIALS}
-      securityTitle="Sit back and watch your event come to life"
-      securitySubtitle="Events may be all fun and games, but we take it seriously. We ensure our customer's security so that you don't have to."
       crossLinks={
         <p className="flex flex-wrap items-center justify-center gap-2">
           Already partnered for dining?

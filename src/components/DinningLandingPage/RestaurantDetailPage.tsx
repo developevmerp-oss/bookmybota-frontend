@@ -1,18 +1,20 @@
 "use client";
-import { useState, use, useRef, useEffect } from 'react';
+import { useState, use, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   MapPin, Phone, CheckCircle, Calendar, Users, Clock,
   Star, Share2, Compass, MessageSquare, Image as ImageIcon,
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
   ChevronLeft, X, Navigation, User,
-  Send, ShieldCheck, ArrowRight, Check, ChevronDown, Tag, CheckCheck
+  Send, ShieldCheck, ArrowRight, Check, ChevronDown, Tag, CheckCheck,
+  Sun, Moon, Sunrise
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
+import { resolveMediaUrl } from '@/lib/mediaUrl';
 import {
   bookingWidgetOfferLabel,
   businessHasCustomerVisibleOffer,
@@ -124,6 +126,167 @@ const getMenuForVenue = (typeName?: string) => {
       "Restaurant";
   return defaults[key];
 };
+
+const isValidImageUrl = (url: unknown): url is string => {
+  if (typeof url !== "string") return false;
+  const trimmed = url.trim();
+  if (!trimmed || trimmed === "0" || trimmed === "null" || trimmed === "undefined") return false;
+  return true;
+};
+
+const resolveValidMediaUrls = (urls: (string | null | undefined)[]) =>
+  [...new Set(
+    urls
+      .filter(isValidImageUrl)
+      .map((url) => resolveMediaUrl(url.trim()))
+      .filter((url) => url.length > 0)
+  )];
+
+function MediaEmptyState({
+  icon: Icon,
+  message,
+}: {
+  icon: typeof ImageIcon;
+  message: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/80 py-12 px-4 text-center">
+      <div className="w-12 h-12 rounded-full bg-[#f7e9ff] flex items-center justify-center mb-3">
+        <Icon size={24} className="text-[#6900AA]" strokeWidth={1.75} />
+      </div>
+      <p className="text-sm text-slate-500 font-medium">{message}</p>
+    </div>
+  );
+}
+
+function VenuePhotosGallery({
+  urls,
+  onOpen,
+}: {
+  urls: string[];
+  onOpen: (index: number, items: string[]) => void;
+}) {
+  const [visibleUrls, setVisibleUrls] = useState(urls);
+
+  useEffect(() => {
+    setVisibleUrls(urls);
+  }, [urls]);
+
+  const markBroken = (badUrl: string) => {
+    setVisibleUrls((prev) => prev.filter((url) => url !== badUrl));
+  };
+
+  if (visibleUrls.length === 0) {
+    return (
+      <MediaEmptyState
+        icon={ImageIcon}
+        message="No photos available at the moment."
+      />
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {visibleUrls.slice(0, 3).map((url, idx) => {
+        const showMoreOverlay = visibleUrls.length > 3 && idx === 2;
+        return (
+          <div
+            key={url}
+            onClick={() => onOpen(showMoreOverlay ? 0 : idx, visibleUrls)}
+            className="relative rounded-xl overflow-hidden h-40 bg-slate-100 border border-slate-100 hover:shadow-md transition-shadow cursor-pointer group"
+          >
+            <img
+              src={url}
+              alt=""
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={() => markBroken(url)}
+            />
+            {showMoreOverlay && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white transition-opacity group-hover:bg-black/75">
+                <ImageIcon size={22} className="mb-1" />
+                <span className="font-bold text-sm tracking-wide">View all photos</span>
+                <span className="text-[0.625rem] text-white/70">{visibleUrls.length} Photos</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function VenueMenuGallery({
+  urls,
+  onOpen,
+}: {
+  urls: string[];
+  onOpen: (index: number, items: string[]) => void;
+}) {
+  const [visibleUrls, setVisibleUrls] = useState(urls);
+
+  useEffect(() => {
+    setVisibleUrls(urls);
+  }, [urls]);
+
+  const markBroken = (badUrl: string) => {
+    setVisibleUrls((prev) => prev.filter((url) => url !== badUrl));
+  };
+
+  if (visibleUrls.length === 0) {
+    return (
+      <MediaEmptyState
+        icon={BookOpen}
+        message="No menu available at the moment."
+      />
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {visibleUrls.slice(0, 3).map((menuUrl, idx) => {
+        const showMoreOverlay = visibleUrls.length > 3 && idx === 2;
+        return (
+          <button
+            key={menuUrl}
+            type="button"
+            onClick={() => onOpen(showMoreOverlay ? 0 : idx, visibleUrls)}
+            className="w-full h-full flex flex-col text-left cursor-pointer group"
+          >
+            <div className="relative w-full pt-3 px-2 flex-1">
+              <div className="absolute top-0 left-4 right-4 h-3 rounded-t-md border border-slate-200 bg-slate-50" aria-hidden />
+              <div className="absolute top-1.5 left-2.5 right-2.5 h-3 rounded-t-md border border-slate-200 bg-slate-100" aria-hidden />
+              <div className="relative w-full rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4] shadow-sm">
+                <img
+                  src={menuUrl}
+                  alt=""
+                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                  onError={() => markBroken(menuUrl)}
+                />
+                {showMoreOverlay && (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white transition-opacity group-hover:bg-black/75">
+                    <BookOpen size={22} className="mb-1" />
+                    <span className="font-bold text-sm tracking-wide">View all menus</span>
+                    <span className="text-[0.625rem] text-white/70">{visibleUrls.length} pages</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-2.5 min-h-[2.5rem]">
+              {!showMoreOverlay && (
+                <>
+                  <p className="text-sm font-bold text-zinc-800">Menu</p>
+                  <p className="text-sm lg:text-xs text-zinc-500">
+                    {idx + 1} of {visibleUrls.length} {visibleUrls.length === 1 ? "page" : "pages"}
+                  </p>
+                </>
+              )}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── Date & Time Slot Helpers ─────────────────────────────────────────────────
 
@@ -334,6 +497,15 @@ const StarRatingInput = ({ value, onChange }: { value: number, onChange: (val: n
   );
 };
 
+/** Sticky tabs that scroll to sections on the Overview page. */
+const DETAIL_SECTION_TABS = [
+  { id: "Overview", sectionId: "section-overview" },
+  { id: "Menu", sectionId: "section-menu" },
+  { id: "Photos", sectionId: "section-photos" },
+  { id: "Reviews", sectionId: "section-reviews" },
+  // { id: "Book a Table", sectionId: "" },
+] as const;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function RestaurantPage({ params }: { params: Promise<{ id: string }> }) {
@@ -402,25 +574,102 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     return () => observer.disconnect();
   }, []);
 
-  // Active Tab: Overview, Menu, Photos, Reviews
+  // Sticky section tabs (Overview / Menu / Photos / Reviews) — scroll-spy like District
   const [activeTab, setActiveTab] = useState("Overview");
   const [tabsStuck, setTabsStuck] = useState(false);
   const tabsSentinelRef = useRef<HTMLDivElement>(null);
-  const skipTabStartScroll = useRef(true);
+  const scrollSpyPausedRef = useRef(false);
 
-  useEffect(() => {
-    if (skipTabStartScroll.current) {
-      skipTabStartScroll.current = false;
-      return;
+  const getDetailStickyOffset = useCallback(() => {
+    const tabsEl = document.getElementById("restaurant-tabs");
+    if (tabsEl) {
+      const headerTop = parseFloat(getComputedStyle(tabsEl).top) || 0;
+      return headerTop + tabsEl.offsetHeight + 8;
     }
-    const timer = window.setTimeout(() => {
-      document.getElementById("tab-panel-start")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 40);
-    return () => window.clearTimeout(timer);
-  }, [activeTab]);
+    if (typeof window === "undefined") return 140;
+    if (window.matchMedia("(min-width: 1280px)").matches) return 148;
+    if (window.matchMedia("(min-width: 1024px)").matches) return 140;
+    if (window.matchMedia("(min-width: 768px)").matches) return 120;
+    return 112;
+  }, []);
+
+  const scrollToDetailSection = useCallback((sectionId: string, tabId: string) => {
+    scrollSpyPausedRef.current = true;
+    setActiveTab(tabId);
+
+    const performScroll = () => {
+      const el = document.getElementById(sectionId);
+      if (!el) return false;
+      const offset = getDetailStickyOffset();
+      const top = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      return true;
+    };
+
+    const tryScroll = (attempt = 0) => {
+      if (performScroll()) {
+        window.setTimeout(() => {
+          scrollSpyPausedRef.current = false;
+        }, 900);
+        return;
+      }
+      if (attempt < 12) {
+        window.setTimeout(() => tryScroll(attempt + 1), 50);
+      } else {
+        scrollSpyPausedRef.current = false;
+      }
+    };
+
+    requestAnimationFrame(() => tryScroll());
+  }, [getDetailStickyOffset]);
+
+  const scrollToTabPanelStart = useCallback(() => {
+    const performScroll = () => {
+      const el = document.getElementById("tab-panel-start");
+      if (!el) return false;
+      const offset = getDetailStickyOffset();
+      const top = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      return true;
+    };
+
+    const tryScroll = (attempt = 0) => {
+      if (performScroll()) return;
+      if (attempt < 12) {
+        window.setTimeout(() => tryScroll(attempt + 1), 50);
+      }
+    };
+
+    requestAnimationFrame(() => tryScroll());
+  }, [getDetailStickyOffset]);
+
+  // Highlight sticky tab from scroll position (About → Menu → Photos → Reviews)
+  useEffect(() => {
+    if (activeTab === "Book a Table") return;
+
+    const syncActiveTabFromScroll = () => {
+      if (scrollSpyPausedRef.current) return;
+      const offset = getDetailStickyOffset();
+      let currentId = DETAIL_SECTION_TABS[0].id;
+      for (const tab of DETAIL_SECTION_TABS) {
+        const el = document.getElementById(tab.sectionId);
+        if (!el) continue;
+        // Last section whose top has crossed under the sticky tabs line wins
+        if (el.getBoundingClientRect().top - offset <= 0) {
+          currentId = tab.id;
+        }
+      }
+      setActiveTab((prev) => (prev === currentId ? prev : currentId));
+    };
+
+    syncActiveTabFromScroll();
+    window.addEventListener("scroll", syncActiveTabFromScroll, { passive: true });
+    window.addEventListener("resize", syncActiveTabFromScroll);
+    return () => {
+      window.removeEventListener("scroll", syncActiveTabFromScroll);
+      window.removeEventListener("resize", syncActiveTabFromScroll);
+    };
+  }, [activeTab === "Book a Table", resolvedParams.id, getDetailStickyOffset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Booking Form State — date/time now driven by pill selectors
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
@@ -743,6 +992,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const photos = profile
     ? (uploadedPhotos.length > 0 ? uploadedPhotos : getPhotosForVenue(profile.type_name, profile.cover_image_url))
     : [];
+  const venueGalleryPhotos = resolveValidMediaUrls(uploadedPhotos);
 
   const openLightbox = (index: number, items?: string[]) => {
     const list = items && items.length > 0 ? items : photos;
@@ -980,6 +1230,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
     setDrawerStep(1);
     setActiveTab("Book a Table");
+    scrollToTabPanelStart();
   };
 
   const closeBookingPanel = () => {
@@ -1014,9 +1265,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   }
 
 
-  const menus = profile
-    ? (profile.menu_images && profile.menu_images.length > 0 ? profile.menu_images : getMenuForVenue(profile.type_name))
-    : [];
+  const venueMenuImages = resolveValidMediaUrls(profile.menu_images ?? []);
   const costText = profile?.average_cost
     ? `${formatMoney(profile.average_cost, { compact: true })} for two (approx.)`
     : getCostForTwoFromRange(profile?.price_range);
@@ -1124,9 +1373,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-2">
         {/* ── Restaurant header (Zomato: details + actions) ── */}
-        <div className="bg-white pt-2">
-          <div className="flex flex-col md:flex-row justify-between items-start gap-3 mb-3">
-            <div className="min-w-0">
+        <div className="bg-white pt-2 mb-3">
+          {/* Row 1: title left · rating right */}
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+            <div className="min-w-0 flex-1">
               <h1 className="text-3xl sm:text-4xl lg:text-[2.5rem] font-semibold text-slate-900 tracking-tight leading-tight">
                 {profile.name}
               </h1>
@@ -1135,89 +1385,94 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <MapPin size={13} className="text-[#6900AA] shrink-0" />
                 <span>{profile.address || 'Address hidden'}</span>
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base sm:text-lg lg:text-sm text-slate-500">
-                {isOpenNow ? (
-                  <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-emerald-600 font-semibold text-xs">
-                    Open now
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-rose-600 font-semibold text-xs">
-                    Closed
-                  </span>
-                )}
-                <span>{timingText}</span>
-                <span>·</span>
-                <span>{costText}</span>
-                {profile.phone && (
-                  <>
-                    <span>·</span>
-                    <a href={`tel:${profile.phone}`} className="text-[#6900AA] hover:underline inline-flex items-center gap-1">
-                      <Phone size={12} />
-                      {profile.phone}
-                    </a>
-                  </>
-                )}
-              </div>
             </div>
-
             <div className="flex items-center gap-3 shrink-0">
               <div className="bg-emerald-600 text-white rounded-md px-3 py-2 flex items-center gap-1.5 shadow-sm">
                 <span className="font-bold text-lg leading-none">{ratingValue}</span>
                 <Star size={15} className="fill-white" />
               </div>
-              <div>
+              <div className="text-left sm:text-right">
                 <p className="text-sm lg:text-xs font-bold text-slate-800 uppercase tracking-wide">Dine-out rating</p>
                 <p className="text-slate-500 text-sm lg:text-xs font-medium">{reviewsCount} Reviews</p>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2.5 mb-5">
-            <button
-              onClick={() => {
-                if (profile.address) {
-                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
-                }
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-            >
-              <Compass size={14} className="text-[#6900AA]" />
-              {copied ? "Copied!" : "Direction"}
-            </button>
-            <button
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({ title: profile.name, url: window.location.href });
-                } else {
-                  navigator.clipboard.writeText(window.location.href);
-                  toast.success("Link copied to clipboard!");
-                }
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-            >
-              <Share2 size={14} className="text-[#6900AA]" />
-              Share
-            </button>
-            <button
-              onClick={() => setActiveTab("Reviews")}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-            >
-              <MessageSquare size={14} className="text-[#6900AA]" />
-              Reviews
-            </button>
-            <button
-              onClick={() => handleQuickBook()}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
-                activeTab === "Book a Table"
-                  ? "border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <Calendar size={14} className="text-[#6900AA]" />
-              Book a Table
-            </button>
+          {/* Row 2: open-time left · Direction / Share / Reviews / Book a Table right (same line) */}
+          <div className="mt-2 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base sm:text-lg lg:text-sm text-slate-500 min-w-0">
+              {isOpenNow ? (
+                <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-emerald-600 font-semibold text-xs">
+                  Open now
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-rose-600 font-semibold text-xs">
+                  Closed
+                </span>
+              )}
+              <span>{timingText}</span>
+              <span>·</span>
+              <span>{costText}</span>
+              {profile.phone && (
+                <>
+                  <span>·</span>
+                  <a href={`tel:${profile.phone}`} className="text-[#6900AA] hover:underline inline-flex items-center gap-1">
+                    <Phone size={12} />
+                    {profile.phone}
+                  </a>
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0 lg:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  if (profile.address) {
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
+                  }
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                <Compass size={14} className="text-[#6900AA]" />
+                {copied ? "Copied!" : "Direction"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({ title: profile.name, url: window.location.href });
+                  } else {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast.success("Link copied to clipboard!");
+                  }
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                <Share2 size={14} className="text-[#6900AA]" />
+                Share
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToDetailSection("section-reviews", "Reviews")}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                <MessageSquare size={14} className="text-[#6900AA]" />
+                Reviews
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickBook()}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
+                  activeTab === "Book a Table"
+                    ? "border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <Calendar size={14} className="text-[#6900AA]" />
+                Book a Table
+              </button>
+            </div>
           </div>
-
         </div>
 
         {/* ── Image Collage ── */}
@@ -1297,23 +1552,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         >
           <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
           <div className="flex gap-6 overflow-x-auto scrollbar-hide">
-            {["Overview", "Reviews", "Photos", "Menu", "Book a Table"].map((tab) => (
+            {DETAIL_SECTION_TABS.map((tab) => (
               <button
-                key={tab}
+                key={tab.id}
                 type="button"
-                onClick={() => {
-                  setActiveTab(tab);
-                  if (tab === "Book a Table") {
-                    setDrawerStep(1);
-                  }
-                }}
+                onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
                 className={`py-3.5 text-base sm:text-lg lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === tab
+                  activeTab === tab.id
                     ? "border-[#6900AA] text-[#6900AA] font-bold"
                     : "border-transparent text-slate-400 hover:text-slate-600"
                 }`}
               >
-                {tab}
+                {tab.id}
               </button>
             ))}
           </div>
@@ -1334,87 +1584,116 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             className={`${hideBookingSidebar ? 'col-span-full' : 'lg:col-span-2'} space-y-8 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]`}
           >
 
-            {/* Overview Tab Content */}
-            {activeTab === "Overview" && (
+            {/* Single-page Overview with scroll-spy sections (District-style) */}
+            {activeTab !== "Book a Table" && (
               <div className="space-y-8">
 
-                {/* Dining Offers — 1 = full-width blue; 2+ = first blue, rest white compact cards */}
-                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Dining Offers</h3>
-                  {visibleOffers.length > 1 && (
-                    <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
-                  )}
-                  {visibleOffers.length <= 1 && <div className="mb-4" />}
-                  {visibleOffers.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {visibleOffers.map((offer, idx) => {
-                        const isFeatured = idx === 0;
-                        const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
-                        return (
-                          <button
-                            key={`${offer.id || offer.title}-${idx}`}
-                            type="button"
-                            onClick={() => handleQuickBook(offer)}
-                            className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
-                              isFeatured
-                                ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
-                                : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
-                            }`}
-                          >
-                            {scheduled && (
-                              <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
-                                Coming soon
+                {/* Overview first — About the Venue (+ offers if any) */}
+                <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-8">
+                  {/* About Venue & Average Cost */}
+                  <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-3">About the Venue</h3>
+                    <p className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap">
+                      {profile.description || 'This venue has not provided a description yet. Enjoy a curated dining experience with premium seats, lovely ambiance, and delicious gourmet specialties.'}
+                    </p>
+
+                    <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-1">Average Cost</h4>
+                    <p className="text-base sm:text-lg lg:text-sm text-slate-600 font-medium">{costText}</p>
+                    <p className="text-base  lg:text-sm text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any</p>
+
+                    {profile.amenities && profile.amenities.length > 0 && (
+                      <>
+                        <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-3">More Info</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
+                          {profile.amenities.map((info: string) => (
+                            <div key={info} className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600">
+                              <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                                <Check size={10} strokeWidth={3} />
                               </span>
-                            )}
-                            <p
-                              className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
-                                isFeatured ? "text-white/85" : "text-[#2563eb]"
+                              <span>{info}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </section>
+
+                  {visibleOffers.length > 0 && (
+                  <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Dining Offers</h3>
+                    {visibleOffers.length > 1 && (
+                      <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
+                    )}
+                    {visibleOffers.length <= 1 && <div className="mb-4" />}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                        {visibleOffers.map((offer, idx) => {
+                          const isFeatured = idx === 0;
+                          const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
+                          return (
+                            <button
+                              key={`${offer.id || offer.title}-${idx}`}
+                              type="button"
+                              onClick={() => handleQuickBook(offer)}
+                              className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
+                                isFeatured
+                                  ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
+                                  : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
                               }`}
                             >
-                              {offer.type || "Offer"}
-                            </p>
-                            <p
-                              className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
-                                isFeatured ? "text-white" : "text-zinc-900"
-                              }`}
-                            >
-                              {offer.title}
-                            </p>
-                            <p
-                              className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
-                                isFeatured ? "text-white/90" : "text-[#2563eb]"
-                              }`}
-                            >
-                              {formatDiningOfferDiscount(offer)}
-                              {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
-                            </p>
-                            <span
-                              className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
-                                isFeatured ? "text-white/15" : "text-[#2563eb]/10"
-                              }`}
-                              aria-hidden
-                            >
-                              %
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No dining offers available for this venue yet.</p>
+                              {scheduled && (
+                                <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                  Coming soon
+                                </span>
+                              )}
+                              <p
+                                className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
+                                  isFeatured ? "text-white/85" : "text-[#2563eb]"
+                                }`}
+                              >
+                                {offer.type || "Offer"}
+                              </p>
+                              <p
+                                className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
+                                  isFeatured ? "text-white" : "text-zinc-900"
+                                }`}
+                              >
+                                {offer.title}
+                              </p>
+                              <p
+                                className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
+                                  isFeatured ? "text-white/90" : "text-[#2563eb]"
+                                }`}
+                              >
+                                {formatDiningOfferDiscount(offer)}
+                                {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
+                              </p>
+                              <span
+                                className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
+                                  isFeatured ? "text-white/15" : "text-[#2563eb]/10"
+                                }`}
+                                aria-hidden
+                              >
+                                %
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                  </section>
                   )}
-                </section>
+                </div>
 
                 {/* Menu — bordered card, cuisine pills, stack preview → lightbox */}
-                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                <section
+                  id="section-menu"
+                  className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+                >
                   <div className="flex items-center justify-between gap-3 mb-4">
                     <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Menu</h3>
-                    {menus.length > 0 && (
+                    {venueMenuImages.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setActiveTab("Menu");
-                        }}
+                        onClick={() => openLightbox(0, venueMenuImages)}
                         className="inline-flex items-center gap-0.5 text-sm font-semibold text-rose-600 hover:text-rose-700 transition-colors cursor-pointer whitespace-nowrap"
                       >
                         See all menus <ChevronRight size={16} />
@@ -1436,331 +1715,178 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     ))}
                   </div>
 
-                  {menus.length > 0 ? (
-                    <>
-                      {/* Mobile / tablet: single stack card → lightbox slider */}
-                      <div className="lg:hidden">
-                        <button
-                          type="button"
-                          onClick={() => openLightbox(0, menus)}
-                          className="w-[148px] sm:w-[168px] text-left cursor-pointer group"
-                        >
-                          <div className="relative pt-3 px-2">
-                            <div className="absolute top-0 left-4 right-4 h-3 rounded-t-md border border-slate-200 bg-slate-50" aria-hidden />
-                            <div className="absolute top-1.5 left-2.5 right-2.5 h-3 rounded-t-md border border-slate-200 bg-slate-100" aria-hidden />
-                            <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4] shadow-sm">
-                              <img
-                                src={menus[0]}
-                                alt="Menu"
-                                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
-                                }}
-                              />
-                            </div>
-                          </div>
-                          <p className="mt-2.5 text-sm font-bold text-zinc-800">Menu</p>
-                          <p className="text-sm lg:text-xs text-zinc-500">
-                            {menus.length} {menus.length === 1 ? "page" : "pages"}
-                          </p>
-                        </button>
-                      </div>
-
-                      {/* Desktop: up to 3 cards in a row; more than 3 → single stack */}
-                      <div className="hidden lg:block">
-                        {menus.length <= 3 ? (
-                          <div className="grid grid-cols-3 gap-5">
-                            {menus.map((menuUrl, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => openLightbox(idx, menus)}
-                                className="w-full text-left cursor-pointer group"
-                              >
-                                <div className="relative pt-3 px-2">
-                                  <div className="absolute top-0 left-4 right-4 h-3 rounded-t-md border border-slate-200 bg-slate-50" aria-hidden />
-                                  <div className="absolute top-1.5 left-2.5 right-2.5 h-3 rounded-t-md border border-slate-200 bg-slate-100" aria-hidden />
-                                  <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4] shadow-sm">
-                                    <img
-                                      src={menuUrl}
-                                      alt={`Menu ${idx + 1}`}
-                                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).src =
-                                          "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                                <p className="mt-2.5 text-sm sm:text-base lg:text-sm font-bold text-zinc-800">Menu</p>
-                                <p className="text-sm sm:text-base lg:text-sm text-zinc-500">
-                                  {idx + 1} of {menus.length} {menus.length === 1 ? "page" : "pages"}
-                                </p>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => openLightbox(0, menus)}
-                            className="w-[168px] text-left cursor-pointer group"
-                          >
-                            <div className="relative pt-3 px-2">
-                              <div className="absolute top-0 left-4 right-4 h-3 rounded-t-md border border-slate-200 bg-slate-50" aria-hidden />
-                              <div className="absolute top-1.5 left-2.5 right-2.5 h-3 rounded-t-md border border-slate-200 bg-slate-100" aria-hidden />
-                              <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-[3/4] shadow-sm">
-                                <img
-                                  src={menus[0]}
-                                  alt="Menu"
-                                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src =
-                                      "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <p className="mt-2.5 text-sm font-bold text-zinc-800">Menu</p>
-                            <p className="text-xs text-zinc-500">{menus.length} pages</p>
-                          </button>
-                        )}
-                      </div>
-                    </>
+                  {venueMenuImages.length > 0 ? (
+                    <VenueMenuGallery
+                      urls={venueMenuImages}
+                      onOpen={(index, items) => openLightbox(index, items)}
+                    />
                   ) : (
-                    <p className="text-sm text-slate-400">No menu photos available yet.</p>
+                    <MediaEmptyState
+                      icon={BookOpen}
+                      message="No menu available at the moment."
+                    />
                   )}
                 </section>
 
-                {/* About Venue & Average Cost */}
-                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-3">About the Venue</h3>
-                  <p className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap">
-                    {profile.description || 'This venue has not provided a description yet. Enjoy a curated dining experience with premium seats, lovely ambiance, and delicious gourmet specialties.'}
-                  </p>
-
-                  <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-1">Average Cost</h4>
-                  <p className="text-base sm:text-lg lg:text-sm text-slate-600 font-medium">{costText}</p>
-                  <p className="text-base  lg:text-sm text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any</p>
-
-                  {profile.amenities && profile.amenities.length > 0 && (
-                    <>
-                      <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-3">More Info</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
-                        {profile.amenities.map((info: string) => (
-                          <div key={info} className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600">
-                            <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                              <Check size={10} strokeWidth={3} />
-                            </span>
-                            <span>{info}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                {/* Photos Gallery — max 3; 3rd gets “View all photos” overlay when more exist */}
+                <section
+                  id="section-photos"
+                  className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+                >
+                  <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-5">Photos Gallery</h3>
+                  <VenuePhotosGallery
+                    urls={venueGalleryPhotos}
+                    onOpen={(index, items) => openLightbox(index, items)}
+                  />
                 </section>
-              </div>
-            )}
 
-            {/* Menu Tab Content — uniform gallery cards, 3 per row on desktop */}
-            {activeTab === "Menu" && (
-              <section className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200">
-                <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-5">Menu Card</h3>
-                {menus.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {menus.map((menuUrl, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => openLightbox(idx, menus)}
-                        className="rounded-xl overflow-hidden border border-slate-200 group cursor-zoom-in text-left bg-white flex flex-col h-full"
-                      >
-                        <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 shrink-0">
-                          <img
-                            src={menuUrl}
-                            alt={`Menu Page ${idx + 1}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80";
-                            }}
+                {/* Reviews — same UI as before, shown in Overview scroll */}
+                <div
+                  id="section-reviews"
+                  className="space-y-6 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+                >
+                  {/* Write Review Form */}
+                  <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                    <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
+                    <form onSubmit={handleAddReview} className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">Your Name</label>
+                          <input
+                            type="text"
+                            required
+                            value={newReviewUser}
+                            onChange={(e) => setNewReviewUser(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
+                            placeholder="E.g., Priya R."
                           />
                         </div>
-                        <div className="p-3 border-t border-slate-200 bg-[#f4f7fb] mt-auto">
-                          <p className="text-xs font-bold text-slate-700">Menu Page {idx + 1}</p>
+                        <div>
+                          <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">Rating</label>
+                          <div className="h-9 flex items-center">
+                            <StarRatingInput value={newReviewRating} onChange={setNewReviewRating} />
+                          </div>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-400">No menu photos available yet.</p>
-                )}
-              </section>
-            )}
-
-            {/* Photos Tab Content */}
-            {activeTab === "Photos" && (
-              <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-5">Photos Gallery</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {photos.map((url, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => openLightbox(idx)}
-                      className="rounded-xl overflow-hidden h-40 bg-slate-100 border border-slate-100 hover:shadow-md transition-shadow cursor-pointer"
-                    >
-                      <img src={url} alt={`gallery item ${idx}`} className="w-full h-full object-cover hover:scale-103 transition-transform duration-300" />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Reviews Tab Content */}
-            {activeTab === "Reviews" && (
-              <div className="space-y-6">
-
-                {/* Write Review Form */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
-                  <form onSubmit={handleAddReview} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      </div>
                       <div>
-                        <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">Your Name</label>
-                        <input
-                          type="text"
+                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">Comment</label>
+                        <textarea
                           required
-                          value={newReviewUser}
-                          onChange={(e) => setNewReviewUser(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
-                          placeholder="E.g., Priya R."
+                          rows={3}
+                          value={newReviewText}
+                          onChange={(e) => setNewReviewText(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
+                          placeholder="Write details about food, staff, service..."
                         />
                       </div>
-                      <div>
-                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">Rating</label>
-                        <div className="h-9 flex items-center">
-                          <StarRatingInput value={newReviewRating} onChange={setNewReviewRating} />
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">Comment</label>
-                      <textarea
-                        required
-                        rows={3}
-                        value={newReviewText}
-                        onChange={(e) => setNewReviewText(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
-                        placeholder="Write details about food, staff, service..."
-                      />
-                    </div>
-                    <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm">
-                      Submit Review
-                    </button>
-                  </form>
-                </section>
+                      <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm">
+                        Submit Review
+                      </button>
+                    </form>
+                  </section>
 
-                {/* Review Feed */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-5 divide-y divide-slate-100">
-                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
-                  {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one!</p>}
-                  {reviews.map((rev: any, idx: number) => (
-                    <div key={rev.id} className={`${idx > 0 ? "pt-5" : ""} flex gap-3`}>
-                      <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 text-slate-500 font-bold text-xs flex items-center justify-center border border-slate-200">
-                        {(rev.user_name || '?').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="text-baselg:text-xs font-bold text-slate-800">{rev.user_name}</p>
-                          <p className="text-[1rem] sm:text-[0.625rem] text-slate-400 font-medium">
-                            {new Date(rev.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {/* Review Feed */}
+                  <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-5 divide-y divide-slate-100">
+                    <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
+                    {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one!</p>}
+                    {reviews.map((rev: any, idx: number) => (
+                      <div key={rev.id} className={`${idx > 0 ? "pt-5" : ""} flex gap-3`}>
+                        <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 text-slate-500 font-bold text-xs flex items-center justify-center border border-slate-200">
+                          {(rev.user_name || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-baselg:text-xs font-bold text-slate-800">{rev.user_name}</p>
+                            <p className="text-[1rem] sm:text-[0.625rem] text-slate-400 font-medium">
+                              {new Date(rev.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md text-sm sm:text-base lg:text-[0.625rem] text-emerald-600 font-bold">
+                              <span>{rev.rating}</span>
+                              <Star size={8} className="fill-emerald-600" />
+                            </div>
+                          </div>
+                          <p className="text-base lg:text-xs text-slate-600 mt-2 leading-relaxed">
+                            {rev.text}
                           </p>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md text-sm sm:text-base lg:text-[0.625rem] text-emerald-600 font-bold">
-                            <span>{rev.rating}</span>
-                            <Star size={8} className="fill-emerald-600" />
-                          </div>
-                        </div>
-                        <p className="text-base lg:text-xs text-slate-600 mt-2 leading-relaxed">
-                          {rev.text}
-                        </p>
 
-                        {/* Render Nested Replies */}
-                        {rev.replies && rev.replies.length > 0 && (
-                          <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100">
-                            {rev.replies.map((reply: any) => (
-                              <div key={reply.id} className={`p-3 rounded-xl text-base lg:text-xs ${reply.user_type === 'owner' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className={`font-bold ${reply.user_type === 'owner' ? 'text-rose-700' : 'text-slate-700'}`}>
-                                    {reply.user_name} {reply.user_type === 'owner' && <span className="ml-1 text-[1rem] lg:text-[0.5625rem] bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Owner</span>}
-                                  </span>
-                                  <span className="text-[1rem] lg:text-[0.625rem] text-slate-400">
-                                    {new Date(reply.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                                  </span>
+                          {/* Render Nested Replies */}
+                          {rev.replies && rev.replies.length > 0 && (
+                            <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100">
+                              {rev.replies.map((reply: any) => (
+                                <div key={reply.id} className={`p-3 rounded-xl text-base lg:text-xs ${reply.user_type === 'owner' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className={`font-bold ${reply.user_type === 'owner' ? 'text-rose-700' : 'text-slate-700'}`}>
+                                      {reply.user_name} {reply.user_type === 'owner' && <span className="ml-1 text-[1rem] lg:text-[0.5625rem] bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Owner</span>}
+                                    </span>
+                                    <span className="text-[1rem] lg:text-[0.625rem] text-slate-400">
+                                      {new Date(reply.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                                    </span>
+                                  </div>
+                                  <p className={reply.user_type === 'owner' ? 'text-rose-900/80' : 'text-slate-600'}>
+                                    {reply.text}
+                                  </p>
                                 </div>
-                                <p className={reply.user_type === 'owner' ? 'text-rose-900/80' : 'text-slate-600'}>
-                                  {reply.text}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Reply Form Toggle */}
-                        <div className="mt-3">
-                          {replyingToReviewId === rev.id ? (
-                            <form onSubmit={(e) => handleAddReply(e, rev.id)} className="bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2">
-                              <div className="flex items-center gap-2 mb-2">
-                                <input
-                                  type="text"
-                                  required
-                                  value={replyUser}
-                                  onChange={(e) => setReplyUser(e.target.value)}
-                                  placeholder="Your Name"
-                                  className="text-base lg:text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-rose-500 w-1/3"
-                                />
-                              </div>
-                              <textarea
-                                required
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                                placeholder="Write your reply..."
-                                className="w-full text-base lg:text-xs border border-slate-200 rounded p-2 outline-none focus:border-rose-500 min-h-[60px]"
-                              />
-                              <div className="flex justify-end gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setReplyingToReviewId(null)}
-                                  className="text-base lg:text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="submit"
-                                  className="text-base lg:text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg"
-                                >
-                                  Post Reply
-                                </button>
-                              </div>
-                            </form>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setReplyingToReviewId(rev.id);
-                                setReplyText("");
-                                setReplyUser("");
-                              }}
-                              className="text-base lg:text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
-                            >
-                              Reply to review
-                            </button>
+                              ))}
+                            </div>
                           )}
+
+                          {/* Reply Form Toggle */}
+                          <div className="mt-3">
+                            {replyingToReviewId === rev.id ? (
+                              <form onSubmit={(e) => handleAddReply(e, rev.id)} className="bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <input
+                                    type="text"
+                                    required
+                                    value={replyUser}
+                                    onChange={(e) => setReplyUser(e.target.value)}
+                                    placeholder="Your Name"
+                                    className="text-base lg:text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-rose-500 w-1/3"
+                                  />
+                                </div>
+                                <textarea
+                                  required
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  placeholder="Write your reply..."
+                                  className="w-full text-base lg:text-xs border border-slate-200 rounded p-2 outline-none focus:border-rose-500 min-h-[60px]"
+                                />
+                                <div className="flex justify-end gap-2 mt-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setReplyingToReviewId(null)}
+                                    className="text-base lg:text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    className="text-base lg:text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg"
+                                  >
+                                    Post Reply
+                                  </button>
+                                </div>
+                              </form>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setReplyingToReviewId(rev.id);
+                                  setReplyText("");
+                                  setReplyUser("");
+                                }}
+                                className="text-base lg:text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
+                              >
+                                Reply to review
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </section>
+                    ))}
+                  </section>
+                </div>
               </div>
             )}
 
@@ -1784,27 +1910,52 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 </div>
               ) : (
                 <>
-              {/* Table Reservation Widget */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-md overflow-hidden">
-                <div className="bg-indigo-50/60 p-4 border-b border-indigo-100/50">
-                  <h3 className="text-base sm:text-lg lg:text-sm font-bold text-slate-800 tracking-wide uppercase">Table reservation</h3>
-                  {widgetOfferLabel ? (
-                  <div className="flex items-center gap-1.5 text-base lg:text-xs text-indigo-700 font-bold mt-1">
-                    <span className="inline-flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-sm lg:text-[0.625rem] font-black shrink-0 shadow-sm">%</span>
-                      <span>{widgetOfferLabel}</span>
+              {/* Table Reservation Widget — District-style card */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden p-4">
+                <div className="flex items-start gap-2.5 sm:gap-4">
+                  {/* <img
+                    src="/images/dining/offer-percent-3d.png"
+                    alt=""
+                    className="w-11 h-11 sm:w-12 sm:h-10 -rotate-10 object-contain shrink-0"
+                    aria-hidden
+                  /> */}
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-wide uppercase leading-tight">
+                      Table reservation
+                    </h3>
+                    {widgetOfferLabel ? (
+                      <p className="mt-1 text-sm text-slate-800 font-semibold leading-snug flex flex-wrap items-center gap-x-0.5">
+                        {widgetOfferLabel.split(/(\d+%?\s*off|\d+\s*ETB\s*off)/i).map((part, idx) =>
+                          /\d/i.test(part) && /off/i.test(part) ? (
+                            <span key={idx} className="text-[#6900AA] font-bold">{part}</span>
+                          ) : (
+                            <span key={idx}>{part}</span>
+                          )
+                        )}
+                        <ChevronRight size={15} className="inline shrink-0 text-slate-800 ml-0.5" />
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-slate-600 font-medium leading-snug">
+                        Reserve a table at this venue
+                      </p>
+                    )}
                   </div>
-                  ) : (
-                    <p className="text-base lg:text-xs text-slate-500 font-medium mt-1">Reserve a table at this venue</p>
-                  )}
+                  <img
+                    src="/images/dining/tag-removebg-preview.png"
+                    alt=""
+                    className="w-12 h-12 sm:w-14 sm:h-12 object-contain shrink-0"
+                    aria-hidden
+                  />
                 </div>
 
-                <div className="p-4 space-y-4">
+                <div className="mt-3 space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div className="relative">
+                      <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6900AA] pointer-events-none z-[1]" />
                       <select
                         value={selectedDateIndex}
                         onChange={(e) => handleDateSelect(Number(e.target.value))}
-                        className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-base lg:text-xs text-slate-750 focus:outline-none appearance-none font-semibold cursor-pointer"
+                        className="w-full bg-white border border-slate-200 rounded-full pl-9 pr-8 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#6900AA]/40 appearance-none cursor-pointer"
                       >
                         {bookingDates.map((d, idx) => {
                           let label = "";
@@ -1818,14 +1969,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           );
                         })}
                       </select>
-                      <ChevronRight size={12} className="absolute right-2 top-2.5 text-slate-400 rotate-90 pointer-events-none" />
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                     </div>
 
                     <div className="relative">
+                      <Users size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6900AA] pointer-events-none z-[1]" />
                       <select
                         value={guests}
                         onChange={(e) => { setGuests(e.target.value); setAvailabilityStatus(null); }}
-                        className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-7 py-2 text-base lg:text-xs text-slate-750 focus:outline-none appearance-none font-semibold cursor-pointer"
+                        className="w-full bg-white border border-slate-200 rounded-full pl-9 pr-8 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#6900AA]/40 appearance-none cursor-pointer"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                           <option key={num} value={num}>
@@ -1833,16 +1985,17 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           </option>
                         ))}
                       </select>
-                      <ChevronRight size={12} className="absolute right-2 top-2.5 text-slate-400 rotate-90 pointer-events-none" />
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                     </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => handleQuickBook()}
-                    className="bg-[#6900AA] hover:bg-[#57008E] text-white rounded-xl w-full py-2.5 text-base lg:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full rounded-full border border-[#6900AA] bg-[#efd7ff] text-[#6900AA] py-2.5 px-4 text-sm sm:text-base font-bold transition-all cursor-pointer flex items-center justify-center gap-1 hover:bg-[#efd7ff]"
                   >
                     Book a table
+                    <ChevronRight size={16} className="shrink-0" />
                   </button>
                 </div>
               </div>
@@ -2097,19 +2250,25 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   ]
                 ).filter((m) => m.active);
 
-                const selectedMeal =
-                  mealOptions.find((m) => m.id === activeMealSection) || mealOptions[0] || null;
-                const visibleSlots = selectedMeal?.slots || [];
+                const mealIcon = (id: 'breakfast' | 'lunch' | 'dinner') => {
+                  if (id === 'breakfast') return <Sunrise size={18} className="text-amber-500 shrink-0" />;
+                  if (id === 'lunch') return <Sun size={18} className="text-amber-500 shrink-0" />;
+                  return <Moon size={18} className="text-slate-500 shrink-0" />;
+                };
 
-                const dateSelectLabel = (() => {
-                  if (selectedDateIndex === 0) return 'Today';
-                  if (selectedDateIndex === 1) return 'Tomorrow';
-                  return bookingDates[selectedDateIndex].toLocaleDateString('en-IN', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'short',
-                  });
-                })();
+                const mealRangeLabel = (id: 'breakfast' | 'lunch' | 'dinner') => {
+                  const cfg = mealsConfig[id];
+                  if (!cfg?.open || !cfg?.close) return '';
+                  return `${formatSlotLabel(cfg.open)} to ${formatSlotLabel(cfg.close)}`;
+                };
+
+                // Keep accordion open on a valid meal; null means all collapsed
+                const openMealId =
+                  activeMealSection === null
+                    ? null
+                    : mealOptions.find((m) => m.id === activeMealSection)?.id ||
+                      mealOptions[0]?.id ||
+                      null;
 
                 return (
                   <div className="space-y-5">
@@ -2118,188 +2277,163 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </h4>
 
                     <div className="space-y-5 bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                    <div ref={bookingFiltersRef} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {/* Date dropdown */}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBookingDropdownOpen((prev) => (prev === 'date' ? null : 'date'))
-                          }
-                          className="w-full flex items-center gap-2 rounded-md bg-[#f5f5f5] hover:bg-[#efefef] px-3 py-3 text-left cursor-pointer"
-                        >
-                          <Calendar size={16} className="text-slate-500 shrink-0" />
-                          <span className="flex-1 text-sm font-medium text-slate-800 truncate">
-                            {dateSelectLabel}
-                          </span>
-                          <ChevronDown size={16} className="text-slate-400 shrink-0" />
-                        </button>
-                        {bookingDropdownOpen === 'date' && (
-                          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-lg bg-white py-1 shadow-lg overflow-hidden">
-                            {bookingDates.map((d, idx) => {
-                              let label = '';
-                              if (idx === 0) label = 'Today';
-                              else if (idx === 1) label = 'Tomorrow';
-                              else {
-                                label = d.toLocaleDateString('en-IN', {
-                                  weekday: 'short',
-                                  day: 'numeric',
-                                  month: 'short',
-                                });
-                              }
-                              const selected = selectedDateIndex === idx;
-                              return (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() => {
-                                    handleDateSelect(idx);
-                                    setBookingDropdownOpen(null);
-                                  }}
-                                  className={`w-full text-left px-3 py-2.5 text-sm font-medium cursor-pointer ${
-                                    selected
-                                      ? 'bg-slate-100 text-slate-900'
-                                      : 'text-slate-700 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  {label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Guests dropdown */}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBookingDropdownOpen((prev) => (prev === 'guests' ? null : 'guests'))
-                          }
-                          className="w-full flex items-center gap-2 rounded-md bg-[#f5f5f5] hover:bg-[#efefef] px-3 py-3 text-left cursor-pointer"
-                        >
-                          <Users size={16} className="text-slate-500 shrink-0" />
-                          <span className="flex-1 text-sm font-medium text-slate-800 truncate">
-                            {guests} {Number(guests) === 1 ? 'guest' : 'guests'}
-                          </span>
-                          <ChevronDown size={16} className="text-slate-400 shrink-0" />
-                        </button>
-                        {bookingDropdownOpen === 'guests' && (
-                          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-56 overflow-y-auto rounded-lg bg-white py-1 shadow-lg">
+                    {/* Number of guest(s) — chip row */}
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
+                      <div className="flex flex-wrap gap-2.5">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-                              const selected = Number(guests) === num;
+                          const selected = Number(guests) === num;
                           return (
                             <button
                               key={num}
                               type="button"
-                                  onClick={() => {
-                                    setGuests(num.toString());
-                                    setAvailabilityStatus(null);
-                                    setBookingDropdownOpen(null);
-                                  }}
-                                  className={`w-full text-left px-3 py-2.5 text-sm font-medium cursor-pointer ${
-                                    selected
-                                      ? 'bg-slate-100 text-slate-900'
-                                      : 'text-slate-700 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  {num} {num === 1 ? 'guest' : 'guests'}
+                              onClick={() => {
+                                setGuests(num.toString());
+                                setAvailabilityStatus(null);
+                              }}
+                              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center ${
+                                selected
+                                  ? 'border border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]'
+                                  : 'border border-slate-200 text-slate-700 bg-white hover:border-slate-300'
+                              }`}
+                            >
+                              {num}
                             </button>
                           );
                         })}
                       </div>
-                        )}
                     </div>
 
-                      {/* Meal dropdown */}
-                      <div className="relative">
-                        <button
-                          type="button"
-                          disabled={mealOptions.length === 0}
-                          onClick={() =>
-                            setBookingDropdownOpen((prev) => (prev === 'meal' ? null : 'meal'))
-                          }
-                          className="w-full flex items-center gap-2 rounded-md bg-[#f5f5f5] hover:bg-[#efefef] px-3 py-3 text-left cursor-pointer disabled:opacity-50"
-                        >
-                          <Clock size={16} className="text-slate-500 shrink-0" />
-                          <span className="flex-1 text-sm font-medium text-slate-800 truncate">
-                            {selectedMeal?.label || 'Meal'}
-                          </span>
-                          <ChevronDown size={16} className="text-slate-400 shrink-0" />
-                        </button>
-                        {bookingDropdownOpen === 'meal' && mealOptions.length > 0 && (
-                          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-lg bg-white py-1 shadow-lg overflow-hidden">
-                            {mealOptions.map((m) => {
-                              const selected = selectedMeal?.id === m.id;
+                    {/* When are you visiting? — horizontal day strip */}
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 mb-3">When are you visiting?</p>
+                      <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+                        {bookingDates.map((d, idx) => {
+                          const labels = formatDateLabel(d, idx);
+                          const selected = selectedDateIndex === idx;
                           return (
                             <button
-                                  key={m.id}
+                              key={idx}
                               type="button"
-                                  onClick={() => {
-                                    setActiveMealSection(m.id);
-                                    setSelectedTime('');
-                                    setAvailabilityStatus(null);
-                                    setBookingDropdownOpen(null);
-                                  }}
-                                  className={`w-full text-left px-3 py-2.5 text-sm font-medium cursor-pointer ${
-                                    selected
-                                      ? 'bg-slate-100 text-slate-900'
-                                      : 'text-slate-700 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  {m.label}
+                              onClick={() => handleDateSelect(idx)}
+                              className={`min-w-[72px] sm:min-w-[78px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${
+                                selected
+                                  ? 'border border-[#6900AA] bg-[#f7e9ff]'
+                                  : 'border border-slate-200 bg-white hover:border-slate-300'
+                              }`}
+                            >
+                              <p className={`text-sm font-semibold leading-tight ${selected ? 'text-[#6900AA]' : 'text-slate-700'}`}>
+                                {labels.top}
+                              </p>
+                              <p className={`text-[0.8rem] font-medium mt-0.5 leading-tight ${selected ? 'text-[#6900AA]' : 'text-slate-500'}`}>
+                                {labels.bottom}
+                              </p>
                             </button>
                           );
                         })}
-                          </div>
-                        )}
                       </div>
                     </div>
 
+                    {/* Meal period accordions + time slots */}
                     <div className="space-y-3 pt-1">
-                      <h4 className="text-base font-semibold text-slate-900">Select slot</h4>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Select the time of day to see the offers
+                      </p>
 
                       {isSelectedDayClosed ? (
                         <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
                           <p className="text-xs text-rose-500 font-bold">Closed on this day</p>
                           <p className="text-[0.625rem] text-slate-400 mt-0.5">Please select another date above.</p>
                         </div>
-                      ) : visibleSlots.length === 0 ? (
+                      ) : mealOptions.length === 0 ? (
                         <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
                           <p className="text-xs text-slate-400 font-medium">No slots available for this selection.</p>
                           <p className="text-[0.625rem] text-slate-400 mt-0.5">Try another date or meal time.</p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-                          {visibleSlots.map((slot) => {
-                                    const isSelected = selectedTime === slot;
-                            const promoText = offerChipLabel;
-                                    return (
-                                      <button
-                                        key={slot}
-                                        type="button"
-                                        onClick={() => handleTimeSelect(slot)}
-                                className={`h-[48px] px-2 rounded-md border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
-                                  isSelected
-                                    ? 'border-[#6900AA] bg-[#f7e9ff] text-slate-900'
-                                    : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400'
-                                }`}
+                        <div className="space-y-3">
+                          {mealOptions.map((meal) => {
+                            const isOpen = openMealId === meal.id;
+                            const cfg = mealsConfig[meal.id];
+                            return (
+                              <div
+                                key={meal.id}
+                                className="rounded-2xl border border-slate-200 bg-white overflow-hidden"
                               >
-                                <span className="text-sm font-semibold leading-none">
-                                  {formatSlotLabel(slot)}
-                                </span>
-                                {promoText ? (
-                                  <span className="text-[0.625rem] font-medium text-[#2563EB] mt-1 leading-none">
-                                    {promoText}
-                                  </span>
-                                ) : null}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isOpen) {
+                                      setActiveMealSection(null);
+                                    } else {
+                                      setActiveMealSection(meal.id);
+                                      setSelectedTime('');
+                                      setAvailabilityStatus(null);
+                                    }
+                                  }}
+                                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50/80 transition-colors"
+                                >
+                                  {mealIcon(meal.id)}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800">{meal.label}</p>
+                                    {cfg?.open && cfg?.close && (
+                                      <p className="text-xs text-slate-500 mt-0.5">
+                                        {mealRangeLabel(meal.id)}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <ChevronDown
+                                    size={18}
+                                    className={`text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                                  />
+                                </button>
+
+                                {isOpen && (
+                                  <div className="px-4 pb-4">
+                                    {meal.slots.length === 0 ? (
+                                      <p className="text-xs text-slate-400 font-medium py-3 text-center">
+                                        No slots available in this period.
+                                      </p>
+                                    ) : (
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                        {meal.slots.map((slot) => {
+                                          const isSelected = selectedTime === slot;
+                                          const promoText = offerChipLabel;
+                                          return (
+                                            <button
+                                              key={slot}
+                                              type="button"
+                                              onClick={() => {
+                                                setActiveMealSection(meal.id);
+                                                handleTimeSelect(slot);
+                                              }}
+                                              className={`min-h-[52px] px-2 py-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                                                isSelected
+                                                  ? 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
+                                                  : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+                                              }`}
+                                            >
+                                              <span className="text-sm font-semibold leading-none">
+                                                {formatSlotLabel(slot)}
+                                              </span>
+                                              {promoText ? (
+                                                <span className="text-[0.625rem] font-bold text-[#2563EB] mt-1.5 leading-none">
+                                                  {promoText}
+                                                </span>
+                                              ) : null}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Choose an offer — merchant + BookMyBota platform offers */}
                     {hasAnyBookableOffer && (

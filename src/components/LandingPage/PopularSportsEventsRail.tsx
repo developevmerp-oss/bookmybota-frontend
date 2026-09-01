@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import { ShowcaseEventPosterCard } from "./PosterCard";
 
@@ -87,7 +88,7 @@ const MIN_VISIBLE = 5;
 
 export default function PopularSportsEventsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const showArrows = POPULAR_SPORTS_EVENTS.length > MIN_VISIBLE;
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [POPULAR_SPORTS_EVENTS.length]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -111,7 +112,7 @@ export default function PopularSportsEventsRail() {
         </div>
 
         <div className="relative">
-          {showArrows && (
+          {scrollEdges.left && (
             <button
               type="button"
               aria-label="Previous sports events"
@@ -136,7 +137,7 @@ export default function PopularSportsEventsRail() {
             ))}
           </AdaptiveCardRow>
 
-          {showArrows && (
+          {scrollEdges.right && (
             <button
               type="button"
               aria-label="Next sports events"

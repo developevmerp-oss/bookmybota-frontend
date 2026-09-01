@@ -5,6 +5,7 @@ import { Calendar, ChevronLeft, ChevronRight, Flame, Loader2, Sparkles, Users } 
 import { useGetActivePlatformOffersQuery, type PlatformOffer } from "@/services/api";
 import { formatDate } from "@/lib/dateFormat";
 import { formatMoney, formatWholeNumber } from "@/lib/currencyFormat";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./SpecialOffersRail.css";
 
 type OfferTheme = "magenta" | "violet" | "ocean" | "sunset" | "emerald";
@@ -183,6 +184,8 @@ export default function SpecialOffersRail() {
     .filter((o) => o.effective_status === "ACTIVE" || o.effective_status === "SCHEDULED")
     .map(mapPlatformOffer);
 
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [offers.length, isLoading]);
+
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -210,14 +213,16 @@ export default function SpecialOffersRail() {
             </div>
           ) : (
             <>
-              <button
-                type="button"
-                aria-label="Previous offers"
-                onClick={() => scrollBy(-1)}
-                className="hidden md:flex absolute -left-4 md:-left-5 lg:-left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-              >
-                <ChevronLeft size={18} />
-              </button>
+              {scrollEdges.left && (
+                <button
+                  type="button"
+                  aria-label="Previous offers"
+                  onClick={() => scrollBy(-1)}
+                  className="hidden md:flex absolute -left-4 md:-left-5 lg:-left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              )}
 
               <div ref={scrollerRef} className="offers-rail">
                 {offers.map((offer) => (
@@ -225,14 +230,16 @@ export default function SpecialOffersRail() {
                 ))}
               </div>
 
-              <button
-                type="button"
-                aria-label="Next offers"
-                onClick={() => scrollBy(1)}
-                className="hidden md:flex absolute -right-4 md:-right-5 lg:-right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-              >
-                <ChevronRight size={18} />
-              </button>
+              {scrollEdges.right && (
+                <button
+                  type="button"
+                  aria-label="Next offers"
+                  onClick={() => scrollBy(1)}
+                  className="hidden md:flex absolute -right-4 md:-right-5 lg:-right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              )}
             </>
           )}
         </div>

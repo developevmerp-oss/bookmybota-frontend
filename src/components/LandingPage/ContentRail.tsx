@@ -5,6 +5,7 @@ import "./AdaptiveCardRow.css";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 
 type ContentRailProps = {
   title: string;
@@ -41,7 +42,7 @@ export default function ContentRail({
 }: ContentRailProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const childCount = Children.toArray(children).filter(Boolean).length;
-  const showArrows = !adaptive || childCount > minVisible;
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [childCount, isLoading, empty]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -114,7 +115,7 @@ export default function ContentRail({
           <p className={`type-body py-8 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>{empty}</p>
         ) : (
           <div className="relative">
-            {showArrows && (
+            {scrollEdges.left && (
               <button
                 type="button"
                 aria-label={`Previous ${label}`}
@@ -140,7 +141,7 @@ export default function ContentRail({
                 {children}
               </div>
             )}
-            {showArrows && (
+            {scrollEdges.right && (
               <button
                 type="button"
                 aria-label={`Next ${label}`}

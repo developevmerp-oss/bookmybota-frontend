@@ -47,6 +47,9 @@ import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
+import DiningBookingPolicyModal, {
+  type DiningBookingPolicySection,
+} from './DiningBookingPolicyModal';
 import {
   confirmBookingSchema,
   type ConfirmBookingValues,
@@ -563,22 +566,35 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     window.scrollTo(0, 0);
   }, [resolvedParams.id]);
 
-  useEffect(() => {
-    const sentinel = tabsSentinelRef.current;
-    if (!sentinel || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setTabsStuck(!entry.isIntersecting),
-      { rootMargin: "-80px 0px 0px 0px", threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, []);
-
   // Sticky section tabs (Overview / Menu / Photos / Reviews) — scroll-spy like District
   const [activeTab, setActiveTab] = useState<string>("Overview");
   const [tabsStuck, setTabsStuck] = useState(false);
+  const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
+  const [sidebarStickyTop, setSidebarStickyTop] = useState(140);
   const tabsSentinelRef = useRef<HTMLDivElement>(null);
   const scrollSpyPausedRef = useRef(false);
+
+  useEffect(() => {
+    const measureHeader = () => {
+      const header = document.querySelector("header");
+      setSiteHeaderHeight(header?.getBoundingClientRect().height ?? 0);
+    };
+    measureHeader();
+    window.addEventListener("resize", measureHeader);
+    return () => window.removeEventListener("resize", measureHeader);
+  }, []);
+
+  useEffect(() => {
+    const sentinel = tabsSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const topInset = siteHeaderHeight > 0 ? siteHeaderHeight : 120;
+    const observer = new IntersectionObserver(
+      ([entry]) => setTabsStuck(!entry.isIntersecting),
+      { rootMargin: `-${topInset}px 0px 0px 0px`, threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [siteHeaderHeight]);
 
   const getDetailStickyOffset = useCallback(() => {
     const tabsEl = document.getElementById("restaurant-tabs");
@@ -587,11 +603,28 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       return headerTop + tabsEl.offsetHeight + 8;
     }
     if (typeof window === "undefined") return 140;
+    if (siteHeaderHeight > 0) {
+      const tabsEl = document.getElementById("restaurant-tabs");
+      return siteHeaderHeight + (tabsEl?.offsetHeight ?? 52) + 8;
+    }
     if (window.matchMedia("(min-width: 1280px)").matches) return 148;
     if (window.matchMedia("(min-width: 1024px)").matches) return 140;
-    if (window.matchMedia("(min-width: 768px)").matches) return 120;
-    return 112;
-  }, []);
+    if (window.matchMedia("(min-width: 768px)").matches) return 132;
+    return 124;
+  }, [siteHeaderHeight]);
+
+  useEffect(() => {
+    const updateSidebarTop = () => setSidebarStickyTop(getDetailStickyOffset());
+    updateSidebarTop();
+    window.addEventListener("resize", updateSidebarTop);
+    const tabsEl = document.getElementById("restaurant-tabs");
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateSidebarTop) : null;
+    if (tabsEl) ro?.observe(tabsEl);
+    return () => {
+      window.removeEventListener("resize", updateSidebarTop);
+      ro?.disconnect();
+    };
+  }, [getDetailStickyOffset]);
 
   const scrollToDetailSection = useCallback((sectionId: string, tabId: string) => {
     scrollSpyPausedRef.current = true;
@@ -775,6 +808,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   // Radio-style meal accordion — only one section open at a time
   const [activeMealSection, setActiveMealSection] = useState<'breakfast' | 'lunch' | 'dinner' | null>('lunch');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [bookingPolicyOpen, setBookingPolicyOpen] = useState(false);
+  const [bookingPolicyFocus, setBookingPolicyFocus] = useState<DiningBookingPolicySection>("terms");
   const [bookingDropdownOpen, setBookingDropdownOpen] = useState<'date' | 'guests' | 'meal' | null>(null);
   const bookingFiltersRef = useRef<HTMLDivElement>(null);
 
@@ -1546,9 +1581,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         <div ref={tabsSentinelRef} className="h-0 mt-6" aria-hidden />
         <div
           id="restaurant-tabs"
-          className={`sticky z-40 bg-white border-b border-slate-200 top-[52px] md:top-[60px] lg:top-[76px] xl:top-[80px] ${
+          className={`sticky z-40 bg-white border-b border-slate-200 ${
             tabsStuck ? "shadow-[0_4px_12px_rgba(15,23,42,0.08)]" : ""
           }`}
+          style={{ top: siteHeaderHeight > 0 ? siteHeaderHeight : 124 }}
         >
           <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
           <div className="flex gap-6 overflow-x-auto scrollbar-hide">
@@ -1901,7 +1937,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
           {/* Right Sidebar Column — hidden on confirm/success for full-width booking flow */}
           {!hideBookingSidebar && (
-          <div ref={bookingWidgetRef} className="lg:col-span-1 space-y-6 lg:sticky lg:top-[140px] xl:top-[144px] z-30 self-start">
+          <div
+            ref={bookingWidgetRef}
+            className="lg:col-span-1 space-y-6 lg:sticky z-30 self-start"
+            style={{ top: sidebarStickyTop }}
+          >
 
               {/* Book a Table step 1: animation only on the right */}
               {activeTab === "Book a Table" && drawerStep === 1 ? (
@@ -3295,9 +3335,31 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </div>
                   <span className="text-xs text-slate-500 font-medium leading-relaxed">
                       I agree to the{' '}
-                    <a href="#" className="text-[#6900AA] font-semibold hover:underline" onClick={e => e.preventDefault()}>Terms &amp; Conditions</a>
+                    <button
+                      type="button"
+                      className="text-[#6900AA] font-semibold hover:underline cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setBookingPolicyFocus("terms");
+                        setBookingPolicyOpen(true);
+                      }}
+                    >
+                      Terms &amp; Conditions
+                    </button>
                       {' '}and{' '}
-                    <a href="#" className="text-[#6900AA] font-semibold hover:underline" onClick={e => e.preventDefault()}>Cancellation Policy</a>
+                    <button
+                      type="button"
+                      className="text-[#6900AA] font-semibold hover:underline cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setBookingPolicyFocus("cancellation");
+                        setBookingPolicyOpen(true);
+                      }}
+                    >
+                      Cancellation Policy
+                    </button>
                     </span>
                   </label>
 
@@ -3332,6 +3394,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               setPhone(customer?.phone || '');
             }
           }}
+        />
+
+        <DiningBookingPolicyModal
+          open={bookingPolicyOpen}
+          focusSection={bookingPolicyFocus}
+          onClose={() => setBookingPolicyOpen(false)}
         />
       </div>
       );

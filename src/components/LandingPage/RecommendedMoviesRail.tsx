@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Star, ThumbsUp } from "lucide-react";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./RecommendedMoviesRail.css";
 
 type MovieCardData = {
@@ -121,6 +122,7 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
 
 export default function RecommendedMoviesRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [RECOMMENDED_MOVIES.length]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -144,14 +146,16 @@ export default function RecommendedMoviesRail() {
         </div>
 
         <div className="relative">
-          <button
-            type="button"
-            aria-label="Previous movies"
-            onClick={() => scrollBy(-1)}
-            className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-          >
-            <ChevronLeft size={18} />
-          </button>
+          {scrollEdges.left && (
+            <button
+              type="button"
+              aria-label="Previous movies"
+              onClick={() => scrollBy(-1)}
+              className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
 
           <div
             ref={scrollerRef}
@@ -163,14 +167,16 @@ export default function RecommendedMoviesRail() {
             ))}
           </div>
 
-          <button
-            type="button"
-            aria-label="Next movies"
-            onClick={() => scrollBy(1)}
-            className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-          >
-            <ChevronRight size={18} />
-          </button>
+          {scrollEdges.right && (
+            <button
+              type="button"
+              aria-label="Next movies"
+              onClick={() => scrollBy(1)}
+              className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
+            >
+              <ChevronRight size={18} />
+            </button>
+          )}
         </div>
       </div>
     </section>

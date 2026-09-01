@@ -837,7 +837,7 @@ export default function PublicEventDetailPage({
             </nav>
           </div>
 
-          <aside className="hidden lg:block lg:sticky lg:top-20 2xl:top-24 lg:self-start lg:z-20">
+          <aside className="hidden lg:block lg:sticky lg:top-[140px] 2xl:top-[148px] lg:self-start lg:z-30">
             {cloneElement(bookingCard)}
           </aside>
         </div>

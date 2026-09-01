@@ -1,0 +1,67 @@
+.dining-hero-swiper .swiper {
+  width: 100%;
+}
+
+.dining-hero-swiper .swiper-slide {
+  height: auto;
+}
+
+.dining-hero-swiper .swiper-pagination {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: 0.75rem !important;
+  width: auto !important;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+.dining-hero-swiper .swiper-pagination-bullet {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: rgba(255, 255, 255, 0.4);
+  opacity: 1;
+  margin: 0 0.2rem !important;
+}
+
+.dining-hero-swiper .swiper-pagination-bullet-active {
+  background: #ffffff;
+  width: 1.25rem;
+  border-radius: 9999px;
+}
+
+.dining-hero-nav {
+  top: 50%;
+  margin-top: -1.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dining-hero-nav:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.dining-hero-nav-prev {
+  left: 0.75rem;
+}
+
+.dining-hero-nav-next {
+  right: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .dining-hero-swiper .swiper-pagination {
+    bottom: 1rem !important;
+  }
+  .dining-hero-nav-prev {
+    left: 1.25rem;
+  }
+  .dining-hero-nav-next {
+    right: 1.25rem;
+  }
+}

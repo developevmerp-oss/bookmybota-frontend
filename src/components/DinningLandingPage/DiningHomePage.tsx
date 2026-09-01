@@ -16,6 +16,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { IconType } from "react-icons";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay, Navigation as SwiperNavigation, Pagination } from "swiper/modules";
+import type { Swiper as SwiperType } from "swiper";
+import "swiper/css";
+import "swiper/css/pagination";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
@@ -58,6 +63,7 @@ import {
   extractCuisines,
   offerBucketSectionTitle,
 } from "@/lib/diningFilters";
+import "./DiningHomePage.css";
 
 const HERO_ACCENT = "#6900AA";
 const PAGE_MUTED = "#f6f7f8";
@@ -82,36 +88,37 @@ const EXPLORE_DINING_CARDS = [
     image: "/images/dining-category-restaurant.png",
     match: ["restaurant"] as const,
   },
-  {
-    id: "bar-grill",
-    title: "Bar & Grill",
-    image: "/images/dining-category-bar-grill.png",
-    match: ["grill", "bar & grill", "bar and grill"] as const,
-  },
+  // {
+  //   id: "bar-grill",
+  //   title: "Bar & Grill",
+  //   image: "/images/dining-category-bar-grill.png",
+  //   match: ["grill", "bar & grill", "bar and grill"] as const,
+  // },
   {
     id: "cafe",
     title: "Cafe",
     image: "/images/dining-category-cafe.png",
     match: ["cafe", "café", "coffee"] as const,
   },
-  {
-    id: "pub",
-    title: "Pub",
-    image: "/images/dining-category-pub.png",
-    match: ["pub"] as const,
-  },
-  {
-    id: "fine-dining",
-    title: "Fine dining",
-    image: "/images/dining-category-fine-dining.png",
-    match: ["fine dining", "fine-dining", "fine"] as const,
-  },
-  {
-    id: "general-restaurant",
-    title: "General restaurant",
-    image: "/images/dining-category-general.png",
-    match: ["general restaurant", "general"] as const,
-  },
+  // Hidden from Explore Dining (frontend only) — keep entries for easy restore.
+  // {
+  //   id: "pub",
+  //   title: "Pub",
+  //   image: "/images/dining-category-pub.png",
+  //   match: ["pub"] as const,
+  // },
+  // {
+  //   id: "fine-dining",
+  //   title: "Fine dining",
+  //   image: "/images/dining-category-fine-dining.png",
+  //   match: ["fine dining", "fine-dining", "fine"] as const,
+  // },
+  // {
+  //   id: "general-restaurant",
+  //   title: "General restaurant",
+  //   image: "/images/dining-category-general.png",
+  //   match: ["general restaurant", "general"] as const,
+  // },
 ] as const;
 
 type MealOccasion = "lunch" | "breakfast" | "dinner" | "fastfood";
@@ -128,8 +135,9 @@ const MEAL_OCCASIONS: {
 ];
 
 const PROMO_SLIDES = [
-  { src: "/images/dining/promo-rakhi.png", alt: "Rakhi Special Celebrations" },
-  { src: "/images/dining/promo-cafe.png", alt: "Good Food. Great Moments." },
+  { id: "dining-hero", src: "/images/dining-hero.png", alt: "Discover dining near you" },
+  { id: "promo-rakhi", src: "/images/dining/promo-rakhi.png", alt: "Rakhi Special Celebrations" },
+  { id: "promo-cafe", src: "/images/dining/promo-cafe.png", alt: "Good Food. Great Moments." },
 ];
 
 const OFFER_THEMES = [
@@ -667,7 +675,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
   const offerLabel = listingOfferLabel(restaurant.dining_offers);
 
   return (
-    <div className="group flex h-full flex-col bg-[#F5F5F5] rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-xl transition-shadow duration-300 p-3">
+    <div className="group flex h-full flex-col bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-shadow duration-300 p-3">
       <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
         <Link href={`/restaurant/${restaurant.id}`} className="absolute inset-0 block">
           <img
@@ -709,7 +717,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
       <Link
         href={`/restaurant/${restaurant.id}`}
-        className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-[#F5F5F5]"
+        className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-white"
       >
         <div className="flex justify-between items-start gap-2 mb-2">
           <h3 className="font-bold text-[#292929] text-lg sm:text-xl leading-tight truncate flex-1 group-hover:text-[#6900AA] transition-colors">
@@ -741,7 +749,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
         <div className="mt-auto pt-3 w-full">
           <span
-            className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-[#6900AA] bg-[#F5F5F5] px-3.5 py-2.5 text-sm font-semibold text-[#6900AA] group-hover:bg-[#EFEFEF] transition-colors [transform:translateZ(0)] [backface-visibility:hidden]"
+            className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-[#6900AA] bg-white px-3.5 py-2.5 text-sm font-semibold text-[#6900AA] group-hover:bg-[#f7e9ff] transition-colors [transform:translateZ(0)] [backface-visibility:hidden]"
           >
             <span>View Booking</span>
             <ArrowRight size={16} className="shrink-0" />
@@ -929,12 +937,23 @@ export default function Home() {
   const [mealOccasion, setMealOccasion] = useState<MealOccasion | "">("");
   const authUser = useAppSelector((state) => state.auth.user);
   const foodieName = authUser?.name?.trim().split(/\s+/)[0] || "Foodie";
-  const [promoIndex, setPromoIndex] = useState(0);
+  const bannerPrevRef = useRef<HTMLButtonElement>(null);
+  const bannerNextRef = useRef<HTMLButtonElement>(null);
 
   const collectionsRef = useRef<HTMLDivElement>(null);
   const cuisinesRef = useRef<HTMLDivElement>(null);
   const offersRef = useRef<HTMLDivElement>(null);
   const [collectionsScroll, setCollectionsScroll] = useState({ left: false, right: false });
+
+  const bindBannerNav = useCallback((swiper: SwiperType) => {
+    const nav = swiper.params?.navigation;
+    if (!nav || typeof nav === "boolean") return;
+    nav.prevEl = bannerPrevRef.current;
+    nav.nextEl = bannerNextRef.current;
+    swiper.navigation?.destroy?.();
+    swiper.navigation?.init?.();
+    swiper.navigation?.update?.();
+  }, []);
 
   const updateCollectionsScroll = useCallback(() => {
     const el = collectionsRef.current;
@@ -1455,42 +1474,74 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ── Promo banner slider (full width, above hero) ─────────────────── */}
-      {/* <section className="relative w-full bg-[#F8E6D4] overflow-hidden">
-        <div className="relative w-full h-[148px] sm:h-[190px] md:h-[230px] lg:h-[280px]">
-          {PROMO_SLIDES.map((slide, i) => (
-            <img
-              key={slide.src}
-              src={slide.src}
-              alt={slide.alt}
-              className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-500 ${
-                i === promoIndex ? "opacity-100" : "opacity-0 pointer-events-none"
-              }`}
-            />
-          ))}
-        </div>
+      {/* ── Top banner slider (movies-style, auto every 3s) ──────────────── */}
+      <section className="w-full overflow-hidden pt-3">
+        <div className="dining-hero-swiper relative w-full">
+          <Swiper
+            modules={[Autoplay, SwiperNavigation, Pagination]}
+            className="w-full"
+            loop={PROMO_SLIDES.length > 1}
+            speed={650}
+            slidesPerView={1}
+            spaceBetween={0}
+            autoplay={
+              PROMO_SLIDES.length > 1
+                ? { delay: 3000, disableOnInteraction: false, pauseOnMouseEnter: true }
+                : false
+            }
+            pagination={PROMO_SLIDES.length > 1 ? { clickable: true } : false}
+            navigation={
+              PROMO_SLIDES.length > 1
+                ? { prevEl: bannerPrevRef.current, nextEl: bannerNextRef.current }
+                : false
+            }
+            onBeforeInit={(swiper: SwiperType) => {
+              const nav = swiper.params?.navigation;
+              if (nav && typeof nav !== "boolean") {
+                nav.prevEl = bannerPrevRef.current;
+                nav.nextEl = bannerNextRef.current;
+              }
+            }}
+            onSwiper={(swiper) => {
+              setTimeout(() => bindBannerNav(swiper));
+            }}
+          >
+            {PROMO_SLIDES.map((slide) => (
+              <SwiperSlide key={slide.id} className="!h-auto">
+                <div className="relative block overflow-hidden min-h-48 sm:min-h-56 md:min-h-72 lg:min-h-75 bg-slate-900">
+                  <img
+                    src={slide.src}
+                    alt={slide.alt}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
 
-        <button
-          type="button"
-          aria-label="Previous offer"
-          onClick={() =>
-            setPromoIndex((prev) => (prev === 0 ? PROMO_SLIDES.length - 1 : prev - 1))
-          }
-          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
-        >
-          <ChevronLeft size={22} />
-        </button>
-        <button
-          type="button"
-          aria-label="Next offer"
-          onClick={() =>
-            setPromoIndex((prev) => (prev === PROMO_SLIDES.length - 1 ? 0 : prev + 1))
-          }
-          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-white/90 hover:bg-white shadow-md flex items-center justify-center text-slate-700"
-        >
-          <ChevronRight size={22} />
-        </button>
-      </section> */}
+          {PROMO_SLIDES.length > 1 && (
+            <>
+              <button
+                ref={bannerPrevRef}
+                type="button"
+                aria-label="Previous banner"
+                className="dining-hero-nav dining-hero-nav-prev absolute z-20 hidden sm:flex items-center justify-center cursor-pointer"
+              >
+                <ChevronLeft className="size-5" strokeWidth={2.25} />
+              </button>
+              <button
+                ref={bannerNextRef}
+                type="button"
+                aria-label="Next banner"
+                className="dining-hero-nav dining-hero-nav-next absolute z-20 hidden sm:flex items-center justify-center cursor-pointer"
+              >
+                <ChevronRight className="size-5" strokeWidth={2.25} />
+              </button>
+            </>
+          )}
+        </div>
+      </section>
 
       {/* ── 1. Hero Search Banner (centered, reference layout) ─────────────── */}
       {/* <section
@@ -1658,7 +1709,7 @@ export default function Home() {
 
       {/* ── Explore Dining categories ─────────────────────────────────────── */}
       <section className="w-full bg-white border-b border-slate-100">
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-6 sm:py-8">
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-6 sm:py-3">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-5 tracking-tight">
             Explore Dining
           </h2>
@@ -1678,6 +1729,19 @@ export default function Home() {
                             <button
                               type="button"
                   onClick={() => {
+                    // Re-clicking the active card must keep selection + results.
+                    // Resetting categories with a new array would clear the list
+                    // while RTK Query returns the same cached page and never rehydrates.
+                    const scrollTargetId =
+                      card.id === "restaurant"
+                        ? "explore-cuisines"
+                        : "restaurant-listings";
+                    if (exploreCardId === card.id) {
+                      document
+                        .getElementById(scrollTargetId)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      return;
+                    }
                     setExploreCardId(card.id);
                     if (resolvedCategory) {
                       setActiveCategories([resolvedCategory]);
@@ -1685,9 +1749,12 @@ export default function Home() {
                       setActiveCategories([]);
                     }
                     setCurrentPage(1);
-                    document
-                      .getElementById("restaurant-listings")
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    // Restaurant shows cuisines under Explore Dining — scroll there, not past it.
+                    requestAnimationFrame(() => {
+                      document
+                        .getElementById(scrollTargetId)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
                   }}
                   className="text-center cursor-pointer w-[120px] h-[140px] sm:w-[132px] sm:h-[160px] rounded-2xl transition-all hover:-translate-y-0.5"
                   aria-pressed={isActive}
@@ -1723,6 +1790,78 @@ className={`text-sm font-bold mt-2 transition-colors ${
 
             </div>
           </section>
+
+      {/* Explore Cuisines — only after Restaurant is selected in Explore Dining */}
+      {exploreCardId === "restaurant" && cuisineCards.length > 0 && (
+        <div className="w-full bg-white border-b border-slate-100">
+          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5 sm:py-6">
+            <section id="explore-cuisines" className="scroll-mt-24">
+              <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
+                <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
+                  Explore Cuisines
+                </h2>
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  <button
+                    type="button"
+                    aria-label="Previous cuisines"
+                    onClick={() => scrollCuisines("left")}
+                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next cuisines"
+                    onClick={() => scrollCuisines("right")}
+                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                  >
+                    <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                  </button>
+                </div>
+              </div>
+              <div
+                ref={cuisinesRef}
+                className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-0 -mx-1 px-1"
+              >
+                {cuisineCards.map((item) => {
+                  const isActive = diningFilters.cuisines.some(
+                    (selected) => selected.toLowerCase() === item.name.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={item.name}
+                      type="button"
+                      onClick={() => handleCuisineSelect(item.name)}
+                      className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
+                    >
+                      <span
+                        className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
+                          isActive ? "ring-2 ring-[#6900AA] ring-offset-1 sm:ring-offset-2" : ""
+                        }`}
+                      >
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const el = e.target as HTMLImageElement;
+                            if (el.src !== CUISINE_IMAGE_FALLBACK) {
+                              el.src = CUISINE_IMAGE_FALLBACK;
+                            }
+                          }}
+                        />
+                      </span>
+                      <span className="mt-1.5 sm:mt-3 text-sm sm:text-lg lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
+                        {item.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
 
       {showHomeExtras && (
       <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
@@ -2099,80 +2238,6 @@ className={`text-sm font-bold mt-2 transition-colors ${
         </div>
       </div>
       </div>
-
-      {showHomeExtras && (
-      <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
-      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
-          {/* ── 7. Cuisine Section ──────────────────────────────────────────── */}
-          {cuisineCards.length > 0 && (
-            <section className="">
-              <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
-                <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
-                  Explore Cuisines
-                </h2>
-                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                  <button
-                    type="button"
-                    aria-label="Previous cuisines"
-                    onClick={() => scrollCuisines("left")}
-                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-                  >
-                    <ChevronLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Next cuisines"
-                    onClick={() => scrollCuisines("right")}
-                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-                  >
-                    <ChevronRight className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                  </button>
-    </div>
-              </div>
-              <div
-                ref={cuisinesRef}
-                className="flex gap-3 sm:gap-5 md:gap-6 lg:gap-8 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-0 -mx-1 px-1"
-              >
-                {cuisineCards.map((item) => {
-                  const isActive = diningFilters.cuisines.some(
-                    (selected) => selected.toLowerCase() === item.name.toLowerCase()
-                  );
-                  return (
-                    <button
-                      key={item.name}
-                      type="button"
-                      onClick={() => handleCuisineSelect(item.name)}
-                      className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
-                    >
-                      <span
-                        className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
-                          isActive ? "ring-2 ring-[#6900AA] ring-offset-1 sm:ring-offset-2" : ""
-                        }`}
-                      >
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          onError={(e) => {
-                            const el = e.target as HTMLImageElement;
-                            if (el.src !== CUISINE_IMAGE_FALLBACK) {
-                              el.src = CUISINE_IMAGE_FALLBACK;
-                            }
-                          }}
-                        />
-                      </span>
-                      <span className="mt-1.5 sm:mt-3 text-sm sm:text-lg lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
-                        {item.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-      </div>
-      </div>
-      )}
     </div>
   );
 }

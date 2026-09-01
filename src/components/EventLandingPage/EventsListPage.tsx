@@ -50,43 +50,15 @@ const EVENT_HERO_SLIDES = [
 const PAGE_SIZE = 8;
 const EMPTY_EVENTS: PublicEvent[] = [];
 const LANG_OPTIONS = ["English", "Amharic"] as const;
-const PRICE_BANDS = [
+const PRICE_BANDS: Array<{ id: string; label: string }> = [
   { id: "free", label: "Free" },
   { id: "0-500", label: "0 - 500" },
   { id: "501-2000", label: "501 - 2000" },
   { id: "2000+", label: "Above 2000" },
-] as const;
-const PRICE_SLIDER_MAX = 2500;
+];
 
 function toIsoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function sliderValueFromBands(bands: string[]) {
-  const band = bands[0];
-  if (band === "free") return 0;
-  if (band === "0-500") return 500;
-  if (band === "501-2000") return 2000;
-  if (band === "2000+") return PRICE_SLIDER_MAX;
-  return PRICE_SLIDER_MAX;
-}
-
-function bandFromSliderValue(value: number) {
-  if (value <= 0) return "free";
-  if (value <= 500) return "0-500";
-  if (value <= 2000) return "501-2000";
-  return "2000+";
-}
-
-function priceLabelFromSlider(value: number) {
-  if (value <= 0) return "Free";
-  if (value >= PRICE_SLIDER_MAX) return `${formatMoney(2000, { compact: true })}+`;
-  return formatMoney(value, { compact: true });
-}
-
-function eventPriceValue(event: PublicEvent) {
-  const raw = Number(event.min_price ?? 0);
-  return Number.isFinite(raw) ? raw : 0;
 }
 
 function FilterTag({
@@ -165,33 +137,37 @@ export default function PublicEventsPage() {
   const [calTab, setCalTab] = useState<"start" | "end">("start");
   const [calMonth, setCalMonth] = useState(() => new Date());
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [selectedPriceBands, setSelectedPriceBands] = useState<string[]>([]);
   const [openFilters, setOpenFilters] = useState({
     categories: true,
     date: false,
+    city: false,
     languages: false,
     price: false,
   });
   const [sort, setSort] = useState("recommended");
   const [page, setPage] = useState(1);
-  const [venueFilter, setVenueFilter] = useState("");
-  const [browseVenues, setBrowseVenues] = useState(false);
-  const [mobileFilterTab, setMobileFilterTab] = useState<"categories" | "date" | "languages" | "price" | null>(null);
+  const [mobileFilterTab, setMobileFilterTab] = useState<
+    "categories" | "date" | "city" | "languages" | "price" | null
+  >(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
-  const [priceSliderValue, setPriceSliderValue] = useState(PRICE_SLIDER_MAX);
 
-  const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
+  const apiCategories = filterOptions?.categories ?? [];
+  const { data: businessTypes = [] } = useGetBusinessTypesQuery("event", {
+    skip: apiCategories.length > 0,
+  });
   const queryArg = useMemo(
     () => ({
       ...(search.trim() ? { q: search.trim() } : {}),
       ...(city ? { city } : {}),
       ...(selectedSlugs.length ? { category: selectedSlugs.join(",") } : {}),
       ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
+      ...(selectedPriceBands.length ? { price: selectedPriceBands.join(",") } : {}),
       ...(datePreset ? { date_preset: datePreset } : {}),
       ...(!datePreset && dateFrom ? { date_from: dateFrom } : {}),
       ...(!datePreset && dateTo ? { date_to: dateTo } : {}),
-      ...(venueFilter ? { organizer: venueFilter } : {}),
       ...(sort && sort !== "recommended" ? { sort } : {}),
     }),
     [
@@ -199,10 +175,10 @@ export default function PublicEventsPage() {
       city,
       selectedSlugs,
       selectedLanguages,
+      selectedPriceBands,
       datePreset,
       dateFrom,
       dateTo,
-      venueFilter,
       sort,
     ]
   );
@@ -228,16 +204,63 @@ export default function PublicEventsPage() {
     return () => window.removeEventListener("selected_city_changed", applyCity);
   }, []);
 
-  const categories = useMemo(
-    () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
-    [businessTypes]
-  );
+  useEffect(() => {
+    let cancelled = false;
 
-  const venues = useMemo(() => filterOptions?.organizers || [], [filterOptions?.organizers]);
+    (async () => {
+      try {
+        const allEvents = await dispatch(
+          api.endpoints.getPublicEvents.initiate(undefined, { forceRefetch: false })
+        ).unwrap();
+
+        const candidates = allEvents.filter(
+          (event) => event.poster_horizontal_url || event.poster_vertical_url
+        );
+
+        const withOffers: PublicEvent[] = [];
+        await Promise.all(
+          candidates.map(async (event) => {
+            if (cancelled) return;
+            try {
+              const offers = await dispatch(
+                api.endpoints.getPublicEventOffers.initiate(event.id, { forceRefetch: false })
+              ).unwrap();
+              if (offers?.length) withOffers.push(event);
+            } catch {
+              // skip events without offers
+            }
+          })
+        );
+
+        if (!cancelled) setOfferHeroEvents(withOffers);
+      } catch {
+        if (!cancelled) setOfferHeroEvents([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch]);
+
+  const categories = useMemo(() => {
+    if (apiCategories.length) return apiCategories;
+    return businessTypes
+      .filter((type) => type.parent_type_id && type.slug)
+      .map((type) => ({ slug: type.slug as string, name: type.name }));
+  }, [apiCategories, businessTypes]);
 
   const languageOptions = useMemo(() => {
+    if (filterOptions?.languages?.length) return filterOptions.languages;
     return [...LANG_OPTIONS];
-  }, []);
+  }, [filterOptions?.languages]);
+
+  const priceBands = useMemo(() => {
+    if (filterOptions?.price_bands?.length) return filterOptions.price_bands;
+    return PRICE_BANDS;
+  }, [filterOptions?.price_bands]);
+
+  const cityOptions = useMemo(() => filterOptions?.cities ?? [], [filterOptions?.cities]);
 
   const datePresets = filterOptions?.date_presets?.length
     ? filterOptions.date_presets
@@ -248,17 +271,14 @@ export default function PublicEventsPage() {
       ];
   const moreOptions: { id: string; label: string }[] = [];
 
-  const filtered = useMemo(() => {
-    if (priceSliderValue >= PRICE_SLIDER_MAX) return events;
-    return events.filter((event) => eventPriceValue(event) <= priceSliderValue);
-  }, [events, priceSliderValue]);
+  const filtered = events;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   useEffect(() => {
     setPage(1);
-  }, [search, city, selectedSlugs, selectedLanguages, datePreset, dateFrom, dateTo, priceSliderValue, venueFilter, sort]);
+  }, [search, city, selectedSlugs, selectedLanguages, selectedPriceBands, datePreset, dateFrom, dateTo, sort]);
 
   const selectSlug = (slug?: string) => {
     if (!slug) return;
@@ -271,6 +291,18 @@ export default function PublicEventsPage() {
 
   const toggleOpen = (key: keyof typeof openFilters) => {
     setOpenFilters((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const clearCity = () => {
+    setCity("");
+    localStorage.setItem("selected_city", "All Cities");
+    window.dispatchEvent(new Event("selected_city_changed"));
+  };
+
+  const selectCity = (cityName: string) => {
+    setCity(cityName);
+    localStorage.setItem("selected_city", cityName);
+    window.dispatchEvent(new Event("selected_city_changed"));
   };
 
   const pickCalendarDay = (day: number) => {
@@ -312,13 +344,39 @@ export default function PublicEventsPage() {
     <div className="flex flex-wrap gap-2">
       {categories.map((cat) => (
         <FilterTag
-          key={cat.id}
+          key={cat.slug}
           label={cat.name}
-          active={!!cat.slug && selectedSlugs.includes(cat.slug)}
+          active={selectedSlugs.includes(cat.slug)}
           onClick={() => selectSlug(cat.slug)}
         />
       ))}
     </div>
+  );
+
+  const cityPanel = () => (
+    <>
+      {!city && <p className="text-xs text-slate-500 mb-2">All Cities</p>}
+      {city ? (
+        <div className="flex flex-wrap gap-2 mb-2">
+          <FilterTag label={city} active onClick={clearCity} />
+        </div>
+      ) : null}
+      {cityOptions.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {cityOptions.map((cityName) => (
+            <FilterTag
+              key={cityName}
+              label={cityName}
+              active={city === cityName}
+              onClick={() => {
+                if (city === cityName) clearCity();
+                else selectCity(cityName);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 
   const datePanel = () => (
@@ -470,57 +528,22 @@ export default function PublicEventsPage() {
   );
 
   const pricePanel = () => (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-slate-400">Price</span>
-        <span className="text-sm font-semibold text-slate-700">{priceLabelFromSlider(priceSliderValue)}</span>
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={PRICE_SLIDER_MAX}
-        step={50}
-        value={priceSliderValue}
-        onChange={(e) => {
-          setPriceSliderValue(Number(e.target.value));
-        }}
-        className="mt-4 h-2 w-full cursor-pointer accent-[#7A00C6]"
-      />
+    <div className="flex flex-wrap gap-2">
+      {priceBands.map((band) => (
+        <FilterTag
+          key={band.id}
+          label={band.label}
+          active={selectedPriceBands.includes(band.id)}
+          onClick={() => toggleIn(selectedPriceBands, band.id, setSelectedPriceBands)}
+        />
+      ))}
     </div>
-  );
-
-  const venueBlock = () => (
-    <>
-      <button
-        type="button"
-        onClick={() => setBrowseVenues((v) => !v)}
-        className="mt-3 w-full border border-[#6900AA] rounded-lg py-2.5 text-sm font-semibold text-[#6900AA] bg-white cursor-pointer"
-      >
-        Browse by Venues
-      </button>
-      {browseVenues && venues.length > 0 && (
-        <ul className="mt-2 bg-white rounded-lg shadow-sm p-3 space-y-2 max-h-40 overflow-y-auto">
-          {venues.map((v) => (
-            <li key={v}>
-              <button
-                type="button"
-                onClick={() => setVenueFilter((cur) => (cur === v ? "" : v))}
-                className={`text-left text-sm w-full cursor-pointer ${
-                  venueFilter === v ? "text-[#6900AA] font-semibold" : "text-slate-600"
-                }`}
-              >
-                {v}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
   );
 
   const mobileTabs = [
     { id: "categories" as const, label: "Categories" },
     { id: "date" as const, label: "Date" },
+    { id: "city" as const, label: "City" },
     { id: "languages" as const, label: "Languages" },
     { id: "price" as const, label: "Price" },
   ];
@@ -579,7 +602,7 @@ export default function PublicEventsPage() {
             <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3 lg:mb-4">Filters</h3>
 
             <div className="lg:hidden">
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-5 gap-1.5">
                 {mobileTabs.map((tab) => {
                   const active = mobileFilterTab === tab.id;
                   return (
@@ -587,7 +610,7 @@ export default function PublicEventsPage() {
                       key={tab.id}
                       type="button"
                       onClick={() => setMobileFilterTab((prev) => (prev === tab.id ? null : tab.id))}
-                      className={`px-1 py-2 rounded-lg text-[11px] sm:text-xs font-semibold cursor-pointer border ${
+                      className={`px-1 py-2 rounded-lg text-[10px] sm:text-[11px] font-semibold cursor-pointer border ${
                         active
                           ? "bg-[#6900AA] border-[#6900AA] text-white"
                           : "bg-white border-slate-200 text-slate-700"
@@ -602,11 +625,11 @@ export default function PublicEventsPage() {
                 <div className="mt-2 bg-white rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.06)] p-3">
                   {mobileFilterTab === "categories" && categoriesPanel()}
                   {mobileFilterTab === "date" && datePanel()}
+                  {mobileFilterTab === "city" && cityPanel()}
                   {mobileFilterTab === "languages" && languagesPanel()}
                   {mobileFilterTab === "price" && pricePanel()}
                 </div>
               )}
-              {venueBlock()}
             </div>
 
             <div className="hidden lg:block space-y-2.5">
@@ -634,6 +657,15 @@ export default function PublicEventsPage() {
               </FilterCard>
 
               <FilterCard
+                title="City"
+                open={openFilters.city}
+                onToggle={() => toggleOpen("city")}
+                onClear={clearCity}
+              >
+                {cityPanel()}
+              </FilterCard>
+
+              <FilterCard
                 title="Languages"
                 open={openFilters.languages}
                 onToggle={() => toggleOpen("languages")}
@@ -646,13 +678,10 @@ export default function PublicEventsPage() {
                 title="Price"
                 open={openFilters.price}
                 onToggle={() => toggleOpen("price")}
-                onClear={() => {
-                  setPriceSliderValue(PRICE_SLIDER_MAX);
-                }}
+                onClear={() => setSelectedPriceBands([])}
               >
                 {pricePanel()}
               </FilterCard>
-              {venueBlock()}
             </div>
           </aside>
 
@@ -661,19 +690,6 @@ export default function PublicEventsPage() {
               <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-900 break-words">
                 Events in {headingCity}
               </h2>
-              {/* <label className="flex items-center gap-2 text-sm text-slate-600">
-                Sort by:
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                  className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-semibold text-slate-800 bg-white"
-                >
-                  <option value="recommended">Recommended</option>
-                  <option value="date">Date</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                </select>
-              </label> */}
             </div>
 
             {isLoading ? (

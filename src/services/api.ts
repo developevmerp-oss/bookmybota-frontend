@@ -2304,8 +2304,8 @@ export const api = createApi({
           payload.menu_images = JSON.stringify(body.menu_images);
         }
         return {
-          url: `/businesses/${bizId}/settings`,
-          method: 'PUT',
+        url: `/businesses/${bizId}/settings`,
+        method: 'PUT',
           body: payload,
         };
       },

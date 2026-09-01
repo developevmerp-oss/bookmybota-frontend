@@ -334,6 +334,11 @@ export interface VenueLayoutTemplate {
   updated_at?: string;
 }
 
+export interface MovieTrailerItem {
+  language: string;
+  trailer_url: string;
+}
+
 export interface Movie {
   id: string;
   title: string;
@@ -342,6 +347,7 @@ export interface Movie {
   poster_url?: string | null;
   banner_url?: string | null;
   trailer_url?: string | null;
+  trailers?: MovieTrailerItem[];
   duration_minutes?: number | null;
   certificate?: string | null;
   release_date?: string | null;
@@ -594,6 +600,7 @@ export interface MovieMasterItem {
   id: number;
   name: string;
   slug?: string;
+  description?: string | null;
   is_active: boolean;
   sort_order: number;
   created_at?: string;
@@ -604,6 +611,7 @@ export interface MovieMastersResponse {
   genres: MovieMasterItem[];
   formats: MovieMasterItem[];
   crew_roles: MovieMasterItem[];
+  certificates: MovieMasterItem[];
 }
 
 export interface CityMaster {
@@ -4507,7 +4515,7 @@ export const api = createApi({
     getPublicMovieMasters: builder.query<MovieMastersResponse, void>({
       query: () => '/movies/masters',
       transformResponse: (res: { data?: MovieMastersResponse }) =>
-        res?.data ?? { languages: [], genres: [], formats: [], crew_roles: [] },
+        res?.data ?? { languages: [], genres: [], formats: [], crew_roles: [], certificates: [] },
       providesTags: [{ type: 'MovieMasters', id: 'PUBLIC' }],
     }),
 
@@ -4735,6 +4743,61 @@ export const api = createApi({
       query: (id) => ({ url: `/admin/movie-crew-roles/${id}`, method: 'DELETE' }),
       invalidatesTags: [
         { type: 'MovieMasters', id: 'CREW_ROLE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        'MovieMasters',
+      ],
+    }),
+
+    getAdminMovieCertificates: builder.query<
+      PaginatedList<MovieMasterItem>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/movie-certificates${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data?: MovieMasterItem[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items?.length
+          ? [
+              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `cert-${item.id}` })),
+              { type: 'MovieMasters', id: 'CERTIFICATE_LIST' },
+            ]
+          : [{ type: 'MovieMasters', id: 'CERTIFICATE_LIST' }],
+    }),
+
+    createAdminMovieCertificate: builder.mutation<
+      MovieMasterItem,
+      { name: string; slug?: string; description?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({ url: '/admin/movie-certificates', method: 'POST', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'CERTIFICATE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+        'MovieMasters',
+      ],
+    }),
+
+    updateAdminMovieCertificate: builder.mutation<
+      MovieMasterItem,
+      { id: number; body: Partial<MovieMasterItem> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/movie-certificates/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: MovieMasterItem }) => res?.data ?? ({} as MovieMasterItem),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'MovieMasters', id: `cert-${id}` },
+        { type: 'MovieMasters', id: 'CERTIFICATE_LIST' },
+        { type: 'MovieMasters', id: 'PUBLIC' },
+      ],
+    }),
+
+    deleteAdminMovieCertificate: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/movie-certificates/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'MovieMasters', id: 'CERTIFICATE_LIST' },
         { type: 'MovieMasters', id: 'PUBLIC' },
         'MovieMasters',
       ],
@@ -5359,6 +5422,10 @@ export const {
   useCreateAdminMovieCrewRoleMutation,
   useUpdateAdminMovieCrewRoleMutation,
   useDeleteAdminMovieCrewRoleMutation,
+  useGetAdminMovieCertificatesQuery,
+  useCreateAdminMovieCertificateMutation,
+  useUpdateAdminMovieCertificateMutation,
+  useDeleteAdminMovieCertificateMutation,
   useGetPartnerMovieCatalogQuery,
   useGetPublicMoviesQuery,
   useGetPublicMovieFiltersQuery,

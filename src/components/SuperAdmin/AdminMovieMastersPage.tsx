@@ -4,24 +4,28 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { Film, Languages, LayoutGrid, Loader2, Pencil, Plus, Tags, Trash2, Users, X } from "lucide-react";
+import { Award, Film, Languages, LayoutGrid, Loader2, Pencil, Plus, Tags, Trash2, Users, X } from "lucide-react";
 import {
   useGetAdminMovieFormatsQuery,
   useGetAdminMovieGenresQuery,
   useGetAdminMovieLanguagesQuery,
   useGetAdminMovieCrewRolesQuery,
+  useGetAdminMovieCertificatesQuery,
   useCreateAdminMovieFormatMutation,
   useCreateAdminMovieGenreMutation,
   useCreateAdminMovieLanguageMutation,
   useCreateAdminMovieCrewRoleMutation,
+  useCreateAdminMovieCertificateMutation,
   useUpdateAdminMovieFormatMutation,
   useUpdateAdminMovieGenreMutation,
   useUpdateAdminMovieLanguageMutation,
   useUpdateAdminMovieCrewRoleMutation,
+  useUpdateAdminMovieCertificateMutation,
   useDeleteAdminMovieFormatMutation,
   useDeleteAdminMovieGenreMutation,
   useDeleteAdminMovieLanguageMutation,
   useDeleteAdminMovieCrewRoleMutation,
+  useDeleteAdminMovieCertificateMutation,
   type MovieMasterItem,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -35,7 +39,7 @@ import Pagination from "@/components/Shared/Pagination";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 
-type MasterTab = "languages" | "genres" | "formats" | "crew_roles";
+type MasterTab = "languages" | "genres" | "formats" | "crew_roles" | "certificates";
 
 const TAB_META: Record<
   MasterTab,
@@ -64,6 +68,12 @@ const TAB_META: Record<
     singular: "Crew role",
     icon: Users,
     searchPlaceholder: "Search crew roles…",
+  },
+  certificates: {
+    label: "Certificates",
+    singular: "Certificate",
+    icon: Award,
+    searchPlaceholder: "Search certificates (e.g. U, UA 13+, PG-13)…",
   },
 };
 
@@ -114,7 +124,7 @@ export default function AdminMovieMastersPage() {
 
   const form = useForm<AdminMovieMasterFormValues>({
     resolver: yupResolver(adminMovieMasterFormSchema),
-    defaultValues: { name: "", sort_order: 0, is_active: true },
+    defaultValues: { name: "", description: "", sort_order: 0, is_active: true },
     mode: "onSubmit",
   });
 
@@ -131,6 +141,7 @@ export default function AdminMovieMastersPage() {
   const genresQuery = useGetAdminMovieGenresQuery(queryArg, { skip: tab !== "genres" });
   const formatsQuery = useGetAdminMovieFormatsQuery(queryArg, { skip: tab !== "formats" });
   const crewRolesQuery = useGetAdminMovieCrewRolesQuery(queryArg, { skip: tab !== "crew_roles" });
+  const certificatesQuery = useGetAdminMovieCertificatesQuery(queryArg, { skip: tab !== "certificates" });
 
   const [createLanguage, { isLoading: creatingLanguage }] = useCreateAdminMovieLanguageMutation();
   const [updateLanguage, { isLoading: updatingLanguage }] = useUpdateAdminMovieLanguageMutation();
@@ -148,6 +159,10 @@ export default function AdminMovieMastersPage() {
   const [updateCrewRole, { isLoading: updatingCrewRole }] = useUpdateAdminMovieCrewRoleMutation();
   const [deleteCrewRole] = useDeleteAdminMovieCrewRoleMutation();
 
+  const [createCertificate, { isLoading: creatingCertificate }] = useCreateAdminMovieCertificateMutation();
+  const [updateCertificate, { isLoading: updatingCertificate }] = useUpdateAdminMovieCertificateMutation();
+  const [deleteCertificate] = useDeleteAdminMovieCertificateMutation();
+
   const tabMeta = TAB_META[tab];
   const saving =
     creatingLanguage ||
@@ -157,7 +172,9 @@ export default function AdminMovieMastersPage() {
     creatingFormat ||
     updatingFormat ||
     creatingCrewRole ||
-    updatingCrewRole;
+    updatingCrewRole ||
+    creatingCertificate ||
+    updatingCertificate;
 
   const activeQuery =
     tab === "languages"
@@ -166,14 +183,16 @@ export default function AdminMovieMastersPage() {
         ? genresQuery
         : tab === "formats"
           ? formatsQuery
-          : crewRolesQuery;
+          : tab === "crew_roles"
+            ? crewRolesQuery
+            : certificatesQuery;
 
   const items = activeQuery.data?.items ?? [];
   const activeMeta = activeQuery.data?.meta;
 
   const openCreate = () => {
     setEditingItem(null);
-    form.reset({ name: "", sort_order: 0, is_active: true });
+    form.reset({ name: "", description: "", sort_order: 0, is_active: true });
     setFormOpen(true);
   };
 
@@ -181,6 +200,7 @@ export default function AdminMovieMastersPage() {
     setEditingItem(item);
     form.reset({
       name: item.name || "",
+      description: item.description || "",
       sort_order: item.sort_order ?? 0,
       is_active: item.is_active !== false,
     });
@@ -196,6 +216,7 @@ export default function AdminMovieMastersPage() {
   const onSubmit = async (values: AdminMovieMasterFormValues) => {
     const payload = {
       name: values.name.trim(),
+      description: values.description?.trim() || undefined,
       sort_order: Number(values.sort_order) || 0,
       is_active: values.is_active !== false,
     };
@@ -225,13 +246,21 @@ export default function AdminMovieMastersPage() {
           const created = await createFormat(payload).unwrap();
           toast.success(`Format "${created.name}" added`);
         }
-      } else {
+      } else if (tab === "crew_roles") {
         if (editingItem) {
           const updated = await updateCrewRole({ id: editingItem.id, body: payload }).unwrap();
           toast.success(`Crew role "${updated.name}" updated`);
         } else {
           const created = await createCrewRole(payload).unwrap();
           toast.success(`Crew role "${created.name}" added`);
+        }
+      } else {
+        if (editingItem) {
+          const updated = await updateCertificate({ id: editingItem.id, body: payload }).unwrap();
+          toast.success(`Certificate "${updated.name}" updated`);
+        } else {
+          const created = await createCertificate(payload).unwrap();
+          toast.success(`Certificate "${created.name}" added`);
         }
       }
       setFormOpen(false);
@@ -263,8 +292,10 @@ export default function AdminMovieMastersPage() {
           await updateGenre({ id: item.id, body }).unwrap();
         } else if (tab === "formats") {
           await updateFormat({ id: item.id, body }).unwrap();
-        } else {
+        } else if (tab === "crew_roles") {
           await updateCrewRole({ id: item.id, body }).unwrap();
+        } else {
+          await updateCertificate({ id: item.id, body }).unwrap();
         }
         toast.success(next ? `"${item.name}" enabled` : `"${item.name}" disabled`);
       },
@@ -286,8 +317,10 @@ export default function AdminMovieMastersPage() {
           await deleteGenre(item.id).unwrap();
         } else if (tab === "formats") {
           await deleteFormat(item.id).unwrap();
-        } else {
+        } else if (tab === "crew_roles") {
           await deleteCrewRole(item.id).unwrap();
+        } else {
+          await deleteCertificate(item.id).unwrap();
         }
         toast.success(`${tabMeta.singular} "${item.name}" deleted`);
       },
@@ -302,7 +335,7 @@ export default function AdminMovieMastersPage() {
             <Film size={20} className="text-fuchsia-400" /> Movie Masters
           </h2>
           <p className="text-sm text-zinc-400 mt-1">
-            Manage languages, genres, screen formats, and crew roles used when adding movies and on customer filters.
+            Manage languages, genres, screen formats, crew roles, and certificates used across movie forms and filters.
           </p>
         </div>
         <button
@@ -315,7 +348,7 @@ export default function AdminMovieMastersPage() {
         </button>
       </div>
 
-      <div className="flex gap-2 border-b border-white/10">
+      <div className="flex gap-2 border-b border-white/10 overflow-x-auto pb-px">
         {(Object.keys(TAB_META) as MasterTab[]).map((key) => {
           const meta = TAB_META[key];
           const Icon = meta.icon;
@@ -328,7 +361,7 @@ export default function AdminMovieMastersPage() {
                 setTab(key);
                 setPage(1);
               }}
-              className={`px-4 py-3 font-semibold text-sm border-b-2 transition-all flex items-center gap-2 ${
+              className={`px-4 py-3 font-semibold text-sm border-b-2 whitespace-nowrap transition-all flex items-center gap-2 ${
                 isActive
                   ? "border-rose-500 text-rose-400"
                   : "border-transparent text-zinc-400 hover:text-white"
@@ -386,6 +419,7 @@ export default function AdminMovieMastersPage() {
               <thead>
                 <tr className="border-b border-white/10 text-zinc-400 text-left bg-zinc-900/50">
                   <th className="px-4 py-3 font-medium">Name</th>
+                  {tab === "certificates" && <th className="px-4 py-3 font-medium">Description</th>}
                   <th className="px-4 py-3 font-medium">Slug</th>
                   <th className="px-4 py-3 font-medium">Sort</th>
                   <th className="px-4 py-3 font-medium">Active</th>
@@ -399,6 +433,11 @@ export default function AdminMovieMastersPage() {
                     className={`border-b border-white/5 last:border-0 ${!item.is_active ? "opacity-60" : ""}`}
                   >
                     <td className="px-4 py-3 text-white font-medium">{item.name}</td>
+                    {tab === "certificates" && (
+                      <td className="px-4 py-3 text-zinc-300 max-w-xs truncate" title={item.description || ""}>
+                        {item.description || "—"}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-zinc-400">{item.slug || "—"}</td>
                     <td className="px-4 py-3 text-zinc-400">{item.sort_order ?? 0}</td>
                     <td className="px-4 py-3">
@@ -498,7 +537,9 @@ export default function AdminMovieMastersPage() {
                         ? "Action"
                         : tab === "formats"
                           ? "IMAX 2D"
-                          : "Director"
+                          : tab === "certificates"
+                            ? "UA 13+"
+                            : "Director"
                   }`}
                   {...form.register("name")}
                 />
@@ -506,6 +547,18 @@ export default function AdminMovieMastersPage() {
                   <p className="text-xs text-rose-400 mt-2">{form.formState.errors.name.message}</p>
                 ) : null}
               </div>
+
+              {tab === "certificates" && (
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1.5">Description / Age Rating</label>
+                  <input
+                    className="input-field w-full"
+                    placeholder="e.g. Parental guidance strongly advised for under 13"
+                    {...form.register("description")}
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Optional description displayed to cinema admins.</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm text-zinc-400 mb-1.5">Sort order</label>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Plus, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateAdminMovieMutation,
@@ -12,6 +12,7 @@ import {
   useUpdateAdminMovieMutation,
   useUploadImageMutation,
   type Movie,
+  type MovieTrailerItem,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
@@ -40,7 +41,6 @@ type FormState = {
   description: string;
   poster_url: string;
   banner_url: string;
-  trailer_url: string;
   duration_minutes: string;
   certificate: string;
   release_date: string;
@@ -52,7 +52,6 @@ const emptyForm: FormState = {
   description: "",
   poster_url: "",
   banner_url: "",
-  trailer_url: "",
   duration_minutes: "",
   certificate: "",
   release_date: "",
@@ -98,12 +97,14 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
   const [selectedFormatIds, setSelectedFormatIds] = useState<number[]>([]);
   const [castMembers, setCastMembers] = useState<MovieCastCrewFormMember[]>([]);
   const [crewMembers, setCrewMembers] = useState<MovieCastCrewFormMember[]>([]);
+  const [trailers, setTrailers] = useState<MovieTrailerItem[]>([]);
   const [hydrated, setHydrated] = useState(!isEdit);
 
   const languageMasters = masters?.languages ?? [];
   const genreMasters = masters?.genres ?? [];
   const formatMasters = masters?.formats ?? [];
   const crewRoleMasters = masters?.crew_roles ?? [];
+  const certificateMasters = masters?.certificates ?? [];
 
   useEffect(() => {
     if (!isEdit || !movie || mastersLoading || !masters) return;
@@ -112,7 +113,6 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
       description: movie.description || "",
       poster_url: movie.poster_url || "",
       banner_url: movie.banner_url || "",
-      trailer_url: movie.trailer_url || "",
       duration_minutes: movie.duration_minutes != null ? String(movie.duration_minutes) : "",
       certificate: movie.certificate || "",
       release_date: movie.release_date ? String(movie.release_date).slice(0, 10) : "",
@@ -123,6 +123,15 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     setSelectedLanguageIds(idsFromMasterNames(masters.languages, movie.languages));
     setSelectedGenreIds(idsFromMasterNames(masters.genres, movie.genres));
     setSelectedFormatIds(idsFromMasterNames(masters.formats, movie.formats));
+
+    const initialTrailers: MovieTrailerItem[] =
+      Array.isArray(movie.trailers) && movie.trailers.length > 0
+        ? movie.trailers.map((t) => ({ language: t.language || "Default", trailer_url: t.trailer_url || "" }))
+        : movie.trailer_url
+          ? [{ language: movie.languages?.[0] || "Default", trailer_url: movie.trailer_url }]
+          : [];
+    setTrailers(initialTrailers);
+
     setHydrated(true);
   }, [isEdit, movie, masters, mastersLoading]);
 
@@ -167,6 +176,28 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     }
   };
 
+  const addTrailerRow = (lang?: string) => {
+    setTrailers((prev) => [
+      ...prev,
+      {
+        language: lang || (languageMasters[0]?.name ?? "Default"),
+        trailer_url: "",
+      },
+    ]);
+  };
+
+  const updateTrailer = (index: number, field: keyof MovieTrailerItem, val: string) => {
+    setTrailers((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: val };
+      return next;
+    });
+  };
+
+  const removeTrailer = (index: number) => {
+    setTrailers((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) {
@@ -177,12 +208,22 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     const genres = namesFromMasterIds(genreMasters, selectedGenreIds);
     const formats = namesFromMasterIds(formatMasters, selectedFormatIds);
 
+    const cleanTrailers = trailers
+      .map((t) => ({
+        language: t.language.trim() || "Default",
+        trailer_url: t.trailer_url.trim(),
+      }))
+      .filter((t) => Boolean(t.trailer_url));
+
+    const primaryTrailerUrl = cleanTrailers.length > 0 ? cleanTrailers[0].trailer_url : null;
+
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
       poster_url: form.poster_url.trim() || null,
       banner_url: form.banner_url.trim() || null,
-      trailer_url: form.trailer_url.trim() || null,
+      trailer_url: primaryTrailerUrl,
+      trailers: cleanTrailers,
       duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
       certificate: form.certificate.trim() || null,
       release_date: form.release_date || null,
@@ -289,12 +330,26 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
 
           <div>
             <FieldLabel>Certificate</FieldLabel>
-            <input
+            <select
               className="input-field w-full"
-              placeholder="UA / U / A"
               value={form.certificate}
               onChange={(e) => setField("certificate", e.target.value)}
-            />
+            >
+              <option value="">Select Certificate Rating (Optional)</option>
+              {certificateMasters.map((cert) => (
+                <option key={cert.id} value={cert.name}>
+                  {cert.name} {cert.description ? `— ${cert.description}` : ""}
+                </option>
+              ))}
+              {form.certificate && !certificateMasters.some((c) => c.name.toLowerCase() === form.certificate.toLowerCase()) ? (
+                <option value={form.certificate}>{form.certificate} (Custom/Legacy)</option>
+              ) : null}
+            </select>
+            {!certificateMasters.length ? (
+              <p className="mt-2 text-xs text-slate-400">
+                No certificates yet. Add them in {masterLink}.
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -366,14 +421,109 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
             <OrphanNotice label="formats" names={orphanFormats} />
           </div>
 
-          <div>
-            <FieldLabel>Trailer URL</FieldLabel>
-            <input
-              className="input-field w-full"
-              placeholder="https://"
-              value={form.trailer_url}
-              onChange={(e) => setField("trailer_url", e.target.value)}
-            />
+          <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <div>
+                <FieldLabel>
+                  <span className="flex items-center gap-1.5 text-slate-800">
+                    <Video size={15} className="text-rose-500" /> Language-Wise Trailers
+                  </span>
+                </FieldLabel>
+                <p className="text-xs text-slate-500">
+                  Add trailer links (YouTube etc.) for each language version. If multiple trailers are provided, users can pick their preferred language on the movie page.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => addTrailerRow()}
+                className="btn-secondary text-xs inline-flex items-center gap-1.5 self-start sm:self-auto py-1.5 px-3"
+              >
+                <Plus size={14} /> Add Trailer
+              </button>
+            </div>
+
+            {trailers.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-xs text-slate-500 bg-white">
+                <Video size={24} className="mx-auto text-slate-400 mb-2" />
+                No trailers added yet.{" "}
+                <button
+                  type="button"
+                  onClick={() => addTrailerRow()}
+                  className="text-rose-600 font-semibold hover:underline"
+                >
+                  Add a trailer
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {trailers.map((item, index) => {
+                  const availableLanguages = Array.from(
+                    new Set([
+                      "Default",
+                      ...languageMasters.map((l) => l.name),
+                      ...namesFromMasterIds(languageMasters, selectedLanguageIds),
+                    ])
+                  );
+
+                  return (
+                    <div
+                      key={index}
+                      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 shadow-sm"
+                    >
+                      <div className="w-full sm:w-48 shrink-0">
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">Language</label>
+                        <select
+                          className="input-field w-full text-xs py-2"
+                          value={item.language}
+                          onChange={(e) => updateTrailer(index, "language", e.target.value)}
+                        >
+                          {availableLanguages.map((lang) => (
+                            <option key={lang} value={lang}>
+                              {lang}
+                            </option>
+                          ))}
+                          {item.language && !availableLanguages.includes(item.language) ? (
+                            <option value={item.language}>{item.language}</option>
+                          ) : null}
+                        </select>
+                      </div>
+
+                      <div className="flex-1">
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">Trailer Video URL</label>
+                        <input
+                          className="input-field w-full text-xs py-2"
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          value={item.trailer_url}
+                          onChange={(e) => updateTrailer(index, "trailer_url", e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 self-end sm:self-end pt-1">
+                        {item.trailer_url?.trim() ? (
+                          <a
+                            href={item.trailer_url.trim()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors"
+                            title="Preview Trailer"
+                          >
+                            <ExternalLink size={16} />
+                          </a>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => removeTrailer(index)}
+                          className="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                          title="Remove Trailer"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <MovieCastCrewEditor

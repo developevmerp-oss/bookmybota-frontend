@@ -575,7 +575,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   }, []);
 
   // Sticky section tabs (Overview / Menu / Photos / Reviews) — scroll-spy like District
-  const [activeTab, setActiveTab] = useState("Overview");
+  const [activeTab, setActiveTab] = useState<string>("Overview");
   const [tabsStuck, setTabsStuck] = useState(false);
   const tabsSentinelRef = useRef<HTMLDivElement>(null);
   const scrollSpyPausedRef = useRef(false);
@@ -650,7 +650,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     const syncActiveTabFromScroll = () => {
       if (scrollSpyPausedRef.current) return;
       const offset = getDetailStickyOffset();
-      let currentId = DETAIL_SECTION_TABS[0].id;
+      let currentId: string = DETAIL_SECTION_TABS[0].id;
       for (const tab of DETAIL_SECTION_TABS) {
         const el = document.getElementById(tab.sectionId);
         if (!el) continue;

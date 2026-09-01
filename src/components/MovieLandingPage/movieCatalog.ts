@@ -16,6 +16,7 @@ export type MovieDetailData = {
   synopsis?: string;
   trailersCount?: number;
   trailerUrl?: string;
+  trailers?: Array<{ language: string; trailerUrl: string }>;
   inCinemas?: boolean;
   comingSoon?: boolean;
   bookHref?: string;
@@ -362,6 +363,7 @@ export function mapApiMovieToDetail(movie: {
   poster_url?: string | null;
   banner_url?: string | null;
   trailer_url?: string | null;
+  trailers?: Array<{ language?: string; trailer_url?: string }>;
   duration_minutes?: number | null;
   certificate?: string | null;
   release_date?: string | null;
@@ -377,6 +379,17 @@ export function mapApiMovieToDetail(movie: {
   const poster = resolveMediaUrl(movie.poster_url) || FALLBACK_POSTER;
   const landscape = resolveMediaUrl(movie.banner_url) || resolveMediaUrl(movie.poster_url) || undefined;
   const comingSoon = movie.status === "coming_soon";
+
+  const mappedTrailers = Array.isArray(movie.trailers)
+    ? movie.trailers
+        .filter((t) => Boolean(t && t.trailer_url?.trim()))
+        .map((t) => ({ language: t.language || "Default", trailerUrl: t.trailer_url!.trim() }))
+    : movie.trailer_url
+      ? [{ language: movie.languages?.[0] || "Default", trailerUrl: movie.trailer_url.trim() }]
+      : [];
+
+  const primaryTrailer = mappedTrailers.length > 0 ? mappedTrailers[0].trailerUrl : (movie.trailer_url?.trim() || undefined);
+
   return {
     id: movie.id,
     slug: movie.slug,
@@ -392,8 +405,9 @@ export function mapApiMovieToDetail(movie: {
       ? "Coming Soon"
       : formatReleaseShort(movie.release_date || undefined),
     synopsis: movie.description?.trim() || undefined,
-    trailerUrl: movie.trailer_url?.trim() || undefined,
-    trailersCount: movie.trailer_url ? 1 : 0,
+    trailerUrl: primaryTrailer,
+    trailersCount: mappedTrailers.length,
+    trailers: mappedTrailers,
     inCinemas: movie.status === "now_showing",
     comingSoon,
     cast: mapCastCrewMembers(movie.cast),

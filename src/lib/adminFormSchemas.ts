@@ -165,6 +165,7 @@ export const adminEventGenreCreateSchema = yup.object({
   category_type_id: yup.string().required('Please select a category.'),
   name: yup.string().trim().required('Genre name is required.'),
 });
+export type AdminEventGenreCreateValues = yup.InferType<typeof adminEventGenreCreateSchema>;
 
 export const adminPlatformOfferSchema = yup.object({
   name: yup.string().trim().required('Offer name is required.'),
@@ -254,12 +255,14 @@ export type AdminPartnerDocumentCreateValues = yup.InferType<typeof adminPartner
 export type AdminPartnerTermCreateValues = yup.InferType<typeof adminPartnerTermCreateSchema>;
 export const adminMovieMasterCreateSchema = yup.object({
   name: yup.string().trim().required('Name is required.'),
+  description: yup.string().trim().optional(),
 });
 
 export type AdminMovieMasterCreateValues = yup.InferType<typeof adminMovieMasterCreateSchema>;
 
 export const adminMovieMasterFormSchema = yup.object({
   name: yup.string().trim().required('Name is required.'),
+  description: yup.string().trim().optional(),
   sort_order: yup
     .number()
     .typeError('Sort order must be a number.')

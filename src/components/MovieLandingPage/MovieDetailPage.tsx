@@ -254,29 +254,35 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 
 
 
-            {movie.trailerUrl && (
-
+            {movie.trailers && movie.trailers.length > 1 ? (
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/60 mr-1 flex items-center gap-1.5">
+                  <Play className="size-3.5" fill="currentColor" /> Watch Trailer:
+                </span>
+                {movie.trailers.map((t, idx) => (
+                  <a
+                    key={idx}
+                    href={t.trailerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/20 hover:border-white/50 transition-colors"
+                  >
+                    <Play className="size-3 text-rose-400" fill="currentColor" />
+                    {t.language}
+                  </a>
+                ))}
+              </div>
+            ) : movie.trailerUrl ? (
               <a
-
                 href={movie.trailerUrl}
-
                 target="_blank"
-
                 rel="noopener noreferrer"
-
                 className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition-colors"
-
               >
-
-                <Play className="size-4" fill="currentColor" />
-
+                <Play className="size-4 text-rose-400" fill="currentColor" />
                 Watch trailer
-
-                {movie.trailersCount && movie.trailersCount > 1 ? ` (${movie.trailersCount})` : ""}
-
               </a>
-
-            )}
+            ) : null}
 
 
 

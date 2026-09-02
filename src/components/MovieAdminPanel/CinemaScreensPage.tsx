@@ -6,6 +6,7 @@ import { CheckCircle, Clapperboard, Eye, Plus, RefreshCw } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
 import {
   useApproveVenueLayoutTemplateMutation,
+  usePublishVenueLayoutTemplateMutation,
   useCreateCinemaScreenMutation,
   useCreateVenueLayoutRequestMutation,
   useGetCinemaScreensQuery,
@@ -95,6 +96,7 @@ export default function CinemaScreensPage() {
   const [updateScreen, { isLoading: updating }] = useUpdateCinemaScreenMutation();
   const [createLayoutRequest, { isLoading: submittingLayout }] = useCreateVenueLayoutRequestMutation();
   const [approveLayout, { isLoading: approving }] = useApproveVenueLayoutTemplateMutation();
+  const [publishLayout, { isLoading: publishing }] = usePublishVenueLayoutTemplateMutation();
   const [rejectLayout, { isLoading: rejecting }] = useRejectVenueLayoutTemplateMutation();
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -273,15 +275,29 @@ export default function CinemaScreensPage() {
         </button>
       </div>
 
-      {layoutOptions.filter((opt) => opt.status === "PUBLISHED" && !opt.is_default).length > 0 && (
+      {layoutOptions.filter(
+        (opt) =>
+          opt.status === "PUBLISHED" &&
+          !opt.is_default &&
+          !opt.venue_approved_at &&
+          !opt.venue_live_requested_at &&
+          !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
+      ).length > 0 && (
         <div className="glass-panel rounded-2xl border border-amber-500/20 p-5 space-y-3">
           <h3 className="text-white font-semibold">Layouts waiting for your approval</h3>
           <p className="text-sm text-zinc-400">
-            Use <span className="text-zinc-200 font-medium">Review layout</span> on the matching
-            screen below, or approve from here.
+            Approve options you like, then use <span className="text-zinc-200 font-medium">Request go live</span> on
+            one — BookMyBota must confirm before it publishes.
           </p>
           {layoutOptions
-            .filter((opt) => opt.status === "PUBLISHED" && !opt.is_default)
+            .filter(
+              (opt) =>
+                opt.status === "PUBLISHED" &&
+                !opt.is_default &&
+                !opt.venue_approved_at &&
+                !opt.venue_live_requested_at &&
+                !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
+            )
             .map((opt) => (
               <div
                 key={opt.id}
@@ -301,7 +317,7 @@ export default function CinemaScreensPage() {
                     onClick={async () => {
                       try {
                         await approveLayout({ bizId, templateId: opt.id }).unwrap();
-                        toast.success("Layout approved for this screen");
+                        toast.success("Layout approved — pick one to make public when ready.");
                         refetch();
                       } catch (err) {
                         toast.error(extractApiError(err, "Approve failed"));
@@ -322,6 +338,57 @@ export default function CinemaScreensPage() {
                     Reject
                   </button>
                 </div>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {layoutOptions.filter(
+        (opt) =>
+          opt.status === "PUBLISHED" &&
+          !opt.is_default &&
+          opt.venue_approved_at &&
+          !opt.venue_live_requested_at &&
+          !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
+      ).length > 0 && (
+        <div className="glass-panel rounded-2xl border border-sky-500/20 p-5 space-y-3">
+          <h3 className="text-white font-semibold">Approved — request one to go live</h3>
+          {layoutOptions
+            .filter(
+              (opt) =>
+                opt.status === "PUBLISHED" &&
+                !opt.is_default &&
+                opt.venue_approved_at &&
+                !opt.venue_live_requested_at &&
+                !layoutOptions.some((o) => o.is_default || o.venue_live_requested_at)
+            )
+            .map((opt) => (
+              <div
+                key={opt.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-white/10 p-3"
+              >
+                <div>
+                  <p className="text-white text-sm font-medium">{opt.name}</p>
+                  <p className="text-xs text-zinc-500">
+                    {opt.hall_name || "Screen"} · capacity {opt.capacity} · {opt.seat_count ?? 0} seats
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold disabled:opacity-50"
+                  disabled={publishing}
+                  onClick={async () => {
+                    try {
+                      await publishLayout({ bizId, templateId: opt.id }).unwrap();
+                      toast.success("Go-live request sent to BookMyBota");
+                      refetch();
+                    } catch (err) {
+                      toast.error(extractApiError(err, "Publish failed"));
+                    }
+                  }}
+                >
+                  Request go live
+                </button>
               </div>
             ))}
         </div>
@@ -621,7 +688,7 @@ export default function CinemaScreensPage() {
                       bizId,
                       templateId: reviewScreen.pending_template_id!,
                     }).unwrap();
-                    toast.success("Layout approved for this screen");
+                    toast.success("Layout approved — use Request go live when ready.");
                     setReviewScreenId(null);
                     refetch();
                   } catch (err) {

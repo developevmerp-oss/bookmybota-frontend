@@ -186,6 +186,8 @@ export interface BusinessSettings {
   address?: string;
   city_id?: number | null;
   city_name?: string | null;
+  country_id?: number | null;
+  country_name?: string | null;
   cuisine?: string;
   phone?: string;
   description?: string;
@@ -218,6 +220,8 @@ export interface BusinessSettings {
   venue_meta?: Record<string, unknown> | null;
   venue_type_slug?: string | null;
   venue_type_name?: string | null;
+  documents?: PartnerDocumentUpload[];
+  admin_email?: string | null;
 }
 
 export interface VenueLayoutRequest {
@@ -236,6 +240,12 @@ export interface VenueLayoutRequest {
   capacity: number;
   spec_json?: Record<string, unknown>;
   status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'ARCHIVED';
+  visit_status?: 'PENDING' | 'VISIT_COMPLETE' | string;
+  visit_completed_at?: string | null;
+  visit_person?: string | null;
+  visit_notes?: string | null;
+  city_name?: string | null;
+  country_name?: string | null;
   review_comments?: string | null;
   submitted_at?: string | null;
   reviewed_at?: string | null;
@@ -247,9 +257,14 @@ export interface VenueLayoutRequest {
   template_seats?: unknown[] | null;
   templates?: VenueLayoutTemplate[];
   template_count?: number;
-  workflow_tab?: 'needs_action' | 'in_builder' | 'submitted' | 'published' | 'rejected';
+  workflow_tab?: 'visit_requests' | 'needs_action' | 'in_builder' | 'submitted' | 'published' | 'rejected';
   draft_count?: number;
   submitted_count?: number;
+  live_pending_count?: number;
+  live_pending_template_id?: string | null;
+  live_pending_template_name?: string | null;
+  live_published_at?: string | null;
+  sent_to_venue_at?: string | null;
   approved_count?: number;
   rejected_count?: number;
   rejection_reason?: string | null;
@@ -267,6 +282,8 @@ export interface VenueLayoutTemplate {
   capacity: number;
   status: 'DRAFT' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
   is_default?: boolean;
+  venue_approved_at?: string | null;
+  venue_live_requested_at?: string | null;
   seating_config?: Record<string, unknown> | null;
   seats_json?: unknown[];
   seat_count?: number;
@@ -277,61 +294,23 @@ export interface VenueLayoutTemplate {
   updated_at?: string;
 }
 
-export interface VenueLayoutRequest {
+export interface VenueLayoutTemplateLog {
   id: string;
   business_id: string;
-  hall_id?: string | null;
-  hall_name?: string | null;
-  hall_description?: string | null;
-  hall_capacity?: number | null;
-  hall_is_indoor?: boolean | null;
-  venue_name?: string | null;
-  venue_address?: string | null;
-  partner_module?: string | null;
-  layout_name: string;
-  layout_type: string;
-  capacity: number;
-  spec_json?: Record<string, unknown>;
-  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'ARCHIVED';
-  review_comments?: string | null;
-  submitted_at?: string | null;
-  reviewed_at?: string | null;
-  created_at?: string;
-  updated_at?: string;
-  template_id?: string | null;
-  template_status?: 'DRAFT' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED' | null;
-  template_seating_config?: Record<string, unknown> | null;
-  template_seats?: unknown[] | null;
-  templates?: VenueLayoutTemplate[];
-  template_count?: number;
-  workflow_tab?: 'needs_action' | 'in_builder' | 'submitted' | 'published' | 'rejected';
-  draft_count?: number;
-  submitted_count?: number;
-  approved_count?: number;
-  rejected_count?: number;
-  rejection_reason?: string | null;
-  venue_meta?: Record<string, unknown> | null;
-  venue_type_slug?: string | null;
-  venue_type_name?: string | null;
-}
-
-export interface VenueLayoutTemplate {
-  id: string;
-  business_id?: string;
   request_id?: string | null;
-  name: string;
-  layout_type: string;
-  capacity: number;
-  status: 'DRAFT' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
-  is_default?: boolean;
-  seating_config?: Record<string, unknown> | null;
-  seats_json?: unknown[];
-  seat_count?: number;
-  hall_name?: string | null;
-  rejection_reason?: string | null;
-  published_at?: string | null;
+  template_id?: string | null;
+  template_name?: string | null;
+  action:
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'REQUESTED_LIVE'
+    | 'REJECTED_ALL'
+    | 'LIVE_CONFIRMED'
+    | 'LIVE_DECLINED';
+  message?: string | null;
+  actor_user_id?: string | null;
+  actor_label?: string | null;
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface MovieTrailerItem {
@@ -1912,7 +1891,9 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes'],
+
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
+
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -2572,6 +2553,19 @@ export const api = createApi({
       invalidatesTags: ['VenueLayouts'],
     }),
 
+    markAdminVenueLayoutVisitComplete: builder.mutation<
+      VenueLayoutRequest,
+      { id: string; visited_person: string; visit_notes: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/venue-layout-requests/${id}/visit-complete`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: VenueLayoutRequest }) => res.data,
+      invalidatesTags: ['VenueLayouts'],
+    }),
+
     saveAdminVenueLayoutTemplate: builder.mutation<
       VenueLayoutTemplate,
       {
@@ -2588,6 +2582,45 @@ export const api = createApi({
         url: `/admin/venue-layout-requests/${id}/template`,
         method: 'PUT',
         body,
+      }),
+      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
+      invalidatesTags: ['VenueLayouts'],
+    }),
+
+    publishAdminVenueLayoutTemplates: builder.mutation<
+      { message?: string; data?: VenueLayoutTemplate[] },
+      { id: string; template_ids: string[] }
+    >({
+      query: ({ id, template_ids }) => ({
+        url: `/admin/venue-layout-requests/${id}/publish-templates`,
+        method: 'POST',
+        body: { template_ids },
+      }),
+      transformResponse: (res: { message?: string; data?: VenueLayoutTemplate[] }) => res,
+      invalidatesTags: ['VenueLayouts'],
+    }),
+
+    confirmAdminVenueLayoutLive: builder.mutation<
+      VenueLayoutTemplate,
+      { id: string; template_id: string }
+    >({
+      query: ({ id, template_id }) => ({
+        url: `/admin/venue-layout-requests/${id}/confirm-live`,
+        method: 'POST',
+        body: { template_id },
+      }),
+      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
+      invalidatesTags: ['VenueLayouts'],
+    }),
+
+    declineAdminVenueLayoutLive: builder.mutation<
+      VenueLayoutTemplate,
+      { id: string; template_id: string; comment?: string }
+    >({
+      query: ({ id, template_id, comment }) => ({
+        url: `/admin/venue-layout-requests/${id}/decline-live`,
+        method: 'POST',
+        body: { template_id, comment },
       }),
       transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
       invalidatesTags: ['VenueLayouts'],
@@ -2746,6 +2779,12 @@ export const api = createApi({
       providesTags: ['VenueLayouts'],
     }),
 
+    getVenueLayoutTemplateLogs: builder.query<VenueLayoutTemplateLog[], string>({
+      query: (bizId) => `/businesses/${bizId}/venue-layout-template-logs`,
+      transformResponse: (res: { data?: VenueLayoutTemplateLog[] }) => res?.data ?? [],
+      providesTags: ['VenueLayoutLogs'],
+    }),
+
     getVenueLayoutTemplate: builder.query<VenueLayoutTemplate, { bizId: string; templateId: string }>({
       query: ({ bizId, templateId }) => `/businesses/${bizId}/venue-layout-templates/${templateId}`,
       transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
@@ -2758,7 +2797,16 @@ export const api = createApi({
         method: 'POST',
       }),
       transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      invalidatesTags: ['VenueLayouts', 'CinemaScreens'],
+      invalidatesTags: ['VenueLayouts', 'VenueLayoutLogs', 'CinemaScreens'],
+    }),
+
+    publishVenueLayoutTemplate: builder.mutation<VenueLayoutTemplate, { bizId: string; templateId: string }>({
+      query: ({ bizId, templateId }) => ({
+        url: `/businesses/${bizId}/venue-layout-templates/${templateId}/publish`,
+        method: 'POST',
+      }),
+      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
+      invalidatesTags: ['VenueLayouts', 'VenueLayoutLogs', 'CinemaScreens'],
     }),
 
     rejectVenueLayoutTemplate: builder.mutation<
@@ -2771,7 +2819,20 @@ export const api = createApi({
         body: { reason },
       }),
       transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
-      invalidatesTags: ['VenueLayouts', 'CinemaScreens'],
+      invalidatesTags: ['VenueLayouts', 'VenueLayoutLogs', 'CinemaScreens'],
+    }),
+
+    rejectAllVenueLayoutTemplates: builder.mutation<
+      { message?: string; rejected_count?: number },
+      { bizId: string; reason: string; request_id?: string }
+    >({
+      query: ({ bizId, reason, request_id }) => ({
+        url: `/businesses/${bizId}/venue-layout-templates/reject-all`,
+        method: 'POST',
+        body: { reason, request_id },
+      }),
+      transformResponse: (res: { message?: string; rejected_count?: number }) => res,
+      invalidatesTags: ['VenueLayouts', 'VenueLayoutLogs', 'CinemaScreens'],
     }),
 
     getApprovedVenueLayout: builder.query<VenueLayoutTemplate | null, string>({
@@ -4136,6 +4197,43 @@ export const api = createApi({
     >({
       query: ({ businessId, showtimeId }) => ({
         url: `/businesses/${businessId}/venue/claim-showtime/${showtimeId}`,
+        method: 'POST',
+      }),
+      transformResponse: (res: { message?: string }) => res,
+    }),
+
+    getArtistClaimableEvents: builder.query<
+      Array<{
+        event_artist_id: string;
+        event_id: string;
+        event_name: string;
+        artist_name: string;
+        role_title?: string | null;
+        starts_at?: string | null;
+        city_name?: string | null;
+        organizer_name?: string | null;
+      }>,
+      string
+    >({
+      query: (businessId) => `/businesses/${businessId}/artist/claimable-events`,
+      transformResponse: (res: { data?: unknown[] }) => (res?.data ?? []) as Array<{
+        event_artist_id: string;
+        event_id: string;
+        event_name: string;
+        artist_name: string;
+        role_title?: string | null;
+        starts_at?: string | null;
+        city_name?: string | null;
+        organizer_name?: string | null;
+      }>,
+    }),
+
+    claimArtistEvent: builder.mutation<
+      { message?: string },
+      { businessId: string; eventArtistId: string }
+    >({
+      query: ({ businessId, eventArtistId }) => ({
+        url: `/businesses/${businessId}/artist/claim-event/${eventArtistId}`,
         method: 'POST',
       }),
       transformResponse: (res: { message?: string }) => res,
@@ -5589,7 +5687,11 @@ export const {
   useGetAdminVenueLayoutRequestsQuery,
   useGetAdminVenueLayoutRequestQuery,
   useReviewAdminVenueLayoutRequestMutation,
+  useMarkAdminVenueLayoutVisitCompleteMutation,
   useSaveAdminVenueLayoutTemplateMutation,
+  usePublishAdminVenueLayoutTemplatesMutation,
+  useConfirmAdminVenueLayoutLiveMutation,
+  useDeclineAdminVenueLayoutLiveMutation,
   useGetAdminEventLayoutRequestsQuery,
   useGetAdminEventLayoutRequestQuery,
   useReviewAdminEventLayoutRequestMutation,
@@ -5605,9 +5707,12 @@ export const {
   useGetAdminGeoLocationsQuery,
   useCreateAdminGeoLocationMutation,
   useGetVenueLayoutTemplatesQuery,
+  useGetVenueLayoutTemplateLogsQuery,
   useGetVenueLayoutTemplateQuery,
   useApproveVenueLayoutTemplateMutation,
+  usePublishVenueLayoutTemplateMutation,
   useRejectVenueLayoutTemplateMutation,
+  useRejectAllVenueLayoutTemplatesMutation,
   useGetApprovedVenueLayoutQuery,
   useGetTablesQuery,
   useAddTableMutation,
@@ -5717,6 +5822,8 @@ export const {
   useAutoRegisterOrganizerArtistMutation,
   useGetVenueClaimableShowtimesQuery,
   useClaimVenueShowtimeMutation,
+  useGetArtistClaimableEventsQuery,
+  useClaimArtistEventMutation,
   useGetOrganizerVenueLayoutsQuery,
   useGetOrganizerVenueLayoutQuery,
   useSearchOrganizerArtistsQuery,

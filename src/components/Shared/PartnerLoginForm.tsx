@@ -39,6 +39,9 @@ type PartnerLoginFormProps = {
   /** page = full-page shell; embedded = card only (for modals) */
   variant?: "page" | "embedded";
   showCustomerLink?: boolean;
+  registerHref?: string;
+  registerPrompt?: string;
+  registerLinkText?: string;
   titleId?: string;
 };
 
@@ -49,6 +52,9 @@ export default function PartnerLoginForm({
   hint,
   variant = "page",
   showCustomerLink = true,
+  registerHref,
+  registerPrompt = "Not registered yet?",
+  registerLinkText = "Register here",
   titleId,
 }: PartnerLoginFormProps) {
   const router = useRouter();
@@ -166,7 +172,14 @@ export default function PartnerLoginForm({
         </div>
       ) : null}
 
-      {showCustomerLink ? (
+      {registerHref ? (
+        <p className="mt-5 text-center text-[11px] text-slate-400">
+          {registerPrompt}{" "}
+          <Link href={registerHref} className="text-[#6900AA] font-semibold hover:underline">
+            {registerLinkText}
+          </Link>
+        </p>
+      ) : showCustomerLink ? (
         <p className="mt-5 text-center text-[11px] text-slate-400">
           Customer login?{" "}
           <Link href="/login" className="text-[#6900AA] font-semibold hover:underline">

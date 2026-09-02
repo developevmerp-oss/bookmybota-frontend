@@ -1,32 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, ImagePlus, Plus, Trash2, Upload, X } from "lucide-react";
+import { Eye, MapPin, ScrollText, X } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import {
   useApproveVenueLayoutTemplateMutation,
+  usePublishVenueLayoutTemplateMutation,
   useCreateVenueLayoutRequestMutation,
   useGetBusinessSettingsQuery,
   useGetVenueLayoutRequestsQuery,
   useGetVenueLayoutTemplateQuery,
+  useGetVenueLayoutTemplateLogsQuery,
   useGetVenueLayoutTemplatesQuery,
   useRejectVenueLayoutTemplateMutation,
-  useUploadImageMutation,
-  type VenueLayoutRequest,
+  useRejectAllVenueLayoutTemplatesMutation,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
-import { extractUploadUrl, normalizeUploadPath, resolveMediaUrl } from "@/lib/mediaUrl";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
-import {
-  buildLayoutRequestDefaults,
-  buildVenueMetaSnapshot,
-} from "@/lib/venueLayoutRequestHelpers";
+import { buildVenueMetaSnapshot } from "@/lib/venueLayoutRequestHelpers";
+import { venueTypeDisplayName } from "@/lib/venuePartnerInfo";
+import { formatDateTime12h } from "@/lib/dateFormat";
+import type { VenueLayoutTemplateLog } from "@/services/api";
 
-type ZoneRow = { name: string; capacity: string };
-type SaveMode = "draft" | "submit" | null;
+const LOG_ACTION_LABELS: Record<VenueLayoutTemplateLog["action"], string> = {
+  APPROVED: "Approved layout",
+  REJECTED: "Rejected layout",
+  REQUESTED_LIVE: "Requested go live",
+  REJECTED_ALL: "Rejected all layouts",
+  LIVE_CONFIRMED: "Layout published live",
+  LIVE_DECLINED: "Go live declined",
+};
+
+const LOG_ACTION_STYLES: Record<VenueLayoutTemplateLog["action"], string> = {
+  APPROVED: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  REJECTED: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  REQUESTED_LIVE: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  REJECTED_ALL: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  LIVE_CONFIRMED: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+  LIVE_DECLINED: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+};
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-slate-100 text-slate-700 border-slate-200",
@@ -37,39 +52,10 @@ const STATUS_STYLES: Record<string, string> = {
   ARCHIVED: "bg-slate-50 text-slate-500 border-slate-200",
 };
 
-const emptyForm = {
-  hallName: "",
-  hallDescription: "",
-  hallCapacity: "300",
-  layoutName: "",
-  layoutType: "theater",
-  capacity: "300",
-  notes: "",
-  isIndoor: true,
+const VISIT_STATUS_STYLES: Record<string, string> = {
+  PENDING: "bg-violet-50 text-violet-700 border-violet-200",
+  VISIT_COMPLETE: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
-
-function zoneTotal(zones: ZoneRow[]) {
-  return zones.reduce((sum, zone) => sum + (Number(zone.capacity) || 0), 0);
-}
-
-function requestZones(spec: Record<string, unknown> | undefined) {
-  const raw = spec?.zones;
-  if (!Array.isArray(raw)) return [] as Array<{ name?: string; capacity?: number }>;
-  return raw as Array<{ name?: string; capacity?: number }>;
-}
-
-function specString(spec: Record<string, unknown> | undefined, key: string) {
-  const value = spec?.[key];
-  return typeof value === "string" ? value : "";
-}
-
-function specImages(spec: Record<string, unknown> | undefined) {
-  const raw = spec?.reference_images;
-  if (!Array.isArray(raw)) return [] as string[];
-  return raw
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => resolveMediaUrl(item));
-}
 
 export default function VenueLayoutRequestsPage() {
   const dispatch = useAppDispatch();
@@ -80,533 +66,308 @@ export default function VenueLayoutRequestsPage() {
 
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
-  const { data: requests = [], isLoading } = useGetVenueLayoutRequestsQuery(bizId, { skip: !bizId });
-  const { data: layoutOptions = [], isLoading: loadingOptions } = useGetVenueLayoutTemplatesQuery(bizId, { skip: !bizId });
-  const [createRequest] = useCreateVenueLayoutRequestMutation();
+  const { data: requests = [], isLoading, refetch } = useGetVenueLayoutRequestsQuery(bizId, { skip: !bizId });
+  const { data: layoutOptions = [], isLoading: loadingOptions } = useGetVenueLayoutTemplatesQuery(bizId, {
+    skip: !bizId,
+  });
+  const { data: activityLogs = [], isLoading: loadingLogs } = useGetVenueLayoutTemplateLogsQuery(bizId, {
+    skip: !bizId,
+  });
+  const [createRequest, { isLoading: submitting }] = useCreateVenueLayoutRequestMutation();
   const [approveLayout, { isLoading: approving }] = useApproveVenueLayoutTemplateMutation();
+  const [publishLayout, { isLoading: publishing }] = usePublishVenueLayoutTemplateMutation();
   const [rejectLayout, { isLoading: rejecting }] = useRejectVenueLayoutTemplateMutation();
-  const [uploadImage, { isLoading: uploadingImage }] = useUploadImageMutation();
+  const [rejectAllLayouts, { isLoading: rejectingAll }] = useRejectAllVenueLayoutTemplatesMutation();
 
-  const [hallName, setHallName] = useState(emptyForm.hallName);
-  const [hallDescription, setHallDescription] = useState(emptyForm.hallDescription);
-  const [hallCapacity, setHallCapacity] = useState(emptyForm.hallCapacity);
-  const [layoutName, setLayoutName] = useState(emptyForm.layoutName);
-  const [layoutType, setLayoutType] = useState(emptyForm.layoutType);
-  const [capacity, setCapacity] = useState(emptyForm.capacity);
-  const [zones, setZones] = useState<ZoneRow[]>([{ name: "", capacity: "" }]);
-  const [notes, setNotes] = useState(emptyForm.notes);
-  const [isIndoor, setIsIndoor] = useState(emptyForm.isIndoor);
-  const [referenceImages, setReferenceImages] = useState<string[]>([]);
-  const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
-  const [saveMode, setSaveMode] = useState<SaveMode>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectAllOpen, setRejectAllOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const { data: viewingLayout, isFetching: loadingView } = useGetVenueLayoutTemplateQuery(
     { bizId, templateId: viewingId || "" },
     { skip: !bizId || !viewingId }
   );
 
-  const totalZoneCapacity = useMemo(() => zoneTotal(zones), [zones]);
-  const profileDefaults = useMemo(() => buildLayoutRequestDefaults(settings), [settings]);
-  const prefilledFromProfile = useRef(false);
-  const busy = saveMode !== null;
+  const venueName = settings?.name?.trim() || "Your venue";
+  const venueTypeLabel = venueTypeDisplayName(settings?.venue_type_slug, settings?.venue_type_name);
+  const venueAddress = [settings?.address?.trim(), settings?.city_name?.trim()]
+    .filter(Boolean)
+    .join(", ") || "Address not set";
 
-  const applyProfileDefaults = () => {
-    const defaults = buildLayoutRequestDefaults(settings);
-    setHallName(defaults.hallName);
-    setHallDescription(defaults.hallDescription);
-    setHallCapacity(defaults.hallCapacity);
-    setLayoutName(defaults.layoutName);
-    setLayoutType(defaults.layoutType);
-    setCapacity(defaults.capacity);
-    setZones(defaults.zones);
-    setNotes(defaults.notes);
-    setIsIndoor(defaults.isIndoor);
-    setReferenceImages(defaults.referenceImages);
-  };
+  const openVisitRequest = useMemo(
+    () =>
+      requests.find(
+        (r) =>
+          r.status !== "DRAFT" &&
+          r.status !== "REJECTED" &&
+          r.status !== "ARCHIVED" &&
+          (r.visit_status || "PENDING") !== "VISIT_COMPLETE"
+      ),
+    [requests]
+  );
 
-  useEffect(() => {
-    if (!settings || editingRequestId || prefilledFromProfile.current) return;
-    applyProfileDefaults();
-    prefilledFromProfile.current = true;
-  }, [settings, editingRequestId]);
+  const pendingLayoutOptions = useMemo(
+    () =>
+      layoutOptions.filter(
+        (o) =>
+          o.status === "PUBLISHED" &&
+          !o.is_default &&
+          !o.venue_approved_at &&
+          !o.venue_live_requested_at
+      ),
+    [layoutOptions]
+  );
 
-  const resetForm = () => {
-    setEditingRequestId(null);
-    prefilledFromProfile.current = false;
-    applyProfileDefaults();
-  };
+  const shortlistedLayoutOptions = useMemo(
+    () =>
+      layoutOptions.filter(
+        (o) =>
+          o.status === "PUBLISHED" &&
+          !o.is_default &&
+          !!o.venue_approved_at &&
+          !o.venue_live_requested_at
+      ),
+    [layoutOptions]
+  );
 
-  const loadRequestIntoForm = (request: VenueLayoutRequest) => {
-    const spec = request.spec_json || {};
-    const zonesFromSpec = requestZones(spec).map((zone) => ({
-      name: zone.name || "",
-      capacity: String(zone.capacity || ""),
-    }));
-    setEditingRequestId(request.id);
-    setHallName(request.hall_name || specString(spec, "hall_name") || "");
-    setHallDescription(request.hall_description || specString(spec, "hall_description") || "");
-    setHallCapacity(String(request.hall_capacity || spec.hall_capacity || request.capacity || ""));
-    setLayoutName(request.layout_name || "");
-    setLayoutType(request.layout_type || "theater");
-    setCapacity(String(request.capacity || ""));
-    setZones(zonesFromSpec.length ? zonesFromSpec : [{ name: "", capacity: "" }]);
-    setNotes(specString(spec, "notes"));
-    setIsIndoor(request.hall_is_indoor !== false && spec.is_indoor !== false);
-    setReferenceImages(specImages(spec));
-    prefilledFromProfile.current = true;
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const awaitingConfirmation = useMemo(
+    () => layoutOptions.filter((o) => !!o.venue_live_requested_at && !o.is_default),
+    [layoutOptions]
+  );
 
-  const buildSpec = () => ({
-    hall_name: hallName.trim(),
-    hall_description: hallDescription.trim(),
-    hall_capacity: Number(hallCapacity) || Number(capacity) || 0,
-    is_indoor: isIndoor,
-    zones: zones
-      .map((zone) => ({ name: zone.name.trim(), capacity: Number(zone.capacity) || 0 }))
-      .filter((zone) => zone.name && zone.capacity > 0),
-    notes: notes.trim(),
-    reference_images: referenceImages
-      .filter((url) => !url.startsWith("blob:"))
-      .map((url) => normalizeUploadPath(url)),
-    intake_mode: "structured_request",
-    venue_meta_snapshot: buildVenueMetaSnapshot(settings),
-    sellable_capacity: profileDefaults.sellableCapacity,
-    gross_capacity: profileDefaults.grossCapacity,
-    venue_type_slug: settings?.venue_type_slug || null,
-    venue_type_name: settings?.venue_type_name || null,
-  });
+  const reviewLocked = useMemo(
+    () =>
+      layoutOptions.some((o) => o.is_default || !!o.venue_live_requested_at),
+    [layoutOptions]
+  );
 
-  const validate = (mode: SaveMode) => {
+  const requestSiteVisit = async () => {
     if (!bizId) {
       toast.error("Missing venue session. Please sign in again.");
-      return false;
+      return;
     }
-    if (!hallName.trim()) {
-      toast.error("Hall name is required.");
-      return false;
+    if (openVisitRequest) {
+      toast.error("You already have a pending site visit request.");
+      return;
     }
-    if (!layoutName.trim()) {
-      toast.error("Layout name is required.");
-      return false;
+    if (!settings?.name?.trim()) {
+      toast.error("Please complete your venue profile name first.");
+      return;
     }
-    if (!Number(capacity) || Number(capacity) <= 0) {
-      toast.error("Usable capacity must be greater than 0.");
-      return false;
-    }
-    if (mode === "submit") {
-      const filledZones = zones.filter((zone) => zone.name.trim() && Number(zone.capacity) > 0);
-      if (filledZones.length === 0) {
-        toast.error("Add at least one section or zone with seating capacity.");
-        return false;
-      }
-      const sellable =
-        profileDefaults.sellableCapacity ?? (Number(capacity) || 0);
-      if (sellable > 0 && totalZoneCapacity > sellable) {
-        toast.error(
-          `Zone total (${totalZoneCapacity}) exceeds sellable capacity (${sellable}). Reduce zones or update your venue profile.`
-        );
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const save = async (mode: "draft" | "submit") => {
-    if (!validate(mode)) return;
-    setSaveMode(mode);
     try {
-      const payload = {
+      await createRequest({
         bizId,
-        hall_name: hallName,
-        hall_description: hallDescription,
-        hall_capacity: Number(hallCapacity) || Number(capacity),
-        is_indoor: isIndoor,
-        layout_name: layoutName,
-        layout_type: layoutType,
-        capacity: Number(capacity),
-        spec_json: buildSpec(),
-        submit_now: mode === "submit",
-      };
-      const saved = await createRequest({
-        ...payload,
-        ...(editingRequestId ? { request_id: editingRequestId } : {}),
+        hall_name: venueName,
+        hall_description: venueAddress,
+        hall_capacity: 1,
+        is_indoor: true,
+        layout_name: `${venueName} layout site visit`,
+        layout_type: "theater",
+        capacity: 1,
+        spec_json: {
+          intake_mode: "site_visit_request",
+          venue_meta_snapshot: buildVenueMetaSnapshot(settings),
+          venue_type_slug: settings?.venue_type_slug || null,
+          venue_type_name: venueTypeLabel,
+        },
+        submit_now: true,
       }).unwrap();
-      if (mode === "draft") {
-        setEditingRequestId(saved.id);
-        toast.success("Draft saved. Fields are kept so you can continue and submit.");
-      } else {
-        toast.success("Layout request submitted for Super Admin review.");
-        resetForm();
-      }
+      toast.success("Site visit request submitted. BookMyBota team will contact you to schedule the visit.");
+      void refetch();
     } catch (err: unknown) {
-      toast.error(extractApiError(err, mode === "draft" ? "Failed to save draft" : "Failed to submit layout request"));
-    } finally {
-      setSaveMode(null);
-    }
-  };
-
-  const uploadFiles = async (files: FileList | File[]) => {
-    const list = Array.from(files);
-    if (!list.length) return;
-    const pending = list.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setReferenceImages((prev) => [...prev, ...pending.map((item) => item.preview)]);
-    try {
-      const replacements = new Map<string, string>();
-      for (const item of pending) {
-        const formData = new FormData();
-        formData.append("image", item.file);
-        const res = await uploadImage(formData).unwrap();
-        const url = normalizeUploadPath(res.url || extractUploadUrl(res));
-        if (!url || url.startsWith("blob:")) throw new Error("Upload returned no image URL.");
-        replacements.set(item.preview, url);
-      }
-      setReferenceImages((prev) => prev.map((entry) => replacements.get(entry) ?? entry));
-      window.setTimeout(() => {
-        for (const item of pending) URL.revokeObjectURL(item.preview);
-      }, 250);
-      toast.success(list.length === 1 ? "Reference image uploaded" : `${list.length} images uploaded`);
-    } catch (err: unknown) {
-      setReferenceImages((prev) => prev.filter((entry) => !pending.some((item) => item.preview === entry)));
-      for (const item of pending) URL.revokeObjectURL(item.preview);
-      toast.error(extractApiError(err, "Failed to upload reference image"));
+      toast.error(extractApiError(err, "Failed to submit site visit request"));
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white">Layout requests</h2>
+        <h2 className="text-2xl font-bold text-white">Layout site visit</h2>
         <p className="text-zinc-400 mt-1">
-          Your venue profile details (sections, rows, stage, balcony, damaged seats) are used to pre-fill this request.
-          Super Admin uses it to build the reusable seating layout.
+          Request BookMyBota to visit your venue and create the seating layout. No layout details are
+          needed here — our team will survey on site.
         </p>
       </div>
 
-      {!profileDefaults.profileComplete && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Complete your{" "}
-          <Link href="/venue/profile" className="font-semibold underline hover:text-amber-50">
-            venue profile
-          </Link>{" "}
-          first (sections, rows, seats per row, capacity) so layout requests are pre-filled accurately.
-        </div>
-      )}
-
-      {profileDefaults.profileComplete && !editingRequestId && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-          Pre-filled from your venue profile
-          {profileDefaults.sellableCapacity != null ? (
-            <>
-              {" "}
-              · sellable capacity <strong>{profileDefaults.sellableCapacity}</strong>
-              {profileDefaults.grossCapacity != null && profileDefaults.grossCapacity !== profileDefaults.sellableCapacity
-                ? ` (${profileDefaults.grossCapacity} gross)`
-                : ""}
-            </>
-          ) : null}
-          . Review zones and images, then submit for Super Admin.
-        </div>
-      )}
-
       <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
-        <div className="px-6 py-5 border-b border-white/10">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-white">
-                {editingRequestId ? "Continue draft" : "New layout request"}
-              </h3>
-              <p className="text-sm text-zinc-400 mt-1">
-                {editingRequestId
-                  ? "Saved fields are loaded. Review them, then submit for Super Admin."
-                  : "Fill hall details first, then add sections and images."}
-              </p>
-            </div>
-            {editingRequestId && (
-              <button type="button" onClick={resetForm} className="text-sm text-zinc-400 hover:text-amber-600">
-                Start new
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="p-6 space-y-8">
-          <section className="space-y-4">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Hall details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Hall name *</label>
-                <input value={hallName} onChange={(e) => setHallName(e.target.value)} className="input-field" placeholder="Main Hall" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Hall capacity</label>
-                <input value={hallCapacity} onChange={(e) => setHallCapacity(e.target.value)} className="input-field" type="number" min="1" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">Hall description</label>
-              <textarea
-                value={hallDescription}
-                onChange={(e) => setHallDescription(e.target.value)}
-                className="input-field min-h-[88px] resize-y"
-                rows={2}
-                placeholder="Location inside the venue, access notes, or hall features"
-              />
-            </div>
-          </section>
-
-          <section className="space-y-4">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Layout details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Layout name *</label>
-                <input value={layoutName} onChange={(e) => setLayoutName(e.target.value)} className="input-field" placeholder="Standard theater seating" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Layout type</label>
-                <select value={layoutType} onChange={(e) => setLayoutType(e.target.value)} className="input-field portal-select">
-                  <option value="theater">Theater</option>
-                  <option value="banquet">Banquet</option>
-                  <option value="standing">Standing</option>
-                  <option value="conference">Conference</option>
-                  <option value="mixed">Mixed</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Usable capacity *</label>
-                <input value={capacity} onChange={(e) => setCapacity(e.target.value)} className="input-field" type="number" min="1" />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setIsIndoor(true)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium border ${isIndoor ? "bg-amber-50 text-amber-700 border-amber-200" : "border-white/10 text-zinc-400"}`}
-              >
-                Indoor venue
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsIndoor(false)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium border ${!isIndoor ? "bg-amber-50 text-amber-700 border-amber-200" : "border-white/10 text-zinc-400"}`}
-              >
-                Outdoor venue
-              </button>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Sections or zones</h4>
-                <p className="text-xs text-zinc-500 mt-1">Add each zone with its own seating capacity.</p>
-              </div>
-              {totalZoneCapacity > 0 && (
-                <span
-                  className={`text-xs font-medium ${
-                    profileDefaults.sellableCapacity != null &&
-                    totalZoneCapacity > profileDefaults.sellableCapacity
-                      ? "text-rose-400"
-                      : "text-zinc-400"
-                  }`}
-                >
-                  Zone total: {totalZoneCapacity}
-                  {profileDefaults.sellableCapacity != null
-                    ? ` / ${profileDefaults.sellableCapacity} sellable`
-                    : ""}
-                </span>
-              )}
-            </div>
-            <div className="rounded-xl border border-white/10 overflow-hidden">
-              <div className="hidden sm:grid grid-cols-[1fr_160px_88px] gap-2 px-4 py-2 bg-white/5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                <span>Zone name</span>
-                <span>Seating capacity</span>
-                <span />
-              </div>
-              <div className="divide-y divide-white/5">
-                {zones.map((zone, idx) => (
-                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_160px_88px] gap-2 p-3 sm:px-4">
-                    <input
-                      value={zone.name}
-                      onChange={(e) => setZones((prev) => prev.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item)))}
-                      className="input-field"
-                      placeholder="e.g. VIP"
-                    />
-                    <input
-                      value={zone.capacity}
-                      onChange={(e) => setZones((prev) => prev.map((item, i) => (i === idx ? { ...item, capacity: e.target.value } : item)))}
-                      className="input-field"
-                      type="number"
-                      min="1"
-                      placeholder="Capacity"
-                    />
-                    <button
-                      type="button"
-                      disabled={zones.length === 1}
-                      onClick={() => setZones((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)))}
-                      className="h-11 rounded-xl border border-white/10 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center"
-                      title="Remove zone"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setZones((prev) => [...prev, { name: "", capacity: "" }])}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-white/20 text-sm font-medium text-zinc-300 hover:border-amber-400 hover:text-amber-600"
-            >
-              <Plus size={16} />
-              Add zone
-            </button>
-          </section>
-
-          <section className="space-y-3">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Layout notes</h4>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="input-field min-h-[110px] resize-y"
-              rows={4}
-              placeholder="Stage position, entry gates, wheelchair areas, blocked pillars, etc."
-            />
-          </section>
-
-          <section className="space-y-3">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Reference layout images</h4>
-            <label
-              className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/15 px-4 py-8 text-center cursor-pointer hover:border-amber-400 hover:bg-amber-50/40"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                void uploadFiles(e.dataTransfer.files);
-              }}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                disabled={uploadingImage}
-                onChange={(e) => {
-                  const files = e.target.files;
-                  e.target.value = "";
-                  if (files) void uploadFiles(files);
-                }}
-              />
-              <span className="h-10 w-10 rounded-full bg-amber-50 text-amber-600 inline-flex items-center justify-center">
-                {uploadingImage ? <Upload size={18} className="animate-pulse" /> : <ImagePlus size={18} />}
-              </span>
-              <span className="text-sm font-medium text-white">
-                {uploadingImage ? "Uploading images..." : "Click to upload or drag images here"}
-              </span>
-              <span className="text-xs text-zinc-500">JPG, PNG, or WebP. Add floor plans, photos, or sketches.</span>
-            </label>
-            {referenceImages.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {referenceImages.map((url, idx) => (
-                  <div key={`${url}-${idx}`} className="relative group rounded-xl overflow-hidden border border-white/10 bg-white">
-                    <img
-                      src={resolveMediaUrl(url)}
-                      alt={`Reference ${idx + 1}`}
-                      className="w-full h-28 object-contain bg-slate-100 p-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
-                        setReferenceImages((prev) => prev.filter((_, i) => i !== idx));
-                      }}
-                      className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/70 text-white inline-flex items-center justify-center"
-                      title="Remove image"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-
-        <div className="px-6 py-4 border-t border-white/10 bg-white/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-xs text-zinc-500">
-            <strong className="text-zinc-400">Save draft</strong> keeps the form filled so you can continue later.{" "}
-            <strong className="text-zinc-400">Submit for review</strong> sends this same request to Super Admin.
+        <div className="p-6 space-y-4">
+          <h3 className="text-lg font-semibold text-white">Request a site visit</h3>
+          <p className="text-sm text-zinc-400">
+            We use your{" "}
+            <Link href="/venue/profile" className="text-amber-400 hover:text-amber-300 font-medium">
+              venue profile
+            </Link>{" "}
+            for venue name, address, and contact details.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" disabled={busy} onClick={() => void save("draft")} className="btn-secondary disabled:opacity-50">
-              {saveMode === "draft" ? "Saving draft..." : "Save draft"}
-            </button>
-            <button type="button" disabled={busy} onClick={() => void save("submit")} className="btn-primary disabled:opacity-50">
-              {saveMode === "submit" ? "Submitting..." : editingRequestId ? "Submit this draft" : "Submit for review"}
-            </button>
+
+          <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-4 space-y-2 text-sm">
+            <p className="text-white font-medium">{venueName}</p>
+            <p className="text-zinc-400">{venueTypeLabel}</p>
+            <p className="text-zinc-400 flex items-start gap-2">
+              <MapPin size={14} className="shrink-0 mt-0.5" />
+              {venueAddress}
+            </p>
           </div>
+
+          {openVisitRequest ? (
+            <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">
+              You already have a pending site visit request. BookMyBota team will visit your venue
+              and mark it complete when done.
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={submitting || !!openVisitRequest}
+            onClick={() => void requestSiteVisit()}
+            className="btn-primary disabled:opacity-50"
+          >
+            {submitting ? "Submitting..." : "Request site visit"}
+          </button>
         </div>
       </div>
 
       <div className="glass-panel rounded-2xl border border-white/10 p-6">
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
           <div>
             <h3 className="text-lg font-semibold text-white">Layout options from Super Admin</h3>
-            <p className="text-sm text-zinc-500 mt-1">View each option, then approve one or reject it with a reason.</p>
+            <p className="text-sm text-zinc-400 mt-1">
+              {awaitingConfirmation.length > 0
+                ? "Your go-live request is with BookMyBota. No further approve/reject actions until they confirm."
+                : pendingLayoutOptions.length > 0
+                  ? `${pendingLayoutOptions.length} option${pendingLayoutOptions.length === 1 ? "" : "s"} waiting for review. Approve the ones you like, then request one to go live.`
+                  : shortlistedLayoutOptions.length > 0
+                    ? `${shortlistedLayoutOptions.length} approved option${shortlistedLayoutOptions.length === 1 ? "" : "s"} — pick one and request it to go live.`
+                    : layoutOptions.length > 0
+                      ? "Review your layout options below."
+                      : "Super Admin will send layout options here after the site visit and layout build."}
+            </p>
           </div>
+          {pendingLayoutOptions.length > 0 && !reviewLocked ? (
+            <button
+              type="button"
+              disabled={rejectingAll}
+              onClick={() => {
+                setRejectAllOpen(true);
+                setRejectReason("");
+              }}
+              className="shrink-0 px-4 py-2 rounded-xl border border-rose-300 text-rose-400 text-sm font-semibold hover:bg-rose-500/10 disabled:opacity-50"
+            >
+              Reject all ({pendingLayoutOptions.length})
+            </button>
+          ) : null}
         </div>
+
         {loadingOptions ? (
           <p className="text-zinc-400">Loading layout options...</p>
         ) : layoutOptions.length === 0 ? (
-          <p className="text-zinc-500">No layout options yet. Super Admin will send options here after building your request.</p>
+          <div className="rounded-xl border border-dashed border-white/15 bg-zinc-900/30 p-10 text-center">
+            <p className="text-zinc-400">No layout options yet.</p>
+            <p className="text-sm text-zinc-500 mt-2">
+              After your site visit, BookMyBota will create and submit multiple layout options for you
+              to compare and approve.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-3">
-            {layoutOptions.map((option) => {
-              const waiting = option.status === "PUBLISHED" && !option.is_default;
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {layoutOptions.map((option, index) => {
+              const waiting =
+                option.status === "PUBLISHED" &&
+                !option.is_default &&
+                !option.venue_approved_at &&
+                !option.venue_live_requested_at;
+              const shortlisted =
+                option.status === "PUBLISHED" &&
+                !option.is_default &&
+                !!option.venue_approved_at &&
+                !option.venue_live_requested_at;
+              const awaitingLive = !!option.venue_live_requested_at && !option.is_default;
               const rejected = option.status === "REJECTED";
+              const live = option.is_default && option.status === "PUBLISHED";
               return (
                 <div
                   key={option.id}
-                  className={`rounded-xl border p-4 ${
-                    option.is_default
-                      ? "border-emerald-300 bg-emerald-50/60"
+                  className={`rounded-2xl border overflow-hidden flex flex-col ${
+                    live
+                      ? "border-sky-500/40 bg-sky-950/20"
+                      : awaitingLive
+                        ? "border-violet-500/40 bg-violet-950/20"
+                      : shortlisted
+                        ? "border-emerald-500/40 bg-emerald-950/20"
                       : rejected
-                        ? "border-rose-200 bg-rose-50/40"
-                        : "border-white/10 bg-white/50"
+                        ? "border-rose-500/30 bg-rose-950/10"
+                        : waiting
+                          ? "border-amber-500/30 bg-zinc-900/50"
+                          : "border-white/10 bg-zinc-900/40"
                   }`}
                 >
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                    <div>
-                      <p className="text-white font-semibold">{option.name}</p>
-                      <p className="text-sm text-zinc-400 mt-1">
-                        {(option.hall_name || "Hall")} · {option.layout_type} · capacity {option.capacity}
-                        {option.seat_count ? ` · ${option.seat_count} seats` : ""}
-                      </p>
-                      {rejected && option.rejection_reason && (
-                        <p className="text-sm text-rose-600 mt-2">Rejected reason: {option.rejection_reason}</p>
-                      )}
+                  <div className="p-3 border-b border-white/5 bg-black/20">
+                    <LayoutSeatPreview
+                      seats={option.seats_json}
+                      config={option.seating_config}
+                      heightClass="h-36"
+                    />
+                  </div>
+                  <div className="p-4 flex-1 flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold uppercase tracking-wide text-amber-400/90">
+                          Option {index + 1}
+                        </p>
+                        <p className="font-semibold text-white truncate">{option.name}</p>
+                        <p className="text-xs text-zinc-400 mt-1">
+                          {option.hall_name || "Hall"} · {option.layout_type}
+                          {option.seat_count ? ` · ${option.seat_count} seats` : ""}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 text-[10px] font-bold uppercase px-2 py-1 rounded-md border ${
+                          live
+                            ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
+                            : awaitingLive
+                              ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+                            : shortlisted
+                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                            : rejected
+                              ? "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                              : waiting
+                                ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                                : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"
+                        }`}
+                      >
+                        {live
+                          ? "Live in system"
+                          : awaitingLive
+                            ? "Awaiting confirmation"
+                          : shortlisted
+                            ? "Approved"
+                            : rejected
+                              ? "Rejected"
+                              : waiting
+                                ? "Pending"
+                                : option.status}
+                      </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+
+                    {rejected && option.rejection_reason ? (
+                      <p className="text-xs text-rose-300/90 line-clamp-2">{option.rejection_reason}</p>
+                    ) : null}
+
+                    {awaitingLive ? (
+                      <p className="text-xs text-violet-300/90">
+                        BookMyBota will confirm before this layout goes live.
+                      </p>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2 mt-auto pt-1">
                       <button
                         type="button"
                         onClick={() => setViewingId(option.id)}
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/15 text-sm text-zinc-200 hover:bg-white/10"
                       >
-                        <Eye size={14} /> View
+                        <Eye size={14} /> View full
                       </button>
-                      {option.is_default ? (
-                        <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
-                          Approved system layout
-                        </span>
-                      ) : rejected ? (
-                        <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-rose-50 text-rose-700 border-rose-200">
-                          Rejected
-                        </span>
-                      ) : waiting ? (
+                      {!reviewLocked && waiting ? (
                         <>
                           <button
                             type="button"
@@ -614,14 +375,14 @@ export default function VenueLayoutRequestsPage() {
                             onClick={async () => {
                               try {
                                 await approveLayout({ bizId, templateId: option.id }).unwrap();
-                                toast.success("Layout approved. It will now show across the system.");
+                                toast.success("Layout approved. You can approve more options, then request one to go live.");
                               } catch (err: unknown) {
                                 toast.error(extractApiError(err, "Failed to approve layout"));
                               }
                             }}
-                            className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                            className="btn-primary text-sm py-2 px-3 disabled:opacity-50"
                           >
-                            {approving ? "Approving..." : "Approve"}
+                            {approving ? "…" : "Approve"}
                           </button>
                           <button
                             type="button"
@@ -630,7 +391,37 @@ export default function VenueLayoutRequestsPage() {
                               setRejectingId(option.id);
                               setRejectReason("");
                             }}
-                            className="px-4 py-2 rounded-xl border border-rose-200 text-rose-600 text-sm hover:bg-rose-50 disabled:opacity-50"
+                            className="px-3 py-2 rounded-xl border border-rose-400/40 text-rose-300 text-sm hover:bg-rose-500/10 disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : null}
+                      {!reviewLocked && shortlisted ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={publishing}
+                            onClick={async () => {
+                              try {
+                                await publishLayout({ bizId, templateId: option.id }).unwrap();
+                                toast.success("Go-live request sent. BookMyBota will confirm before it publishes.");
+                              } catch (err: unknown) {
+                                toast.error(extractApiError(err, "Failed to request go live"));
+                              }
+                            }}
+                            className="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold disabled:opacity-50"
+                          >
+                            {publishing ? "…" : "Request go live"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={rejecting}
+                            onClick={() => {
+                              setRejectingId(option.id);
+                              setRejectReason("");
+                            }}
+                            className="px-3 py-2 rounded-xl border border-rose-400/40 text-rose-300 text-sm hover:bg-rose-500/10 disabled:opacity-50"
                           >
                             Reject
                           </button>
@@ -647,74 +438,145 @@ export default function VenueLayoutRequestsPage() {
 
       <div className="glass-panel rounded-2xl border border-white/10 p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <ScrollText size={18} className="text-zinc-400" />
+            <h3 className="text-lg font-semibold text-white">Activity log</h3>
+          </div>
+          <span className="text-xs text-zinc-500">{activityLogs.length} entries</span>
+        </div>
+        <p className="text-sm text-zinc-400 mb-4">
+          Every approve, reject, and go-live step is recorded here in order (newest first).
+        </p>
+        {loadingLogs ? (
+          <p className="text-zinc-400">Loading activity...</p>
+        ) : activityLogs.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/15 bg-zinc-900/30 p-8 text-center">
+            <p className="text-zinc-400">No activity yet.</p>
+            <p className="text-sm text-zinc-500 mt-1">
+              When you approve, reject, or request a layout to go live, it will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-0">
+            {activityLogs.map((entry, index) => (
+              <div
+                key={entry.id}
+                className={`flex gap-4 py-4 ${index < activityLogs.length - 1 ? "border-b border-white/10" : ""}`}
+              >
+                <div className="shrink-0 w-2 mt-2 rounded-full bg-white/10 self-stretch min-h-[2.5rem]" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span
+                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
+                        LOG_ACTION_STYLES[entry.action] || "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"
+                      }`}
+                    >
+                      {LOG_ACTION_LABELS[entry.action] || entry.action}
+                    </span>
+                    {entry.created_at ? (
+                      <span className="text-xs text-zinc-500">{formatDateTime12h(entry.created_at)}</span>
+                    ) : null}
+                  </div>
+                  {entry.template_name ? (
+                    <p className="text-sm font-medium text-white">{entry.template_name}</p>
+                  ) : null}
+                  {entry.message ? (
+                    <p className="text-sm text-zinc-400 mt-1 whitespace-pre-line">{entry.message}</p>
+                  ) : null}
+                  {entry.actor_label ? (
+                    <p className="text-xs text-zinc-500 mt-1">By {entry.actor_label}</p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="glass-panel rounded-2xl border border-white/10 p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <h3 className="text-lg font-semibold text-white">Existing requests</h3>
           <span className="text-xs text-zinc-500">{requests.length} total</span>
         </div>
         {isLoading ? (
           <p className="text-zinc-400">Loading requests...</p>
         ) : requests.length === 0 ? (
-          <p className="text-zinc-500">No layout requests yet. Save a draft or submit the form above.</p>
+          <p className="text-zinc-500">No layout requests yet. Use the button above to request a site visit.</p>
         ) : (
           <div className="space-y-3">
-            {requests.map((request) => {
-              const zonesInRequest = requestZones(request.spec_json);
-              return (
-                <div
-                  key={request.id}
-                  className={`rounded-xl border p-4 ${
-                    editingRequestId === request.id
-                      ? "border-amber-300 bg-amber-50/60"
-                      : "border-white/10 bg-white/50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-white font-semibold">{request.layout_name}</p>
-                      <p className="text-sm text-zinc-400 mt-1">
-                        {(request.hall_name || "Hall")} · {request.layout_type} · capacity {request.capacity}
+            {requests.map((request) => (
+              <div key={request.id} className="rounded-xl border border-white/10 bg-white/50 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-white font-semibold">{request.layout_name}</p>
+                    <p className="text-sm text-zinc-400 mt-1">
+                      {(request.hall_name || venueName)} · Site visit request
+                    </p>
+                    {request.visit_status === "VISIT_COMPLETE" ? (
+                      <p className="text-xs text-emerald-600 mt-2">
+                        BookMyBota team has completed the site visit. Layout building is in progress.
                       </p>
-                      {zonesInRequest.length > 0 && (
-                        <p className="text-xs text-zinc-500 mt-2">
-                          {zonesInRequest.map((zone) => `${zone.name || "Zone"} (${zone.capacity || 0})`).join(" · ")}
-                        </p>
-                      )}
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${STATUS_STYLES[request.status] || STATUS_STYLES.DRAFT}`}>
+                    ) : request.status !== "DRAFT" ? (
+                      <p className="text-xs text-violet-400 mt-2">
+                        Waiting for BookMyBota team to visit your venue and complete the survey.
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {request.status !== "DRAFT" ? (
+                      <span
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${
+                          VISIT_STATUS_STYLES[request.visit_status || "PENDING"] || VISIT_STATUS_STYLES.PENDING
+                        }`}
+                      >
+                        {(request.visit_status || "PENDING") === "VISIT_COMPLETE"
+                          ? "Visit complete"
+                          : "Visit pending"}
+                      </span>
+                    ) : null}
+                    <span
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${
+                        STATUS_STYLES[request.status] || STATUS_STYLES.DRAFT
+                      }`}
+                    >
                       {request.status.replaceAll("_", " ")}
                     </span>
                   </div>
-                  {request.review_comments && (
-                    <p className="text-sm text-amber-600 mt-3">Admin comment: {request.review_comments}</p>
-                  )}
-                  {(request.status === "DRAFT" || request.status === "REJECTED") && (
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={() => loadRequestIntoForm(request)}
-                        className="text-sm font-medium text-amber-700 hover:text-amber-800"
-                      >
-                        {editingRequestId === request.id ? "Editing this draft" : "Continue editing"}
-                      </button>
-                    </div>
-                  )}
                 </div>
-              );
-            })}
+                {request.review_comments ? (
+                  <p className="text-sm text-amber-600 mt-3">Admin comment: {request.review_comments}</p>
+                ) : null}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {viewingId && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setViewingId(null)}>
-          <div className="w-full max-w-3xl rounded-2xl bg-zinc-950 border border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
+      {viewingId ? (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setViewingId(null)}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-950 border border-white/10 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-400">
+                  Option {layoutOptions.findIndex((o) => o.id === viewingId) + 1} of {layoutOptions.length}
+                </p>
                 <h3 className="text-lg font-semibold text-white">{viewingLayout?.name || "Layout option"}</h3>
                 <p className="text-sm text-zinc-400 mt-1">
-                  {(viewingLayout?.hall_name || "Hall")} · {viewingLayout?.layout_type || ""} · {viewingLayout?.seat_count || 0} seats
+                  {viewingLayout?.hall_name || "Hall"} · {viewingLayout?.layout_type || ""} ·{" "}
+                  {viewingLayout?.seat_count || 0} seats
                 </p>
               </div>
-              <button type="button" onClick={() => setViewingId(null)} className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setViewingId(null)}
+                className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center hover:bg-white/10"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -724,25 +586,151 @@ export default function VenueLayoutRequestsPage() {
               <LayoutSeatPreview
                 seats={viewingLayout?.seats_json}
                 config={viewingLayout?.seating_config}
-                heightClass="h-[420px]"
+                heightClass="h-[480px]"
               />
             )}
-            {viewingLayout?.rejection_reason && (
+            {viewingLayout?.rejection_reason ? (
               <p className="text-sm text-rose-400 mt-4">Rejected reason: {viewingLayout.rejection_reason}</p>
-            )}
+            ) : null}
+            {viewingLayout &&
+            viewingLayout.status === "PUBLISHED" &&
+            !viewingLayout.is_default &&
+            !reviewLocked ? (
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/10">
+                {!viewingLayout.venue_approved_at ? (
+                  <button
+                    type="button"
+                    disabled={approving}
+                    onClick={async () => {
+                      try {
+                        await approveLayout({ bizId, templateId: viewingLayout.id }).unwrap();
+                        toast.success("Layout approved.");
+                        setViewingId(null);
+                      } catch (err: unknown) {
+                        toast.error(extractApiError(err, "Failed to approve layout"));
+                      }
+                    }}
+                    className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                  >
+                    Approve this option
+                  </button>
+                ) : !viewingLayout.venue_live_requested_at ? (
+                  <button
+                    type="button"
+                    disabled={publishing}
+                    onClick={async () => {
+                      try {
+                        await publishLayout({ bizId, templateId: viewingLayout.id }).unwrap();
+                        toast.success("Go-live request sent to BookMyBota.");
+                        setViewingId(null);
+                      } catch (err: unknown) {
+                        toast.error(extractApiError(err, "Failed to request go live"));
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    Request go live
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRejectingId(viewingLayout.id);
+                    setRejectReason("");
+                  }}
+                  className="px-4 py-2 rounded-xl border border-rose-400/40 text-rose-300 text-sm"
+                >
+                  Reject this option
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {rejectingId && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setRejectingId(null)}>
-          <div className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
+      {rejectAllOpen ? (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setRejectAllOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-white/10 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Reject all layout options</h3>
+                <p className="text-sm text-zinc-400 mt-1">
+                  This rejects all {pendingLayoutOptions.length} options waiting for approval. Super Admin
+                  can revise and send new options.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectAllOpen(false)}
+                className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="input-field min-h-[120px]"
+              placeholder="Why are none of these layouts acceptable?"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setRejectAllOpen(false)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={rejectingAll}
+                onClick={async () => {
+                  if (!rejectReason.trim()) {
+                    toast.error("Rejection reason is required.");
+                    return;
+                  }
+                  try {
+                    const res = await rejectAllLayouts({
+                      bizId,
+                      reason: rejectReason.trim(),
+                    }).unwrap();
+                    toast.success(res.message || "All layout options rejected.");
+                    setRejectAllOpen(false);
+                    setRejectReason("");
+                  } catch (err: unknown) {
+                    toast.error(extractApiError(err, "Failed to reject layouts"));
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-sm disabled:opacity-50"
+              >
+                {rejectingAll ? "Rejecting..." : "Reject all with notes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {rejectingId ? (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setRejectingId(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-white/10 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-white">Reject layout option</h3>
                 <p className="text-sm text-zinc-400 mt-1">Add a reason so Super Admin can revise this option.</p>
               </div>
-              <button type="button" onClick={() => setRejectingId(null)} className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setRejectingId(null)}
+                className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -780,7 +768,7 @@ export default function VenueLayoutRequestsPage() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

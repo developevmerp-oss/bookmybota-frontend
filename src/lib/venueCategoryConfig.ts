@@ -244,11 +244,8 @@ const VENUE_FIELDS_BY_SLUG: Record<string, VenueFieldDef[]> = {
 
 export const VENUE_TYPE_LABELS: Record<string, string> = {
   stadium: 'Stadium',
-  auditorium: 'Auditorium / Theatre',
-  'concert-arena': 'Concert Venue / Arena',
-  'outdoor-venue': 'Outdoor Ground / Festival',
-  'conference-center': 'Convention / Conference Center',
-  'exhibition-expo': 'Exhibition / Expo Center',
+  auditorium: 'Auditorium',
+  'outdoor-venue': 'Ground',
   'banquet-hall': 'Banquet Hall',
 };
 
@@ -256,10 +253,7 @@ export const VENUE_TYPE_LABELS: Record<string, string> = {
 export const CANONICAL_VENUE_TYPE_SLUGS = new Set([
   'stadium',
   'auditorium',
-  'concert-arena',
   'outdoor-venue',
-  'conference-center',
-  'exhibition-expo',
   'banquet-hall',
 ]);
 

@@ -41,6 +41,18 @@ export function formatTime12h(value?: string | Date | null): string {
   });
 }
 
+/** Convert stored HH:mm (24h) to 12-hour display, e.g. "18:57" → "6:57 PM" */
+export function formatHm12h(hm?: string | null): string {
+  if (!hm?.trim()) return '—';
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  if (!match) return hm.trim();
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return hm.trim();
+  const d = new Date(2000, 0, 1, hours, minutes);
+  return formatTime12h(d);
+}
+
 /** Convert ISO / Date to `datetime-local` input value (YYYY-MM-DDTHH:mm) */
 export function toDatetimeLocal(iso?: string | null): string {
   if (!iso) return '';

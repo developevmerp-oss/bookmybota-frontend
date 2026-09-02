@@ -9,7 +9,7 @@ import {
   type VenueBookingInquiry,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
-import { formatDate, formatDateTime12h } from "@/lib/dateFormat";
+import { formatDate, formatDateTime12h, formatHm12h } from "@/lib/dateFormat";
 
 const STATUS_STYLE: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-800 border-amber-200",
@@ -86,7 +86,7 @@ export default function VenueInquiriesPage() {
                   <p>
                     <span className="portal-muted">Date:</span>{" "}
                     <strong>{formatDate(inq.event_date)}</strong>
-                    {inq.event_time ? ` · ${inq.event_time}` : ""}
+                    {inq.event_time ? ` · ${formatHm12h(inq.event_time)}` : ""}
                   </p>
                   {inq.event_type ? (
                     <p>

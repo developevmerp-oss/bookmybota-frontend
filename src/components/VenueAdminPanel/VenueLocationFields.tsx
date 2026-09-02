@@ -41,11 +41,11 @@ export default function VenueLocationFields({
       : "w-full rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/30 focus:border-[#6900AA]";
 
   useEffect(() => {
-    if (!cityId) return;
+    if (!cityId || citiesLoading || !countryId) return;
     if (!cities.some((c) => c.id === Number(cityId))) {
       onCityChange("");
     }
-  }, [cities, cityId, onCityChange]);
+  }, [cities, cityId, onCityChange, citiesLoading, countryId]);
 
   return (
     <div className="grid sm:grid-cols-2 gap-4">

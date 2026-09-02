@@ -15,6 +15,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useGetPublicEventFiltersQuery } from "@/services/api";
+import {
+  categorySlugsMatch,
+  eventCategoryHref,
+  resolveCategorySlug,
+  type EventCategoryKey,
+} from "@/lib/eventCategories";
 
 type SubNavTab = {
   label: string;
@@ -35,20 +41,10 @@ const TABS: SubNavTab[] = [
   { label: "ListYourShow", href: "/list-your-show", match: "list-your-show", Icon: Ticket, variant: "cta" },
 ];
 
-function eventHref(key: string, categories: Array<{ slug: string; name: string }>) {
-  const match = categories.find((c) => {
-    const slug = c.slug.toLowerCase();
-    const name = c.name.toLowerCase();
-    return slug === key || name === key || slug.includes(key) || name.includes(key);
-  });
-  if (match) return `/events?category=${encodeURIComponent(match.slug)}`;
-  return `/events?q=${encodeURIComponent(key)}`;
-}
-
 function tabHref(item: SubNavTab, diningHref: string, categories: Array<{ slug: string; name: string }>) {
   if (item.href && item.match === "dining") return diningHref;
   if (item.href) return item.href;
-  if (item.key) return eventHref(item.key, categories);
+  if (item.key) return eventCategoryHref(item.key as EventCategoryKey, categories);
   return "/";
 }
 
@@ -90,10 +86,12 @@ export default function SubNavBar() {
       return pathname === "/" && typeof window !== "undefined" && window.location.hash === "#offers";
     }
     if (item.key) {
-      return (
-        onEvents &&
-        (activeSlug === item.key || activeSlug.includes(item.key) || q === item.key)
-      );
+      if (!onEvents) return false;
+      const itemSlug = resolveCategorySlug(item.key, categories);
+      if (activeSlug) {
+        return categorySlugsMatch(activeSlug, itemSlug, categories);
+      }
+      return q === item.key;
     }
     return false;
   };

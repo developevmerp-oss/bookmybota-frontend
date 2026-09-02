@@ -159,6 +159,7 @@ function InfoPopupModal({
   return (
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40"
+      data-scroll-lock-container
       onClick={onClose}
       role="presentation"
     >
@@ -1176,6 +1177,7 @@ export default function PartnerListYourShowLanding({
       {!hostOnly && loginOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm"
+          data-scroll-lock-container
           onClick={onCloseLogin}
           role="presentation"
         >

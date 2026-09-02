@@ -198,6 +198,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+      data-scroll-lock-container
       onClick={onClose}
       role="presentation"
     >

@@ -644,8 +644,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         window.setTimeout(() => {
           scrollSpyPausedRef.current = false;
         }, 900);
-        return;
-      }
+      return;
+    }
       if (attempt < 12) {
         window.setTimeout(() => tryScroll(attempt + 1), 50);
       } else {
@@ -1436,77 +1436,77 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           {/* Row 2: open-time left · Direction / Share / Reviews / Book a Table right (same line) */}
           <div className="mt-2 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base sm:text-lg lg:text-sm text-slate-500 min-w-0">
-              {isOpenNow ? (
-                <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-emerald-600 font-semibold text-xs">
-                  Open now
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-rose-600 font-semibold text-xs">
-                  Closed
-                </span>
-              )}
-              <span>{timingText}</span>
-              <span>·</span>
-              <span>{costText}</span>
-              {profile.phone && (
-                <>
-                  <span>·</span>
-                  <a href={`tel:${profile.phone}`} className="text-[#6900AA] hover:underline inline-flex items-center gap-1">
-                    <Phone size={12} />
-                    {profile.phone}
-                  </a>
-                </>
-              )}
-            </div>
+                {isOpenNow ? (
+                  <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-emerald-600 font-semibold text-xs">
+                    Open now
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-rose-600 font-semibold text-xs">
+                    Closed
+                  </span>
+                )}
+                <span>{timingText}</span>
+                <span>·</span>
+                <span>{costText}</span>
+                {profile.phone && (
+                  <>
+                    <span>·</span>
+                    <a href={`tel:${profile.phone}`} className="text-[#6900AA] hover:underline inline-flex items-center gap-1">
+                      <Phone size={12} />
+                      {profile.phone}
+                    </a>
+                  </>
+                )}
+              </div>
             <div className="flex flex-wrap items-center gap-2.5 shrink-0 lg:justify-end">
-              <button
+            <button
                 type="button"
-                onClick={() => {
-                  if (profile.address) {
-                    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
-                  }
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-              >
-                <Compass size={14} className="text-[#6900AA]" />
-                {copied ? "Copied!" : "Direction"}
-              </button>
-              <button
+              onClick={() => {
+                if (profile.address) {
+                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <Compass size={14} className="text-[#6900AA]" />
+              {copied ? "Copied!" : "Direction"}
+            </button>
+            <button
                 type="button"
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({ title: profile.name, url: window.location.href });
-                  } else {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success("Link copied to clipboard!");
-                  }
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-              >
-                <Share2 size={14} className="text-[#6900AA]" />
-                Share
-              </button>
-              <button
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({ title: profile.name, url: window.location.href });
+                } else {
+                  navigator.clipboard.writeText(window.location.href);
+                  toast.success("Link copied to clipboard!");
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <Share2 size={14} className="text-[#6900AA]" />
+              Share
+            </button>
+            <button
                 type="button"
                 onClick={() => scrollToDetailSection("section-reviews", "Reviews")}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-              >
-                <MessageSquare size={14} className="text-[#6900AA]" />
-                Reviews
-              </button>
-              <button
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <MessageSquare size={14} className="text-[#6900AA]" />
+              Reviews
+            </button>
+            <button
                 type="button"
-                onClick={() => handleQuickBook()}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
-                  activeTab === "Book a Table"
-                    ? "border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <Calendar size={14} className="text-[#6900AA]" />
-                Book a Table
-              </button>
-            </div>
+              onClick={() => handleQuickBook()}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
+                activeTab === "Book a Table"
+                  ? "border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]"
+                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <Calendar size={14} className="text-[#6900AA]" />
+              Book a Table
+            </button>
+          </div>
           </div>
         </div>
 
@@ -1655,67 +1655,67 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   </section>
 
                   {visibleOffers.length > 0 && (
-                  <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Dining Offers</h3>
-                    {visibleOffers.length > 1 && (
-                      <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
-                    )}
-                    {visibleOffers.length <= 1 && <div className="mb-4" />}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                        {visibleOffers.map((offer, idx) => {
-                          const isFeatured = idx === 0;
-                          const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
-                          return (
-                            <button
-                              key={`${offer.id || offer.title}-${idx}`}
-                              type="button"
-                              onClick={() => handleQuickBook(offer)}
-                              className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
-                                isFeatured
-                                  ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
-                                  : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
+                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Dining Offers</h3>
+                  {visibleOffers.length > 1 && (
+                    <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
+                  )}
+                  {visibleOffers.length <= 1 && <div className="mb-4" />}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                      {visibleOffers.map((offer, idx) => {
+                        const isFeatured = idx === 0;
+                        const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
+                        return (
+                          <button
+                            key={`${offer.id || offer.title}-${idx}`}
+                            type="button"
+                            onClick={() => handleQuickBook(offer)}
+                            className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
+                              isFeatured
+                                ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
+                                : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
+                            }`}
+                          >
+                            {scheduled && (
+                              <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                Coming soon
+                              </span>
+                            )}
+                            <p
+                              className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
+                                isFeatured ? "text-white/85" : "text-[#2563eb]"
                               }`}
                             >
-                              {scheduled && (
-                                <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
-                                  Coming soon
-                                </span>
-                              )}
-                              <p
-                                className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
-                                  isFeatured ? "text-white/85" : "text-[#2563eb]"
-                                }`}
-                              >
-                                {offer.type || "Offer"}
-                              </p>
-                              <p
-                                className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
-                                  isFeatured ? "text-white" : "text-zinc-900"
-                                }`}
-                              >
-                                {offer.title}
-                              </p>
-                              <p
-                                className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
-                                  isFeatured ? "text-white/90" : "text-[#2563eb]"
-                                }`}
-                              >
-                                {formatDiningOfferDiscount(offer)}
-                                {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
-                              </p>
-                              <span
-                                className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
-                                  isFeatured ? "text-white/15" : "text-[#2563eb]/10"
-                                }`}
-                                aria-hidden
-                              >
-                                %
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                  </section>
+                              {offer.type || "Offer"}
+                            </p>
+                            <p
+                              className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
+                                isFeatured ? "text-white" : "text-zinc-900"
+                              }`}
+                            >
+                              {offer.title}
+                            </p>
+                            <p
+                              className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
+                                isFeatured ? "text-white/90" : "text-[#2563eb]"
+                              }`}
+                            >
+                              {formatDiningOfferDiscount(offer)}
+                              {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
+                            </p>
+                            <span
+                              className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
+                                isFeatured ? "text-white/15" : "text-[#2563eb]/10"
+                              }`}
+                              aria-hidden
+                            >
+                              %
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                </section>
                   )}
                 </div>
 
@@ -1774,154 +1774,154 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     urls={venueGalleryPhotos}
                     onOpen={(index, items) => openLightbox(index, items)}
                   />
-                </section>
+              </section>
 
                 {/* Reviews — same UI as before, shown in Overview scroll */}
                 <div
                   id="section-reviews"
                   className="space-y-6 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
                 >
-                  {/* Write Review Form */}
-                  <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                    <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
-                    <form onSubmit={handleAddReview} className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">Your Name</label>
-                          <input
-                            type="text"
-                            required
-                            value={newReviewUser}
-                            onChange={(e) => setNewReviewUser(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
-                            placeholder="E.g., Priya R."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">Rating</label>
-                          <div className="h-9 flex items-center">
-                            <StarRatingInput value={newReviewRating} onChange={setNewReviewRating} />
-                          </div>
-                        </div>
-                      </div>
+                {/* Write Review Form */}
+                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
+                  <form onSubmit={handleAddReview} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">Comment</label>
-                        <textarea
+                        <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">Your Name</label>
+                        <input
+                          type="text"
                           required
-                          rows={3}
-                          value={newReviewText}
-                          onChange={(e) => setNewReviewText(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
-                          placeholder="Write details about food, staff, service..."
+                          value={newReviewUser}
+                          onChange={(e) => setNewReviewUser(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
+                          placeholder="E.g., Priya R."
                         />
                       </div>
-                      <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm">
-                        Submit Review
-                      </button>
-                    </form>
-                  </section>
-
-                  {/* Review Feed */}
-                  <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-5 divide-y divide-slate-100">
-                    <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
-                    {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one!</p>}
-                    {reviews.map((rev: any, idx: number) => (
-                      <div key={rev.id} className={`${idx > 0 ? "pt-5" : ""} flex gap-3`}>
-                        <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 text-slate-500 font-bold text-xs flex items-center justify-center border border-slate-200">
-                          {(rev.user_name || '?').charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-baselg:text-xs font-bold text-slate-800">{rev.user_name}</p>
-                            <p className="text-[1rem] sm:text-[0.625rem] text-slate-400 font-medium">
-                              {new Date(rev.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md text-sm sm:text-base lg:text-[0.625rem] text-emerald-600 font-bold">
-                              <span>{rev.rating}</span>
-                              <Star size={8} className="fill-emerald-600" />
-                            </div>
-                          </div>
-                          <p className="text-base lg:text-xs text-slate-600 mt-2 leading-relaxed">
-                            {rev.text}
-                          </p>
-
-                          {/* Render Nested Replies */}
-                          {rev.replies && rev.replies.length > 0 && (
-                            <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100">
-                              {rev.replies.map((reply: any) => (
-                                <div key={reply.id} className={`p-3 rounded-xl text-base lg:text-xs ${reply.user_type === 'owner' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className={`font-bold ${reply.user_type === 'owner' ? 'text-rose-700' : 'text-slate-700'}`}>
-                                      {reply.user_name} {reply.user_type === 'owner' && <span className="ml-1 text-[1rem] lg:text-[0.5625rem] bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Owner</span>}
-                                    </span>
-                                    <span className="text-[1rem] lg:text-[0.625rem] text-slate-400">
-                                      {new Date(reply.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                                    </span>
-                                  </div>
-                                  <p className={reply.user_type === 'owner' ? 'text-rose-900/80' : 'text-slate-600'}>
-                                    {reply.text}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Reply Form Toggle */}
-                          <div className="mt-3">
-                            {replyingToReviewId === rev.id ? (
-                              <form onSubmit={(e) => handleAddReply(e, rev.id)} className="bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <input
-                                    type="text"
-                                    required
-                                    value={replyUser}
-                                    onChange={(e) => setReplyUser(e.target.value)}
-                                    placeholder="Your Name"
-                                    className="text-base lg:text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-rose-500 w-1/3"
-                                  />
-                                </div>
-                                <textarea
-                                  required
-                                  value={replyText}
-                                  onChange={(e) => setReplyText(e.target.value)}
-                                  placeholder="Write your reply..."
-                                  className="w-full text-base lg:text-xs border border-slate-200 rounded p-2 outline-none focus:border-rose-500 min-h-[60px]"
-                                />
-                                <div className="flex justify-end gap-2 mt-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setReplyingToReviewId(null)}
-                                    className="text-base lg:text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    type="submit"
-                                    className="text-base lg:text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg"
-                                  >
-                                    Post Reply
-                                  </button>
-                                </div>
-                              </form>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setReplyingToReviewId(rev.id);
-                                  setReplyText("");
-                                  setReplyUser("");
-                                }}
-                                className="text-base lg:text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
-                              >
-                                Reply to review
-                              </button>
-                            )}
-                          </div>
+                      <div>
+                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">Rating</label>
+                        <div className="h-9 flex items-center">
+                          <StarRatingInput value={newReviewRating} onChange={setNewReviewRating} />
                         </div>
                       </div>
-                    ))}
-                  </section>
+                    </div>
+                    <div>
+                      <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">Comment</label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={newReviewText}
+                        onChange={(e) => setNewReviewText(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
+                        placeholder="Write details about food, staff, service..."
+                      />
+                    </div>
+                    <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm">
+                      Submit Review
+                    </button>
+                  </form>
+                </section>
+
+                {/* Review Feed */}
+                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-5 divide-y divide-slate-100">
+                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
+                  {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one!</p>}
+                  {reviews.map((rev: any, idx: number) => (
+                    <div key={rev.id} className={`${idx > 0 ? "pt-5" : ""} flex gap-3`}>
+                      <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 text-slate-500 font-bold text-xs flex items-center justify-center border border-slate-200">
+                        {(rev.user_name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-baselg:text-xs font-bold text-slate-800">{rev.user_name}</p>
+                          <p className="text-[1rem] sm:text-[0.625rem] text-slate-400 font-medium">
+                            {new Date(rev.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md text-sm sm:text-base lg:text-[0.625rem] text-emerald-600 font-bold">
+                            <span>{rev.rating}</span>
+                            <Star size={8} className="fill-emerald-600" />
+                          </div>
+                        </div>
+                        <p className="text-base lg:text-xs text-slate-600 mt-2 leading-relaxed">
+                          {rev.text}
+                        </p>
+
+                        {/* Render Nested Replies */}
+                        {rev.replies && rev.replies.length > 0 && (
+                          <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100">
+                            {rev.replies.map((reply: any) => (
+                              <div key={reply.id} className={`p-3 rounded-xl text-base lg:text-xs ${reply.user_type === 'owner' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={`font-bold ${reply.user_type === 'owner' ? 'text-rose-700' : 'text-slate-700'}`}>
+                                    {reply.user_name} {reply.user_type === 'owner' && <span className="ml-1 text-[1rem] lg:text-[0.5625rem] bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Owner</span>}
+                                  </span>
+                                  <span className="text-[1rem] lg:text-[0.625rem] text-slate-400">
+                                    {new Date(reply.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                                  </span>
+                                </div>
+                                <p className={reply.user_type === 'owner' ? 'text-rose-900/80' : 'text-slate-600'}>
+                                  {reply.text}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Reply Form Toggle */}
+                        <div className="mt-3">
+                          {replyingToReviewId === rev.id ? (
+                            <form onSubmit={(e) => handleAddReply(e, rev.id)} className="bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2">
+                              <div className="flex items-center gap-2 mb-2">
+                                <input
+                                  type="text"
+                                  required
+                                  value={replyUser}
+                                  onChange={(e) => setReplyUser(e.target.value)}
+                                  placeholder="Your Name"
+                                  className="text-base lg:text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-rose-500 w-1/3"
+                                />
+                              </div>
+                              <textarea
+                                required
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder="Write your reply..."
+                                className="w-full text-base lg:text-xs border border-slate-200 rounded p-2 outline-none focus:border-rose-500 min-h-[60px]"
+                              />
+                              <div className="flex justify-end gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setReplyingToReviewId(null)}
+                                  className="text-base lg:text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="text-base lg:text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg"
+                                >
+                                  Post Reply
+                                </button>
+                              </div>
+                            </form>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setReplyingToReviewId(rev.id);
+                                setReplyText("");
+                                setReplyUser("");
+                              }}
+                              className="text-base lg:text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
+                            >
+                              Reply to review
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </section>
                 </div>
               </div>
             )}
@@ -1963,7 +1963,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-wide uppercase leading-tight">
                       Table reservation
                     </h3>
-                    {widgetOfferLabel ? (
+                  {widgetOfferLabel ? (
                       <p className="mt-1 text-sm text-slate-800 font-semibold leading-snug flex flex-wrap items-center gap-x-0.5">
                         {widgetOfferLabel.split(/(\d+%?\s*off|\d+\s*ETB\s*off)/i).map((part, idx) =>
                           /\d/i.test(part) && /off/i.test(part) ? (
@@ -2322,21 +2322,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <p className="text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
                       <div className="flex flex-wrap gap-2.5">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
-                          const selected = Number(guests) === num;
+                              const selected = Number(guests) === num;
                           return (
                             <button
                               key={num}
                               type="button"
-                              onClick={() => {
-                                setGuests(num.toString());
-                                setAvailabilityStatus(null);
-                              }}
+                                  onClick={() => {
+                                    setGuests(num.toString());
+                                    setAvailabilityStatus(null);
+                                  }}
                               className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center ${
-                                selected
+                                    selected
                                   ? 'border border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]'
                                   : 'border border-slate-200 text-slate-700 bg-white hover:border-slate-300'
-                              }`}
-                            >
+                                  }`}
+                                >
                               {num}
                             </button>
                           );
@@ -2357,7 +2357,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               type="button"
                               onClick={() => handleDateSelect(idx)}
                               className={`min-w-[72px] sm:min-w-[78px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${
-                                selected
+                                    selected
                                   ? 'border border-[#6900AA] bg-[#f7e9ff]'
                                   : 'border border-slate-200 bg-white hover:border-slate-300'
                               }`}
@@ -2437,31 +2437,31 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                     ) : (
                                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                                         {meal.slots.map((slot) => {
-                                          const isSelected = selectedTime === slot;
-                                          const promoText = offerChipLabel;
-                                          return (
-                                            <button
-                                              key={slot}
-                                              type="button"
+                                    const isSelected = selectedTime === slot;
+                            const promoText = offerChipLabel;
+                                    return (
+                                      <button
+                                        key={slot}
+                                        type="button"
                                               onClick={() => {
                                                 setActiveMealSection(meal.id);
                                                 handleTimeSelect(slot);
                                               }}
                                               className={`min-h-[52px] px-2 py-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
-                                                isSelected
+                                  isSelected
                                                   ? 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
                                                   : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
-                                              }`}
-                                            >
-                                              <span className="text-sm font-semibold leading-none">
-                                                {formatSlotLabel(slot)}
-                                              </span>
-                                              {promoText ? (
+                                }`}
+                              >
+                                <span className="text-sm font-semibold leading-none">
+                                  {formatSlotLabel(slot)}
+                                </span>
+                                {promoText ? (
                                                 <span className="text-[0.625rem] font-bold text-[#2563EB] mt-1.5 leading-none">
-                                                  {promoText}
-                                                </span>
-                                              ) : null}
-                                            </button>
+                                    {promoText}
+                                  </span>
+                                ) : null}
+                                      </button>
                                           );
                                         })}
                                       </div>
@@ -2469,11 +2469,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   </div>
                                 )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
 
                     {/* Choose an offer — merchant + BookMyBota platform offers */}
                     {hasAnyBookableOffer && (

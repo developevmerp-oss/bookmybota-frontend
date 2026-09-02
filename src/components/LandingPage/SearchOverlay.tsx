@@ -161,7 +161,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-[#F7F7F7] overflow-y-auto">
+    <div className="fixed inset-0 z-[90] bg-[#F7F7F7] overflow-y-auto" data-scroll-lock-container>
       <button
         type="button"
         onClick={onClose}

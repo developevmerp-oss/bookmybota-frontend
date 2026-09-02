@@ -165,7 +165,6 @@ export default function ListYourShowLandingPage() {
       hostOnly
       layout="bms"
       centeredPartnerHeader
-      showBackButton
       slides={HERO_SLIDES}
       registerHref="/organizer/register"
       loginHref="/login"

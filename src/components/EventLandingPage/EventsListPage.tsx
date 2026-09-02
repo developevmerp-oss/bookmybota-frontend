@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
-  FaMapMarkerAlt,
   FaSearch,
 } from "react-icons/fa";
 import {
@@ -19,10 +19,20 @@ import {
 import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
 import images from "@/Images";
-import { EventPosterCard } from "@/components/LandingPage/PosterCard";
+import { EventPosterCard, ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import EventHeroSlider from "@/components/EventLandingPage/EventHeroSlider";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
+import {
+  EVENT_CATEGORY_OPTIONS,
+  categorySlugsMatch,
+  isEventCategoryKey,
+  normalizeCategoryParam,
+  resolveCategorySlug,
+  resolveCategoryKeyFromSlug,
+  type EventCategoryKey,
+} from "@/lib/eventCategories";
+import { SHOWCASE_EVENT_CARDS, showcaseCardsForCategories } from "@/data/showcaseEventCards";
 
 function imageSrc(img: string | { src: string }) {
   return typeof img === "string" ? img : img.src;
@@ -85,7 +95,7 @@ function FilterTag({
   );
 }
 
-function FilterCard({
+function FilterSection({
   title,
   open,
   onToggle,
@@ -99,8 +109,8 @@ function FilterCard({
   children: ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-      <div className="flex items-center gap-2 px-3 py-3">
+    <div className="border-b border-slate-100 last:border-b-0">
+      <div className="flex items-center gap-2 px-4 py-3">
         <button
           type="button"
           onClick={onToggle}
@@ -110,13 +120,43 @@ function FilterCard({
             size={11}
             className={`shrink-0 transition-transform ${open ? "rotate-180 text-[#6900AA]" : "text-slate-400"}`}
           />
-          <span className={`text-sm font-medium ${open ? "text-[#6900AA]" : "text-slate-800"}`}>{title}</span>
+          <span className={`text-sm font-semibold ${open ? "text-[#6900AA]" : "text-slate-800"}`}>
+            {title}
+          </span>
         </button>
-        <button type="button" onClick={onClear} className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer shrink-0"
+        >
           Clear
         </button>
       </div>
-      {open && <div className="px-3 pb-3">{children}</div>}
+      {open ? <div className="px-4 pb-4">{children}</div> : null}
+    </div>
+  );
+}
+
+function FiltersPanel({
+  onClearAll,
+  children,
+}: {
+  onClearAll: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-100 shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
+        <h3 className="font-bold text-slate-900 text-base">Filters</h3>
+        <button
+          type="button"
+          onClick={onClearAll}
+          className="text-sm font-medium text-[#6900AA] hover:text-[#57008E] cursor-pointer"
+        >
+          Clear All
+        </button>
+      </div>
+      {children}
     </div>
   );
 }
@@ -127,6 +167,9 @@ function EventCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: strin
 
 export default function PublicEventsPage() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
+  const pathname = usePathname() || "/events";
+  const [urlQuery, setUrlQuery] = useState("");
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -147,9 +190,6 @@ export default function PublicEventsPage() {
   });
   const [sort, setSort] = useState("recommended");
   const [page, setPage] = useState(1);
-  const [mobileFilterTab, setMobileFilterTab] = useState<
-    "categories" | "date" | "city" | "languages" | "price" | null
-  >(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
 
@@ -185,6 +225,34 @@ export default function PublicEventsPage() {
   const { data: eventsData, isLoading } = useGetPublicEventsQuery(queryArg);
   const events = eventsData ?? EMPTY_EVENTS;
 
+  const categoryPool = useMemo(() => {
+    if (apiCategories.length) return apiCategories;
+    return businessTypes
+      .filter((type) => type.parent_type_id && type.slug)
+      .map((type) => ({ slug: type.slug as string, name: type.name }));
+  }, [apiCategories, businessTypes]);
+
+  const syncCategoryToUrl = (slug: string | null) => {
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : urlQuery
+    );
+    if (slug) params.set("category", slug);
+    else params.delete("category");
+    const qs = params.toString();
+    const nextQuery = qs ? `?${qs}` : "";
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    setUrlQuery(nextQuery);
+  };
+
+  useEffect(() => {
+    const syncUrlQuery = () => {
+      setUrlQuery(window.location.search);
+    };
+    syncUrlQuery();
+    window.addEventListener("popstate", syncUrlQuery);
+    return () => window.removeEventListener("popstate", syncUrlQuery);
+  }, [pathname]);
+
   useEffect(() => {
     const applyCity = () => {
       const stored = localStorage.getItem("selected_city");
@@ -194,15 +262,28 @@ export default function PublicEventsPage() {
       else if (stored && stored !== "All Cities") setCity(stored);
       else setCity("");
     };
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get("q");
-    const cat = params.get("category");
-    if (q) setSearch(q);
-    if (cat) setSelectedSlugs([cat]);
     applyCity();
     window.addEventListener("selected_city_changed", applyCity);
     return () => window.removeEventListener("selected_city_changed", applyCity);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(urlQuery.replace(/^\?/, ""));
+    const catParam = params.get("category");
+    const qParam = params.get("q");
+
+    if (catParam) {
+      setSelectedSlugs([normalizeCategoryParam(catParam, categoryPool)]);
+    } else if (qParam && isEventCategoryKey(qParam)) {
+      setSelectedSlugs([resolveCategorySlug(qParam, categoryPool)]);
+    } else {
+      setSelectedSlugs([]);
+    }
+
+    if (qParam && !isEventCategoryKey(qParam)) {
+      setSearch(qParam);
+    }
+  }, [urlQuery, categoryPool]);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,12 +324,23 @@ export default function PublicEventsPage() {
     };
   }, [dispatch]);
 
-  const categories = useMemo(() => {
-    if (apiCategories.length) return apiCategories;
-    return businessTypes
-      .filter((type) => type.parent_type_id && type.slug)
-      .map((type) => ({ slug: type.slug as string, name: type.name }));
-  }, [apiCategories, businessTypes]);
+  const categoryFilters = useMemo(
+    () =>
+      EVENT_CATEGORY_OPTIONS.map((opt) => ({
+        slug: resolveCategorySlug(opt.key, categoryPool),
+        name: opt.label,
+      })),
+    [categoryPool]
+  );
+
+  const emptyShowcaseCards = useMemo(() => {
+    if (selectedSlugs.length === 0) return SHOWCASE_EVENT_CARDS;
+    const keys = selectedSlugs
+      .map((slug) => resolveCategoryKeyFromSlug(slug, categoryPool))
+      .filter((key): key is EventCategoryKey => key != null);
+    if (keys.length === 0) return SHOWCASE_EVENT_CARDS;
+    return showcaseCardsForCategories(keys);
+  }, [selectedSlugs, categoryPool]);
 
   const languageOptions = useMemo(() => {
     if (filterOptions?.languages?.length) return filterOptions.languages;
@@ -282,7 +374,22 @@ export default function PublicEventsPage() {
 
   const selectSlug = (slug?: string) => {
     if (!slug) return;
-    setSelectedSlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
+    const isActive = selectedSlugs.some((s) => categorySlugsMatch(s, slug, categoryPool));
+    const next = isActive ? [] : [slug];
+    setSelectedSlugs(next);
+    syncCategoryToUrl(next[0] ?? null);
+  };
+
+  const clearAllFilters = () => {
+    setSelectedSlugs([]);
+    setDatePreset("");
+    setDateFrom("");
+    setDateTo("");
+    setUseDateRange(false);
+    clearCity();
+    setSelectedLanguages([]);
+    setSelectedPriceBands([]);
+    syncCategoryToUrl(null);
   };
 
   const toggleIn = (list: string[], value: string, setter: (next: string[]) => void) => {
@@ -342,11 +449,11 @@ export default function PublicEventsPage() {
 
   const categoriesPanel = () => (
     <div className="flex flex-wrap gap-2">
-      {categories.map((cat) => (
+      {categoryFilters.map((cat) => (
         <FilterTag
           key={cat.slug}
           label={cat.name}
-          active={selectedSlugs.includes(cat.slug)}
+          active={selectedSlugs.some((s) => categorySlugsMatch(s, cat.slug, categoryPool))}
           onClick={() => selectSlug(cat.slug)}
         />
       ))}
@@ -540,13 +647,62 @@ export default function PublicEventsPage() {
     </div>
   );
 
-  const mobileTabs = [
-    { id: "categories" as const, label: "Categories" },
-    { id: "date" as const, label: "Date" },
-    { id: "city" as const, label: "City" },
-    { id: "languages" as const, label: "Languages" },
-    { id: "price" as const, label: "Price" },
-  ];
+  const filterSections = (
+    <>
+      <FilterSection
+        title="Categories"
+        open={openFilters.categories}
+        onToggle={() => toggleOpen("categories")}
+        onClear={() => {
+          setSelectedSlugs([]);
+          syncCategoryToUrl(null);
+        }}
+      >
+        {categoriesPanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="Date"
+        open={openFilters.date}
+        onToggle={() => toggleOpen("date")}
+        onClear={() => {
+          setDatePreset("");
+          setDateFrom("");
+          setDateTo("");
+          setUseDateRange(false);
+        }}
+      >
+        {datePanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="City"
+        open={openFilters.city}
+        onToggle={() => toggleOpen("city")}
+        onClear={clearCity}
+      >
+        {cityPanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="Languages"
+        open={openFilters.languages}
+        onToggle={() => toggleOpen("languages")}
+        onClear={() => setSelectedLanguages([])}
+      >
+        {languagesPanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="Price"
+        open={openFilters.price}
+        onToggle={() => toggleOpen("price")}
+        onClear={() => setSelectedPriceBands([])}
+      >
+        {pricePanel()}
+      </FilterSection>
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-[#f6f7f8]">
@@ -599,90 +755,7 @@ export default function PublicEventsPage() {
             id="city-filter"
             className="lg:sticky lg:top-24 self-start h-fit max-h-none lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto [scrollbar-width:thin]"
           >
-            <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3 lg:mb-4">Filters</h3>
-
-            <div className="lg:hidden">
-              <div className="grid grid-cols-5 gap-1.5">
-                {mobileTabs.map((tab) => {
-                  const active = mobileFilterTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setMobileFilterTab((prev) => (prev === tab.id ? null : tab.id))}
-                      className={`px-1 py-2 rounded-lg text-[10px] sm:text-[11px] font-semibold cursor-pointer border ${
-                        active
-                          ? "bg-[#6900AA] border-[#6900AA] text-white"
-                          : "bg-white border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {mobileFilterTab && (
-                <div className="mt-2 bg-white rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.06)] p-3">
-                  {mobileFilterTab === "categories" && categoriesPanel()}
-                  {mobileFilterTab === "date" && datePanel()}
-                  {mobileFilterTab === "city" && cityPanel()}
-                  {mobileFilterTab === "languages" && languagesPanel()}
-                  {mobileFilterTab === "price" && pricePanel()}
-                </div>
-              )}
-            </div>
-
-            <div className="hidden lg:block space-y-2.5">
-              <FilterCard
-                title="Categories"
-                open={openFilters.categories}
-                onToggle={() => toggleOpen("categories")}
-                onClear={() => setSelectedSlugs([])}
-              >
-                {categoriesPanel()}
-              </FilterCard>
-
-              <FilterCard
-                title="Date"
-                open={openFilters.date}
-                onToggle={() => toggleOpen("date")}
-                onClear={() => {
-                  setDatePreset("");
-                  setDateFrom("");
-                  setDateTo("");
-                  setUseDateRange(false);
-                }}
-              >
-                {datePanel()}
-              </FilterCard>
-
-              <FilterCard
-                title="City"
-                open={openFilters.city}
-                onToggle={() => toggleOpen("city")}
-                onClear={clearCity}
-              >
-                {cityPanel()}
-              </FilterCard>
-
-              <FilterCard
-                title="Languages"
-                open={openFilters.languages}
-                onToggle={() => toggleOpen("languages")}
-                onClear={() => setSelectedLanguages([])}
-              >
-                {languagesPanel()}
-              </FilterCard>
-
-              <FilterCard
-                title="Price"
-                open={openFilters.price}
-                onToggle={() => toggleOpen("price")}
-                onClear={() => setSelectedPriceBands([])}
-              >
-                {pricePanel()}
-              </FilterCard>
-            </div>
+            <FiltersPanel onClearAll={clearAllFilters}>{filterSections}</FiltersPanel>
           </aside>
 
           <div>
@@ -695,10 +768,19 @@ export default function PublicEventsPage() {
             {isLoading ? (
               <EventListShimmer />
             ) : paged.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                <FaMapMarkerAlt className="mx-auto text-slate-300 mb-3" size={28} />
-                <p className="text-slate-600 font-medium">No events match these filters</p>
-                <p className="text-slate-400 text-sm mt-1">Try clearing filters or searching another city.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+                {emptyShowcaseCards.map((event) => (
+                  <ShowcaseEventPosterCard
+                    key={event.id}
+                    title={event.title}
+                    image={event.image}
+                    showDate={event.showDate}
+                    place={event.place}
+                    eventType={event.eventType}
+                    href={event.href}
+                    fullWidth
+                  />
+                ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">

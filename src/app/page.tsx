@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import PromoBannerCarousel from "@/components/LandingPage/PromoBannerCarousel";
 import PopularDiningRail from "@/components/LandingPage/PopularDiningRail";
+import BarSceneRail from "@/components/LandingPage/BarSceneRail";
 import TopArtistsRail from "@/components/LandingPage/TopArtistsRail";
 import TopVenuesRail from "@/components/LandingPage/TopVenuesRail";
 import RecommendedMoviesRail from "@/components/LandingPage/RecommendedMoviesRail";
@@ -34,6 +35,7 @@ export default function Home() {
         <LiveCategoryTiles city={city} />
       </div>
       <PopularDiningRail city={city} />
+      <BarSceneRail city={city} />
       <TopArtistsRail />
       <RecommendedMoviesRail />
       <TopVenuesRail />
@@ -41,7 +43,7 @@ export default function Home() {
       <SpecialOffersRail />
       {/* <EventsNearYouRail city={city} /> */}
       {/* <SportsStadiumBanner /> */}
-      <PopularSportsEventsRail />
+      <PopularSportsEventsRail city={city} />
       <Footer />
     </div>
   );

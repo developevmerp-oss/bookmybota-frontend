@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Building2, ChevronDown, ChevronUp, Locate, Search, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Locate, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGetCitiesQuery, type CityMaster } from "@/services/api";
 import { lockBodyScroll } from "@/lib/lockBodyScroll";
+import { ALPHABET, POPULAR_CITY_CONFIG, resolvePopularCityName } from "@/lib/cityLandmarkImages";
 
 type CitySelectModalProps = {
   open: boolean;
@@ -37,21 +39,53 @@ function matchCity(detected: string, cities: CityMaster[]) {
   );
 }
 
-function PopularCityIcon({ city }: { city: CityMaster }) {
-  if (city.icon_url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={city.icon_url}
-        alt=""
-        className="w-10 h-10 object-contain"
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = "none";
-        }}
-      />
-    );
-  }
-  return <Building2 size={28} strokeWidth={1.5} className="text-slate-400" />;
+function cityFirstLetter(name: string) {
+  const ch = name.trim()[0]?.toUpperCase() || "";
+  return /[A-Z]/.test(ch) ? ch : null;
+}
+
+function PopularCityCard({
+  displayName,
+  image,
+  pickName,
+  active,
+  onPick,
+}: {
+  displayName: string;
+  image: string;
+  pickName: string;
+  active: boolean;
+  onPick: (name: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(pickName)}
+      className="flex flex-col items-center gap-2.5 w-full cursor-pointer group"
+    >
+      <span
+        className={`w-full max-w-[132px] sm:max-w-[148px] aspect-[5/4] rounded-2xl overflow-hidden flex items-center justify-center p-2 sm:p-2.5 transition-all bg-purple-50 ${
+          active
+            ? "ring-2 ring-[#6900AA] shadow-[0_4px_14px_rgba(105,0,170,0.22)]"
+            : "ring-1 ring-slate-200 group-hover:ring-[#6900AA]/40"
+        }`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={image}
+          alt={displayName}
+          className="w-full h-full object-contain"
+        />
+      </span>
+      <span
+        className={`text-sm sm:text-[0.9375rem] font-semibold text-center leading-tight px-1 ${
+          active ? "text-[#6900AA]" : "text-slate-800 group-hover:text-[#6900AA]"
+        }`}
+      >
+        {displayName}
+      </span>
+    </button>
+  );
 }
 
 export default function CitySelectModal({
@@ -63,12 +97,11 @@ export default function CitySelectModal({
   const { data: cities = [], isLoading } = useGetCitiesQuery(undefined, { skip: !open });
   const [query, setQuery] = useState("");
   const [detecting, setDetecting] = useState(false);
-  const [showOtherCities, setShowOtherCities] = useState(true);
+  const [activeLetter, setActiveLetter] = useState("A");
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    setShowOtherCities(true);
     const unlock = lockBodyScroll();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -80,32 +113,61 @@ export default function CitySelectModal({
     };
   }, [open, onClose]);
 
-  const popularCities = useMemo(
-    () => cities.filter((c) => c.is_popular).slice(0, 10),
+  const sortedCities = useMemo(
+    () => cities.slice().sort((a, b) => a.name.localeCompare(b.name)),
     [cities]
+  );
+
+  const popularCities = useMemo(
+    () =>
+      POPULAR_CITY_CONFIG.map((item) => ({
+        ...item,
+        pickName: resolvePopularCityName(item.displayName, item.aliases, sortedCities),
+      })),
+    [sortedCities]
   );
 
   const filteredCities = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return cities;
-    return cities.filter(
+    if (!q) return sortedCities;
+    return sortedCities.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         (c.state || "").toLowerCase().includes(q) ||
         (c.country || "").toLowerCase().includes(q)
     );
-  }, [cities, query]);
+  }, [sortedCities, query]);
 
-  const otherCities = useMemo(() => {
-    const popularIds = new Set(popularCities.map((c) => c.id));
-    return filteredCities
-      .filter((c) => !popularIds.has(c.id))
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredCities, popularCities]);
+  const citiesByLetter = useMemo(() => {
+    const map = new Map<string, CityMaster[]>();
+    for (const city of sortedCities) {
+      const letter = cityFirstLetter(city.name);
+      if (!letter) continue;
+      const list = map.get(letter) ?? [];
+      list.push(city);
+      map.set(letter, list);
+    }
+    return map;
+  }, [sortedCities]);
+
+  const availableLetters = useMemo(
+    () => ALPHABET.filter((letter) => (citiesByLetter.get(letter)?.length ?? 0) > 0),
+    [citiesByLetter]
+  );
+
+  useEffect(() => {
+    if (!open || availableLetters.length === 0) return;
+    setActiveLetter((prev) =>
+      availableLetters.includes(prev) ? prev : availableLetters[0]
+    );
+  }, [open, availableLetters]);
+
+  const letterCities = useMemo(() => {
+    if (query.trim()) return [];
+    return citiesByLetter.get(activeLetter) ?? [];
+  }, [citiesByLetter, activeLetter, query]);
 
   const searching = Boolean(query.trim());
-  const searchResults = searching ? filteredCities : [];
 
   const detectLocation = () => {
     if (!navigator.geolocation) {
@@ -155,73 +217,70 @@ export default function CitySelectModal({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center px-3 sm:px-4">
+  const modal = (
+    <div
+      className="fixed inset-0 z-[80] flex items-start justify-center px-3 sm:px-4 py-6 sm:py-10"
+      data-scroll-lock-container
+    >
       <button
         type="button"
         aria-label="Close city picker"
-        className="absolute inset-0 bg-black/45 cursor-pointer"
+        className="absolute inset-0 bg-black/50 cursor-pointer"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-[920px] mt-8 sm:mt-12 max-h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 shrink-0 border-b border-slate-100">
-          <h2 className="type-brand font-bold text-slate-900">Select City</h2>
+      <div className="relative w-full max-w-[960px] max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 sm:px-8 pt-5 sm:pt-6 pb-2 shrink-0">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Select Location</h2>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500"
+            className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
             aria-label="Close"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-3">
-          {/* Search */}
+        <div className="flex-1 overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8">
           <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for your city"
-              className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-200 bg-white type-body text-slate-800 placeholder:text-slate-400 outline-none focus:border-[color:var(--city-accent)] focus:ring-1 focus:ring-[color:var(--city-accent)]"
-              style={{ ["--city-accent" as string]: ACCENT }}
+              placeholder="Search city, area or locality"
+              className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-200 bg-white text-base text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]"
               autoFocus
             />
           </div>
 
-          {/* Detect */}
           <button
             type="button"
             onClick={detectLocation}
             disabled={detecting}
-            className="mt-2.5 inline-flex items-center gap-1.5 type-body font-medium cursor-pointer disabled:opacity-60"
+            className="mt-4 inline-flex items-center gap-2 text-base font-semibold cursor-pointer disabled:opacity-60"
             style={{ color: ACCENT }}
           >
-            <Locate size={15} />
-            {detecting ? "Detecting..." : "Detect my location"}
+            <Locate size={18} />
+            {detecting ? "Detecting..." : "Use Current Location"}
           </button>
 
           {isLoading ? (
-            <p className="type-body text-slate-400 text-center py-10">Loading cities…</p>
+            <p className="text-slate-400 text-center py-12">Loading cities…</p>
           ) : searching ? (
-            <div className="mt-4">
-              <p className="text-center type-label font-semibold text-slate-500 mb-2">Search results</p>
-              {searchResults.length === 0 ? (
-                <p className="type-body text-slate-400 text-center py-6">No cities match “{query.trim()}”.</p>
+            <div className="mt-6">
+              {filteredCities.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No cities match “{query.trim()}”.</p>
               ) : (
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  {searchResults.map((city) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-2">
+                  {filteredCities.map((city) => (
                     <button
                       key={city.id}
                       type="button"
                       onClick={() => pickCity(city.name)}
-                      className={`w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] md:w-[calc((100%-3rem)/4)] lg:w-[calc((100%-4rem)/5)] text-left type-card-body py-1 hover:underline ${
-                        city.name === selected ? "font-semibold" : "text-slate-600"
+                      className={`text-left text-sm sm:text-base py-1.5 hover:text-[#6900AA] cursor-pointer ${
+                        city.name === selected ? "font-bold text-[#6900AA]" : "text-slate-700"
                       }`}
-                      style={city.name === selected ? { color: ACCENT } : undefined}
                     >
                       {city.name}
                     </button>
@@ -231,107 +290,97 @@ export default function CitySelectModal({
             </div>
           ) : (
             <>
-              {/* Popular */}
               {popularCities.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-center type-label font-semibold text-slate-500 mb-3">Popular Cities</p>
-                  <div className="flex flex-wrap gap-2 sm:gap-3">
-                    {popularCities.map((city) => {
-                      const active = city.name === selected;
-                      return (
-                        <button
-                          key={city.id}
-                          type="button"
-                          onClick={() => pickCity(city.name)}
-                          className={`w-[calc((100%-1.5rem)/4)] sm:w-[calc((100%-3rem)/5)] md:w-[calc((100%-7rem)/8)] lg:w-[calc((100%-9*0.75rem)/10)] flex flex-col items-center gap-1 py-1.5 px-0.5 rounded-lg transition-colors ${
-                            active ? "bg-[#F3EEFF]" : "hover:bg-slate-50"
-                          }`}
-                        >
-                          <span
-                            className={`w-11 h-11 flex items-center justify-center ${
-                              active ? "text-[#6900AA]" : "text-slate-400"
-                            }`}
-                          >
-                            <PopularCityIcon city={city} />
-                          </span>
-                          <span
-                            className={`type-card-caption font-medium text-center leading-tight ${
-                              active ? "text-[#6900AA]" : "text-slate-600"
-                            }`}
-                          >
-                            {city.name}
-                          </span>
-                        </button>
-                      );
-                    })}
+                <section className="mt-6 sm:mt-8">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-4 sm:mb-5">
+                    Popular Cities
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-5 sm:gap-x-4 sm:gap-y-6">
+                    {popularCities.map((city) => (
+                      <PopularCityCard
+                        key={city.displayName}
+                        displayName={city.displayName}
+                        image={city.image}
+                        pickName={city.pickName}
+                        active={
+                          selected.toLowerCase() === city.pickName.toLowerCase() ||
+                          selected.toLowerCase() === city.displayName.toLowerCase()
+                        }
+                        onPick={pickCity}
+                      />
+                    ))}
                   </div>
-                </div>
+                </section>
               )}
 
-              {/* Other cities */}
-              <div className="mt-5">
-                <p className="text-center type-label font-semibold text-slate-500 mb-2.5">Other Cities</p>
-                {showOtherCities ? (
-                  otherCities.length === 0 ? (
-                    <p className="type-body text-slate-400 text-center py-4">
-                      {cities.length === 0
-                        ? "No cities yet. Super Admin can add them under City Masters."
-                        : "No other cities."}
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-                      {otherCities.map((city) => (
-                        <button
-                          key={city.id}
-                          type="button"
-                          onClick={() => pickCity(city.name)}
-                          className={`w-[calc((100%-1rem)/2)] sm:w-[calc((100%-2rem)/3)] md:w-[calc((100%-3rem)/4)] lg:w-[calc((100%-4rem)/5)] text-left type-card-body py-1 hover:underline ${
-                            city.name === selected ? "font-semibold" : "text-slate-500"
-                          }`}
-                          style={city.name === selected ? { color: ACCENT } : undefined}
-                        >
-                          {city.name}
-                        </button>
-                      ))}
-                    </div>
-                  )
-                ) : null}
-              </div>
+              <section className="mt-8 sm:mt-10">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-4">All Cities</h3>
+
+                <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pb-3 border-b border-slate-100">
+                  {ALPHABET.map((letter) => {
+                    const hasCities = availableLetters.includes(letter);
+                    const active = activeLetter === letter;
+                    return (
+                      <button
+                        key={letter}
+                        type="button"
+                        disabled={!hasCities}
+                        onClick={() => setActiveLetter(letter)}
+                        className={`shrink-0 text-sm sm:text-base font-semibold pb-1 transition-colors cursor-pointer disabled:cursor-default ${
+                          active
+                            ? "text-[#6900AA] border-b-2 border-[#6900AA]"
+                            : hasCities
+                              ? "text-slate-500 hover:text-slate-800"
+                              : "text-slate-300"
+                        }`}
+                      >
+                        {letter}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {letterCities.length === 0 ? (
+                  <p className="text-slate-400 text-center py-8">
+                    {cities.length === 0
+                      ? "No cities yet. Super Admin can add them under City Masters."
+                      : `No cities starting with “${activeLetter}”.`}
+                  </p>
+                ) : (
+                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 sm:gap-x-6 gap-y-2">
+                    {letterCities.map((city) => (
+                      <button
+                        key={city.id}
+                        type="button"
+                        onClick={() => pickCity(city.name)}
+                        className={`text-left text-sm sm:text-base py-1.5 hover:text-[#6900AA] cursor-pointer ${
+                          city.name === selected ? "font-bold text-[#6900AA]" : "text-slate-700"
+                        }`}
+                      >
+                        {city.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {selected ? (
+                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={clearCity}
+                    className="text-sm font-medium text-slate-500 hover:text-slate-800 underline underline-offset-2 cursor-pointer"
+                  >
+                    Clear City
+                  </button>
+                </div>
+              ) : null}
             </>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 border-t border-slate-100 px-4 py-2.5 flex items-center justify-center gap-5">
-          {!searching && (
-            <button
-              type="button"
-              onClick={() => setShowOtherCities((v) => !v)}
-              className="inline-flex items-center gap-1 type-body font-medium"
-              style={{ color: ACCENT }}
-            >
-              {showOtherCities ? (
-                <>
-                  Hide all cities <ChevronUp size={16} />
-                </>
-              ) : (
-                <>
-                  View all cities <ChevronDown size={16} />
-                </>
-              )}
-            </button>
-          )}
-          {selected ? (
-            <button
-              type="button"
-              onClick={clearCity}
-              className="type-body font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2"
-            >
-              Clear City
-            </button>
-          ) : null}
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

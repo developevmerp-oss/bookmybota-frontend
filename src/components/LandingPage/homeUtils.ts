@@ -101,6 +101,11 @@ export function isOutdoorEvent(event: PublicEvent) {
   );
 }
 
+export function isSportsEvent(event: PublicEvent) {
+  const blob = `${event.category_slug || ""} ${event.category_name || ""} ${event.name || ""}`.toLowerCase();
+  return blob.includes("sport") || blob.includes("football") || blob.includes("basketball") || blob.includes("wrestling");
+}
+
 export function formatShowDate(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);

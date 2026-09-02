@@ -508,10 +508,16 @@ export default function OrganizerAccountSetupForm({
                     onCityChange={setCityId}
                   />
                 )}
-                {(module === "artist" || module === "venue") && (
+                {(module === "artist" || module === "venue" || module === "event" || module === "cinema") && (
                   <div>
                     <label className={labelClass}>
-                      {module === "artist" ? "Artist image" : "Venue cover image"}{" "}
+                      {module === "artist"
+                        ? "Artist image"
+                        : module === "venue"
+                          ? "Venue cover image"
+                          : module === "event"
+                            ? "Organisation cover image"
+                            : "Cinema cover image"}{" "}
                       {module === "artist" ? <span className="text-[#6900AA]">*</span> : null}
                     </label>
                     <CroppedImageField
@@ -537,7 +543,11 @@ export default function OrganizerAccountSetupForm({
                           if (res.url) {
                             setCoverImageUrl(res.url);
                             toast.success(
-                              module === "artist" ? "Artist image uploaded" : "Image uploaded"
+                              module === "artist"
+                                ? "Artist image uploaded"
+                                : module === "event"
+                                  ? "Organisation image uploaded"
+                                  : "Image uploaded"
                             );
                           }
                         } catch (err) {
@@ -552,7 +562,9 @@ export default function OrganizerAccountSetupForm({
                               ? "Uploading…"
                               : module === "artist"
                                 ? "Upload artist image"
-                                : "Add photo"}
+                                : module === "event"
+                                  ? "Upload organisation image"
+                                  : "Add photo"}
                           </span>
                         </>
                       }
@@ -560,7 +572,11 @@ export default function OrganizerAccountSetupForm({
                     <p className="mt-1.5 text-xs text-slate-400">
                       {module === "artist"
                         ? "Square photo of the artist — shown on public listings and your profile."
-                        : "Shown on the public venue listing and profile page."}
+                        : module === "event"
+                          ? "Shown on your organisation profile and event listings."
+                          : module === "cinema"
+                            ? "Shown on the public cinema listing and profile page."
+                            : "Shown on the public venue listing and profile page."}
                     </p>
                   </div>
                 )}

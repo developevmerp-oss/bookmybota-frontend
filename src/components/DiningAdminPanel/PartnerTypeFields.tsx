@@ -134,7 +134,6 @@ export default function PartnerTypeFields({
 
   useEffect(() => {
     if (!(fixedEvent || fixedCinema || fixedVenue || fixedArtist)) return;
-    onVenueTypeIdChange("");
     const fixedParents = fixedEvent
       ? eventParents
       : fixedCinema
@@ -156,22 +155,21 @@ export default function PartnerTypeFields({
     artistParents,
     parentTypeId,
     onParentTypeIdChange,
-    onVenueTypeIdChange,
   ]);
 
   useEffect(() => {
-    if (isEventSelected || isCinemaSelected) {
+    if ((isEventSelected || isCinemaSelected) && venueTypeId !== "") {
       onVenueTypeIdChange("");
     }
-  }, [isEventSelected, isCinemaSelected, onVenueTypeIdChange]);
+  }, [isEventSelected, isCinemaSelected, venueTypeId, onVenueTypeIdChange]);
 
   useEffect(() => {
     if (fixedEvent || fixedCinema || fixedVenue || fixedArtist) return;
     if (parentTypeId && !parentOptions.some((p) => String(p.id) === parentTypeId)) {
       onParentTypeIdChange("");
-      onVenueTypeIdChange("");
+      if (venueTypeId !== "") onVenueTypeIdChange("");
     }
-  }, [fixedEvent, fixedCinema, fixedVenue, fixedArtist, parentTypeId, parentOptions, onParentTypeIdChange, onVenueTypeIdChange]);
+  }, [fixedEvent, fixedCinema, fixedVenue, fixedArtist, parentTypeId, parentOptions, venueTypeId, onParentTypeIdChange, onVenueTypeIdChange]);
 
   useEffect(() => {
     if (isEventSelected || isCinemaSelected || !parentTypeId) return;

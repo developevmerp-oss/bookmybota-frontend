@@ -1,40 +1,27 @@
 "use client";
 
-
-
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
-import { ArrowRight, ChevronRight, Loader2, Play, Share2, Star, ThumbsUp } from "lucide-react";
-
+import { ArrowRight, ChevronRight, Loader2, Play, Share2, Star, ThumbsUp, Ticket } from "lucide-react";
 import { toast } from "sonner";
-
+import MovieTrailerModal from "@/components/MovieLandingPage/MovieTrailerModal";
 import {
-
   useGetMovieEligiblePlatformOffersQuery,
-
   useGetPublicMovieQuery,
-
 } from "@/services/api";
-
 import {
-
   mapApiMovieToDetail,
-
   withMovieExtras,
-
   type MovieDetailData,
-
   type MovieOfferItem,
-
 } from "@/components/MovieLandingPage/movieCatalog";
-
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
-
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
+import MovieShowtimeSelector from "@/components/MovieLandingPage/MovieShowtimeSelector";
 
 
 
@@ -69,6 +56,15 @@ function mapPlatformOffersToMovieOffers(
 
 
 function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
+  const [trailerModalOpen, setTrailerModalOpen] = useState(false);
+  const [selectedTrailerUrl, setSelectedTrailerUrl] = useState<string | undefined>(undefined);
+  const [selectedTrailerLang, setSelectedTrailerLang] = useState<string | undefined>(undefined);
+
+  const handleOpenTrailer = (url?: string, lang?: string) => {
+    setSelectedTrailerUrl(url || movie.trailerUrl || movie.trailers?.[0]?.trailerUrl);
+    setSelectedTrailerLang(lang || movie.trailers?.[0]?.language);
+    setTrailerModalOpen(true);
+  };
 
   const bg = movie.landscape || movie.poster;
 
@@ -260,6 +256,34 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
                   <Play className="size-3.5" fill="currentColor" /> Watch Trailer:
                 </span>
                 {movie.trailers.map((t, idx) => (
+<<<<<<< Updated upstream
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleOpenTrailer(t.trailerUrl, t.language)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/20 hover:border-white/50 transition-colors cursor-pointer"
+                  >
+                    <Play className="size-3 text-rose-400" fill="currentColor" />
+                    {t.language}
+                  </button>
+                ))}
+              </div>
+            ) : (movie.trailerUrl || (movie.trailers && movie.trailers.length > 0)) ? (
+              <button
+                type="button"
+                onClick={() =>
+                  handleOpenTrailer(
+                    movie.trailerUrl || movie.trailers?.[0]?.trailerUrl,
+                    movie.trailers?.[0]?.language
+                  )
+                }
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition-colors cursor-pointer"
+              >
+                <Play className="size-4 text-rose-400" fill="currentColor" />
+                Watch trailer
+              </button>
+            ) : null}
+=======
                   <a
                     key={idx}
                     href={t.trailerUrl}
@@ -285,51 +309,47 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
             ) : null}
 
 
+>>>>>>> Stashed changes
 
             <div className="mt-6 sm:mt-8 flex flex-wrap items-center gap-3">
-
               {movie.comingSoon ? (
-
                 <span className={bookClass.replace("hover:opacity-90", "opacity-80 cursor-default")}>
-
                   Coming Soon
-
                 </span>
-
               ) : movie.bookHref ? (
-
                 <Link href={movie.bookHref} className={bookClass}>
-
                   {bookLabel}
-
                 </Link>
-
               ) : (
-
-                <button type="button" className={bookClass} disabled>
-
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById("showtimes-section");
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className={bookClass}
+                >
                   {bookLabel}
-
                 </button>
-
               )}
 
-
-
               <MovieWishlistButton movieId={movie.id} />
-
             </div>
-
           </div>
-
         </div>
-
       </div>
 
+      {/* Embedded Trailer Modal */}
+      <MovieTrailerModal
+        isOpen={trailerModalOpen}
+        onClose={() => setTrailerModalOpen(false)}
+        movieTitle={movie.title}
+        initialTrailerUrl={selectedTrailerUrl}
+        initialLanguage={selectedTrailerLang}
+        trailers={movie.trailers}
+      />
     </section>
-
   );
-
 }
 
 
@@ -426,15 +446,30 @@ export default function MovieDetailPage() {
 
 
   return (
-
     <div className="min-h-screen bg-white">
-
       <MovieDetailBanner movie={movie} />
 
+      {!movie.comingSoon && (
+        <section id="showtimes-section" className="py-10 bg-slate-950 text-white border-t border-b border-white/10">
+          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 space-y-4">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2.5">
+              <Ticket className="size-6 text-[#F84464]" />
+              Select Cinema &amp; Showtime
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Pick a date and cinema below to book your tickets and reserved seats.
+            </p>
+            <MovieShowtimeSelector
+              movieIdOrSlug={idOrSlug}
+              movieTitle={movie.title}
+              movieCertificate={movie.certification}
+            />
+          </div>
+        </section>
+      )}
+
       <MovieDetailSections movie={movie} idOrSlug={idOrSlug} />
-
     </div>
-
   );
 
 }

@@ -51,7 +51,7 @@ type ViewAllKey = "now-showing" | "coming-soon" | "top-rated" | null;
 const FALLBACK_HERO_SLIDES = [
   {
     id: "toxic",
-    href: "/movies/s1",
+    href: "/movies/toxic-a-fairy-tale-for-grown-ups",
     image:
       "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=1600&h=800&fit=crop&q=80",
     poster: "/images/movies/toxic-poster.png",

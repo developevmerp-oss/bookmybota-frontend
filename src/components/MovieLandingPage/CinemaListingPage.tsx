@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Heart, Loader2, Search } from "lucide-react";
 import {
-  useGetPublicRegisteredVenuesQuery,
+  useGetPublicRegisteredCinemasQuery,
   type PublicRegisteredPartner,
 } from "@/services/api";
 
@@ -136,7 +136,7 @@ export default function CinemaListingPage() {
     [city, search]
   );
 
-  const { data: venues = [], isLoading } = useGetPublicRegisteredVenuesQuery(queryArgs);
+  const { data: venues = [], isLoading } = useGetPublicRegisteredCinemasQuery(queryArgs);
 
   useEffect(() => {
     const applyCity = () => {

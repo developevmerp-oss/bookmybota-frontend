@@ -1,11 +1,12 @@
-export default function MovieShowtimesPlaceholderPage() {
+"use client";
+
+import { Suspense } from "react";
+import MovieShowtimesPage from "@/components/MovieAdminPanel/MovieShowtimesPage";
+
+export default function MovieShowtimesRoutePage() {
   return (
-    <div className="max-w-3xl mx-auto glass-panel rounded-2xl border border-white/10 p-8 text-center space-y-3">
-      <h2 className="text-xl font-bold text-white">Showtimes</h2>
-      <p className="text-zinc-400 text-sm">
-        Coming next. After screens have an approved seat layout and Super Admin has movies in the
-        catalog, you will publish daily shows here (date, time, language, format, prices).
-      </p>
-    </div>
+    <Suspense fallback={<div className="p-8 text-zinc-400">Loading showtimes…</div>}>
+      <MovieShowtimesPage />
+    </Suspense>
   );
 }

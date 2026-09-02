@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -26,10 +26,12 @@ import {
   useGetPartnerDocumentMastersQuery,
   useGetAdminDiningCollectionsQuery,
   useGetPartnerOnboardingTermsQuery,
+  useGetAdminCitiesQuery,
   useRegisterBusinessMutation,
   useUpdateAdminBusinessMutation,
   useUploadImageMutation,
   type Business,
+  type CityMaster,
   type PartnerDocumentUpload,
 } from "@/services/api";
 
@@ -134,6 +136,58 @@ export default function PartnerOnboardForm({
     skip: mode !== "create",
   });
 
+  const { data: citiesData } = useGetAdminCitiesQuery({ limit: 500 });
+  const allCities = citiesData?.items ?? [];
+
+  const country = watch("country");
+  const countries = useMemo(() => {
+    const set = new Set<string>();
+    allCities.forEach((c: CityMaster) => {
+      if (c.country) set.add(c.country);
+    });
+    return Array.from(set).sort();
+  }, [allCities]);
+
+  const filteredCities = useMemo(() => {
+    if (!country) return allCities;
+    return allCities.filter((c: CityMaster) => c.country === country);
+  }, [allCities, country]);
+
+  const handleCityChange = useCallback((cityIdStr: string) => {
+    setValue("city_id", cityIdStr, { shouldValidate: true, shouldDirty: true });
+    if (cityIdStr) {
+      const matchedCity = allCities.find((c: CityMaster) => String(c.id) === cityIdStr);
+      if (matchedCity?.country) {
+        setValue("country", matchedCity.country, { shouldDirty: true });
+      }
+    }
+  }, [setValue, allCities]);
+
+  const handleCountryChange = useCallback((countryName: string) => {
+    setValue("country", countryName, { shouldValidate: true, shouldDirty: true });
+    if (countryName) {
+      const currentCityId = watch("city_id");
+      const matched = allCities.find((c: CityMaster) => String(c.id) === currentCityId);
+      if (matched && matched.country !== countryName) {
+        setValue("city_id", "", { shouldDirty: true });
+      }
+    }
+  }, [setValue, watch, allCities]);
+
+  // If allCities loads after form is ready in edit mode, ensure country and city_id are hydrated
+  useEffect(() => {
+    if (mode !== "edit" || !editingBusiness || allCities.length === 0) return;
+    if (editingBusiness.city_id) {
+      const currentCity = allCities.find((c: CityMaster) => c.id === editingBusiness.city_id);
+      if (currentCity?.country && !watch("country")) {
+        setValue("country", currentCity.country, { shouldDirty: false });
+      }
+      if (!watch("city_id")) {
+        setValue("city_id", String(editingBusiness.city_id), { shouldDirty: false });
+      }
+    }
+  }, [mode, editingBusiness, allCities, setValue, watch]);
+
   useEffect(() => {
     if (mode !== "edit" || !editingBusiness || formReady) return;
     if (businessTypes.length === 0) return;
@@ -162,6 +216,8 @@ export default function PartnerOnboardForm({
       nextVenue = child ? String(child.id) : "";
     }
 
+    const currentCity = allCities.find((c: CityMaster) => c.id === editingBusiness.city_id);
+
     reset({
       business_name: editingBusiness.name || "",
       address: editingBusiness.address || "",
@@ -169,6 +225,8 @@ export default function PartnerOnboardForm({
       description: editingBusiness.description || "",
       parent_type_id: nextParent,
       venue_type_id: nextVenue,
+      country: currentCity?.country || "",
+      city_id: editingBusiness.city_id ? String(editingBusiness.city_id) : "",
       admin_email: editingBusiness.admin_email || "",
       accept_terms: true,
     });
@@ -184,7 +242,7 @@ export default function PartnerOnboardForm({
         : []
     );
     setFormReady(true);
-  }, [mode, editingBusiness, partnerType, businessTypes, formReady, reset]);
+  }, [mode, editingBusiness, partnerType, businessTypes, allCities, formReady, reset]);
 
   const isDark = variant === "dark";
   const labelClass = isDark
@@ -249,6 +307,7 @@ export default function PartnerOnboardForm({
           address: values.address,
           phone: values.phone,
           description: values.description || "",
+          city_id: values.city_id ? parseInt(values.city_id, 10) : undefined,
           type_id: selectedPartner
             ? selectedPartner.partner_type === "event" || selectedPartner.partner_type === "cinema"
               ? selectedPartner.type_id
@@ -279,6 +338,7 @@ export default function PartnerOnboardForm({
         address: values.address,
         phone: values.phone,
         description: values.description || "",
+        city_id: values.city_id ? parseInt(values.city_id, 10) : null,
         ...(isDining
           ? { type_id: parseInt(values.venue_type_id, 10), collection_ids: collectionIds }
           : isVenue || isArtist
@@ -306,6 +366,15 @@ export default function PartnerOnboardForm({
 
   const busy = isOnboarding || isUpdating;
 
+  const handleParentTypeIdChange = useCallback((id: string) => {
+    setValue("parent_type_id", id, { shouldValidate: true, shouldDirty: true });
+    if (partnerType === "combined") setDocuments([]);
+  }, [setValue, partnerType]);
+
+  const handleVenueTypeIdChange = useCallback((id: string) => {
+    setValue("venue_type_id", id, { shouldValidate: true, shouldDirty: true });
+  }, [setValue]);
+
   const fieldsGrid = (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <PartnerTypeFields
@@ -313,13 +382,8 @@ export default function PartnerOnboardForm({
         businessTypes={businessTypes}
         parentTypeId={parentTypeId}
         venueTypeId={venueTypeId}
-        onParentTypeIdChange={(id) => {
-          setValue("parent_type_id", id, { shouldValidate: true, shouldDirty: true });
-          if (partnerType === "combined") setDocuments([]);
-        }}
-        onVenueTypeIdChange={(id) =>
-          setValue("venue_type_id", id, { shouldValidate: true, shouldDirty: true })
-        }
+        onParentTypeIdChange={handleParentTypeIdChange}
+        onVenueTypeIdChange={handleVenueTypeIdChange}
         variant={variant}
       />
       {errors.parent_type_id && (
@@ -392,9 +456,40 @@ export default function PartnerOnboardForm({
           type="text"
           {...register("address")}
           className={inputClass}
-          placeholder="City / area"
+          placeholder="Street address / locality"
         />
         {errors.address && <p className={fieldErrorClass}>{errors.address.message}</p>}
+      </div>
+      <div>
+        <label className={labelClass}>Country</label>
+        <select
+          value={country || ""}
+          onChange={(e) => handleCountryChange(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">All Countries</option>
+          {countries.map((c: string) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={labelClass}>City (from City Master)</label>
+        <select
+          value={watch("city_id") || ""}
+          onChange={(e) => handleCityChange(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select City</option>
+          {filteredCities.map((c: CityMaster) => (
+            <option key={c.id} value={c.id}>
+              {c.name} {c.state ? `(${c.state})` : ""} - {c.country}
+            </option>
+          ))}
+        </select>
+        {errors.city_id && <p className={fieldErrorClass}>{errors.city_id.message}</p>}
       </div>
       <PhoneInput
         label="Phone Number"

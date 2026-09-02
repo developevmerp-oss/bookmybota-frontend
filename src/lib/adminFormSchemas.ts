@@ -79,6 +79,8 @@ export const partnerOnboardSchema = yup.object({
   description: yup.string().trim().default(''),
   parent_type_id: yup.string().required('Please select a parent type.'),
   venue_type_id: yup.string().default(''),
+  country: yup.string().default(''),
+  city_id: yup.string().default(''),
   admin_email: yup
     .string()
     .trim()

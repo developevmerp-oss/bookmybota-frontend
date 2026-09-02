@@ -424,6 +424,190 @@ export interface CinemaScreen {
   updated_at?: string;
 }
 
+export interface MovieShowtimeTierPrice {
+  tier_name: string;
+  price: number;
+}
+
+export interface MovieShowtime {
+  id: string;
+  movie_id: string;
+  business_id: string;
+  cinema_screen_id: string;
+  starts_at: string;
+  ends_at?: string | null;
+  language: string;
+  format: string;
+  tier_pricing: MovieShowtimeTierPrice[];
+  status: 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  movie_title?: string;
+  movie_poster_url?: string | null;
+  movie_duration_minutes?: number | null;
+  movie_certificate?: string | null;
+  movie_languages?: string[];
+  movie_formats?: string[];
+  screen_name?: string;
+  screen_type?: string;
+  screen_capacity?: number;
+  layout_template_id?: string | null;
+  layout_name?: string | null;
+}
+
+export interface PublicMovieShowtimeItem {
+  id: string;
+  starts_at: string;
+  ends_at?: string | null;
+  language: string;
+  format: string;
+  screen_id: string;
+  screen_name: string;
+  screen_type?: string;
+  layout_template_id?: string | null;
+  tier_pricing: MovieShowtimeTierPrice[];
+  min_price?: number | null;
+  max_price?: number | null;
+}
+
+export interface PublicMovieCinemaGroup {
+  id: string;
+  name: string;
+  slug?: string;
+  address?: string;
+  image?: string | null;
+  showtimes: PublicMovieShowtimeItem[];
+}
+
+export interface PublicMovieShowtimesResponse {
+  movie: {
+    id: string;
+    title: string;
+    slug: string;
+  };
+  available_dates: string[];
+  cinemas: PublicMovieCinemaGroup[];
+}
+
+export interface MovieShowtimeLayoutData {
+  showtime: {
+    id: string;
+    starts_at: string;
+    ends_at?: string | null;
+    language: string;
+    format: string;
+    tier_pricing: MovieShowtimeTierPrice[];
+    status: string;
+    is_active: boolean;
+  };
+  movie: {
+    id: string;
+    title: string;
+    slug: string;
+    poster_url?: string | null;
+    banner_url?: string | null;
+    certificate?: string | null;
+    duration_minutes?: number | null;
+  };
+  cinema: {
+    id: string;
+    name: string;
+    address?: string | null;
+    image?: string | null;
+  };
+  screen: {
+    id: string;
+    name: string;
+    screen_type?: string | null;
+    capacity?: number | null;
+  };
+  layout_template?: {
+    id: string;
+    name: string;
+    status: string;
+    seating_config?: any;
+    seats_json?: any;
+    data?: any;
+    preview_image_url?: string | null;
+  } | null;
+  booked_seat_identifiers: string[];
+}
+
+export interface MovieBookingSeatPayload {
+  seat_identifier: string;
+  tier_name?: string;
+  row_label?: string;
+  seat_number?: string;
+  unit_price: number;
+}
+
+export interface CreateMovieBookingPayload {
+  showtime_id: string;
+  seats: MovieBookingSeatPayload[];
+  guest_name: string;
+  guest_phone: string;
+  guest_email?: string;
+  promo_code?: string;
+  platform_offer_id?: string;
+  payment_method?: string;
+}
+
+export interface MovieBookingResult {
+  booking_id: string;
+  booking_code: string;
+  qr_code_token: string;
+  movie_title: string;
+  cinema_name: string;
+  ticket_qty: number;
+  grand_total: number;
+  seats: MovieBookingSeatPayload[];
+}
+
+export interface MovieBookingDetail {
+  id: string;
+  movie_id: string;
+  showtime_id: string;
+  business_id: string;
+  cinema_screen_id: string;
+  guest_name: string;
+  guest_phone: string;
+  guest_email?: string;
+  status: string;
+  ticket_amount: number;
+  convenience_fee_total: number;
+  discount_amount: number;
+  grand_total: number;
+  ticket_qty: number;
+  promo_code?: string;
+  booking_code: string;
+  qr_code_token: string;
+  payment_method?: string | null;
+  payment_status?: string | null;
+  created_at: string;
+  showtime_starts_at: string;
+  showtime_ends_at?: string;
+  showtime_language: string;
+  showtime_format: string;
+  movie_title: string;
+  movie_poster?: string;
+  movie_certificate?: string;
+  movie_duration?: number;
+  cinema_name: string;
+  cinema_address?: string;
+  cinema_image?: string;
+  screen_name: string;
+  screen_type?: string;
+  seats: Array<{
+    id?: string;
+    seat_identifier: string;
+    tier_name?: string;
+    row_label?: string;
+    seat_number?: string;
+    unit_price: number;
+  }>;
+}
+
 export interface BusinessType {
   id: number;
   name: string;
@@ -1728,7 +1912,7 @@ const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> =
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes'],
   endpoints: (builder) => ({
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1929,6 +2113,7 @@ export const api = createApi({
         documents?: PartnerDocumentUpload[];
         cover_image_url?: string;
         collection_ids?: number[];
+        city_id?: number | null;
       }
     >({
       query: ({ id, ...body }) => ({
@@ -1936,7 +2121,7 @@ export const api = createApi({
         method: 'PUT',
         body,
       }),
-      invalidatesTags: ['Businesses', 'DiningMasters'],
+      invalidatesTags: ['Businesses', 'DiningMasters', 'MovieShowtimes'],
     }),
 
     setBusinessEnabled: builder.mutation<
@@ -4108,6 +4293,21 @@ export const api = createApi({
       providesTags: ['Businesses'],
     }),
 
+    getPublicRegisteredCinemas: builder.query<
+      PublicRegisteredPartner[],
+      { q?: string; city?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.append('q', params.q);
+        if (params?.city) sp.append('city', params.city);
+        const qs = sp.toString();
+        return `/movies/public/cinemas${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data?: PublicRegisteredPartner[] }) => res?.data ?? [],
+      providesTags: ['Businesses'],
+    }),
+
     getPublicRegisteredArtists: builder.query<
       PublicRegisteredPartner[],
       { q?: string; city?: string } | void
@@ -4921,6 +5121,170 @@ export const api = createApi({
       invalidatesTags: (_r, _e, arg) => [{ type: 'CinemaScreens', id: arg.bizId }, 'CinemaScreens'],
     }),
 
+    // ── Cinema Partner Movie Showtimes ─────────────────────────────────────────
+
+    getPartnerMovieShowtimes: builder.query<
+      MovieShowtime[],
+      { bizId: string; date?: string; cinema_screen_id?: string; movie_id?: string }
+    >({
+      query: ({ bizId, ...params }) => ({
+        url: `/businesses/${bizId}/movie-showtimes`,
+        params,
+      }),
+      providesTags: (_r, _e, arg) => [{ type: 'MovieShowtimes', id: arg.bizId }, 'MovieShowtimes'],
+    }),
+
+    createPartnerMovieShowtime: builder.mutation<
+      MovieShowtime,
+      {
+        bizId: string;
+        body: {
+          movie_id: string;
+          cinema_screen_id: string;
+          starts_at: string;
+          ends_at?: string | null;
+          language?: string;
+          format?: string;
+          tier_pricing: MovieShowtimeTierPrice[];
+        };
+      }
+    >({
+      query: ({ bizId, body }) => ({
+        url: `/businesses/${bizId}/movie-showtimes`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'MovieShowtimes', id: arg.bizId },
+        'MovieShowtimes',
+        'Movies',
+      ],
+    }),
+
+    updatePartnerMovieShowtime: builder.mutation<
+      MovieShowtime,
+      {
+        bizId: string;
+        showtimeId: string;
+        body: {
+          starts_at?: string;
+          ends_at?: string | null;
+          language?: string;
+          format?: string;
+          tier_pricing?: MovieShowtimeTierPrice[];
+          status?: 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
+          is_active?: boolean;
+        };
+      }
+    >({
+      query: ({ bizId, showtimeId, body }) => ({
+        url: `/businesses/${bizId}/movie-showtimes/${showtimeId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'MovieShowtimes', id: arg.bizId },
+        'MovieShowtimes',
+        'Movies',
+      ],
+    }),
+
+    deletePartnerMovieShowtime: builder.mutation<
+      { success: boolean; message?: string },
+      { bizId: string; showtimeId: string }
+    >({
+      query: ({ bizId, showtimeId }) => ({
+        url: `/businesses/${bizId}/movie-showtimes/${showtimeId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'MovieShowtimes', id: arg.bizId },
+        'MovieShowtimes',
+        'Movies',
+      ],
+    }),
+
+    // ── Cinema Partner Movie Bookings ─────────────────────────────────────────
+
+    getPartnerMovieBookings: builder.query<
+      {
+        data: MovieBookingDetail[];
+        stats: { total_bookings: number; total_tickets_sold: number; total_revenue: number };
+      },
+      { bizId: string; q?: string; date?: string; status?: string; movie_id?: string; screen_id?: string }
+    >({
+      query: ({ bizId, ...params }) => ({
+        url: `/businesses/${bizId}/movie-bookings`,
+        params,
+      }),
+      providesTags: (_r, _e, arg) => [{ type: 'MovieShowtimes', id: `bookings-${arg.bizId}` }],
+    }),
+
+    updatePartnerMovieBookingStatus: builder.mutation<
+      { message: string; data: MovieBookingDetail },
+      { bizId: string; id: string; status: string }
+    >({
+      query: ({ bizId, id, status }) => ({
+        url: `/businesses/${bizId}/movie-bookings/${id}/status`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      invalidatesTags: (_r, _e, arg) => [{ type: 'MovieShowtimes', id: `bookings-${arg.bizId}` }],
+    }),
+
+    // ── Public Movie Showtimes ────────────────────────────────────────────────
+
+    getPublicMovieShowtimes: builder.query<
+      PublicMovieShowtimesResponse,
+      { idOrSlug: string; date?: string; city_id?: string; city_slug?: string }
+    >({
+      query: ({ idOrSlug, ...params }) => ({
+        url: `/movies/${idOrSlug}/showtimes`,
+        params,
+      }),
+      providesTags: (_r, _e, arg) => [{ type: 'MovieShowtimes', id: arg.idOrSlug }, 'MovieShowtimes'],
+    }),
+
+    getMovieShowtimeLayout: builder.query<
+      MovieShowtimeLayoutData,
+      string
+    >({
+      query: (showtimeId) => `/movies/showtimes/${showtimeId}/layout`,
+      transformResponse: (res: { data: MovieShowtimeLayoutData }) => res.data,
+      providesTags: (_r, _e, showtimeId) => [{ type: 'MovieShowtimes', id: `layout-${showtimeId}` }],
+    }),
+
+    createMovieBooking: builder.mutation<
+      { message: string; data: MovieBookingResult },
+      CreateMovieBookingPayload
+    >({
+      query: (body) => ({
+        url: '/movies/bookings',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'MovieShowtimes', id: `layout-${arg.showtime_id}` },
+        'MovieShowtimes',
+      ],
+    }),
+
+    getMovieBooking: builder.query<
+      MovieBookingDetail,
+      string
+    >({
+      query: (id) => `/movies/bookings/${id}`,
+      transformResponse: (res: { data: MovieBookingDetail }) => res.data,
+    }),
+
+    getCustomerMovieBookings: builder.query<
+      MovieBookingDetail[],
+      void
+    >({
+      query: () => '/movies/customer/bookings',
+      transformResponse: (res: { data: MovieBookingDetail[] }) => res.data ?? [],
+    }),
+
     // ── Admin City Masters ────────────────────────────────────────────────────
 
     getAdminCities: builder.query<
@@ -5370,6 +5734,7 @@ export const {
   useGetPublicEventsQuery,
   useGetPublicEventFiltersQuery,
   useGetPublicRegisteredVenuesQuery,
+  useGetPublicRegisteredCinemasQuery,
   useGetPublicRegisteredArtistsQuery,
   useGetPublicArtistQuery,
   useCreateArtistInquiryMutation,
@@ -5435,6 +5800,17 @@ export const {
   useGetCinemaScreensQuery,
   useCreateCinemaScreenMutation,
   useUpdateCinemaScreenMutation,
+  useGetPartnerMovieShowtimesQuery,
+  useCreatePartnerMovieShowtimeMutation,
+  useUpdatePartnerMovieShowtimeMutation,
+  useDeletePartnerMovieShowtimeMutation,
+  useGetPartnerMovieBookingsQuery,
+  useUpdatePartnerMovieBookingStatusMutation,
+  useGetPublicMovieShowtimesQuery,
+  useGetMovieShowtimeLayoutQuery,
+  useCreateMovieBookingMutation,
+  useGetMovieBookingQuery,
+  useGetCustomerMovieBookingsQuery,
   useGetCitiesQuery,
   useGetAdminCitiesQuery,
   useCreateAdminCityMutation,

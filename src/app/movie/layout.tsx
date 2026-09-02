@@ -18,6 +18,7 @@ import {
   MonitorPlay,
   User,
   Tag,
+  Ticket,
   X,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
     { name: "Movies", href: "/movie/movies", icon: Film },
     { name: "Movie Offers", href: "/movie/offers", icon: Tag },
     { name: "Showtimes", href: "/movie/showtimes", icon: Clapperboard },
+    { name: "Bookings", href: "/movie/bookings", icon: Ticket },
     { name: "Profile", href: "/movie/profile", icon: User },
     { name: "Change Password", href: "/movie/change-password", icon: KeyRound },
   ];

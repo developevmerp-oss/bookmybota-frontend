@@ -51,6 +51,8 @@ type VenueAdapter = {
     payload: { seating_config: { canvasWidth: number; canvasHeight: number; labels: Label[]; shapes: Shape[]; bgImageUrl?: string | null }; seats: Seat[] },
     options?: { publish?: boolean }
   ) => Promise<void>;
+  onBlankPage?: () => void;
+  hideSubmitToVenue?: boolean;
 };
 
 type HistorySnapshot = {
@@ -1963,11 +1965,20 @@ export default function VenueLayoutBuilder({
           <button onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
             <Save size={16} /> {isSaving ? "Saving..." : venueAdapter ? "Save layout" : "Save Layout"}
           </button>
-          {venueAdapter && (
+          {venueAdapter?.onBlankPage ? (
+            <button
+              type="button"
+              onClick={() => venueAdapter.onBlankPage?.()}
+              className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              Add blank page
+            </button>
+          ) : null}
+          {venueAdapter && !venueAdapter.hideSubmitToVenue ? (
             <button onClick={() => void handleSave(true)} disabled={isSaving} className="btn-primary flex items-center gap-2">
               {isSaving ? "Submitting..." : "Submit to venue"}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 

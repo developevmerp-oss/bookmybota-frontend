@@ -28,6 +28,7 @@ import {
 } from "@/lib/eventTicketMode";
 import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
 import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
@@ -48,7 +49,9 @@ function ConfirmationContent() {
     [booking]
   );
 
-  const poster = booking?.poster_horizontal_url || booking?.poster_vertical_url;
+  const poster = resolveMediaUrl(
+    booking?.poster_horizontal_url || booking?.poster_vertical_url
+  );
   const venue = [booking?.venue_name, booking?.venue_address].filter(Boolean).join(", ");
   const ticketMode = normalizeTicketMode(booking?.ticket_mode);
 

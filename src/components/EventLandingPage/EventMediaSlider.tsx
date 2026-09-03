@@ -7,6 +7,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { parseYouTubeId, youtubeEmbedSrc, youtubeThumb } from "@/lib/youtube";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import "./EventMediaSlider.css";
 
 type Props = {
@@ -24,7 +25,7 @@ export default function EventMediaSlider({
 }: Props) {
   const [active, setActive] = useState(0);
   const youtubeId = parseYouTubeId(youtubeUrl);
-  const images = posterHorizontal ? [posterHorizontal] : [];
+  const images = posterHorizontal ? [resolveMediaUrl(posterHorizontal)] : [];
 
   const slides: Array<{ type: "image"; src: string } | { type: "youtube"; id: string }> = [];
   if (images[0]) slides.push({ type: "image", src: images[0] });

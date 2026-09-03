@@ -48,7 +48,7 @@ function WishlistRestaurantCard({
 }) {
   const [toggleWishlist, { isLoading }] = useToggleDiningWishlistMutation();
   const imageSrc =
-    restaurant.cover_image_url ||
+    resolveMediaUrl(restaurant.cover_image_url) ||
     "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
   const rating = Number(restaurant.rating || 0).toFixed(1);
   const offerLabel = listingOfferLabel(restaurant.dining_offers);

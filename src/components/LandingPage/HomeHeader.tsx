@@ -52,11 +52,11 @@ function NavSearchBar({
       className={`flex min-w-0 relative cursor-pointer text-left ${className ?? ""}`}
     >
       <Search
-        size={15}
+        size={20}
         strokeWidth={2}
         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#666666] pointer-events-none shrink-0"
       />
-      <span className="w-full h-9 sm:h-10 pl-10 pr-4 rounded-full border border-[#DDDDDD] bg-white text-[12px] sm:text-[13px] text-[#888888] font-normal flex items-center truncate whitespace-nowrap overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+      <span className="w-full h-9 sm:h-10 pl-10 pr-4 rounded-full border border-[#DDDDDD] bg-white text-[0.75rem] sm:text-[0.8125rem] lg:text-[1rem] text-[#888888] font-normal flex items-center truncate whitespace-nowrap overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         {SEARCH_PLACEHOLDER}
       </span>
     </button>
@@ -146,7 +146,7 @@ function AuthSection({
           <span className="w-8 h-8 rounded-full bg-[#7A00C6] text-white type-nav-md font-bold flex items-center justify-center">
             {initial}
           </span>
-          <span className="hidden sm:inline type-nav-md font-semibold text-[#111111] max-w-[110px] truncate whitespace-nowrap">
+          <span className="hidden sm:inline type-nav-md font-semibold text-[#111111] max-w-[8rem] truncate whitespace-nowrap">
             {displayName}
           </span>
         </Link>
@@ -219,32 +219,90 @@ export default function HomeHeader() {
   const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-black/10 text-[#111111]">
-      {/* Phone (< md) */}
-      <div className="md:hidden px-3 py-2 space-y-2">
-        <div className="flex items-center justify-between gap-2 min-w-0">
-          <Link href="/" className="shrink-0 flex items-center min-w-0">
-            <img src={logoSrc} alt="Book My Bota" className="h-8 w-auto max-w-[6.5rem] object-contain object-left" />
+    <header className="sticky top-0 z-50 bg-white text-[#111111]">
+      <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2 border-b-2 border-[#a044d9]">
+        {/* Mobile: logo + actions, then full-width search */}
+        <div className="flex flex-col gap-2 md:hidden">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <Link href="/" className="shrink-0 flex items-center min-w-0">
+              <img
+                src={logoSrc}
+                alt="Book My Bota"
+                className="h-8 w-auto object-contain object-left"
+              />
+            </Link>
+
+            <div className="flex items-center gap-2 shrink-0 min-w-0">
+              <button
+                type="button"
+                onClick={() => setCityOpen(true)}
+                className="inline-flex h-8 items-center gap-0.5 min-w-0 text-[#111111] type-nav font-medium hover:text-[#6900AA] transition-colors cursor-pointer"
+              >
+                <MapPin size={13} className="shrink-0" />
+                <span className="truncate">{cityLabel}</span>
+                <ChevronDown size={11} className="shrink-0 opacity-80" />
+              </button>
+
+              <Link
+                href="/gift-cards"
+                aria-label="Gift Cards"
+                className="w-8 h-8 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0"
+              >
+                <Gift size={16} />
+              </Link>
+
+              <AuthSection
+                authReady={authReady}
+                customer={customer}
+                displayName={displayName}
+                initial={initial}
+                isAuthPage={isAuthPage}
+                onLogin={() => setLoginOpen(true)}
+                onLogout={handleLogout}
+              />
+            </div>
+          </div>
+
+          <NavSearchBar onClick={() => setSearchOpen(true)} className="w-full" />
+        </div>
+
+        {/* Tablet + Desktop: logo | flexible search | actions */}
+        <div className="hidden md:flex items-center gap-3 lg:gap-4 min-w-0">
+          <Link href="/" className="shrink-0 flex items-center">
+            <img
+              src={logoSrc}
+              alt="Book My Bota"
+              className="h-12 lg:h-14 w-auto object-contain"
+            />
           </Link>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <NavSearchBar
+            onClick={() => setSearchOpen(true)}
+            className="flex-1 min-w-0 max-w-md lg:max-w-xl "
+          />
+
+          <div className="flex items-center gap-3 lg:gap-4 shrink-0 ml-auto">
             <button
               type="button"
               onClick={() => setCityOpen(true)}
-              className="inline-flex h-8 items-center gap-0.5 px-1.5 text-[#111111] type-nav font-medium hover:text-[#6900AA] transition-colors cursor-pointer max-w-[5.5rem] min-w-0"
+              className="flex items-center gap-1.5 type-nav-md font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] min-w-0"
             >
-              <MapPin size={13} className="shrink-0" />
+              <MapPin size={16} className="shrink-0" />
               <span className="truncate">{cityLabel}</span>
-              <ChevronDown size={11} className="shrink-0 opacity-80" />
+              <ChevronDown size={14} className="shrink-0 opacity-80" />
             </button>
+
+            <HeaderDivider />
 
             <Link
               href="/gift-cards"
-              aria-label="Gift Cards"
-              className="w-8 h-8 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0"
+              className="inline-flex items-center gap-1.5 text-[#111111] type-nav-md font-semibold hover:text-[#6900AA] transition-colors whitespace-nowrap"
             >
-              <Gift size={16} />
+              <Gift size={17} strokeWidth={2} />
+              <span>Gift Cards</span>
             </Link>
+
+            <HeaderDivider />
 
             <AuthSection
               authReady={authReady}
@@ -256,68 +314,6 @@ export default function HomeHeader() {
               onLogout={handleLogout}
             />
           </div>
-        </div>
-
-        <button
-          type="button"
-          aria-label="Search"
-          onClick={() => setSearchOpen(true)}
-          className="w-full cursor-pointer text-left relative"
-        >
-          <Search
-            size={14}
-            strokeWidth={2}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#666666] pointer-events-none"
-          />
-          <span className="w-full h-9 pl-10 pr-4 rounded-full border border-[#DDDDDD] bg-white text-[12px] text-[#888888] flex items-center truncate shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-            {SEARCH_PLACEHOLDER}
-          </span>
-        </button>
-      </div>
-
-      {/* Tablet + Desktop (md+) */}
-      <div className="hidden md:flex mx-auto px-4 md:px-5 lg:px-8 py-2 items-center gap-3 lg:gap-4">
-        <Link href="/" className="shrink-0 flex items-center">
-          <img src={logoSrc} alt="Book My Bota" className="h-12 lg:h-14 w-auto object-contain" />
-        </Link>
-
-        <NavSearchBar
-          onClick={() => setSearchOpen(true)}
-          className="w-full max-w-[22rem] lg:max-w-[45rem] ml-15 shrink-0"
-        />
-
-        <div className="flex items-center gap-3 lg:gap-4 shrink-0 ml-auto">
-          <button
-            type="button"
-            onClick={() => setCityOpen(true)}
-            className="flex items-center gap-1.5 type-nav-md font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] max-w-[140px] lg:max-w-[160px]"
-          >
-            <MapPin size={16} className="shrink-0" />
-            <span className="truncate">{cityLabel}</span>
-            <ChevronDown size={14} className="shrink-0 opacity-80" />
-          </button>
-
-          <HeaderDivider />
-
-          <Link
-            href="/gift-cards"
-            className="inline-flex items-center gap-1.5 text-[#111111] type-nav-md font-semibold hover:text-[#6900AA] transition-colors whitespace-nowrap"
-          >
-            <Gift size={17} strokeWidth={2} />
-            <span>Gift Cards</span>
-          </Link>
-
-          <HeaderDivider />
-
-          <AuthSection
-            authReady={authReady}
-            customer={customer}
-            displayName={displayName}
-            initial={initial}
-            isAuthPage={isAuthPage}
-            onLogin={() => setLoginOpen(true)}
-            onLogout={handleLogout}
-          />
         </div>
       </div>
 

@@ -208,7 +208,6 @@ export default function OrganizerLandingPage({
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
-      showBackButton
       loginHref="/organizer/login"
       expectedRole="event_admin"
       loginTitle="Event Admin Login"

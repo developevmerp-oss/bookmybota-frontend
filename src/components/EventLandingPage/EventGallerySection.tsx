@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import EventGalleryModal from "@/components/EventLandingPage/EventGalleryModal";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 type Props = {
   eventName: string;
@@ -12,7 +13,7 @@ type Props = {
 const PREVIEW_COUNT = 2;
 
 export default function EventGallerySection({ eventName, images }: Props) {
-  const gallery = images.filter(Boolean);
+  const gallery = images.filter(Boolean).map((url) => resolveMediaUrl(url));
   const [modalOpen, setModalOpen] = useState(false);
   const [startIndex, setStartIndex] = useState(0);
 

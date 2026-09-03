@@ -12,6 +12,7 @@ import {
   ticketModeLabel,
   type TicketDeliveryMode,
 } from "@/lib/eventTicketMode";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 export type EventTicketCardBooking = {
   id: string;
@@ -236,7 +237,7 @@ export function EventTicketCard({ booking, posterUrl, onCopyCode, className = ""
       <div className="flex gap-4 p-4 sm:gap-5 sm:p-6">
         {posterUrl ? (
           <img
-            src={posterUrl}
+            src={resolveMediaUrl(posterUrl)}
             alt={booking.event_name || "Event"}
             className="aspect-[3/4] w-[5rem] shrink-0 rounded-xl object-cover bg-slate-100 shadow-md ring-1 ring-slate-200/80 sm:w-[5.75rem]"
           />

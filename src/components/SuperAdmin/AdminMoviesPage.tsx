@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Archive, Film, Pencil, Plus } from "lucide-react";
-import { useDeleteAdminMovieMutation, useGetAdminMoviesQuery, type Movie } from "@/services/api";
+import {
+  useDeleteAdminMovieMutation,
+  useGetAdminMoviesQuery,
+  useUpdateAdminMovieMutation,
+  type Movie,
+} from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
@@ -21,6 +27,10 @@ const STATUS_LABEL: Record<Movie["status"], string> = {
   archived: "Archived",
 };
 
+function isPublicCatalogStatus(status: Movie["status"]) {
+  return status === "now_showing" || status === "coming_soon";
+}
+
 export default function AdminMoviesPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -28,6 +38,7 @@ export default function AdminMoviesPage() {
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [archiveTarget, setArchiveTarget] = useState<Movie | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
+  const activatedIdsRef = useRef<Set<string>>(new Set());
 
   const queryArg = useMemo(
     () => ({
@@ -42,6 +53,45 @@ export default function AdminMoviesPage() {
   const { data, isLoading, isFetching } = useGetAdminMoviesQuery(queryArg);
   const movies = data?.items ?? [];
   const [deleteMovie] = useDeleteAdminMovieMutation();
+  const [updateMovie] = useUpdateAdminMovieMutation();
+
+  // Existing titles can be "Now showing" in admin but still inactive for public/partner
+  // catalog (e.g. after archive → restore). Activate them via the existing update API.
+  useEffect(() => {
+    const needsActivate = movies.filter(
+      (m) =>
+        isPublicCatalogStatus(m.status) &&
+        m.is_active === false &&
+        !activatedIdsRef.current.has(m.id)
+    );
+    if (needsActivate.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      let activated = 0;
+      for (const movie of needsActivate) {
+        if (cancelled) break;
+        activatedIdsRef.current.add(movie.id);
+        try {
+          await updateMovie({ id: movie.id, body: { is_active: true } }).unwrap();
+          activated += 1;
+        } catch {
+          activatedIdsRef.current.delete(movie.id);
+        }
+      }
+      if (!cancelled && activated > 0) {
+        toast.success(
+          activated === 1
+            ? "1 movie is now visible on the public catalog"
+            : `${activated} movies are now visible on the public catalog`
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [movies, updateMovie]);
 
   const runArchive = async () => {
     if (!archiveTarget) return;
@@ -133,7 +183,7 @@ export default function AdminMoviesPage() {
                         {movie.poster_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={movie.poster_url}
+                            src={resolveMediaUrl(movie.poster_url)}
                             alt=""
                             className="w-10 h-14 rounded object-cover border border-slate-200 shrink-0"
                           />

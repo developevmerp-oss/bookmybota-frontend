@@ -21,6 +21,7 @@ import {
   DiningFilterState,
   extractCuisines,
 } from "@/lib/diningFilters";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const DINING_LIST_LIMIT = 12;
 
@@ -34,7 +35,8 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
     return "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
   };
 
-  const imageSrc = restaurant.cover_image_url || getFallbackImageForType(restaurant.type_name);
+  const imageSrc =
+    resolveMediaUrl(restaurant.cover_image_url) || getFallbackImageForType(restaurant.type_name);
   const rating = Number(restaurant.rating || 4.2).toFixed(1);
   const cuisine =
     restaurant.cuisine ||
@@ -244,7 +246,7 @@ function SearchContent() {
       return {
         title: activeCollection.title,
         subtitle: activeCollection.subtitle || "Curated list of premium spots",
-        image: activeCollection.image_url || "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&q=80",
+        image: resolveMediaUrl(activeCollection.image_url) || "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&q=80",
         gradient: activeCollection.color_gradient || "from-rose-900/80",
       };
     }
@@ -252,7 +254,7 @@ function SearchContent() {
       return {
         title: activeMood.title,
         subtitle: "Satisfy your cravings today",
-        image: activeMood.image_url || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1600&q=80",
+        image: resolveMediaUrl(activeMood.image_url) || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1600&q=80",
         gradient: "from-amber-900/80",
       };
     }

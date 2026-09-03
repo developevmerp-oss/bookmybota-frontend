@@ -30,6 +30,7 @@ import { useRouter } from 'next/navigation';
 import {
   useGetBusinessPublicQuery,
   useCreateBookingMutation,
+  useLazyCheckAvailabilityQuery,
   useSendCustomerOtpMutation,
   useVerifyCustomerOtpMutation,
   useRegisterCustomerMutation,
@@ -516,6 +517,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const { data: profile, isLoading } = useGetBusinessPublicQuery(resolvedParams.id);
   const [createBooking] = useCreateBookingMutation();
+  const [checkAvailabilityQuery] = useLazyCheckAvailabilityQuery();
   const { data: reviewsData } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
   const reviews = reviewsData?.items ?? [];
   const [createReview] = useCreateReviewMutation();
@@ -1025,7 +1027,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   }
 
   const photos = profile
-    ? (uploadedPhotos.length > 0 ? uploadedPhotos : getPhotosForVenue(profile.type_name, profile.cover_image_url))
+    ? (uploadedPhotos.length > 0
+        ? resolveValidMediaUrls(uploadedPhotos)
+        : getPhotosForVenue(profile.type_name, profile.cover_image_url))
     : [];
   const venueGalleryPhotos = resolveValidMediaUrls(uploadedPhotos);
 
@@ -1109,10 +1113,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setAvailabilityStatus('loading');
     try {
       const bookingDateTime = getBookingISO();
-      const res = await fetch(
-        `http://localhost:5000/api/bookings/availability?business_id=${resolvedParams.id}&date=${bookingDateTime}&guests=${guests}`
-      );
-      const data = await res.json();
+      const data = await checkAvailabilityQuery({
+        business_id: resolvedParams.id,
+        date: bookingDateTime,
+        guests: String(guests),
+      }).unwrap();
       setAvailabilityStatus(data.available === true ? 'available' : 'unavailable');
     } catch {
       setAvailabilityStatus('error');
@@ -2126,7 +2131,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {similarRestaurants.map((restaurant) => {
                   const rating = Number(restaurant.rating || 4.2).toFixed(1);
                   const cuisine = restaurant.cuisine || "Italian, Chinese, Continental";
-                  const coverImg = restaurant.cover_image_url || "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
+                  const coverImg =
+                    resolveMediaUrl(restaurant.cover_image_url) ||
+                    "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
                   const locality = restaurant.address ? restaurant.address.split(",")[0].trim() : "";
                   const priceForTwo = restaurant.average_cost
                     ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
@@ -3202,12 +3209,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
                         <div className="h-40 sm:h-44 bg-zinc-100 overflow-hidden">
                           <img
-                            src={photos[0] || profile.cover_image_url || 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80'}
+                            src={
+                              photos[0] ||
+                              resolveMediaUrl(profile.cover_image_url) ||
+                              "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80"
+                            }
                             alt={profile.name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src =
-                                'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80';
+                                "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
                             }}
                           />
                         </div>

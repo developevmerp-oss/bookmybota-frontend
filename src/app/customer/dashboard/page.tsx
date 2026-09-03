@@ -34,6 +34,7 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const DEFAULT_DINING_IMAGE =
   "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
@@ -369,7 +370,7 @@ export default function CustomerDashboard() {
                     <div className="relative w-full h-40 sm:h-44 lg:w-52 lg:h-40 xl:w-56 xl:h-44 shrink-0">
                       <img
                         src={
-                          b.image ||
+                          resolveMediaUrl(b.image) ||
                           (isEvent ? DEFAULT_EVENT_IMAGE : DEFAULT_DINING_IMAGE)
                         }
                         alt={b.title}

@@ -1,15 +1,16 @@
 import type { Business, PublicEvent } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 export function hasCityFilter(city?: string) {
   return Boolean(city && city !== "All Cities");
 }
 
 export function eventPortrait(event: PublicEvent) {
-  return event.poster_vertical_url || event.poster_horizontal_url || "";
+  return resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url || "");
 }
 
 export function eventLandscape(event: PublicEvent) {
-  return event.poster_horizontal_url || event.poster_vertical_url || "";
+  return resolveMediaUrl(event.poster_horizontal_url || event.poster_vertical_url || "");
 }
 
 export function formatShowDateBar(iso?: string) {

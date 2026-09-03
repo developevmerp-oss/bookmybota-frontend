@@ -171,7 +171,6 @@ export default function ArtistLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
-      showBackButton
       loginHref="/artist/login"
       expectedRole="artist_admin"
       loginTitle="Artist Admin Login"

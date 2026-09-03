@@ -164,7 +164,6 @@ export default function BusinessLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
-      showBackButton
       loginHref="/business/login"
       expectedRole="business_admin"
       loginTitle="Dining Admin Login"

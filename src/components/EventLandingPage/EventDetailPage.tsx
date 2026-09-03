@@ -38,6 +38,7 @@ import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { toast } from "sonner";
 import { EventDetailShimmer } from "@/components/Shared/Shimmer";
 import EventMediaSlider from "@/components/EventLandingPage/EventMediaSlider";
@@ -115,7 +116,7 @@ function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
 }
 
 function RelatedCard({ event }: { event: PublicEvent }) {
-  const image = event.poster_vertical_url || event.poster_horizontal_url;
+  const image = resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url);
   const subtitle = event.category_name || formatLongDate(event.next_showtime);
   return (
     <Link
@@ -611,7 +612,7 @@ export default function PublicEventDetailPage({
           <div className="min-w-0">
             <EventMediaSlider
               eventName={event.name}
-              posterHorizontal={event.poster_horizontal_url}
+              posterHorizontal={resolveMediaUrl(event.poster_horizontal_url)}
               youtubeUrl={event.youtube_url}
             />
 
@@ -718,7 +719,7 @@ export default function PublicEventDetailPage({
                   >
                     <div className="relative h-[160px] sm:h-[188px] lg:h-[196px] 2xl:h-[208px] rounded-xl overflow-hidden bg-slate-200">
                       {artist.image_url ? (
-                        <img src={artist.image_url} alt={artist.name} className="absolute inset-0 w-full h-full object-cover" />
+                        <img src={resolveMediaUrl(artist.image_url)} alt={artist.name} className="absolute inset-0 w-full h-full object-cover" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-[1.375rem] sm:text-[1.625rem] font-extrabold text-white bg-[#1B365D]">
                           {artist.name.slice(0, 1).toUpperCase()}
@@ -769,7 +770,7 @@ export default function PublicEventDetailPage({
             </section>
           )}
 
-            <EventGallerySection eventName={event.name} images={event.gallery_images || []} />
+            <EventGallerySection eventName={event.name} images={(event.gallery_images || []).map((url) => resolveMediaUrl(url))} />
 
             {termLines.length > 0 && (
               <button
@@ -940,7 +941,7 @@ export default function PublicEventDetailPage({
             <div className="overflow-y-auto max-h-[92vh] sm:max-h-[90vh] px-5 sm:px-6 pt-5 sm:pt-6 pb-6 sm:pb-7">
               <div className="w-[180px] sm:w-[220px] mx-auto aspect-square rounded-xl overflow-hidden bg-slate-200">
                 {artistModal.image_url ? (
-                  <img src={artistModal.image_url} alt={artistModal.name} className="w-full h-full object-cover" />
+                  <img src={resolveMediaUrl(artistModal.image_url)} alt={artistModal.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-[1.875rem] sm:text-[2.25rem] font-extrabold text-white bg-[#1B365D]">
                     {artistModal.name.slice(0, 1).toUpperCase()}

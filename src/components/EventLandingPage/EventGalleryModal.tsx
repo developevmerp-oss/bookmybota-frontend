@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 type Props = {
   open: boolean;
@@ -18,7 +19,7 @@ export default function EventGalleryModal({
   startIndex = 0,
   onClose,
 }: Props) {
-  const gallery = images.filter(Boolean);
+  const gallery = images.filter(Boolean).map((url) => resolveMediaUrl(url));
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

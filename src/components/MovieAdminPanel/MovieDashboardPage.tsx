@@ -22,6 +22,7 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 export default function MovieDashboardPage() {
   const user = useAppSelector((state) => state.auth.user);
@@ -186,7 +187,7 @@ export default function MovieDashboardPage() {
                   {st.movie_poster_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={st.movie_poster_url}
+                      src={resolveMediaUrl(st.movie_poster_url)}
                       alt={st.movie_title || "Movie"}
                       className="size-12 rounded-lg object-cover bg-zinc-800 shrink-0"
                     />

@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Loader2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useGetCollectionsQuery } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 function CollectionsContent() {
   const searchParams = useSearchParams();
@@ -75,7 +76,7 @@ function CollectionsContent() {
                   className="relative group h-80 rounded-2xl overflow-hidden cursor-pointer shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5 block border border-slate-100/50 bg-slate-100"
                 >
                   <img
-                    src={collection.image_url || "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80"}
+                    src={resolveMediaUrl(collection.image_url) || "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80"}
                     alt={collection.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     onError={(e) => {

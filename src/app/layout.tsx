@@ -114,7 +114,10 @@ export default function RootLayout({
     isMovieLogin;
 
   /** Minimal logo + Login bar (List Your Show style) — not customer HomeHeader. */
-  const isPartnerMinimalHeaderPage = isPartnerRegisterPage || isBusinessLogin;
+  const isPasswordAuthPage =
+    pathname === "/forgot-password" || pathname === "/reset-password";
+  const isPartnerMinimalHeaderPage =
+    isPartnerRegisterPage || isBusinessLogin || isPasswordAuthPage;
 
   const isAdminOrBusiness =
     Boolean(pathname?.startsWith("/admin")) ||

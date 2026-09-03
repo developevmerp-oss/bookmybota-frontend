@@ -435,6 +435,26 @@ function resolveExploreTypeName(
   return exact?.name || fallback;
 }
 
+/** Map filter category selection back to an Explore Dining card id. */
+function exploreCardIdForCategories(
+  categories: string[],
+  types: { name: string }[]
+): string {
+  if (categories.length === 0) return "all-dining";
+  for (const cat of categories) {
+    const lower = cat.trim().toLowerCase();
+    if (!lower) continue;
+    for (const card of EXPLORE_DINING_CARDS) {
+      if (!card.match) continue;
+      const resolved = resolveExploreTypeName(card.match, types, card.title);
+      if (resolved && resolved.trim().toLowerCase() === lower) return card.id;
+      if (card.title.trim().toLowerCase() === lower) return card.id;
+      if (card.match.some((m) => m === lower)) return card.id;
+    }
+  }
+  return "all-dining";
+}
+
 function CuisineLandmarkIcon({
   type,
   color,
@@ -1061,7 +1081,10 @@ export default function Home() {
     const searchParam = params.get("search");
     const storedCity = localStorage.getItem("selected_city") || "";
 
-    if (filterParam) setActiveCategories([filterParam]);
+    if (filterParam) {
+      setActiveCategories([filterParam]);
+      setExploreCardId(exploreCardIdForCategories([filterParam], []));
+    }
 
     const nextCity =
       cityParam && cityParam !== "All Cities"
@@ -1104,6 +1127,13 @@ export default function Home() {
     locationCity && locationCity !== "All Cities" ? locationCity : undefined;
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery('dining');
+
+  // Keep Explore Dining highlight in sync with Filters → Category (same shared options).
+  useEffect(() => {
+    const nextId = exploreCardIdForCategories(activeCategories, businessTypes);
+    setExploreCardId((prev) => (prev === nextId ? prev : nextId));
+  }, [activeCategories, businessTypes]);
+
   const {
     data: businessesData,
     isLoading: businessesLoading,
@@ -1798,7 +1828,12 @@ export default function Home() {
                     }
                     setExploreCardId(card.id);
                     if (resolvedCategory) {
-                      setActiveCategories([resolvedCategory]);
+                      // Use the same label as Filters → Category so both stay highlighted together.
+                      const filterLabel =
+                        exploreDiningFilterCategories.find(
+                          (c) => c.toLowerCase() === resolvedCategory.toLowerCase()
+                        ) || resolvedCategory;
+                      setActiveCategories([filterLabel]);
                     } else {
                       setActiveCategories([]);
                     }
@@ -2111,7 +2146,8 @@ className={`text-sm font-bold mt-2 transition-colors ${
               categoriesSelected={activeCategories}
               onCategoriesChange={(next) => {
                 setActiveCategories(next);
-                if (next.length === 0) setExploreCardId("all-dining");
+                setExploreCardId(exploreCardIdForCategories(next, businessTypes));
+                setCurrentPage(1);
               }}
             />
           </section>
@@ -2244,7 +2280,8 @@ className={`text-sm font-bold mt-2 transition-colors ${
                         (c) => c.toLowerCase() !== selectedCategory.toLowerCase()
                       );
                       setActiveCategories(next);
-                      if (next.length === 0) setExploreCardId("all-dining");
+                      setExploreCardId(exploreCardIdForCategories(next, businessTypes));
+                      setCurrentPage(1);
                     }}
                     className="hover:bg-slate-200 p-0.5 rounded-full transition-colors flex items-center justify-center"
                     aria-label="Clear category filter"

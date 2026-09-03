@@ -8,7 +8,6 @@ import {
   Laugh,
   Mic2,
   Music,
-  Tag,
   Ticket,
   Trophy,
   UtensilsCrossed,
@@ -99,37 +98,34 @@ export default function SubNavBar() {
   return (
     <nav
       aria-label="Browse categories"
-      className="border-b border-[#b7b6b6] bg-[#a044d9] mb-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="bg-[#a044d9] border-b border-[#b7b6b6] "
     >
-      <div className=" mx-auto max-w-7xl min-h-[44px] sm:min-h-[48px] px-4 md:px-5 lg:px-8 py-2 flex items-center justify-between gap-4 min-w-max lg:min-w-0 w-full">
-        <div className="flex items-center justify-evenly lg:justify-start gap-3 sm:gap-4 lg:gap-5 shrink-0 lg:flex-1">
-          {linkTabs.map((item) => {
-            const { label, Icon } = item;
-            const active = isTabActive(item);
-            const href = tabHref(item, diningHref, categories);
-            return (
-              <Link
-                key={label}
-                href={href}
-                className={`inline-flex items-center gap-1.5 shrink-0 px-2 sm:px-2.5 py-1.5 rounded-md text-[11px] sm:text-[14px] font-semibold uppercase tracking-wide whitespace-nowrap transition-colors ${
-                  active
-                    ? "bg-[#FFD600] text-[#111111]"
-                    : "text-white hover:text-white hover:bg-white/10"
-                }`}
-              >
-                <Icon size={20} strokeWidth={2} className="shrink-0" aria-hidden />
-                {label}
-              </Link>
-            );
-          })}
-        </div>
+      <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2 flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {linkTabs.map((item) => {
+          const { label, Icon } = item;
+          const active = isTabActive(item);
+          const href = tabHref(item, diningHref, categories);
+          return (
+            <Link
+              key={label}
+              href={href}
+              className={`inline-flex items-center gap-1.5 shrink-0 px-2 sm:px-2.5 py-1.5 rounded-md text-[11px] sm:text-sm font-semibold uppercase tracking-wide whitespace-nowrap transition-colors ${
+                active
+                  ? "bg-[#FFD600] text-[#111111]"
+                  : "text-white hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <Icon size={18} strokeWidth={2} className="shrink-0 sm:w-5 sm:h-5" aria-hidden />
+              {label}
+            </Link>
+          );
+        })}
 
         {ctaTab ? (
           <Link
             href={ctaTab.href!}
-            className="shrink-0 inline-flex items-center gap-1.5 h-8 sm:h-9 px-3 sm:px-4 rounded-md bg-[#f9df53] text-[#111111] text-[11px] sm:text-[17px] font-normal  hover:bg-[#F5CE00] transition-colors"
+            className="shrink-0 inline-flex items-center justify-center h-8 sm:h-9 px-3 sm:px-4 rounded-md bg-[#f9df53] text-[#111111] text-[11px] sm:text-base font-normal hover:bg-[#F5CE00] transition-colors whitespace-nowrap ml-3 sm:ml-60"
           >
-            {/* <ctaTab.Icon size={14} strokeWidth={2.5} className="shrink-0" aria-hidden /> */}
             {ctaTab.label}
           </Link>
         ) : null}

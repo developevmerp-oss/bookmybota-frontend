@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Building2, MapPin, Mic2 } from "lucide-react";
 import type { PublicRegisteredPartner } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const BRAND = "#6900AA";
 const BRAND_SOFT = "#F7E9FF";
@@ -34,7 +35,7 @@ function PartnerCard({
       <div className="relative aspect-[3/4] overflow-hidden" style={{ backgroundColor: BRAND_SOFT }}>
         {partner.cover_image_url ? (
           <img
-            src={partner.cover_image_url}
+            src={resolveMediaUrl(partner.cover_image_url)}
             alt={partner.name}
             className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-500"
           />

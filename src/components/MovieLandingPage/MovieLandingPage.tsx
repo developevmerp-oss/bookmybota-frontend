@@ -23,6 +23,11 @@ import {
   type Movie,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import {
+  SHOWCASE_NOW_SHOWING_MOVIE_CARDS,
+  SHOWCASE_UPCOMING_MOVIE_CARDS,
+  type ShowcaseMovieCard,
+} from "@/data/showcaseMovieCards";
 import "./MovieLandingPage.css";
 
 const PAGE_BG = "#f6f7f8";
@@ -120,6 +125,19 @@ function mapCatalogMovieToCard(movie: Movie): MovieCardData {
     formats: movie.formats || [],
     comingSoon: movie.status === "coming_soon",
     href: `/movies/${movie.slug || movie.id}`,
+  };
+}
+
+function mapShowcaseMovieToCard(movie: ShowcaseMovieCard): MovieCardData {
+  return {
+    id: movie.id,
+    title: movie.title,
+    poster: movie.poster,
+    certification: movie.certification,
+    language: movie.language,
+    genres: [],
+    comingSoon: movie.comingSoon,
+    href: movie.href,
   };
 }
 
@@ -488,8 +506,22 @@ export default function MovieLandingPage() {
     [catalogMovies]
   );
 
-  const movies = nowShowingSource;
-  const comingSoonMovies = comingSoonSource;
+  const hasActiveFilters =
+    selectedLanguages.length > 0 || selectedGenres.length > 0 || selectedFormats.length > 0;
+
+  const useStaticMovies =
+    !isLoading &&
+    !hasActiveFilters &&
+    !noCinemasInCity &&
+    nowShowingSource.length === 0 &&
+    comingSoonSource.length === 0;
+
+  const movies = useStaticMovies
+    ? SHOWCASE_NOW_SHOWING_MOVIE_CARDS.map(mapShowcaseMovieToCard)
+    : nowShowingSource;
+  const comingSoonMovies = useStaticMovies
+    ? SHOWCASE_UPCOMING_MOVIE_CARDS.map(mapShowcaseMovieToCard)
+    : comingSoonSource;
 
   const topRatedMovies = useMemo(() => {
     return [...movies]
@@ -497,8 +529,6 @@ export default function MovieLandingPage() {
       .sort((a, b) => ratingValue(b.rating) - ratingValue(a.rating));
   }, [movies]);
 
-  const hasActiveFilters =
-    selectedLanguages.length > 0 || selectedGenres.length > 0 || selectedFormats.length > 0;
   const headingCity = city || "Ethiopia";
   const cinemasHref = city
     ? `/movies/cinemas?city=${encodeURIComponent(city)}`

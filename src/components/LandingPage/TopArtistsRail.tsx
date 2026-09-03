@@ -4,6 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Mic2 } from "lucide-react";
 import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./TopArtistsRail.css";
 
@@ -23,7 +24,7 @@ function ArtistCard({ artist }: { artist: PublicRegisteredPartner }) {
         <div className="top-artists-avatar-inner">
           {artist.cover_image_url ? (
             <img
-              src={artist.cover_image_url}
+              src={resolveMediaUrl(artist.cover_image_url)}
               alt={artist.name}
               className="w-full h-full object-cover"
               loading="lazy"

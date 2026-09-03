@@ -22,6 +22,7 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import ArtistMonthCalendar from "@/components/Shared/ArtistMonthCalendar";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { formatDate } from "@/lib/dateFormat";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const BRAND = "#6900AA";
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
@@ -145,7 +146,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
             <div className="aspect-[3/4] md:aspect-auto md:min-h-[280px] bg-[#F7E9FF] relative">
               {artist.cover_image_url ? (
                 <img
-                  src={artist.cover_image_url}
+                  src={resolveMediaUrl(artist.cover_image_url)}
                   alt={artist.name}
                   className="w-full h-full object-cover"
                 />

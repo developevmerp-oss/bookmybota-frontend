@@ -27,6 +27,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const ACCENT = "#6900AA";
 const DEFAULT_DINING_IMAGE =
@@ -162,7 +163,7 @@ export default function BookingDetailPage({
   const bookingCode = displayBookingCode(booking.id);
   const badge = statusBadge(booking.status);
   const qrData = booking.qr_token || booking.id;
-  const cover = booking.business_cover_image || DEFAULT_DINING_IMAGE;
+  const cover = resolveMediaUrl(booking.business_cover_image) || DEFAULT_DINING_IMAGE;
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] pt-8 sm:pt-10 pb-12 sm:pb-16">

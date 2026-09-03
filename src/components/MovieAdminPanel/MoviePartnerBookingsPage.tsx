@@ -31,6 +31,7 @@ import {
 } from "@/services/api";
 import SearchInput from "@/components/Shared/SearchInput";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 export default function MoviePartnerBookingsPage() {
   const user = useAppSelector((state) => state.auth.user);
@@ -246,7 +247,7 @@ export default function MoviePartnerBookingsPage() {
                   {booking.movie_poster ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={booking.movie_poster}
+                      src={resolveMediaUrl(booking.movie_poster)}
                       alt={booking.movie_title}
                       className="size-14 rounded-xl object-cover bg-zinc-800 shrink-0"
                     />

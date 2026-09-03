@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useGetPublicEventQuery } from "@/services/api";
 import EventGalleryModal from "@/components/EventLandingPage/EventGalleryModal";
 import { EventGalleryShimmer } from "@/components/Shared/Shimmer";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 /** Deep-link: /events/[id]/gallery opens the same lightbox modal on the event. */
 export default function EventGalleryPage({
@@ -19,11 +20,11 @@ export default function EventGalleryPage({
   const [open, setOpen] = useState(true);
 
   const images = useMemo(() => {
-    const gallery = (event?.gallery_images || []).filter(Boolean);
+    const gallery = (event?.gallery_images || []).filter(Boolean).map((url) => resolveMediaUrl(url));
     if (gallery.length > 0) return gallery;
-    return [event?.poster_horizontal_url, event?.poster_vertical_url].filter(
-      (u): u is string => Boolean(u)
-    );
+    return [event?.poster_horizontal_url, event?.poster_vertical_url]
+      .filter((u): u is string => Boolean(u))
+      .map((url) => resolveMediaUrl(url));
   }, [event]);
 
   useEffect(() => {

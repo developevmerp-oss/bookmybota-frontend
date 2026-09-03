@@ -1,51 +1,42 @@
-# API Production Checklist (RTK Query — no logic changes)
+# API / media host (local vs live)
 
-## API base URL behavior
+## Behavior
 
-In `src/services/api.ts`:
+Shared helper: `src/lib/apiBaseUrl.ts`
 
-1. If `NEXT_PUBLIC_API_BASE_URL` is set → use it
-2. Else `next dev` (development) → `http://localhost:5000/api`
-3. Else production build → `https://bookmybota-backend.onrender.com/api`
+| Runtime | API base |
+|---------|----------|
+| Local (`next dev`, browser on localhost, local `next start`) | `http://localhost:5000/api` |
+| Live (Vercel / non-local production host) | `https://bookmybota-backend.onrender.com/api` |
+| Override | `NEXT_PUBLIC_API_BASE_URL` (legacy: `NEXT_PUBLIC_API_URL`) |
 
-Local file `frontend/.env.local` (gitignored) should point at localhost while developing:
+If a live deploy env accidentally points at localhost, code falls back to the production API and logs a warning.
+
+## Wired through
+
+- All RTK Query calls → `services/api.ts` → `getApiBaseUrl()`
+- Uploaded images → stored as `/uploads/...` (host-stable)
+- Display → `resolveMediaUrl()` / `getApiOrigin()` rewrites localhost/live upload URLs to the active API host
+- Dining availability → RTK `checkAvailability` (no hardcoded localhost)
+
+## Local `.env.local` (optional)
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
 ```
 
-On Vercel production, either leave the var unset (code default) or set:
+## Vercel production
+
+Leave unset, or:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://bookmybota-backend.onrender.com/api
 ```
 
-## Backend CORS (required for localhost → Render)
+Never set localhost on the live frontend. Rebuild after changing `NEXT_PUBLIC_*`.
 
-Render currently only reflected `https://bookmybota-frontend.vercel.app`, so `http://localhost:3000` got CORS errors.
+## Backend
 
-`backend/src/server.ts` now allows:
-
-- `CORS_ORIGINS` / `APP_PUBLIC_URL` env values
-- `https://bookmybota-frontend.vercel.app`
-- any `http://localhost:<port>` / `http://127.0.0.1:<port>`
-
-**You must redeploy the backend on Render** for this CORS fix to apply live.
-
-On Render, set env if needed:
-
-```env
-CORS_ORIGINS=https://bookmybota-frontend.vercel.app,http://localhost:3000
-APP_PUBLIC_URL=https://bookmybota-frontend.vercel.app
-```
-
-## Before deploy
-
-1. Frontend production uses Render API URL (env or code default)
-2. Backend CORS allows Vercel + localhost
-3. Rebuild frontend after changing `NEXT_PUBLIC_*`
-4. Redeploy backend after CORS changes
-
-## Release note
-
-Dev uses localhost API; production uses Render API. Backend CORS allows Vercel + localhost. RTK Query endpoint logic unchanged.
+- Upload route returns `/uploads/<file>` (not an absolute localhost URL)
+- CORS allows Vercel + localhost ports (see `backend/src/server.ts`)
+- On Render set `APP_PUBLIC_URL` to the live frontend URL for emails

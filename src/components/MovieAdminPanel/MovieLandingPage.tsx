@@ -81,7 +81,6 @@ export default function MovieLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
-      showBackButton
       loginHref="/movie/login"
       expectedRole="movie_admin"
       loginTitle="Movie Admin Login"

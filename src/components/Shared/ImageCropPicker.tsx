@@ -11,6 +11,7 @@ import ReactCrop, {
 } from "react-image-crop";
 import { Pencil, X } from "lucide-react";
 import { enforceAspectCrop } from "@/lib/imageCropAspect";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import "react-image-crop/dist/ReactCrop.css";
 import "./ImageCropPicker.css";
 
@@ -312,12 +313,12 @@ export function CroppedImageField({
     <>
       <div className={`relative overflow-hidden border border-slate-200 ${previewClassName}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={value} alt="" className="w-full h-full object-cover" />
+        <img src={resolveMediaUrl(value)} alt="" className="w-full h-full object-cover" />
         {!disabled && (
           <div className="absolute inset-x-0 bottom-0 flex gap-1 p-1.5 bg-gradient-to-t from-black/70 to-transparent">
             <button
               type="button"
-              onClick={() => setSrc(value)}
+              onClick={() => setSrc(resolveMediaUrl(value))}
               className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-white/90 text-slate-800 text-[11px] font-semibold py-1"
             >
               <Pencil size={12} /> Edit

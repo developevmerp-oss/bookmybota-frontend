@@ -30,6 +30,7 @@ import {
   type MovieShowtimeTierPrice,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 
 const FORMAT_OPTIONS = ["2D", "3D", "IMAX 2D", "IMAX 3D", "4DX", "Dolby Cinema", "ScreenX"];
@@ -461,7 +462,7 @@ export default function MovieShowtimesPage() {
                     <div className="w-14 h-20 rounded-lg overflow-hidden bg-zinc-800 shrink-0 border border-white/10">
                       {st.movie_poster_url ? (
                         <img
-                          src={st.movie_poster_url}
+                          src={resolveMediaUrl(st.movie_poster_url)}
                           alt={st.movie_title || "Movie"}
                           className="w-full h-full object-cover"
                         />

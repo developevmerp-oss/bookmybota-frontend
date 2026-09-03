@@ -18,6 +18,7 @@ import {
 } from "@/services/api";
 import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import images from "@/Images";
 import { EventPosterCard, ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
@@ -442,10 +443,11 @@ export default function PublicEventsPage() {
   const headingCity = city || "Ethiopia";
   const hasOfferHero = offerHeroEvents.length > 0;
   const activeHeroEvent = hasOfferHero ? offerHeroEvents[heroSlideIndex] : null;
-  const activeHeroSrc =
+  const activeHeroSrc = resolveMediaUrl(
     activeHeroEvent?.poster_horizontal_url ||
-    activeHeroEvent?.poster_vertical_url ||
-    "";
+      activeHeroEvent?.poster_vertical_url ||
+      ""
+  );
 
   const categoriesPanel = () => (
     <div className="flex flex-wrap gap-2">

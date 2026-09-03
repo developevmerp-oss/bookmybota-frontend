@@ -7,6 +7,7 @@ import { useGetPartnerMovieCatalogQuery } from "@/services/api";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const STATUS_LABEL: Record<string, string> = {
   coming_soon: "Coming soon",
@@ -66,7 +67,7 @@ export default function MovieCatalogBrowsePage() {
               <div className="aspect-[2/3] bg-zinc-900">
                 {movie.poster_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={movie.poster_url} alt={movie.title} className="w-full h-full object-cover" />
+                  <img src={resolveMediaUrl(movie.poster_url)} alt={movie.title} className="w-full h-full object-cover" />
                 ) : null}
               </div>
               <div className="p-4 space-y-1">

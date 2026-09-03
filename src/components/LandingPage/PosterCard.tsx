@@ -5,6 +5,7 @@ import { Building2, Calendar, Star } from "lucide-react";
 import type { Business, PublicEvent, PublicRegisteredPartner } from "@/services/api";
 import { useGetPublicEventQuery } from "@/services/api";
 import { normalizePriceRange } from "@/lib/currencyFormat";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
   eventPortrait,
   eventLandscape,
@@ -216,7 +217,9 @@ export function VenuePosterCard({
   const widthClass = fillSlot
     ? "w-full"
     : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px]";
-  const image = venue.cover_image_url?.trim() || "";
+  const image = venue.cover_image_url?.trim()
+    ? resolveMediaUrl(venue.cover_image_url.trim())
+    : "";
   const placeLine = venuePlaceLine(venue);
   const venueType = venue.type_name?.trim() || "Venue";
 
@@ -266,7 +269,7 @@ export function MusicEventCard({ event, city }: { event: PublicEvent; city?: str
 
 export function DiningPosterCard({ place }: { place: Business }) {
   const adaptive = useAdaptiveCard();
-  const image = place.cover_image_url || "";
+  const image = resolveMediaUrl(place.cover_image_url) || "";
   const rating = Number(place.rating);
   const showRating = Number.isFinite(rating) && rating > 0;
   const locality = localityFromAddress(place.address);

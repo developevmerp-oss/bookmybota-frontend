@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
 import HomeHeader from "@/components/LandingPage/HomeHeader";
+import PartnerAuthHeader from "@/components/Shared/PartnerAuthHeader";
 import { isArtistAdminPath, isMovieAdminPath, isVenueAdminPath } from "@/lib/authStorage";
 
 const roboto = Roboto({
@@ -90,13 +91,18 @@ export default function RootLayout({
   const isVenueRegister = pathname === "/venue/register";
   const isArtistRegister = pathname === "/artist/register";
   const isBusinessRegister = pathname === "/business/register";
-  /** Public partner register pages use the main customer HomeHeader */
-  const isPartnerRegisterPage =
-    isOrganizerRegister || isVenueRegister || isArtistRegister || isBusinessRegister;
   const isMovieRegister = pathname === "/movie/register";
+  /** Partner register pages use the minimal logo + Login bar (not customer HomeHeader). */
+  const isPartnerRegisterPage =
+    isOrganizerRegister ||
+    isVenueRegister ||
+    isArtistRegister ||
+    isBusinessRegister ||
+    isMovieRegister;
   const isVenueLogin = pathname === "/venue/login";
   const isArtistLogin = pathname === "/artist/login";
   const isMovieLogin = pathname === "/movie/login";
+  const isBusinessLogin = pathname === "/business/login";
   /** Partner login/register keep the public navbar (same as organizer register). */
   const isPartnerPublicAuth =
     isOrganizerRegister ||
@@ -107,9 +113,12 @@ export default function RootLayout({
     isArtistLogin ||
     isMovieLogin;
 
+  /** Minimal logo + Login bar (List Your Show style) — not customer HomeHeader. */
+  const isPartnerMinimalHeaderPage = isPartnerRegisterPage || isBusinessLogin;
+
   const isAdminOrBusiness =
-    pathname?.startsWith("/admin") ||
-    (Boolean(pathname?.startsWith("/business")) && !isBusinessRegister) ||
+    Boolean(pathname?.startsWith("/admin")) ||
+    (Boolean(pathname?.startsWith("/business")) && !isBusinessRegister && !isBusinessLogin) ||
     ((isArtistAdminPath(pathname || "") && !isArtistRegister && !isArtistLogin) && !isArtistRegister) ||
     ((isVenueAdminPath(pathname || "") && !isVenueRegister) && !isVenueRegister && !isVenueLogin) ||
     (isMovieAdminPath(pathname || "") && !isMovieRegister && !isMovieLogin) ||
@@ -127,18 +136,19 @@ export default function RootLayout({
     pathname === "/business/login" ||
     pathname === "/organizer/login" ||
     pathname === "/movie/login" ||
-
     pathname === "/venue/login" ||
     pathname === "/artist/login" ||
-    isOrganizerRegister ||
-    isVenueRegister ||
-    isArtistRegister;
+    isPartnerRegisterPage ||
     isPartnerPublicAuth;
-    isPartnerRegisterPage;
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
   const isListYourShowPage =
     pathname === "/list-your-show" || Boolean(pathname?.startsWith("/list-your-show/"));
-  const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow && !isListYourShowPage;
+  const showPublicHeader =
+    !isAdminOrBusiness &&
+    !isEventBookingFlow &&
+    !isListYourShowPage &&
+    !isPartnerMinimalHeaderPage;
+  const showPartnerAuthHeader = isPartnerMinimalHeaderPage;
   const showLayoutFooter =
     showPublicHeader &&
     !isLandingPage &&
@@ -165,7 +175,7 @@ export default function RootLayout({
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={roboto.className}>
         <StoreProvider>
-          {showPublicHeader && <HomeHeader />}
+          {showPartnerAuthHeader ? <PartnerAuthHeader /> : showPublicHeader ? <HomeHeader /> : null}
           <main className={isEventBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
             {children}
             {showLayoutFooter && <Footer />}

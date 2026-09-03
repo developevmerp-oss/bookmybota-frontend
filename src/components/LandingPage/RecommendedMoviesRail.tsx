@@ -2,127 +2,93 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Star, ThumbsUp } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useGetPublicMoviesQuery, type Movie } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { SHOWCASE_MOVIE_CARDS, type ShowcaseMovieCard } from "@/data/showcaseMovieCards";
 import "./RecommendedMoviesRail.css";
 
-type MovieCardData = {
+const VISIBLE = 5;
+const MOVIES_HOME_HREF = "/movies";
+
+type RailMovieCard = {
   id: string;
   title: string;
-  genres: string;
   poster: string;
-  promoted?: boolean;
-  rating?: string;
-  votes?: string;
-  likes?: string;
+  certification?: string;
+  language?: string;
+  comingSoon?: boolean;
+  href: string;
 };
 
-/** Static showcase data for the landing Recommended Movies rail. */
-export const RECOMMENDED_MOVIES: MovieCardData[] = [
-  {
-    id: "1",
-    title: "Awarapan 2",
-    genres: "Action/Crime/Romantic",
-    poster: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&h=750&fit=crop&q=80",
-    promoted: true,
-    rating: "8.2/10",
-    votes: "55.6K+ Votes",
-  },
-  {
-    id: "2",
-    title: "Batwara 1947",
-    genres: "Action/Drama/Period",
-    poster: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=500&h=750&fit=crop&q=80",
-    rating: "7.9/10",
-    votes: "12.1K+ Votes",
-  },
-  {
-    id: "3",
-    title: "Insidious: Out of The Further",
-    genres: "Horror/Thriller",
-    poster: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=500&h=750&fit=crop&q=80",
-    rating: "8.9/10",
-    votes: "470+ Votes",
-  },
-  {
-    id: "4",
-    title: "Spider-Man: Brand New Day",
-    genres: "Action/Adventure/Sci-Fi",
-    poster: "https://images.unsplash.com/photo-1635805737707-575885ab0820?w=500&h=750&fit=crop&q=80",
-    rating: "8.9/10",
-    votes: "314K+ Votes",
-  },
-  {
-    id: "5",
-    title: "PAW Patrol: The Dino Movie",
-    genres: "Adventure/Animation/Comedy",
-    poster: "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=500&h=750&fit=crop&q=80",
-    likes: "6.8K+ Likes",
-  },
-  {
-    id: "6",
-    title: "The Night Express",
-    genres: "Thriller/Mystery",
-    poster: "https://images.unsplash.com/photo-1440404653325-ab127d49abb1?w=500&h=750&fit=crop&q=80",
-    rating: "8.1/10",
-    votes: "22.4K+ Votes",
-  },
-  {
-    id: "7",
-    title: "Desert Mirage",
-    genres: "Drama/Adventure",
-    poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500&h=750&fit=crop&q=80",
-    rating: "7.5/10",
-    votes: "9.2K+ Votes",
-  },
-];
+function mapApiMovie(movie: Movie): RailMovieCard {
+  return {
+    id: movie.id,
+    title: movie.title,
+    poster: resolveMediaUrl(movie.poster_url),
+    certification: movie.certificate?.trim() || undefined,
+    language: (movie.languages || []).join(", ") || undefined,
+    comingSoon: movie.status === "coming_soon",
+    href: `/movies/${movie.slug || movie.id}`,
+  };
+}
 
-const VISIBLE = 5;
+function mapShowcaseMovie(movie: ShowcaseMovieCard): RailMovieCard {
+  return {
+    id: movie.id,
+    title: movie.title,
+    poster: movie.poster,
+    certification: movie.certification,
+    language: movie.language,
+    comingSoon: movie.comingSoon,
+    href: movie.href,
+  };
+}
 
-function MovieCard({ movie }: { movie: MovieCardData }) {
+function MovieCard({ movie }: { movie: RailMovieCard }) {
   return (
-    <article className="movies-rail-slot group">
-      <div className="relative overflow-hidden rounded-t-lg bg-[#111111]">
-        <div className="aspect-[2/3] w-full overflow-hidden">
-          <img
-            src={movie.poster}
-            alt={movie.title}
-            className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-            loading="lazy"
-            draggable={false}
-          />
-        </div>
-        {movie.promoted && (
-          <span className="absolute top-2 right-2 rounded-full bg-[#6900AA] px-2 py-0.5 type-card-caption font-bold uppercase tracking-wide text-white">
-            Promoted
-          </span>
-        )}
-        <div className="flex items-center gap-1.5 bg-[#111111] px-2.5 py-1.5 text-white">
-          {movie.likes ? (
-            <>
-              <ThumbsUp size={14} className="shrink-0 text-[#22C55E]" fill="currentColor" />
-              <span className="type-card-caption font-medium truncate">{movie.likes}</span>
-            </>
+    <Link href={movie.href} className="movies-rail-slot group block">
+      <div className="relative overflow-hidden rounded-xl bg-[#F3F4F6]">
+        <div className="aspect-[2/3] w-full overflow-hidden rounded-xl">
+          {movie.poster ? (
+            <img
+              src={movie.poster}
+              alt={movie.title}
+              className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+              loading="lazy"
+              draggable={false}
+            />
           ) : (
-            <>
-              <Star size={14} className="shrink-0 text-[#6900AA]" fill="currentColor" />
-              <span className="type-card-caption font-semibold shrink-0">{movie.rating}</span>
-              <span className="type-card-caption text-white/80 truncate">{movie.votes}</span>
-            </>
+            <div className="h-full w-full bg-slate-200" />
           )}
         </div>
+        {movie.comingSoon ? (
+          <span className="absolute top-2 right-2 z-[2] rounded-full border border-green-500/40 bg-green-50 px-2 py-0.5 type-card-caption font-bold uppercase tracking-wide text-green-700">
+            Coming Soon
+          </span>
+        ) : null}
       </div>
-      <h3 className="mt-2.5 type-card-title font-semibold text-[#111111] line-clamp-2 leading-snug">
+      <h3 className="mt-2.5 type-card-title font-semibold text-[#111111] line-clamp-2 leading-snug group-hover:text-[#6900AA] transition-colors">
         {movie.title}
       </h3>
-      <p className="mt-1 type-card-body text-[#6B6B6B] line-clamp-1">{movie.genres}</p>
-    </article>
+      {movie.certification ? (
+        <p className="mt-1 type-card-body text-[#6B6B6B] line-clamp-1">{movie.certification}</p>
+      ) : null}
+      {movie.language ? (
+        <p className="mt-0.5 type-card-body text-[#6B6B6B] line-clamp-1">{movie.language}</p>
+      ) : null}
+    </Link>
   );
 }
 
 export default function RecommendedMoviesRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [RECOMMENDED_MOVIES.length]);
+  const { data, isLoading } = useGetPublicMoviesQuery({ limit: 12 });
+  const apiMovies = (data?.items ?? []).map(mapApiMovie);
+  const useStatic = !isLoading && apiMovies.length === 0;
+  const items = useStatic ? SHOWCASE_MOVIE_CARDS.map(mapShowcaseMovie) : apiMovies;
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [items.length, useStatic, isLoading]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -138,7 +104,7 @@ export default function RecommendedMoviesRail() {
             Recommended Movies
           </h2>
           <Link
-            href="/events"
+            href={MOVIES_HOME_HREF}
             className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
           >
             See All ›
@@ -157,15 +123,30 @@ export default function RecommendedMoviesRail() {
             </button>
           )}
 
-          <div
-            ref={scrollerRef}
-            className="movies-rail"
-            style={{ ["--movies-visible" as string]: VISIBLE }}
-          >
-            {RECOMMENDED_MOVIES.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div
+              className="movies-rail"
+              style={{ ["--movies-visible" as string]: VISIBLE }}
+            >
+              {Array.from({ length: VISIBLE }).map((_, i) => (
+                <div key={i} className="movies-rail-slot">
+                  <div className="aspect-[2/3] w-full rounded-xl bg-[#F7F7F7]" />
+                  <div className="mt-3 h-4 w-4/5 rounded bg-[#F7F7F7]" />
+                  <div className="mt-2 h-3 w-2/5 rounded bg-[#F7F7F7]" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              ref={scrollerRef}
+              className="movies-rail"
+              style={{ ["--movies-visible" as string]: VISIBLE }}
+            >
+              {items.map((movie) => (
+                <MovieCard key={movie.id} movie={movie} />
+              ))}
+            </div>
+          )}
 
           {scrollEdges.right && (
             <button

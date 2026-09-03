@@ -168,7 +168,6 @@ export default function VenueLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
-      showBackButton
       loginHref="/venue/login"
       expectedRole="venue_admin"
       loginTitle="Venue Admin Login"

@@ -52,6 +52,7 @@ import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferLabel } from "@/lib/diningOffers";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useAppSelector } from "@/lib/hooks";
 import {
   DEFAULT_DINING_FILTERS,
@@ -631,7 +632,8 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
     return "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
   };
 
-  const imageSrc = restaurant.cover_image_url || getFallbackImageForType(restaurant.type_name);
+  const imageSrc =
+    resolveMediaUrl(restaurant.cover_image_url) || getFallbackImageForType(restaurant.type_name);
   const rating = Number(restaurant.rating || 4.2).toFixed(1);
   const cuisine =
     restaurant.cuisine ||
@@ -781,7 +783,7 @@ function CollectionCard({
       className="relative shrink-0 w-[200px] h-[268px] sm:w-[220px] sm:h-[300px] lg:w-[236px] lg:h-[320px] rounded-2xl overflow-hidden cursor-pointer group shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block"
     >
       <img
-        src={collection.image_url || "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80"}
+        src={resolveMediaUrl(collection.image_url) || "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80"}
         alt={collection.title}
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         onError={(e) => {
@@ -1283,7 +1285,7 @@ export default function Home() {
       const match = sectionPool.find((b) =>
         (b.cuisine || "").toLowerCase().includes(name.toLowerCase())
       );
-      return match?.cover_image_url || "";
+      return resolveMediaUrl(match?.cover_image_url) || "";
     };
 
     const pushKnown = (known: (typeof EXPLORE_CUISINES)[number], displayName?: string) => {
@@ -1322,7 +1324,7 @@ export default function Home() {
       cards.push({
         name: master.name,
         tags: known?.tags || "Fresh • Tasty • Popular",
-        image: master.image_url || coverForCuisine(master.name) || known?.image || CUISINE_IMAGE_FALLBACK,
+        image: resolveMediaUrl(master.image_url) || coverForCuisine(master.name) || known?.image || CUISINE_IMAGE_FALLBACK,
         accent: theme.accent,
         blob: theme.blob,
         icon: known?.icon || theme.icon,

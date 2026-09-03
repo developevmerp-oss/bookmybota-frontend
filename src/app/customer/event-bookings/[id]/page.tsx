@@ -27,6 +27,7 @@ import { formatMoney } from "@/lib/currencyFormat";
 import { buildEventTicketPdf, downloadPdfBlob, shortBookingCode } from "@/lib/eventTicketPdf";
 import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
 import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 function formatDateLine(iso?: string) {
   if (!iso) return "";
@@ -83,7 +84,9 @@ export default function EventBookingDetailPage({
     () => (booking ? shortBookingCode(booking.id) : ""),
     [booking]
   );
-  const poster = booking?.poster_horizontal_url || booking?.poster_vertical_url;
+  const poster = resolveMediaUrl(
+    booking?.poster_horizontal_url || booking?.poster_vertical_url
+  );
   const venue = [booking?.venue_name, booking?.venue_address].filter(Boolean).join(", ");
   const ticketTypeLabel = booking?.items?.[0]?.ticket_type || "Ticket";
   const ticketCount = booking?.ticket_qty || 0;

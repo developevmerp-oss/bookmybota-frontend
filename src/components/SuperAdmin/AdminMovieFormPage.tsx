@@ -217,6 +217,9 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
 
     const primaryTrailerUrl = cleanTrailers.length > 0 ? cleanTrailers[0].trailer_url : null;
 
+    // Public landing + partner catalog only list active now_showing / coming_soon titles.
+    const isPublicStatus = form.status === "now_showing" || form.status === "coming_soon";
+
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -233,6 +236,7 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
       cast: serializeMovieCastCrew(castMembers),
       crew: serializeMovieCastCrew(crewMembers),
       status: form.status,
+      is_active: isPublicStatus,
     };
     try {
       if (isEdit && movieId) {

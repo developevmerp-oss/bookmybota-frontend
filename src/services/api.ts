@@ -9,14 +9,13 @@
  * - 401 session errors (expired/invalid token, ACCOUNT_DISABLED): handleAuthSessionFailure in authSession
  * - SessionGuard: triggers GET /auth/me; logout on failure via authSession
  *
- * Base URL:
- * - Prefer NEXT_PUBLIC_API_BASE_URL when set
- * - Else development → http://localhost:5000/api
- * - Else production → https://bookmybota-backend.onrender.com/api
+ * Base URL: see `@/lib/apiBaseUrl` (env → local vs live).
  */
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
+import { getApiBaseUrl } from '@/lib/apiBaseUrl';
+import { extractUploadUrl } from '@/lib/mediaUrl';
 import { storageKeysForPath } from '@/lib/authStorage';
 import {
   handleAuthSessionFailure,
@@ -39,21 +38,7 @@ import {
 
 export type { PaginationMeta, PaginatedList, PagedQuery } from '@/lib/pagination';
 
-const LOCAL_API_BASE_URL = 'http://localhost:5000/api';
-const PRODUCTION_API_BASE_URL = 'https://bookmybota-backend.onrender.com/api';
-
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  (process.env.NODE_ENV === 'production' ? PRODUCTION_API_BASE_URL : LOCAL_API_BASE_URL);
-
-if (
-  process.env.NODE_ENV === 'production' &&
-  /localhost|127\.0\.0\.1/i.test(BASE_URL)
-) {
-  console.warn(
-    '[api] NEXT_PUBLIC_API_BASE_URL still points at localhost in production. Set a real API host before deploying.'
-  );
-}
+// API host resolved per request via getApiBaseUrl() in baseQuery.
 
 // ─── Type Definitions ────────────────────────────────────────────────────────
 
@@ -1849,27 +1834,40 @@ export interface AuthUser {
 
 // ─── RTK Query API ────────────────────────────────────────────────────────────
 
-const rawBaseQuery = fetchBaseQuery({
-    baseUrl: BASE_URL,
-    prepareHeaders: (headers) => {
-      if (typeof window !== 'undefined') {
-      // Same rules as before: /admin|/organizer|/business|/customer → role token; else customer.
-      const { tokenKey } = storageKeysForPath(window.location.pathname);
-        const token = localStorage.getItem(tokenKey);
-        if (token) {
-          headers.set('Authorization', `Bearer ${token}`);
-        }
-      }
-      return headers;
-    },
-});
+const prepareApiHeaders = (headers: Headers) => {
+  if (typeof window !== 'undefined') {
+    // Same rules as before: /admin|/organizer|/business|/customer → role token; else customer.
+    const { tokenKey } = storageKeysForPath(window.location.pathname);
+    const token = localStorage.getItem(tokenKey);
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
+  return headers;
+};
+
+let cachedApiBaseUrl = '';
+let cachedRawBaseQuery: ReturnType<typeof fetchBaseQuery> | null = null;
+
+function getRawBaseQuery() {
+  const baseUrl = getApiBaseUrl();
+  if (cachedRawBaseQuery && cachedApiBaseUrl === baseUrl) {
+    return cachedRawBaseQuery;
+  }
+  cachedApiBaseUrl = baseUrl;
+  cachedRawBaseQuery = fetchBaseQuery({
+    baseUrl,
+    prepareHeaders: prepareApiHeaders,
+  });
+  return cachedRawBaseQuery;
+}
 
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
   args,
   api,
   extraOptions
 ) => {
-  const result = await rawBaseQuery(args, api, extraOptions);
+  const result = await getRawBaseQuery()(args, api, extraOptions);
   if (result.error && typeof window !== 'undefined') {
     const path = window.location.pathname;
     const url = typeof args === 'string' ? args : args.url;
@@ -5629,8 +5627,8 @@ export const api = createApi({
         body: formData,
       }),
       transformResponse: (res: { url?: string; data?: { url?: string } }) => {
-        const url = res?.url || res?.data?.url || '';
-        return { url };
+        // Persist host-stable /uploads/... paths (not localhost/live absolute URLs).
+        return { url: extractUploadUrl(res) || res?.url || res?.data?.url || "" };
       },
       invalidatesTags: [],
     }),
@@ -5722,6 +5720,7 @@ export const {
   useGetCustomerBookingsQuery,
   useGetBookingByIdQuery,
   useCheckAvailabilityQuery,
+  useLazyCheckAvailabilityQuery,
   useCreateBookingMutation,
   usePhoneLoginMutation,
   useGetCustomerProfileQuery,

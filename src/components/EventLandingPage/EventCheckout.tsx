@@ -1743,7 +1743,7 @@ export default function EventCheckout({
                         {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
                       </p>
                       <p className="text-[1.25rem] font-extrabold text-slate-900 leading-tight">
-                        {formatMoney(grandTotal, { compact: true })}
+                        {formatMoney(ticketAmount, { compact: true })}
                       </p>
                     </div>
                     <button
@@ -1783,7 +1783,7 @@ export default function EventCheckout({
                       {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
                     </p>
                     <p className="text-[1.25rem] font-extrabold text-slate-900">
-                      {formatMoney(grandTotal, { compact: true })}
+                      {formatMoney(ticketAmount, { compact: true })}
                     </p>
                   </div>
                 </div>

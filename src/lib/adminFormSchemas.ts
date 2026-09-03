@@ -79,6 +79,8 @@ export const partnerOnboardSchema = yup.object({
   description: yup.string().trim().default(''),
   parent_type_id: yup.string().required('Please select a parent type.'),
   venue_type_id: yup.string().default(''),
+  country: yup.string().default(''),
+  city_id: yup.string().default(''),
   admin_email: yup
     .string()
     .trim()
@@ -165,6 +167,7 @@ export const adminEventGenreCreateSchema = yup.object({
   category_type_id: yup.string().required('Please select a category.'),
   name: yup.string().trim().required('Genre name is required.'),
 });
+export type AdminEventGenreCreateValues = yup.InferType<typeof adminEventGenreCreateSchema>;
 
 export const adminPlatformOfferSchema = yup.object({
   name: yup.string().trim().required('Offer name is required.'),
@@ -178,7 +181,7 @@ export const adminPlatformOfferSchema = yup.object({
     .min(0, 'Value cannot be negative.'),
   max_discount: yup.string().default(''),
   min_order_amount: yup.string().default('0'),
-  category: yup.mixed<'ALL' | 'EVENTS' | 'DINING'>().oneOf(['ALL', 'EVENTS', 'DINING']).required(),
+  category: yup.mixed<'ALL' | 'EVENTS' | 'DINING' | 'MOVIES'>().oneOf(['ALL', 'EVENTS', 'DINING', 'MOVIES']).required(),
   apply_to: yup
     .mixed<'ENTIRE_CATEGORY' | 'SELECTED_ITEMS'>()
     .oneOf(['ENTIRE_CATEGORY', 'SELECTED_ITEMS'])
@@ -196,6 +199,7 @@ export const adminPlatformOfferSchema = yup.object({
   sort_order: yup.string().default('0'),
   event_ids: yup.array().of(yup.string().required()).default([]),
   restaurant_ids: yup.array().of(yup.string().required()).default([]),
+  movie_ids: yup.array().of(yup.string().required()).default([]),
 });
 export type AdminPlatformOfferValues = yup.InferType<typeof adminPlatformOfferSchema>;
 
@@ -251,4 +255,23 @@ export type AdminMarketingCampaignValues = yup.InferType<typeof adminMarketingCa
 export type AdminPayoutValues = yup.InferType<typeof adminPayoutSchema>;
 export type AdminPartnerDocumentCreateValues = yup.InferType<typeof adminPartnerDocumentCreateSchema>;
 export type AdminPartnerTermCreateValues = yup.InferType<typeof adminPartnerTermCreateSchema>;
-export type AdminEventGenreCreateValues = yup.InferType<typeof adminEventGenreCreateSchema>;
+export const adminMovieMasterCreateSchema = yup.object({
+  name: yup.string().trim().required('Name is required.'),
+  description: yup.string().trim().optional(),
+});
+
+export type AdminMovieMasterCreateValues = yup.InferType<typeof adminMovieMasterCreateSchema>;
+
+export const adminMovieMasterFormSchema = yup.object({
+  name: yup.string().trim().required('Name is required.'),
+  description: yup.string().trim().optional(),
+  sort_order: yup
+    .number()
+    .typeError('Sort order must be a number.')
+    .integer('Sort order must be a whole number.')
+    .min(0, 'Sort order cannot be negative.')
+    .default(0),
+  is_active: yup.boolean().default(true),
+});
+
+export type AdminMovieMasterFormValues = yup.InferType<typeof adminMovieMasterFormSchema>;

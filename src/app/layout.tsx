@@ -136,13 +136,16 @@ export default function RootLayout({
     isPartnerPublicAuth;
     isPartnerRegisterPage;
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
-  const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow;
+  const isListYourShowPage =
+    pathname === "/list-your-show" || Boolean(pathname?.startsWith("/list-your-show/"));
+  const showPublicHeader = !isAdminOrBusiness && !isEventBookingFlow && !isListYourShowPage;
   const showLayoutFooter =
     showPublicHeader &&
     !isLandingPage &&
     !isAuthPage &&
     !isEventsPublicPage &&
-    !isOrganizerMarketingPage;
+    !isOrganizerMarketingPage &&
+    !isListYourShowPage;
 
   useEffect(() => {
     window.scrollTo(0, 0);

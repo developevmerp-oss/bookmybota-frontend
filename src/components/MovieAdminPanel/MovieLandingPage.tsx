@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
+import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
+import { PARTNER_CATEGORY_TYPES } from "@/data/partnerCategoryTypes";
 
 const FEATURE_SLIDES = [
   {
@@ -46,6 +48,8 @@ const FEATURE_SLIDES = [
   },
 ];
 
+const HERO_IMAGE = FEATURE_SLIDES[0].image;
+
 const CINEMA_TYPES = [
   { label: "Multiplex", infoId: "movie.host.multiplex", Icon: Film },
   { label: "Single Screen", infoId: "movie.host.single", Icon: Clapperboard },
@@ -75,6 +79,10 @@ export default function MovieLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
+      centeredPartnerHeader
+      showBackButton
+      loginHref="/movie/login"
       expectedRole="movie_admin"
       loginTitle="Movie Admin Login"
       loginSubtitle="Sign in to manage your cinema listings"
@@ -87,18 +95,17 @@ export default function MovieLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="Register your cinema"
-      secondaryLoginLabel="Movie Admin Login"
-      slides={FEATURE_SLIDES}
-      hostTitle="What can you list?"
-      hostSubtitle="From multiplex chains to independent screens, Book My Bota helps cinema partners onboard, get approved, and manage movie listings from one portal."
-      hostTiles={CINEMA_TYPES}
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
+      heroImage={HERO_IMAGE}
+      heroImageAlt="Movie partner on Book My Bota"
+      imageCards={PARTNER_VENUE_TYPE_CARDS}
+      categoryTypesTitle={`${PARTNER_CATEGORY_TYPES.movie.title} Types`}
+      categoryTypes={PARTNER_CATEGORY_TYPES.movie.types}
       servicesTitle="What can you do in the portal?"
       servicesSubtitle="The movie admin panel follows the same onboarding and approval flow as event organizers — register, upload documents, wait for approval, then manage your cinema."
       servicesTiles={SERVICES}
       servicesFootnote="Movie listing, showtime, and booking tools will expand in this panel as the cinema module grows on Book My Bota."
-      securityTitle="Secure partner onboarding"
-      securitySubtitle="Your account stays disabled until Super Admin verifies your documents — the same trusted flow used for event organizers."
       loginOpen={loginOpen}
       onOpenLogin={openLogin}
       onCloseLogin={() => setLoginOpen(false)}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Film } from "lucide-react";
 import { useGetPartnerMovieCatalogQuery } from "@/services/api";
 import SearchInput from "@/components/Shared/SearchInput";
@@ -78,6 +79,14 @@ export default function MovieCatalogBrowsePage() {
                 <p className="text-xs text-zinc-400 line-clamp-2">
                   {(movie.languages || []).join(", ") || "—"}
                 </p>
+                <div className="pt-2 border-t border-white/5">
+                  <Link
+                    href={`/movie/showtimes?movie_id=${movie.id}`}
+                    className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 px-3 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-300 text-xs font-bold transition-colors"
+                  >
+                    Schedule Show
+                  </Link>
+                </div>
               </div>
             </article>
           ))}

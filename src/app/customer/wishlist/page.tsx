@@ -1,5 +1,5 @@
-import CustomerDiningWishlistPage from "@/components/DinningLandingPage/CustomerDiningWishlistPage";
+import CustomerWishlistPage from "@/components/Customer/CustomerWishlistPage";
 
 export default function Page() {
-  return <CustomerDiningWishlistPage />;
+  return <CustomerWishlistPage />;
 }

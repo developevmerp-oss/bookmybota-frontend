@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import PartnerDocumentsFields from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import { extractApiError } from "@/lib/apiErrors";
+import { parseContactPerson } from "@/lib/venuePartnerInfo";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import {
   useArchiveBusinessMutation,
@@ -79,6 +80,8 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         ? "Venue type"
         : "Module";
   const typeValue = hasSubtype ? biz?.type_name : isCinema ? "Cinema" : "Event";
+  const contactPerson = parseContactPerson(biz?.description);
+  const aboutVenue = (biz?.description || "").replace(/Contact person:\s*.+/i, "").trim();
   const moduleBadge = isArtist ? "Artist" : isCinema ? "Cinema" : "Event";
 
   const goToList = () => {
@@ -287,6 +290,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
               {biz.phone?.trim() || "—"}
             </p>
           </div>
+          {isVenue && <Field label="Contact person" value={contactPerson} />}
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">Admin email</p>
             <p className="text-white text-sm flex items-center gap-1.5">
@@ -311,7 +315,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
           )}
           {isDining && <Field label="Cuisine" value={biz.cuisine} />}
           <div className="md:col-span-2">
-            <Field label="Description" value={biz.description} />
+            <Field label={isVenue ? "About venue" : "Description"} value={isVenue ? aboutVenue || "—" : biz.description} />
           </div>
         </div>
       </div>

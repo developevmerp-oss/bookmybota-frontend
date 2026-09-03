@@ -17,8 +17,11 @@ import {
   useGetPartnerOnboardingTermsQuery,
   useRegisterBusinessMutation,
   useUploadImageMutation,
+  useGetCitiesQuery,
   type PartnerDocumentUpload,
 } from "@/services/api";
+import VenueLocationFields from "@/components/VenueAdminPanel/VenueLocationFields";
+import { CANONICAL_VENUE_TYPE_SLUGS, VENUE_TYPE_LABELS, defaultVenueMeta, type VenueMeta } from "@/lib/venueCategoryConfig";
 
 type StepId = 1 | 2;
 
@@ -145,6 +148,13 @@ export default function OrganizerAccountSetupForm({
   const [phoneValid, setPhoneValid] = useState(false);
   const [subtypeId, setSubtypeId] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [countryId, setCountryId] = useState<number | "">("");
+  const [cityId, setCityId] = useState<number | "">("");
+  const { data: regCities = [] } = useGetCitiesQuery(
+    countryId ? { country_id: Number(countryId) } : undefined,
+    { skip: !countryId || !["venue", "artist", "event", "cinema"].includes(module) }
+  );
+  const [venueMeta, setVenueMeta] = useState<VenueMeta>(() => defaultVenueMeta());
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -162,9 +172,19 @@ export default function OrganizerAccountSetupForm({
 
   const subtypeOptions = useMemo(() => {
     if (!needsSubtype || moduleParentId == null) return [];
-    return businessTypes
-      .filter((t) => t.module_key === module && t.parent_type_id === moduleParentId)
-      .slice()
+    const bySlug = new Map<string, (typeof businessTypes)[number]>();
+    for (const t of businessTypes) {
+      if (t.module_key !== module || t.parent_type_id !== moduleParentId) continue;
+      const slug = String(t.slug || "").toLowerCase();
+      if (module === "venue" && !CANONICAL_VENUE_TYPE_SLUGS.has(slug)) continue;
+      if (!bySlug.has(slug)) bySlug.set(slug, t);
+    }
+    return Array.from(bySlug.values())
+      .map((t) =>
+        module === "venue"
+          ? { ...t, name: VENUE_TYPE_LABELS[String(t.slug || "").toLowerCase()] || t.name }
+          : t
+      )
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [businessTypes, module, moduleParentId, needsSubtype]);
 
@@ -179,17 +199,24 @@ export default function OrganizerAccountSetupForm({
   }, [needsSubtype, subtypeId, subtypeOptions]);
 
   const step1Valid = useMemo(() => {
-    return (
+    const needsGeo = module === "venue" || module === "artist" || module === "event" || module === "cinema";
+    const hasLocation =
+      module === "artist"
+        ? !!countryId && !!cityId
+        : needsGeo
+          ? orgAddress.trim().length > 1 && !!countryId && !!cityId
+          : orgAddress.trim().length > 1;
+    const base =
       !!moduleParentId &&
       (!needsSubtype || !!subtypeId) &&
       orgName.trim().length > 1 &&
-      orgAddress.trim().length > 1 &&
+      hasLocation &&
       contactName.trim().length > 1 &&
       phoneValid &&
       !!adminEmail.trim() &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim()) &&
-      (module !== "artist" || !!coverImageUrl.trim())
-    );
+      (module !== "artist" || !!coverImageUrl.trim());
+    return base;
   }, [
     moduleParentId,
     needsSubtype,
@@ -201,6 +228,8 @@ export default function OrganizerAccountSetupForm({
     adminEmail,
     module,
     coverImageUrl,
+    countryId,
+    cityId,
   ]);
 
   const canOpenStep = (id: StepId) => (id === 1 ? true : step1Done);
@@ -284,9 +313,14 @@ export default function OrganizerAccountSetupForm({
     setError(null);
     const resolvedTypeId = needsSubtype ? Number(subtypeId) : moduleParentId;
     try {
+      const cityLabel =
+        regCities.find((c) => c.id === Number(cityId))?.name?.trim() || "";
       const data = await registerBusiness({
         business_name: orgName.trim(),
-        address: orgAddress.trim(),
+        address:
+          module === "artist"
+            ? cityLabel
+            : orgAddress.trim(),
         phone: phone.trim(),
         description: `Contact person: ${contactName.trim()}`,
         type_id: resolvedTypeId,
@@ -296,6 +330,21 @@ export default function OrganizerAccountSetupForm({
         cover_image_url: coverImageUrl.trim() || undefined,
         registration_terms_accepted: true,
         registration_terms_version: copy.termsVersion,
+        ...(module === "venue" || module === "artist" || module === "event" || module === "cinema"
+          ? {
+              city_id: Number(cityId),
+              ...(module === "venue"
+                ? {
+                    venue_meta: {
+                      ...venueMeta,
+                      registration: {
+                        country_id: countryId ? Number(countryId) : null,
+                      },
+                    },
+                  }
+                : {}),
+            }
+          : {}),
       }).unwrap();
       setOnboardStatus("success");
       toast.success(data.message || "Registration received");
@@ -325,10 +374,19 @@ export default function OrganizerAccountSetupForm({
         <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">
           <CheckCircle size={32} />
         </div>
-        <h2 className="text-2xl font-bold text-[#111111] mb-2">Registration received</h2>
+        <h2 className="text-2xl font-bold text-[#111111] mb-2">
+          {module === "artist"
+            ? "Artist registration received"
+            : module === "venue"
+              ? "Venue registration received"
+              : "Registration received"}
+        </h2>
         <p className="text-sm text-slate-500 max-w-md mx-auto">
-          Your account is disabled until a Super Admin enables it. Login details will be emailed
-          after approval. Redirecting…
+          {module === "artist"
+            ? "Your artist account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"
+            : module === "venue"
+              ? "Your venue account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"
+              : "Your account is disabled until a Super Admin enables it. Login details will be emailed after approval. Redirecting…"}
         </p>
       </div>
     );
@@ -400,7 +458,7 @@ export default function OrganizerAccountSetupForm({
                       <option value="">
                         {module === "artist"
                           ? "Select artist type (e.g. Singer, Band)"
-                          : "Select venue type (e.g. Banquet Hall, Auditorium)"}
+                          : "Select venue type (Auditorium, Banquet Hall, Stadium, Ground)"}
                       </option>
                       {subtypeOptions.map((t) => (
                         <option key={t.id} value={t.id}>
@@ -428,22 +486,38 @@ export default function OrganizerAccountSetupForm({
                     placeholder={copy.namePlaceholder}
                   />
                 </div>
-                <div>
-                  <label className={labelClass}>
-                    {copy.addressLabel} <span className="text-[#6900AA]">*</span>
-                  </label>
-                  <textarea
-                    value={orgAddress}
-                    onChange={(e) => setOrgAddress(e.target.value)}
-                    className={textareaClass}
-                    placeholder={copy.addressPlaceholder}
-                    rows={3}
-                  />
-                </div>
-                {(module === "artist" || module === "venue") && (
+                {module !== "artist" && (
                   <div>
                     <label className={labelClass}>
-                      {module === "artist" ? "Artist image" : "Venue cover image"}{" "}
+                      {copy.addressLabel} <span className="text-[#6900AA]">*</span>
+                    </label>
+                    <textarea
+                      value={orgAddress}
+                      onChange={(e) => setOrgAddress(e.target.value)}
+                      className={textareaClass}
+                      placeholder={copy.addressPlaceholder}
+                      rows={3}
+                    />
+                  </div>
+                )}
+                {(module === "venue" || module === "artist" || module === "event" || module === "cinema") && (
+                  <VenueLocationFields
+                    countryId={countryId}
+                    cityId={cityId}
+                    onCountryChange={setCountryId}
+                    onCityChange={setCityId}
+                  />
+                )}
+                {(module === "artist" || module === "venue" || module === "event" || module === "cinema") && (
+                  <div>
+                    <label className={labelClass}>
+                      {module === "artist"
+                        ? "Artist image"
+                        : module === "venue"
+                          ? "Venue cover image"
+                          : module === "event"
+                            ? "Organisation cover image"
+                            : "Cinema cover image"}{" "}
                       {module === "artist" ? <span className="text-[#6900AA]">*</span> : null}
                     </label>
                     <CroppedImageField
@@ -469,7 +543,11 @@ export default function OrganizerAccountSetupForm({
                           if (res.url) {
                             setCoverImageUrl(res.url);
                             toast.success(
-                              module === "artist" ? "Artist image uploaded" : "Image uploaded"
+                              module === "artist"
+                                ? "Artist image uploaded"
+                                : module === "event"
+                                  ? "Organisation image uploaded"
+                                  : "Image uploaded"
                             );
                           }
                         } catch (err) {
@@ -484,7 +562,9 @@ export default function OrganizerAccountSetupForm({
                               ? "Uploading…"
                               : module === "artist"
                                 ? "Upload artist image"
-                                : "Add photo"}
+                                : module === "event"
+                                  ? "Upload organisation image"
+                                  : "Add photo"}
                           </span>
                         </>
                       }
@@ -492,7 +572,11 @@ export default function OrganizerAccountSetupForm({
                     <p className="mt-1.5 text-xs text-slate-400">
                       {module === "artist"
                         ? "Square photo of the artist — shown on public listings and your profile."
-                        : "Shown on the public venue listing and profile page."}
+                        : module === "event"
+                          ? "Shown on your organisation profile and event listings."
+                          : module === "cinema"
+                            ? "Shown on the public cinema listing and profile page."
+                            : "Shown on the public venue listing and profile page."}
                     </p>
                   </div>
                 )}

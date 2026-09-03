@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
-  FaMapMarkerAlt,
   FaSearch,
 } from "react-icons/fa";
 import {
@@ -19,10 +19,20 @@ import {
 import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
 import images from "@/Images";
-import { EventPosterCard } from "@/components/LandingPage/PosterCard";
+import { EventPosterCard, ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import EventHeroSlider from "@/components/EventLandingPage/EventHeroSlider";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
+import {
+  EVENT_CATEGORY_OPTIONS,
+  categorySlugsMatch,
+  isEventCategoryKey,
+  normalizeCategoryParam,
+  resolveCategorySlug,
+  resolveCategoryKeyFromSlug,
+  type EventCategoryKey,
+} from "@/lib/eventCategories";
+import { SHOWCASE_EVENT_CARDS, showcaseCardsForCategories } from "@/data/showcaseEventCards";
 
 function imageSrc(img: string | { src: string }) {
   return typeof img === "string" ? img : img.src;
@@ -50,43 +60,15 @@ const EVENT_HERO_SLIDES = [
 const PAGE_SIZE = 8;
 const EMPTY_EVENTS: PublicEvent[] = [];
 const LANG_OPTIONS = ["English", "Amharic"] as const;
-const PRICE_BANDS = [
+const PRICE_BANDS: Array<{ id: string; label: string }> = [
   { id: "free", label: "Free" },
   { id: "0-500", label: "0 - 500" },
   { id: "501-2000", label: "501 - 2000" },
   { id: "2000+", label: "Above 2000" },
-] as const;
-const PRICE_SLIDER_MAX = 2500;
+];
 
 function toIsoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function sliderValueFromBands(bands: string[]) {
-  const band = bands[0];
-  if (band === "free") return 0;
-  if (band === "0-500") return 500;
-  if (band === "501-2000") return 2000;
-  if (band === "2000+") return PRICE_SLIDER_MAX;
-  return PRICE_SLIDER_MAX;
-}
-
-function bandFromSliderValue(value: number) {
-  if (value <= 0) return "free";
-  if (value <= 500) return "0-500";
-  if (value <= 2000) return "501-2000";
-  return "2000+";
-}
-
-function priceLabelFromSlider(value: number) {
-  if (value <= 0) return "Free";
-  if (value >= PRICE_SLIDER_MAX) return `${formatMoney(2000, { compact: true })}+`;
-  return formatMoney(value, { compact: true });
-}
-
-function eventPriceValue(event: PublicEvent) {
-  const raw = Number(event.min_price ?? 0);
-  return Number.isFinite(raw) ? raw : 0;
 }
 
 function FilterTag({
@@ -113,7 +95,7 @@ function FilterTag({
   );
 }
 
-function FilterCard({
+function FilterSection({
   title,
   open,
   onToggle,
@@ -127,8 +109,8 @@ function FilterCard({
   children: ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-      <div className="flex items-center gap-2 px-3 py-3">
+    <div className="border-b border-slate-100 last:border-b-0">
+      <div className="flex items-center gap-2 px-4 py-3">
         <button
           type="button"
           onClick={onToggle}
@@ -138,13 +120,43 @@ function FilterCard({
             size={11}
             className={`shrink-0 transition-transform ${open ? "rotate-180 text-[#6900AA]" : "text-slate-400"}`}
           />
-          <span className={`text-sm font-medium ${open ? "text-[#6900AA]" : "text-slate-800"}`}>{title}</span>
+          <span className={`text-sm font-semibold ${open ? "text-[#6900AA]" : "text-slate-800"}`}>
+            {title}
+          </span>
         </button>
-        <button type="button" onClick={onClear} className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer shrink-0"
+        >
           Clear
         </button>
       </div>
-      {open && <div className="px-3 pb-3">{children}</div>}
+      {open ? <div className="px-4 pb-4">{children}</div> : null}
+    </div>
+  );
+}
+
+function FiltersPanel({
+  onClearAll,
+  children,
+}: {
+  onClearAll: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-100 shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
+        <h3 className="font-bold text-slate-900 text-base">Filters</h3>
+        <button
+          type="button"
+          onClick={onClearAll}
+          className="text-sm font-medium text-[#6900AA] hover:text-[#57008E] cursor-pointer"
+        >
+          Clear All
+        </button>
+      </div>
+      {children}
     </div>
   );
 }
@@ -155,6 +167,9 @@ function EventCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: strin
 
 export default function PublicEventsPage() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
+  const pathname = usePathname() || "/events";
+  const [urlQuery, setUrlQuery] = useState("");
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -165,33 +180,34 @@ export default function PublicEventsPage() {
   const [calTab, setCalTab] = useState<"start" | "end">("start");
   const [calMonth, setCalMonth] = useState(() => new Date());
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [selectedPriceBands, setSelectedPriceBands] = useState<string[]>([]);
   const [openFilters, setOpenFilters] = useState({
     categories: true,
     date: false,
+    city: false,
     languages: false,
     price: false,
   });
   const [sort, setSort] = useState("recommended");
   const [page, setPage] = useState(1);
-  const [venueFilter, setVenueFilter] = useState("");
-  const [browseVenues, setBrowseVenues] = useState(false);
-  const [mobileFilterTab, setMobileFilterTab] = useState<"categories" | "date" | "languages" | "price" | null>(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
-  const [priceSliderValue, setPriceSliderValue] = useState(PRICE_SLIDER_MAX);
 
-  const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
+  const apiCategories = filterOptions?.categories ?? [];
+  const { data: businessTypes = [] } = useGetBusinessTypesQuery("event", {
+    skip: apiCategories.length > 0,
+  });
   const queryArg = useMemo(
     () => ({
       ...(search.trim() ? { q: search.trim() } : {}),
       ...(city ? { city } : {}),
       ...(selectedSlugs.length ? { category: selectedSlugs.join(",") } : {}),
       ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
+      ...(selectedPriceBands.length ? { price: selectedPriceBands.join(",") } : {}),
       ...(datePreset ? { date_preset: datePreset } : {}),
       ...(!datePreset && dateFrom ? { date_from: dateFrom } : {}),
       ...(!datePreset && dateTo ? { date_to: dateTo } : {}),
-      ...(venueFilter ? { organizer: venueFilter } : {}),
       ...(sort && sort !== "recommended" ? { sort } : {}),
     }),
     [
@@ -199,15 +215,43 @@ export default function PublicEventsPage() {
       city,
       selectedSlugs,
       selectedLanguages,
+      selectedPriceBands,
       datePreset,
       dateFrom,
       dateTo,
-      venueFilter,
       sort,
     ]
   );
   const { data: eventsData, isLoading } = useGetPublicEventsQuery(queryArg);
   const events = eventsData ?? EMPTY_EVENTS;
+
+  const categoryPool = useMemo(() => {
+    if (apiCategories.length) return apiCategories;
+    return businessTypes
+      .filter((type) => type.parent_type_id && type.slug)
+      .map((type) => ({ slug: type.slug as string, name: type.name }));
+  }, [apiCategories, businessTypes]);
+
+  const syncCategoryToUrl = (slug: string | null) => {
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : urlQuery
+    );
+    if (slug) params.set("category", slug);
+    else params.delete("category");
+    const qs = params.toString();
+    const nextQuery = qs ? `?${qs}` : "";
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    setUrlQuery(nextQuery);
+  };
+
+  useEffect(() => {
+    const syncUrlQuery = () => {
+      setUrlQuery(window.location.search);
+    };
+    syncUrlQuery();
+    window.addEventListener("popstate", syncUrlQuery);
+    return () => window.removeEventListener("popstate", syncUrlQuery);
+  }, [pathname]);
 
   useEffect(() => {
     const applyCity = () => {
@@ -218,26 +262,97 @@ export default function PublicEventsPage() {
       else if (stored && stored !== "All Cities") setCity(stored);
       else setCity("");
     };
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get("q");
-    const cat = params.get("category");
-    if (q) setSearch(q);
-    if (cat) setSelectedSlugs([cat]);
     applyCity();
     window.addEventListener("selected_city_changed", applyCity);
     return () => window.removeEventListener("selected_city_changed", applyCity);
   }, []);
 
-  const categories = useMemo(
-    () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
-    [businessTypes]
+  useEffect(() => {
+    const params = new URLSearchParams(urlQuery.replace(/^\?/, ""));
+    const catParam = params.get("category");
+    const qParam = params.get("q");
+
+    if (catParam) {
+      setSelectedSlugs([normalizeCategoryParam(catParam, categoryPool)]);
+    } else if (qParam && isEventCategoryKey(qParam)) {
+      setSelectedSlugs([resolveCategorySlug(qParam, categoryPool)]);
+    } else {
+      setSelectedSlugs([]);
+    }
+
+    if (qParam && !isEventCategoryKey(qParam)) {
+      setSearch(qParam);
+    }
+  }, [urlQuery, categoryPool]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const allEvents = await dispatch(
+          api.endpoints.getPublicEvents.initiate(undefined, { forceRefetch: false })
+        ).unwrap();
+
+        const candidates = allEvents.filter(
+          (event) => event.poster_horizontal_url || event.poster_vertical_url
+        );
+
+        const withOffers: PublicEvent[] = [];
+        await Promise.all(
+          candidates.map(async (event) => {
+            if (cancelled) return;
+            try {
+              const offers = await dispatch(
+                api.endpoints.getPublicEventOffers.initiate(event.id, { forceRefetch: false })
+              ).unwrap();
+              if (offers?.length) withOffers.push(event);
+            } catch {
+              // skip events without offers
+            }
+          })
+        );
+
+        if (!cancelled) setOfferHeroEvents(withOffers);
+      } catch {
+        if (!cancelled) setOfferHeroEvents([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch]);
+
+  const categoryFilters = useMemo(
+    () =>
+      EVENT_CATEGORY_OPTIONS.map((opt) => ({
+        slug: resolveCategorySlug(opt.key, categoryPool),
+        name: opt.label,
+      })),
+    [categoryPool]
   );
 
-  const venues = useMemo(() => filterOptions?.organizers || [], [filterOptions?.organizers]);
+  const emptyShowcaseCards = useMemo(() => {
+    if (selectedSlugs.length === 0) return SHOWCASE_EVENT_CARDS;
+    const keys = selectedSlugs
+      .map((slug) => resolveCategoryKeyFromSlug(slug, categoryPool))
+      .filter((key): key is EventCategoryKey => key != null);
+    if (keys.length === 0) return SHOWCASE_EVENT_CARDS;
+    return showcaseCardsForCategories(keys);
+  }, [selectedSlugs, categoryPool]);
 
   const languageOptions = useMemo(() => {
+    if (filterOptions?.languages?.length) return filterOptions.languages;
     return [...LANG_OPTIONS];
-  }, []);
+  }, [filterOptions?.languages]);
+
+  const priceBands = useMemo(() => {
+    if (filterOptions?.price_bands?.length) return filterOptions.price_bands;
+    return PRICE_BANDS;
+  }, [filterOptions?.price_bands]);
+
+  const cityOptions = useMemo(() => filterOptions?.cities ?? [], [filterOptions?.cities]);
 
   const datePresets = filterOptions?.date_presets?.length
     ? filterOptions.date_presets
@@ -248,21 +363,33 @@ export default function PublicEventsPage() {
       ];
   const moreOptions: { id: string; label: string }[] = [];
 
-  const filtered = useMemo(() => {
-    if (priceSliderValue >= PRICE_SLIDER_MAX) return events;
-    return events.filter((event) => eventPriceValue(event) <= priceSliderValue);
-  }, [events, priceSliderValue]);
+  const filtered = events;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   useEffect(() => {
     setPage(1);
-  }, [search, city, selectedSlugs, selectedLanguages, datePreset, dateFrom, dateTo, priceSliderValue, venueFilter, sort]);
+  }, [search, city, selectedSlugs, selectedLanguages, selectedPriceBands, datePreset, dateFrom, dateTo, sort]);
 
   const selectSlug = (slug?: string) => {
     if (!slug) return;
-    setSelectedSlugs((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
+    const isActive = selectedSlugs.some((s) => categorySlugsMatch(s, slug, categoryPool));
+    const next = isActive ? [] : [slug];
+    setSelectedSlugs(next);
+    syncCategoryToUrl(next[0] ?? null);
+  };
+
+  const clearAllFilters = () => {
+    setSelectedSlugs([]);
+    setDatePreset("");
+    setDateFrom("");
+    setDateTo("");
+    setUseDateRange(false);
+    clearCity();
+    setSelectedLanguages([]);
+    setSelectedPriceBands([]);
+    syncCategoryToUrl(null);
   };
 
   const toggleIn = (list: string[], value: string, setter: (next: string[]) => void) => {
@@ -271,6 +398,18 @@ export default function PublicEventsPage() {
 
   const toggleOpen = (key: keyof typeof openFilters) => {
     setOpenFilters((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const clearCity = () => {
+    setCity("");
+    localStorage.setItem("selected_city", "All Cities");
+    window.dispatchEvent(new Event("selected_city_changed"));
+  };
+
+  const selectCity = (cityName: string) => {
+    setCity(cityName);
+    localStorage.setItem("selected_city", cityName);
+    window.dispatchEvent(new Event("selected_city_changed"));
   };
 
   const pickCalendarDay = (day: number) => {
@@ -310,15 +449,41 @@ export default function PublicEventsPage() {
 
   const categoriesPanel = () => (
     <div className="flex flex-wrap gap-2">
-      {categories.map((cat) => (
+      {categoryFilters.map((cat) => (
         <FilterTag
-          key={cat.id}
+          key={cat.slug}
           label={cat.name}
-          active={!!cat.slug && selectedSlugs.includes(cat.slug)}
+          active={selectedSlugs.some((s) => categorySlugsMatch(s, cat.slug, categoryPool))}
           onClick={() => selectSlug(cat.slug)}
         />
       ))}
     </div>
+  );
+
+  const cityPanel = () => (
+    <>
+      {!city && <p className="text-xs text-slate-500 mb-2">All Cities</p>}
+      {city ? (
+        <div className="flex flex-wrap gap-2 mb-2">
+          <FilterTag label={city} active onClick={clearCity} />
+        </div>
+      ) : null}
+      {cityOptions.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {cityOptions.map((cityName) => (
+            <FilterTag
+              key={cityName}
+              label={cityName}
+              active={city === cityName}
+              onClick={() => {
+                if (city === cityName) clearCity();
+                else selectCity(cityName);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 
   const datePanel = () => (
@@ -470,60 +635,74 @@ export default function PublicEventsPage() {
   );
 
   const pricePanel = () => (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-slate-400">Price</span>
-        <span className="text-sm font-semibold text-slate-700">{priceLabelFromSlider(priceSliderValue)}</span>
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={PRICE_SLIDER_MAX}
-        step={50}
-        value={priceSliderValue}
-        onChange={(e) => {
-          setPriceSliderValue(Number(e.target.value));
-        }}
-        className="mt-4 h-2 w-full cursor-pointer accent-[#7A00C6]"
-      />
+    <div className="flex flex-wrap gap-2">
+      {priceBands.map((band) => (
+        <FilterTag
+          key={band.id}
+          label={band.label}
+          active={selectedPriceBands.includes(band.id)}
+          onClick={() => toggleIn(selectedPriceBands, band.id, setSelectedPriceBands)}
+        />
+      ))}
     </div>
   );
 
-  const venueBlock = () => (
+  const filterSections = (
     <>
-      <button
-        type="button"
-        onClick={() => setBrowseVenues((v) => !v)}
-        className="mt-3 w-full border border-[#6900AA] rounded-lg py-2.5 text-sm font-semibold text-[#6900AA] bg-white cursor-pointer"
+      <FilterSection
+        title="Categories"
+        open={openFilters.categories}
+        onToggle={() => toggleOpen("categories")}
+        onClear={() => {
+          setSelectedSlugs([]);
+          syncCategoryToUrl(null);
+        }}
       >
-        Browse by Venues
-      </button>
-      {browseVenues && venues.length > 0 && (
-        <ul className="mt-2 bg-white rounded-lg shadow-sm p-3 space-y-2 max-h-40 overflow-y-auto">
-          {venues.map((v) => (
-            <li key={v}>
-              <button
-                type="button"
-                onClick={() => setVenueFilter((cur) => (cur === v ? "" : v))}
-                className={`text-left text-sm w-full cursor-pointer ${
-                  venueFilter === v ? "text-[#6900AA] font-semibold" : "text-slate-600"
-                }`}
-              >
-                {v}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+        {categoriesPanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="Date"
+        open={openFilters.date}
+        onToggle={() => toggleOpen("date")}
+        onClear={() => {
+          setDatePreset("");
+          setDateFrom("");
+          setDateTo("");
+          setUseDateRange(false);
+        }}
+      >
+        {datePanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="City"
+        open={openFilters.city}
+        onToggle={() => toggleOpen("city")}
+        onClear={clearCity}
+      >
+        {cityPanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="Languages"
+        open={openFilters.languages}
+        onToggle={() => toggleOpen("languages")}
+        onClear={() => setSelectedLanguages([])}
+      >
+        {languagesPanel()}
+      </FilterSection>
+
+      <FilterSection
+        title="Price"
+        open={openFilters.price}
+        onToggle={() => toggleOpen("price")}
+        onClear={() => setSelectedPriceBands([])}
+      >
+        {pricePanel()}
+      </FilterSection>
     </>
   );
-
-  const mobileTabs = [
-    { id: "categories" as const, label: "Categories" },
-    { id: "date" as const, label: "Date" },
-    { id: "languages" as const, label: "Languages" },
-    { id: "price" as const, label: "Price" },
-  ];
 
   return (
     <div className="min-h-screen bg-[#f6f7f8]">
@@ -576,84 +755,7 @@ export default function PublicEventsPage() {
             id="city-filter"
             className="lg:sticky lg:top-24 self-start h-fit max-h-none lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto [scrollbar-width:thin]"
           >
-            <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3 lg:mb-4">Filters</h3>
-
-            <div className="lg:hidden">
-              <div className="grid grid-cols-4 gap-1.5">
-                {mobileTabs.map((tab) => {
-                  const active = mobileFilterTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setMobileFilterTab((prev) => (prev === tab.id ? null : tab.id))}
-                      className={`px-1 py-2 rounded-lg text-[11px] sm:text-xs font-semibold cursor-pointer border ${
-                        active
-                          ? "bg-[#6900AA] border-[#6900AA] text-white"
-                          : "bg-white border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {mobileFilterTab && (
-                <div className="mt-2 bg-white rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.06)] p-3">
-                  {mobileFilterTab === "categories" && categoriesPanel()}
-                  {mobileFilterTab === "date" && datePanel()}
-                  {mobileFilterTab === "languages" && languagesPanel()}
-                  {mobileFilterTab === "price" && pricePanel()}
-                </div>
-              )}
-              {venueBlock()}
-            </div>
-
-            <div className="hidden lg:block space-y-2.5">
-              <FilterCard
-                title="Categories"
-                open={openFilters.categories}
-                onToggle={() => toggleOpen("categories")}
-                onClear={() => setSelectedSlugs([])}
-              >
-                {categoriesPanel()}
-              </FilterCard>
-
-              <FilterCard
-                title="Date"
-                open={openFilters.date}
-                onToggle={() => toggleOpen("date")}
-                onClear={() => {
-                  setDatePreset("");
-                  setDateFrom("");
-                  setDateTo("");
-                  setUseDateRange(false);
-                }}
-              >
-                {datePanel()}
-              </FilterCard>
-
-              <FilterCard
-                title="Languages"
-                open={openFilters.languages}
-                onToggle={() => toggleOpen("languages")}
-                onClear={() => setSelectedLanguages([])}
-              >
-                {languagesPanel()}
-              </FilterCard>
-
-              <FilterCard
-                title="Price"
-                open={openFilters.price}
-                onToggle={() => toggleOpen("price")}
-                onClear={() => {
-                  setPriceSliderValue(PRICE_SLIDER_MAX);
-                }}
-              >
-                {pricePanel()}
-              </FilterCard>
-              {venueBlock()}
-            </div>
+            <FiltersPanel onClearAll={clearAllFilters}>{filterSections}</FiltersPanel>
           </aside>
 
           <div>
@@ -661,28 +763,24 @@ export default function PublicEventsPage() {
               <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-900 break-words">
                 Events in {headingCity}
               </h2>
-              {/* <label className="flex items-center gap-2 text-sm text-slate-600">
-                Sort by:
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                  className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-semibold text-slate-800 bg-white"
-                >
-                  <option value="recommended">Recommended</option>
-                  <option value="date">Date</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                </select>
-              </label> */}
             </div>
 
             {isLoading ? (
               <EventListShimmer />
             ) : paged.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                <FaMapMarkerAlt className="mx-auto text-slate-300 mb-3" size={28} />
-                <p className="text-slate-600 font-medium">No events match these filters</p>
-                <p className="text-slate-400 text-sm mt-1">Try clearing filters or searching another city.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+                {emptyShowcaseCards.map((event) => (
+                  <ShowcaseEventPosterCard
+                    key={event.id}
+                    title={event.title}
+                    image={event.image}
+                    showDate={event.showDate}
+                    place={event.place}
+                    eventType={event.eventType}
+                    href={event.href}
+                    fullWidth
+                  />
+                ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">

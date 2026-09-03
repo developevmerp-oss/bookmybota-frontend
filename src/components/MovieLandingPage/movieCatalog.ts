@@ -1,5 +1,6 @@
 export type MovieDetailData = {
   id: string;
+  slug?: string;
   title: string;
   poster: string;
   landscape?: string;
@@ -15,6 +16,7 @@ export type MovieDetailData = {
   synopsis?: string;
   trailersCount?: number;
   trailerUrl?: string;
+  trailers?: Array<{ language: string; trailerUrl: string }>;
   inCinemas?: boolean;
   comingSoon?: boolean;
   bookHref?: string;
@@ -153,12 +155,17 @@ const DEFAULT_REVIEW_TAGS = [
   { tag: "#Wholesome", count: 2100 },
 ];
 
+const DEFAULT_RATING = "8.2/10";
+const DEFAULT_VOTES = "1.2K+ Votes";
+const DEFAULT_REVIEWS_COUNT_LABEL = "1.2K reviews";
+
 export const MOVIE_CATALOG: MovieDetailData[] = [
   {
     id: "s1",
+    slug: "toxic-a-fairy-tale-for-grown-ups",
     title: "Toxic: A Fairy Tale for Grown-ups",
-    poster: "/images/movies/toxic-poster.png",
-    landscape: "/images/movies/toxic-poster.png",
+    poster: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&h=750&fit=crop&q=80",
+    landscape: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=1600&h=800&fit=crop&q=80",
     certification: "A",
     languages: ["Kannada", "Telugu", "Tamil", "Hindi", "Malayalam", "English"],
     genres: ["Action", "Crime", "Period", "Thriller"],
@@ -181,6 +188,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s2",
+    slug: "tom-and-cherry",
     title: "Tom & Cherry",
     poster: "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=500&h=750&fit=crop&q=80",
     certification: "UA 7+",
@@ -196,6 +204,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s3",
+    slug: "get-set-go",
     title: "Get Set Go",
     poster: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=500&h=750&fit=crop&q=80",
     certification: "UA16+",
@@ -212,6 +221,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s4",
+    slug: "jindagi-once-more",
     title: "Jindagi Once More",
     poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500&h=750&fit=crop&q=80",
     certification: "U",
@@ -228,6 +238,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s5",
+    slug: "spider-man-brand-new-day",
     title: "Spider-Man: Brand New Day",
     poster: "https://images.unsplash.com/photo-1635805737707-575885ab0820?w=500&h=750&fit=crop&q=80",
     certification: "UA",
@@ -244,6 +255,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "s6",
+    slug: "insidious-out-of-the-further",
     title: "Insidious: Out of The Further",
     poster: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=500&h=750&fit=crop&q=80",
     certification: "A",
@@ -260,6 +272,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "u1",
+    slug: "desert-mirage",
     title: "Desert Mirage",
     poster: "https://images.unsplash.com/photo-1440404653325-ab127d49abb1?w=500&h=750&fit=crop&q=80",
     certification: "UA",
@@ -275,6 +288,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "u2",
+    slug: "the-night-express",
     title: "The Night Express",
     poster: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&h=750&fit=crop&q=80",
     certification: "UA16+",
@@ -291,6 +305,7 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
   {
     id: "u3",
+    slug: "marham-poetry-music-night",
     title: "Marham: Poetry & Music Night",
     poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500&h=750&fit=crop&q=80",
     certification: "U",
@@ -306,20 +321,134 @@ export const MOVIE_CATALOG: MovieDetailData[] = [
   },
 ];
 
-export function getCatalogMovie(id: string) {
-  return MOVIE_CATALOG.find((m) => m.id === id) || null;
+export function getCatalogMovie(idOrSlug: string) {
+  const key = idOrSlug.trim().toLowerCase();
+  if (!key) return null;
+  return (
+    MOVIE_CATALOG.find((movie) => {
+      const id = movie.id.toLowerCase();
+      const slug = (movie.slug || "").toLowerCase();
+      return id === key || slug === key;
+    }) || null
+  );
+}
+
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+
+const FALLBACK_POSTER =
+  "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&h=750&fit=crop&q=80";
+
+const FALLBACK_PERSON =
+  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop&q=80";
+
+function mapCastCrewMembers(
+  items: Array<{ name?: string; role?: string; image_url?: string | null }> | undefined | null
+): MoviePerson[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item?.name?.trim())
+    .map((item) => ({
+      name: String(item.name).trim(),
+      role: item.role?.trim() ? String(item.role).trim() : undefined,
+      image: resolveMediaUrl(item.image_url) || FALLBACK_PERSON,
+    }));
+}
+
+/** Map API movie record to customer detail shape. */
+export function mapApiMovieToDetail(movie: {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string | null;
+  poster_url?: string | null;
+  banner_url?: string | null;
+  trailer_url?: string | null;
+  trailers?: Array<{ language?: string; trailer_url?: string }>;
+  duration_minutes?: number | null;
+  certificate?: string | null;
+  release_date?: string | null;
+  languages?: string[];
+  genres?: string[];
+  formats?: string[];
+  cast?: Array<{ name?: string; role?: string; image_url?: string | null; sort_order?: number }>;
+  crew?: Array<{ name?: string; role?: string; image_url?: string | null; sort_order?: number }>;
+  cast_text?: string | null;
+  director?: string | null;
+  status?: string;
+}): MovieDetailData {
+  const poster = resolveMediaUrl(movie.poster_url) || FALLBACK_POSTER;
+  const landscape = resolveMediaUrl(movie.banner_url) || resolveMediaUrl(movie.poster_url) || undefined;
+  const comingSoon = movie.status === "coming_soon";
+
+  const mappedTrailers = Array.isArray(movie.trailers)
+    ? movie.trailers
+        .filter((t) => Boolean(t && t.trailer_url?.trim()))
+        .map((t) => ({ language: t.language || "Default", trailerUrl: t.trailer_url!.trim() }))
+    : movie.trailer_url
+      ? [{ language: movie.languages?.[0] || "Default", trailerUrl: movie.trailer_url.trim() }]
+      : [];
+
+  const primaryTrailer = mappedTrailers.length > 0 ? mappedTrailers[0].trailerUrl : (movie.trailer_url?.trim() || undefined);
+
+  return {
+    id: movie.id,
+    slug: movie.slug,
+    title: movie.title,
+    poster,
+    landscape,
+    certification: movie.certificate?.trim() || undefined,
+    languages: movie.languages || [],
+    genres: movie.genres || [],
+    formats: movie.formats?.length ? movie.formats : ["2D"],
+    duration: formatDurationShort(movie.duration_minutes),
+    releaseDate: comingSoon
+      ? "Coming Soon"
+      : formatReleaseShort(movie.release_date || undefined),
+    synopsis: movie.description?.trim() || undefined,
+    trailerUrl: primaryTrailer,
+    trailersCount: mappedTrailers.length,
+    trailers: mappedTrailers,
+    inCinemas: movie.status === "now_showing",
+    comingSoon,
+    cast: mapCastCrewMembers(movie.cast),
+    crew: mapCastCrewMembers(movie.crew),
+  };
+}
+
+export function movieDetailPath(movie: Pick<MovieDetailData, "id" | "slug">) {
+  return `/movies/${movie.slug || movie.id}`;
 }
 
 /** Fill showcase extras for catalog titles that don't define their own. */
-export function withMovieExtras(movie: MovieDetailData): MovieDetailData {
+export function withMovieExtras(
+  movie: MovieDetailData,
+  options?: {
+    fillCastCrew?: boolean;
+    fillOffers?: boolean;
+    fillReviews?: boolean;
+    fillRating?: boolean;
+  }
+): MovieDetailData {
+  const fillCastCrew = options?.fillCastCrew ?? true;
+  const fillOffers = options?.fillOffers ?? true;
+  const fillReviews = options?.fillReviews ?? true;
+  const fillRating = options?.fillRating ?? true;
   return {
     ...movie,
-    cast: movie.cast?.length ? movie.cast : DEFAULT_CAST,
-    crew: movie.crew?.length ? movie.crew : DEFAULT_CREW,
-    offers: movie.offers?.length ? movie.offers : DEFAULT_OFFERS,
-    reviews: movie.reviews?.length ? movie.reviews : DEFAULT_REVIEWS,
-    reviewTags: movie.reviewTags?.length ? movie.reviewTags : DEFAULT_REVIEW_TAGS,
-    reviewsCountLabel: movie.reviewsCountLabel || "1.2K reviews",
+    cast: movie.cast?.length ? movie.cast : fillCastCrew ? DEFAULT_CAST : [],
+    crew: movie.crew?.length ? movie.crew : fillCastCrew ? DEFAULT_CREW : [],
+    offers: movie.offers?.length ? movie.offers : fillOffers ? DEFAULT_OFFERS : [],
+    reviews: movie.reviews?.length ? movie.reviews : fillReviews ? DEFAULT_REVIEWS : [],
+    reviewTags: movie.reviewTags?.length
+      ? movie.reviewTags
+      : fillReviews
+        ? DEFAULT_REVIEW_TAGS
+        : [],
+    reviewsCountLabel:
+      movie.reviewsCountLabel || (fillReviews ? DEFAULT_REVIEWS_COUNT_LABEL : ""),
+    rating: movie.rating || (fillRating ? DEFAULT_RATING : undefined),
+    votes: movie.votes || (fillRating ? DEFAULT_VOTES : undefined),
+    likes: movie.likes,
   };
 }
 

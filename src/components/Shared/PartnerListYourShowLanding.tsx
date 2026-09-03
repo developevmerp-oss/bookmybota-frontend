@@ -1,14 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowUpRight,
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
-  Quote,
-  ShieldCheck,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -45,6 +43,8 @@ export type PartnerTile = {
   iconSrc?: string;
   /** Short line under the title on host/service cards */
   blurb?: string;
+  /** BMS host cards: i button navigates here instead of opening a popup */
+  infoHref?: string;
 };
 
 export type PartnerTestimonial = {
@@ -54,23 +54,49 @@ export type PartnerTestimonial = {
   photo?: string;
 };
 
+export type PartnerImageCard = {
+  label: string;
+  image: string;
+};
+
+export type PartnerCategoryTypeItem = {
+  label: string;
+  image: string;
+};
+
 export type PartnerListYourShowLandingProps = {
-  expectedRole: Exclude<UserRole, "customer">;
-  loginTitle: string;
-  loginSubtitle: string;
   registerHref: string;
-  registerHint?: React.ReactNode;
   primaryCtaLabel: string;
-  secondaryLoginLabel: string;
-  slides: PartnerSlide[];
-  hostTitle: string;
-  hostSubtitle: string;
-  hostTiles: PartnerTile[];
+  hostTitle?: string;
+  hostSubtitle?: string;
+  hostTiles?: PartnerTile[];
+  /** When true, render only the host categories section. */
+  hostOnly?: boolean;
+  expectedRole?: Exclude<UserRole, "customer">;
+  loginTitle?: string;
+  loginSubtitle?: string;
+  registerHint?: React.ReactNode;
+  secondaryLoginLabel?: string;
+  /** Fallback login link when no onOpenLogin handler (defaults from registerHref). */
+  loginHref?: string;
+  slides?: PartnerSlide[];
+  /** Full-width hero image — replaces the carousel when set. */
+  heroImage?: string;
+  heroImageAlt?: string;
+  /** Image cards shown below the hero banner (detail pages). */
+  imageCards?: PartnerImageCard[];
+  /** Round category-type chips shown after venue image cards. */
+  categoryTypesTitle?: string;
+  categoryTypes?: PartnerCategoryTypeItem[];
   hostEyebrow?: string;
-  servicesTitle: string;
-  servicesSubtitle: string;
-  servicesTiles: PartnerTile[];
+  servicesTitle?: string;
+  servicesSubtitle?: string;
+  servicesTiles?: PartnerTile[];
   servicesEyebrow?: string;
+  featuresTitle?: string;
+  featuresSubtitle?: string;
+  featuresTiles?: PartnerTile[];
+  featuresFootnote?: string;
   servicesBannerText?: string;
   servicesFootnote?: string;
   securityTitle?: string;
@@ -78,9 +104,17 @@ export type PartnerListYourShowLandingProps = {
   testimonials?: PartnerTestimonial[];
   crossLinks?: React.ReactNode;
   middleSlot?: React.ReactNode;
-  onOpenLogin: () => void;
-  loginOpen: boolean;
-  onCloseLogin: () => void;
+  /** When true, omit fixed logo/login bar (use site HomeHeader instead). */
+  hideBuiltInHeader?: boolean;
+  /** Centered logo + login bar (BookMyShow list-your-show style). */
+  centeredPartnerHeader?: boolean;
+  /** Show circular back button on the partner header (left). */
+  showBackButton?: boolean;
+  /** BookMyShow list-your-show style — slider + host + services only. */
+  layout?: "default" | "bms";
+  onOpenLogin?: () => void;
+  loginOpen?: boolean;
+  onCloseLogin?: () => void;
 };
 
 function logoSrc() {
@@ -125,6 +159,7 @@ function InfoPopupModal({
   return (
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40"
+      data-scroll-lock-container
       onClick={onClose}
       role="presentation"
     >
@@ -198,6 +233,333 @@ const SERVICE_ICON_TONES = [
   { bg: "bg-[#DBEAFE]", fg: "text-[#1D4ED8]" },
   { bg: "bg-[#EDE9FE]", fg: "text-[#6D28D9]" },
 ];
+
+const BMS_CARD_HOVER =
+  "transition-[box-shadow,border-color,background-color] duration-300 ease-out hover:shadow-[6px_6px_0_rgba(26,43,72,0.06),10px_10px_18px_rgba(26,43,72,0.14)]";
+
+function BmsInfoIcon() {
+  return (
+    <span
+      className="mt-4 inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 border-[#E57373] text-sm sm:text-base font-bold leading-none text-[#E57373]"
+      aria-hidden
+    >
+      i
+    </span>
+  );
+}
+
+function BmsActionButtons({
+  registerHref,
+  primaryCtaLabel,
+  secondaryLoginLabel,
+  onOpenLogin,
+  loginHref,
+}: {
+  registerHref: string;
+  primaryCtaLabel: string;
+  secondaryLoginLabel?: string;
+  onOpenLogin?: () => void;
+  loginHref?: string;
+}) {
+  const resolvedLoginHref = loginHref ?? registerHref.replace(/\/register\/?$/, "/login");
+
+  return (
+    <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+      <Link
+        href={registerHref}
+        className="inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] text-white text-[15px] sm:text-base font-semibold hover:opacity-90 transition-opacity"
+        style={{ backgroundColor: BRAND }}
+      >
+        {primaryCtaLabel}
+      </Link>
+      {secondaryLoginLabel ? (
+        onOpenLogin ? (
+          <button
+            type="button"
+            onClick={onOpenLogin}
+            className="inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] border-2 text-[15px] sm:text-base font-semibold hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+            style={{ borderColor: BRAND, color: BRAND }}
+          >
+            {secondaryLoginLabel}
+          </button>
+        ) : (
+          <Link
+            href={resolvedLoginHref}
+            className="inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] border-2 text-[15px] sm:text-base font-semibold hover:bg-[#F7E9FF] transition-colors"
+            style={{ borderColor: BRAND, color: BRAND }}
+          >
+            {secondaryLoginLabel}
+          </Link>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function BmsSectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="text-center max-w-[820px] mx-auto">
+      <h2 className="text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold tracking-tight text-[#1A2B48] leading-tight">
+        {title}
+      </h2>
+      <p className="mt-4 text-[14px] sm:text-[15px] text-[#555555] leading-relaxed">{subtitle}</p>
+    </div>
+  );
+}
+
+function BmsRoundCategoryTypesGrid({
+  title,
+  types,
+}: {
+  title: string;
+  types: PartnerCategoryTypeItem[];
+}) {
+  return (
+    <section className="bg-white py-10 md:py-14 border-t border-[#F0F0F0]">
+      <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+        <h2 className="text-center text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold tracking-tight text-[#1A2B48] leading-tight">
+          {title}
+        </h2>
+        <div className="mt-8 sm:mt-10 flex flex-wrap justify-center gap-5 sm:gap-6 md:gap-8 max-w-[980px] mx-auto">
+          {types.map((type) => (
+            <div
+              key={type.label}
+              className="flex flex-col items-center gap-2 sm:gap-3 w-[88px] sm:w-[100px] md:w-[112px]"
+            >
+              <div
+                className={`h-[88px] w-[88px] sm:h-[100px] sm:w-[100px] md:h-[112px] md:w-[112px] rounded-full overflow-hidden border-2 border-[#D6EAF5] bg-[#EBF5FB] shrink-0 ${BMS_CARD_HOVER}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={type.image}
+                  alt={type.label}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <p className="text-[11px] sm:text-xs font-semibold text-[#1A2B48] text-center leading-tight">
+                {type.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BmsImageCardsGrid({ cards }: { cards: PartnerImageCard[] }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-[1100px] mx-auto">
+      {cards.map((card) => (
+        <article
+          key={card.label}
+          className={`overflow-hidden rounded-md border border-[#D6EAF5] bg-white ${BMS_CARD_HOVER}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={card.image}
+            alt={card.label}
+            className="w-full h-36 sm:h-44 md:h-48 object-cover"
+          />
+          <p className="py-3 sm:py-4 px-2 text-center text-sm sm:text-base font-bold text-[#1A2B48] leading-snug">
+            {card.label}
+          </p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function BmsHostCardsGrid({
+  tiles,
+  onOpenInfo,
+}: {
+  tiles: PartnerTile[];
+  onOpenInfo?: (tile: PartnerTile) => void;
+}) {
+  const mdCols = tiles.length > 6 ? "md:grid-cols-4" : "md:grid-cols-3";
+  const maxWidth = tiles.length > 6 ? "max-w-[1100px]" : "max-w-[1000px]";
+  const cardClassName = `flex flex-col items-center text-center rounded-md border border-[#D6EAF5] bg-[#EBF5FB] px-4 py-8 sm:py-10 ${BMS_CARD_HOVER}`;
+
+  return (
+    <div className={`mt-10 sm:mt-12 grid grid-cols-2 ${mdCols} gap-4 sm:gap-6 ${maxWidth} mx-auto`}>
+      {tiles.map((tile) => {
+        const { label, Icon, iconSrc, infoHref, infoId, blurb } = tile;
+        const description = blurb || (infoId ? INFO_POPUPS[infoId]?.description : undefined);
+
+        const content = (
+          <>
+            <span className="inline-flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center">
+              {iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={iconSrc} alt="" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
+              ) : (
+                <>
+                  <Icon size={48} strokeWidth={1.25} className="text-[#111] sm:hidden" />
+                  <Icon size={56} strokeWidth={1.25} className="text-[#111] hidden sm:block" />
+                </>
+              )}
+            </span>
+            <p className="mt-4 text-base sm:text-2xl font-bold text-[#1A2B48] leading-snug">{label}</p>
+            {description ? (
+              <p className="mt-2 text-[12px] sm:text-[14px] text-[#555555] leading-relaxed line-clamp-3">
+                {description}
+              </p>
+            ) : null}
+          </>
+        );
+
+        if (infoHref) {
+          return (
+            <Link key={label} href={infoHref} className={`${cardClassName} cursor-pointer`}>
+              {content}
+            </Link>
+          );
+        }
+
+        if (onOpenInfo) {
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onOpenInfo(tile)}
+              className={`${cardClassName} cursor-pointer`}
+            >
+              {content}
+            </button>
+          );
+        }
+
+        return (
+          <div key={label} className={cardClassName}>
+            {content}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BmsFeatureCardsGrid({ tiles }: { tiles: PartnerTile[] }) {
+  const cardClassName = `flex flex-col items-center text-center rounded-md border border-[#E8E0E0] bg-[#FDF5F5] px-4 py-8 sm:py-10 min-h-[220px] sm:min-h-[240px] ${BMS_CARD_HOVER}`;
+
+  return (
+    <div className="mt-10 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-[1000px] mx-auto">
+      {tiles.map((tile) => {
+        const { label, Icon, iconSrc, infoId, blurb } = tile;
+        const description = blurb || (infoId ? INFO_POPUPS[infoId]?.description : undefined);
+
+        return (
+          <div key={label} className={cardClassName}>
+            <span className="inline-flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center">
+              {iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={iconSrc} alt="" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
+              ) : (
+                <>
+                  <Icon size={48} strokeWidth={1.25} className="text-[#111] sm:hidden" />
+                  <Icon size={56} strokeWidth={1.25} className="text-[#111] hidden sm:block" />
+                </>
+              )}
+            </span>
+            <p className="mt-4 text-[15px] sm:text-base md:text-lg font-bold text-[#1A2B48] leading-snug max-w-[260px]">
+              {label}
+            </p>
+            {description ? (
+              <p className="mt-2 text-[12px] sm:text-[13px] text-[#555555] leading-relaxed line-clamp-3 max-w-[280px]">
+                {description}
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function securityBgSrc() {
+  return typeof images.partnerSecurityBg === "string" ? images.partnerSecurityBg : images.partnerSecurityBg.src;
+}
+
+function PartnerHeroBanner({ image, alt = "" }: { image: string; alt?: string }) {
+  return (
+    <section className="bg-white w-full">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={image}
+        alt={alt}
+        className="w-full h-[220px] sm:h-[280px] md:h-[340px] lg:h-[400px] object-cover"
+      />
+    </section>
+  );
+}
+
+function BmsSecuritySection({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <section className="bg-white py-16 md:py-20">
+      <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+        <div className="flex flex-col md:flex-row items-center md:items-center gap-10 md:gap-12 lg:gap-16">
+          <div className="w-full md:w-[42%] lg:w-[45%] shrink-0 flex items-center justify-center md:justify-start">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={securityBgSrc()}
+              alt=""
+              className="w-full max-w-[320px] sm:max-w-[380px] md:max-w-none h-[350px] object-contain"
+            />
+          </div>
+          <div className="w-full md:flex-1 text-center md:text-left">
+            <h2 className="text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold tracking-tight text-[#1A2B48] leading-tight">
+              {title}
+            </h2>
+            <p className="mt-4 text-[14px] sm:text-[15px] text-[#555555] leading-relaxed max-w-[640px] md:max-w-none mx-auto md:mx-0">
+              {subtitle}
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BmsServiceCardsGrid({
+  tiles,
+  onOpenInfo,
+}: {
+  tiles: PartnerTile[];
+  onOpenInfo: (tile: PartnerTile) => void;
+}) {
+  return (
+    <div className="mt-10 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-[1000px] mx-auto">
+      {tiles.map((tile) => {
+        const { label, Icon, iconSrc } = tile;
+        return (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onOpenInfo(tile)}
+            className={`flex flex-col items-center text-center rounded-md border border-[#E8E0E0] bg-[#FDF5F5] px-4 py-10 sm:py-11 hover:bg-[#FCF0F0] cursor-pointer min-h-[220px] sm:min-h-[240px] ${BMS_CARD_HOVER}`}
+          >
+            <span className="inline-flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center">
+              {iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={iconSrc} alt="" className="h-16 w-16 sm:h-20 sm:w-20 object-contain" />
+              ) : (
+                <>
+                  <Icon size={48} strokeWidth={1.25} className="text-[#111] sm:hidden" />
+                  <Icon size={56} strokeWidth={1.25} className="text-[#111] hidden sm:block" />
+                </>
+              )}
+            </span>
+            <p className="mt-5 text-[15px] sm:text-base md:text-lg font-bold text-[#1A2B48] leading-snug max-w-[260px]">
+              {label}
+            </p>
+            <BmsInfoIcon />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function SectionHeading({
   eyebrow,
@@ -317,39 +679,54 @@ function ServiceCardsGrid({
 }
 
 export default function PartnerListYourShowLanding({
-  expectedRole,
-  loginTitle,
-  loginSubtitle,
+  expectedRole = "event_admin",
+  loginTitle = "",
+  loginSubtitle = "",
   registerHref,
   registerHint,
   primaryCtaLabel,
-  secondaryLoginLabel,
-  slides,
-  hostTitle,
-  hostSubtitle,
-  hostTiles,
+  secondaryLoginLabel = "",
+  loginHref,
+  slides = [],
+  heroImage,
+  heroImageAlt = "",
+  imageCards = [],
+  categoryTypesTitle = "",
+  categoryTypes = [],
+  hostTitle = "",
+  hostSubtitle = "",
+  hostTiles = [],
   hostEyebrow = "Explore possibilities",
-  servicesTitle,
-  servicesSubtitle,
-  servicesTiles,
+  servicesTitle = "",
+  servicesSubtitle = "",
+  servicesTiles = [],
   servicesEyebrow = "We've got you covered",
+  featuresTitle = "",
+  featuresSubtitle = "",
+  featuresTiles = [],
+  featuresFootnote,
   servicesBannerText = "From planning to performance, we make every event a success.",
   servicesFootnote,
-  securityTitle = "Sit back and watch your event come to life",
-  securitySubtitle = "Events may be all fun and games, but we take it seriously. We ensure our customer's security so that you don't have to.",
+  securityTitle = "",
+  securitySubtitle = "",
   testimonials = [],
   crossLinks,
   middleSlot,
+  hideBuiltInHeader = false,
+  centeredPartnerHeader = false,
+  showBackButton = false,
+  layout = "default",
+  hostOnly = false,
   onOpenLogin,
-  loginOpen,
-  onCloseLogin,
+  loginOpen = false,
+  onCloseLogin = () => {},
 }: PartnerListYourShowLandingProps) {
+  const router = useRouter();
   const n = slides.length;
   /** Middle copy of tripled track — starts on first real slide */
   const [index, setIndex] = useState(n);
   const [animate, setAnimate] = useState(true);
   const [paused, setPaused] = useState(false);
-  const [testimonial, setTestimonial] = useState(0);
   const [infoPopup, setInfoPopup] = useState<ActiveInfoPopup | null>(null);
   const [narrow, setNarrow] = useState(false);
   const jumpingRef = useRef(false);
@@ -408,14 +785,6 @@ export default function PartnerListYourShowLanding({
     return () => window.clearInterval(id);
   }, [n, paused, index]);
 
-  useEffect(() => {
-    if (testimonials.length <= 1) return;
-    const id = window.setInterval(() => {
-      setTestimonial((s) => (s + 1) % testimonials.length);
-    }, 7000);
-    return () => window.clearInterval(id);
-  }, [testimonials.length]);
-
   const goPrev = useCallback(() => {
     if (n <= 1) return;
     setAnimate(true);
@@ -462,37 +831,90 @@ export default function PartnerListYourShowLanding({
     }
   }, [index, n]);
 
-  const activeQuote = testimonials[testimonial];
+  const isBms = layout === "bms";
   /** Center card slightly narrower so side peeks show more (BMS-style) */
   const slideW = narrow ? 40 : 53;
   const gapPx = narrow ? 10 : 14;
+  const headerLoginHref = loginHref ?? registerHref.replace(/\/register\/?$/, "/login");
+
+  const loginControl = onOpenLogin ? (
+    <button
+      type="button"
+      onClick={onOpenLogin}
+      className="h-9 px-5 rounded-md border border-[#D0D0D0] text-[#333] text-sm font-semibold hover:bg-[#FAFAFA] transition-colors cursor-pointer"
+    >
+      Login
+    </button>
+  ) : (
+    <Link
+      href={headerLoginHref}
+      className="inline-flex h-9 items-center px-5 rounded-md border border-[#D0D0D0] text-[#333] text-sm font-semibold hover:bg-[#FAFAFA] transition-colors"
+    >
+      Login
+    </Link>
+  );
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] flex flex-col font-sans text-[#222] overflow-x-hidden">
-      <header className="fixed top-0 w-full z-50 bg-white border-b border-[#EBEBEB]">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
-          <div className="flex justify-between items-center h-[72px]">
-            <Link href="/" className="flex items-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={logoSrc()}
-                alt="Book My Bota"
-                className="h-12 sm:h-14 w-auto object-contain object-left"
-              />
-            </Link>
-            <button
-              type="button"
-              onClick={onOpenLogin}
-              className="h-9 px-5 rounded-md border border-[#D0D0D0] text-[#333] text-sm font-semibold hover:bg-[#FAFAFA] transition-colors cursor-pointer"
-            >
-              Login
-            </button>
+      {!hideBuiltInHeader ? (
+        <header className="sticky top-0 w-full z-50 bg-white border-b border-[#EBEBEB]">
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
+            {centeredPartnerHeader ? (
+              <div className="flex items-center justify-between h-[72px]">
+                <div className="flex items-center gap-3 min-w-0">
+                  {showBackButton ? (
+                    <button
+                      type="button"
+                      onClick={() => router.back()}
+                      aria-label="Go back"
+                      className="shrink-0 h-10 w-10 rounded-full border border-[#E5E5E5] bg-[#F3F3F3] flex items-center justify-center text-[#444] hover:bg-[#EBEBEB] transition-colors cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
+                    >
+                      <ChevronLeft size={20} strokeWidth={2} />
+                    </button>
+                  ) : null}
+                  <Link href="/" className="flex items-center shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={logoSrc()}
+                      alt="Book My Bota"
+                      className="h-12 sm:h-14 w-auto object-contain object-left"
+                    />
+                  </Link>
+                </div>
+                {loginControl}
+              </div>
+            ) : (
+              <div className="flex justify-between items-center h-[72px]">
+                <Link href="/" className="flex items-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={logoSrc()}
+                    alt="Book My Bota"
+                    className="h-12 sm:h-14 w-auto object-contain object-left"
+                  />
+                </Link>
+                {loginControl}
+              </div>
+            )}
           </div>
-        </div>
-      </header>
+        </header>
+      ) : null}
 
-      <div className="pt-[72px] flex-1">
-        {/* Hero — full-bleed infinite BMS-style carousel */}
+      <div className="flex-1">
+        {heroImage ? (
+          <PartnerHeroBanner image={heroImage} alt={heroImageAlt} />
+        ) : null}
+        {imageCards.length > 0 ? (
+          <section className="bg-white py-10 md:py-14">
+            <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+              <BmsImageCardsGrid cards={imageCards} />
+            </div>
+          </section>
+        ) : null}
+        {categoryTypes.length > 0 ? (
+          <BmsRoundCategoryTypesGrid title={categoryTypesTitle} types={categoryTypes} />
+        ) : null}
+        {!heroImage && slides.length > 0 ? (
         <section
           className="bg-white pt-3 sm:pt-4 pb-3 w-full overflow-hidden"
           onMouseEnter={() => setPaused(true)}
@@ -603,89 +1025,159 @@ export default function PartnerListYourShowLanding({
             </div>
           </div>
         </section>
+        ) : null}
 
         {/* What can you host */}
+        {hostTiles.length > 0 ? (
         <section className="bg-white py-14 md:py-16">
           <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
-            <SectionHeading eyebrow={hostEyebrow} title={hostTitle} subtitle={hostSubtitle} />
-            <HostCardsGrid tiles={hostTiles} onOpenInfo={openInfo} />
-            <div className="mt-10 sm:mt-12 flex justify-center">
-              <Link
-                href={registerHref}
-                className="inline-flex items-center justify-center gap-2 h-11 sm:h-12 px-7 sm:px-8 rounded-xl border-2 text-[14px] sm:text-[15px] font-bold hover:bg-[#F7E9FF] transition-colors"
-                style={{ borderColor: BRAND, color: BRAND }}
-              >
-                {primaryCtaLabel}
-                <ArrowUpRight size={18} strokeWidth={2.25} />
-              </Link>
-            </div>
+            {isBms ? (
+              <BmsSectionHeading title={hostTitle} subtitle={hostSubtitle} />
+            ) : (
+              <SectionHeading eyebrow={hostEyebrow} title={hostTitle} subtitle={hostSubtitle} />
+            )}
+            {isBms ? (
+              <BmsHostCardsGrid tiles={hostTiles} onOpenInfo={openInfo} />
+            ) : (
+              <HostCardsGrid tiles={hostTiles} onOpenInfo={openInfo} />
+            )}
           </div>
         </section>
+        ) : null}
 
-        {middleSlot}
+        {featuresTiles.length > 0 ? (
+          <section id="features" className="bg-white py-14 md:py-16 scroll-mt-24">
+            <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+              {isBms ? (
+                <BmsSectionHeading title={featuresTitle} subtitle={featuresSubtitle} />
+              ) : (
+                <SectionHeading
+                  eyebrow="Platform features"
+                  title={featuresTitle}
+                  subtitle={featuresSubtitle}
+                />
+              )}
+              {isBms ? (
+                <BmsFeatureCardsGrid tiles={featuresTiles} />
+              ) : (
+                <HostCardsGrid tiles={featuresTiles} onOpenInfo={openInfo} />
+              )}
+              {featuresFootnote ? (
+                <p className="mt-10 sm:mt-12 text-center text-[14px] sm:text-[15px] text-[#555555] leading-relaxed max-w-[820px] mx-auto">
+                  {featuresFootnote}
+                </p>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {featuresTiles.length > 0 && securityTitle ? (
+          <BmsSecuritySection title={securityTitle} subtitle={securitySubtitle} />
+        ) : null}
+
+        {!hostOnly ? (
+          <>
+        {!isBms ? middleSlot : null}
 
         {/* Services */}
-        <section id="services" className="bg-[#F7F4FB] py-14 md:py-16 scroll-mt-24">
+        <section id="services" className={isBms ? "bg-white py-14 md:py-16 scroll-mt-24" : "bg-[#F7F4FB] py-14 md:py-16 scroll-mt-24"}>
           <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
-            <SectionHeading
-              eyebrow={servicesEyebrow}
-              title={servicesTitle}
-              subtitle={servicesSubtitle}
-            />
-            <ServiceCardsGrid tiles={servicesTiles} onOpenInfo={openInfo} />
+            {isBms ? (
+              <BmsSectionHeading title={servicesTitle} subtitle={servicesSubtitle} />
+            ) : (
+              <SectionHeading
+                eyebrow={servicesEyebrow}
+                title={servicesTitle}
+                subtitle={servicesSubtitle}
+              />
+            )}
+            {isBms ? (
+              <BmsServiceCardsGrid tiles={servicesTiles} onOpenInfo={openInfo} />
+            ) : (
+              <ServiceCardsGrid tiles={servicesTiles} onOpenInfo={openInfo} />
+            )}
 
-            <div className="mt-10 sm:mt-12 rounded-2xl border border-[#E8E0F2] bg-white px-5 py-5 sm:px-7 sm:py-6 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-6 shadow-[0_2px_12px_rgba(105,0,170,0.04)]">
-              <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
-                <span className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#F3E8FF] text-[#6900AA]">
-                  <CalendarCheck size={22} strokeWidth={1.75} />
-                </span>
-                <p className="text-[14px] sm:text-[15px] font-semibold text-[#1a1a2e] leading-snug">
-                  {servicesBannerText}
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-                <Link
-                  href={registerHref}
-                  className="inline-flex items-center justify-center h-11 px-6 rounded-xl text-white text-[14px] font-bold hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: BRAND }}
-                >
-                  {primaryCtaLabel}
-                </Link>
-                <button
-                  type="button"
-                  onClick={onOpenLogin}
-                  className="inline-flex items-center justify-center h-11 px-6 rounded-xl border-2 text-[14px] font-bold hover:bg-[#F7E9FF] transition-colors cursor-pointer"
-                  style={{ borderColor: BRAND, color: BRAND }}
-                >
-                  {secondaryLoginLabel}
-                </button>
-              </div>
-            </div>
+            {!isBms ? (
+              <>
+                <div className="mt-10 sm:mt-12 rounded-2xl border border-[#E8E0F2] bg-white px-5 py-5 sm:px-7 sm:py-6 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-6 shadow-[0_2px_12px_rgba(105,0,170,0.04)]">
+                  <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                    <span className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#F3E8FF] text-[#6900AA]">
+                      <CalendarCheck size={22} strokeWidth={1.75} />
+                    </span>
+                    <p className="text-[14px] sm:text-[15px] font-semibold text-[#1a1a2e] leading-snug">
+                      {servicesBannerText}
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                    <Link
+                      href={registerHref}
+                      className="inline-flex items-center justify-center h-11 px-6 rounded-xl text-white text-[14px] font-bold hover:opacity-90 transition-opacity"
+                      style={{ backgroundColor: BRAND }}
+                    >
+                      {primaryCtaLabel}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={onOpenLogin}
+                      className="inline-flex items-center justify-center h-11 px-6 rounded-xl border-2 text-[14px] font-bold hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+                      style={{ borderColor: BRAND, color: BRAND }}
+                    >
+                      {secondaryLoginLabel}
+                    </button>
+                  </div>
+                </div>
 
-            {servicesFootnote ? (
-              <p className="mt-8 text-center text-[13px] sm:text-[14px] text-[#6B7280] leading-relaxed max-w-3xl mx-auto">
-                {servicesFootnote}
-              </p>
-            ) : null}
-            {crossLinks ? (
-              <div className="mt-6 text-center text-[13px] text-[#888]">{crossLinks}</div>
-            ) : null}
+                {servicesFootnote ? (
+                  <p className="mt-8 text-center text-[13px] sm:text-[14px] text-[#6B7280] leading-relaxed max-w-3xl mx-auto">
+                    {servicesFootnote}
+                  </p>
+                ) : null}
+                {crossLinks ? (
+                  <div className="mt-6 text-center text-[13px] text-[#888]">{crossLinks}</div>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {isBms ? (
+                  <BmsActionButtons
+                    registerHref={registerHref}
+                    primaryCtaLabel={primaryCtaLabel}
+                    secondaryLoginLabel={secondaryLoginLabel}
+                    onOpenLogin={onOpenLogin}
+                    loginHref={loginHref}
+                  />
+                ) : null}
+                {servicesFootnote ? (
+                  <p className="mt-10 sm:mt-12 text-center text-[14px] sm:text-[15px] text-[#555555] leading-relaxed max-w-[820px] mx-auto">
+                    {servicesFootnote}
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
         </section>
+        {featuresTiles.length === 0 && securityTitle ? (
+          <BmsSecuritySection title={securityTitle} subtitle={securitySubtitle} />
+        ) : null}
+          </>
+        ) : null}
       </div>
 
       <Footer />
 
+      {!hostOnly ? (
       <InfoPopupModal
         active={infoPopup}
         ctaLabel={primaryCtaLabel}
         ctaHref={registerHref}
         onClose={() => setInfoPopup(null)}
       />
+      ) : null}
 
-      {loginOpen && (
+      {!hostOnly && loginOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm"
+          data-scroll-lock-container
           onClick={onCloseLogin}
           role="presentation"
         >

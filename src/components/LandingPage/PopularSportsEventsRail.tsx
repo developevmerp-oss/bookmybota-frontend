@@ -3,97 +3,31 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { SHOWCASE_SPORTS_EVENT_CARDS } from "@/data/showcaseEventCards";
 import AdaptiveCardRow from "./AdaptiveCardRow";
-import { ShowcaseEventPosterCard } from "./PosterCard";
-
-type SportEvent = {
-  id: string;
-  title: string;
-  image: string;
-  showDate: string;
-  place: string;
-  eventType: string;
-  href: string;
-};
-
-/** Static showcase data for the landing Popular Sports Events rail. */
-export const POPULAR_SPORTS_EVENTS: SportEvent[] = [
-  {
-    id: "1",
-    title: "Great Ethiopian Run 10K",
-    image: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=500&h=750&fit=crop&q=80",
-    showDate: "2026-11-20T09:00:00",
-    place: "Meskel Square: Addis Ababa",
-    eventType: "Sports · Running",
-    href: "/events?category=sports",
-  },
-  {
-    id: "2",
-    title: "Ethiopian Premier League Final",
-    image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=500&h=750&fit=crop&q=80",
-    showDate: "2026-12-05T16:00:00",
-    place: "Addis Ababa Stadium: Addis Ababa",
-    eventType: "Sports · Football",
-    href: "/events?category=sports",
-  },
-  {
-    id: "3",
-    title: "National Wrestling Cup",
-    image: "https://images.unsplash.com/photo-1555597673-b21d5c935865?w=500&h=750&fit=crop&q=80",
-    showDate: "2026-12-12T14:00:00",
-    place: "Dire Dawa Arena: Dire Dawa",
-    eventType: "Sports · Wrestling",
-    href: "/events?category=sports",
-  },
-  {
-    id: "4",
-    title: "Addis Basketball Night",
-    image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=500&h=750&fit=crop&q=80",
-    showDate: "2026-12-18T19:00:00",
-    place: "Millennium Hall: Addis Ababa",
-    eventType: "Sports · Basketball",
-    href: "/events?category=sports",
-  },
-  {
-    id: "5",
-    title: "Rift Valley Cycling Challenge",
-    image: "https://images.unsplash.com/photo-1517649763962-0c623066027c?w=500&h=750&fit=crop&q=80",
-    showDate: "2027-01-22T07:00:00",
-    place: "Hawassa Lakeside: Hawassa",
-    eventType: "Sports · Cycling",
-    href: "/events?category=sports",
-  },
-  {
-    id: "6",
-    title: "Track & Field Open Meet",
-    image: "https://images.unsplash.com/photo-1461896836934-ffe607ba6851?w=500&h=750&fit=crop&q=80",
-    showDate: "2027-02-08T10:00:00",
-    place: "Bahir Dar Stadium: Bahir Dar",
-    eventType: "Sports · Athletics",
-    href: "/events?category=sports",
-  },
-  {
-    id: "7",
-    title: "Youth Football Festival",
-    image: "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=500&h=750&fit=crop&q=80",
-    showDate: "2027-02-15T15:00:00",
-    place: "Jimma Sports Complex: Jimma",
-    eventType: "Sports · Football",
-    href: "/events?category=sports",
-  },
-];
+import { EventPosterCard, ShowcaseEventPosterCard } from "./PosterCard";
+import { isSportsEvent } from "./homeUtils";
+import { useHomeCatalog } from "./useHomeCatalog";
 
 const MIN_VISIBLE = 5;
 
-export default function PopularSportsEventsRail() {
+export default function PopularSportsEventsRail({ city }: { city: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const showArrows = POPULAR_SPORTS_EVENTS.length > MIN_VISIBLE;
+  const { events, fallbackEvents, isLoadingEvents, isLoadingFallback } = useHomeCatalog(city);
+  const pool = events.length > 0 ? events : fallbackEvents;
+  const sportsEvents = pool.filter(isSportsEvent).slice(0, 12);
+  const useStatic = !isLoadingEvents && !isLoadingFallback && sportsEvents.length === 0;
+  const cardCount = useStatic ? SHOWCASE_SPORTS_EVENT_CARDS.length : sportsEvents.length;
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [cardCount, useStatic, isLoadingEvents]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
   };
+
+  const isLoading = isLoadingEvents || isLoadingFallback;
 
   return (
     <section className="bg-white py-6 sm:py-8 lg:py-10">
@@ -111,7 +45,7 @@ export default function PopularSportsEventsRail() {
         </div>
 
         <div className="relative">
-          {showArrows && (
+          {scrollEdges.left && (
             <button
               type="button"
               aria-label="Previous sports events"
@@ -122,21 +56,37 @@ export default function PopularSportsEventsRail() {
             </button>
           )}
 
-          <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
-            {POPULAR_SPORTS_EVENTS.map((event) => (
-              <ShowcaseEventPosterCard
-                key={event.id}
-                title={event.title}
-                image={event.image}
-                showDate={event.showDate}
-                place={event.place}
-                eventType={event.eventType}
-                href={event.href}
-              />
-            ))}
-          </AdaptiveCardRow>
+          {isLoading ? (
+            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
+              {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
+                <div key={i} className="adaptive-card-slot">
+                  <div className="aspect-[3/4] w-full rounded-xl bg-[#F7F7F7]" />
+                  <div className="mt-3 h-4 w-4/5 rounded bg-[#F7F7F7]" />
+                  <div className="mt-2 h-3 w-3/5 rounded bg-[#F7F7F7]" />
+                </div>
+              ))}
+            </AdaptiveCardRow>
+          ) : (
+            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
+              {useStatic
+                ? SHOWCASE_SPORTS_EVENT_CARDS.map((event) => (
+                    <ShowcaseEventPosterCard
+                      key={event.id}
+                      title={event.title}
+                      image={event.image}
+                      showDate={event.showDate}
+                      place={event.place}
+                      eventType={event.eventType}
+                      href={event.href}
+                    />
+                  ))
+                : sportsEvents.map((event) => (
+                    <EventPosterCard key={event.id} event={event} city={city} />
+                  ))}
+            </AdaptiveCardRow>
+          )}
 
-          {showArrows && (
+          {scrollEdges.right && (
             <button
               type="button"
               aria-label="Next sports events"

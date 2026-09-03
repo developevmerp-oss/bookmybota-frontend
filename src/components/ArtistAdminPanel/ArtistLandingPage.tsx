@@ -19,6 +19,7 @@ import {
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
+import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { useGetPublicRegisteredArtistsQuery } from "@/services/api";
 
 const FEATURE_SLIDES = [
@@ -55,6 +56,8 @@ const FEATURE_SLIDES = [
     bg: "#1D4E89",
   },
 ];
+
+const HERO_IMAGE = FEATURE_SLIDES[0].image;
 
 const ARTIST_TYPES = [
   {
@@ -166,6 +169,10 @@ export default function ArtistLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
+      centeredPartnerHeader
+      showBackButton
+      loginHref="/artist/login"
       expectedRole="artist_admin"
       loginTitle="Artist Admin Login"
       loginSubtitle="Sign in to manage your artist profile"
@@ -178,19 +185,16 @@ export default function ArtistLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your show"
-      secondaryLoginLabel="Artist Login"
-      slides={FEATURE_SLIDES}
-      hostTitle="What can you host???"
-      hostSubtitle="From solo singers to full bands and specialty acts — Book My Bota helps performers get in front of organizers who are building lineups every week."
-      hostTiles={ARTIST_TYPES}
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
+      heroImage={HERO_IMAGE}
+      heroImageAlt="Artist partner on Book My Bota"
+      imageCards={PARTNER_VENUE_TYPE_CARDS}
       servicesTitle="What are the services we offer?"
       servicesSubtitle="A simple partner portal focused on discovery, profile management, and trust — so you spend more time performing and less time chasing bookings."
       servicesTiles={SERVICES}
       servicesFootnote="Complete account setup (details + documents). After Super Admin approval, sign in to manage your artist profile, free dates, and booking inquiries."
       testimonials={TESTIMONIALS}
-      securityTitle="Sit back and watch your career come to life"
-      securitySubtitle="Performing is the fun part. We keep your partner profile and booking inquiries secure so you can focus on the stage."
       middleSlot={
         <PartnerDirectorySection
           title="Registered artists on Book My Bota"

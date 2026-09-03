@@ -7,7 +7,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import AuthGate from "@/components/Shared/AuthGate";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
-import { KeyRound, LogOut, Menu, Mic2, User, X, CalendarDays, Inbox } from "lucide-react";
+import { KeyRound, LogOut, Menu, Mic2, User, X, CalendarDays, Inbox, Ticket } from "lucide-react";
 
 function ArtistShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,6 +18,7 @@ function ArtistShell({ children }: { children: React.ReactNode }) {
     { name: "Profile", href: "/artist/profile", icon: User },
     { name: "Availability", href: "/artist/availability", icon: CalendarDays },
     { name: "Inquiries", href: "/artist/inquiries", icon: Inbox },
+    { name: "Claim Events", href: "/artist/claim-events", icon: Ticket },
     { name: "Change Password", href: "/artist/change-password", icon: KeyRound },
   ];
 

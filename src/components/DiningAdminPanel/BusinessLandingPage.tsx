@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
+import { PARTNER_CATEGORY_TYPES } from "@/data/partnerCategoryTypes";
 
 const FEATURE_SLIDES = [
   {
@@ -50,6 +51,8 @@ const FEATURE_SLIDES = [
     bg: "#1D4E89",
   },
 ];
+
+const HERO_IMAGE = FEATURE_SLIDES[1].image;
 
 const HOST_CATEGORIES = [
   {
@@ -159,6 +162,10 @@ export default function BusinessLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
+      centeredPartnerHeader
+      showBackButton
+      loginHref="/business/login"
       expectedRole="business_admin"
       loginTitle="Dining Admin Login"
       loginSubtitle="Sign in to manage your restaurant"
@@ -171,19 +178,17 @@ export default function BusinessLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your restaurant"
-      secondaryLoginLabel="Dining Login"
-      slides={FEATURE_SLIDES}
-      hostTitle="What can you host???"
-      hostSubtitle="Book My Bota helps restaurants grow with end-to-end dining tools — from the moment you register to every cover you serve. Let's look at who can partner."
-      hostTiles={HOST_CATEGORIES}
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
+      heroImage={HERO_IMAGE}
+      heroImageAlt="Dining partner on Book My Bota"
+      categoryTypesTitle={`${PARTNER_CATEGORY_TYPES.dining.title} Types`}
+      categoryTypes={PARTNER_CATEGORY_TYPES.dining.types}
       servicesTitle="What are the services we offer?"
       servicesSubtitle="After collaborating with dining partners across the city, we're equipped to bring more guests through your door."
       servicesTiles={SERVICES}
       servicesFootnote="Apart from these must-haves, we also support promotions, gift-card settlements, and dedicated tools to manage tables, reviews, and guest experience."
       testimonials={TESTIMONIALS}
-      securityTitle="Sit back and watch your restaurant grow"
-      securitySubtitle="Hospitality is fun — operations shouldn't be stressful. We help keep bookings, offers, and guest data secure so you can focus on the floor."
       crossLinks={
         <p className="flex flex-wrap items-center justify-center gap-2">
           Also listing events?

@@ -193,5 +193,63 @@
   "artist.service.reach": {
     "title": "Cross-city reach",
     "description": "Connect with organizers hosting shows across Book My Bota cities and grow your touring footprint."
+  },
+
+  "list-your-show.host.dining": {
+    "title": "Dining",
+    "description": "Partner your restaurant, café, or bar on Book My Bota. Accept table bookings, run offers, and reach diners browsing dining experiences in their city."
+  },
+  "list-your-show.host.concert": {
+    "title": "Concert",
+    "description": "List live concerts and stage shows. Sell tickets, manage entry, and reach audiences searching for the next big performance."
+  },
+  "list-your-show.host.comedy": {
+    "title": "Comedy",
+    "description": "Host stand-up nights, open mics, and comedy specials. Promote your show to fans looking for a great laugh."
+  },
+  "list-your-show.host.music": {
+    "title": "Music",
+    "description": "From indie gigs to festival stages — list music events, manage bookings, and grow your live music audience."
+  },
+  "list-your-show.host.movie": {
+    "title": "Movie",
+    "description": "List your cinema, publish showtimes, and sell tickets for the latest screenings on Book My Bota."
+  },
+  "list-your-show.host.sports": {
+    "title": "Sports",
+    "description": "Run tournaments, matches, and sporting events. Sell tickets and manage entry for fans ready to cheer."
+  },
+  "list-your-show.host.artist": {
+    "title": "Artist",
+    "description": "Build your artist profile, showcase your talent, and get booked for concerts, gigs, and live performances."
+  },
+  "list-your-show.host.venue": {
+    "title": "Venue",
+    "description": "Partner your venue on Book My Bota. Publish layouts, claim showtimes, and connect with organizers hosting events at your space."
+  },
+
+  "list-your-show.feature.registration": {
+    "title": "Partner registration & onboarding",
+    "description": "Register your business, submit documents, and get verified by our team — the same trusted onboarding flow for dining, events, movies, venues, and artists."
+  },
+  "list-your-show.feature.discovery": {
+    "title": "Online discovery & visibility",
+    "description": "Get found by customers and partners browsing Book My Bota — whether they search for restaurants, shows, cinemas, venues, or live talent."
+  },
+  "list-your-show.feature.dashboard": {
+    "title": "Dedicated partner portal",
+    "description": "Manage listings, bookings, profiles, and day-to-day operations from one secure dashboard tailored to your partner type."
+  },
+  "list-your-show.feature.login": {
+    "title": "Secure partner login",
+    "description": "Sign in with role-based access so your team can manage the business safely — separate portals for dining, events, movies, venues, and artists."
+  },
+  "list-your-show.feature.offers": {
+    "title": "Offers & promotions",
+    "description": "Run offers, campaigns, and special deals to attract more guests — from dining specials and event tickets to movie showtimes and artist bookings."
+  },
+  "list-your-show.feature.reports": {
+    "title": "Reports & business insights",
+    "description": "Track bookings, sales signals, and performance in clear reports so every partner — restaurant, organizer, cinema, venue, or artist — can plan smarter."
   }
 }

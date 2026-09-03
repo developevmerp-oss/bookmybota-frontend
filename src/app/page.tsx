@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import PromoBannerCarousel from "@/components/LandingPage/PromoBannerCarousel";
 import PopularDiningRail from "@/components/LandingPage/PopularDiningRail";
+import BarSceneRail from "@/components/LandingPage/BarSceneRail";
 import TopArtistsRail from "@/components/LandingPage/TopArtistsRail";
 import TopVenuesRail from "@/components/LandingPage/TopVenuesRail";
 import RecommendedMoviesRail from "@/components/LandingPage/RecommendedMoviesRail";
@@ -29,20 +30,20 @@ export default function Home() {
 
   return (
     <div className=" bg-white text-[#111111] overflow-x-hidden">
-      {/* Hero + category tiles — tiles keep fixed aspect; do not stretch when banner is hidden */}
       <div className="flex flex-col">
         <PromoBannerCarousel city={city} />
         <LiveCategoryTiles city={city} />
       </div>
       <PopularDiningRail city={city} />
+      <BarSceneRail city={city} />
       <TopArtistsRail />
       <RecommendedMoviesRail />
       <TopVenuesRail />
       <PopularEventsRail city={city} />
       <SpecialOffersRail />
-      <EventsNearYouRail city={city} />
+      {/* <EventsNearYouRail city={city} /> */}
       {/* <SportsStadiumBanner /> */}
-      <PopularSportsEventsRail />
+      <PopularSportsEventsRail city={city} />
       <Footer />
     </div>
   );

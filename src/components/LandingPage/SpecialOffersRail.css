@@ -15,12 +15,12 @@
 
 .offers-rail-slot {
   flex: 0 0 auto;
-  width: calc((100% - 0.75rem) / 1.04);
+  width: 100%;
   min-width: 0;
   scroll-snap-align: start;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .offers-rail-slot {
     width: calc((100% - 0.75rem) / 2);
   }
@@ -31,7 +31,6 @@
     gap: 1rem;
   }
 
-  /* Exactly 3 full cards — no clipped 3rd card */
   .offers-rail-slot {
     width: calc((100% - 2rem) / 3);
   }
@@ -48,7 +47,8 @@
   position: relative;
   display: flex;
   align-items: stretch;
-  height: 200px;
+  min-height: 200px;
+  height: auto;
   border-radius: 18px;
   overflow: hidden;
   background: #ffffff;
@@ -271,9 +271,9 @@
   text-align: center;
 }
 
-@media (max-width: 639px) {
+@media (max-width: 767px) {
   .offer-card {
-    height: 168px;
+    min-height: 168px;
   }
 
   .offer-card__left {
@@ -310,7 +310,7 @@
 
 @media (min-width: 768px) {
   .offer-card {
-    height: 214px;
+    min-height: 214px;
   }
 
   .offer-card__discount {

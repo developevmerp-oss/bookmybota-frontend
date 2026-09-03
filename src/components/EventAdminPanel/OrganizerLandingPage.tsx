@@ -20,6 +20,13 @@ import {
 } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
+import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
+import {
+  PARTNER_CATEGORY_TYPES,
+  type PartnerCategoryKey,
+} from "@/data/partnerCategoryTypes";
+
+type OrganizerCategory = Extract<PartnerCategoryKey, "concert" | "comedy" | "sports" | "music">;
 
 const FEATURE_SLIDES = [
   {
@@ -58,6 +65,15 @@ const FEATURE_SLIDES = [
     bg: "#1D4E89",
   },
 ];
+
+const HERO_IMAGE = FEATURE_SLIDES[0].image;
+
+const CATEGORY_HERO_IMAGES: Record<OrganizerCategory, string> = {
+  concert: FEATURE_SLIDES[1].image,
+  comedy: "https://images.unsplash.com/photo-1527224857830-43d7b7b4e8f6?w=1200&q=80",
+  sports: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80",
+  music: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200&q=80",
+};
 
 const HOST_CATEGORIES = [
   {
@@ -120,28 +136,28 @@ const SERVICES = [
     blurb: "Flexible ticket tiers and offers so you stay in control of revenue.",
   },
   {
-    label: "Food & Beverages",
+    label: "Food & beverages, stalls and the works!",
     infoId: "organizer.service.fnb",
     Icon: Truck,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/food.png",
     blurb: "Coordinate F&B, stalls and add-ons alongside ticket sales.",
   },
   {
-    label: "On-ground Support",
+    label: "On ground support & gate entry management",
     infoId: "organizer.service.on-ground",
     Icon: Handshake,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/on-ground-support.png",
     blurb: "Smooth check-in and gate management on event day.",
   },
   {
-    label: "Reports & Insights",
+    label: "Reports & business insights",
     infoId: "organizer.service.reports",
     Icon: BarChart3,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/report.png",
     blurb: "Track sales and performance with clear business reports.",
   },
   {
-    label: "Smart Access Solutions",
+    label: "POS, RFID, Turnstiles & more...",
     infoId: "organizer.service.pos",
     Icon: Smartphone,
     iconSrc: "https://assets-in.bmscdn.com/static/2021/06/rfids.png",
@@ -170,9 +186,14 @@ const TESTIMONIALS = [
   },
 ];
 
-export default function OrganizerLandingPage() {
+export default function OrganizerLandingPage({
+  category,
+}: {
+  category?: OrganizerCategory;
+} = {}) {
   const router = useRouter();
   const [loginOpen, setLoginOpen] = useState(false);
+  const categoryConfig = category ? PARTNER_CATEGORY_TYPES[category] : null;
 
   const openLogin = () => {
     const session = readSessionForRole("event_admin");
@@ -185,6 +206,10 @@ export default function OrganizerLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
+      centeredPartnerHeader
+      showBackButton
+      loginHref="/organizer/login"
       expectedRole="event_admin"
       loginTitle="Event Admin Login"
       loginSubtitle="Sign in to manage your events"
@@ -197,19 +222,22 @@ export default function OrganizerLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your show"
-      secondaryLoginLabel="Organizer Login"
-      slides={FEATURE_SLIDES}
-      hostTitle="What can you host?"
-      hostSubtitle="From local gatherings to global events, Book My Bota helps you create unforgettable experiences across every category."
-      hostTiles={HOST_CATEGORIES}
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
+      heroImage={category ? CATEGORY_HERO_IMAGES[category] : HERO_IMAGE}
+      heroImageAlt={
+        categoryConfig
+          ? `${categoryConfig.title} partner on Book My Bota`
+          : "Event organizer partner on Book My Bota"
+      }
+      imageCards={PARTNER_VENUE_TYPE_CARDS}
+      categoryTypesTitle={categoryConfig ? `${categoryConfig.title} Types` : undefined}
+      categoryTypes={categoryConfig?.types}
       servicesTitle="What are the services we offer?"
-      servicesSubtitle="Everything you need to run successful events, all in one place."
+      servicesSubtitle="After successful collaborations with the best event organisers over the past decade and a half, we're well equipped to bring your vision to life."
       servicesTiles={SERVICES}
-      servicesFootnote="Apart from these must-haves for any event, we also support a host of other services like SEO for your event, custom pricing for your tickets, and dedicated organizer tools to manage bookings and guest experience."
+      servicesFootnote="Apart from these must haves for any event, we also support a host of other services like SEO for your event, custom pricing for your tickets and this and also this."
       testimonials={TESTIMONIALS}
-      securityTitle="Sit back and watch your event come to life"
-      securitySubtitle="Events may be all fun and games, but we take it seriously. We ensure our customer's security so that you don't have to."
       crossLinks={
         <p className="flex flex-wrap items-center justify-center gap-2">
           Already partnered for dining?

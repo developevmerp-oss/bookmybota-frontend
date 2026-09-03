@@ -7,6 +7,7 @@ import {
 } from './dateFormat';
 import { parseYouTubeId } from './youtube';
 import { countChars } from './eventDocumentScope';
+import { validateShowtimeTickets } from './eventTicketLayoutValidation';
 
 /** About event limit — characters so the counter rises as the user types. */
 export const MAX_ABOUT_EVENT_CHARS = 2500;
@@ -62,6 +63,18 @@ const showtimeSchema = yup.object({
     .default(null),
   custom_layout_notes: yup.string().trim().default(''),
   custom_layout_images: yup.array().of(yup.string().required()).default([]),
+  /** Client-only: published layout capacity when standard mode is selected. */
+  layout_capacity_snapshot: yup
+    .number()
+    .nullable()
+    .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+    .default(null),
+  /** Client-only: seat count from layout map when loaded. */
+  layout_seat_count_snapshot: yup
+    .number()
+    .nullable()
+    .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+    .default(null),
   location_id: yup
     .number()
     .nullable()
@@ -275,6 +288,21 @@ export const eventSubmitSchema = eventDraftSchema.shape({
             then: (schema) => schema.required('Custom layout name is required'),
             otherwise: (schema) => schema,
           }),
+        custom_layout_capacity: yup
+          .number()
+          .nullable()
+          .transform((value, original) =>
+            original === '' || original === null || original === undefined ? null : value
+          )
+          .when('layout_mode', {
+            is: 'custom',
+            then: (schema) =>
+              schema
+                .typeError('Expected capacity must be a number')
+                .required('Expected capacity is required for custom layout')
+                .min(1, 'Expected capacity must be at least 1'),
+            otherwise: (schema) => schema.nullable(),
+          }),
       })
     )
     .min(1, 'At least one venue / showtime is required')
@@ -283,10 +311,9 @@ export const eventSubmitSchema = eventDraftSchema.shape({
       if (!showtimes?.length) return true;
       const durationMinutes = Number(this.parent?.duration_minutes) || 0;
       for (const s of showtimes) {
-        if (!s.ticket_types?.length) {
-          return this.createError({
-            message: `Add at least one ticket type for venue "${s.venue_name || 'this venue'}".`,
-          });
+        const ticketErr = validateShowtimeTickets(s, { forSubmit: true });
+        if (ticketErr) {
+          return this.createError({ message: ticketErr });
         }
         const { starts_at: start, ends_at: end } = showtimeToIso(s, durationMinutes);
         if (!start) {
@@ -337,6 +364,8 @@ export const defaultVenue = (): EventFormValues['showtimes'][number] => ({
   custom_layout_capacity: null,
   custom_layout_notes: '',
   custom_layout_images: [],
+  layout_capacity_snapshot: null,
+  layout_seat_count_snapshot: null,
   location_id: null,
   venue_proposal: null,
   duration_type: 'ONE_DAY',
@@ -496,6 +525,7 @@ export function getCompletedEventStepIds(opts: {
       }
       const tickets = s.ticket_types || [];
       if (!tickets.length) return false;
+      if (validateShowtimeTickets(s, { forSubmit: true })) return false;
       return tickets.every(
         (t) =>
           Boolean(t.ticket_type?.trim()) &&

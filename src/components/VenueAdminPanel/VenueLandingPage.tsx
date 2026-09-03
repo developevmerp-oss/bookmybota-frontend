@@ -17,6 +17,7 @@ import {
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
+import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
 
 const FEATURE_SLIDES = [
@@ -53,6 +54,8 @@ const FEATURE_SLIDES = [
     bg: "#1D4E89",
   },
 ];
+
+const HERO_IMAGE = FEATURE_SLIDES[0].image;
 
 const VENUE_TYPES = [
   {
@@ -163,6 +166,10 @@ export default function VenueLandingPage() {
 
   return (
     <PartnerListYourShowLanding
+      layout="bms"
+      centeredPartnerHeader
+      showBackButton
+      loginHref="/venue/login"
       expectedRole="venue_admin"
       loginTitle="Venue Admin Login"
       loginSubtitle="Sign in to manage layouts and claim events"
@@ -175,19 +182,16 @@ export default function VenueLandingPage() {
           </Link>
         </p>
       }
-      primaryCtaLabel="List your venue"
-      secondaryLoginLabel="Venue Login"
-      slides={FEATURE_SLIDES}
-      hostTitle="What can you host???"
-      hostSubtitle="From auditoriums to banquet halls and outdoor grounds — list your space so organizers can book shows where your guests already gather."
-      hostTiles={VENUE_TYPES}
+      primaryCtaLabel="List your business"
+      secondaryLoginLabel="Login your business"
+      heroImage={HERO_IMAGE}
+      heroImageAlt="Venue partner on Book My Bota"
+      imageCards={PARTNER_VENUE_TYPE_CARDS}
       servicesTitle="What are the services we offer?"
       servicesSubtitle="Tools built for venue operators — claim shows at your property, publish layouts, and stay connected to organizers using Book My Bota."
       servicesTiles={SERVICES}
       servicesFootnote="Complete account setup (details + documents). After Super Admin approval, sign in to manage layouts and claim events."
       testimonials={TESTIMONIALS}
-      securityTitle="Sit back and watch your venue come to life"
-      securitySubtitle="Hosting events is exciting — paperwork shouldn't be. We keep partner data and guest bookings secure so you can focus on the floor."
       middleSlot={
         <PartnerDirectorySection
           title="Registered venues on Book My Bota"

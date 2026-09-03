@@ -256,7 +256,6 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
                   <Play className="size-3.5" fill="currentColor" /> Watch Trailer:
                 </span>
                 {movie.trailers.map((t, idx) => (
-<<<<<<< Updated upstream
                   <button
                     key={idx}
                     type="button"
@@ -283,33 +282,6 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
                 Watch trailer
               </button>
             ) : null}
-=======
-                  <a
-                    key={idx}
-                    href={t.trailerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/20 hover:border-white/50 transition-colors"
-                  >
-                    <Play className="size-3 text-rose-400" fill="currentColor" />
-                    {t.language}
-                  </a>
-                ))}
-              </div>
-            ) : movie.trailerUrl ? (
-              <a
-                href={movie.trailerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition-colors"
-              >
-                <Play className="size-4 text-rose-400" fill="currentColor" />
-                Watch trailer
-              </a>
-            ) : null}
-
-
->>>>>>> Stashed changes
 
             <div className="mt-6 sm:mt-8 flex flex-wrap items-center gap-3">
               {movie.comingSoon ? (

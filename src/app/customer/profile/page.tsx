@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useForm, Controller } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { Check, Loader2, Mail, MapPin, Pencil, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -11,8 +13,12 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, updateUser } from "@/features/auth/authSlice";
 import PhoneInput from "@/components/Shared/PhoneInput";
-import { isValidPhone } from "@/lib/validation";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { extractApiError } from "@/lib/apiErrors";
+import {
+  customerProfileSchema,
+  type CustomerProfileValues,
+} from "@/lib/customerProfileFormSchema";
 
 type FieldKey = "name" | "phone" | "email" | "address" | "city" | "state";
 
@@ -21,6 +27,8 @@ const inputClass =
 
 const plainInputClass =
   "w-full px-4 py-2.5 rounded-xl border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-[#6900AA]/25 focus:border-[#6900AA] disabled:bg-[#f7f7f7] disabled:text-[#555]";
+
+const fieldErrorClass = "mt-1.5 text-[12px] font-semibold text-rose-500";
 
 function FieldHeader({
   label,
@@ -39,7 +47,7 @@ function FieldHeader({
     <div className="flex items-center justify-between gap-2 mb-1.5">
       <label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
         {label}
-        {required && <span className="text-[#6900AA] ml-0.5">*</span>}
+        {required && <span className="text-rose-500 ml-0.5">*</span>}
       </label>
       {!editing && (
         <button
@@ -86,14 +94,6 @@ export default function CustomerProfilePage() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [initialized, setInitialized] = useState(false);
-  const [phoneValid, setPhoneValid] = useState(false);
   const [editing, setEditing] = useState<Record<FieldKey, boolean>>({
     name: false,
     phone: false,
@@ -108,6 +108,30 @@ export default function CustomerProfilePage() {
   const addressRef = useRef<HTMLInputElement>(null);
   const cityRef = useRef<HTMLInputElement>(null);
   const stateRef = useRef<HTMLInputElement>(null);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<CustomerProfileValues>({
+    resolver: yupResolver(customerProfileSchema) as any,
+    defaultValues: {
+      name: "",
+      phone: "",
+      email: "",
+      address: "",
+      city: "",
+      state: "",
+    },
+    mode: "onSubmit",
+  });
+
+  const name = watch("name") || "";
+  const phone = watch("phone") || "";
+  const email = watch("email") || "";
 
   const enableEdit = (key: FieldKey, focus?: () => void) => {
     setEditing((prev) => ({ ...prev, [key]: true }));
@@ -136,44 +160,36 @@ export default function CustomerProfilePage() {
   const [updateProfile, { isLoading: isSaving }] = useUpdateCustomerProfileMutation();
 
   useEffect(() => {
-    if (!profile || initialized) return;
-    setName(profile.name || "");
-    setPhone(profile.phone || "");
-    setEmail(profile.email || user?.email || "");
-    setAddress(profile.address || "");
-    setCity(profile.city || "");
-    setState(profile.state || "");
-    setInitialized(true);
-  }, [profile, user?.email, initialized]);
+    if (!profile) return;
+    reset({
+      name: profile.name || "",
+      phone: profile.phone || "",
+      email: profile.email || user?.email || "",
+      address: profile.address || "",
+      city: profile.city || "",
+      state: profile.state || "",
+    });
+  }, [profile, user?.email, reset]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onValid = async (values: CustomerProfileValues) => {
     if (!customerId) return;
-    if (!name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    if (phone.trim() && !isValidPhone(phone)) {
-      toast.error("Phone must be 9–12 digits (numbers only)");
-      return;
-    }
 
     try {
       const res = await updateProfile({
         customerId,
-        name: name.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        state: state.trim(),
+        name: values.name.trim(),
+        phone: (values.phone || "").trim(),
+        email: (values.email || "").trim(),
+        address: (values.address || "").trim(),
+        city: (values.city || "").trim(),
+        state: (values.state || "").trim(),
       }).unwrap();
 
       dispatch(
         updateUser({
           name: res.data.name,
           phone: res.data.phone,
-          email: res.data.email || email.trim(),
+          email: res.data.email || (values.email || "").trim(),
         })
       );
       window.dispatchEvent(new Event("auth_changed"));
@@ -185,13 +201,9 @@ export default function CustomerProfilePage() {
         city: false,
         state: false,
       });
-      toast.success("Profile updated successfully");
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "data" in err
-          ? String((err as { data?: { error?: string } }).data?.error || "Failed to update profile")
-          : "Failed to update profile";
-      toast.error(message);
+      toast.success(res.message || "Profile updated successfully");
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to update profile"));
     }
   };
 
@@ -204,6 +216,11 @@ export default function CustomerProfilePage() {
   }
 
   const displayName = name || user.name || user.email?.split("@")[0] || "Guest";
+  const { ref: nameRegisterRef, ...nameRegister } = register("name");
+  const { ref: emailRegisterRef, ...emailRegister } = register("email");
+  const { ref: addressRegisterRef, ...addressRegister } = register("address");
+  const { ref: cityRegisterRef, ...cityRegister } = register("city");
+  const { ref: stateRegisterRef, ...stateRegister } = register("state");
 
   return (
     <CustomerAccountLayout>
@@ -218,27 +235,32 @@ export default function CustomerProfilePage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit(onValid)} className="space-y-5" noValidate>
           <div>
             <FieldHeader
               label="Full Name"
+              required
               htmlFor="profile-name"
               editing={editing.name}
               onEdit={() => enableEdit("name", () => nameRef.current?.focus())}
             />
             <IconField icon={<User size={16} />}>
               <input
-                ref={nameRef}
                 id="profile-name"
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
                 disabled={!editing.name}
                 className={inputClass}
                 placeholder="Your name"
-                required
+                {...nameRegister}
+                ref={(el) => {
+                  nameRegisterRef(el);
+                  nameRef.current = el;
+                }}
               />
             </IconField>
+            {errors.name && (
+              <p className={fieldErrorClass}>{errors.name.message}</p>
+            )}
           </div>
 
           <div>
@@ -249,15 +271,21 @@ export default function CustomerProfilePage() {
               onEdit={() => enableEdit("phone")}
             />
             <div className="relative">
-              <PhoneInput
-                value={phone}
-                onChange={setPhone}
-                onValidChange={setPhoneValid}
-                required={!!phone.trim()}
-                placeholder="9876543210"
-                showIcon
-                disabled={!editing.phone}
-                inputClassName={`${inputClass}${!editing.phone && phone.trim() ? " pr-10" : ""}`}
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    required={!!(field.value || "").trim()}
+                    placeholder="9876543210"
+                    showIcon
+                    disabled={!editing.phone}
+                    inputClassName={`${inputClass}${!editing.phone && (field.value || "").trim() ? " pr-10" : ""}`}
+                  />
+                )}
               />
               {!editing.phone && phone.trim() && (
                 <Check
@@ -268,6 +296,9 @@ export default function CustomerProfilePage() {
                 />
               )}
             </div>
+            {errors.phone && (
+              <p className={fieldErrorClass}>{errors.phone.message}</p>
+            )}
           </div>
 
           <div>
@@ -279,16 +310,21 @@ export default function CustomerProfilePage() {
             />
             <IconField icon={<Mail size={16} />} showCheck={!editing.email && !!email.trim()}>
               <input
-                ref={emailRef}
                 id="profile-email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 disabled={!editing.email}
                 className={`${inputClass}${!editing.email && email.trim() ? " pr-10" : ""}`}
                 placeholder="you@example.com"
+                {...emailRegister}
+                ref={(el) => {
+                  emailRegisterRef(el);
+                  emailRef.current = el;
+                }}
               />
             </IconField>
+            {errors.email && (
+              <p className={fieldErrorClass}>{errors.email.message}</p>
+            )}
           </div>
 
           <div>
@@ -300,16 +336,21 @@ export default function CustomerProfilePage() {
             />
             <IconField icon={<MapPin size={16} />}>
               <input
-                ref={addressRef}
                 id="profile-address"
                 type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
                 disabled={!editing.address}
                 className={inputClass}
                 placeholder="Street address"
+                {...addressRegister}
+                ref={(el) => {
+                  addressRegisterRef(el);
+                  addressRef.current = el;
+                }}
               />
             </IconField>
+            {errors.address && (
+              <p className={fieldErrorClass}>{errors.address.message}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -321,15 +362,20 @@ export default function CustomerProfilePage() {
                 onEdit={() => enableEdit("city", () => cityRef.current?.focus())}
               />
               <input
-                ref={cityRef}
                 id="profile-city"
                 type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
                 disabled={!editing.city}
                 className={plainInputClass}
                 placeholder="City"
+                {...cityRegister}
+                ref={(el) => {
+                  cityRegisterRef(el);
+                  cityRef.current = el;
+                }}
               />
+              {errors.city && (
+                <p className={fieldErrorClass}>{errors.city.message}</p>
+              )}
             </div>
             <div>
               <FieldHeader
@@ -339,21 +385,26 @@ export default function CustomerProfilePage() {
                 onEdit={() => enableEdit("state", () => stateRef.current?.focus())}
               />
               <input
-                ref={stateRef}
                 id="profile-state"
                 type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
                 disabled={!editing.state}
                 className={plainInputClass}
                 placeholder="State"
+                {...stateRegister}
+                ref={(el) => {
+                  stateRegisterRef(el);
+                  stateRef.current = el;
+                }}
               />
+              {errors.state && (
+                <p className={fieldErrorClass}>{errors.state.message}</p>
+              )}
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={isSaving || (phone.trim() !== "" && !phoneValid)}
+            disabled={isSaving}
             className="btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 disabled:opacity-60"
           >
             {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}

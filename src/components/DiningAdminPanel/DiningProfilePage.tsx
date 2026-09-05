@@ -1,14 +1,26 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { Save, ImagePlus, X, Upload, Info, Wifi, Image as ImageIcon } from 'lucide-react';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { Save, ImagePlus, Wifi, Image as ImageIcon, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGetBusinessSettingsQuery, useUpdateBusinessSettingsMutation, useUploadImageMutation, useGetDiningCuisinesQuery, useGetCollectionsQuery, useGetCitiesQuery } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
 import { extractApiError } from '@/lib/apiErrors';
-import { isValidPhone } from '@/lib/validation';
+import {
+  diningPartnerProfileSchema,
+  emptyDiningPartnerProfileValues,
+  type DiningPartnerProfileValues,
+} from '@/lib/diningPartnerFormSchemas';
 import PhoneInput from '@/components/Shared/PhoneInput';
 import ImageCropPicker, { CroppedImageField } from '@/components/Shared/ImageCropPicker';
+
+const fieldErrorClass = 'mt-1.5 text-[11px] font-semibold text-rose-500';
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 function normalizeImageList(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -41,70 +53,72 @@ export default function ProfilePage() {
   const { data: cities = [] } = useGetCitiesQuery();
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
 
-  const [phone, setPhone] = useState('');
-  const [phoneValid, setPhoneValid] = useState(true);
-  const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [menuImages, setMenuImages] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("Basic Info");
   const [amenities, setAmenities] = useState<string[]>([]);
-  const [averageCost, setAverageCost] = useState<string>('');
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [cityId, setCityId] = useState<number | ''>('');
   const [cuisine, setCuisine] = useState('');
   const [collectionIds, setCollectionIds] = useState<number[]>([]);
-  const [openTime, setOpenTime] = useState('08:00');
-  const [closeTime, setCloseTime] = useState('23:30');
   const [uploadImage] = useUploadImageMutation();
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<DiningPartnerProfileValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(diningPartnerProfileSchema) as any,
+    defaultValues: emptyDiningPartnerProfileValues(),
+    mode: 'onSubmit',
+  });
 
   useEffect(() => {
     if (settings) {
-      setPhone(settings.phone || '');
-      setDescription(settings.description || '');
+      reset({
+        name: settings.name || '',
+        phone: settings.phone || '',
+        address: settings.address || '',
+        city_id: settings.city_id != null ? String(settings.city_id) : '',
+        description: settings.description || '',
+        average_cost: settings.average_cost ? String(settings.average_cost) : '',
+        open_time: settings.operating_hours?.['monday']?.open || '08:00',
+        close_time: settings.operating_hours?.['monday']?.close || '23:30',
+      });
       setCoverUrl(settings.cover_image_url || '');
       setGalleryImages(normalizeImageList(settings.gallery_images));
       setMenuImages(normalizeImageList(settings.menu_images));
       setAmenities(settings.amenities || []);
-      if (settings.average_cost) setAverageCost(settings.average_cost.toString());
-      if (settings.name) setName(settings.name);
-      if (settings.address) setAddress(settings.address);
-      setCityId(settings.city_id ?? '');
       if (settings.cuisine) setCuisine(settings.cuisine);
       setCollectionIds(
         Array.isArray(settings.collection_ids)
           ? settings.collection_ids.map(Number).filter((n) => Number.isInteger(n) && n > 0)
           : []
       );
-
-      if (settings.operating_hours && settings.operating_hours['monday']) {
-        setOpenTime(settings.operating_hours['monday'].open || '08:00');
-        setCloseTime(settings.operating_hours['monday'].close || '23:30');
-      }
     }
-  }, [settings]);
+  }, [settings, reset]);
 
-  const handleSave = async () => {
+  const onSave = handleSubmit(
+    async (values) => {
     if (!bizId) return;
-    if (phone.trim() && !isValidPhone(phone)) {
-      toast.error('Phone must be 9–12 digits (numbers only)');
-      return;
-    }
+    const openTime = values.open_time || '08:00';
+    const closeTime = values.close_time || '23:30';
     try {
-      await updateSettings({
+      const res = await updateSettings({
         bizId,
         body: {
-          phone,
-          description,
+          phone: values.phone,
+          description: values.description,
           cover_image_url: coverUrl,
           gallery_images: galleryImages,
           menu_images: menuImages,
           amenities: amenities,
-          average_cost: averageCost ? parseInt(averageCost) : undefined,
-          name,
-          address,
-          city_id: cityId === '' ? null : cityId,
+          average_cost: values.average_cost ? parseInt(values.average_cost, 10) : undefined,
+          name: values.name.trim(),
+          address: values.address.trim(),
+          city_id: values.city_id ? Number(values.city_id) : null,
           cuisine,
           collection_ids: collectionIds,
           operating_hours: {
@@ -118,11 +132,13 @@ export default function ProfilePage() {
           }
         }
       }).unwrap();
-      toast.success('Profile saved successfully!');
+      toast.success((res as { message?: string }).message || 'Profile saved successfully!');
     } catch (err) {
       toast.error(extractApiError(err, 'Failed to save profile'));
     }
-  };
+  },
+    () => setActiveTab('Basic Info')
+  );
 
   const uploadCropped = async (file: File, type: 'gallery' | 'menu' | 'cover') => {
     const formData = new FormData();
@@ -134,8 +150,8 @@ export default function ProfilePage() {
         else if (type === 'menu') setMenuImages((prev) => [...prev, res.url]);
         else setCoverUrl(res.url);
       }
-    } catch {
-      toast.error('Failed to upload ' + file.name);
+    } catch (err) {
+      toast.error(extractApiError(err, 'Failed to upload ' + file.name));
     }
   };
 
@@ -173,6 +189,7 @@ export default function ProfilePage() {
         ].map((tab) => (
           <button
             key={tab.name}
+            type="button"
             onClick={() => setActiveTab(tab.name)}
             className={`flex items-center gap-2 px-6 py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === tab.name
                 ? "border-rose-500 text-rose-500"
@@ -184,7 +201,12 @@ export default function ProfilePage() {
           </button>
         ))}
         </div>
-        <button onClick={handleSave} disabled={saving || (phone.trim() !== '' && !phoneValid)} className="btn-primary flex items-center gap-2 shrink-0 mb-2 sm:mb-0">
+        <button
+          type="button"
+          onClick={() => void onSave()}
+          disabled={saving}
+          className="btn-primary flex items-center gap-2 shrink-0 mb-2 sm:mb-0 disabled:opacity-60"
+        >
           <Save size={18} /> {saving ? 'Saving...' : 'Save Profile'}
         </button>
       </div>
@@ -193,31 +215,47 @@ export default function ProfilePage() {
         {activeTab === "Basic Info" && (
           <div className="glass-panel p-8 rounded-2xl border border-white/5 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <h3 className="text-lg font-bold text-white mb-6">Public Information</h3>
-            <div className="space-y-4">
+            <form
+              id="dining-partner-profile-form"
+              onSubmit={onSave}
+              className="space-y-4"
+              noValidate
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-2">Venue Name</label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="input-field" placeholder="e.g. The Grand Place" />
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">
+                    Venue Name <RequiredMark />
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. The Grand Place"
+                    {...register('name')}
+                  />
+                  {errors.name && <p className={fieldErrorClass}>{errors.name.message}</p>}
                 </div>
-                <PhoneInput
-                  label="Public Phone Number"
-                  labelClassName="block text-sm font-medium text-zinc-400 mb-2"
-                  variant="dark"
-                  value={phone}
-                  onChange={setPhone}
-                  onValidChange={setPhoneValid}
-                  required={false}
-                  placeholder="9876543210"
+                <Controller
+                  name="phone"
+                  control={control}
+                  render={({ field }) => (
+                    <PhoneInput
+                      label="Public Phone Number"
+                      labelClassName="block text-sm font-medium text-zinc-400 mb-2"
+                      variant="dark"
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      required
+                      placeholder="9876543210"
+                      error={errors.phone?.message}
+                    />
+                  )}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">City</label>
-                <select
-                  value={cityId === '' ? '' : String(cityId)}
-                  onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all"
-                >
+                <select className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all" {...register('city_id')}>
                   <option value="">Select city</option>
                   {cities.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -226,11 +264,20 @@ export default function ProfilePage() {
                   ))}
                 </select>
                 <p className="text-xs text-zinc-500 mt-1">Used for the top-bar city filter on the dining listing.</p>
+                {errors.city_id && <p className={fieldErrorClass}>{errors.city_id.message}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Full Address</label>
-                <textarea value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all" placeholder="Enter complete address..." rows={2} />
+                <label className="block text-sm font-medium text-zinc-400 mb-2">
+                  Full Address <RequiredMark />
+                </label>
+                <textarea
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all"
+                  placeholder="Enter complete address..."
+                  rows={2}
+                  {...register('address')}
+                />
+                {errors.address && <p className={fieldErrorClass}>{errors.address.message}</p>}
               </div>
 
               <div>
@@ -259,7 +306,13 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <>
-                    <input type="text" value={cuisine} onChange={(e) => setCuisine(e.target.value)} className="input-field" placeholder="e.g. Italian, Mexican" />
+                    <input
+                      type="text"
+                      value={cuisine}
+                      onChange={(e) => setCuisine(e.target.value)}
+                      className="input-field"
+                      placeholder="e.g. Italian, Mexican"
+                    />
                     <p className="text-xs text-zinc-500 mt-1">Comma separated</p>
                   </>
                 )}
@@ -298,11 +351,13 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Open Time</label>
-                  <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="input-field" />
+                  <input type="time" className="input-field" {...register('open_time')} />
+                  {errors.open_time && <p className={fieldErrorClass}>{errors.open_time.message}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-2">Close Time</label>
-                  <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="input-field" />
+                  <input type="time" className="input-field" {...register('close_time')} />
+                  {errors.close_time && <p className={fieldErrorClass}>{errors.close_time.message}</p>}
                 </div>
               </div>
 
@@ -328,18 +383,28 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Average Cost for Two (ETB)</label>
                 <input
                   type="number"
-                  value={averageCost}
-                  onChange={(e) => setAverageCost(e.target.value)}
                   className="input-field"
                   placeholder="e.g. 1200"
+                  {...register('average_cost')}
                 />
                 <p className="text-xs text-zinc-500 mt-1">Leave blank to use default price range mapping.</p>
+                {errors.average_cost && (
+                  <p className={fieldErrorClass}>{errors.average_cost.message}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">About the Venue</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all" placeholder="Tell your story. What makes your venue special?" rows={5} />
+                <textarea
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all"
+                  placeholder="Tell your story. What makes your venue special?"
+                  rows={5}
+                  {...register('description')}
+                />
+                {errors.description && (
+                  <p className={fieldErrorClass}>{errors.description.message}</p>
+                )}
               </div>
-            </div>
+            </form>
           </div>
         )}
 
@@ -387,7 +452,7 @@ export default function ProfilePage() {
                 >
                   Crop & add gallery photo
                 </ImageCropPicker>
-                <p className="text-xs text-zinc-500 mt-2 mb-4">These images will appear in the photo grid on your restaurant's booking page.</p>
+                <p className="text-xs text-zinc-500 mt-2 mb-4">These images will appear in the photo grid on your restaurant&apos;s booking page.</p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                   {galleryImages.map((url, idx) => (
@@ -405,8 +470,8 @@ export default function ProfilePage() {
                           if (res.url) {
                             setGalleryImages((prev) => prev.map((u, i) => (i === idx ? res.url : u)));
                           }
-                        } catch {
-                          toast.error('Failed to upload ' + file.name);
+                        } catch (err) {
+                          toast.error(extractApiError(err, 'Failed to upload ' + file.name));
                         }
                       }}
                     />
@@ -441,8 +506,8 @@ export default function ProfilePage() {
                           if (res.url) {
                             setMenuImages((prev) => prev.map((u, i) => (i === idx ? res.url : u)));
                           }
-                        } catch {
-                          toast.error('Failed to upload ' + file.name);
+                        } catch (err) {
+                          toast.error(extractApiError(err, 'Failed to upload ' + file.name));
                         }
                       }}
                     />

@@ -1,5 +1,7 @@
 "use client";
-import { use, useState } from "react";
+import { use } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -21,6 +23,16 @@ import { formatDateTime12h } from "@/lib/dateFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
+import {
+  adminEventRejectionSchema,
+  type AdminEventRejectionValues,
+} from "@/lib/adminFormSchemas";
+
+const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
@@ -66,18 +78,43 @@ export default function AdminEventDetailPage({
   const { id } = use(params);
   const { data: event, isLoading } = useGetAdminEventDetailQuery(id);
   const [updateEvent, { isLoading: isUpdating }] = useUpdateAdminEventMutation();
-  const [rejectionReason, setRejectionReason] = useState("");
 
-  const handleAction = async (action: "approve" | "reject" | "go_live" | "close") => {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<AdminEventRejectionValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(adminEventRejectionSchema) as any,
+    defaultValues: { rejection_reason: "" },
+    mode: "onSubmit",
+  });
+
+  const handleAction = async (action: "approve" | "go_live" | "close") => {
+    try {
+      await updateEvent({ id, action }).unwrap();
+      toast.success(
+        action === "approve"
+          ? "Event approved"
+          : action === "go_live"
+            ? "Event is now live"
+            : "Event closed"
+      );
+    } catch (err) {
+      toast.error(extractApiError(err, "Update failed"));
+    }
+  };
+
+  const onReject = async (values: AdminEventRejectionValues) => {
     try {
       await updateEvent({
         id,
-        action,
-        ...(action === "reject"
-          ? { rejection_reason: rejectionReason.trim() || undefined }
-          : {}),
+        action: "reject",
+        rejection_reason: values.rejection_reason.trim(),
       }).unwrap();
-      toast.success("Event updated");
+      toast.success("Event rejected (back to draft)");
+      reset({ rejection_reason: "" });
     } catch (err) {
       toast.error(extractApiError(err, "Update failed"));
     }
@@ -211,7 +248,7 @@ export default function AdminEventDetailPage({
               </button>
               <button
                 disabled={isUpdating}
-                onClick={() => handleAction("reject")}
+                onClick={handleSubmit(onReject)}
                 className="px-4 py-2 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-sm font-medium flex items-center gap-2"
               >
                 <XCircle size={16} /> Reject
@@ -249,15 +286,17 @@ export default function AdminEventDetailPage({
       {event.status === "PENDING_APPROVAL" && (
         <div className="glass-panel rounded-2xl border border-white/5 p-6">
           <label className="block text-sm font-medium text-zinc-400 mb-2">
-            Rejection reason (shown to organizer if you reject)
+            Rejection reason <RequiredMark />
           </label>
           <textarea
             rows={3}
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
+            {...register("rejection_reason")}
             placeholder="e.g. Poster quality is low, please upload a clearer image..."
             className="input-field resize-y min-h-[80px] w-full"
           />
+          {errors.rejection_reason && (
+            <p className={fieldErrorClass}>{errors.rejection_reason.message}</p>
+          )}
         </div>
       )}
 

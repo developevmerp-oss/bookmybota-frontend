@@ -1,29 +1,109 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import { useForm } from "react-hook-form";
+import * as yup from "yup";
 import { toast } from "sonner";
 import {
   useGetOrganizerEventQuery,
   useReviewOrganizerEventLayoutRequestMutation,
 } from "@/services/api";
+import { extractApiError } from "@/lib/apiErrors";
+import {
+  buildOrganizerLayoutNotesSchema,
+  type OrganizerLayoutNotesValues,
+} from "@/lib/organizerPartnerFormSchemas";
+
+const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
+const reqStar = <span className="text-rose-500">*</span>;
+
+function LayoutRequestReviewForm({
+  requestId,
+  reviewing,
+  onReview,
+}: {
+  requestId: string;
+  reviewing: boolean;
+  onReview: (id: string, action: "approve" | "request_changes", notes: string) => Promise<void>;
+}) {
+  const {
+    register,
+    getValues,
+    setError,
+    clearErrors,
+    formState: { errors },
+  } = useForm<OrganizerLayoutNotesValues>({
+    defaultValues: { notes: "" },
+    mode: "onSubmit",
+  });
+
+  const submitAction = async (action: "approve" | "request_changes") => {
+    clearErrors("notes");
+    try {
+      const values = await buildOrganizerLayoutNotesSchema(action).validate(getValues(), {
+        abortEarly: true,
+      });
+      await onReview(requestId, action, values.notes || "");
+    } catch (err) {
+      if (err instanceof yup.ValidationError) {
+        setError("notes", { type: "manual", message: err.message });
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+        Notes {reqStar}
+        <span className="ml-1 font-normal normal-case text-zinc-500">
+          (required when requesting changes; optional for approve)
+        </span>
+      </label>
+      <textarea
+        className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2 text-sm text-white"
+        rows={2}
+        placeholder="Notes (required for change request)"
+        {...register("notes")}
+      />
+      {errors.notes && <p className={fieldErrorClass}>{errors.notes.message}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={reviewing}
+          onClick={() => void submitAction("approve")}
+          className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-sm text-white"
+        >
+          Approve layout
+        </button>
+        <button
+          type="button"
+          disabled={reviewing}
+          onClick={() => void submitAction("request_changes")}
+          className="rounded-lg bg-amber-600 hover:bg-amber-500 px-3 py-1.5 text-sm text-white"
+        >
+          Request changes
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function OrganizerLayoutRequestsPanel({ eventId }: { eventId: string }) {
   const { data: event, isLoading } = useGetOrganizerEventQuery(eventId);
   const [review, { isLoading: reviewing }] = useReviewOrganizerEventLayoutRequestMutation();
-  const [notesById, setNotesById] = useState<Record<string, string>>({});
 
   const requests = (event?.layout_requests || []).filter((r) => r.status !== "DRAFT");
 
-  const onReview = async (id: string, action: "approve" | "request_changes") => {
+  const onReview = async (id: string, action: "approve" | "request_changes", notes: string) => {
     try {
       await review({
         id,
         action,
-        notes: notesById[id] || "",
+        notes,
       }).unwrap();
       toast.success(action === "approve" ? "Layout approved" : "Change request sent");
     } catch (err) {
-      toast.error((err as { data?: { error?: string } })?.data?.error || "Review failed");
+      toast.error(extractApiError(err, "Review failed"));
     }
   };
 
@@ -58,33 +138,11 @@ export default function OrganizerLayoutRequestsPanel({ eventId }: { eventId: str
           </div>
           {r.notes && <p className="text-sm text-zinc-300 whitespace-pre-wrap">{r.notes}</p>}
           {r.status === "PENDING_ORGANIZER_APPROVAL" && (
-            <div className="space-y-2">
-              <textarea
-                className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2 text-sm text-white"
-                rows={2}
-                placeholder="Notes (required for change request)"
-                value={notesById[r.id] || ""}
-                onChange={(e) => setNotesById((prev) => ({ ...prev, [r.id]: e.target.value }))}
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={reviewing}
-                  onClick={() => onReview(r.id, "approve")}
-                  className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-sm text-white"
-                >
-                  Approve layout
-                </button>
-                <button
-                  type="button"
-                  disabled={reviewing}
-                  onClick={() => onReview(r.id, "request_changes")}
-                  className="rounded-lg bg-amber-600 hover:bg-amber-500 px-3 py-1.5 text-sm text-white"
-                >
-                  Request changes
-                </button>
-              </div>
-            </div>
+            <LayoutRequestReviewForm
+              requestId={r.id}
+              reviewing={reviewing}
+              onReview={onReview}
+            />
           )}
           {r.organizer_change_notes && (
             <p className="text-sm text-amber-200">Change notes: {r.organizer_change_notes}</p>

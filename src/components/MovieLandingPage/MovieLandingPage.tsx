@@ -124,6 +124,7 @@ function mapCatalogMovieToCard(movie: Movie): MovieCardData {
     genres: movie.genres || [],
     formats: movie.formats || [],
     comingSoon: movie.status === "coming_soon",
+    promoted: Boolean(movie.is_promoted),
     href: `/movies/${movie.slug || movie.id}`,
   };
 }

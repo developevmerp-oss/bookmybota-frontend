@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { useForm, useFieldArray } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -27,18 +29,23 @@ import {
   useUpdatePartnerMovieShowtimeMutation,
   useDeletePartnerMovieShowtimeMutation,
   type MovieShowtime,
-  type MovieShowtimeTierPrice,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import {
+  emptyMovieShowtimeFormValues,
+  movieShowtimeFormSchema,
+  type MovieShowtimeFormValues,
+} from "@/lib/moviePartnerFormSchemas";
 
 const FORMAT_OPTIONS = ["2D", "3D", "IMAX 2D", "IMAX 3D", "4DX", "Dolby Cinema", "ScreenX"];
-const DEFAULT_TIERS = [
-  { tier_name: "VIP", defaultPrice: 400 },
-  { tier_name: "Executive", defaultPrice: 250 },
-  { tier_name: "Standard", defaultPrice: 150 },
-];
+
+const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 function parseIsoDateAndHours(iso: string) {
   if (!iso) return { dateStr: "", timeStr: "", displayTime: "" };
@@ -94,15 +101,13 @@ function formatDateHeader(isoDateStr: string) {
 export default function MovieShowtimesPage() {
   const searchParams = useSearchParams();
   const user = useAppSelector((state) => state.auth.user);
-  const bizId = user?.business_id || (user as any)?.business?.id || "";
+  const bizId = user?.business_id || (user as { business?: { id?: string } })?.business?.id || "";
 
-  // Date selection state (YYYY-MM-DD)
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [screenFilter, setScreenFilter] = useState<string>("");
   const [movieFilter, setMovieFilter] = useState<string>("");
 
-  // Queries
   const { data: screens = [] } = useGetCinemaScreensQuery(bizId, { skip: !bizId });
   const { data: catalogData } = useGetPartnerMovieCatalogQuery({ page: 1, limit: 100 });
   const catalogMovies = catalogData?.items ?? [];
@@ -121,149 +126,146 @@ export default function MovieShowtimesPage() {
     { skip: !bizId }
   );
 
-  // Mutations
   const [createShowtime, { isLoading: creating }] = useCreatePartnerMovieShowtimeMutation();
   const [updateShowtime, { isLoading: updating }] = useUpdatePartnerMovieShowtimeMutation();
   const [deleteShowtime, { isLoading: deleting }] = useDeletePartnerMovieShowtimeMutation();
 
-  // Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [editingShowtime, setEditingShowtime] = useState<MovieShowtime | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MovieShowtime | null>(null);
+  const [urlMovieHandled, setUrlMovieHandled] = useState(false);
 
-  // Form State
-  const [formMovieId, setFormMovieId] = useState("");
-  const [formScreenId, setFormScreenId] = useState("");
-  const [formDate, setFormDate] = useState(todayStr);
-  const [formStartTime, setFormStartTime] = useState("14:00");
-  const [formLanguage, setFormLanguage] = useState("English");
-  const [formFormat, setFormFormat] = useState("2D");
-  const [formTiers, setFormTiers] = useState<MovieShowtimeTierPrice[]>([
-    { tier_name: "Standard", price: 150 },
-  ]);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    control,
+    formState: { errors },
+  } = useForm<MovieShowtimeFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(movieShowtimeFormSchema) as any,
+    defaultValues: emptyMovieShowtimeFormValues({ show_date: todayStr }),
+    mode: "onSubmit",
+  });
 
-  // Handle movie_id param from URL
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "tier_pricing",
+  });
+
+  const formMovieId = watch("movie_id");
+  const formScreenId = watch("cinema_screen_id");
+
   useEffect(() => {
     const pMovieId = searchParams.get("movie_id");
-    if (pMovieId && !editingShowtime) {
-      setFormMovieId(pMovieId);
+    if (pMovieId && !editingShowtime && !urlMovieHandled) {
+      reset(
+        emptyMovieShowtimeFormValues({
+          movie_id: pMovieId,
+          cinema_screen_id: screens[0]?.id || "",
+          show_date: selectedDate || todayStr,
+        })
+      );
       setModalOpen(true);
+      setUrlMovieHandled(true);
     }
-  }, [searchParams, editingShowtime]);
+  }, [
+    searchParams,
+    editingShowtime,
+    urlMovieHandled,
+    reset,
+    screens,
+    selectedDate,
+    todayStr,
+  ]);
 
-  // Delete Confirm State
-  const [deleteTarget, setDeleteTarget] = useState<MovieShowtime | null>(null);
-
-  // Date helper navigation
   const shiftDate = (days: number) => {
     const d = new Date(selectedDate + "T00:00:00");
     d.setDate(d.getDate() + days);
     setSelectedDate(d.toISOString().split("T")[0]);
   };
 
-  // Open modal for Create
   const openCreateModal = () => {
     setEditingShowtime(null);
-    setFormMovieId(catalogMovies[0]?.id || "");
-    setFormScreenId(screens[0]?.id || "");
-    setFormDate(selectedDate || todayStr);
-    setFormStartTime("14:00");
-    setFormLanguage("English");
-    setFormFormat("2D");
-    setFormTiers([
-      { tier_name: "VIP", price: 350 },
-      { tier_name: "Standard", price: 200 },
-    ]);
+    reset(
+      emptyMovieShowtimeFormValues({
+        movie_id: catalogMovies[0]?.id || "",
+        cinema_screen_id: screens[0]?.id || "",
+        show_date: selectedDate || todayStr,
+        start_time: "14:00",
+        language: "English",
+        format: "2D",
+        tier_pricing: [
+          { tier_name: "VIP", price: 350 },
+          { tier_name: "Standard", price: 200 },
+        ],
+      })
+    );
     setModalOpen(true);
   };
 
-  // Open modal for Edit
   const openEditModal = (st: MovieShowtime) => {
     setEditingShowtime(st);
-    setFormMovieId(st.movie_id);
-    setFormScreenId(st.cinema_screen_id);
     const parsed = parseIsoDateAndHours(st.starts_at);
-    setFormDate(parsed.dateStr || selectedDate);
-    setFormStartTime(parsed.timeStr || "18:00");
-    setFormLanguage(st.language || "English");
-    setFormFormat(st.format || "2D");
-    setFormTiers(st.tier_pricing?.length ? st.tier_pricing : [{ tier_name: "Standard", price: 150 }]);
+    reset({
+      movie_id: st.movie_id,
+      cinema_screen_id: st.cinema_screen_id,
+      show_date: parsed.dateStr || selectedDate,
+      start_time: parsed.timeStr || "18:00",
+      language: st.language || "English",
+      format: st.format || "2D",
+      tier_pricing: st.tier_pricing?.length
+        ? st.tier_pricing.map((t) => ({ tier_name: t.tier_name, price: Number(t.price) }))
+        : [{ tier_name: "Standard", price: 150 }],
+    });
     setModalOpen(true);
   };
 
-  // Auto-adapt language and format when selected movie changes in form
   useEffect(() => {
-    if (!formMovieId) return;
+    if (!formMovieId || editingShowtime) return;
     const selectedMovie = catalogMovies.find((m) => m.id === formMovieId);
-    if (selectedMovie) {
-      if (selectedMovie.languages?.length && !editingShowtime) {
-        setFormLanguage(selectedMovie.languages[0]);
-      }
-      if (selectedMovie.formats?.length && !editingShowtime) {
-        setFormFormat(selectedMovie.formats[0]);
-      }
+    if (!selectedMovie) return;
+    if (selectedMovie.languages?.length) {
+      setValue("language", selectedMovie.languages[0]);
     }
-  }, [formMovieId, catalogMovies, editingShowtime]);
+    if (selectedMovie.formats?.length) {
+      setValue("format", selectedMovie.formats[0]);
+    }
+  }, [formMovieId, catalogMovies, editingShowtime, setValue]);
 
-  // Handle tier editing
-  const updateTier = (idx: number, field: "tier_name" | "price", val: any) => {
-    setFormTiers((prev) => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], [field]: field === "price" ? Number(val) : val };
-      return next;
-    });
-  };
-
-  const addTier = () => {
-    setFormTiers((prev) => [...prev, { tier_name: "Premium", price: 250 }]);
-  };
-
-  const removeTier = (idx: number) => {
-    setFormTiers((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  // Submit showtime
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onValid = async (values: MovieShowtimeFormValues) => {
     if (!bizId) {
       toast.error("Business ID not found");
       return;
     }
-    if (!formMovieId) {
-      toast.error("Please select a movie.");
-      return;
-    }
-    if (!formScreenId) {
-      toast.error("Please select a cinema screen.");
-      return;
-    }
-    if (!formDate || !formStartTime) {
-      toast.error("Please specify show date and start time.");
-      return;
-    }
 
     const payload = {
-      movie_id: formMovieId,
-      cinema_screen_id: formScreenId,
-      starts_at: `${formDate}T${formStartTime}:00`,
-      language: formLanguage.trim() || "English",
-      format: formFormat.trim() || "2D",
-      tier_pricing: formTiers.filter((t) => t.tier_name && Number(t.price) >= 0),
+      movie_id: values.movie_id,
+      cinema_screen_id: values.cinema_screen_id,
+      starts_at: `${values.show_date}T${values.start_time}:00`,
+      language: values.language?.trim() || "English",
+      format: values.format?.trim() || "2D",
+      tier_pricing: (values.tier_pricing || [])
+        .filter((t) => t.tier_name && Number(t.price) >= 0)
+        .map((t) => ({ tier_name: t.tier_name, price: Number(t.price) })),
     };
 
     try {
       if (editingShowtime) {
-        await updateShowtime({
+        const res = await updateShowtime({
           bizId,
           showtimeId: editingShowtime.id,
           body: payload,
         }).unwrap();
-        toast.success("Showtime updated successfully!");
+        toast.success((res as { message?: string })?.message || "Showtime updated successfully!");
       } else {
-        await createShowtime({
+        const res = await createShowtime({
           bizId,
           body: payload,
         }).unwrap();
-        toast.success("Showtime scheduled successfully!");
+        toast.success((res as { message?: string })?.message || "Showtime scheduled successfully!");
       }
       setModalOpen(false);
     } catch (err) {
@@ -271,29 +273,29 @@ export default function MovieShowtimesPage() {
     }
   };
 
-  // Toggle active status
   const handleToggleActive = async (st: MovieShowtime) => {
     try {
-      await updateShowtime({
+      const res = await updateShowtime({
         bizId,
         showtimeId: st.id,
         body: { is_active: !st.is_active },
       }).unwrap();
-      toast.success(st.is_active ? "Showtime disabled" : "Showtime enabled");
+      toast.success(
+        (res as { message?: string })?.message || (st.is_active ? "Showtime disabled" : "Showtime enabled")
+      );
     } catch (err) {
       toast.error(extractApiError(err, "Failed to update showtime status"));
     }
   };
 
-  // Confirm delete
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
     try {
-      await deleteShowtime({
+      const res = await deleteShowtime({
         bizId,
         showtimeId: deleteTarget.id,
       }).unwrap();
-      toast.success("Showtime removed successfully");
+      toast.success((res as { message?: string })?.message || "Showtime removed successfully");
       setDeleteTarget(null);
     } catch (err) {
       toast.error(extractApiError(err, "Failed to delete showtime"));
@@ -305,7 +307,6 @@ export default function MovieShowtimesPage() {
 
   return (
     <div className="w-full space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -325,9 +326,7 @@ export default function MovieShowtimesPage() {
         </button>
       </div>
 
-      {/* Date Switcher & Filters */}
       <div className="glass-panel rounded-2xl border border-white/10 p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Date Navigation */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -370,7 +369,6 @@ export default function MovieShowtimesPage() {
           </button>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={screenFilter}
@@ -400,7 +398,6 @@ export default function MovieShowtimesPage() {
         </div>
       </div>
 
-      {/* Screen Alerts if no screens exist */}
       {screens.length === 0 && (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-amber-200 text-sm">
           <p className="font-semibold mb-1">No cinema screens configured yet.</p>
@@ -410,7 +407,6 @@ export default function MovieShowtimesPage() {
         </div>
       )}
 
-      {/* Showtimes List */}
       {isLoading ? (
         <div className="glass-panel rounded-2xl border border-white/10 p-12 text-center text-zinc-400">
           Loading schedule…
@@ -457,7 +453,6 @@ export default function MovieShowtimesPage() {
                       : "border-white/5 bg-zinc-950/40 opacity-60"
                   }`}
                 >
-                  {/* Left: Movie Info */}
                   <div className="flex items-start gap-4 min-w-0">
                     <div className="w-14 h-20 rounded-lg overflow-hidden bg-zinc-800 shrink-0 border border-white/10">
                       {st.movie_poster_url ? (
@@ -509,7 +504,6 @@ export default function MovieShowtimesPage() {
                         ) : null}
                       </div>
 
-                      {/* Tier Pricing Chips */}
                       {st.tier_pricing && st.tier_pricing.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap pt-1">
                           <Tag size={12} className="text-zinc-500" />
@@ -526,7 +520,6 @@ export default function MovieShowtimesPage() {
                     </div>
                   </div>
 
-                  {/* Middle: Timing Badge */}
                   <div className="flex md:flex-col items-center md:items-end justify-between w-full md:w-auto shrink-0 gap-1 bg-white/5 md:bg-transparent p-2.5 md:p-0 rounded-xl">
                     <div className="flex items-center gap-1.5 text-base font-extrabold text-white">
                       <Clock size={16} className="text-rose-400" />
@@ -536,7 +529,6 @@ export default function MovieShowtimesPage() {
                     <span className="text-[11px] text-zinc-400">{formatDateHeader(selectedDate)}</span>
                   </div>
 
-                  {/* Right: Actions */}
                   <div className="flex items-center gap-2 self-end md:self-center shrink-0">
                     <button
                       type="button"
@@ -576,7 +568,6 @@ export default function MovieShowtimesPage() {
         </div>
       )}
 
-      {/* Schedule / Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
           <div className="glass-panel w-full max-w-xl rounded-2xl border border-white/20 p-6 sm:p-7 space-y-5 bg-zinc-900 text-white shadow-2xl my-8">
@@ -599,16 +590,13 @@ export default function MovieShowtimesPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Movie Selection */}
+            <form onSubmit={handleSubmit(onValid)} className="space-y-4" noValidate>
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Select Movie <span className="text-rose-400">*</span>
+                  Select Movie <RequiredMark />
                 </label>
                 <select
-                  value={formMovieId}
-                  onChange={(e) => setFormMovieId(e.target.value)}
-                  required
+                  {...register("movie_id")}
                   className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
                 >
                   <option value="">-- Choose movie from catalog --</option>
@@ -618,24 +606,26 @@ export default function MovieShowtimesPage() {
                     </option>
                   ))}
                 </select>
+                {errors.movie_id && <p className={fieldErrorClass}>{errors.movie_id.message}</p>}
                 {activeMovieForForm && (
                   <p className="mt-1 text-[11px] text-zinc-400 flex items-center gap-2">
-                    <span>Certificate: <strong>{activeMovieForForm.certificate || "Not specified"}</strong></span>
+                    <span>
+                      Certificate: <strong>{activeMovieForForm.certificate || "Not specified"}</strong>
+                    </span>
                     <span>•</span>
-                    <span>Duration: <strong>{activeMovieForForm.duration_minutes || 120} mins</strong></span>
+                    <span>
+                      Duration: <strong>{activeMovieForForm.duration_minutes || 120} mins</strong>
+                    </span>
                   </p>
                 )}
               </div>
 
-              {/* Screen Selection */}
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Cinema Screen / Auditorium <span className="text-rose-400">*</span>
+                  Cinema Screen / Auditorium <RequiredMark />
                 </label>
                 <select
-                  value={formScreenId}
-                  onChange={(e) => setFormScreenId(e.target.value)}
-                  required
+                  {...register("cinema_screen_id")}
                   className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
                 >
                   <option value="">-- Choose screen --</option>
@@ -645,6 +635,9 @@ export default function MovieShowtimesPage() {
                     </option>
                   ))}
                 </select>
+                {errors.cinema_screen_id && (
+                  <p className={fieldErrorClass}>{errors.cinema_screen_id.message}</p>
+                )}
                 {activeScreenForForm?.layout_name && (
                   <p className="mt-1 text-[11px] text-emerald-400">
                     ✓ Layout Attached: <strong>{activeScreenForForm.layout_name}</strong>
@@ -652,42 +645,37 @@ export default function MovieShowtimesPage() {
                 )}
               </div>
 
-              {/* Date & Start Time */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                    Show Date <span className="text-rose-400">*</span>
+                    Show Date <RequiredMark />
                   </label>
                   <input
                     type="date"
-                    value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    required
+                    {...register("show_date")}
                     className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
                   />
+                  {errors.show_date && <p className={fieldErrorClass}>{errors.show_date.message}</p>}
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                    Start Time <span className="text-rose-400">*</span>
+                    Start Time <RequiredMark />
                   </label>
                   <input
                     type="time"
-                    value={formStartTime}
-                    onChange={(e) => setFormStartTime(e.target.value)}
-                    required
+                    {...register("start_time")}
                     className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
                   />
+                  {errors.start_time && <p className={fieldErrorClass}>{errors.start_time.message}</p>}
                 </div>
               </div>
 
-              {/* Language & Format */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Audio Language</label>
                   <input
-                    value={formLanguage}
-                    onChange={(e) => setFormLanguage(e.target.value)}
+                    {...register("language")}
                     placeholder="e.g. English, Amharic"
                     className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
                   />
@@ -696,8 +684,7 @@ export default function MovieShowtimesPage() {
                 <div>
                   <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Screen Format</label>
                   <select
-                    value={formFormat}
-                    onChange={(e) => setFormFormat(e.target.value)}
+                    {...register("format")}
                     className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
                   >
                     {FORMAT_OPTIONS.map((f) => (
@@ -709,16 +696,19 @@ export default function MovieShowtimesPage() {
                 </div>
               </div>
 
-              {/* Tier Pricing Configuration */}
               <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="block text-xs font-bold text-zinc-200">Seat Tier Ticket Pricing (ETB)</label>
-                    <p className="text-[11px] text-zinc-400">Set prices for seat categories configured in the layout.</p>
+                    <label className="block text-xs font-bold text-zinc-200">
+                      Seat Tier Ticket Pricing (ETB) <RequiredMark />
+                    </label>
+                    <p className="text-[11px] text-zinc-400">
+                      Set prices for seat categories configured in the layout.
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={addTier}
+                    onClick={() => append({ tier_name: "Premium", price: 250 })}
                     className="text-xs text-rose-400 hover:text-rose-300 font-semibold inline-flex items-center gap-1"
                   >
                     <Plus size={14} /> Add Tier
@@ -726,41 +716,49 @@ export default function MovieShowtimesPage() {
                 </div>
 
                 <div className="space-y-2.5">
-                  {formTiers.map((tier, idx) => (
-                    <div key={idx} className="flex items-center gap-2.5">
-                      <input
-                        value={tier.tier_name}
-                        onChange={(e) => updateTier(idx, "tier_name", e.target.value)}
-                        placeholder="Tier name (e.g. VIP, Standard)"
-                        className="flex-1 bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
-                      />
-                      <div className="w-32 flex items-center gap-1 bg-zinc-800 border border-white/10 rounded-lg px-2.5 py-1.5">
-                        <span className="text-[11px] text-zinc-400">ETB</span>
+                  {fields.map((field, idx) => (
+                    <div key={field.id} className="space-y-1">
+                      <div className="flex items-center gap-2.5">
                         <input
-                          type="number"
-                          min={0}
-                          value={tier.price}
-                          onChange={(e) => updateTier(idx, "price", e.target.value)}
-                          placeholder="Price"
-                          className="w-full bg-transparent text-xs text-white font-semibold focus:outline-none text-right"
+                          {...register(`tier_pricing.${idx}.tier_name`)}
+                          placeholder="Tier name (e.g. VIP, Standard)"
+                          className="flex-1 bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
                         />
+                        <div className="w-32 flex items-center gap-1 bg-zinc-800 border border-white/10 rounded-lg px-2.5 py-1.5">
+                          <span className="text-[11px] text-zinc-400">ETB</span>
+                          <input
+                            type="number"
+                            min={0}
+                            {...register(`tier_pricing.${idx}.price`, { valueAsNumber: true })}
+                            placeholder="Price"
+                            className="w-full bg-transparent text-xs text-white font-semibold focus:outline-none text-right"
+                          />
+                        </div>
+                        {fields.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => remove(idx)}
+                            className="p-1.5 text-zinc-500 hover:text-rose-400 rounded-lg"
+                            title="Remove tier"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
-                      {formTiers.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeTier(idx)}
-                          className="p-1.5 text-zinc-500 hover:text-rose-400 rounded-lg"
-                          title="Remove tier"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      {(errors.tier_pricing?.[idx]?.tier_name || errors.tier_pricing?.[idx]?.price) && (
+                        <p className={fieldErrorClass}>
+                          {errors.tier_pricing?.[idx]?.tier_name?.message ||
+                            errors.tier_pricing?.[idx]?.price?.message}
+                        </p>
                       )}
                     </div>
                   ))}
                 </div>
+                {typeof errors.tier_pricing?.message === "string" && (
+                  <p className={fieldErrorClass}>{errors.tier_pricing.message}</p>
+                )}
               </div>
 
-              {/* Form Footer */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
@@ -782,7 +780,6 @@ export default function MovieShowtimesPage() {
         </div>
       )}
 
-      {/* Delete Confirmation */}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Cancel Showtime"

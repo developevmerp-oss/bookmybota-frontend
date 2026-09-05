@@ -42,8 +42,16 @@ export function formatMoney(
   return `${formatted} ${CURRENCY_SYMBOL}`;
 }
 
-/** @deprecated Use formatMoney — kept for gradual migration */
-export const formatCurrency = formatMoney;
+/**
+ * Format money — hides .00 decimals but keeps cents when present.
+ * @example formatMoneyDisplay(2000) → "2,000 ETB"
+ * @example formatMoneyDisplay(129.99) → "129.99 ETB"
+ */
+export function formatMoneyDisplay(
+  amount: number | string | undefined | null
+): string {
+  return `${formatWholeNumber(amount)} ${CURRENCY_SYMBOL}`;
+}
 
 /** Dining budget tier labels (low → high) */
 export const PRICE_TIERS = ['Br', 'Br Br', 'Br Br Br', 'Br Br Br Br'] as const;

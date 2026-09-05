@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { CheckCircle, ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import PartnerDocumentsFields, {
@@ -9,7 +11,6 @@ import PartnerDocumentsFields, {
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
-import { isValidPhone } from "@/lib/validation";
 import { extractApiError } from "@/lib/apiErrors";
 import {
   useGetBusinessTypesQuery,
@@ -22,6 +23,11 @@ import {
 } from "@/services/api";
 import VenueLocationFields from "@/components/VenueAdminPanel/VenueLocationFields";
 import { CANONICAL_VENUE_TYPE_SLUGS, VENUE_TYPE_LABELS, defaultVenueMeta, type VenueMeta } from "@/lib/venueCategoryConfig";
+import {
+  buildOrganizerAccountSetupFormSchema,
+  emptyOrganizerAccountSetupFormValues,
+  type OrganizerAccountSetupFormValues,
+} from "@/lib/organizerAccountSetupFormSchema";
 
 type StepId = 1 | 2;
 
@@ -29,6 +35,9 @@ const STEPS: { id: StepId; label: string }[] = [
   { id: 1, label: "General Information" },
   { id: 2, label: "Upload documents" },
 ];
+
+const reqStar = <span className="text-rose-500">*</span>;
+const fieldErrorClass = "mt-1.5 text-xs font-semibold text-rose-500";
 
 /** Full-bleed section: header bar flush to main box edges; only fields are padded */
 function SectionBlock({ title, children }: { title: string; children: React.ReactNode }) {
@@ -140,13 +149,30 @@ export default function OrganizerAccountSetupForm({
   const [step, setStep] = useState<StepId>(1);
   const [step1Done, setStep1Done] = useState(false);
 
-  const [orgName, setOrgName] = useState("");
-  const [orgAddress, setOrgAddress] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [phoneValid, setPhoneValid] = useState(false);
-  const [subtypeId, setSubtypeId] = useState("");
+  const needsSubtype = module === "venue" || module === "artist";
+  const requireAddress = module !== "artist";
+
+  const schema = useMemo(
+    () => buildOrganizerAccountSetupFormSchema({ needsSubtype, requireAddress }),
+    [needsSubtype, requireAddress]
+  );
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    trigger,
+    formState: { errors },
+  } = useForm<OrganizerAccountSetupFormValues>({
+    resolver: yupResolver(schema) as never,
+    defaultValues: emptyOrganizerAccountSetupFormValues(),
+    mode: "onSubmit",
+  });
+
+  const phone = watch("phone");
+  const subtypeId = watch("subtypeId");
+
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [countryId, setCountryId] = useState<number | "">("");
   const [cityId, setCityId] = useState<number | "">("");
@@ -154,14 +180,14 @@ export default function OrganizerAccountSetupForm({
     countryId ? { country_id: Number(countryId) } : undefined,
     { skip: !countryId || !["venue", "artist", "event", "cinema"].includes(module) }
   );
-  const [venueMeta, setVenueMeta] = useState<VenueMeta>(() => defaultVenueMeta());
+  const [venueMeta] = useState<VenueMeta>(() => defaultVenueMeta());
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
   const [error, setError] = useState<string | null>(null);
-
-  const needsSubtype = module === "venue" || module === "artist";
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   const moduleParentId = useMemo(() => {
     const parent =
@@ -190,47 +216,19 @@ export default function OrganizerAccountSetupForm({
 
   useEffect(() => {
     if (!needsSubtype) {
-      setSubtypeId("");
+      setValue("subtypeId", "");
       return;
     }
     if (subtypeId && !subtypeOptions.some((t) => String(t.id) === subtypeId)) {
-      setSubtypeId("");
+      setValue("subtypeId", "");
     }
-  }, [needsSubtype, subtypeId, subtypeOptions]);
+  }, [needsSubtype, subtypeId, subtypeOptions, setValue]);
 
-  const step1Valid = useMemo(() => {
+  const hasValidLocation = useMemo(() => {
     const needsGeo = module === "venue" || module === "artist" || module === "event" || module === "cinema";
-    const hasLocation =
-      module === "artist"
-        ? !!countryId && !!cityId
-        : needsGeo
-          ? orgAddress.trim().length > 1 && !!countryId && !!cityId
-          : orgAddress.trim().length > 1;
-    const base =
-      !!moduleParentId &&
-      (!needsSubtype || !!subtypeId) &&
-      orgName.trim().length > 1 &&
-      hasLocation &&
-      contactName.trim().length > 1 &&
-      phoneValid &&
-      !!adminEmail.trim() &&
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim()) &&
-      (module !== "artist" || !!coverImageUrl.trim());
-    return base;
-  }, [
-    moduleParentId,
-    needsSubtype,
-    subtypeId,
-    orgName,
-    orgAddress,
-    contactName,
-    phoneValid,
-    adminEmail,
-    module,
-    coverImageUrl,
-    countryId,
-    cityId,
-  ]);
+    if (!needsGeo) return true;
+    return !!countryId && !!cityId;
+  }, [module, countryId, cityId]);
 
   const canOpenStep = (id: StepId) => (id === 1 ? true : step1Done);
 
@@ -243,40 +241,53 @@ export default function OrganizerAccountSetupForm({
     setError(null);
   };
 
-  const handleSaveStep1 = () => {
-    if (!step1Valid) {
+  const validateExtras = (): string | null => {
+    if (!moduleParentId) return copy.typeMissing;
+    if (!hasValidLocation) {
+      setLocationError("Please select country and city.");
+      return "Please select country and city.";
+    }
+    setLocationError(null);
+    if (module === "artist" && !coverImageUrl.trim()) {
+      setCoverError("Please upload an artist image.");
+      return "Please upload an artist image and fill all required fields.";
+    }
+    setCoverError(null);
+    return null;
+  };
+
+  const handleSaveStep1 = async () => {
+    const ok = await trigger();
+    const extrasErr = validateExtras();
+    if (!ok || extrasErr) {
       const message =
-        module === "artist" && !coverImageUrl.trim()
-          ? "Please upload an artist image and fill all required fields."
-          : "Please fill all required General Information fields.";
+        extrasErr || "Please fill all required General Information fields.";
       setError(message);
       toast.error(message);
       return;
     }
-    if (!isValidPhone(phone)) return;
     setStep1Done(true);
     setError(null);
     toast.success("Details saved");
   };
 
-  const handleProceedStep1 = () => {
-    if (!step1Valid) {
+  const handleProceedStep1 = async () => {
+    const ok = await trigger();
+    const extrasErr = validateExtras();
+    if (!ok || extrasErr) {
       const message =
-        module === "artist" && !coverImageUrl.trim()
-          ? "Please upload an artist image and fill all required fields."
-          : "Please fill all required General Information fields.";
+        extrasErr || "Please fill all required General Information fields.";
       setError(message);
       toast.error(message);
       return;
     }
-    if (!isValidPhone(phone)) return;
     setStep1Done(true);
     setError(null);
     setStep(2);
   };
 
-  const handleSubmit = async () => {
-    if (!step1Done || !step1Valid) {
+  const onRegister = async (values: OrganizerAccountSetupFormValues) => {
+    if (!step1Done) {
       toast.error("Please complete General Information first.");
       setStep(1);
       return;
@@ -293,7 +304,7 @@ export default function OrganizerAccountSetupForm({
       toast.error(message);
       return;
     }
-    if (needsSubtype && !subtypeId) {
+    if (needsSubtype && !values.subtypeId) {
       const message =
         module === "artist"
           ? "Please select an artist type under Artist, such as Singer or Band."
@@ -303,28 +314,31 @@ export default function OrganizerAccountSetupForm({
       setStep(1);
       return;
     }
+    const extrasErr = validateExtras();
+    if (extrasErr) {
+      setError(extrasErr);
+      toast.error(extrasErr);
+      setStep(1);
+      return;
+    }
     const docsErr = validateRequiredPartnerDocuments(partnerDocMasters, documents);
     if (docsErr) {
       setError(docsErr);
       toast.error(docsErr);
       return;
     }
-    if (!isValidPhone(phone)) return;
     setError(null);
-    const resolvedTypeId = needsSubtype ? Number(subtypeId) : moduleParentId;
+    const resolvedTypeId = needsSubtype ? Number(values.subtypeId) : moduleParentId;
     try {
       const cityLabel =
         regCities.find((c) => c.id === Number(cityId))?.name?.trim() || "";
       const data = await registerBusiness({
-        business_name: orgName.trim(),
-        address:
-          module === "artist"
-            ? cityLabel
-            : orgAddress.trim(),
-        phone: phone.trim(),
-        description: `Contact person: ${contactName.trim()}`,
+        business_name: values.name.trim(),
+        address: module === "artist" ? cityLabel : values.address.trim(),
+        phone: values.phone.trim(),
+        description: `Contact person: ${values.contact.trim()}`,
         type_id: resolvedTypeId,
-        admin_email: adminEmail.trim(),
+        admin_email: values.email.trim(),
         partner_type: module,
         documents,
         cover_image_url: coverImageUrl.trim() || undefined,
@@ -357,6 +371,10 @@ export default function OrganizerAccountSetupForm({
       setError(message);
       toast.error(message);
     }
+  };
+
+  const handleSubmitStep2 = () => {
+    void handleSubmit(onRegister)();
   };
 
   useEffect(() => {
@@ -439,7 +457,6 @@ export default function OrganizerAccountSetupForm({
           })}
         </nav>
 
-        {/* No outer padding — sections sit flush to the main box edges */}
         <div className="bg-white">
           {step === 1 && (
             <>
@@ -447,14 +464,9 @@ export default function OrganizerAccountSetupForm({
                 {needsSubtype && (
                   <div>
                     <label className={labelClass}>
-                      {module === "artist" ? "Artist type" : "Venue type"}{" "}
-                      <span className="text-[#6900AA]">*</span>
+                      {module === "artist" ? "Artist type" : "Venue type"} {reqStar}
                     </label>
-                    <select
-                      value={subtypeId}
-                      onChange={(e) => setSubtypeId(e.target.value)}
-                      className={inputClass}
-                    >
+                    <select className={inputClass} {...register("subtypeId")}>
                       <option value="">
                         {module === "artist"
                           ? "Select artist type (e.g. Singer, Band)"
@@ -466,6 +478,9 @@ export default function OrganizerAccountSetupForm({
                         </option>
                       ))}
                     </select>
+                    {errors.subtypeId && (
+                      <p className={fieldErrorClass}>{errors.subtypeId.message}</p>
+                    )}
                     {subtypeOptions.length === 0 && (
                       <p className="mt-1 text-xs text-amber-700">
                         No {module === "artist" ? "artist" : "venue"} types configured yet. Ask Super
@@ -476,37 +491,48 @@ export default function OrganizerAccountSetupForm({
                 )}
                 <div>
                   <label className={labelClass}>
-                    {copy.nameLabel} <span className="text-[#6900AA]">*</span>
+                    {copy.nameLabel} {reqStar}
                   </label>
                   <input
                     type="text"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
                     className={inputClass}
                     placeholder={copy.namePlaceholder}
+                    {...register("name")}
                   />
+                  {errors.name && <p className={fieldErrorClass}>{errors.name.message}</p>}
                 </div>
                 {module !== "artist" && (
                   <div>
                     <label className={labelClass}>
-                      {copy.addressLabel} <span className="text-[#6900AA]">*</span>
+                      {copy.addressLabel} {reqStar}
                     </label>
                     <textarea
-                      value={orgAddress}
-                      onChange={(e) => setOrgAddress(e.target.value)}
                       className={textareaClass}
                       placeholder={copy.addressPlaceholder}
                       rows={3}
+                      {...register("address")}
                     />
+                    {errors.address && (
+                      <p className={fieldErrorClass}>{errors.address.message}</p>
+                    )}
                   </div>
                 )}
                 {(module === "venue" || module === "artist" || module === "event" || module === "cinema") && (
-                  <VenueLocationFields
-                    countryId={countryId}
-                    cityId={cityId}
-                    onCountryChange={setCountryId}
-                    onCityChange={setCityId}
-                  />
+                  <div>
+                    <VenueLocationFields
+                      countryId={countryId}
+                      cityId={cityId}
+                      onCountryChange={(id) => {
+                        setCountryId(id);
+                        setLocationError(null);
+                      }}
+                      onCityChange={(id) => {
+                        setCityId(id);
+                        setLocationError(null);
+                      }}
+                    />
+                    {locationError && <p className={fieldErrorClass}>{locationError}</p>}
+                  </div>
                 )}
                 {(module === "artist" || module === "venue" || module === "event" || module === "cinema") && (
                   <div>
@@ -518,7 +544,7 @@ export default function OrganizerAccountSetupForm({
                           : module === "event"
                             ? "Organisation cover image"
                             : "Cinema cover image"}{" "}
-                      {module === "artist" ? <span className="text-[#6900AA]">*</span> : null}
+                      {module === "artist" ? reqStar : null}
                     </label>
                     <CroppedImageField
                       value={coverImageUrl}
@@ -534,7 +560,10 @@ export default function OrganizerAccountSetupForm({
                           ? "flex flex-col items-center justify-center w-36 h-36 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA] bg-slate-50"
                           : "flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
                       }
-                      onRemove={() => setCoverImageUrl("")}
+                      onRemove={() => {
+                        setCoverImageUrl("");
+                        setCoverError(null);
+                      }}
                       onCroppedFile={async (file) => {
                         const formData = new FormData();
                         formData.append("image", file);
@@ -542,6 +571,7 @@ export default function OrganizerAccountSetupForm({
                           const res = await uploadImage(formData).unwrap();
                           if (res.url) {
                             setCoverImageUrl(res.url);
+                            setCoverError(null);
                             toast.success(
                               module === "artist"
                                 ? "Artist image uploaded"
@@ -569,6 +599,7 @@ export default function OrganizerAccountSetupForm({
                         </>
                       }
                     />
+                    {coverError && <p className={fieldErrorClass}>{coverError}</p>}
                     <p className="mt-1.5 text-xs text-slate-400">
                       {module === "artist"
                         ? "Square photo of the artist — shown on public listings and your profile."
@@ -586,27 +617,29 @@ export default function OrganizerAccountSetupForm({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className={labelClass}>
-                      Full Name <span className="text-[#6900AA]">*</span>
+                      Full Name {reqStar}
                     </label>
                     <input
                       type="text"
-                      value={contactName}
-                      onChange={(e) => setContactName(e.target.value)}
                       className={inputClass}
                       placeholder="Enter your full name"
+                      {...register("contact")}
                     />
+                    {errors.contact && (
+                      <p className={fieldErrorClass}>{errors.contact.message}</p>
+                    )}
                   </div>
                   <div>
                     <label className={labelClass}>
-                      Email (Admin Login Email) <span className="text-[#6900AA]">*</span>
+                      Email (Admin Login Email) {reqStar}
                     </label>
                     <input
                       type="email"
-                      value={adminEmail}
-                      onChange={(e) => setAdminEmail(e.target.value)}
                       className={inputClass}
                       placeholder="Enter your email address"
+                      {...register("email")}
                     />
+                    {errors.email && <p className={fieldErrorClass}>{errors.email.message}</p>}
                     <p className="mt-1 text-xs text-slate-400">
                       Password is auto-generated and emailed after onboarding.
                     </p>
@@ -617,9 +650,12 @@ export default function OrganizerAccountSetupForm({
                       labelClassName={labelClass}
                       variant="light"
                       value={phone}
-                      onChange={setPhone}
-                      onValidChange={setPhoneValid}
+                      onChange={(v) =>
+                        setValue("phone", v, { shouldValidate: true, shouldDirty: true })
+                      }
                       required
+                      error={errors.phone?.message}
+                      showError={!!errors.phone}
                       placeholder="Enter mobile number"
                       inputClassName={inputClass}
                       helperText="9–12 digits, numbers only"
@@ -675,16 +711,15 @@ export default function OrganizerAccountSetupForm({
               <>
                 <button
                   type="button"
-                  onClick={handleSaveStep1}
+                  onClick={() => void handleSaveStep1()}
                   className="h-11 px-6 rounded-md border border-slate-300 bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
                 >
                   Save details
                 </button>
                 <button
                   type="button"
-                  onClick={handleProceedStep1}
-                  disabled={!step1Valid}
-                  className="h-11 px-8 rounded-md bg-[#6900AA] text-white text-sm font-bold hover:bg-[#57008E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  onClick={() => void handleProceedStep1()}
+                  className="h-11 px-8 rounded-md bg-[#6900AA] text-white text-sm font-bold hover:bg-[#57008E] transition-colors cursor-pointer"
                 >
                   Proceed
                 </button>
@@ -701,7 +736,7 @@ export default function OrganizerAccountSetupForm({
                 </button>
                 <button
                   type="button"
-                  onClick={handleSubmit}
+                  onClick={handleSubmitStep2}
                   disabled={isLoading || !acceptTerms}
                   className="h-11 px-8 rounded-md bg-[#6900AA] text-white text-sm font-bold hover:bg-[#57008E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer inline-flex items-center justify-center gap-2"
                 >

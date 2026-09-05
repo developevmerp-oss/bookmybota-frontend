@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import Link from 'next/link';
 import { CheckCircle, Eye, EyeOff, XCircle, Radio, FileSignature } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +15,17 @@ import SearchInput from '@/components/Shared/SearchInput';
 import Pagination from '@/components/Shared/Pagination';
 import { AdminListShimmer } from '@/components/Shared/Shimmer';
 import { PAGE_SIZE } from '@/lib/pagination';
+import { extractApiError } from '@/lib/apiErrors';
+import {
+  adminEventRejectionSchema,
+  type AdminEventRejectionValues,
+} from '@/lib/adminFormSchemas';
+
+const fieldErrorClass = 'mt-1.5 text-xs text-rose-400 font-medium';
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 const STATUS_FILTERS = [
   { label: 'All', value: '' },
@@ -37,10 +50,21 @@ function statusBadge(status: string) {
 export default function AdminEventsPage() {
   const [statusFilter, setStatusFilter] = useState('PENDING_APPROVAL');
   const [selected, setSelected] = useState<AdminEvent | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<AdminEventRejectionValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(adminEventRejectionSchema) as any,
+    defaultValues: { rejection_reason: '' },
+    mode: 'onSubmit',
+  });
 
   const { data, isLoading, isFetching } = useGetAdminEventsQuery({
     page,
@@ -53,37 +77,44 @@ export default function AdminEventsPage() {
 
   const openDetail = (event: AdminEvent) => {
     setSelected(event);
-    setRejectionReason('');
+    reset({ rejection_reason: '' });
   };
 
   const handleAction = async (
-    action: 'approve' | 'reject' | 'go_live' | 'close',
+    action: 'approve' | 'go_live' | 'close',
     eventId?: string
   ) => {
     const id = eventId || selected?.id;
     if (!id) return;
     try {
-      const body: {
-        id: string;
-        action: typeof action;
-        rejection_reason?: string;
-      } = { id, action };
-      if (action === 'reject') {
-        body.rejection_reason = rejectionReason.trim() || undefined;
-      }
-      await updateEvent(body).unwrap();
+      await updateEvent({ id, action }).unwrap();
       toast.success(
         action === 'approve'
           ? 'Event approved'
-          : action === 'reject'
-            ? 'Event rejected (back to draft)'
-            : action === 'go_live'
-              ? 'Event is now live'
-              : 'Event closed'
+          : action === 'go_live'
+            ? 'Event is now live'
+            : 'Event closed'
       );
       if (selected?.id === id) setSelected(null);
-    } catch {
-      toast.error('Failed to update event');
+    } catch (err) {
+      toast.error(extractApiError(err, 'Failed to update event'));
+    }
+  };
+
+  const onReject = async (values: AdminEventRejectionValues) => {
+    const id = selected?.id;
+    if (!id) return;
+    try {
+      await updateEvent({
+        id,
+        action: 'reject',
+        rejection_reason: values.rejection_reason.trim(),
+      }).unwrap();
+      toast.success('Event rejected (back to draft)');
+      setSelected(null);
+      reset({ rejection_reason: '' });
+    } catch (err) {
+      toast.error(extractApiError(err, 'Failed to update event'));
     }
   };
 
@@ -94,8 +125,8 @@ export default function AdminEventsPage() {
         is_visible: !event.is_visible,
       }).unwrap();
       toast.success(event.is_visible ? 'Hidden from customers' : 'Visible to customers');
-    } catch {
-      toast.error('Failed to update visibility');
+    } catch (err) {
+      toast.error(extractApiError(err, 'Failed to update visibility'));
     }
   };
 
@@ -342,15 +373,17 @@ export default function AdminEventsPage() {
             {selected.status === 'PENDING_APPROVAL' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-zinc-400 mb-2">
-                  Rejection reason (if rejecting)
+                  Rejection reason <RequiredMark />
                 </label>
                 <textarea
                   rows={3}
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
+                  {...register('rejection_reason')}
                   placeholder="Tell the organizer what needs to be fixed..."
                   className="input-field resize-y min-h-[80px]"
                 />
+                {errors.rejection_reason && (
+                  <p className={fieldErrorClass}>{errors.rejection_reason.message}</p>
+                )}
               </div>
             )}
 
@@ -366,7 +399,7 @@ export default function AdminEventsPage() {
                   </button>
                   <button
                     disabled={isUpdating}
-                    onClick={() => handleAction('reject')}
+                    onClick={handleSubmit(onReject)}
                     className="px-4 py-2 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
                   >
                     <XCircle size={16} /> Reject

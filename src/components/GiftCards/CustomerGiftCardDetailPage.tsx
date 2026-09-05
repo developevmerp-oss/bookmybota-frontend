@@ -49,11 +49,9 @@ export default function CustomerGiftCardDetailPage() {
   }, [card]);
 
   const purchaseLabel =
-    card?.purchase_for === "SOMEONE_ELSE" ? "Gift for someone else" : "For myself";
+    card?.purchase_for === "SELF" ? "Purchased for myself (legacy)" : "Gift for someone else";
 
-  const recipientLabel =
-    card?.recipient_name?.trim() ||
-    (card?.purchase_for === "SELF" ? "—" : "—");
+  const recipientLabel = card?.recipient_name?.trim() || "—";
 
   return (
     <CustomerAccountLayout>
@@ -107,7 +105,7 @@ export default function CustomerGiftCardDetailPage() {
                     </span>
                     {card.expires_at ? (
                       <span className="text-[11px] sm:text-[12px] text-white/80">
-                        Expires {new Date(card.expires_at).toLocaleDateString()}
+                        Valid until {new Date(card.expires_at).toLocaleDateString()}
                       </span>
                     ) : null}
                   </div>

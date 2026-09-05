@@ -51,7 +51,7 @@ export default function VenueLocationFields({
     <div className="grid sm:grid-cols-2 gap-4">
       <div>
         <label className={labelClass}>
-          Country {required ? <span className="text-[#6900AA]">*</span> : null}
+          Country {required ? <span className="text-rose-500">*</span> : null}
         </label>
         <select
           disabled={disabled || countriesLoading}
@@ -75,7 +75,7 @@ export default function VenueLocationFields({
 
       <div>
         <label className={labelClass}>
-          City {required ? <span className="text-[#6900AA]">*</span> : null}
+          City {required ? <span className="text-rose-500">*</span> : null}
         </label>
         <select
           disabled={disabled || !countryId || citiesLoading}

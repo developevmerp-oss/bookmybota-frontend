@@ -46,6 +46,7 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
+import CategoryPromoBanners from '@/components/LandingPage/CategoryPromoBanners';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
 import DiningBookingPolicyModal, {
@@ -55,6 +56,12 @@ import {
   confirmBookingSchema,
   type ConfirmBookingValues,
 } from '@/lib/loginFormSchema';
+import {
+  diningReviewFormSchema,
+  emptyDiningReviewFormValues,
+  type DiningReviewFormValues,
+} from '@/lib/diningReviewFormSchema';
+import { extractApiError } from '@/lib/apiErrors';
 
 /** Same customer session the header Login button uses (token + user in localStorage). */
 function readCustomerSessionFromStorage() {
@@ -866,6 +873,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     shouldFocusError: true,
   });
 
+  const {
+    register: registerReview,
+    control: reviewControl,
+    handleSubmit: handleReviewSubmit,
+    reset: resetReviewForm,
+    formState: { errors: reviewErrors },
+  } = useForm<DiningReviewFormValues>({
+    resolver: yupResolver(diningReviewFormSchema) as any,
+    defaultValues: emptyDiningReviewFormValues(),
+    mode: 'onSubmit',
+  });
+
   // Pre-fill Name & Phone when authUser changes
   useEffect(() => {
     if (authUser && authUser.role === 'customer') {
@@ -1096,11 +1115,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     return dt.toISOString();
   };
 
-  // Reviews Local State
-  const [newReviewText, setNewReviewText] = useState("");
-  const [newReviewRating, setNewReviewRating] = useState(5);
-  const [newReviewUser, setNewReviewUser] = useState("");
-
+  // Reviews use RHF (see reviewForm above)
   const bookingWidgetRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -1206,23 +1221,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setDrawerStep(1);
   };
 
-  const handleAddReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newReviewUser.trim() || !newReviewText.trim()) return;
+  const onAddReview = async (values: DiningReviewFormValues) => {
     try {
-      await createReview({
+      const res = await createReview({
         businessId: resolvedParams.id,
-        user_name: newReviewUser,
-        rating: newReviewRating,
-        text: newReviewText
+        user_name: values.user_name.trim(),
+        rating: values.rating,
+        text: values.text.trim(),
       }).unwrap();
-      setNewReviewUser("");
-      setNewReviewText("");
-      setNewReviewRating(5);
-      toast.success("Review submitted successfully!");
+      resetReviewForm(emptyDiningReviewFormValues());
+      toast.success(res.message || "Review submitted successfully!");
     } catch (err) {
-      console.error("Failed to submit review", err);
-      toast.error("Error submitting review.");
+      toast.error(extractApiError(err, "Error submitting review."));
     }
   };
 
@@ -1411,15 +1421,28 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
+      <CategoryPromoBanners
+        category="DINING"
+        targetId={resolvedParams.id}
+        className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-3"
+      />
+
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-2">
         {/* ── Restaurant header (Zomato: details + actions) ── */}
         <div className="bg-white pt-2 mb-3">
           {/* Row 1: title left · rating right */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
             <div className="min-w-0 flex-1">
-              <h1 className="text-3xl sm:text-4xl lg:text-[2.5rem] font-semibold text-slate-900 tracking-tight leading-tight">
-                {profile.name}
-              </h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-3xl sm:text-4xl lg:text-[2.5rem] font-semibold text-slate-900 tracking-tight leading-tight">
+                  {profile.name}
+                </h1>
+                {profile.is_promoted ? (
+                  <span className="inline-flex items-center rounded-full bg-[#6900AA]/10 text-[#6900AA] border border-[#6900AA]/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                    Promoted
+                  </span>
+                ) : null}
+              </div>
               <p className="text-slate-600 text-lg sm:text-xl lg:text-base mt-1 font-medium">{cuisines}</p>
               <p className="text-slate-500 text-base sm:text-lg lg:text-sm mt-1 flex items-center gap-1.5">
                 <MapPin size={13} className="text-[#6900AA] shrink-0" />
@@ -1789,36 +1812,53 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {/* Write Review Form */}
                 <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                   <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
-                  <form onSubmit={handleAddReview} className="space-y-4">
+                  <form onSubmit={handleReviewSubmit(onAddReview)} className="space-y-4" noValidate>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">Your Name</label>
+                        <label className="block text-base sm:text-lg lg:text-sm font-medium text-slate-400 mb-1">
+                          Your Name <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
-                          required
-                          value={newReviewUser}
-                          onChange={(e) => setNewReviewUser(e.target.value)}
+                          {...registerReview("user_name")}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base lg:text-xs focus:outline-none focus:border-rose-500"
                           placeholder="E.g., Priya R."
                         />
+                        {reviewErrors.user_name && (
+                          <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.user_name.message}</p>
+                        )}
                       </div>
                       <div>
-                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">Rating</label>
+                        <label className="block text-base lg:text-xs font-medium text-slate-400 mb-2">
+                          Rating <span className="text-rose-500">*</span>
+                        </label>
                         <div className="h-9 flex items-center">
-                          <StarRatingInput value={newReviewRating} onChange={setNewReviewRating} />
+                          <Controller
+                            name="rating"
+                            control={reviewControl}
+                            render={({ field }) => (
+                              <StarRatingInput value={field.value} onChange={field.onChange} />
+                            )}
+                          />
                         </div>
+                        {reviewErrors.rating && (
+                          <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.rating.message}</p>
+                        )}
                       </div>
                     </div>
                     <div>
-                      <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">Comment</label>
+                      <label className="block text-base lg:text-xs font-medium text-slate-400 mb-1">
+                        Comment <span className="text-rose-500">*</span>
+                      </label>
                       <textarea
-                        required
                         rows={3}
-                        value={newReviewText}
-                        onChange={(e) => setNewReviewText(e.target.value)}
+                        {...registerReview("text")}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm lg:text-xs focus:outline-none focus:border-rose-500"
                         placeholder="Write details about food, staff, service..."
                       />
+                      {reviewErrors.text && (
+                        <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.text.message}</p>
+                      )}
                     </div>
                     <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm">
                       Submit Review

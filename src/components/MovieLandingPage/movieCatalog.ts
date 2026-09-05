@@ -19,6 +19,7 @@ export type MovieDetailData = {
   trailers?: Array<{ language: string; trailerUrl: string }>;
   inCinemas?: boolean;
   comingSoon?: boolean;
+  promoted?: boolean;
   bookHref?: string;
   cast?: MoviePerson[];
   crew?: MoviePerson[];
@@ -375,6 +376,7 @@ export function mapApiMovieToDetail(movie: {
   cast_text?: string | null;
   director?: string | null;
   status?: string;
+  is_promoted?: boolean;
 }): MovieDetailData {
   const poster = resolveMediaUrl(movie.poster_url) || FALLBACK_POSTER;
   const landscape = resolveMediaUrl(movie.banner_url) || resolveMediaUrl(movie.poster_url) || undefined;
@@ -410,6 +412,7 @@ export function mapApiMovieToDetail(movie: {
     trailers: mappedTrailers,
     inCinemas: movie.status === "now_showing",
     comingSoon,
+    promoted: Boolean(movie.is_promoted),
     cast: mapCastCrewMembers(movie.cast),
     crew: mapCastCrewMembers(movie.crew),
   };

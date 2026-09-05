@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { Plus, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useGetBusinessBookingsQuery, useCancelBookingMutation, useCreateBookingMutation } from '@/services/api';
@@ -10,9 +12,20 @@ import ConfirmDialog from '@/components/Shared/ConfirmDialog';
 import SearchInput from '@/components/Shared/SearchInput';
 import Pagination from '@/components/Shared/Pagination';
 import { PAGE_SIZE } from '@/lib/pagination';
-import { isValidPhone } from '@/lib/validation';
+import { extractApiError } from '@/lib/apiErrors';
+import {
+  diningWalkInFormSchema,
+  emptyDiningWalkInFormValues,
+  type DiningWalkInFormValues,
+} from '@/lib/diningPartnerFormSchemas';
 import { formatDate, formatTime12h } from '@/lib/dateFormat';
 import { formatDiningOfferDiscount } from '@/lib/diningOffers';
+
+const fieldErrorClass = 'mt-1.5 text-[11px] font-semibold text-rose-500';
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 export default function BookingsManager() {
   const dispatch = useAppDispatch();
@@ -39,37 +52,52 @@ export default function BookingsManager() {
   const [createBooking, { isLoading: isAddingWalkIn }] = useCreateBookingMutation();
 
   const [showModal, setShowModal] = useState(false);
-  const [walkInName, setWalkInName] = useState('Walk-in Guest');
-  const [walkInPhone, setWalkInPhone] = useState('');
-  const [walkInPhoneValid, setWalkInPhoneValid] = useState(true);
-  const [walkInGuests, setWalkInGuests] = useState('2');
-
   const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<DiningWalkInFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(diningWalkInFormSchema) as any,
+    defaultValues: emptyDiningWalkInFormValues(),
+    mode: 'onSubmit',
+  });
+
+  const openWalkInModal = () => {
+    reset(emptyDiningWalkInFormValues());
+    setShowModal(true);
+  };
+
+  const closeWalkInModal = () => {
+    setShowModal(false);
+    reset(emptyDiningWalkInFormValues());
+  };
 
   const handleCancelBooking = (id: string) => {
     setPendingCancelId(id);
   };
 
-  const handleAddWalkIn = async () => {
-    if (walkInPhone.trim() && !isValidPhone(walkInPhone)) {
-      toast.error('Guest phone must be 9–12 digits (numbers only)');
-      return;
-    }
+  const onWalkInSubmit = handleSubmit(async (values) => {
     try {
-      await createBooking({
+      const res = await createBooking({
         business_id: bizId,
-        customer_name: walkInName,
-        customer_phone: walkInPhone.trim() || '0000000000',
+        customer_name: values.customer_name.trim() || 'Walk-in Guest',
+        customer_phone: (values.customer_phone || '').trim() || '0000000000',
         booking_time: new Date().toISOString(),
         booking_source: 'WALK_IN',
-        guests: Number(walkInGuests),
+        guests: Number(values.guests),
       }).unwrap();
-      setShowModal(false);
-    } catch {
-      toast.error('Failed to add walk-in. Check table availability.');
+      toast.success(res.message || 'Walk-in seated.');
+      closeWalkInModal();
+    } catch (err) {
+      toast.error(extractApiError(err, 'Failed to add walk-in. Check table availability.'));
     }
-  };
+  });
 
   // DataTable Sorting Toggle
   const toggleSort = (column: string) => {
@@ -133,7 +161,8 @@ export default function BookingsManager() {
           <p className="text-sm text-zinc-400 mt-1">Review, monitor, and check-in your venue's table bookings.</p>
         </div>
         <button 
-          onClick={() => setShowModal(true)} 
+          type="button"
+          onClick={openWalkInModal} 
           className="btn-primary flex items-center justify-center gap-2 rounded-xl px-5 py-3 hover-lift text-sm font-semibold shadow-lg shadow-rose-600/10"
         >
           <Plus size={18} />
@@ -305,53 +334,67 @@ export default function BookingsManager() {
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
           <div className="glass-panel max-w-md w-full p-6 rounded-2xl border border-white/10 relative shadow-2xl">
             <button 
-              onClick={() => setShowModal(false)} 
+              type="button"
+              onClick={closeWalkInModal} 
               className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
             >
               ✕
             </button>
             <h2 className="text-xl font-bold mb-5 text-white tracking-tight">Add Walk-in</h2>
-            <div className="space-y-4">
+            <form onSubmit={onWalkInSubmit} className="space-y-4" noValidate>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Guest Name (Optional)</label>
                 <input 
                   type="text" 
-                  value={walkInName} 
-                  onChange={(e) => setWalkInName(e.target.value)} 
                   className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all placeholder:text-zinc-650"
                   placeholder="e.g. John Doe"
+                  {...register('customer_name')}
                 />
+                {errors.customer_name && (
+                  <p className={fieldErrorClass}>{errors.customer_name.message}</p>
+                )}
               </div>
-              <PhoneInput
-                label="Guest Phone (Optional)"
-                labelClassName="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2"
-                variant="dark"
-                value={walkInPhone}
-                onChange={setWalkInPhone}
-                onValidChange={setWalkInPhoneValid}
-                required={false}
-                placeholder="9876543210"
-                helperText="Leave empty or enter 9–12 digits"
+              <Controller
+                name="customer_phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    label="Guest Phone (Optional)"
+                    labelClassName="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2"
+                    variant="dark"
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    required={false}
+                    placeholder="9876543210"
+                    helperText="Leave empty or enter 9–12 digits"
+                    error={errors.customer_phone?.message}
+                  />
+                )}
               />
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Party Size</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+                  Party Size <RequiredMark />
+                </label>
                 <input 
                   type="number" 
-                  value={walkInGuests} 
-                  onChange={(e) => setWalkInGuests(e.target.value)} 
                   className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all"
                   min="1" 
-                  max="20" 
+                  max="20"
+                  {...register('guests')}
                 />
+                {errors.guests && (
+                  <p className={fieldErrorClass}>{errors.guests.message}</p>
+                )}
               </div>
               <button 
-                onClick={handleAddWalkIn} 
-                disabled={isAddingWalkIn || (walkInPhone.trim() !== '' && !walkInPhoneValid)} 
+                type="submit"
+                disabled={isAddingWalkIn} 
                 className="btn-primary w-full mt-4 disabled:opacity-50 flex items-center justify-center gap-2 rounded-xl py-3 hover-lift text-sm font-semibold shadow-lg shadow-rose-600/10"
               >
                 {isAddingWalkIn ? 'Adding...' : 'Seat Walk-in Now'}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
@@ -367,10 +410,11 @@ export default function BookingsManager() {
           if (!pendingCancelId) return;
           setConfirmBusy(true);
           try {
-            await cancelBooking({ id: pendingCancelId }).unwrap();
+            const res = await cancelBooking({ id: pendingCancelId }).unwrap();
+            toast.success((res as { message?: string }).message || 'Booking cancelled.');
             setPendingCancelId(null);
           } catch (err) {
-            console.error(err);
+            toast.error(extractApiError(err, 'Failed to cancel booking'));
           } finally {
             setConfirmBusy(false);
           }

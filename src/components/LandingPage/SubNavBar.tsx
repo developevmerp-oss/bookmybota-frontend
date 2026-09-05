@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -37,7 +37,7 @@ const TABS: SubNavTab[] = [
   { label: "Music", key: "music", Icon: Music },
   { label: "Movie", href: "/movies", match: "movie", Icon: Clapperboard },
   { label: "Sports", key: "sports", Icon: Trophy },
-  { label: "ListYourShow", href: "/list-your-show", match: "list-your-show", Icon: Ticket, variant: "cta" },
+  { label: "List Your Show", href: "/list-your-show", match: "list-your-show", Icon: Ticket, variant: "cta" },
 ];
 
 function tabHref(item: SubNavTab, diningHref: string, categories: Array<{ slug: string; name: string }>) {
@@ -46,6 +46,10 @@ function tabHref(item: SubNavTab, diningHref: string, categories: Array<{ slug: 
   if (item.key) return eventCategoryHref(item.key as EventCategoryKey, categories);
   return "/";
 }
+
+/** Landing scroll: hide after this Y; show only after returning near top (hysteresis). */
+const LANDING_HIDE_AFTER_Y = 140;
+const LANDING_SHOW_BELOW_Y = 56;
 
 export default function SubNavBar() {
   const pathname = usePathname() || "";
@@ -57,7 +61,10 @@ export default function SubNavBar() {
   const onEvents = pathname === "/events" || pathname.startsWith("/events/");
   const onMovies = pathname === "/movies" || pathname.startsWith("/movies/");
   const onDining = pathname === "/dining" || pathname.startsWith("/restaurant/");
+  const isLandingPage = pathname === "/";
   const [city, setCity] = useState("");
+  const [hideOnScroll, setHideOnScroll] = useState(false);
+  const hideOnScrollRef = useRef(false);
 
   useEffect(() => {
     const sync = () => {
@@ -68,6 +75,33 @@ export default function SubNavBar() {
     window.addEventListener("selected_city_changed", sync);
     return () => window.removeEventListener("selected_city_changed", sync);
   }, []);
+
+  useEffect(() => {
+    if (!isLandingPage) return;
+
+    const applyHidden = (next: boolean) => {
+      if (hideOnScrollRef.current === next) return;
+      hideOnScrollRef.current = next;
+      setHideOnScroll(next);
+    };
+
+    const syncFromScroll = () => {
+      const y = window.scrollY;
+      if (y <= LANDING_SHOW_BELOW_Y) {
+        applyHidden(false);
+      } else if (y >= LANDING_HIDE_AFTER_Y) {
+        applyHidden(true);
+      }
+      // Between thresholds: keep current state (hysteresis / no blink).
+    };
+
+    const frame = requestAnimationFrame(syncFromScroll);
+    window.addEventListener("scroll", syncFromScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", syncFromScroll);
+    };
+  }, [isLandingPage]);
 
   const diningHref =
     city && city !== "All Cities" ? `/dining?city=${encodeURIComponent(city)}` : "/dining";
@@ -95,36 +129,51 @@ export default function SubNavBar() {
     return false;
   };
 
+  const collapsed = isLandingPage && hideOnScroll;
+
   return (
     <nav
       aria-label="Browse categories"
-      className="bg-[#a044d9] border-b border-[#b7b6b6] "
+      aria-hidden={collapsed}
+      className={`border-t bg-[#F7E9FF] overflow-hidden transition-[max-height,opacity,border-color] duration-300 ease-in-out ${
+        collapsed
+          ? "max-h-0 opacity-0 border-transparent pointer-events-none"
+          : "max-h-12 h-12 opacity-100 border-[#E3BCFF]"
+      }`}
     >
-      <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2 flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {linkTabs.map((item) => {
-          const { label, Icon } = item;
-          const active = isTabActive(item);
-          const href = tabHref(item, diningHref, categories);
-          return (
-            <Link
-              key={label}
-              href={href}
-              className={`inline-flex items-center gap-1.5 shrink-0 px-2 sm:px-2.5 py-1.5 rounded-md text-[11px] sm:text-sm font-semibold uppercase tracking-wide whitespace-nowrap transition-colors ${
-                active
-                  ? "bg-[#FFD600] text-[#111111]"
-                  : "text-white hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Icon size={18} strokeWidth={2} className="shrink-0 sm:w-5 sm:h-5" aria-hidden />
-              {label}
-            </Link>
-          );
-        })}
+      <div className="container mx-auto px-4 md:px-5 lg:px-8 h-full flex items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+          {linkTabs.map((item) => {
+            const { label, Icon } = item;
+            const active = isTabActive(item);
+            const href = tabHref(item, diningHref, categories);
+            return (
+              <Link
+                key={label}
+                href={href}
+                tabIndex={collapsed ? -1 : undefined}
+                className={`inline-flex items-center gap-1.5 shrink-0 h-8 px-2.5 sm:px-3 rounded-full text-[12px] sm:text-[13px] font-semibold uppercase tracking-wide whitespace-nowrap transition-colors ${
+                  active
+                    ? "bg-[#6900AA] text-white shadow-sm"
+                    : "text-[#57008E] hover:bg-[#EFD7FF] hover:text-[#6900AA]"
+                }`}
+              >
+                <Icon size={16} strokeWidth={2.25} className="shrink-0" aria-hidden />
+                {label}
+              </Link>
+            );
+          })}
+        </div>
 
         {ctaTab ? (
           <Link
             href={ctaTab.href!}
-            className="shrink-0 inline-flex items-center justify-center h-8 sm:h-9 px-3 sm:px-4 rounded-md bg-[#f9df53] text-[#111111] text-[11px] sm:text-base font-normal hover:bg-[#F5CE00] transition-colors whitespace-nowrap ml-3 sm:ml-60"
+            tabIndex={collapsed ? -1 : undefined}
+            className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3.5 sm:px-4 rounded-full text-[12px] sm:text-[13px] font-semibold whitespace-nowrap transition-colors shadow-sm ${
+              isTabActive(ctaTab)
+                ? "bg-[#F5CE00] text-[#111111] ring-2 ring-[#6900AA]/25"
+                : "bg-[#FFD600] text-[#111111] hover:bg-[#F5CE00]"
+            }`}
           >
             {ctaTab.label}
           </Link>

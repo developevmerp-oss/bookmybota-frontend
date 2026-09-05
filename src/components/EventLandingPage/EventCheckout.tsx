@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Controller, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import {
   ArrowLeft,
   Check,
@@ -46,7 +48,15 @@ import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
-import { getPhoneValidationError, sanitizePhoneInput } from "@/lib/validation";
+import { sanitizePhoneInput } from "@/lib/validation";
+import {
+  emptyEventCheckoutContactValues,
+  emptyEventCheckoutDeliveryValues,
+  eventCheckoutContactSchema,
+  eventCheckoutDeliverySchema,
+  type EventCheckoutContactValues,
+  type EventCheckoutDeliveryValues,
+} from "@/lib/eventCheckoutFormSchema";
 import {
   ticketModeConfirmNote,
   ticketModeDetailBullets,
@@ -58,6 +68,9 @@ import {
 import dynamic from "next/dynamic";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import images from "@/Images";
+
+const fieldErrorClass = "mt-1.5 text-[0.8125rem] font-medium text-rose-500";
+const reqStar = <span className="text-rose-500">*</span>;
 
 const VenueLayoutViewer = dynamic(
   () => import("@/components/EventLandingPage/VenueLayoutViewer"),
@@ -158,9 +171,6 @@ export default function EventCheckout({
   const [showtimeId, setShowtimeId] = useState("");
   const [selectedDateKey, setSelectedDateKey] = useState("");
   const [qtyByType, setQtyByType] = useState<Record<string, number>>({});
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromoOffer | null>(null);
   const [giftCardInput, setGiftCardInput] = useState("");
@@ -175,14 +185,59 @@ export default function EventCheckout({
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [cancelTxnOpen, setCancelTxnOpen] = useState(false);
   const [cancelTxnAction, setCancelTxnAction] = useState<"back" | "exit">("back");
-  const [editName, setEditName] = useState("");
-  const [editPhone, setEditPhone] = useState("");
-  const [editEmail, setEditEmail] = useState("");
   const [ticketMode, setTicketMode] = useState<TicketDeliveryMode>("M_TICKET");
-  const [deliveryAddressLine, setDeliveryAddressLine] = useState("");
-  const [deliveryCity, setDeliveryCity] = useState("");
-  const [deliveryNotes, setDeliveryNotes] = useState("");
   const dateScrollRef = useRef<HTMLDivElement>(null);
+
+  const contactForm = useForm<EventCheckoutContactValues>({
+    resolver: yupResolver(eventCheckoutContactSchema) as any,
+    defaultValues: emptyEventCheckoutContactValues(),
+    mode: "onSubmit",
+  });
+  const {
+    watch: watchContact,
+    reset: resetContact,
+    getValues: getContactValues,
+    trigger: triggerContact,
+  } = contactForm;
+  const name = watchContact("name") || "";
+  const phone = watchContact("phone") || "";
+  const email = watchContact("email") || "";
+
+  const contactModalForm = useForm<EventCheckoutContactValues>({
+    resolver: yupResolver(eventCheckoutContactSchema) as any,
+    defaultValues: emptyEventCheckoutContactValues(),
+    mode: "onSubmit",
+  });
+  const {
+    register: registerContactModal,
+    control: contactModalControl,
+    handleSubmit: handleContactModalSubmit,
+    reset: resetContactModal,
+    formState: { errors: contactModalErrors },
+  } = contactModalForm;
+
+  const deliveryForm = useForm<EventCheckoutDeliveryValues>({
+    resolver: yupResolver(eventCheckoutDeliverySchema) as any,
+    defaultValues: emptyEventCheckoutDeliveryValues(false),
+    mode: "onSubmit",
+  });
+  const {
+    register: registerDelivery,
+    watch: watchDelivery,
+    reset: resetDelivery,
+    setValue: setDeliveryValue,
+    getValues: getDeliveryValues,
+    trigger: triggerDelivery,
+    formState: { errors: deliveryErrors },
+  } = deliveryForm;
+  const deliveryAddressLine = watchDelivery("delivery_address_line") || "";
+  const deliveryCity = watchDelivery("delivery_city") || "";
+  const deliveryNotes = watchDelivery("delivery_notes") || "";
+
+  const openContactModal = () => {
+    resetContactModal(getContactValues());
+    setContactModalOpen(true);
+  };
   const checkoutScrollFadeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [checkoutScrollActive, setCheckoutScrollActive] = useState(false);
 
@@ -263,9 +318,8 @@ export default function EventCheckout({
     setQtyByType({});
     setSelectedSeats([]);
     setIsMapFullscreen(false);
-    setName("");
-    setPhone("");
-    setEmail("");
+    resetContact(emptyEventCheckoutContactValues());
+    resetContactModal(emptyEventCheckoutContactValues());
     setPromoInput("");
     setAppliedPromo(null);
     setGiftCardInput("");
@@ -278,10 +332,8 @@ export default function EventCheckout({
     setContactModalOpen(false);
     setCancelTxnOpen(false);
     setTicketMode(defaultTicketModeForEvent(event.allowed_ticket_modes));
-    setDeliveryAddressLine("");
-    setDeliveryCity("");
-    setDeliveryNotes("");
-  }, [open, event.id, event.allowed_ticket_modes, initialShowtimeId]);
+    resetDelivery(emptyEventCheckoutDeliveryValues(false));
+  }, [open, event.id, event.allowed_ticket_modes, initialShowtimeId, resetContact, resetContactModal, resetDelivery]);
 
   useEffect(() => {
     if (!availableTicketModes.some((o) => o.id === ticketMode)) {
@@ -290,11 +342,17 @@ export default function EventCheckout({
   }, [availableTicketModes, ticketMode, event.allowed_ticket_modes]);
 
   useEffect(() => {
+    setDeliveryValue("needs_delivery", ticketMode === "PHYSICAL_DELIVERY");
+  }, [ticketMode, setDeliveryValue]);
+
+  useEffect(() => {
     if (isOrganizer || authUser?.role !== "customer") return;
-    setName(profile?.name || authUser.name || "");
-    setPhone(sanitizePhoneInput(profile?.phone || authUser.phone || ""));
-    setEmail(profile?.email || authUser.email || "");
-  }, [authUser, profile, isOrganizer]);
+    resetContact({
+      name: profile?.name || authUser.name || "",
+      phone: sanitizePhoneInput(profile?.phone || authUser.phone || ""),
+      email: profile?.email || authUser.email || "",
+    });
+  }, [authUser, profile, isOrganizer, resetContact]);
 
   const timesForDate = useMemo(
     () => showtimes.filter((s) => dateKey(s.starts_at) === selectedDateKey),
@@ -505,30 +563,19 @@ export default function EventCheckout({
       return;
     }
 
-    const phoneErr = getPhoneValidationError(phone);
-    if (!name.trim()) {
-      toast.error(isOrganizer ? "Please enter the customer's name." : "Please enter your name.");
+    const contactValid = await triggerContact();
+    if (!contactValid) {
+      openContactModal();
+      toast.error(isOrganizer ? "Please enter customer contact details." : "Please complete your contact details.");
       return;
     }
-    if (phoneErr) {
-      toast.error(phoneErr);
-      return;
-    }
-    if (!email.trim()) {
-      toast.error("Enter an email so we can send the tickets.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      toast.error("Enter a valid email address.");
-      return;
-    }
+
+    setDeliveryValue("needs_delivery", ticketMode === "PHYSICAL_DELIVERY");
     if (ticketMode === "PHYSICAL_DELIVERY") {
-      if (!deliveryAddressLine.trim()) {
-        toast.error("Enter the delivery street address.");
-        return;
-      }
-      if (!deliveryCity.trim()) {
-        toast.error("Enter the delivery city.");
+      const deliveryValid = await triggerDelivery();
+      if (!deliveryValid) {
+        toast.error("Enter the full delivery address.");
+        setStep(3);
         return;
       }
     }
@@ -546,15 +593,17 @@ export default function EventCheckout({
         });
       }
 
-      const guest_name = name.trim();
-      const guest_phone = sanitizePhoneInput(phone);
-      const guest_email = email.trim() || undefined;
+      const contact = getContactValues();
+      const guest_name = contact.name.trim();
+      const guest_phone = sanitizePhoneInput(contact.phone);
+      const guest_email = contact.email.trim() || undefined;
+      const delivery = getDeliveryValues();
       const deliveryPayload =
         ticketMode === "PHYSICAL_DELIVERY"
           ? {
-              delivery_address_line: deliveryAddressLine.trim(),
-              delivery_city: deliveryCity.trim(),
-              delivery_notes: deliveryNotes.trim() || undefined,
+              delivery_address_line: (delivery.delivery_address_line || "").trim(),
+              delivery_city: (delivery.delivery_city || "").trim(),
+              delivery_notes: (delivery.delivery_notes || "").trim() || undefined,
             }
           : {};
 
@@ -590,11 +639,11 @@ export default function EventCheckout({
       }
 
       if (isOrganizer) {
-        toast.success(`Tickets booked and sent to ${email.trim()}.`);
+        toast.success(result.message || `Tickets booked and sent to ${contact.email.trim()}.`);
         onOrganizerSuccess?.(result);
         onClose();
       } else {
-        toast.success(`Tickets booked! Confirmation sent to ${email.trim()}.`);
+        toast.success(result.message || `Tickets booked! Confirmation sent to ${contact.email.trim()}.`);
         onClose();
         if (result.booking_id) {
           router.push(`/customer/event-bookings/confirmation?id=${result.booking_id}`);
@@ -634,11 +683,11 @@ export default function EventCheckout({
             : "Choose how you want your tickets and sign in to continue."
           : "Review your order and confirm your booking.";
   const isCustomerLoggedIn = authUser?.role === "customer";
-  const contactDetailsReady =
-    Boolean(name.trim()) &&
-    !getPhoneValidationError(phone) &&
-    Boolean(email.trim()) &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const contactDetailsReady = eventCheckoutContactSchema.isValidSync({
+    name,
+    phone,
+    email,
+  });
   const detailsReady =
     contactDetailsReady && (isOrganizer || isCustomerLoggedIn);
   const canConfirm = detailsReady && !submitting && Boolean(ticketMode);
@@ -663,10 +712,7 @@ export default function EventCheckout({
         return;
       }
       if (!contactDetailsReady) {
-        setEditName(name);
-        setEditPhone(phone);
-        setEditEmail(email);
-        setContactModalOpen(true);
+        openContactModal();
         toast.error(isOrganizer ? "Please enter customer contact details." : "Please complete your contact details.");
         return;
       }
@@ -1332,33 +1378,36 @@ export default function EventCheckout({
                   <p className="text-[0.9375rem] font-bold text-slate-900">Delivery address</p>
                   <div>
                     <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
-                      <span className="text-[#6900AA]">*</span> Street / house / area
+                      {reqStar} Street / house / area
                     </label>
                     <input
-                      value={deliveryAddressLine}
-                      onChange={(e) => setDeliveryAddressLine(e.target.value)}
+                      {...registerDelivery("delivery_address_line")}
                       className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
                       placeholder="e.g. Bole Road, Building 12, Apt 4"
                     />
+                    {deliveryErrors.delivery_address_line && (
+                      <p className={fieldErrorClass}>{deliveryErrors.delivery_address_line.message}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
-                      <span className="text-[#6900AA]">*</span> City
+                      {reqStar} City
                     </label>
                     <input
-                      value={deliveryCity}
-                      onChange={(e) => setDeliveryCity(e.target.value)}
+                      {...registerDelivery("delivery_city")}
                       className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
                       placeholder="e.g. Addis Ababa"
                     />
+                    {deliveryErrors.delivery_city && (
+                      <p className={fieldErrorClass}>{deliveryErrors.delivery_city.message}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[0.875rem] font-semibold text-slate-800 mb-1">
                       Delivery notes <span className="font-normal text-slate-400">(optional)</span>
                     </label>
                     <textarea
-                      value={deliveryNotes}
-                      onChange={(e) => setDeliveryNotes(e.target.value)}
+                      {...registerDelivery("delivery_notes")}
                       rows={2}
                       className={`w-full rounded-lg border border-slate-300 px-3 py-2.5 text-[0.9375rem] text-slate-900 focus:outline-none resize-none ${accentFocus} focus:ring-1 focus:ring-[#6900AA]/30`}
                       placeholder="Landmark, gate code, preferred time..."
@@ -1392,12 +1441,7 @@ export default function EventCheckout({
                     )}
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditName(name);
-                        setEditPhone(phone);
-                        setEditEmail(email);
-                        setContactModalOpen(true);
-                      }}
+                      onClick={openContactModal}
                       className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                     >
                       {contactDetailsReady ? "Edit contact details" : "Add contact details"}
@@ -1418,12 +1462,7 @@ export default function EventCheckout({
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditName(name);
-                        setEditPhone(phone);
-                        setEditEmail(email);
-                        setContactModalOpen(true);
-                      }}
+                      onClick={openContactModal}
                       className="mt-3 text-[0.875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                     >
                       Edit contact details
@@ -1672,12 +1711,7 @@ export default function EventCheckout({
                     <p className="text-[0.9375rem] font-bold text-slate-900">For sending booking details</p>
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditName(name);
-                        setEditPhone(phone);
-                        setEditEmail(email);
-                        setContactModalOpen(true);
-                      }}
+                      onClick={openContactModal}
                       className="inline-flex items-center gap-1 text-[0.875rem] font-semibold text-[#6900AA] cursor-pointer hover:underline"
                     >
                       Edit
@@ -1875,25 +1909,14 @@ export default function EventCheckout({
           .join(", ")
       : `ENTRY FOR ${ticketQty} (${ticketQty} ticket(s))`;
 
-  const saveContactDetails = () => {
-    const phoneErr = getPhoneValidationError(editPhone);
-    if (!editName.trim()) {
-      toast.error(isOrganizer ? "Please enter the customer's name." : "Please enter your name.");
-      return;
-    }
-    if (phoneErr) {
-      toast.error(phoneErr);
-      return;
-    }
-    if (!editEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail.trim())) {
-      toast.error("Enter a valid email address.");
-      return;
-    }
-    setName(editName.trim());
-    setPhone(sanitizePhoneInput(editPhone));
-    setEmail(editEmail.trim());
+  const saveContactDetails = handleContactModalSubmit((values) => {
+    resetContact({
+      name: values.name.trim(),
+      phone: sanitizePhoneInput(values.phone),
+      email: values.email.trim(),
+    });
     setContactModalOpen(false);
-  };
+  });
 
   const checkoutModals = (
     <>
@@ -1967,78 +1990,91 @@ export default function EventCheckout({
               </h3>
             </div>
 
-            <div className="px-5 py-5 space-y-5">
-                <div>
+            <form onSubmit={saveContactDetails} className="px-5 py-5 space-y-5" noValidate>
+              <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
-                  <span className="text-[#6900AA]">*</span> Your name
-                  </label>
-                  <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  {reqStar} Your name
+                </label>
+                <input
+                  {...registerContactModal("name")}
                   className="w-full rounded-[0.375rem] border border-slate-300 px-3 py-2.5 text-[1.0625rem] text-slate-900 focus:outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]/30"
                   placeholder="Full name"
-                  />
-                </div>
+                />
+                {contactModalErrors.name && (
+                  <p className={fieldErrorClass}>{contactModalErrors.name.message}</p>
+                )}
+              </div>
 
-                <div>
+              <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
-                  <span className="text-[#6900AA]">*</span> Your email
-                  </label>
-                  <input
+                  {reqStar} Your email
+                </label>
+                <input
                   type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
+                  {...registerContactModal("email")}
                   className="w-full rounded-[0.375rem] border border-slate-300 px-3 py-2.5 text-[1.0625rem] text-slate-900 focus:outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]/30"
                   placeholder="you@email.com"
                 />
+                {contactModalErrors.email && (
+                  <p className={fieldErrorClass}>{contactModalErrors.email.message}</p>
+                )}
                 <p className="mt-1.5 text-[0.875rem] text-slate-500">
                   To access the ticket(s) on other devices, login with this email
                 </p>
-                </div>
+              </div>
 
-                <div>
+              <div>
                 <label className="block text-[1rem] font-bold text-slate-900 mb-1.5">
-                  <span className="text-[#6900AA]">*</span> Mobile Number
-                  </label>
+                  {reqStar} Mobile Number
+                </label>
                 <div className="flex items-center gap-2 rounded-[0.375rem] border border-slate-300 px-3 bg-white focus-within:border-[#6900AA] focus-within:ring-1 focus-within:ring-[#6900AA]/30">
                   <span className="inline-flex items-center gap-1 text-[1rem] font-semibold text-slate-700 shrink-0">
                     +251
                     <ChevronDown size={12} className="text-slate-400" />
                   </span>
                   <span className="w-px h-5 bg-slate-200 shrink-0" />
-                  <input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(sanitizePhoneInput(e.target.value))}
-                    inputMode="numeric"
-                    maxLength={12}
-                    className="flex-1 bg-transparent py-2.5 text-[1.0625rem] focus:outline-none text-slate-900 min-w-0"
-                    placeholder="Mobile number"
+                  <Controller
+                    name="phone"
+                    control={contactModalControl}
+                    render={({ field }) => (
+                      <input
+                        type="tel"
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(sanitizePhoneInput(e.target.value))}
+                        onBlur={field.onBlur}
+                        inputMode="numeric"
+                        maxLength={12}
+                        className="flex-1 bg-transparent py-2.5 text-[1.0625rem] focus:outline-none text-slate-900 min-w-0"
+                        placeholder="Mobile number"
+                      />
+                    )}
                   />
                 </div>
+                {contactModalErrors.phone && (
+                  <p className={fieldErrorClass}>{contactModalErrors.phone.message}</p>
+                )}
                 <p className="mt-1.5 text-[0.875rem] text-slate-500">
                   This number will only be used for sending ticket(s)
                 </p>
-        </div>
+              </div>
 
-            <button
-              type="button"
+              <button
+                type="button"
                 onClick={() =>
                   toast.message("Tickets are non-transferable and subject to event terms.")
                 }
                 className="text-[1rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
               >
                 *Terms &amp; Conditions
-            </button>
+              </button>
 
-            <button
-              type="button"
-                onClick={saveContactDetails}
+              <button
+                type="submit"
                 className={`w-full py-3 rounded-[0.5rem] ${accentBtn} text-white text-[1.125rem] font-bold cursor-pointer`}
-            >
+              >
                 Submit
-            </button>
-            </div>
+              </button>
+            </form>
           </div>
         </div>
       )}

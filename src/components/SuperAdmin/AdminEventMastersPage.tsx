@@ -387,7 +387,9 @@ export default function AdminEventMastersPage() {
             </h3>
             <form onSubmit={genreForm.handleSubmit(onCreateGenre)} noValidate className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1.5">Category</label>
+                <label className="block text-sm text-zinc-400 mb-1.5">
+                  Category <span className="text-rose-500">*</span>
+                </label>
                 <select {...genreForm.register("category_type_id")} className="input-field w-full">
                   <option value="">Select Comedy / Music / Concert</option>
                   {eventCategories.map((c) => (
@@ -403,7 +405,9 @@ export default function AdminEventMastersPage() {
                 )}
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1.5">Genre name</label>
+                <label className="block text-sm text-zinc-400 mb-1.5">
+                  Genre name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   {...genreForm.register("name")}
                   placeholder="e.g. Stand-up Comedy"
@@ -541,7 +545,9 @@ export default function AdminEventMastersPage() {
             </h3>
             <form onSubmit={docForm.handleSubmit(onCreateDocument)} noValidate className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1.5">Document name</label>
+                <label className="block text-sm text-zinc-400 mb-1.5">
+                  Document name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   {...docForm.register("name")}
                   placeholder="Venue Booking Agreement"
@@ -724,6 +730,9 @@ export default function AdminEventMastersPage() {
               noValidate
               className="space-y-2"
             >
+              <label className="block text-sm text-zinc-400 mb-1.5">
+                T&amp;C point <span className="text-rose-500">*</span>
+              </label>
               <div className="flex gap-3">
                 <input
                   {...termForm.register("text")}

@@ -37,6 +37,7 @@ function dayBefore(dateStr: string): string {
 }
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
+const reqStar = <span className="text-rose-500">*</span>;
 
 function applyLabel(applyTo?: string) {
   switch (applyTo) {
@@ -210,14 +211,14 @@ function OfferFormPanel({
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-            Offer name <span className="text-rose-500">*</span>
+            Offer name {reqStar}
           </label>
           <input className="input-field" placeholder="Early bird 20% off" {...register("title")} />
           {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
         </div>
         <div>
           <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-            Offer code <span className="text-rose-500">*</span>
+            Offer code {reqStar}
           </label>
           <input
             className="input-field uppercase"
@@ -242,7 +243,7 @@ function OfferFormPanel({
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-            Discount type <span className="text-rose-500">*</span>
+            Discount type {reqStar}
           </label>
           <select className="portal-select" {...register("discount_type")}>
             <option value="PERCENT">Percentage</option>
@@ -252,7 +253,7 @@ function OfferFormPanel({
         </div>
         <div>
           <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-            Discount value <span className="text-rose-500">*</span>
+            Discount value {reqStar}
           </label>
           <input type="number" min={1} step="any" className="input-field" {...register("discount_value")} />
           {errors.discount_value && (
@@ -435,7 +436,7 @@ function OfferFormPanel({
         </div>
         <div>
           <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-            End date <span className="text-rose-500">*</span>
+            End date {reqStar}
           </label>
           <input
             type="date"

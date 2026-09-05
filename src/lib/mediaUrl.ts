@@ -58,7 +58,8 @@ export function resolveMediaUrl(url?: string | null): string {
   return url;
 }
 
-/** Store uploads as /uploads/... paths when possible (stable across hosts). */
+/** Store uploads as /uploads/... paths when possible (stable across hosts).
+ *  Keep absolute CDN URLs (e.g. Cloudinary) unchanged. */
 export function normalizeUploadPath(url?: string | null): string {
   if (!url) return "";
   if (url.startsWith("blob:") || url.startsWith("data:")) return url;
@@ -67,6 +68,8 @@ export function normalizeUploadPath(url?: string | null): string {
   try {
     const parsed = new URL(url);
     if (parsed.pathname.startsWith("/uploads/")) return parsed.pathname;
+    // Cloudinary / external CDN — persist full URL
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return url;
   } catch {
     /* relative or invalid */
   }

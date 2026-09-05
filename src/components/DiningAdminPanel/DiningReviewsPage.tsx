@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { useGetReviewsQuery, useCreateReviewReplyMutation, useGetBusinessPublicQuery } from '@/services/api';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage } from '@/features/auth/authSlice';
@@ -10,6 +12,18 @@ import { formatDate } from '@/lib/dateFormat';
 import SearchInput from '@/components/Shared/SearchInput';
 import Pagination from '@/components/Shared/Pagination';
 import { PAGE_SIZE } from '@/lib/pagination';
+import { extractApiError } from '@/lib/apiErrors';
+import {
+  diningReviewReplySchema,
+  emptyDiningReviewReplyValues,
+  type DiningReviewReplyValues,
+} from '@/lib/diningPartnerFormSchemas';
+
+const fieldErrorClass = 'mt-1.5 text-[11px] font-semibold text-rose-500';
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 export default function BusinessReviewsPage() {
   const dispatch = useAppDispatch();
@@ -31,32 +45,50 @@ export default function BusinessReviewsPage() {
   );
   const reviews = reviewsData?.items ?? [];
   const statsReviews = statsData?.items ?? [];
-  const [createReply] = useCreateReviewReplyMutation();
+  const [createReply, { isLoading: postingReply }] = useCreateReviewReplyMutation();
 
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
-  const [replyText, setReplyText] = useState("");
 
-  const handleReplySubmit = async (e: React.FormEvent, reviewId: number) => {
-    e.preventDefault();
-    if (!replyText.trim()) return;
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<DiningReviewReplyValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(diningReviewReplySchema) as any,
+    defaultValues: emptyDiningReviewReplyValues(),
+    mode: 'onSubmit',
+  });
+
+  const startReply = (reviewId: number) => {
+    setReplyingTo(reviewId);
+    reset(emptyDiningReviewReplyValues());
+  };
+
+  const cancelReply = () => {
+    setReplyingTo(null);
+    reset(emptyDiningReviewReplyValues());
+  };
+
+  const onReplySubmit = handleSubmit(async (values) => {
+    if (replyingTo == null) return;
 
     try {
-      await createReply({
-        reviewId,
+      const res = await createReply({
+        reviewId: replyingTo,
         businessId: bizId,
         user_name: profile?.name || "Business Owner",
         user_type: "owner",
-        text: replyText
+        text: values.text.trim(),
       }).unwrap();
-      
-      setReplyingTo(null);
-      setReplyText("");
-      toast.success("Reply posted successfully.");
+
+      cancelReply();
+      toast.success(res.message || "Reply posted successfully.");
     } catch (err) {
-      console.error("Failed to post reply:", err);
-      toast.error("Failed to post reply.");
+      toast.error(extractApiError(err, "Failed to post reply."));
     }
-  };
+  });
 
   if (!user || isLoading) {
     return (
@@ -231,42 +263,45 @@ export default function BusinessReviewsPage() {
                         {/* Connecting branch line */}
                         <div className="absolute left-6 top-5 w-6 h-px bg-white/10"></div>
                         
-                        <form onSubmit={(e) => handleReplySubmit(e, rev.id)} className="flex-1 bg-zinc-900/50 p-4 rounded-2xl border border-white/10 shadow-inner">
+                        <form onSubmit={onReplySubmit} className="flex-1 bg-zinc-900/50 p-4 rounded-2xl border border-white/10 shadow-inner" noValidate>
                           <h5 className="text-white font-bold mb-3 flex items-center gap-2 text-sm">
                             <MessageCircle size={14} className="text-rose-400"/> 
                             Replying as <span className="text-rose-400">{profile?.name || "Venue Owner"}</span>
                           </h5>
+                          <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+                            Your reply <RequiredMark />
+                          </label>
                           <textarea
-                            required
                             autoFocus
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
                             placeholder="Write a professional response to this customer..."
                             className="input-field w-full bg-zinc-900/50 border border-white/5 rounded-xl p-3 text-sm text-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none min-h-[80px] transition-all"
+                            {...register('text')}
                           />
+                          {errors.text && (
+                            <p className={fieldErrorClass}>{errors.text.message}</p>
+                          )}
                           <div className="flex justify-end gap-2 mt-3">
                             <button
                               type="button"
-                              onClick={() => setReplyingTo(null)}
+                              onClick={cancelReply}
                               className="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                             >
                               Cancel
                             </button>
                             <button
                               type="submit"
-                              className="btn-primary text-xs py-2 px-5 shadow-md hover:shadow-rose-500/20"
+                              disabled={postingReply}
+                              className="btn-primary text-xs py-2 px-5 shadow-md hover:shadow-rose-500/20 disabled:opacity-60"
                             >
-                              Post Reply
+                              {postingReply ? 'Posting...' : 'Post Reply'}
                             </button>
                           </div>
                         </form>
                       </div>
                     ) : (
                       <button
-                        onClick={() => {
-                          setReplyingTo(rev.id);
-                          setReplyText("");
-                        }}
+                        type="button"
+                        onClick={() => startReply(rev.id)}
                         className="mt-2 ml-14 text-zinc-400 hover:text-rose-400 text-xs font-bold flex items-center gap-1.5 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
                       >
                         <MessageCircle size={14} /> 

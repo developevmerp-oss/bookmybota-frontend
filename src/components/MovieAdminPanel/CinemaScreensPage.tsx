@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
 import { CheckCircle, Clapperboard, Eye, Plus, RefreshCw } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
@@ -17,6 +19,19 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
+import {
+  cinemaScreenFormSchema,
+  emptyCinemaScreenFormValues,
+  layoutRejectReasonSchema,
+  type CinemaScreenFormValues,
+  type LayoutRejectReasonValues,
+} from "@/lib/moviePartnerFormSchemas";
+
+const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 const SCREEN_TYPES = [
   { value: "standard", label: "Standard" },
@@ -99,15 +114,35 @@ export default function CinemaScreensPage() {
   const [publishLayout, { isLoading: publishing }] = usePublishVenueLayoutTemplateMutation();
   const [rejectLayout, { isLoading: rejecting }] = useRejectVenueLayoutTemplateMutation();
   const [rejectId, setRejectId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
 
-  const [name, setName] = useState("");
-  const [screenType, setScreenType] = useState("standard");
-  const [capacity, setCapacity] = useState("200");
-  const [description, setDescription] = useState("");
   const [layoutScreenId, setLayoutScreenId] = useState<string | null>(null);
   const [previewScreenId, setPreviewScreenId] = useState<string | null>(null);
   const [reviewScreenId, setReviewScreenId] = useState<string | null>(null);
+
+  const {
+    register: registerScreen,
+    handleSubmit: handleScreenSubmit,
+    reset: resetScreenForm,
+    getValues: getScreenValues,
+    formState: { errors: screenErrors },
+  } = useForm<CinemaScreenFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(cinemaScreenFormSchema) as any,
+    defaultValues: emptyCinemaScreenFormValues(),
+    mode: "onSubmit",
+  });
+
+  const {
+    register: registerReject,
+    handleSubmit: handleRejectSubmit,
+    reset: resetRejectForm,
+    formState: { errors: rejectErrors },
+  } = useForm<LayoutRejectReasonValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(layoutRejectReasonSchema) as any,
+    defaultValues: { reason: "" },
+    mode: "onSubmit",
+  });
 
   const selectedScreen = useMemo(
     () => screens.find((s) => s.id === layoutScreenId) || null,
@@ -122,43 +157,57 @@ export default function CinemaScreensPage() {
     [screens, reviewScreenId]
   );
 
-  const resetForm = () => {
-    setName("");
-    setScreenType("standard");
-    setCapacity("200");
-    setDescription("");
+  const openRejectModal = (templateId: string) => {
+    setRejectId(templateId);
+    resetRejectForm({ reason: "" });
   };
 
-  const onCreate = async () => {
+  const onCreate = async (values: CinemaScreenFormValues) => {
     if (!bizId) return;
-    if (!name.trim()) {
-      toast.error("Screen name is required");
-      return;
-    }
     try {
-      await createScreen({
+      const res = await createScreen({
         bizId,
-        name: name.trim(),
-        screen_type: screenType,
-        capacity: Number(capacity) || 0,
-        description: description.trim() || undefined,
+        name: values.name.trim(),
+        screen_type: values.screen_type,
+        capacity: Number(values.capacity) || 0,
+        description: values.description?.trim() || undefined,
       }).unwrap();
-      toast.success("Screen created");
-      resetForm();
+      toast.success((res as { message?: string })?.message || "Screen created");
+      resetScreenForm(emptyCinemaScreenFormValues());
     } catch (err) {
       toast.error(extractApiError(err, "Failed to create screen"));
+    }
+  };
+
+  const onReject = async (values: LayoutRejectReasonValues) => {
+    if (!bizId || !rejectId) return;
+    try {
+      const res = await rejectLayout({
+        bizId,
+        templateId: rejectId,
+        reason: values.reason.trim(),
+      }).unwrap();
+      toast.success((res as { message?: string })?.message || "Layout rejected");
+      setRejectId(null);
+      resetRejectForm({ reason: "" });
+      refetch();
+    } catch (err) {
+      toast.error(extractApiError(err, "Reject failed"));
     }
   };
 
   const toggleActive = async (screen: CinemaScreen) => {
     if (!bizId) return;
     try {
-      await updateScreen({
+      const res = await updateScreen({
         bizId,
         screenId: screen.id,
         body: { is_active: !screen.is_active },
       }).unwrap();
-      toast.success(screen.is_active ? "Screen disabled" : "Screen enabled");
+      toast.success(
+        (res as { message?: string })?.message ||
+          (screen.is_active ? "Screen disabled" : "Screen enabled")
+      );
     } catch (err) {
       toast.error(extractApiError(err, "Failed to update screen"));
     }
@@ -169,10 +218,11 @@ export default function CinemaScreensPage() {
       toast.error("This screen is missing a linked hall. Recreate the screen.");
       return;
     }
-    const cap = Number(selectedScreen.capacity) || Number(capacity) || 100;
+    const formCapacity = Number(getScreenValues("capacity")) || 0;
+    const cap = Number(selectedScreen.capacity) || formCapacity || 100;
     const phase = resolveLayoutPhase(selectedScreen);
     try {
-      await createLayoutRequest({
+      const res = await createLayoutRequest({
         bizId,
         ...(phase === "draft" && selectedScreen.layout_request_id
           ? { request_id: selectedScreen.layout_request_id }
@@ -196,7 +246,10 @@ export default function CinemaScreensPage() {
         },
         submit_now: submitNow,
       }).unwrap();
-      toast.success(submitNow ? "Layout request submitted to Super Admin" : "Layout draft saved");
+      toast.success(
+        (res as { message?: string })?.message ||
+          (submitNow ? "Layout request submitted to Super Admin" : "Layout draft saved")
+      );
       setLayoutScreenId(null);
       refetch();
     } catch (err) {
@@ -220,60 +273,64 @@ export default function CinemaScreensPage() {
         </p>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4">
+      <form
+        onSubmit={handleScreenSubmit(onCreate)}
+        className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4"
+        noValidate
+      >
         <h3 className="text-white font-semibold">Add screen</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="portal-label">Screen name *</label>
+            <label className="portal-label">
+              Screen name <RequiredMark />
+            </label>
             <input
               className="input-field"
               placeholder="Screen 1 / IMAX"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              {...registerScreen("name")}
             />
+            {screenErrors.name && <p className={fieldErrorClass}>{screenErrors.name.message}</p>}
           </div>
           <div>
             <label className="portal-label">Screen type</label>
-            <select
-              className="input-field"
-              value={screenType}
-              onChange={(e) => setScreenType(e.target.value)}
-            >
+            <select className="input-field" {...registerScreen("screen_type")}>
               {SCREEN_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
                 </option>
               ))}
             </select>
+            {screenErrors.screen_type && (
+              <p className={fieldErrorClass}>{screenErrors.screen_type.message}</p>
+            )}
           </div>
           <div>
-            <label className="portal-label">Expected capacity</label>
+            <label className="portal-label">
+              Expected capacity <RequiredMark />
+            </label>
             <input
               className="input-field"
               type="number"
               min={1}
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
+              {...registerScreen("capacity")}
             />
+            {screenErrors.capacity && (
+              <p className={fieldErrorClass}>{screenErrors.capacity.message}</p>
+            )}
           </div>
           <div>
             <label className="portal-label">Notes</label>
-            <input
-              className="input-field"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            <input className="input-field" {...registerScreen("description")} />
           </div>
         </div>
         <button
-          type="button"
-          onClick={onCreate}
+          type="submit"
           disabled={creating}
           className="btn-primary inline-flex items-center gap-2"
         >
           <Plus size={16} /> {creating ? "Creating…" : "Create screen"}
         </button>
-      </div>
+      </form>
 
       {layoutOptions.filter(
         (opt) =>
@@ -316,8 +373,11 @@ export default function CinemaScreensPage() {
                     disabled={approving}
                     onClick={async () => {
                       try {
-                        await approveLayout({ bizId, templateId: opt.id }).unwrap();
-                        toast.success("Layout approved — pick one to make public when ready.");
+                        const res = await approveLayout({ bizId, templateId: opt.id }).unwrap();
+                        toast.success(
+                          (res as { message?: string })?.message ||
+                            "Layout approved — pick one to make public when ready."
+                        );
                         refetch();
                       } catch (err) {
                         toast.error(extractApiError(err, "Approve failed"));
@@ -330,10 +390,7 @@ export default function CinemaScreensPage() {
                     type="button"
                     className="btn-secondary text-sm"
                     disabled={rejecting}
-                    onClick={() => {
-                      setRejectId(opt.id);
-                      setRejectReason("");
-                    }}
+                    onClick={() => openRejectModal(opt.id)}
                   >
                     Reject
                   </button>
@@ -379,8 +436,10 @@ export default function CinemaScreensPage() {
                   disabled={publishing}
                   onClick={async () => {
                     try {
-                      await publishLayout({ bizId, templateId: opt.id }).unwrap();
-                      toast.success("Go-live request sent to BookMyBota");
+                      const res = await publishLayout({ bizId, templateId: opt.id }).unwrap();
+                      toast.success(
+                        (res as { message?: string })?.message || "Go-live request sent to BookMyBota"
+                      );
                       refetch();
                     } catch (err) {
                       toast.error(extractApiError(err, "Publish failed"));
@@ -396,41 +455,45 @@ export default function CinemaScreensPage() {
 
       {rejectId && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 space-y-3">
+          <form
+            onSubmit={handleRejectSubmit(onReject)}
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-5 space-y-3"
+            noValidate
+          >
             <h3 className="text-white font-semibold">Reject layout</h3>
-            <textarea
-              className="input-field min-h-[88px]"
-              placeholder="Reason for Super Admin"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-            />
+            <div>
+              <label className="portal-label">
+                Reason for Super Admin <RequiredMark />
+              </label>
+              <textarea
+                className="input-field min-h-[88px]"
+                placeholder="Reason for Super Admin"
+                {...registerReject("reason")}
+              />
+              {rejectErrors.reason && (
+                <p className={fieldErrorClass}>{rejectErrors.reason.message}</p>
+              )}
+            </div>
             <div className="flex justify-end gap-2">
-              <button type="button" className="btn-secondary" onClick={() => setRejectId(null)}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setRejectId(null);
+                  resetRejectForm({ reason: "" });
+                }}
+              >
                 Cancel
               </button>
               <button
-                type="button"
+                type="submit"
                 className="btn-primary bg-rose-600 hover:bg-rose-500"
-                disabled={rejecting || !rejectReason.trim()}
-                onClick={async () => {
-                  try {
-                    await rejectLayout({
-                      bizId,
-                      templateId: rejectId,
-                      reason: rejectReason.trim(),
-                    }).unwrap();
-                    toast.success("Layout rejected");
-                    setRejectId(null);
-                    refetch();
-                  } catch (err) {
-                    toast.error(extractApiError(err, "Reject failed"));
-                  }
-                }}
+                disabled={rejecting}
               >
                 Reject
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
@@ -671,8 +734,7 @@ export default function CinemaScreensPage() {
                 className="btn-secondary"
                 disabled={rejecting}
                 onClick={() => {
-                  setRejectId(reviewScreen.pending_template_id!);
-                  setRejectReason("");
+                  openRejectModal(reviewScreen.pending_template_id!);
                   setReviewScreenId(null);
                 }}
               >
@@ -684,11 +746,14 @@ export default function CinemaScreensPage() {
                 disabled={approving}
                 onClick={async () => {
                   try {
-                    await approveLayout({
+                    const res = await approveLayout({
                       bizId,
                       templateId: reviewScreen.pending_template_id!,
                     }).unwrap();
-                    toast.success("Layout approved — use Request go live when ready.");
+                    toast.success(
+                      (res as { message?: string })?.message ||
+                        "Layout approved — use Request go live when ready."
+                    );
                     setReviewScreenId(null);
                     refetch();
                   } catch (err) {

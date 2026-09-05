@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { CheckCircle2, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,6 +17,10 @@ import { formatMoney } from "@/lib/currencyFormat";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
+import {
+  adminSettlementNotesSchema,
+  type AdminSettlementNotesValues,
+} from "@/lib/adminFormSchemas";
 
 type StatusTab = "ALL" | "PENDING" | "APPROVED" | "PAID" | "CANCELLED";
 
@@ -25,6 +31,8 @@ const TABS: { key: StatusTab; label: string }[] = [
   { key: "PAID", label: "Paid" },
   { key: "CANCELLED", label: "Cancelled" },
 ];
+
+const fieldErrorClass = "mt-1 text-[11px] font-semibold text-rose-400";
 
 function statusBadge(status?: string) {
   const s = (status || "PENDING").toUpperCase();
@@ -62,12 +70,93 @@ function StatCard({
   );
 }
 
+function SettlementRowActions({
+  row,
+  busy,
+  onUpdate,
+}: {
+  row: DiningGiftCardRedemptionRow;
+  busy: boolean;
+  onUpdate: (row: DiningGiftCardRedemptionRow, status: string, notes: string) => Promise<void>;
+}) {
+  const isPaid = row.settlement_status === "PAID";
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<AdminSettlementNotesValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(adminSettlementNotesSchema) as any,
+    defaultValues: { notes: row.settlement_notes || "" },
+    mode: "onSubmit",
+  });
+
+  const run = (status: string) =>
+    handleSubmit(async (values) => {
+      await onUpdate(row, status, values.notes?.trim() || "");
+    })();
+
+  return (
+    <td className="px-4 py-3 align-top min-w-[220px]">
+      <input
+        {...register("notes")}
+        disabled={isPaid}
+        placeholder="Settlement note / ref"
+        className="w-full mb-1 bg-zinc-900/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white disabled:opacity-50"
+      />
+      {errors.notes && <p className={fieldErrorClass}>{errors.notes.message}</p>}
+      <div className="flex flex-wrap gap-1.5 mt-1.5">
+        {row.settlement_status === "PENDING" && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run("APPROVED")}
+            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-sky-600/80 hover:bg-sky-500 text-white disabled:opacity-50"
+          >
+            Approve
+          </button>
+        )}
+        {(row.settlement_status === "PENDING" || row.settlement_status === "APPROVED") && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run("PAID")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-600/80 hover:bg-emerald-500 text-white disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            Mark paid
+          </button>
+        )}
+        {row.settlement_status !== "PAID" && row.settlement_status !== "CANCELLED" && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run("CANCELLED")}
+            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        )}
+        {row.settlement_status === "CANCELLED" && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run("PENDING")}
+            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-white/15 text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+          >
+            Reopen
+          </button>
+        )}
+      </div>
+    </td>
+  );
+}
+
 export default function AdminGiftCardSettlementsPage() {
   const [tab, setTab] = useState<StatusTab>("PENDING");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [businessId, setBusinessId] = useState("");
-  const [notesById, setNotesById] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { data: restaurants = [] } = useGetBusinessesQuery({ module: "dining" });
@@ -91,14 +180,15 @@ export default function AdminGiftCardSettlementsPage() {
 
   const updateStatus = async (
     row: DiningGiftCardRedemptionRow,
-    settlement_status: string
+    settlement_status: string,
+    notes: string
   ) => {
     setBusyId(row.id);
     try {
       const res = await patchSettlement({
         id: row.id,
         settlement_status,
-        settlement_notes: notesById[row.id]?.trim() || undefined,
+        settlement_notes: notes || undefined,
       }).unwrap();
       toast.success(res.message || "Settlement updated");
     } catch (err) {
@@ -217,7 +307,6 @@ export default function AdminGiftCardSettlementsPage() {
               <tbody className="divide-y divide-white/5">
                 {rows.map((row) => {
                   const busy = busyId === row.id;
-                  const isPaid = row.settlement_status === "PAID";
                   return (
                     <tr key={row.id} className="hover:bg-white/[0.02]">
                       <td className="px-4 py-3 align-top">
@@ -257,66 +346,12 @@ export default function AdminGiftCardSettlementsPage() {
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 align-top min-w-[220px]">
-                        <input
-                          value={notesById[row.id] ?? row.settlement_notes ?? ""}
-                          onChange={(e) =>
-                            setNotesById((prev) => ({ ...prev, [row.id]: e.target.value }))
-                          }
-                          disabled={isPaid}
-                          placeholder="Settlement note / ref"
-                          className="w-full mb-2 bg-zinc-900/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white disabled:opacity-50"
-                        />
-                        <div className="flex flex-wrap gap-1.5">
-                          {row.settlement_status === "PENDING" && (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void updateStatus(row, "APPROVED")}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-sky-600/80 hover:bg-sky-500 text-white disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                          )}
-                          {(row.settlement_status === "PENDING" ||
-                            row.settlement_status === "APPROVED") && (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void updateStatus(row, "PAID")}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-600/80 hover:bg-emerald-500 text-white disabled:opacity-50"
-                            >
-                              {busy ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <CheckCircle2 size={12} />
-                              )}
-                              Mark paid
-                            </button>
-                          )}
-                          {row.settlement_status !== "PAID" &&
-                            row.settlement_status !== "CANCELLED" && (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void updateStatus(row, "CANCELLED")}
-                                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                          {row.settlement_status === "CANCELLED" && (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void updateStatus(row, "PENDING")}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-white/15 text-zinc-300 hover:bg-white/5 disabled:opacity-50"
-                            >
-                              Reopen
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      <SettlementRowActions
+                        key={`${row.id}-${row.settlement_status}-${row.settlement_notes || ""}`}
+                        row={row}
+                        busy={busy}
+                        onUpdate={updateStatus}
+                      />
                     </tr>
                   );
                 })}

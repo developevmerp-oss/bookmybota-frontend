@@ -104,6 +104,11 @@ export function EventPosterCard({
           </div>
         )}
         <DateBadge iso={event.next_showtime} />
+        {event.is_promoted ? (
+          <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#6900AA] shadow-sm">
+            Promoted
+          </span>
+        ) : null}
       </div>
 
       <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">

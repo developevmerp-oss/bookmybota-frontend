@@ -517,7 +517,7 @@ export default function AdminPlatformOffersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Offer Name
+                    Offer Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     {...register("name")}
@@ -530,7 +530,7 @@ export default function AdminPlatformOffersPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Offer Code
+                    Offer Code <span className="text-rose-500">*</span>
                   </label>
                   <input
                     {...register("code", {
@@ -562,7 +562,7 @@ export default function AdminPlatformOffersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Type
+                    Type <span className="text-rose-500">*</span>
                   </label>
                   <select
                     {...register("discount_type")}
@@ -574,7 +574,7 @@ export default function AdminPlatformOffersPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Value
+                    Value <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -618,7 +618,7 @@ export default function AdminPlatformOffersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Category
+                    Category <span className="text-rose-500">*</span>
                   </label>
                   <select
                     {...register("category")}
@@ -632,7 +632,7 @@ export default function AdminPlatformOffersPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Apply To
+                    Apply To <span className="text-rose-500">*</span>
                   </label>
                   <select
                     {...register("apply_to")}
@@ -644,7 +644,7 @@ export default function AdminPlatformOffersPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Customers
+                    Customers <span className="text-rose-500">*</span>
                   </label>
                   <select
                     {...register("customer_eligibility")}
@@ -777,7 +777,7 @@ export default function AdminPlatformOffersPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Status
+                    Status <span className="text-rose-500">*</span>
                   </label>
                   <select
                     {...register("status")}

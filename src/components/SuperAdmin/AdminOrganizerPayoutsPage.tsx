@@ -142,7 +142,9 @@ export default function AdminOrganizerPayoutsPage() {
           <h3 className="text-lg font-semibold text-white">New payout</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Event organizer *</label>
+              <label className="block text-xs text-zinc-500 mb-1">
+                Event organizer <span className="text-rose-500">*</span>
+              </label>
               <select
                 {...register("business_id", {
                   onChange: () => setValue("event_id", ""),
@@ -178,7 +180,9 @@ export default function AdminOrganizerPayoutsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Amount (ETB) *</label>
+              <label className="block text-xs text-zinc-500 mb-1">
+                Amount (ETB) <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="number"
                 min="0.01"
@@ -191,7 +195,9 @@ export default function AdminOrganizerPayoutsPage() {
               )}
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Status</label>
+              <label className="block text-xs text-zinc-500 mb-1">
+                Status <span className="text-rose-500">*</span>
+              </label>
               <select
                 {...register("status")}
                 className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"

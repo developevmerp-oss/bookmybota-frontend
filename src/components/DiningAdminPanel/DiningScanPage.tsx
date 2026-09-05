@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { Html5Qrcode } from "html5-qrcode";
 import { Camera, ImageUp, Loader2, QrCode, Tag, Users, Clock, UtensilsCrossed, Gift, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
@@ -24,10 +26,19 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  diningScanTokenSchema,
+  type DiningScanTokenValues,
+} from "@/lib/diningPartnerFormSchemas";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { sanitizePhoneInput } from "@/lib/validation";
 
 const SCANNER_REGION_ID = "dining-guest-qr-reader";
+const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 type PromoBillPreview = {
   title?: string;
@@ -109,7 +120,6 @@ export default function DiningScanPage() {
   const lastTokenRef = useRef("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [manualToken, setManualToken] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
   const [starting, setStarting] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -133,6 +143,18 @@ export default function DiningScanPage() {
   const [gcGuestPhone, setGcGuestPhone] = useState("");
   const [gcVerified, setGcVerified] = useState<MerchantGiftCardVerify | null>(null);
   const [gcPreview, setGcPreview] = useState<MerchantGiftCardPreview | null>(null);
+
+  const {
+    register: registerToken,
+    handleSubmit: handleTokenSubmit,
+    setValue: setTokenValue,
+    formState: { errors: tokenErrors },
+  } = useForm<DiningScanTokenValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(diningScanTokenSchema) as any,
+    defaultValues: { token: "" },
+    mode: "onSubmit",
+  });
 
   const [scanQr, { isLoading: isScanning }] = useScanDiningBookingQrMutation();
   const [checkout, { isLoading: isCheckingOut }] = useCheckoutDiningBookingMutation();
@@ -199,6 +221,7 @@ export default function DiningScanPage() {
       const token = raw.trim();
       if (!token || token === lastTokenRef.current) return;
       lastTokenRef.current = token;
+      setTokenValue("token", token);
       try {
         const result = await scanQr({ qr_token: token }).unwrap();
         applyScannedBooking(result.data);
@@ -209,8 +232,12 @@ export default function DiningScanPage() {
         toast.error(extractApiError(err, "No booking found for this QR"));
       }
     },
-    [scanQr, stopCamera, applyScannedBooking]
+    [scanQr, stopCamera, applyScannedBooking, setTokenValue]
   );
+
+  const onTokenLookup = handleTokenSubmit(async (values) => {
+    await lookupToken(values.token);
+  });
 
   const startCamera = async () => {
     if (starting || cameraOn) return;
@@ -615,17 +642,22 @@ export default function DiningScanPage() {
         </div>
         <form
           className="flex flex-col sm:flex-row gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void lookupToken(manualToken);
-          }}
+          onSubmit={onTokenLookup}
+          noValidate
         >
-          <input
-            value={manualToken}
-            onChange={(e) => setManualToken(e.target.value)}
-            placeholder="Or paste / type QR code (DNB-...)"
-            className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500"
-          />
+          <div className="flex-1">
+            <label className="sr-only">
+              QR token <RequiredMark />
+            </label>
+            <input
+              placeholder="Or paste / type QR code (DNB-...)"
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500"
+              {...registerToken("token")}
+            />
+            {tokenErrors.token && (
+              <p className={fieldErrorClass}>{tokenErrors.token.message}</p>
+            )}
+          </div>
           <button
             type="submit"
             disabled={isScanning}
@@ -760,7 +792,7 @@ export default function DiningScanPage() {
                     )}
                     <div className={offer.promo_code ? "" : "sm:col-span-2"}>
                       <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                        Total bill amount (ETB) *
+                        Total bill amount (ETB) <RequiredMark />
                       </label>
                       <input
                         type="number"

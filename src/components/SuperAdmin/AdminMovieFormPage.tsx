@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { ArrowLeft, ExternalLink, Loader2, Plus, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,6 +17,11 @@ import {
   type MovieTrailerItem,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  adminMovieFormSchema,
+  emptyAdminMovieFormValues,
+  type AdminMovieFormValues,
+} from "@/lib/adminFormSchemas";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import MultiSelectPills, {
   idsFromMasterNames,
@@ -36,27 +43,7 @@ const STATUS_LABEL: Record<Movie["status"], string> = {
   archived: "Archived",
 };
 
-type FormState = {
-  title: string;
-  description: string;
-  poster_url: string;
-  banner_url: string;
-  duration_minutes: string;
-  certificate: string;
-  release_date: string;
-  status: Movie["status"];
-};
-
-const emptyForm: FormState = {
-  title: "",
-  description: "",
-  poster_url: "",
-  banner_url: "",
-  duration_minutes: "",
-  certificate: "",
-  release_date: "",
-  status: "draft",
-};
+const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -91,7 +78,6 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
   const [createMovie, { isLoading: creating }] = useCreateAdminMovieMutation();
   const [updateMovie, { isLoading: updating }] = useUpdateAdminMovieMutation();
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
-  const [form, setForm] = useState<FormState>(emptyForm);
   const [selectedLanguageIds, setSelectedLanguageIds] = useState<number[]>([]);
   const [selectedGenreIds, setSelectedGenreIds] = useState<number[]>([]);
   const [selectedFormatIds, setSelectedFormatIds] = useState<number[]>([]);
@@ -99,6 +85,25 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
   const [crewMembers, setCrewMembers] = useState<MovieCastCrewFormMember[]>([]);
   const [trailers, setTrailers] = useState<MovieTrailerItem[]>([]);
   const [hydrated, setHydrated] = useState(!isEdit);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<AdminMovieFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(adminMovieFormSchema) as any,
+    defaultValues: emptyAdminMovieFormValues(),
+    mode: "onSubmit",
+  });
+
+  const posterUrl = watch("poster_url");
+  const bannerUrl = watch("banner_url");
+  const certificate = watch("certificate");
 
   const languageMasters = masters?.languages ?? [];
   const genreMasters = masters?.genres ?? [];
@@ -108,7 +113,7 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
 
   useEffect(() => {
     if (!isEdit || !movie || mastersLoading || !masters) return;
-    setForm({
+    reset({
       title: movie.title || "",
       description: movie.description || "",
       poster_url: movie.poster_url || "",
@@ -133,7 +138,7 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     setTrailers(initialTrailers);
 
     setHydrated(true);
-  }, [isEdit, movie, masters, mastersLoading]);
+  }, [isEdit, movie, masters, mastersLoading, reset]);
 
   const orphanLanguages = useMemo(
     () => orphanMasterNames(languageMasters, isEdit ? movie?.languages : []),
@@ -148,17 +153,14 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     [formatMasters, isEdit, movie?.formats]
   );
 
-  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
   const uploadField = async (file: File, key: "poster_url" | "banner_url") => {
     const fd = new FormData();
     fd.append("image", file);
     try {
       const res = await uploadImage(fd).unwrap();
       if (!res.url) return;
-      setField(key, res.url);
+      setValue(key, res.url, { shouldValidate: true, shouldDirty: true });
+      toast.success(key === "poster_url" ? "Poster uploaded" : "Banner uploaded");
     } catch (err) {
       toast.error(extractApiError(err, key === "poster_url" ? "Poster upload failed" : "Banner upload failed"));
     }
@@ -198,12 +200,16 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     setTrailers((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) {
-      toast.error("Title is required");
+  const onValid = async (values: AdminMovieFormValues) => {
+    if (castMembers.some((m) => !m.name.trim())) {
+      toast.error("Cast member name is required.");
       return;
     }
+    if (crewMembers.some((m) => !m.name.trim())) {
+      toast.error("Crew member name is required.");
+      return;
+    }
+
     const languages = namesFromMasterIds(languageMasters, selectedLanguageIds);
     const genres = namesFromMasterIds(genreMasters, selectedGenreIds);
     const formats = namesFromMasterIds(formatMasters, selectedFormatIds);
@@ -218,33 +224,33 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     const primaryTrailerUrl = cleanTrailers.length > 0 ? cleanTrailers[0].trailer_url : null;
 
     // Public landing + partner catalog only list active now_showing / coming_soon titles.
-    const isPublicStatus = form.status === "now_showing" || form.status === "coming_soon";
+    const isPublicStatus = values.status === "now_showing" || values.status === "coming_soon";
 
     const payload = {
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      poster_url: form.poster_url.trim() || null,
-      banner_url: form.banner_url.trim() || null,
+      title: values.title.trim(),
+      description: values.description.trim() || null,
+      poster_url: values.poster_url.trim() || null,
+      banner_url: values.banner_url.trim() || null,
       trailer_url: primaryTrailerUrl,
       trailers: cleanTrailers,
-      duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
-      certificate: form.certificate.trim() || null,
-      release_date: form.release_date || null,
+      duration_minutes: values.duration_minutes ? Number(values.duration_minutes) : null,
+      certificate: values.certificate.trim() || null,
+      release_date: values.release_date || null,
       languages,
       genres,
       formats,
       cast: serializeMovieCastCrew(castMembers),
       crew: serializeMovieCastCrew(crewMembers),
-      status: form.status,
+      status: values.status,
       is_active: isPublicStatus,
     };
     try {
       if (isEdit && movieId) {
-        await updateMovie({ id: movieId, body: payload }).unwrap();
-        toast.success("Movie updated");
+        const res = await updateMovie({ id: movieId, body: payload }).unwrap();
+        toast.success(res.message || "Movie updated");
       } else {
-        await createMovie(payload).unwrap();
-        toast.success("Movie created");
+        const res = await createMovie(payload).unwrap();
+        toast.success(res.message || "Movie created");
       }
       router.push("/admin/movies");
     } catch (err) {
@@ -302,7 +308,7 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
       </p>
 
       <form
-        onSubmit={onSubmit}
+        onSubmit={handleSubmit(onValid)}
         className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 md:p-8"
         noValidate
       >
@@ -311,44 +317,51 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
             <FieldLabel required>Title</FieldLabel>
             <input
               className="input-field w-full"
-              value={form.title}
-              onChange={(e) => setField("title", e.target.value)}
+              {...register("title")}
               placeholder="Movie title"
             />
+            {errors.title ? <p className={fieldErrorClass}>{errors.title.message}</p> : null}
           </div>
 
           <div>
             <FieldLabel>Status</FieldLabel>
-            <select
-              className="input-field w-full"
-              value={form.status}
-              onChange={(e) => setField("status", e.target.value as Movie["status"])}
-            >
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_LABEL[status]}
-                </option>
-              ))}
-            </select>
+            <Controller
+              name="status"
+              control={control}
+              render={({ field }) => (
+                <select className="input-field w-full" {...field}>
+                  {STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>
+                      {STATUS_LABEL[status]}
+                    </option>
+                  ))}
+                </select>
+              )}
+            />
+            {errors.status ? <p className={fieldErrorClass}>{errors.status.message}</p> : null}
           </div>
 
           <div>
             <FieldLabel>Certificate</FieldLabel>
-            <select
-              className="input-field w-full"
-              value={form.certificate}
-              onChange={(e) => setField("certificate", e.target.value)}
-            >
-              <option value="">Select Certificate Rating (Optional)</option>
-              {certificateMasters.map((cert) => (
-                <option key={cert.id} value={cert.name}>
-                  {cert.name} {cert.description ? `— ${cert.description}` : ""}
-                </option>
-              ))}
-              {form.certificate && !certificateMasters.some((c) => c.name.toLowerCase() === form.certificate.toLowerCase()) ? (
-                <option value={form.certificate}>{form.certificate} (Custom/Legacy)</option>
-              ) : null}
-            </select>
+            <Controller
+              name="certificate"
+              control={control}
+              render={({ field }) => (
+                <select className="input-field w-full" {...field}>
+                  <option value="">Select Certificate Rating (Optional)</option>
+                  {certificateMasters.map((cert) => (
+                    <option key={cert.id} value={cert.name}>
+                      {cert.name} {cert.description ? `— ${cert.description}` : ""}
+                    </option>
+                  ))}
+                  {certificate &&
+                  !certificateMasters.some((c) => c.name.toLowerCase() === certificate.toLowerCase()) ? (
+                    <option value={certificate}>{certificate} (Custom/Legacy)</option>
+                  ) : null}
+                </select>
+              )}
+            />
+            {errors.certificate ? <p className={fieldErrorClass}>{errors.certificate.message}</p> : null}
             {!certificateMasters.length ? (
               <p className="mt-2 text-xs text-slate-400">
                 No certificates yet. Add them in {masterLink}.
@@ -362,19 +375,19 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
               className="input-field w-full"
               type="number"
               min={1}
-              value={form.duration_minutes}
-              onChange={(e) => setField("duration_minutes", e.target.value)}
+              {...register("duration_minutes")}
             />
+            {errors.duration_minutes ? (
+              <p className={fieldErrorClass}>{errors.duration_minutes.message}</p>
+            ) : null}
           </div>
 
           <div>
             <FieldLabel>Release date</FieldLabel>
-            <input
-              className="input-field w-full"
-              type="date"
-              value={form.release_date}
-              onChange={(e) => setField("release_date", e.target.value)}
-            />
+            <input className="input-field w-full" type="date" {...register("release_date")} />
+            {errors.release_date ? (
+              <p className={fieldErrorClass}>{errors.release_date.message}</p>
+            ) : null}
           </div>
 
           <div>
@@ -553,37 +566,38 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
 
           <div className="md:col-span-2">
             <FieldLabel>Description</FieldLabel>
-            <textarea
-              className="input-field w-full min-h-[110px]"
-              value={form.description}
-              onChange={(e) => setField("description", e.target.value)}
-            />
+            <textarea className="input-field w-full min-h-[110px]" {...register("description")} />
+            {errors.description ? (
+              <p className={fieldErrorClass}>{errors.description.message}</p>
+            ) : null}
           </div>
 
           <div>
             <FieldLabel>Poster</FieldLabel>
             <CroppedImageField
-              value={form.poster_url}
+              value={posterUrl || ""}
               aspect={2 / 3}
               previewClassName="w-full h-56 rounded-xl border border-slate-200"
               emptyClassName="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
               emptyLabel="Add poster"
-              onRemove={() => setField("poster_url", "")}
+              onRemove={() => setValue("poster_url", "", { shouldValidate: true, shouldDirty: true })}
               onCroppedFile={(file) => uploadField(file, "poster_url")}
             />
+            {errors.poster_url ? <p className={fieldErrorClass}>{errors.poster_url.message}</p> : null}
           </div>
 
           <div>
             <FieldLabel>Banner</FieldLabel>
             <CroppedImageField
-              value={form.banner_url}
+              value={bannerUrl || ""}
               aspect={16 / 9}
               previewClassName="w-full h-56 rounded-xl border border-slate-200"
               emptyClassName="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
               emptyLabel="Add banner"
-              onRemove={() => setField("banner_url", "")}
+              onRemove={() => setValue("banner_url", "", { shouldValidate: true, shouldDirty: true })}
               onCroppedFile={(file) => uploadField(file, "banner_url")}
             />
+            {errors.banner_url ? <p className={fieldErrorClass}>{errors.banner_url.message}</p> : null}
           </div>
         </div>
 

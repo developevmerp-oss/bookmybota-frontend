@@ -628,6 +628,10 @@ export interface AdminEvent {
   platform_earned?: number | string;
   created_at?: string;
   updated_at?: string;
+  /** Earliest showtime start (organizer list). */
+  event_starts_at?: string | null;
+  /** Latest showtime end (organizer list). */
+  event_ends_at?: string | null;
   ticket_types?: Array<{
     id: string;
     ticket_type: string;
@@ -1621,9 +1625,20 @@ export interface EventOffer {
   discount_type: 'PERCENT' | 'FLAT';
   discount_value: number | string;
   promo_code?: string | null;
+  min_booking_amount?: number | string;
+  apply_to?: 'THIS_EVENT' | 'SELECTED_EVENTS' | 'ALL_MY_EVENTS';
+  usage_limit?: number | null;
+  per_customer_limit?: number | null;
   valid_from?: string | null;
   valid_until?: string | null;
+  start_date?: string;
+  start_time?: string;
+  end_date?: string;
+  end_time?: string;
+  status?: 'DRAFT' | 'ACTIVE' | string;
   is_active: boolean;
+  sort_order?: number;
+  event_ids?: string[];
   event_name?: string;
   event_status?: string;
   created_at?: string;
@@ -3923,10 +3938,21 @@ export const api = createApi({
         description?: string;
         discount_type: 'PERCENT' | 'FLAT';
         discount_value: number;
-        promo_code?: string;
+        promo_code: string;
+        min_booking_amount?: number;
+        apply_to?: 'THIS_EVENT' | 'SELECTED_EVENTS' | 'ALL_MY_EVENTS';
+        event_ids?: string[];
+        usage_limit?: number | null;
+        per_customer_limit?: number | null;
+        start_date?: string;
+        start_time?: string;
+        end_date?: string;
+        end_time?: string;
         valid_from?: string;
         valid_until?: string;
+        status?: 'DRAFT' | 'ACTIVE';
         is_active?: boolean;
+        sort_order?: number;
       }
     >({
       query: ({ eventId, ...body }) => ({
@@ -3946,10 +3972,21 @@ export const api = createApi({
         description?: string;
         discount_type: 'PERCENT' | 'FLAT';
         discount_value: number;
-        promo_code?: string;
+        promo_code: string;
+        min_booking_amount?: number;
+        apply_to?: 'THIS_EVENT' | 'SELECTED_EVENTS' | 'ALL_MY_EVENTS';
+        event_ids?: string[];
+        usage_limit?: number | null;
+        per_customer_limit?: number | null;
+        start_date?: string;
+        start_time?: string;
+        end_date?: string;
+        end_time?: string;
         valid_from?: string;
         valid_until?: string;
+        status?: 'DRAFT' | 'ACTIVE';
         is_active?: boolean;
+        sort_order?: number;
       }
     >({
       query: ({ offerId, ...body }) => ({

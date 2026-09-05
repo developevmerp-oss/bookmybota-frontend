@@ -230,6 +230,22 @@ export default function PublicEventDetailPage({
   const languages = useMemo(() => parseEventLanguages(event?.language), [event?.language]);
   const showtimes = useMemo(() => event?.showtimes || [], [event?.showtimes]);
   const ticketTypes = useMemo(() => event?.ticket_types || [], [event?.ticket_types]);
+  const ticketTypesDisplay = useMemo(() => {
+    const map = new Map<
+      string,
+      { key: string; ticket_type: string; price: number; max_per_order: number }
+    >();
+    for (const t of ticketTypes) {
+      const name = String(t.ticket_type || "").trim() || "Ticket";
+      const price = Number(t.price) || 0;
+      const maxPer = Math.max(1, Number((t as { max_per_order?: number | null }).max_per_order) || 10);
+      const key = `${name.toLowerCase()}|${price}|${maxPer}`;
+      if (!map.has(key)) {
+        map.set(key, { key, ticket_type: name, price, max_per_order: maxPer });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.price - b.price);
+  }, [ticketTypes]);
   const displayArtists = useMemo((): StaticArtist[] => {
     const rows = event?.artists || [];
     return rows.map((a) => {
@@ -701,6 +717,34 @@ export default function PublicEventDetailPage({
                     </>
                   )}
                 </p>
+              </section>
+            )}
+
+            {ticketTypesDisplay.length > 0 && (
+              <section className="mt-6 sm:mt-8 lg:mt-9">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+                  Tickets
+                </h2>
+                <ul className="divide-y divide-[#EEE] rounded-xl border border-[#E8E8E8] overflow-hidden">
+                  {ticketTypesDisplay.map((t) => (
+                    <li
+                      key={t.key}
+                      className="flex items-start justify-between gap-3 px-3.5 sm:px-4 py-3 sm:py-3.5 bg-white"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem]">
+                          {t.ticket_type}
+                        </p>
+                        <p className="mt-0.5 text-[0.875rem] sm:text-[0.9375rem] text-[#6B6B6B]">
+                          Max {t.max_per_order} per order
+                        </p>
+                      </div>
+                      <p className="shrink-0 font-extrabold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem]">
+                        {formatMoney(t.price, { compact: true })}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
               </section>
             )}
 

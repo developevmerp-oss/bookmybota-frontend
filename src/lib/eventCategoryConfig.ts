@@ -1,5 +1,4 @@
 export type EventStepperStepId =
-  | "type"
   | "details"
   | "sport"
   | "media"
@@ -42,21 +41,19 @@ export type EventStepperStepDef = {
 };
 
 const DEFAULT_STEPS: EventStepperStepDef[] = [
-  { id: "type", label: "Event type", short: "Type" },
   { id: "details", label: "Event details", short: "Details" },
   { id: "media", label: "Media", short: "Media" },
-  { id: "venue", label: "Venue & tickets", short: "Venue" },
+  { id: "venue", label: "Venue & layout", short: "Venue" },
   { id: "artists", label: "Lineup", short: "Lineup" },
   { id: "documents", label: "Documents", short: "Docs" },
   { id: "review", label: "Review", short: "Review" },
 ];
 
 const SPORT_STEPS: EventStepperStepDef[] = [
-  { id: "type", label: "Event type", short: "Type" },
   { id: "details", label: "Event details", short: "Details" },
   { id: "sport", label: "Sport details", short: "Sport" },
   { id: "media", label: "Media", short: "Media" },
-  { id: "venue", label: "Venue & tickets", short: "Venue" },
+  { id: "venue", label: "Venue & layout", short: "Venue" },
   { id: "artists", label: "Teams / players", short: "Teams" },
   { id: "documents", label: "Documents", short: "Docs" },
   { id: "review", label: "Review", short: "Review" },

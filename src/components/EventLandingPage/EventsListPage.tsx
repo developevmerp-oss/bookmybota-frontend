@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   FaChevronDown,
   FaChevronLeft,
@@ -67,9 +68,24 @@ const PRICE_BANDS: Array<{ id: string; label: string }> = [
   { id: "501-2000", label: "501 - 2000" },
   { id: "2000+", label: "Above 2000" },
 ];
+const SORT_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: "recommended", label: "Recommended" },
+  { id: "date", label: "Date" },
+  { id: "price-asc", label: "Price: Low to High" },
+  { id: "price-desc", label: "Price: High to Low" },
+  { id: "rating", label: "Rating" },
+];
 
 function toIsoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseCsvParam(raw: string | null): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function FilterTag({
@@ -168,6 +184,8 @@ function EventCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: strin
 
 export default function PublicEventsPage() {
   const dispatch = useAppDispatch();
+  const searchParams = useSearchParams();
+  const [searchInput, setSearchInput] = useState("");
   const router = useRouter();
   const pathname = usePathname() || "/events";
   const [urlQuery, setUrlQuery] = useState("");
@@ -182,15 +200,20 @@ export default function PublicEventsPage() {
   const [calMonth, setCalMonth] = useState(() => new Date());
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [selectedPriceBands, setSelectedPriceBands] = useState<string[]>([]);
+  const [selectedMore, setSelectedMore] = useState<string[]>([]);
   const [openFilters, setOpenFilters] = useState({
     categories: true,
     date: false,
     city: false,
     languages: false,
     price: false,
+    more: false,
   });
   const [sort, setSort] = useState("recommended");
   const [page, setPage] = useState(1);
+  const [mobileFilterTab, setMobileFilterTab] = useState<
+    "categories" | "date" | "city" | "languages" | "price" | "more" | null
+  >(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
 
@@ -199,6 +222,71 @@ export default function PublicEventsPage() {
   const { data: businessTypes = [] } = useGetBusinessTypesQuery("event", {
     skip: apiCategories.length > 0,
   });
+
+  // Debounce search so every keystroke does not hit the API.
+  useEffect(() => {
+    const t = window.setTimeout(() => setSearch(searchInput.trim()), 350);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
+
+  // Keep listing filters in sync with URL (?q, ?category, ?city, …) from nav/search.
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    const cat = searchParams.get("category");
+    const cityParam = searchParams.get("city");
+    const language = searchParams.get("language");
+    const price = searchParams.get("price");
+    const more = searchParams.get("more");
+    const datePresetParam = searchParams.get("date_preset");
+    const dateFromParam = searchParams.get("date_from");
+    const dateToParam = searchParams.get("date_to");
+    const sortParam = searchParams.get("sort");
+
+    setSearchInput(q);
+    setSearch(q.trim());
+    setSelectedSlugs(parseCsvParam(cat));
+    setSelectedLanguages(parseCsvParam(language));
+    setSelectedPriceBands(parseCsvParam(price));
+    setSelectedMore(parseCsvParam(more));
+
+    if (datePresetParam) {
+      setDatePreset(datePresetParam);
+      setDateFrom("");
+      setDateTo("");
+      setUseDateRange(false);
+    } else {
+      setDatePreset("");
+      setDateFrom(dateFromParam || "");
+      setDateTo(dateToParam || "");
+      setUseDateRange(Boolean(dateFromParam || dateToParam));
+    }
+
+    if (sortParam && SORT_OPTIONS.some((o) => o.id === sortParam)) {
+      setSort(sortParam);
+    }
+
+    if (cityParam) {
+      if (cityParam === "All Cities") setCity("");
+      else setCity(cityParam);
+    } else {
+      const stored = localStorage.getItem("selected_city");
+      if (stored && stored !== "All Cities") setCity(stored);
+      else setCity("");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const applyCity = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("city")) return;
+      const stored = localStorage.getItem("selected_city");
+      if (stored && stored !== "All Cities") setCity(stored);
+      else setCity("");
+    };
+    window.addEventListener("selected_city_changed", applyCity);
+    return () => window.removeEventListener("selected_city_changed", applyCity);
+  }, []);
+
   const queryArg = useMemo(
     () => ({
       ...(search.trim() ? { q: search.trim() } : {}),
@@ -206,6 +294,7 @@ export default function PublicEventsPage() {
       ...(selectedSlugs.length ? { category: selectedSlugs.join(",") } : {}),
       ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
       ...(selectedPriceBands.length ? { price: selectedPriceBands.join(",") } : {}),
+      ...(selectedMore.length ? { more: selectedMore.join(",") } : {}),
       ...(datePreset ? { date_preset: datePreset } : {}),
       ...(!datePreset && dateFrom ? { date_from: dateFrom } : {}),
       ...(!datePreset && dateTo ? { date_to: dateTo } : {}),
@@ -217,74 +306,15 @@ export default function PublicEventsPage() {
       selectedSlugs,
       selectedLanguages,
       selectedPriceBands,
+      selectedMore,
       datePreset,
       dateFrom,
       dateTo,
       sort,
     ]
   );
-  const { data: eventsData, isLoading } = useGetPublicEventsQuery(queryArg);
+  const { data: eventsData, isLoading, isFetching } = useGetPublicEventsQuery(queryArg);
   const events = eventsData ?? EMPTY_EVENTS;
-
-  const categoryPool = useMemo(() => {
-    if (apiCategories.length) return apiCategories;
-    return businessTypes
-      .filter((type) => type.parent_type_id && type.slug)
-      .map((type) => ({ slug: type.slug as string, name: type.name }));
-  }, [apiCategories, businessTypes]);
-
-  const syncCategoryToUrl = (slug: string | null) => {
-    const params = new URLSearchParams(
-      typeof window !== "undefined" ? window.location.search : urlQuery
-    );
-    if (slug) params.set("category", slug);
-    else params.delete("category");
-    const qs = params.toString();
-    const nextQuery = qs ? `?${qs}` : "";
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    setUrlQuery(nextQuery);
-  };
-
-  useEffect(() => {
-    const syncUrlQuery = () => {
-      setUrlQuery(window.location.search);
-    };
-    syncUrlQuery();
-    window.addEventListener("popstate", syncUrlQuery);
-    return () => window.removeEventListener("popstate", syncUrlQuery);
-  }, [pathname]);
-
-  useEffect(() => {
-    const applyCity = () => {
-      const stored = localStorage.getItem("selected_city");
-      const params = new URLSearchParams(window.location.search);
-      const cityParam = params.get("city");
-      if (cityParam && cityParam !== "All Cities") setCity(cityParam);
-      else if (stored && stored !== "All Cities") setCity(stored);
-      else setCity("");
-    };
-    applyCity();
-    window.addEventListener("selected_city_changed", applyCity);
-    return () => window.removeEventListener("selected_city_changed", applyCity);
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(urlQuery.replace(/^\?/, ""));
-    const catParam = params.get("category");
-    const qParam = params.get("q");
-
-    if (catParam) {
-      setSelectedSlugs([normalizeCategoryParam(catParam, categoryPool)]);
-    } else if (qParam && isEventCategoryKey(qParam)) {
-      setSelectedSlugs([resolveCategorySlug(qParam, categoryPool)]);
-    } else {
-      setSelectedSlugs([]);
-    }
-
-    if (qParam && !isEventCategoryKey(qParam)) {
-      setSearch(qParam);
-    }
-  }, [urlQuery, categoryPool]);
 
   useEffect(() => {
     let cancelled = false;
@@ -362,7 +392,7 @@ export default function PublicEventsPage() {
         { id: "tomorrow", label: "Tomorrow" },
         { id: "weekend", label: "This Weekend" },
       ];
-  const moreOptions: { id: string; label: string }[] = [];
+  const moreOptions = filterOptions?.more?.length ? filterOptions.more : [];
 
   const filtered = events;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -371,7 +401,18 @@ export default function PublicEventsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, city, selectedSlugs, selectedLanguages, selectedPriceBands, datePreset, dateFrom, dateTo, sort]);
+  }, [
+    search,
+    city,
+    selectedSlugs,
+    selectedLanguages,
+    selectedPriceBands,
+    selectedMore,
+    datePreset,
+    dateFrom,
+    dateTo,
+    sort,
+  ]);
 
   const selectSlug = (slug?: string) => {
     if (!slug) return;
@@ -413,6 +454,14 @@ export default function PublicEventsPage() {
     window.dispatchEvent(new Event("selected_city_changed"));
   };
 
+  const clearDateFilters = () => {
+    setDatePreset("");
+    setDateFrom("");
+    setDateTo("");
+    setUseDateRange(false);
+    setCalTab("start");
+  };
+
   const pickCalendarDay = (day: number) => {
     const iso = toIsoDate(calMonth.getFullYear(), calMonth.getMonth(), day);
     setDatePreset("");
@@ -420,12 +469,10 @@ export default function PublicEventsPage() {
       setDateFrom(iso);
       if (dateTo && iso > dateTo) setDateTo("");
       setCalTab("end");
+    } else if (dateFrom && iso < dateFrom) {
+      setDateFrom(iso);
     } else {
-      if (dateFrom && iso < dateFrom) {
-        setDateFrom(iso);
-      } else {
-        setDateTo(iso);
-      }
+      setDateTo(iso);
     }
   };
 
@@ -516,8 +563,14 @@ export default function PublicEventsPage() {
           type="checkbox"
           checked={useDateRange}
           onChange={(e) => {
-            setUseDateRange(e.target.checked);
-            if (e.target.checked) setDatePreset("");
+            const on = e.target.checked;
+            setUseDateRange(on);
+            if (on) {
+              setDatePreset("");
+            } else {
+              setDateFrom("");
+              setDateTo("");
+            }
           }}
           className="accent-[#6900AA]"
         />
@@ -535,7 +588,7 @@ export default function PublicEventsPage() {
                   : "text-slate-400"
               }`}
             >
-              Start Date
+              Start Date{dateFrom ? `: ${dateFrom}` : ""}
             </button>
             <button
               type="button"
@@ -546,7 +599,7 @@ export default function PublicEventsPage() {
                   : "text-slate-400"
               }`}
             >
-              End Date
+              End Date{dateTo ? `: ${dateTo}` : ""}
             </button>
           </div>
           <div className="flex items-center justify-between mb-2">
@@ -578,13 +631,18 @@ export default function PublicEventsPage() {
               if (!day) return <span key={`e-${i}`} />;
               const iso = toIsoDate(calMonth.getFullYear(), calMonth.getMonth(), day);
               const selected = iso === dateFrom || iso === dateTo;
+              const inRange = Boolean(dateFrom && dateTo && iso >= dateFrom && iso <= dateTo);
               return (
                 <button
                   key={iso}
                   type="button"
                   onClick={() => pickCalendarDay(day)}
                   className={`h-7 text-xs rounded cursor-pointer ${
-                    selected ? "text-[#6900AA] font-bold" : "text-slate-700 hover:bg-slate-100"
+                    selected
+                      ? "bg-[#6900AA] text-white font-bold"
+                      : inRange
+                        ? "bg-[#F3E8FF] text-[#6900AA] font-semibold"
+                        : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   {day}
@@ -595,30 +653,29 @@ export default function PublicEventsPage() {
           <div className="mt-3 flex flex-col sm:flex-row gap-2">
             <button
               type="button"
-              onClick={() => setUseDateRange(false)}
-              className="flex-1 text-xs py-1.5 border border-slate-200 rounded text-[#6900AA] cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDateFrom("");
-                setDateTo("");
-              }}
+              onClick={clearDateFilters}
               className="flex-1 text-xs py-1.5 border border-slate-200 rounded text-[#6900AA] cursor-pointer"
             >
               Clear
             </button>
             <button
               type="button"
-              onClick={() => setUseDateRange(true)}
-              className="flex-1 text-xs py-1.5 rounded bg-[#6900AA] text-white cursor-pointer"
+              onClick={() => setUseDateRange(false)}
+              className="flex-1 text-xs py-1.5 rounded bg-[#6900AA] text-white cursor-pointer disabled:opacity-50"
+              disabled={!dateFrom && !dateTo}
             >
-              Apply
+              Done
             </button>
           </div>
         </div>
+      )}
+      {(dateFrom || dateTo) && !useDateRange && (
+        <p className="mt-2 text-xs text-slate-600">
+          Range: {dateFrom || "…"} → {dateTo || "…"}{" "}
+          <button type="button" className="text-[#6900AA] underline cursor-pointer" onClick={clearDateFilters}>
+            Clear
+          </button>
+        </p>
       )}
     </>
   );
@@ -649,62 +706,31 @@ export default function PublicEventsPage() {
     </div>
   );
 
-  const filterSections = (
-    <>
-      <FilterSection
-        title="Categories"
-        open={openFilters.categories}
-        onToggle={() => toggleOpen("categories")}
-        onClear={() => {
-          setSelectedSlugs([]);
-          syncCategoryToUrl(null);
-        }}
-      >
-        {categoriesPanel()}
-      </FilterSection>
-
-      <FilterSection
-        title="Date"
-        open={openFilters.date}
-        onToggle={() => toggleOpen("date")}
-        onClear={() => {
-          setDatePreset("");
-          setDateFrom("");
-          setDateTo("");
-          setUseDateRange(false);
-        }}
-      >
-        {datePanel()}
-      </FilterSection>
-
-      <FilterSection
-        title="City"
-        open={openFilters.city}
-        onToggle={() => toggleOpen("city")}
-        onClear={clearCity}
-      >
-        {cityPanel()}
-      </FilterSection>
-
-      <FilterSection
-        title="Languages"
-        open={openFilters.languages}
-        onToggle={() => toggleOpen("languages")}
-        onClear={() => setSelectedLanguages([])}
-      >
-        {languagesPanel()}
-      </FilterSection>
-
-      <FilterSection
-        title="Price"
-        open={openFilters.price}
-        onToggle={() => toggleOpen("price")}
-        onClear={() => setSelectedPriceBands([])}
-      >
-        {pricePanel()}
-      </FilterSection>
-    </>
+  const morePanel = () => (
+    <div className="flex flex-wrap gap-2">
+      {moreOptions.length === 0 ? (
+        <p className="text-xs text-slate-500">No extra filters available.</p>
+      ) : (
+        moreOptions.map((opt) => (
+          <FilterTag
+            key={opt.id}
+            label={opt.label}
+            active={selectedMore.includes(opt.id)}
+            onClick={() => toggleIn(selectedMore, opt.id, setSelectedMore)}
+          />
+        ))
+      )}
+    </div>
   );
+
+  const mobileTabs = [
+    { id: "categories" as const, label: "Categories" },
+    { id: "date" as const, label: "Date" },
+    { id: "city" as const, label: "City" },
+    { id: "languages" as const, label: "Languages" },
+    { id: "price" as const, label: "Price" },
+    ...(moreOptions.length ? [{ id: "more" as const, label: "More" }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-[#f6f7f8]">
@@ -757,17 +783,131 @@ export default function PublicEventsPage() {
             id="city-filter"
             className="lg:sticky lg:top-24 self-start h-fit max-h-none lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto [scrollbar-width:thin]"
           >
-            <FiltersPanel onClearAll={clearAllFilters}>{filterSections}</FiltersPanel>
+            <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3 lg:mb-4">Filters</h3>
+
+            <div className="lg:hidden">
+              <div className={`grid gap-1.5 ${moreOptions.length ? "grid-cols-3" : "grid-cols-5"}`}>
+                {mobileTabs.map((tab) => {
+                  const active = mobileFilterTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setMobileFilterTab((prev) => (prev === tab.id ? null : tab.id))}
+                      className={`px-1 py-2 rounded-lg text-[10px] sm:text-[11px] font-semibold cursor-pointer border ${
+                        active
+                          ? "bg-[#6900AA] border-[#6900AA] text-white"
+                          : "bg-white border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {mobileFilterTab && (
+                <div className="mt-2 bg-white rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.06)] p-3">
+                  {mobileFilterTab === "categories" && categoriesPanel()}
+                  {mobileFilterTab === "date" && datePanel()}
+                  {mobileFilterTab === "city" && cityPanel()}
+                  {mobileFilterTab === "languages" && languagesPanel()}
+                  {mobileFilterTab === "price" && pricePanel()}
+                  {mobileFilterTab === "more" && morePanel()}
+                </div>
+              )}
+            </div>
+
+            <div className="hidden lg:block space-y-2.5">
+              <FilterCard
+                title="Categories"
+                open={openFilters.categories}
+                onToggle={() => toggleOpen("categories")}
+                onClear={() => setSelectedSlugs([])}
+              >
+                {categoriesPanel()}
+              </FilterCard>
+
+              <FilterCard
+                title="Date"
+                open={openFilters.date}
+                onToggle={() => toggleOpen("date")}
+                onClear={clearDateFilters}
+              >
+                {datePanel()}
+              </FilterCard>
+
+              <FilterCard
+                title="City"
+                open={openFilters.city}
+                onToggle={() => toggleOpen("city")}
+                onClear={clearCity}
+              >
+                {cityPanel()}
+              </FilterCard>
+
+              <FilterCard
+                title="Languages"
+                open={openFilters.languages}
+                onToggle={() => toggleOpen("languages")}
+                onClear={() => setSelectedLanguages([])}
+              >
+                {languagesPanel()}
+              </FilterCard>
+
+              <FilterCard
+                title="Price"
+                open={openFilters.price}
+                onToggle={() => toggleOpen("price")}
+                onClear={() => setSelectedPriceBands([])}
+              >
+                {pricePanel()}
+              </FilterCard>
+
+              {moreOptions.length > 0 && (
+                <FilterCard
+                  title="More filters"
+                  open={openFilters.more}
+                  onToggle={() => toggleOpen("more")}
+                  onClear={() => setSelectedMore([])}
+                >
+                  {morePanel()}
+                </FilterCard>
+              )}
+            </div>
           </aside>
 
           <div>
-            <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-5">
               <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-900 break-words">
                 Events in {headingCity}
               </h2>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
+                <label className="relative flex-1 sm:w-56">
+                  <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                  <input
+                    type="search"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Search events"
+                    className="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-2 text-sm text-slate-800 outline-none focus:border-[#6900AA]"
+                  />
+                </label>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-[#6900AA] cursor-pointer"
+                  aria-label="Sort events"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {isLoading ? (
+            {isLoading || (isFetching && paged.length === 0) ? (
               <EventListShimmer />
             ) : paged.length === 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
@@ -787,7 +927,7 @@ export default function PublicEventsPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                 {paged.map((event) => (
-                  <EventCard key={event.id} event={event} cityLabel={headingCity} />
+                  <EventCard key={event.id} event={event} cityLabel={city || undefined} />
                 ))}
               </div>
             )}

@@ -62,7 +62,22 @@ export function mergeContractHtml(contract: EventContractRecord): string {
   return htmlWithMergedValues(contract.body_html, data);
 }
 
-export function contractStatusLabel(status: string): string {
+export function contractStatusLabel(
+  status: string,
+  options?: { eventStatus?: string }
+): string {
+  if (options?.eventStatus === 'CLOSED') {
+    switch (status) {
+      case 'ACTIVE':
+        return 'Signed — event closed';
+      case 'PENDING_SIGNATURES':
+        return 'Unsigned — event closed';
+      case 'REJECTED':
+        return 'Rejected — event closed';
+      default:
+        return 'Event closed';
+    }
+  }
   switch (status) {
     case 'PENDING_SIGNATURES':
       return 'Awaiting signatures';
@@ -84,10 +99,10 @@ export function organizerWorkflowLabel(event: {
     organizer_signed_at?: string | null;
   } | null;
 }): string {
+  if (event.status === 'CLOSED') return 'Closed';
   if (event.contract?.status === 'ACTIVE' && event.is_visible) return 'Public';
   if (event.status === 'DRAFT') return 'Draft';
   if (event.status === 'PENDING_APPROVAL') return 'Awaiting Super Admin review';
-  if (event.status === 'CLOSED') return 'Closed';
   if (!event.contract || event.contract.status === 'REJECTED') {
     return event.contract?.status === 'REJECTED'
       ? 'Contract rejected'

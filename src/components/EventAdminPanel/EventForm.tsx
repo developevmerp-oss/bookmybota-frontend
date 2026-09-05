@@ -986,6 +986,121 @@ function EventDocUploadsList({
   );
 }
 
+function EventTicketTypesFields({ readOnly }: { readOnly: boolean }) {
+  const {
+    register,
+    control,
+    watch,
+    setValue,
+    getValues,
+  } = useFormContext<EventFormValues>();
+  const {
+    fields: ticketFields,
+    append,
+    remove,
+  } = useFieldArray({ control, name: "showtimes.0.ticket_types" });
+
+  const tickets = watch("showtimes.0.ticket_types") || [];
+  const showtimeCount = (watch("showtimes") || []).length;
+
+  useEffect(() => {
+    if (showtimeCount <= 1) return;
+    const source = (getValues("showtimes.0.ticket_types") || []).map((t) => ({ ...t }));
+    for (let i = 1; i < showtimeCount; i++) {
+      setValue(`showtimes.${i}.ticket_types`, source, { shouldDirty: false });
+    }
+  }, [tickets, showtimeCount, getValues, setValue]);
+
+  const labelClass = "portal-label block text-sm font-semibold mb-1.5";
+  const inputClass = "input-field w-full";
+
+  return (
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Ticket types</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Add ticket types, price, seat count, and max tickets per order. These apply to all venues.
+          </p>
+        </div>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => append(defaultTicketType())}
+            className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1 shrink-0"
+          >
+            <Plus size={14} /> Add type
+          </button>
+        )}
+      </div>
+
+      {ticketFields.length === 0 && (
+        <p className="text-xs text-slate-500">No ticket type selected yet. Click Add type to create one.</p>
+      )}
+      {ticketFields.map((field, ti) => (
+        <div
+          key={field.id}
+          className="grid sm:grid-cols-4 gap-3 items-start rounded-lg border border-slate-200 bg-white p-3"
+        >
+          <div>
+            <label className={labelClass}>Type name</label>
+            <input
+              disabled={readOnly}
+              className={inputClass}
+              {...register(`showtimes.0.ticket_types.${ti}.ticket_type`)}
+              placeholder="General, VIP..."
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Total seats</label>
+            <input
+              disabled={readOnly}
+              type="number"
+              min={1}
+              className={inputClass}
+              {...register(`showtimes.0.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Price (ETB)</label>
+            <input
+              disabled={readOnly}
+              type="number"
+              min={0}
+              step="0.01"
+              className={inputClass}
+              {...register(`showtimes.0.ticket_types.${ti}.price`, { valueAsNumber: true })}
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className={labelClass}>Max per order</label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={1}
+                className={inputClass}
+                {...register(`showtimes.0.ticket_types.${ti}.max_per_order`, {
+                  valueAsNumber: true,
+                })}
+              />
+            </div>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => remove(ti)}
+                className="p-2.5 text-slate-400 hover:text-rose-600 self-end"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function VenueBlock({
   index,
   readOnly,
@@ -1013,16 +1128,10 @@ function VenueBlock({
 }) {
   const {
     register,
-    control,
     watch,
     setValue,
     formState: { errors },
   } = useFormContext<EventFormValues>();
-  const {
-    fields: ticketFields,
-    append,
-    remove,
-  } = useFieldArray({ control, name: `showtimes.${index}.ticket_types` });
 
   const durationType =
     hostingType === "single" ? "ONE_DAY" : watch(`showtimes.${index}.duration_type`) || "ONE_DAY";
@@ -1274,23 +1383,26 @@ function VenueBlock({
       )}
 
       <div className="space-y-3 pt-2 border-t border-slate-200">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-800">Ticket types for this venue</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Total seats across all types must fit within the layout capacity when a layout is selected.
-            </p>
-          </div>
-          {!readOnly && (
-            <button
-              type="button"
-              onClick={() => append(defaultTicketType())}
-              className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1 shrink-0"
-            >
-              <Plus size={14} /> Add type
-            </button>
-          )}
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Ticket capacity</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Ticket types are set in the <strong>Event details</strong> step. Total seats must fit within the
+            layout capacity when a layout is selected.
+          </p>
         </div>
+
+        {ticketTypes.length === 0 ? (
+          <p className="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            No ticket types yet. Add them in Event details.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-600">
+            {(ticketTypes || []).length} ticket type(s) from Event details
+            {(ticketTypes || [])
+              .map((t) => ` · ${t.ticket_type || "Untitled"} (${t.total_count || 0} @ ${t.price ?? "—"})`)
+              .join("")}
+          </p>
+        )}
 
         {(layoutMode === "standard" || layoutMode === "custom") && (
           <div
@@ -1324,67 +1436,6 @@ function VenueBlock({
             ) : null}
           </div>
         )}
-
-        {ticketFields.length === 0 && (
-          <p className="text-xs text-slate-500">No ticket type selected yet. Click Add type to create one.</p>
-        )}
-        {ticketFields.map((field, ti) => (
-          <div key={field.id} className="grid sm:grid-cols-4 gap-3 items-start rounded-lg border border-slate-200 bg-white p-3">
-            <div>
-              <label className={labelClass}>Type name</label>
-              <input
-                disabled={readOnly}
-                className={inputClass}
-                {...register(`showtimes.${index}.ticket_types.${ti}.ticket_type`)}
-                placeholder="General, VIP..."
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Total seats</label>
-              <input
-                disabled={readOnly}
-                type="number"
-                min={1}
-                className={inputClass}
-                {...register(`showtimes.${index}.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Price (ETB)</label>
-              <input
-                disabled={readOnly}
-                type="number"
-                min={0}
-                step="0.01"
-                className={inputClass}
-                {...register(`showtimes.${index}.ticket_types.${ti}.price`, { valueAsNumber: true })}
-              />
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className={labelClass}>Max per order</label>
-                <input
-                  disabled={readOnly}
-                  type="number"
-                  min={1}
-                  className={inputClass}
-                  {...register(`showtimes.${index}.ticket_types.${ti}.max_per_order`, {
-                    valueAsNumber: true,
-                  })}
-                />
-              </div>
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => remove(ti)}
-                  className="p-2.5 text-slate-400 hover:text-rose-600 self-end"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
       </div>
 
       {index === 0 && venueDocuments.length > 0 && onDocumentUpload && onDocumentRemove && (
@@ -1749,9 +1800,9 @@ export default function EventForm({
   const [hostingType, setHostingType] = useState<"single" | "tour">(
     (event?.showtimes?.length || 0) > 1 ? "tour" : "single"
   );
-  const [stepId, setStepId] = useState<EventStepperStepId>(event ? "details" : "type");
+  const [stepId, setStepId] = useState<EventStepperStepId>("details");
   const [visitedSteps, setVisitedSteps] = useState<EventStepperStepId[]>(() =>
-    event ? getEventStepperSteps(event.category_slug).map((s) => s.id) : []
+    event ? getEventStepperSteps(event.category_slug).map((s) => s.id) : ["details"]
   );
 
   const categories = useMemo(
@@ -1786,8 +1837,6 @@ export default function EventForm({
   const allowedTicketModes = watch("allowed_ticket_modes") || [];
   const aboutEvent = watch("about_event") || "";
   const durationMinutesTotal = Number(watch("duration_minutes") || 0);
-  const durationHours = Math.floor(Math.max(0, durationMinutesTotal) / 60);
-  const durationMinutesPart = Math.max(0, durationMinutesTotal) % 60;
   const watchedValues = watch();
 
   const categorySlug = useMemo(() => {
@@ -2233,14 +2282,11 @@ export default function EventForm({
   };
 
   const validateCurrentStep = async (): Promise<boolean> => {
-    if (stepId === "type") {
+    if (stepId === "details") {
       if (!hostingType) {
         toast.error("Choose Single Event or Tour to continue.");
         return false;
       }
-      return true;
-    }
-    if (stepId === "details") {
       const ok = await trigger([
         "name",
         "category_type_id",
@@ -2282,7 +2328,30 @@ export default function EventForm({
           return false;
         }
         if (!Number(values.duration_minutes) || Number(values.duration_minutes) < 1) {
-          toast.error("Set event duration (hours and/or minutes).");
+          toast.error("Set event duration in minutes.");
+          return false;
+        }
+      }
+      const tickets = values.showtimes?.[0]?.ticket_types || [];
+      if (!tickets.length) {
+        toast.error("Add at least one ticket type.");
+        return false;
+      }
+      for (const t of tickets) {
+        if (!String(t.ticket_type || "").trim()) {
+          toast.error("Each ticket type needs a name.");
+          return false;
+        }
+        if (!Number(t.total_count) || Number(t.total_count) < 1) {
+          toast.error("Each ticket type needs total seats of at least 1.");
+          return false;
+        }
+        if (!Number.isFinite(Number(t.price)) || Number(t.price) < 0) {
+          toast.error("Each ticket type needs a valid price.");
+          return false;
+        }
+        if (!Number(t.max_per_order) || Number(t.max_per_order) < 1) {
+          toast.error("Each ticket type needs a max per order of at least 1.");
           return false;
         }
       }
@@ -2388,14 +2457,17 @@ export default function EventForm({
           }}
         />
 
-        {stepId === "type" && (
-          <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
-            <div>
-              <h3 className="portal-heading text-lg font-semibold">What would you like to host?</h3>
-              <p className="portal-muted text-sm mt-1">
-                Choose how this listing is structured. You can still save a draft at any later step.
-              </p>
-            </div>
+        {stepId === "details" && (
+        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+          <div>
+            <h3 className="portal-heading text-lg font-semibold">Event details</h3>
+            <p className="portal-muted text-sm mt-1">
+              Choose how this listing is structured, then fill in the basic event information.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-slate-800">What would you like to host?</p>
             <div className="grid sm:grid-cols-2 gap-4">
               <button
                 type="button"
@@ -2449,12 +2521,9 @@ export default function EventForm({
                 </p>
               </div>
             )}
-          </section>
-        )}
+          </div>
 
-        {stepId === "details" && (
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
-          <h3 className="portal-heading text-lg font-semibold">Basic details</h3>
+          <h3 className="portal-heading text-lg font-semibold pt-2 border-t border-slate-200">Basic details</h3>
 
           <div>
             <label className={labelClass}>Event name <span className="text-rose-500">*</span></label>
@@ -2488,38 +2557,20 @@ export default function EventForm({
             Set event duration below. For single events, end time is calculated from start time + duration.
           </p>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Duration (hours)</label>
-              <input
-                disabled={readOnly}
-                type="number"
-                min={0}
-                className={inputClass}
-                value={durationHours}
-                onChange={(e) => {
-                  const hours = Math.max(0, Number(e.target.value) || 0);
-                  const next = hours * 60 + durationMinutesPart;
-                  setValue("duration_minutes", next > 0 ? next : null, { shouldDirty: true });
-                }}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Duration (minutes)</label>
-              <input
-                disabled={readOnly}
-                type="number"
-                min={0}
-                max={59}
-                className={inputClass}
-                value={durationMinutesPart}
-                onChange={(e) => {
-                  const mins = Math.min(59, Math.max(0, Number(e.target.value) || 0));
-                  const next = durationHours * 60 + mins;
-                  setValue("duration_minutes", next > 0 ? next : null, { shouldDirty: true });
-                }}
-              />
-            </div>
+          <div>
+            <label className={labelClass}>Duration (minutes) <span className="text-rose-500">*</span></label>
+            <input
+              disabled={readOnly}
+              type="number"
+              min={1}
+              className={inputClass}
+              value={durationMinutesTotal > 0 ? durationMinutesTotal : ""}
+              onChange={(e) => {
+                const mins = Math.max(0, Number(e.target.value) || 0);
+                setValue("duration_minutes", mins > 0 ? mins : null, { shouldDirty: true });
+              }}
+              placeholder="e.g. 120"
+            />
           </div>
 
           {hostingType === "single" && (
@@ -2555,6 +2606,8 @@ export default function EventForm({
               </div>
             </div>
           )}
+
+          <EventTicketTypesFields readOnly={readOnly} />
 
           <div>
             <label className={labelClass}>
@@ -3093,19 +3146,26 @@ export default function EventForm({
         <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="portal-heading text-lg font-semibold">
-              {hostingType === "tour" ? "Tour stops, timings & tickets" : "Venues, timings & tickets"}{" "}
+              {hostingType === "tour" ? "Tour stops & layouts" : "Venue & layout"}{" "}
               <span className="text-rose-500 text-sm">*</span>
             </h3>
             {!readOnly && (
-              <button type="button" onClick={() => appendShowtime(defaultVenue())} className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const tickets = (getValues("showtimes.0.ticket_types") || []).map((t) => ({ ...t }));
+                  appendShowtime({ ...defaultVenue(), ticket_types: tickets });
+                }}
+                className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
+              >
                 <Plus size={14} /> Add venue
               </button>
             )}
           </div>
           <p className="portal-muted text-xs">
             {hostingType === "tour"
-              ? "Add each tour city stop as a venue. Each stop has its own ticket types and show times."
-              : "Add venue details and ticket types here. Event date and times are set in Event details."}
+              ? "Add each tour city stop as a venue. Ticket types are set in Event details and apply to every stop."
+              : "Add venue and layout details. Ticket types are set in Event details."}
           </p>
           {showtimeFields.map((field, i) => (
             <VenueBlock
@@ -3226,7 +3286,7 @@ export default function EventForm({
                     {formatTime12h(
                       `${watch("showtimes.0.event_date")}T${watch("showtimes.0.start_time")}`
                     )}
-                    {durationMinutesTotal > 0 ? ` · ${durationHours}h ${durationMinutesPart}m` : ""}
+                    {durationMinutesTotal > 0 ? ` · ${durationMinutesTotal} min` : ""}
                   </p>
                 ) : null}
                 <p className="text-sm text-slate-600">
@@ -3236,6 +3296,17 @@ export default function EventForm({
                         .map((o) => o.label)
                         .join(", ")
                     : "None selected"}
+                </p>
+                <p className="text-sm text-slate-600">
+                  Ticket types:{" "}
+                  {(watch("showtimes.0.ticket_types") || []).length
+                    ? (watch("showtimes.0.ticket_types") || [])
+                        .map(
+                          (t) =>
+                            `${t.ticket_type || "Untitled"} (${t.total_count || 0} @ ${t.price ?? "—"}, max ${t.max_per_order || 10}/order)`
+                        )
+                        .join(" · ")
+                    : "None added"}
                 </p>
                 <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("details")}>
                   Edit details

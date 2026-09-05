@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,6 +38,17 @@ function dayBefore(dateStr: string): string {
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
 
+function applyLabel(applyTo?: string) {
+  switch (applyTo) {
+    case "ALL_MY_EVENTS":
+      return "All my events";
+    case "SELECTED_EVENTS":
+      return "Selected events";
+    default:
+      return "This event";
+  }
+}
+
 type OfferFormPanelProps = {
   editing: EventOffer | null;
   eligibleEvents: OfferEligibleEvent[];
@@ -72,14 +83,26 @@ function OfferFormPanel({
         context: unknown,
         options: Parameters<ReturnType<typeof yupResolver>>[2]
       ) => {
-        const eventStartDate = startDateByEventId.get(values.eventId) || "";
-        return yupResolver(buildEventOfferFormSchema(eventStartDate))(
+        const ids =
+          values.apply_to === "ALL_MY_EVENTS"
+            ? eligibleEvents.map((e) => e.id)
+            : values.apply_to === "THIS_EVENT"
+              ? values.eventId
+                ? [values.eventId]
+                : []
+              : values.event_ids;
+        let earliest = "";
+        for (const id of ids) {
+          const starts = startDateByEventId.get(id);
+          if (starts && (!earliest || starts < earliest)) earliest = starts;
+        }
+        return yupResolver(buildEventOfferFormSchema(earliest))(
           values,
           context,
           options as never
         );
       },
-    [startDateByEventId]
+    [eligibleEvents, startDateByEventId]
   );
 
   const {
@@ -87,6 +110,7 @@ function OfferFormPanel({
     handleSubmit,
     watch,
     setValue,
+    control,
     reset,
     formState: { errors },
   } = useForm<EventOfferFormValues>({
@@ -95,16 +119,28 @@ function OfferFormPanel({
     mode: "onBlur",
   });
 
+  const applyTo = watch("apply_to");
   const eventId = watch("eventId");
-  const validFrom = watch("valid_from");
-  const validUntil = watch("valid_until");
+  const eventIds = watch("event_ids");
+  const startDate = watch("start_date");
+  const endDate = watch("end_date");
 
-  const selectedEvent = useMemo(
-    () => eligibleEvents.find((ev) => ev.id === eventId),
-    [eligibleEvents, eventId]
-  );
-  const eventStartDate = selectedEvent?.starts_on || "";
-  const lastOfferDate = eventStartDate ? dayBefore(eventStartDate) : "";
+  const boundEventIds = useMemo(() => {
+    if (applyTo === "ALL_MY_EVENTS") return eligibleEvents.map((e) => e.id);
+    if (applyTo === "THIS_EVENT") return eventId ? [eventId] : [];
+    return eventIds || [];
+  }, [applyTo, eligibleEvents, eventId, eventIds]);
+
+  const earliestEventStart = useMemo(() => {
+    let earliest = "";
+    for (const id of boundEventIds) {
+      const starts = startDateByEventId.get(id);
+      if (starts && (!earliest || starts < earliest)) earliest = starts;
+    }
+    return earliest;
+  }, [boundEventIds, startDateByEventId]);
+
+  const lastOfferDate = earliestEventStart ? dayBefore(earliestEventStart) : "";
 
   useEffect(() => {
     reset(initialValues);
@@ -112,15 +148,43 @@ function OfferFormPanel({
 
   const onSubmit = handleSubmit(async (values) => {
     const discount_value = Number(values.discount_value);
+    const primaryEventId =
+      values.apply_to === "THIS_EVENT"
+        ? values.eventId
+        : values.apply_to === "SELECTED_EVENTS"
+          ? values.event_ids[0]
+          : values.eventId || eligibleEvents[0]?.id || "";
+
+    if (!primaryEventId) {
+      toast.error("Select an event.");
+      return;
+    }
+
     const payload = {
       title: values.title.trim(),
       description: values.description.trim() || undefined,
       discount_type: values.discount_type,
       discount_value,
-      promo_code: values.promo_code.trim() || undefined,
-      valid_from: values.valid_from || undefined,
-      valid_until: values.valid_until || undefined,
-      is_active: values.is_active,
+      promo_code: values.promo_code.trim().toUpperCase(),
+      min_booking_amount: Number(values.min_booking_amount) || 0,
+      apply_to: values.apply_to,
+      event_ids:
+        values.apply_to === "THIS_EVENT"
+          ? [values.eventId]
+          : values.apply_to === "SELECTED_EVENTS"
+            ? values.event_ids
+            : [],
+      usage_limit: values.usage_limit ? Number(values.usage_limit) : null,
+      per_customer_limit: values.per_customer_limit
+        ? Number(values.per_customer_limit)
+        : null,
+      start_date: values.start_date,
+      start_time: values.start_time || undefined,
+      end_date: values.end_date,
+      end_time: values.end_time || undefined,
+      status: values.status,
+      is_active: values.status === "ACTIVE",
+      sort_order: Number(values.sort_order) || 0,
     };
 
     try {
@@ -128,7 +192,7 @@ function OfferFormPanel({
         await updateOffer({ offerId: editing.id, ...payload }).unwrap();
         toast.success("Offer updated.");
       } else {
-        await createOffer({ eventId: values.eventId, ...payload }).unwrap();
+        await createOffer({ eventId: primaryEventId, ...payload }).unwrap();
         toast.success("Offer created.");
       }
       onSaved();
@@ -138,73 +202,25 @@ function OfferFormPanel({
   });
 
   return (
-    <form onSubmit={onSubmit} className="glass-panel rounded-2xl p-5 space-y-4" noValidate>
-      <h3 className="portal-heading font-semibold">{editing ? "Edit offer" : "Create offer"}</h3>
-
-      {!editing && (
-        <div>
-          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Event</label>
-          <select
-            className="portal-select"
-            {...register("eventId", {
-              onChange: () => {
-                setValue("valid_from", "");
-                setValue("valid_until", "");
-              },
-            })}
-          >
-            <option value="">Select event</option>
-            {eligibleEvents.map((ev) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name} ({ev.status.replace("_", " ")})
-              </option>
-            ))}
-          </select>
-          {errors.eventId && <p className={fieldErrorClass}>{errors.eventId.message}</p>}
-          {eventStartDate && (
-            <p className="text-xs portal-muted mt-1">
-              Offers run before the event. Valid until must be before <strong>{eventStartDate}</strong>
-              {lastOfferDate ? ` (latest: ${lastOfferDate})` : ""}.
-            </p>
-          )}
-        </div>
-      )}
-
-      <div>
-        <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Title</label>
-        <input className="input-field" placeholder="Early bird 20% off" {...register("title")} />
-        {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
-      </div>
-
-      <div>
-        <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Description</label>
-        <textarea className="input-field resize-none" rows={2} {...register("description")} />
-        {errors.description && <p className={fieldErrorClass}>{errors.description.message}</p>}
-      </div>
+    <form onSubmit={onSubmit} className="glass-panel rounded-2xl p-5 space-y-5" noValidate>
+      <h3 className="portal-heading font-semibold text-lg">
+        {editing ? "Edit offer" : "Create offer"}
+      </h3>
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
-          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Discount type</label>
-          <select className="portal-select" {...register("discount_type")}>
-            <option value="PERCENT">Percent (%)</option>
-            <option value="FLAT">Flat amount (ETB)</option>
-          </select>
-          {errors.discount_type && <p className={fieldErrorClass}>{errors.discount_type.message}</p>}
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Offer name <span className="text-rose-500">*</span>
+          </label>
+          <input className="input-field" placeholder="Early bird 20% off" {...register("title")} />
+          {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
         </div>
         <div>
-          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Value</label>
-          <input type="number" min={1} className="input-field" {...register("discount_value")} />
-          {errors.discount_value && (
-            <p className={fieldErrorClass}>{errors.discount_value.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid sm:grid-cols-3 gap-4">
-        <div>
-          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Promo code</label>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Offer code <span className="text-rose-500">*</span>
+          </label>
           <input
-            className="input-field"
+            className="input-field uppercase"
             placeholder="SAVE20"
             {...register("promo_code", {
               onChange: (e) =>
@@ -215,37 +231,245 @@ function OfferFormPanel({
           />
           {errors.promo_code && <p className={fieldErrorClass}>{errors.promo_code.message}</p>}
         </div>
+      </div>
+
+      <div>
+        <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Description</label>
+        <textarea className="input-field resize-none" rows={2} {...register("description")} />
+        {errors.description && <p className={fieldErrorClass}>{errors.description.message}</p>}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
         <div>
-          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Valid from</label>
-          <input
-            type="date"
-            className="input-field"
-            max={lastOfferDate || validUntil || undefined}
-            {...register("valid_from")}
-          />
-          <p className="text-[10px] portal-muted mt-1">When the offer starts (optional)</p>
-          {errors.valid_from && <p className={fieldErrorClass}>{errors.valid_from.message}</p>}
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Discount type <span className="text-rose-500">*</span>
+          </label>
+          <select className="portal-select" {...register("discount_type")}>
+            <option value="PERCENT">Percentage</option>
+            <option value="FLAT">Flat amount</option>
+          </select>
+          {errors.discount_type && <p className={fieldErrorClass}>{errors.discount_type.message}</p>}
         </div>
         <div>
-          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Valid until</label>
-          <input
-            type="date"
-            className="input-field"
-            min={validFrom || undefined}
-            max={lastOfferDate || undefined}
-            {...register("valid_until")}
-          />
-          <p className="text-[10px] portal-muted mt-1">Must be before event day</p>
-          {errors.valid_until && <p className={fieldErrorClass}>{errors.valid_until.message}</p>}
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Discount value <span className="text-rose-500">*</span>
+          </label>
+          <input type="number" min={1} step="any" className="input-field" {...register("discount_value")} />
+          {errors.discount_value && (
+            <p className={fieldErrorClass}>{errors.discount_value.message}</p>
+          )}
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm portal-muted">
-        <input type="checkbox" {...register("is_active")} />
-        Active offer
-      </label>
+      <div>
+        <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+          Minimum booking amount
+        </label>
+        <input
+          type="number"
+          min={0}
+          step="any"
+          className="input-field sm:max-w-xs"
+          {...register("min_booking_amount")}
+        />
+        {errors.min_booking_amount && (
+          <p className={fieldErrorClass}>{errors.min_booking_amount.message}</p>
+        )}
+      </div>
 
-      <div className="flex gap-2">
+      <div>
+        <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+          Apply to <span className="text-rose-500">*</span>
+        </label>
+        <select
+          className="portal-select"
+          {...register("apply_to", {
+            onChange: (e) => {
+              const next = e.target.value;
+              if (next === "THIS_EVENT" && eventId) {
+                setValue("event_ids", [eventId]);
+              }
+            },
+          })}
+        >
+          <option value="THIS_EVENT">This event</option>
+          <option value="SELECTED_EVENTS">Selected events</option>
+          <option value="ALL_MY_EVENTS">All my events</option>
+        </select>
+        {errors.apply_to && <p className={fieldErrorClass}>{errors.apply_to.message}</p>}
+      </div>
+
+      {applyTo === "THIS_EVENT" && (
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Select event <span className="text-rose-500">*</span>
+          </label>
+          <select
+            className="portal-select"
+            {...register("eventId", {
+              onChange: (e) => {
+                const id = e.target.value;
+                setValue("event_ids", id ? [id] : []);
+                setValue("start_date", "");
+                setValue("end_date", "");
+              },
+            })}
+          >
+            <option value="">Choose an event…</option>
+            {eligibleEvents.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.name} ({ev.status.replace("_", " ")})
+              </option>
+            ))}
+          </select>
+          {errors.eventId && <p className={fieldErrorClass}>{errors.eventId.message}</p>}
+          {errors.event_ids && <p className={fieldErrorClass}>{errors.event_ids.message}</p>}
+        </div>
+      )}
+
+      {applyTo === "SELECTED_EVENTS" && (
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Select event(s) <span className="text-rose-500">*</span>
+          </label>
+          <Controller
+            name="event_ids"
+            control={control}
+            render={({ field }) => (
+              <div className="rounded-xl border border-slate-200 divide-y max-h-48 overflow-y-auto">
+                {eligibleEvents.map((ev) => {
+                  const checked = field.value?.includes(ev.id);
+                  return (
+                    <label
+                      key={ev.id}
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-slate-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!checked}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...(field.value || []), ev.id]
+                            : (field.value || []).filter((id) => id !== ev.id);
+                          field.onChange(next);
+                          if (next[0]) setValue("eventId", next[0]);
+                        }}
+                      />
+                      <span>
+                        {ev.name}{" "}
+                        <span className="text-xs text-slate-400">
+                          ({ev.status.replace("_", " ")})
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          />
+          {errors.event_ids && <p className={fieldErrorClass}>{errors.event_ids.message}</p>}
+        </div>
+      )}
+
+      {applyTo === "ALL_MY_EVENTS" && (
+        <p className="text-xs portal-muted">
+          This offer applies to all of your Live and Pending Approval events.
+        </p>
+      )}
+
+      {earliestEventStart && (
+        <p className="text-xs portal-muted">
+          Offers must end before the earliest event date{" "}
+          <strong>{earliestEventStart}</strong>
+          {lastOfferDate ? ` (latest end date: ${lastOfferDate})` : ""}.
+        </p>
+      )}
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Total usage limit
+          </label>
+          <input
+            type="number"
+            min={1}
+            className="input-field"
+            placeholder="Unlimited"
+            {...register("usage_limit")}
+          />
+          {errors.usage_limit && <p className={fieldErrorClass}>{errors.usage_limit.message}</p>}
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Per customer limit
+          </label>
+          <input
+            type="number"
+            min={1}
+            className="input-field"
+            placeholder="Unlimited"
+            {...register("per_customer_limit")}
+          />
+          {errors.per_customer_limit && (
+            <p className={fieldErrorClass}>{errors.per_customer_limit.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Start date <span className="text-rose-500">*</span>
+          </label>
+          <input
+            type="date"
+            className="input-field"
+            max={lastOfferDate || endDate || undefined}
+            {...register("start_date")}
+          />
+          {errors.start_date && <p className={fieldErrorClass}>{errors.start_date.message}</p>}
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Start time</label>
+          <input type="time" className="input-field" {...register("start_time")} />
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            End date <span className="text-rose-500">*</span>
+          </label>
+          <input
+            type="date"
+            className="input-field"
+            min={startDate || undefined}
+            max={lastOfferDate || undefined}
+            {...register("end_date")}
+          />
+          {errors.end_date && <p className={fieldErrorClass}>{errors.end_date.message}</p>}
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">End time</label>
+          <input type="time" className="input-field" {...register("end_time")} />
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+            Status <span className="text-rose-500">*</span>
+          </label>
+          <select className="portal-select" {...register("status")}>
+            <option value="DRAFT">Draft</option>
+            <option value="ACTIVE">Active</option>
+          </select>
+        </div>
+        <div>
+          <label className="portal-label text-xs font-bold uppercase mb-1.5 block">Sort order</label>
+          <input type="number" min={0} className="input-field" {...register("sort_order")} />
+          {errors.sort_order && <p className={fieldErrorClass}>{errors.sort_order.message}</p>}
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1">
         <button
           type="submit"
           disabled={saving}
@@ -296,16 +520,31 @@ export default function OrganizerOffersPage() {
 
   const openEdit = (offer: EventOffer) => {
     setEditing(offer);
+    const applyTo = offer.apply_to || "THIS_EVENT";
+    const eventIds = offer.event_ids?.length
+      ? offer.event_ids
+      : offer.event_id
+        ? [offer.event_id]
+        : [];
     setInitialValues({
+      apply_to: applyTo,
       eventId: offer.event_id,
+      event_ids: eventIds,
       title: offer.title,
       description: offer.description || "",
       discount_type: offer.discount_type,
       discount_value: String(offer.discount_value),
       promo_code: offer.promo_code || "",
-      valid_from: offer.valid_from?.slice(0, 10) || "",
-      valid_until: offer.valid_until?.slice(0, 10) || "",
-      is_active: offer.is_active,
+      min_booking_amount: String(offer.min_booking_amount ?? 0),
+      usage_limit: offer.usage_limit != null ? String(offer.usage_limit) : "",
+      per_customer_limit:
+        offer.per_customer_limit != null ? String(offer.per_customer_limit) : "",
+      start_date: offer.start_date || offer.valid_from?.slice(0, 10) || "",
+      start_time: offer.start_time || "",
+      end_date: offer.end_date || offer.valid_until?.slice(0, 10) || "",
+      end_time: offer.end_time || "",
+      status: offer.status === "ACTIVE" || offer.is_active ? "ACTIVE" : "DRAFT",
+      sort_order: String(offer.sort_order ?? 0),
     });
     setFormKey((k) => k + 1);
     setShowForm(true);
@@ -326,8 +565,8 @@ export default function OrganizerOffersPage() {
             <Tag className="text-violet-500" /> Event Offers
           </h2>
           <p className="portal-muted text-sm mt-1">
-            Add offers only on <strong>Live</strong> or <strong>Pending Approval</strong> events.
-            Closed or rejected events cannot have offers.
+            Create promo offers for <strong>Live</strong> or <strong>Pending Approval</strong>{" "}
+            events. Closed events cannot receive new offers.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -380,11 +619,19 @@ export default function OrganizerOffersPage() {
               <div>
                 <p className="font-semibold portal-heading">{o.title}</p>
                 <p className="text-sm portal-muted">
-                  {o.event_name} · {discountLabel(o)}
+                  {discountLabel(o)}
                   {o.promo_code ? ` · Code: ${o.promo_code}` : ""}
+                  {` · ${applyLabel(o.apply_to)}`}
                 </p>
                 <p className="text-xs portal-muted mt-1">
-                  Status: {o.event_status?.replace("_", " ")} · {o.is_active ? "Active" : "Inactive"}
+                  {o.apply_to === "ALL_MY_EVENTS"
+                    ? "All eligible events"
+                    : o.event_name || "Event"}
+                  {" · "}
+                  {(o.status || (o.is_active ? "ACTIVE" : "DRAFT")).replace("_", " ")}
+                  {o.start_date || o.valid_from
+                    ? ` · ${o.start_date || o.valid_from?.slice(0, 10)} → ${o.end_date || o.valid_until?.slice(0, 10) || "—"}`
+                    : ""}
                 </p>
               </div>
               <div className="flex gap-2">

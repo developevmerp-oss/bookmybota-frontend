@@ -16,7 +16,6 @@ import {
   Menu,
   X,
   CalendarCheck,
-  Star,
   Tag,
   Wallet,
   User,
@@ -40,7 +39,6 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
     { name: "Scan Tickets", href: "/organizer/scan", icon: QrCode },
     { name: "Ticket Stats", href: "/organizer/tickets", icon: BarChart3 },
     { name: "Offers", href: "/organizer/offers", icon: Tag },
-    { name: "Reviews", href: "/organizer/reviews", icon: Star },
     { name: "Ledger", href: "/organizer/ledger", icon: Wallet },
   ];
 

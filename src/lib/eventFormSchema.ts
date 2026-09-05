@@ -459,7 +459,6 @@ export function validateRequiredDocuments(
 }
 
 export type EventStepCompletionId =
-  | 'type'
   | 'details'
   | 'sport'
   | 'media'
@@ -483,10 +482,7 @@ export function getCompletedEventStepIds(opts: {
   const done: EventStepCompletionId[] = [];
   const isSports = String(opts.categorySlug || '').toLowerCase() === 'sports';
 
-  if (hostingType === 'single' || hostingType === 'tour') {
-    done.push('type');
-  }
-
+  const hostingOk = hostingType === 'single' || hostingType === 'tour';
   const nameOk = Boolean(values.name?.trim());
   const categoryOk = values.category_type_id != null && Number.isFinite(Number(values.category_type_id));
   const languagesOk = (values.languages || []).length > 0;
@@ -494,7 +490,18 @@ export function getCompletedEventStepIds(opts: {
   const aboutOk = Boolean(values.about_event?.trim()) && countChars(values.about_event) <= MAX_ABOUT_CHARS;
   const modesOk = (values.allowed_ticket_modes || []).length > 0;
   const genresOk = !genresConfigured || (values.genres || []).length > 0;
-  if (nameOk && categoryOk && languagesOk && ageOk && aboutOk && modesOk && genresOk) {
+  const tickets = values.showtimes?.[0]?.ticket_types || [];
+  const ticketsOk =
+    tickets.length > 0 &&
+    tickets.every(
+      (t) =>
+        Boolean(t.ticket_type?.trim()) &&
+        Number(t.total_count) >= 1 &&
+        Number(t.price) >= 0 &&
+        Number.isFinite(Number(t.price)) &&
+        Number(t.max_per_order) >= 1
+    );
+  if (hostingOk && nameOk && categoryOk && languagesOk && ageOk && aboutOk && modesOk && genresOk && ticketsOk) {
     done.push('details');
   }
 
@@ -550,7 +557,7 @@ export function getCompletedEventStepIds(opts: {
     if (!docsErr) done.push('documents');
   }
 
-  const requiredCore: EventStepCompletionId[] = ['type', 'details', 'media', 'venue'];
+  const requiredCore: EventStepCompletionId[] = ['details', 'media', 'venue'];
   if (requiredCore.every((id) => done.includes(id))) {
     done.push('review');
   }

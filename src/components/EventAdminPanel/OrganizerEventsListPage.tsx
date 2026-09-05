@@ -8,6 +8,7 @@ import { contractStatusLabel, organizerWorkflowLabel } from "@/lib/contractPlace
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
+
 const STATUS_FILTERS = [
   { label: "All", value: "" },
   { label: "Draft", value: "DRAFT" },
@@ -26,6 +27,28 @@ function statusBadge(status: string) {
     CLOSED: "bg-rose-500/10 text-rose-400 border-rose-500/20",
   };
   return map[status] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+}
+
+function formatEventDate(startsAt?: string | null, endsAt?: string | null): string {
+  if (!startsAt) return "—";
+  const start = new Date(startsAt);
+  if (Number.isNaN(start.getTime())) return "—";
+  const startLabel = start.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  if (!endsAt) return startLabel;
+  const end = new Date(endsAt);
+  if (Number.isNaN(end.getTime())) return startLabel;
+  const sameDay = start.toDateString() === end.toDateString();
+  if (sameDay) return startLabel;
+  const endLabel = end.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  return `${startLabel} – ${endLabel}`;
 }
 
 export default function OrganizerEventsPage() {
@@ -99,71 +122,79 @@ export default function OrganizerEventsPage() {
             </Link>
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
-              <tr>
-                <th className="px-6 py-4 font-medium">Event</th>
-                <th className="px-6 py-4 font-medium">Category</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Contract</th>
-                <th className="px-6 py-4 font-medium">Visible</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {events.map((event) => (
-                <tr key={event.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4">
-                    <Link
-                      href={`/organizer/events/${event.id}`}
-                      className="font-medium portal-table-link hover:text-violet-600"
-                    >
-                      {event.name}
-                    </Link>
-                    {event.rejection_reason && (
-                      <p className="text-xs text-rose-400/80 mt-0.5 line-clamp-1">
-                        Rejected: {event.rejection_reason}
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 portal-table-muted">{event.category_name || "—"}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
-                    >
-                      {organizerWorkflowLabel(event)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 portal-table-muted text-sm">
-                    {event.contract
-                      ? contractStatusLabel(event.contract.status)
-                      : "Waiting for Super Admin"}
-                  </td>
-                  <td className="px-6 py-4 text-zinc-400 text-sm">
-                    {event.is_visible ? "Yes" : "No"}
-                  </td>
-                  <td className="px-6 py-4 text-right space-x-3">
-                    <Link
-                      href={`/organizer/events/${event.id}`}
-                      className="text-sm text-violet-400 hover:text-violet-300"
-                    >
-                      {event.status === "DRAFT" || event.status === "PENDING_APPROVAL"
-                        ? "Edit"
-                        : "View"}
-                    </Link>
-                    {event.contract && (
-                      <Link
-                        href={`/organizer/events/${event.id}/contract`}
-                        className="text-sm text-violet-600 hover:text-violet-800 font-medium"
-                      >
-                        {event.contract.organizer_signed_at ? "View contract" : "Sign contract →"}
-                      </Link>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[720px]">
+              <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
+                <tr>
+                  <th className="px-6 py-4 font-medium">Event</th>
+                  <th className="px-6 py-4 font-medium">Event date</th>
+                  <th className="px-6 py-4 font-medium">Category</th>
+                  <th className="px-6 py-4 font-medium">Status</th>
+                  <th className="px-6 py-4 font-medium">Contract</th>
+                  <th className="px-6 py-4 font-medium">Visible</th>
+                  <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {events.map((event) => (
+                  <tr key={event.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4">
+                      <Link
+                        href={`/organizer/events/${event.id}`}
+                        className="font-medium portal-table-link hover:text-violet-600"
+                      >
+                        {event.name}
+                      </Link>
+                      {event.rejection_reason && (
+                        <p className="text-xs text-rose-400/80 mt-0.5 line-clamp-1">
+                          Rejected: {event.rejection_reason}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 portal-table-muted text-sm whitespace-nowrap">
+                      {formatEventDate(event.event_starts_at, event.event_ends_at)}
+                    </td>
+                    <td className="px-6 py-4 portal-table-muted">{event.category_name || "—"}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
+                      >
+                        {organizerWorkflowLabel(event)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 portal-table-muted text-sm">
+                      {event.contract
+                        ? contractStatusLabel(event.contract.status, {
+                            eventStatus: event.status,
+                          })
+                        : "Waiting for Super Admin"}
+                    </td>
+                    <td className="px-6 py-4 text-zinc-400 text-sm">
+                      {event.is_visible ? "Yes" : "No"}
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-3">
+                      <Link
+                        href={`/organizer/events/${event.id}`}
+                        className="text-sm text-violet-400 hover:text-violet-300"
+                      >
+                        {event.status === "DRAFT" || event.status === "PENDING_APPROVAL"
+                          ? "Edit"
+                          : "View"}
+                      </Link>
+                      {event.contract && (
+                        <Link
+                          href={`/organizer/events/${event.id}/contract`}
+                          className="text-sm text-violet-600 hover:text-violet-800 font-medium"
+                        >
+                          {event.contract.organizer_signed_at ? "View contract" : "Sign contract →"}
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         {data?.meta && <Pagination meta={data.meta} onPageChange={setPage} />}
       </div>

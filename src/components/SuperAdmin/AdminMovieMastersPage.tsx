@@ -225,42 +225,62 @@ export default function AdminMovieMastersPage() {
       if (tab === "languages") {
         if (editingItem) {
           const updated = await updateLanguage({ id: editingItem.id, body: payload }).unwrap();
-          toast.success(`Language "${updated.name}" updated`);
+          toast.success(
+            (updated as { message?: string }).message || `Language "${updated.name}" updated`
+          );
         } else {
           const created = await createLanguage(payload).unwrap();
-          toast.success(`Language "${created.name}" added`);
+          toast.success(
+            (created as { message?: string }).message || `Language "${created.name}" added`
+          );
         }
       } else if (tab === "genres") {
         if (editingItem) {
           const updated = await updateGenre({ id: editingItem.id, body: payload }).unwrap();
-          toast.success(`Genre "${updated.name}" updated`);
+          toast.success(
+            (updated as { message?: string }).message || `Genre "${updated.name}" updated`
+          );
         } else {
           const created = await createGenre(payload).unwrap();
-          toast.success(`Genre "${created.name}" added`);
+          toast.success(
+            (created as { message?: string }).message || `Genre "${created.name}" added`
+          );
         }
       } else if (tab === "formats") {
         if (editingItem) {
           const updated = await updateFormat({ id: editingItem.id, body: payload }).unwrap();
-          toast.success(`Format "${updated.name}" updated`);
+          toast.success(
+            (updated as { message?: string }).message || `Format "${updated.name}" updated`
+          );
         } else {
           const created = await createFormat(payload).unwrap();
-          toast.success(`Format "${created.name}" added`);
+          toast.success(
+            (created as { message?: string }).message || `Format "${created.name}" added`
+          );
         }
       } else if (tab === "crew_roles") {
         if (editingItem) {
           const updated = await updateCrewRole({ id: editingItem.id, body: payload }).unwrap();
-          toast.success(`Crew role "${updated.name}" updated`);
+          toast.success(
+            (updated as { message?: string }).message || `Crew role "${updated.name}" updated`
+          );
         } else {
           const created = await createCrewRole(payload).unwrap();
-          toast.success(`Crew role "${created.name}" added`);
+          toast.success(
+            (created as { message?: string }).message || `Crew role "${created.name}" added`
+          );
         }
       } else {
         if (editingItem) {
           const updated = await updateCertificate({ id: editingItem.id, body: payload }).unwrap();
-          toast.success(`Certificate "${updated.name}" updated`);
+          toast.success(
+            (updated as { message?: string }).message || `Certificate "${updated.name}" updated`
+          );
         } else {
           const created = await createCertificate(payload).unwrap();
-          toast.success(`Certificate "${created.name}" added`);
+          toast.success(
+            (created as { message?: string }).message || `Certificate "${created.name}" added`
+          );
         }
       }
       setFormOpen(false);
@@ -527,7 +547,9 @@ export default function AdminMovieMastersPage() {
 
             <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1.5">{tabMeta.singular} name *</label>
+                <label className="block text-sm text-zinc-400 mb-1.5">
+                  {tabMeta.singular} name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   className="input-field w-full"
                   placeholder={`e.g. ${

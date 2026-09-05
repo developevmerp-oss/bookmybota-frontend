@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useUploadImageMutation } from "@/services/api";
@@ -9,7 +9,7 @@ import { extractApiError } from "@/lib/apiErrors";
 type Props = {
   value?: string | null;
   onChange: (url: string | null) => void;
-  label?: string;
+  label?: ReactNode;
 };
 
 export default function SignaturePad({ value, onChange, label = "Your signature" }: Props) {
@@ -37,7 +37,7 @@ export default function SignaturePad({ value, onChange, label = "Your signature"
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-semibold text-slate-800">{label}</p>
+      {label ? <p className="text-sm font-semibold text-slate-800">{label}</p> : null}
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-xs text-slate-500 mb-3">
           Upload signature image (PNG/JPG). The image will be placed on the digital contract.

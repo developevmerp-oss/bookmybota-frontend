@@ -87,6 +87,7 @@ export default function PasswordInput({
           }
         >
           {label}
+          {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       )}
       <div className="relative">

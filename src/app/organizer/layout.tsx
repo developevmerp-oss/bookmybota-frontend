@@ -20,6 +20,7 @@ import {
   Wallet,
   User,
   QrCode,
+  Megaphone,
 } from "lucide-react";
 
 function OrganizerShell({ children }: { children: React.ReactNode }) {
@@ -39,6 +40,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
     { name: "Scan Tickets", href: "/organizer/scan", icon: QrCode },
     { name: "Ticket Stats", href: "/organizer/tickets", icon: BarChart3 },
     { name: "Offers", href: "/organizer/offers", icon: Tag },
+    { name: "Promotions", href: "/organizer/promotions", icon: Megaphone },
     { name: "Ledger", href: "/organizer/ledger", icon: Wallet },
   ];
 

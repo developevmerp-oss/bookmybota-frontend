@@ -306,7 +306,7 @@ function CityLocationFields({
         </select>
       </div>
       <div>
-        <label className={labelClass}>City</label>
+        <label className={labelClass}>City <span className="text-rose-500">*</span></label>
         <select
           disabled={readOnly}
           className={inputClass}
@@ -433,7 +433,7 @@ function VenueNameSearchField({
 
   return (
     <div>
-      <label className={labelClass}>Venue name</label>
+      <label className={labelClass}>Venue name <span className="text-rose-500">*</span></label>
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         <input
@@ -1342,12 +1342,12 @@ function VenueBlock({
           {durationType === "ONE_DAY" ? (
             <div className="grid sm:grid-cols-3 gap-3">
               <div>
-                <label className={labelClass}>Date</label>
+                <label className={labelClass}>Date <span className="text-rose-500">*</span></label>
                 <input disabled={readOnly} type="date" className={inputClass} {...register(`showtimes.${index}.event_date`)} />
                 {eventDate && <p className="text-xs text-slate-600 mt-1">{formatDate(eventDate)}</p>}
               </div>
               <div>
-                <label className={labelClass}>Start time</label>
+                <label className={labelClass}>Start time <span className="text-rose-500">*</span></label>
                 <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.start_time`)} />
                 {startTime && eventDate && (
                   <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${startTime}`)}</p>
@@ -1436,6 +1436,67 @@ function VenueBlock({
             ) : null}
           </div>
         )}
+
+        {ticketFields.length === 0 && (
+          <p className="text-xs text-slate-500">No ticket type selected yet. Click Add type to create one.</p>
+        )}
+        {ticketFields.map((field, ti) => (
+          <div key={field.id} className="grid sm:grid-cols-4 gap-3 items-start rounded-lg border border-slate-200 bg-white p-3">
+            <div>
+              <label className={labelClass}>Type name <span className="text-rose-500">*</span></label>
+              <input
+                disabled={readOnly}
+                className={inputClass}
+                {...register(`showtimes.${index}.ticket_types.${ti}.ticket_type`)}
+                placeholder="General, VIP..."
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Total seats <span className="text-rose-500">*</span></label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={1}
+                className={inputClass}
+                {...register(`showtimes.${index}.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Price (ETB) <span className="text-rose-500">*</span></label>
+              <input
+                disabled={readOnly}
+                type="number"
+                min={0}
+                step="0.01"
+                className={inputClass}
+                {...register(`showtimes.${index}.ticket_types.${ti}.price`, { valueAsNumber: true })}
+              />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className={labelClass}>Max per order</label>
+                <input
+                  disabled={readOnly}
+                  type="number"
+                  min={1}
+                  className={inputClass}
+                  {...register(`showtimes.${index}.ticket_types.${ti}.max_per_order`, {
+                    valueAsNumber: true,
+                  })}
+                />
+              </div>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => remove(ti)}
+                  className="p-2.5 text-slate-400 hover:text-rose-600 self-end"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
       {index === 0 && venueDocuments.length > 0 && onDocumentUpload && onDocumentRemove && (

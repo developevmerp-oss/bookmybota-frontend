@@ -5,6 +5,7 @@ import useImage from "use-image";
 import { toast } from "sonner";
 import { Save, PlusSquare, MousePointer2, Trash2, Eraser, Undo2, Redo2, RotateCcw } from "lucide-react";
 import { useGetOrganizerEventQuery, useUpdateEventLayoutMutation, useGetEventLayoutQuery } from "@/services/api";
+import { extractApiError } from "@/lib/apiErrors";
 
 type Seat = {
   id?: string;
@@ -1836,8 +1837,8 @@ export default function VenueLayoutBuilder({
       }).unwrap();
       toast.success("Layout saved successfully!");
       refetch();
-    } catch (err: any) {
-      toast.error(err?.data?.error || err?.message || "Failed to save layout.");
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Failed to save layout."));
     }
   };
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { Html5Qrcode } from "html5-qrcode";
 import {
   AlertTriangle,
@@ -27,8 +29,14 @@ import { extractApiError } from "@/lib/apiErrors";
 import { ticketModeLabel } from "@/lib/eventTicketMode";
 import { expandEventScanTokens, isEventBookingCheckedIn } from "@/lib/eventScanToken";
 import { shortBookingCode } from "@/lib/eventTicketPdf";
+import {
+  organizerScanTokenSchema,
+  type OrganizerScanTokenValues,
+} from "@/lib/organizerPartnerFormSchemas";
 
 const SCANNER_REGION_ID = "organizer-event-qr-reader";
+const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
+const reqStar = <span className="text-rose-500">*</span>;
 
 export default function OrganizerScanPage() {
   const dispatch = useAppDispatch();
@@ -43,7 +51,17 @@ export default function OrganizerScanPage() {
   const lastScanAtRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [manualToken, setManualToken] = useState("");
+  const {
+    register,
+    handleSubmit,
+    reset: resetManualForm,
+    formState: { errors: manualErrors },
+  } = useForm<OrganizerScanTokenValues>({
+    resolver: yupResolver(organizerScanTokenSchema),
+    defaultValues: { manualToken: "" },
+    mode: "onSubmit",
+  });
+
   const [cameraOn, setCameraOn] = useState(false);
   const [starting, setStarting] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -143,7 +161,7 @@ export default function OrganizerScanPage() {
     lastTokenRef.current = "";
     lastScanAtRef.current = 0;
     setLastDecoded("");
-    setManualToken("");
+    resetManualForm({ manualToken: "" });
   };
 
   const startCamera = async () => {
@@ -239,9 +257,9 @@ export default function OrganizerScanPage() {
     }
   };
 
-  const handleManualLookup = () => {
-    void resolveBooking(manualToken, true);
-  };
+  const onManualLookup = handleSubmit((values) => {
+    void resolveBooking(values.manualToken, true);
+  });
 
   const handleCheckIn = async () => {
     if (!scanned?.id) return;
@@ -354,26 +372,27 @@ export default function OrganizerScanPage() {
             onChange={(e) => void handleScanFile(e.target.files?.[0])}
           />
         </div>
-        <form
-          className="flex flex-col sm:flex-row gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleManualLookup();
-          }}
-        >
-          <input
-            value={manualToken}
-            onChange={(e) => setManualToken(e.target.value)}
-            placeholder="Paste BMB-… booking code, EVB-… QR code, or booking ID"
-            className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500"
-          />
-          <button
-            type="submit"
-            disabled={isScanning || lookingUp}
-            className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60"
-          >
-            {isScanning || lookingUp ? "Looking up..." : "Lookup"}
-          </button>
+        <form className="space-y-2" onSubmit={onManualLookup} noValidate>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            Manual booking code {reqStar}
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              placeholder="Paste BMB-… booking code, EVB-… QR code, or booking ID"
+              className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500"
+              {...register("manualToken")}
+            />
+            <button
+              type="submit"
+              disabled={isScanning || lookingUp}
+              className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60"
+            >
+              {isScanning || lookingUp ? "Looking up..." : "Lookup"}
+            </button>
+          </div>
+          {manualErrors.manualToken && (
+            <p className={fieldErrorClass}>{manualErrors.manualToken.message}</p>
+          )}
         </form>
       </div>
 

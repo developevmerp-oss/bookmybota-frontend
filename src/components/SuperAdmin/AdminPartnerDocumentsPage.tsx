@@ -194,7 +194,9 @@ export default function AdminPartnerDocumentsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm text-zinc-400 mb-1.5">Applies to</label>
+              <label className="block text-sm text-zinc-400 mb-1.5">
+                Applies to <span className="text-rose-500">*</span>
+              </label>
               <select {...docForm.register("module")} className="input-field w-full">
                 <option value="both">All modules</option>
                 <option value="dining">Dining only</option>
@@ -397,6 +399,9 @@ export default function AdminPartnerDocumentsPage() {
           className="grid md:grid-cols-[1fr_180px_auto] gap-3 mb-4"
         >
           <div>
+            <label className="block text-sm text-zinc-400 mb-1.5">
+              Term text <span className="text-rose-500">*</span>
+            </label>
             <input
               {...termForm.register("text")}
               placeholder="e.g. I confirm all uploaded documents are valid."
@@ -408,14 +413,23 @@ export default function AdminPartnerDocumentsPage() {
               </p>
             )}
           </div>
-          <select {...termForm.register("module")} className="input-field">
-            <option value="both">All modules</option>
-            <option value="dining">Dining only</option>
-            <option value="event">Event only</option>
-            <option value="venue">Venue only</option>
-            <option value="artist">Artist only</option>
-          </select>
-          <button type="submit" disabled={creatingTerm} className="btn-primary disabled:opacity-50">
+          <div>
+            <label className="block text-sm text-zinc-400 mb-1.5">
+              Applies to <span className="text-rose-500">*</span>
+            </label>
+            <select {...termForm.register("module")} className="input-field w-full">
+              <option value="both">All modules</option>
+              <option value="dining">Dining only</option>
+              <option value="event">Event only</option>
+              <option value="venue">Venue only</option>
+              <option value="artist">Artist only</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={creatingTerm}
+            className="btn-primary disabled:opacity-50 self-end"
+          >
             Add term
           </button>
         </form>

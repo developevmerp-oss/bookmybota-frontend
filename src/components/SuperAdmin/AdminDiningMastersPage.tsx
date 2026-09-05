@@ -288,7 +288,9 @@ export default function AdminDiningMastersPage() {
             </h3>
             <form onSubmit={cuisineForm.handleSubmit(onCreateCuisine)} noValidate className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1.5">Cuisine name</label>
+                <label className="block text-sm text-zinc-400 mb-1.5">
+                  Cuisine name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   {...cuisineForm.register("name")}
                   placeholder="e.g. Indian"
@@ -301,7 +303,9 @@ export default function AdminDiningMastersPage() {
                 )}
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1.5">Cuisine image</label>
+                <label className="block text-sm text-zinc-400 mb-1.5">
+                  Cuisine image <span className="text-rose-500">*</span>
+                </label>
                 <CroppedImageField
                   value={cuisineImageUrl}
                   aspect={1}
@@ -449,7 +453,9 @@ export default function AdminDiningMastersPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-sm text-zinc-400 mb-1.5">Collection name</label>
+                <label className="block text-sm text-zinc-400 mb-1.5">
+                  Collection name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   {...collectionForm.register("title")}
                   placeholder="e.g. Hidden Gems"

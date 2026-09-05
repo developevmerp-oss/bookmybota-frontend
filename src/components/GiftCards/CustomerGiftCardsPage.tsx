@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { CalendarDays, Gift, Loader2, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -11,6 +14,10 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
+import {
+  customerGiftCardClaimSchema,
+  type CustomerGiftCardClaimValues,
+} from "@/lib/giftCardFormSchemas";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 
 const CARD_HEADERS = [
@@ -92,47 +99,70 @@ function GiftCardTile({ card, index }: { card: GiftCardMine; index: number }) {
           </div>
         </div>
 
-        {card.expires_at ? (
-          <p className="mt-auto pt-1 inline-flex items-center gap-1.5 text-[11px] text-[#9CA3AF]">
-            <CalendarDays size={12} strokeWidth={2} />
-            Expires {new Date(card.expires_at).toLocaleDateString()}
-          </p>
-        ) : card.purchase_for === "SOMEONE_ELSE" && card.recipient_name ? (
-          <p className="mt-auto pt-1 text-[11px] text-[#9CA3AF]">
-            Gift for {card.recipient_name}
-            {!card.is_claimed_by_me ? " · awaiting claim" : ""}
-          </p>
-        ) : null}
+        <div className="mt-auto pt-1 flex flex-col gap-0.5">
+          {card.expires_at ? (
+            <p className="inline-flex items-center gap-1.5 text-[11px] text-[#9CA3AF]">
+              <CalendarDays size={12} strokeWidth={2} />
+              Valid until {new Date(card.expires_at).toLocaleDateString()}
+            </p>
+          ) : null}
+          {card.purchase_for === "SOMEONE_ELSE" && card.recipient_name ? (
+            <p className="text-[11px] text-[#9CA3AF]">
+              Gift for {card.recipient_name}
+              {!card.is_claimed_by_me ? " · awaiting claim" : ""}
+            </p>
+          ) : null}
+        </div>
       </div>
     </Link>
   );
 }
 
 export default function CustomerGiftCardsPage() {
+  const searchParams = useSearchParams();
+  const codeFromMail = (
+    searchParams.get("code") ||
+    searchParams.get("claim") ||
+    ""
+  )
+    .trim()
+    .toUpperCase();
   const { data: cards = [], isLoading, isError, refetch } = useGetMyGiftCardsQuery();
   const [claim, { isLoading: claiming }] = useClaimGiftCardMutation();
-  const [code, setCode] = useState("");
 
-  const handleClaim = async () => {
-    const trimmed = code.trim();
-    if (!trimmed) {
-      toast.error("Enter a gift card code");
-      return;
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<CustomerGiftCardClaimValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(customerGiftCardClaimSchema) as any,
+    defaultValues: { code: codeFromMail },
+    mode: "onSubmit",
+  });
+
+  useEffect(() => {
+    if (codeFromMail) {
+      setValue("code", codeFromMail, { shouldValidate: false });
     }
+  }, [codeFromMail, setValue]);
+
+  const onClaim = async (values: CustomerGiftCardClaimValues) => {
     try {
-      const res = await claim({ code: trimmed }).unwrap();
+      const res = await claim({ code: values.code.trim().toUpperCase() }).unwrap();
       toast.success(res.message || "Gift card claimed");
-      setCode("");
+      reset({ code: "" });
       void refetch();
     } catch (err) {
-      toast.error(extractApiError(err) || "Could not claim gift card");
+      toast.error(extractApiError(err, "Could not claim gift card"));
     }
   };
 
   return (
     <CustomerAccountLayout>
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 flex flex-col gap-4 sm:gap-5">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start justify-between gap-3">
           <div className="flex flex-col gap-1 min-w-0">
             <h2 className="text-[20px] sm:text-2xl font-extrabold text-[#1a1040] tracking-tight">
@@ -153,29 +183,42 @@ export default function CustomerGiftCardsPage() {
           </Link>
         </div>
 
-        {/* Claim a code */}
-        <div className="rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-3.5 sm:p-4 flex flex-col gap-2.5">
-          <p className="text-sm font-bold text-[#111827]">Claim a code</p>
+        <form
+          onSubmit={handleSubmit(onClaim)}
+          noValidate
+          className="rounded-2xl border border-[#E8D5FF] bg-[#F9F5FF] p-3.5 sm:p-4 flex flex-col gap-2.5"
+        >
+          <p className="text-sm font-bold text-[#111827]">Redeem / claim a gift card code</p>
+          <p className="text-[12px] text-slate-500 -mt-1">
+            Enter the code from your email to add the balance to this account.
+          </p>
+          <label className="text-sm font-semibold text-[#1F2937]">
+            Gift card code <span className="text-rose-500">*</span>
+          </label>
           <div className="flex flex-col sm:flex-row gap-2.5">
             <input
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="Enter gift card code (e.g. BOTA-XXXX-XXXX-XXXX)"
               className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white font-mono text-[13px] sm:text-sm text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/25 focus:border-[#6900AA]"
+              {...register("code", {
+                onChange: (e) => {
+                  e.target.value = String(e.target.value || "").toUpperCase();
+                },
+              })}
             />
             <button
-              type="button"
+              type="submit"
               disabled={claiming}
-              onClick={handleClaim}
-              className="h-11 px-5 rounded-xl border border-[#111827] bg-white text-sm font-semibold text-[#111827] hover:bg-slate-50 disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto"
+              className="h-11 px-5 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white text-sm font-semibold disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto"
             >
               {claiming ? <Loader2 className="animate-spin" size={16} /> : <Ticket size={16} />}
               Claim
             </button>
           </div>
-        </div>
+          {errors.code && (
+            <p className="text-[12px] font-semibold text-rose-500">{errors.code.message}</p>
+          )}
+        </form>
 
-        {/* Cards */}
         {isLoading ? (
           <div className="flex items-center gap-2 text-slate-500 py-12 justify-center">
             <Loader2 className="animate-spin" size={18} /> Loading…

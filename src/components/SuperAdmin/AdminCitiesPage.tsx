@@ -248,9 +248,12 @@ export default function AdminCitiesPage() {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
+            <label className="block text-sm text-zinc-400 mb-1.5">
+              City name <span className="text-rose-500">*</span>
+            </label>
             <input
               type="text"
-              placeholder="City name *"
+              placeholder="City name"
               {...register("name")}
               className="input-field w-full"
             />
@@ -259,6 +262,7 @@ export default function AdminCitiesPage() {
             )}
           </div>
           <div>
+            <label className="block text-sm text-zinc-400 mb-1.5">State / region</label>
             <input
               type="text"
               placeholder="State / region"
@@ -267,8 +271,11 @@ export default function AdminCitiesPage() {
             />
           </div>
           <div>
+            <label className="block text-sm text-zinc-400 mb-1.5">
+              Country <span className="text-rose-500">*</span>
+            </label>
             <select {...register("country")} className="input-field w-full">
-              <option value="">Select country *</option>
+              <option value="">Select country</option>
               {CITY_COUNTRIES.map((country) => (
                 <option key={country} value={country}>
                   {country}
@@ -279,7 +286,7 @@ export default function AdminCitiesPage() {
               <p className="mt-1.5 text-xs text-rose-400 font-medium">{errors.country.message}</p>
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm text-zinc-300 px-1">
+          <label className="flex items-center gap-2 text-sm text-zinc-300 px-1 self-end pb-2.5">
             <input type="checkbox" {...register("is_popular")} className="rounded border-zinc-600" />
             Mark as popular
           </label>

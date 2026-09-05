@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -8,6 +8,9 @@ import { Autoplay, Navigation, Pagination } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import "swiper/css/pagination";
+import { useGetActiveMarketingPromotionsQuery } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { promotionClickHref } from "@/lib/promotionCta";
 import { useHomeCatalog } from "./useHomeCatalog";
 import { eventLandscape } from "./homeUtils";
 import "./PromoBannerCarousel.css";
@@ -16,13 +19,46 @@ type PromoBannerCarouselProps = {
   city: string;
 };
 
+type Slide = {
+  id: string;
+  title: string;
+  image: string;
+  href: string;
+  badge?: string;
+};
+
 export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) {
   const { bannerEvents, isLoadingEvents, isLoadingFallback } = useHomeCatalog(city);
-  const slides = bannerEvents.slice(0, 5);
+  const { data: promotions = [], isLoading: loadingPromos } = useGetActiveMarketingPromotionsQuery({
+    surface: "slider",
+  });
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
 
-  if (isLoadingEvents || (slides.length === 0 && isLoadingFallback)) {
+  const slides = useMemo<Slide[]>(() => {
+    if (promotions.length > 0) {
+      return promotions.slice(0, 10).map((p) => ({
+        id: String(p.id),
+        title: p.title || p.plan_name || "Promotion",
+        image: resolveMediaUrl(p.banner_image_url || ""),
+        href: promotionClickHref(p) || categoryFallbackHref(p.category),
+        badge: p.category && p.category !== "ALL" ? p.category : undefined,
+      }));
+    }
+
+    return bannerEvents.slice(0, 5).map((event) => ({
+      id: event.id,
+      title: event.name,
+      image: eventLandscape(event),
+      href: `/events/${event.id}`,
+      badge: "EVENTS",
+    }));
+  }, [promotions, bannerEvents]);
+
+  const loading =
+    loadingPromos || (promotions.length === 0 && (isLoadingEvents || (slides.length === 0 && isLoadingFallback)));
+
+  if (loading) {
     return (
       <section className="bg-white w-full">
         <div className="relative h-[200px] sm:h-[270px] md:h-[320px] lg:h-[380px] xl:h-[420px] w-full">
@@ -92,18 +128,20 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
         >
           {slides.map((slide) => (
             <SwiperSlide key={slide.id} className="h-full">
-              <div className="h-full w-full">
-                <Link
-                  href={`/events/${slide.id}`}
-                  className="block h-full w-full overflow-hidden bg-[#111111]"
-                >
+              <div className="h-full w-full relative">
+                <Link href={slide.href} className="block h-full w-full overflow-hidden bg-[#111111]">
                   <img
-                    src={eventLandscape(slide)}
-                    alt={slide.name}
+                    src={slide.image}
+                    alt={slide.title}
                     className="h-full w-full object-cover"
                     draggable={false}
                   />
                 </Link>
+                {slide.badge ? (
+                  <span className="pointer-events-none absolute top-3 left-3 z-[1] text-[10px] sm:text-xs font-bold uppercase tracking-wide px-2.5 py-1 rounded-md bg-white/95 text-[#6900AA] shadow-sm">
+                    {slide.badge}
+                  </span>
+                ) : null}
               </div>
             </SwiperSlide>
           ))}
@@ -132,4 +170,19 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
       </div>
     </section>
   );
+}
+
+function categoryFallbackHref(category?: string) {
+  switch ((category || "").toUpperCase()) {
+    case "DINING":
+      return "/dining";
+    case "MOVIES":
+      return "/movies";
+    case "SPORTS":
+      return "/events?q=sports";
+    case "EVENTS":
+      return "/events";
+    default:
+      return "/";
+  }
 }

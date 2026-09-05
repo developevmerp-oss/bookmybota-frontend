@@ -108,7 +108,7 @@ export default function AdminCustomerEditPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-zinc-500 mb-2">
-              Name
+              Name <span className="text-rose-500">*</span>
             </label>
             <input {...register("name")} className="input-field w-full" />
             {errors.name && (

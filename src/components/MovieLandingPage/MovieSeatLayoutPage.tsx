@@ -3,6 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Controller, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import {
   ArrowLeft,
   Calendar,
@@ -31,6 +33,17 @@ import {
   type MovieBookingSeatPayload,
 } from "@/services/api";
 import { useAppSelector } from "@/lib/hooks";
+import { extractApiError } from "@/lib/apiErrors";
+import { sanitizePhoneInput } from "@/lib/validation";
+import {
+  emptyMovieCheckoutFormValues,
+  movieCheckoutFormSchema,
+  type MovieCheckoutFormValues,
+} from "@/lib/movieCheckoutFormSchema";
+import PhoneInput from "@/components/Shared/PhoneInput";
+
+const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-400";
+const reqStar = <span className="text-rose-500">*</span>;
 
 interface MovieSeatLayoutPageProps {
   showtimeId: string;
@@ -60,21 +73,33 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [createBooking, { isLoading: isBooking }] = useCreateMovieBookingMutation();
 
   const [selectedSeats, setSelectedSeats] = useState<MovieBookingSeatPayload[]>([]);
-  const [guestName, setGuestName] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
-  const [guestEmail, setGuestEmail] = useState("");
   const [promoCode, setPromoCode] = useState("");
   const [promoApplied, setPromoApplied] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
 
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    getValues,
+    formState: { errors },
+  } = useForm<MovieCheckoutFormValues>({
+    resolver: yupResolver(movieCheckoutFormSchema) as any,
+    defaultValues: emptyMovieCheckoutFormValues(),
+    mode: "onSubmit",
+  });
+
   // Pre-fill user profile if logged in
   useEffect(() => {
-    if (authUser) {
-      if (authUser.name && !guestName) setGuestName(authUser.name);
-      if (authUser.phone && !guestPhone) setGuestPhone(authUser.phone);
-      if (authUser.email && !guestEmail) setGuestEmail(authUser.email);
-    }
-  }, [authUser]);
+    if (!authUser) return;
+    const current = getValues();
+    reset({
+      guest_name: current.guest_name || authUser.name || "",
+      guest_phone: current.guest_phone || sanitizePhoneInput(authUser.phone || ""),
+      guest_email: current.guest_email || authUser.email || "",
+    });
+  }, [authUser, getValues, reset]);
 
   const showtime = layoutData?.showtime;
   const movie = layoutData?.movie;
@@ -249,21 +274,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   };
 
   // Submit Booking Form
-  const handleConfirmBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const onConfirmBooking = async (values: MovieCheckoutFormValues) => {
     if (selectedSeats.length === 0) {
       toast.error("Please select at least one seat to proceed.");
-      return;
-    }
-
-    if (!guestName.trim()) {
-      toast.error("Please enter your full name.");
-      return;
-    }
-
-    if (!guestPhone.trim() || guestPhone.trim().length < 6) {
-      toast.error("Please enter a valid contact phone number.");
       return;
     }
 
@@ -271,19 +284,17 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       const res = await createBooking({
         showtime_id: showtimeId,
         seats: selectedSeats,
-        guest_name: guestName.trim(),
-        guest_phone: guestPhone.trim(),
-        guest_email: guestEmail.trim() || undefined,
+        guest_name: values.guest_name.trim(),
+        guest_phone: sanitizePhoneInput(values.guest_phone),
+        guest_email: (values.guest_email || "").trim() || undefined,
         promo_code: promoApplied ? promoCode.trim() : undefined,
         payment_method: "CASH",
       }).unwrap();
 
       toast.success(res.message || "Booking confirmed!");
       router.push(`/movies/booking-confirmation/${res.data.booking_id}`);
-    } catch (err: any) {
-      console.error("Booking error:", err);
-      const errMsg = err?.data?.error || err?.message || "Failed to confirm booking. Please try again.";
-      toast.error(errMsg);
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to confirm booking. Please try again."));
       refetch();
     }
   };
@@ -510,8 +521,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         {/* Right Column: Checkout Summary & Guest Details Drawer */}
         <aside className="lg:col-span-4 space-y-6">
           <form
-            onSubmit={handleConfirmBooking}
+            onSubmit={handleSubmit(onConfirmBooking)}
             className="rounded-3xl border border-white/10 bg-slate-950/80 backdrop-blur-md p-6 space-y-6 shadow-2xl sticky top-24"
+            noValidate
           >
             {/* Booking Header */}
             <div className="border-b border-white/10 pb-4">
@@ -598,35 +610,55 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
               <div className="space-y-2.5">
                 <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-400">
+                    Full Name {reqStar}
+                  </label>
                   <input
                     type="text"
-                    required
-                    value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    placeholder="Full Name *"
+                    {...register("guest_name")}
+                    placeholder="Full Name"
                     className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#F84464]"
+                  />
+                  {errors.guest_name && (
+                    <p className={fieldErrorClass}>{errors.guest_name.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-400">
+                    Phone Number {reqStar}
+                  </label>
+                  <Controller
+                    name="guest_phone"
+                    control={control}
+                    render={({ field }) => (
+                      <PhoneInput
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        required
+                        variant="dark"
+                        inputClassName="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#F84464]"
+                        placeholder="Phone Number (e.g. 912345678)"
+                        error={errors.guest_phone?.message}
+                      />
+                    )}
                   />
                 </div>
 
                 <div>
-                  <input
-                    type="tel"
-                    required
-                    value={guestPhone}
-                    onChange={(e) => setGuestPhone(e.target.value)}
-                    placeholder="Phone Number (e.g. +251 91 234 5678) *"
-                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#F84464]"
-                  />
-                </div>
-
-                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-400">
+                    Email Address
+                  </label>
                   <input
                     type="email"
-                    value={guestEmail}
-                    onChange={(e) => setGuestEmail(e.target.value)}
+                    {...register("guest_email")}
                     placeholder="Email Address (for ticket receipt)"
                     className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#F84464]"
                   />
+                  {errors.guest_email && (
+                    <p className={fieldErrorClass}>{errors.guest_email.message}</p>
+                  )}
                 </div>
               </div>
             </div>

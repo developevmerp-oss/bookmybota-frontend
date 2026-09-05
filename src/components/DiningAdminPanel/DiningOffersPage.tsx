@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import {
   Archive,
   ArchiveRestore,
@@ -19,7 +21,6 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import {
-  createEmptyDiningOffer,
   diningOfferStatusBadgeClass,
   formatDiningOfferDiscount,
   getEffectiveDiningOfferStatus,
@@ -28,6 +29,11 @@ import {
   type DiningOffer,
   type DiningOfferStatus,
 } from "@/lib/diningOffers";
+import {
+  diningOfferFormSchema,
+  emptyDiningOfferFormValues,
+  type DiningOfferFormValues,
+} from "@/lib/diningPartnerFormSchemas";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
@@ -45,21 +51,15 @@ const STATUS_TABS: { key: TabKey; label: string }[] = [
   { key: "ARCHIVED", label: "Archived" },
 ];
 
-const EMPTY_FORM = {
-  title: "",
-  promo_code: "",
-  type: "Pre-Book Offer",
-  discount_type: "PERCENT" as "PERCENT" | "FLAT",
-  discount_value: "10",
-  max_discount: "",
-  min_bill_amount: "0",
-  per_day_limit: "",
-  start_at: "",
-  end_at: "",
-  status: "DRAFT" as DiningOfferStatus,
-};
+const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
+const labelClass = "block text-xs font-semibold text-zinc-400 uppercase mb-2";
+const inputClass = "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white";
 
-function offerToForm(offer: DiningOffer) {
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
+
+function offerToForm(offer: DiningOffer): DiningOfferFormValues {
   const discountType: "PERCENT" | "FLAT" = offer.discount_type === "FLAT" ? "FLAT" : "PERCENT";
   return {
     title: offer.title || "",
@@ -97,9 +97,23 @@ export default function DiningOffersPage() {
   const [offers, setOffers] = useState<DiningOffer[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ ...EMPTY_FORM });
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<DiningOfferFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(diningOfferFormSchema) as any,
+    defaultValues: emptyDiningOfferFormValues(),
+    mode: "onSubmit",
+  });
+
+  const discountType = watch("discount_type");
 
   useEffect(() => {
     dispatch(loadFromStorage());
@@ -134,12 +148,12 @@ export default function DiningOffersPage() {
       return false;
     }
     try {
-      await updateSettings({
+      const res = await updateSettings({
         bizId,
         body: { dining_offers: nextOffers },
       }).unwrap();
       setOffers(nextOffers);
-      toast.success(successMessage);
+      toast.success((res as { message?: string }).message || successMessage);
       return true;
     } catch (error) {
       toast.error(extractApiError(error, "Failed to save offers."));
@@ -149,60 +163,39 @@ export default function DiningOffersPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ ...EMPTY_FORM });
+    reset(emptyDiningOfferFormValues());
     setFormOpen(true);
   };
 
   const openEdit = (offer: DiningOffer) => {
     setEditingId(offer.id || null);
-    setForm(offerToForm(offer));
+    reset(offerToForm(offer));
     setFormOpen(true);
   };
 
-  const buildOfferFromForm = (): DiningOffer => {
-    const status = form.status;
-    return {
+  const onSubmit = handleSubmit(async (values) => {
+    const status = values.status;
+    const nextOffer: DiningOffer = {
       id: editingId || crypto.randomUUID(),
-      title: form.title.trim(),
-      promo_code: form.promo_code.trim().toUpperCase(),
-      type: form.type.trim() || "Offer",
-      discount_type: form.discount_type,
-      discount_value: Number(form.discount_value),
+      title: values.title.trim(),
+      promo_code: values.promo_code.trim().toUpperCase(),
+      type: values.type.trim() || "Offer",
+      discount_type: values.discount_type,
+      discount_value: Number(values.discount_value),
       max_discount:
-        form.discount_type === "PERCENT" && form.max_discount
-          ? Number(form.max_discount)
+        values.discount_type === "PERCENT" && values.max_discount
+          ? Number(values.max_discount)
           : null,
-      min_bill_amount: Number(form.min_bill_amount) || 0,
-      per_day_limit: form.per_day_limit ? Number(form.per_day_limit) : null,
+      min_bill_amount: Number(values.min_bill_amount) || 0,
+      per_day_limit: values.per_day_limit ? Number(values.per_day_limit) : null,
       validity: "",
-      start_at: form.start_at || null,
-      end_at: form.end_at || null,
+      start_at: values.start_at || null,
+      end_at: values.end_at || null,
       status,
       is_active: status === "ACTIVE",
       archived_at: status === "ARCHIVED" ? new Date().toISOString() : null,
     };
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) {
-      toast.error("Offer title is required.");
-      return;
-    }
-    if (!form.promo_code.trim()) {
-      toast.error("Promo code is required.");
-      return;
-    }
-    if (!form.discount_value.trim() || Number(form.discount_value) < 0) {
-      toast.error("Enter a valid discount value.");
-      return;
-    }
-    if (form.discount_type === "PERCENT" && Number(form.discount_value) > 100) {
-      toast.error("Percentage discount cannot exceed 100.");
-      return;
-    }
-
-    const nextOffer = buildOfferFromForm();
     const nextOffers = editingId
       ? offers.map((o) => (o.id === editingId ? { ...o, ...nextOffer, id: editingId } : o))
       : [...offers, nextOffer];
@@ -212,7 +205,7 @@ export default function DiningOffersPage() {
       editingId ? "Offer updated." : "Offer created."
     );
     if (ok) setFormOpen(false);
-  };
+  });
 
   const handleTogglePause = async (offer: DiningOffer) => {
     const effective = getEffectiveDiningOfferStatus(offer);
@@ -443,169 +436,143 @@ export default function DiningOffersPage() {
               Guests can pick this offer when booking. Staff redeem it via Scan QR or walk-in promo.
             </p>
 
-            <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-4" noValidate>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Offer title *
+                  <label className={labelClass}>
+                    Offer title <RequiredMark />
                   </label>
                   <input
-                    required
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white"
+                    className={inputClass}
                     placeholder="Lunch Special"
+                    {...register("title")}
                   />
+                  {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Promo code *
+                  <label className={labelClass}>
+                    Promo code <RequiredMark />
                   </label>
                   <input
-                    required
-                    value={form.promo_code}
-                    onChange={(e) =>
-                      setForm({ ...form, promo_code: e.target.value.toUpperCase() })
-                    }
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white font-mono"
+                    className={`${inputClass} font-mono uppercase`}
                     placeholder="LUNCH20"
+                    {...register("promo_code", {
+                      setValueAs: (v) => String(v ?? "").toUpperCase(),
+                    })}
                   />
+                  {errors.promo_code && (
+                    <p className={fieldErrorClass}>{errors.promo_code.message}</p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Offer type label
-                  </label>
+                  <label className={labelClass}>Offer type label</label>
                   <input
-                    value={form.type}
-                    onChange={(e) => setForm({ ...form, type: e.target.value })}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white"
+                    className={inputClass}
                     placeholder="Pre-Book Offer"
+                    {...register("type")}
                   />
+                  {errors.type && <p className={fieldErrorClass}>{errors.type.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm({ ...form, status: e.target.value as DiningOfferStatus })
-                    }
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white"
-                  >
+                  <label className={labelClass}>Status</label>
+                  <select className={inputClass} {...register("status")}>
                     <option value="DRAFT">Draft</option>
                     <option value="ACTIVE">Active</option>
                     <option value="PAUSED">Paused</option>
                   </select>
+                  {errors.status && <p className={fieldErrorClass}>{errors.status.message}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Discount type
-                  </label>
-                  <select
-                    value={form.discount_type}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        discount_type: e.target.value as "PERCENT" | "FLAT",
-                      })
-                    }
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
-                  >
+                  <label className={labelClass}>Discount type</label>
+                  <select className={`${inputClass} px-3`} {...register("discount_type")}>
                     <option value="PERCENT">Percentage (%)</option>
                     <option value="FLAT">Flat (ETB)</option>
                   </select>
+                  {errors.discount_type && (
+                    <p className={fieldErrorClass}>{errors.discount_type.message}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Discount value *
+                  <label className={labelClass}>
+                    Discount value <RequiredMark />
                   </label>
                   <input
-                    required
                     type="number"
                     min="0"
-                    step={form.discount_type === "PERCENT" ? "0.01" : "1"}
-                    value={form.discount_value}
-                    onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
-                    placeholder={form.discount_type === "PERCENT" ? "e.g. 20" : "e.g. 200"}
+                    step={discountType === "PERCENT" ? "0.01" : "1"}
+                    className={`${inputClass} px-3`}
+                    placeholder={discountType === "PERCENT" ? "e.g. 20" : "e.g. 200"}
+                    {...register("discount_value")}
                   />
                   <p className="text-[11px] text-zinc-500 mt-1">
-                    {form.discount_type === "PERCENT"
+                    {discountType === "PERCENT"
                       ? "Percent off the food bill"
                       : "Fixed ETB amount off the bill"}
                   </p>
+                  {errors.discount_value && (
+                    <p className={fieldErrorClass}>{errors.discount_value.message}</p>
+                  )}
                 </div>
-                {form.discount_type === "PERCENT" && (
+                {discountType === "PERCENT" && (
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                      Max discount (ETB)
-                    </label>
+                    <label className={labelClass}>Max discount (ETB)</label>
                     <input
                       type="number"
                       min="0"
-                      value={form.max_discount}
-                      onChange={(e) => setForm({ ...form, max_discount: e.target.value })}
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
+                      className={`${inputClass} px-3`}
                       placeholder="Optional cap"
+                      {...register("max_discount")}
                     />
+                    {errors.max_discount && (
+                      <p className={fieldErrorClass}>{errors.max_discount.message}</p>
+                    )}
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Min bill (ETB)
-                  </label>
+                  <label className={labelClass}>Min bill (ETB)</label>
                   <input
                     type="number"
                     min="0"
-                    value={form.min_bill_amount}
-                    onChange={(e) => setForm({ ...form, min_bill_amount: e.target.value })}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
+                    className={`${inputClass} px-3`}
+                    {...register("min_bill_amount")}
                   />
+                  {errors.min_bill_amount && (
+                    <p className={fieldErrorClass}>{errors.min_bill_amount.message}</p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Start date
-                  </label>
-                  <input
-                    type="date"
-                    value={form.start_at}
-                    onChange={(e) => setForm({ ...form, start_at: e.target.value })}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white"
-                  />
+                  <label className={labelClass}>Start date</label>
+                  <input type="date" className={inputClass} {...register("start_at")} />
+                  {errors.start_at && (
+                    <p className={fieldErrorClass}>{errors.start_at.message}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    End date
-                  </label>
-                  <input
-                    type="date"
-                    value={form.end_at}
-                    onChange={(e) => setForm({ ...form, end_at: e.target.value })}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white"
-                  />
+                  <label className={labelClass}>End date</label>
+                  <input type="date" className={inputClass} {...register("end_at")} />
+                  {errors.end_at && <p className={fieldErrorClass}>{errors.end_at.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Daily limit
-                  </label>
+                  <label className={labelClass}>Daily limit</label>
                   <input
                     type="number"
                     min="1"
-                    value={form.per_day_limit}
-                    onChange={(e) => setForm({ ...form, per_day_limit: e.target.value })}
                     placeholder="Unlimited"
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white"
+                    className={inputClass}
+                    {...register("per_day_limit")}
                   />
+                  {errors.per_day_limit && (
+                    <p className={fieldErrorClass}>{errors.per_day_limit.message}</p>
+                  )}
                 </div>
               </div>
 

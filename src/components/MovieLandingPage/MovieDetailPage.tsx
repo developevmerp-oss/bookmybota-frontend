@@ -20,6 +20,7 @@ import {
   type MovieOfferItem,
 } from "@/components/MovieLandingPage/movieCatalog";
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
+import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import MovieShowtimeSelector from "@/components/MovieLandingPage/MovieShowtimeSelector";
 
@@ -194,7 +195,14 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 
           <div className="min-w-0 text-white">
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight">{movie.title}</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight">
+              {movie.title}
+              {movie.promoted ? (
+                <span className="ml-2 align-middle inline-flex items-center rounded-full bg-white/95 text-[#6900AA] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  Promoted
+                </span>
+              ) : null}
+            </h1>
 
 
 
@@ -439,6 +447,12 @@ export default function MovieDetailPage() {
           </div>
         </section>
       )}
+
+      <CategoryPromoBanners
+        category="MOVIES"
+        targetId={movie.id}
+        className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-4"
+      />
 
       <MovieDetailSections movie={movie} idOrSlug={idOrSlug} />
     </div>

@@ -125,6 +125,19 @@ export const adminMarketingPlanSchema = yup.object({
     .typeError('Price must be a number.')
     .required('Price is required.')
     .min(0, 'Price cannot be negative.'),
+  module: yup
+    .string()
+    .oneOf(['ALL', 'DINING', 'EVENTS', 'MOVIES'])
+    .default('ALL'),
+  listing_boost: yup.boolean().default(true),
+  landing_slider: yup.boolean().default(false),
+  category_rail: yup.boolean().default(false),
+  allows_item_target: yup.boolean().default(false),
+  max_targets: yup
+    .number()
+    .typeError('Max targets must be a number.')
+    .min(1, 'At least 1 target.')
+    .default(1),
 });
 
 export const adminMarketingCampaignSchema = yup.object({
@@ -275,3 +288,72 @@ export const adminMovieMasterFormSchema = yup.object({
 });
 
 export type AdminMovieMasterFormValues = yup.InferType<typeof adminMovieMasterFormSchema>;
+
+export const adminMovieFormSchema = yup.object({
+  title: yup.string().trim().required('Title is required.'),
+  description: yup.string().trim().default(''),
+  poster_url: yup.string().trim().default(''),
+  banner_url: yup.string().trim().default(''),
+  duration_minutes: yup
+    .string()
+    .trim()
+    .default('')
+    .test('duration-number', 'Duration must be a positive number.', (value) => {
+      if (value == null || value === '') return true;
+      const n = Number(value);
+      return Number.isFinite(n) && n >= 1;
+    }),
+  certificate: yup.string().trim().default(''),
+  release_date: yup.string().default(''),
+  status: yup
+    .mixed<'draft' | 'coming_soon' | 'now_showing' | 'archived'>()
+    .oneOf(['draft', 'coming_soon', 'now_showing', 'archived'])
+    .required('Status is required.')
+    .default('draft'),
+});
+
+export type AdminMovieFormValues = yup.InferType<typeof adminMovieFormSchema>;
+
+export const emptyAdminMovieFormValues = (): AdminMovieFormValues => ({
+  title: '',
+  description: '',
+  poster_url: '',
+  banner_url: '',
+  duration_minutes: '',
+  certificate: '',
+  release_date: '',
+  status: 'draft',
+});
+
+export const adminEventContractSignSchema = yup.object({
+  signature_url: yup.string().trim().required('Upload your signature first.'),
+  otp: yup
+    .string()
+    .required('OTP is required.')
+    .transform((value) => String(value ?? '').replace(/\D/g, '').slice(0, 6))
+    .test('otp-digits', 'Enter the 6-digit OTP.', (value) => String(value ?? '').length === 6),
+});
+export type AdminEventContractSignValues = yup.InferType<typeof adminEventContractSignSchema>;
+
+export const adminEventRejectionSchema = yup.object({
+  rejection_reason: yup
+    .string()
+    .trim()
+    .required('Rejection reason is required.')
+    .min(3, 'Please provide a bit more detail.'),
+});
+export type AdminEventRejectionValues = yup.InferType<typeof adminEventRejectionSchema>;
+
+export const adminMarketingRejectSchema = yup.object({
+  admin_note: yup.string().trim().default(''),
+});
+export type AdminMarketingRejectValues = yup.InferType<typeof adminMarketingRejectSchema>;
+
+export const adminSettlementNotesSchema = yup.object({
+  notes: yup
+    .string()
+    .trim()
+    .max(1000, 'Notes must be at most 1000 characters.')
+    .default(''),
+});
+export type AdminSettlementNotesValues = yup.InferType<typeof adminSettlementNotesSchema>;

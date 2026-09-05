@@ -186,7 +186,9 @@ export default function CreateEventContractPage() {
             <h3 className="text-lg font-semibold text-white">Event & commercial terms</h3>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Select event *</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1">
+                Select event <span className="text-rose-500">*</span>
+              </label>
               <select
                 className="input-field w-full"
                 {...register("event_id")}
@@ -283,7 +285,9 @@ export default function CreateEventContractPage() {
           </div>
 
           <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-white">Contract details (rich text)</h3>
+            <h3 className="text-lg font-semibold text-white">
+              Contract details (rich text) <span className="text-rose-500">*</span>
+            </h3>
             <p className="text-xs text-zinc-500">
               Use <strong className="text-zinc-400">+ Insert Dynamic Field</strong> to add placeholders.
               They appear as labeled chips in the editor — not raw HTML tags.

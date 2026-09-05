@@ -2,48 +2,56 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useParams } from "next/navigation";
+import { useForm, Controller } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import {
   ArrowLeft,
-  ArrowRight,
-  CalendarDays,
   Check,
   CircleHelp,
   Copy,
-  Gift,
-  Heart,
   Loader2,
   Lock,
   ShieldCheck,
   ShoppingBag,
-  Tag,
-  User,
   Wallet,
-  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  useGetPublicGiftCardProductsQuery,
+  useGetPublicGiftCardDenominationsQuery,
+  useGetPublicGiftCardDesignQuery,
+  useGetPublicGiftCardSettingsQuery,
   usePurchaseGiftCardMutation,
   type GiftCardPurchaseResult,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
+import { GIFT_CARD_DENOMINATIONS, formatGiftCardAmountLabel } from "@/lib/giftCardDenominations";
+import {
+  DEFAULT_GIFT_CARD_VALIDITY_DAYS,
+  formatGiftCardValidityLabel,
+} from "@/lib/giftCardValidity";
+import {
+  customerGiftCardBuySchema,
+  GIFT_CARD_MESSAGE_MAX,
+  MAX_GIFT_CARD_QTY,
+  type CustomerGiftCardBuyValues,
+} from "@/lib/giftCardFormSchemas";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
+import GiftCardDesignFace from "@/components/GiftCards/GiftCardDesignFace";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import images from "@/Images";
 
-type PurchaseFor = "SELF" | "SOMEONE_ELSE";
+const fieldErrorClass = "mt-1.5 text-[12px] font-semibold text-rose-500";
+const labelClass = "block text-sm font-semibold text-[#1F2937] mb-1.5";
 
-function imgSrc(img: string | { src: string }) {
-  return typeof img === "string" ? img : img.src;
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
 }
 
 export default function GiftCardBuyPage() {
   const params = useParams();
-  const productId = String(params?.id || "");
+  const designId = String(params?.id || "");
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
   const isLoggedIn = Boolean(authUser?.role === "customer" || authUser?.customer_id);
@@ -52,429 +60,450 @@ export default function GiftCardBuyPage() {
     dispatch(loadFromStorage());
   }, [dispatch]);
 
-  const { data: products = [], isLoading } = useGetPublicGiftCardProductsQuery();
-  const product = useMemo(
-    () => products.find((p) => p.id === productId),
-    [products, productId]
-  );
+  const {
+    data: design,
+    isLoading: designLoading,
+    isError: designError,
+  } = useGetPublicGiftCardDesignQuery(designId, { skip: !designId });
 
+  const { data: denominationOptions = [] } = useGetPublicGiftCardDenominationsQuery();
+  const { data: giftSettings } = useGetPublicGiftCardSettingsQuery();
   const [purchase, { isLoading: purchasing }] = usePurchaseGiftCardMutation();
+
+  const validityDays =
+    giftSettings?.validity_days ||
+    denominationOptions[0]?.validity_days ||
+    DEFAULT_GIFT_CARD_VALIDITY_DAYS;
+  const validityLabel = formatGiftCardValidityLabel(validityDays);
+
   const [loginOpen, setLoginOpen] = useState(false);
-  const [purchaseFor, setPurchaseFor] = useState<PurchaseFor>("SELF");
-  const [recipientName, setRecipientName] = useState("");
-  const [recipientEmail, setRecipientEmail] = useState("");
-  const [senderName, setSenderName] = useState("");
-  const [personalMessage, setPersonalMessage] = useState("");
   const [issued, setIssued] = useState<GiftCardPurchaseResult | null>(null);
 
+  const amountChips = useMemo(() => {
+    if (denominationOptions.length > 0) {
+      return denominationOptions.map((d) => ({
+        value: Number(d.denomination),
+        available: d.available !== false,
+      }));
+    }
+    return GIFT_CARD_DENOMINATIONS.map((value) => ({ value, available: true }));
+  }, [denominationOptions]);
+
+  const defaultDenomination = amountChips.find((c) => c.available)?.value ?? 100;
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<CustomerGiftCardBuyValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(customerGiftCardBuySchema) as any,
+    defaultValues: {
+      sender_name: "",
+      recipient_name: "",
+      recipient_email: "",
+      personal_message: "",
+      denomination: defaultDenomination,
+      quantity: 1,
+    },
+    mode: "onSubmit",
+  });
+
+  const senderName = watch("sender_name");
+  const recipientName = watch("recipient_name");
+  const personalMessage = watch("personal_message") || "";
+  const amount = Number(watch("denomination")) || defaultDenomination;
+  const quantity = Number(watch("quantity")) || 1;
+
+  useEffect(() => {
+    const first = amountChips.find((c) => c.available);
+    if (first && !amountChips.some((c) => c.value === amount && c.available)) {
+      setValue("denomination", first.value);
+    }
+  }, [amountChips, amount, setValue]);
+
   const inputClass =
-    "w-full px-3 sm:px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[14px] sm:text-[15px] text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/25 focus:border-[#6900AA]";
+    "w-full px-3 sm:px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-[14px] text-[#111111] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6900AA]/25 focus:border-[#6900AA]";
 
-  const amount = Number(product?.denomination ?? 0);
-  const payAmount = Number(product?.selling_price ?? product?.denomination ?? 0);
-  const amountLabel = formatMoney(amount, { compact: true });
-  const payLabel = formatMoney(payAmount, { compact: true });
-  const validityDays = product?.validity_days || 365;
+  const totalPayable = amount * Math.max(1, quantity);
+  const payLabel = formatMoney(totalPayable, { compact: true });
+  const previewTo = recipientName?.trim() || "Recipient Name";
+  const previewFrom = senderName?.trim() || "Your Name";
+  const previewMsg = personalMessage.trim() || "Your Message";
+  const issuedCards =
+    issued?.cards && issued.cards.length > 0 ? issued.cards : issued ? [issued] : [];
 
-  const handleBuy = async () => {
-    if (!product) return;
+  const onValid = async (values: CustomerGiftCardBuyValues) => {
+    if (!design) return;
     if (!isLoggedIn) {
       setLoginOpen(true);
       toast.message("Please sign in to complete your purchase");
       return;
     }
-    if (purchaseFor === "SOMEONE_ELSE") {
-      if (!recipientName.trim()) {
-        toast.error("Recipient name is required");
-        return;
-      }
-      if (!recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) {
-        toast.error("Enter a valid recipient email");
-        return;
-      }
+    const chip = amountChips.find((c) => c.value === values.denomination);
+    if (!chip?.available) {
+      toast.error("This amount is temporarily unavailable");
+      return;
     }
 
     try {
       const res = await purchase({
-        product_id: product.id,
-        purchase_for: purchaseFor,
-        recipient_name: purchaseFor === "SOMEONE_ELSE" ? recipientName.trim() : undefined,
-        recipient_email: purchaseFor === "SOMEONE_ELSE" ? recipientEmail.trim() : undefined,
-        sender_name: senderName.trim() || undefined,
-        personal_message:
-          purchaseFor === "SOMEONE_ELSE" ? personalMessage.trim() || undefined : undefined,
+        denomination: values.denomination,
+        design_id: design.id,
+        purchase_for: "SOMEONE_ELSE",
+        recipient_name: values.recipient_name.trim(),
+        recipient_email: values.recipient_email.trim(),
+        sender_name: values.sender_name.trim(),
+        personal_message: values.personal_message?.trim() || undefined,
+        quantity: values.quantity,
       }).unwrap();
       setIssued(res.data);
       toast.success(res.message || "Gift card purchased");
     } catch (err) {
-      toast.error(extractApiError(err) || "Purchase failed");
+      toast.error(extractApiError(err, "Purchase failed"));
     }
   };
 
-  const copyCode = async () => {
-    if (!issued?.code) return;
+  const copyCode = async (code?: string) => {
+    const value = code || issued?.code;
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(issued.code);
+      await navigator.clipboard.writeText(value);
       toast.success("Code copied");
     } catch {
-      toast.message(issued.code);
+      toast.message(value);
     }
   };
 
+  if (designLoading) {
+    return (
+      <div className="bg-[#F4F2F7] min-h-[calc(100vh-4rem)] flex items-center justify-center gap-2 text-slate-500">
+        <Loader2 className="animate-spin" size={18} /> Loading design…
+      </div>
+    );
+  }
+
+  if (designError || !design) {
+    return (
+      <div className="bg-[#F4F2F7] min-h-[calc(100vh-4rem)] py-10 px-4">
+        <div className="max-w-md mx-auto bg-white rounded-2xl border border-slate-200 p-8 text-center">
+          <p className="text-slate-600">This gift card design is not available.</p>
+          <Link href="/gift-cards" className="text-[#6900AA] font-semibold text-sm mt-3 inline-block">
+            Choose a design
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-[#F4F2F7] min-h-[calc(100vh-4rem)] py-3 sm:py-6 md:py-8 lg:py-10">
+    <div className="bg-[#F4F2F7] min-h-[calc(100vh-4rem)] py-3 sm:py-6 md:py-8">
       <div className="max-w-6xl mx-auto px-3 sm:px-5 md:px-6">
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-slate-500 py-16 sm:py-20 justify-center bg-white rounded-2xl sm:rounded-[28px] shadow-sm">
-            <Loader2 className="animate-spin" size={18} /> Loading…
-          </div>
-        ) : !product ? (
-          <div className="bg-white rounded-2xl sm:rounded-[28px] border border-slate-200 p-6 sm:p-8 text-center shadow-sm">
-            <p className="text-slate-600">This gift card is not available.</p>
-            <Link href="/gift-cards" className="text-[#6900AA] font-semibold text-sm mt-3 inline-block">
-              Browse gift cards
-            </Link>
-          </div>
-        ) : issued ? (
-          <div className="bg-white rounded-2xl sm:rounded-[28px] shadow-[0_10px_40px_rgba(17,17,17,0.07)] w-full max-w-md sm:max-w-lg mx-auto p-4 sm:p-5 md:p-6 lg:p-8 flex flex-col items-stretch">
-            {/* Success header */}
-            <div className="flex flex-col items-center text-center mb-4 sm:mb-5 lg:mb-6">
-              <div className="relative mb-3 sm:mb-4">
-                <span
-                  className="absolute -inset-2.5 sm:-inset-3 rounded-full bg-emerald-400/20 blur-md"
-                  aria-hidden
-                />
-                <span
-                  className="absolute -top-1 -right-2 h-2 w-2 rounded-sm bg-[#6900AA] rotate-12"
-                  aria-hidden
-                />
-                <span
-                  className="absolute top-0 -left-3 h-1.5 w-1.5 rounded-sm bg-[#EAB308] -rotate-12"
-                  aria-hidden
-                />
-                <span
-                  className="absolute -bottom-1 right-0 h-1.5 w-1.5 rounded-sm bg-[#9B2DE3]"
-                  aria-hidden
-                />
-                <span
-                  className="absolute bottom-1 -left-2 h-2 w-2 rounded-sm bg-[#F59E0B]/80 rotate-45"
-                  aria-hidden
-                />
-                <span className="relative z-[1] inline-flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_8px_24px_rgba(16,185,129,0.35)]">
-                  <Check size={24} className="sm:hidden" strokeWidth={3} />
-                  <Check size={28} className="hidden sm:block" strokeWidth={3} />
-                </span>
-              </div>
-              <h1 className="text-[18px] sm:text-[20px] lg:text-2xl font-extrabold text-[#111111] tracking-tight">
-                Payment Successful!
-              </h1>
-              <p className="mt-1.5 sm:mt-2 text-[12px] sm:text-[13px] lg:text-sm text-slate-600 max-w-[20rem] sm:max-w-sm leading-relaxed px-0.5">
-                Demo checkout complete. Save your code – it is shown once here and{" "}
+        {issued ? (
+          <div className="bg-white rounded-2xl sm:rounded-[28px] shadow-[0_10px_40px_rgba(17,17,17,0.07)] w-full max-w-md sm:max-w-lg mx-auto p-4 sm:p-6 lg:p-8">
+            <div className="flex flex-col items-center text-center mb-5">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-white mb-3">
+                <Check size={24} strokeWidth={3} />
+              </span>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-[#111111]">Payment Successful!</h1>
+              <p className="mt-2 text-sm text-slate-600 max-w-sm">
+                Your e-gift{issuedCards.length > 1 ? `s (${issuedCards.length}) were` : " was"}{" "}
                 <span className="font-bold text-[#6900AA]">
-                  emailed to you
-                  {issued.purchase_for === "SOMEONE_ELSE" ? " and the recipient" : ""}.
+                  emailed to {issued.recipient_email || issued.recipient_name || "the recipient"}
                 </span>
+                . Save the code{issuedCards.length > 1 ? "s" : ""} below for your records.
               </p>
             </div>
 
-            {/* Gift card code */}
-            <div className="relative rounded-xl sm:rounded-2xl bg-[#F5EBFF] border border-[#E8D5FF] px-3 sm:px-4 py-3 sm:py-3.5 lg:py-4 mb-4 sm:mb-5 overflow-hidden">
-              <div
-                className="pointer-events-none absolute inset-y-0 right-12 sm:right-16 w-16 sm:w-24 opacity-[0.12] hidden min-[420px]:block"
-                aria-hidden
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(135deg, #6900AA 0 2px, transparent 2px 10px)",
-                }}
-              />
-              <div className="relative flex flex-row items-center gap-2 sm:gap-3">
-                <div className="flex-1 min-w-0 flex flex-col gap-0.5 sm:gap-1">
-                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.14em] text-[#6900AA]">
-                    Gift card code
-                  </p>
-                  <code className="text-[12px] min-[360px]:text-[14px] sm:text-base lg:text-xl font-extrabold tracking-wide sm:tracking-wider text-[#6900AA] break-all leading-snug">
-                    {issued.code}
-                  </code>
-                </div>
-                <div className="h-8 sm:h-10 w-px border-l border-dashed border-[#C9A8F0] shrink-0 self-stretch sm:self-auto" />
-                <button
-                  type="button"
-                  onClick={copyCode}
-                  className="shrink-0 h-9 w-9 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-[#6900AA] text-white inline-flex items-center justify-center hover:bg-[#57008E] transition-colors cursor-pointer shadow-sm"
-                  aria-label="Copy code"
+            <div className="space-y-2.5 mb-5">
+              {issuedCards.map((card, idx) => (
+                <div
+                  key={card.id || card.code}
+                  className="rounded-xl bg-[#F5EBFF] border border-[#E8D5FF] px-4 py-3.5 flex items-center gap-3"
                 >
-                  <Copy size={16} className="sm:hidden" />
-                  <Copy size={17} className="hidden sm:block" />
-                </button>
-              </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#6900AA]">
+                      Gift card code{issuedCards.length > 1 ? ` ${idx + 1}` : ""}
+                    </p>
+                    <code className="text-sm sm:text-base font-extrabold tracking-wide text-[#6900AA] break-all">
+                      {card.code}
+                    </code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyCode(card.code)}
+                    className="shrink-0 h-10 w-10 rounded-xl bg-[#6900AA] text-white inline-flex items-center justify-center hover:bg-[#57008E]"
+                    aria-label="Copy code"
+                  >
+                    <Copy size={17} />
+                  </button>
+                </div>
+              ))}
             </div>
 
-            {/* Product details: left gift + right info */}
-            <div className="flex flex-row items-center gap-3 sm:gap-4 mb-5 sm:mb-6">
-              <div className="relative shrink-0 w-[60px] h-[60px] sm:w-[72px] sm:h-[72px] lg:w-[88px] lg:h-[88px] flex items-center justify-center">
-                <span
-                  className="absolute inset-0 rounded-full bg-[#F0E6FF]"
-                  aria-hidden
-                />
-                <Image
-                  src={imgSrc(images.giftbox)}
-                  alt=""
-                  width={72}
-                  height={72}
-                  className="relative z-[1] w-11 sm:w-14 lg:w-16 h-auto object-contain"
-                  style={{ filter: "hue-rotate(-18deg) saturate(1.25) brightness(0.98)" }}
-                />
-              </div>
-              <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0 flex-1">
-                <p className="text-[13px] sm:text-[14px] lg:text-[15px] font-medium text-[#4B5563] leading-snug line-clamp-2">
-                  {issued.product_name || "BookMyBota Gift Card"}
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-extrabold text-[#6900AA] leading-none">
-                  {formatMoney(issued.initial_balance, { compact: true })}
-                </p>
-                <span className="inline-flex w-fit items-center gap-1 rounded-full bg-[#F3E8FF] px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-medium text-[#6900AA]">
-                  <CalendarDays size={11} className="sm:hidden shrink-0" strokeWidth={2.25} />
-                  <CalendarDays size={12} className="hidden sm:block shrink-0" strokeWidth={2.25} />
-                  Valid for {product?.validity_days || 365} days
+            <p className="text-center text-2xl font-extrabold text-[#6900AA] mb-2">
+              {formatMoney(
+                issued.total_payable ??
+                  Number(issued.initial_balance) * (issued.quantity || issuedCards.length || 1),
+                { compact: true }
+              )}
+            </p>
+            {issuedCards.length > 1 ? (
+              <p className="text-center text-sm text-slate-500 mb-1">
+                {issuedCards.length} × {formatMoney(issued.initial_balance, { compact: true })}
+              </p>
+            ) : null}
+            {issued.expires_at ? (
+              <p className="text-center text-sm text-slate-500 mb-5">
+                Valid until{" "}
+                <span className="font-semibold text-slate-700">
+                  {new Date(issued.expires_at).toLocaleDateString()}
                 </span>
-              </div>
-            </div>
+              </p>
+            ) : (
+              <p className="text-center text-sm text-slate-500 mb-5">Valid for {validityLabel}</p>
+            )}
 
-            {/* Heart divider */}
-            <div className="relative flex items-center justify-center mb-5 sm:mb-6">
-              <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-[#E5E7EB]" />
-              <span className="relative z-[1] inline-flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-white border border-[#EDE4F8] shadow-sm">
-                <Heart size={11} className="sm:hidden text-[#6900AA]" fill="currentColor" />
-                <Heart size={12} className="hidden sm:block text-[#6900AA]" fill="currentColor" />
-              </span>
-            </div>
-
-            {/* Actions — full-width stack on mobile + tablet; row on desktop */}
-            <div className="flex flex-col lg:flex-row gap-2.5 sm:gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 href={`/customer/gift-cards/${issued.id}`}
-                className="inline-flex w-full lg:flex-1 items-center justify-center gap-2 h-11 sm:h-12 rounded-2xl bg-gradient-to-r from-[#6900AA] to-[#9B2DE3] text-white text-[13px] sm:text-sm font-semibold hover:brightness-105 transition-[filter] shadow-[0_8px_20px_rgba(105,0,170,0.28)]"
+                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-2xl bg-gradient-to-r from-[#6900AA] to-[#9B2DE3] text-white text-sm font-semibold"
               >
-                <Wallet size={16} className="sm:hidden shrink-0" strokeWidth={2.2} />
-                <Wallet size={17} className="hidden sm:block shrink-0" strokeWidth={2.2} />
+                <Wallet size={17} />
                 View in My Gift Cards
               </Link>
               <Link
                 href="/gift-cards"
-                className="inline-flex w-full lg:flex-1 items-center justify-center gap-2 h-11 sm:h-12 rounded-2xl border border-[#6900AA] bg-white text-[#6900AA] text-[13px] sm:text-sm font-semibold hover:bg-[#F7E9FF] transition-colors"
+                className="inline-flex flex-1 items-center justify-center gap-2 h-11 rounded-2xl border border-[#6900AA] text-[#6900AA] text-sm font-semibold hover:bg-[#F7E9FF]"
               >
-                <ShoppingBag size={16} className="sm:hidden shrink-0" strokeWidth={2.2} />
-                <ShoppingBag size={17} className="hidden sm:block shrink-0" strokeWidth={2.2} />
+                <ShoppingBag size={17} />
                 Buy another
               </Link>
             </div>
           </div>
         ) : (
           <div className="bg-white rounded-2xl sm:rounded-[28px] shadow-[0_10px_40px_rgba(17,17,17,0.07)] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 px-3.5 sm:px-6 md:px-7 lg:px-8 py-3 sm:py-3.5 md:py-[18px] border-b border-[#EEEAF3]">
+            <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-3.5 border-b border-[#EEEAF3]">
               <Link
                 href="/gift-cards"
-                className="inline-flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-[14px] font-medium text-[#4B5563] hover:text-[#6900AA] transition-colors min-w-0"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#4B5563] hover:text-[#6900AA]"
               >
-                <ArrowLeft size={18} strokeWidth={2} className="shrink-0" />
-                <span className="truncate">All gift cards</span>
+                <ArrowLeft size={18} />
+                Select a design
               </Link>
               <a
                 href="mailto:support@bookmybota.com"
-                className="inline-flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-[14px] font-medium text-[#4B5563] hover:text-[#6900AA] transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#4B5563] hover:text-[#6900AA]"
               >
-                <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border border-[#D1D5DB] text-[#6B7280]">
-                  <CircleHelp size={13} strokeWidth={2} />
-                </span>
-                <span className="hidden min-[380px]:inline">Need help?</span>
+                <CircleHelp size={16} />
+                <span className="hidden sm:inline">Need help?</span>
               </a>
             </div>
 
-            {/* Body: stack on phone + tablet; side-by-side from desktop */}
-            <div className="flex flex-col lg:flex-row lg:items-start gap-5 sm:gap-6 lg:gap-8 px-3.5 sm:px-6 lg:px-8 py-5 sm:py-7 lg:py-8">
-              {/* LEFT SIDE */}
-              <div className="gift-buy-left w-full lg:flex-1 min-w-0 flex flex-col">
-                <h1 className="text-[20px] sm:text-[24px] lg:text-[28px] font-bold text-[#1F2937] tracking-tight leading-tight">
-                  BookMyBota Gift Card
-                </h1>
-                <p className="mt-1.5 sm:mt-2.5 lg:mt-3 text-[30px] sm:text-[40px] lg:text-[48px] font-extrabold text-[#6900AA] leading-none tracking-tight">
-                  {amountLabel}
-                </p>
-
-                <div className="relative flex items-center justify-center my-4 sm:my-6 lg:my-8 min-h-[140px] sm:min-h-[180px] lg:min-h-[220px]">
-                  <div
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[140px] h-[140px] sm:w-[220px] sm:h-[180px] lg:w-[280px] lg:h-[220px] rounded-tr-[30%] rounded-bl-[30%] bg-[#f0e3fd]"
-                    aria-hidden
+            <form
+              onSubmit={handleSubmit(onValid)}
+              noValidate
+              className="flex flex-col lg:flex-row gap-6 lg:gap-8 px-4 sm:px-6 lg:px-8 py-5 sm:py-7"
+            >
+              <div className="flex-1 min-w-0 flex flex-col gap-4 sm:gap-5">
+                <div>
+                  <label className={labelClass}>
+                    From <RequiredMark />
+                  </label>
+                  <input
+                    className={inputClass}
+                    placeholder="Please Enter Sender's Name"
+                    {...register("sender_name")}
                   />
-                  <Image
-                    src={imgSrc(images.giftbox)}
-                    alt="Gift card"
-                    width={220}
-                    height={220}
-                    priority
-                    className="relative z-[1] w-[110px] sm:w-[160px] lg:w-[200px] h-auto object-contain drop-shadow-[0_12px_24px_rgba(105,0,170,0.2)]"
-                    style={{ filter: "hue-rotate(-18deg) saturate(1.25) brightness(0.98)" }}
-                  />
-                </div>
-
-                <div className="flex flex-row gap-1.5 sm:gap-2.5 lg:gap-3 mt-auto pt-1 sm:pt-3 lg:pt-4">
-                  {[
-                    { Icon: CalendarDays, label: `${validityDays} days validity` },
-                    { Icon: Tag, label: "Promo codes" },
-                    { Icon: Zap, label: "Instant delivery" },
-                  ].map(({ Icon, label }) => (
-                    <div
-                      key={label}
-                      className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 sm:gap-1.5 lg:gap-2 rounded-[10px] sm:rounded-[12px] lg:rounded-[14px] border border-[#E8E8EE] bg-white py-2 sm:py-2.5 lg:py-3 px-0.5 sm:px-1 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-                    >
-                      <Icon size={18} className="text-[#6900AA] sm:hidden" strokeWidth={1.75} />
-                      <Icon size={22} className="text-[#6900AA] hidden sm:block lg:hidden" strokeWidth={1.75} />
-                      <Icon size={27} className="text-[#6900AA] hidden lg:block" strokeWidth={1.75} />
-                      <span className="text-[10px] sm:text-[12px] lg:text-[15px] max-w-[4.25rem] sm:max-w-[5rem] lg:max-w-[70px] font-medium text-[#6B7280] text-center leading-snug">
-                        {label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* RIGHT SIDE */}
-              <div className="gift-buy-right w-full lg:w-[360px] xl:w-[420px] 2xl:w-[450px] shrink-0 flex flex-col">
-                <div className="rounded-[14px] sm:rounded-[16px] lg:rounded-[20px] bg-white border border-[#F0EEF4] shadow-[0_12px_40px_rgba(17,17,17,0.08)] p-3.5 sm:p-5 lg:p-6 flex flex-col gap-3.5 sm:gap-4 lg:gap-5">
-                  <div className="flex flex-col gap-2.5 sm:gap-3">
-                    <p className="text-[13px] sm:text-[14px] lg:text-[15px] font-bold text-[#1F2937]">Who is this for?</p>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setPurchaseFor("SELF")}
-                        className={`h-[44px] sm:h-[46px] lg:h-[48px] rounded-[12px] text-[12px] sm:text-[13px] font-semibold border inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-colors cursor-pointer px-1 ${
-                          purchaseFor === "SELF"
-                            ? "bg-[#6900AA] border-[#6900AA] text-white shadow-[0_4px_14px_rgba(105,0,170,0.25)]"
-                            : "bg-white border-[#E5E7EB] text-[#374151] hover:bg-slate-50"
-                        }`}
-                      >
-                        <User size={15} strokeWidth={2.2} className="shrink-0" />
-                        <span className="truncate">For myself</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPurchaseFor("SOMEONE_ELSE")}
-                        className={`h-[44px] sm:h-[46px] lg:h-[48px] rounded-[12px] text-[12px] sm:text-[13px] font-semibold border inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-colors cursor-pointer px-1 ${
-                          purchaseFor === "SOMEONE_ELSE"
-                            ? "bg-[#6900AA] border-[#6900AA] text-white shadow-[0_4px_14px_rgba(105,0,170,0.25)]"
-                            : "bg-white border-[#E5E7EB] text-[#374151] hover:bg-slate-50"
-                        }`}
-                      >
-                        <Gift size={15} strokeWidth={2.2} className="shrink-0" />
-                        <span className="truncate">Someone else</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {purchaseFor === "SOMEONE_ELSE" && (
-                    <div className="flex flex-col gap-3 rounded-[14px] bg-[#F9FAFB] border border-[#F3F4F6] p-3 sm:p-3.5 lg:p-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[13px] sm:text-sm font-medium text-slate-700">
-                          Recipient name *
-                        </label>
-                        <input
-                          className={inputClass}
-                          value={recipientName}
-                          onChange={(e) => setRecipientName(e.target.value)}
-                          placeholder="Full name"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[13px] sm:text-sm font-medium text-slate-700">
-                          Recipient email *
-                        </label>
-                        <input
-                          type="email"
-                          className={inputClass}
-                          value={recipientEmail}
-                          onChange={(e) => setRecipientEmail(e.target.value)}
-                          placeholder="email@example.com"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[13px] sm:text-sm font-medium text-slate-700">
-                          Your name (optional)
-                        </label>
-                        <input
-                          className={inputClass}
-                          value={senderName}
-                          onChange={(e) => setSenderName(e.target.value)}
-                          placeholder="Shown on the gift email"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[13px] sm:text-sm font-medium text-slate-700">
-                          Personal message (optional)
-                        </label>
-                        <textarea
-                          className={`${inputClass} min-h-[72px] sm:min-h-[80px] resize-y`}
-                          value={personalMessage}
-                          onChange={(e) => setPersonalMessage(e.target.value.slice(0, 500))}
-                          placeholder="Happy birthday!"
-                          maxLength={500}
-                        />
-                      </div>
-                    </div>
+                  {errors.sender_name && (
+                    <p className={fieldErrorClass}>{errors.sender_name.message}</p>
                   )}
+                </div>
 
-                  <div className="rounded-[12px] border border-[#E8D48A] bg-[#FFF8DC] px-3 sm:px-3.5 py-2.5 sm:py-3 flex flex-row items-start gap-2 sm:gap-2.5">
-                    <ShieldCheck size={17} className="text-[#B45309] shrink-0 mt-0.5" strokeWidth={2} />
-                    <p className="text-[11px] sm:text-[12px] lg:text-[13px] text-[#78520F] leading-snug">
-                      <strong className="font-bold">Demo payment</strong>
-                      {" – "}
-                      No real charge – clicking Buy issues an ACTIVE gift card immediately.
+                <div>
+                  <label className={labelClass}>
+                    To <RequiredMark />
+                  </label>
+                  <input
+                    className={inputClass}
+                    placeholder="Please Enter Recipient's Name"
+                    {...register("recipient_name")}
+                  />
+                  {errors.recipient_name && (
+                    <p className={fieldErrorClass}>{errors.recipient_name.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    Email <RequiredMark />
+                  </label>
+                  <input
+                    type="email"
+                    className={inputClass}
+                    placeholder="Recipient email for gift delivery"
+                    {...register("recipient_email")}
+                  />
+                  {errors.recipient_email && (
+                    <p className={fieldErrorClass}>{errors.recipient_email.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>Personal Message</label>
+                  <textarea
+                    className={`${inputClass} min-h-[88px] resize-y`}
+                    placeholder="Write a short note"
+                    maxLength={GIFT_CARD_MESSAGE_MAX}
+                    {...register("personal_message")}
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {personalMessage.length}/{GIFT_CARD_MESSAGE_MAX} characters
+                  </p>
+                  {errors.personal_message && (
+                    <p className={fieldErrorClass}>{errors.personal_message.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#1F2937] mb-2">
+                    Amount <RequiredMark />
+                  </label>
+                  <Controller
+                    name="denomination"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex flex-wrap gap-2">
+                        {amountChips.map((chip) => {
+                          const selected = Number(field.value) === chip.value;
+                          return (
+                            <button
+                              key={chip.value}
+                              type="button"
+                              disabled={!chip.available}
+                              onClick={() => field.onChange(chip.value)}
+                              className={`min-w-[5.25rem] h-10 px-3 rounded-md text-sm font-bold border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                                selected
+                                  ? "bg-[#6900AA] border-[#6900AA] text-white"
+                                  : "bg-white border-slate-300 text-slate-800 hover:border-[#6900AA]"
+                              }`}
+                            >
+                              {formatGiftCardAmountLabel(chip.value)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  />
+                  <p className="mt-2 text-[12px] text-slate-500">
+                    Valid for <span className="font-semibold text-slate-700">{validityLabel}</span>{" "}
+                    from the purchase date.
+                  </p>
+                  {errors.denomination && (
+                    <p className={fieldErrorClass}>{errors.denomination.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    Quantity <RequiredMark />
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={MAX_GIFT_CARD_QTY}
+                    step={1}
+                    inputMode="numeric"
+                    className={inputClass}
+                    {...register("quantity", { valueAsNumber: true })}
+                  />
+                  <p className="mt-1.5 text-[12px] text-slate-500">
+                    Please enter value less than or equal to {MAX_GIFT_CARD_QTY}
+                  </p>
+                  {errors.quantity && (
+                    <p className={fieldErrorClass}>{errors.quantity.message}</p>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-[#E8D48A] bg-[#FFF8DC] px-3 py-2.5 flex gap-2">
+                  <ShieldCheck size={16} className="text-[#B45309] shrink-0 mt-0.5" />
+                  <p className="text-[12px] text-[#78520F] leading-snug">
+                    <strong>Demo payment</strong> – no real charge. The gift code is emailed to the
+                    recipient instantly.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1 border-t border-slate-100">
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold">
+                      Amount payable
                     </p>
+                    <p className="text-xl font-extrabold text-[#111111]">{payLabel}</p>
                   </div>
-
-                  <div className="flex flex-col gap-2.5 sm:gap-3">
-                    <p className="text-[13px] sm:text-[14px] lg:text-[15px] font-bold text-[#1F2937]">Order summary</p>
-                    <div className="rounded-[12px] border border-[#ECEAF0] bg-[#FAFAFB] px-3 sm:px-3.5 lg:px-4 py-3 sm:py-3.5 flex flex-col gap-2.5 sm:gap-3">
-                      <div className="flex flex-row items-center justify-between text-[12px] sm:text-[13px] lg:text-[14px] text-[#6B7280]">
-                        <span>Gift card value</span>
-                        <span className="font-medium text-[#374151]">{amountLabel}</span>
-                      </div>
-                      <div className="h-px bg-[#E8E6ED]" />
-                      <div className="flex flex-row items-center justify-between gap-2">
-                        <span className="text-[12px] sm:text-[13px] lg:text-[14px] font-bold text-[#1F2937]">Total to pay</span>
-                        <span className="text-[15px] sm:text-[16px] lg:text-[18px] font-extrabold text-[#6900AA]">{payLabel}</span>
-                      </div>
-                    </div>
-                  </div>
-
                   <button
-                    type="button"
+                    type="submit"
                     disabled={purchasing}
-                    onClick={handleBuy}
-                    className="w-full h-[46px] sm:h-[50px] lg:h-[52px] rounded-[14px] bg-[#6900AA] hover:bg-[#5A008F] text-white font-semibold disabled:opacity-60 inline-flex items-center justify-between gap-2 px-3 sm:px-4 lg:px-5 cursor-pointer transition-colors shadow-[0_8px_22px_rgba(105,0,170,0.3)]"
+                    className="h-12 px-6 rounded-xl bg-[#6900AA] hover:bg-[#5A008F] text-white font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2 shadow-[0_8px_22px_rgba(105,0,170,0.3)]"
                   >
                     {purchasing ? (
-                      <span className="flex-1 inline-flex items-center justify-center gap-2">
+                      <>
                         <Loader2 className="animate-spin" size={18} /> Processing…
-                      </span>
+                      </>
                     ) : (
                       <>
-                        <Lock size={16} strokeWidth={2.4} className="shrink-0" />
-                        <span className="flex-1 text-center text-[12px] min-[380px]:text-[13px] sm:text-[14px] lg:text-[15px] font-semibold truncate px-1">
-                          Continue to pay {payLabel}
-                        </span>
-                        <ArrowRight size={16} strokeWidth={2.4} className="shrink-0" />
+                        <Lock size={16} />
+                        Make Payment
                       </>
                     )}
                   </button>
+                </div>
+              </div>
 
-                  <p className="text-center text-[10px] sm:text-[11px] lg:text-[12px] text-[#9CA3AF] inline-flex items-center justify-center gap-1.5 w-full -mt-0.5 sm:-mt-1 px-1">
-                    <Lock size={11} className="opacity-80 shrink-0" />
-                    You will be asked to sign in before payment.
+              <div className="w-full lg:w-[340px] xl:w-[380px] shrink-0">
+                <div className="sticky top-4">
+                  <GiftCardDesignFace
+                    design={design}
+                    size="preview"
+                    className="aspect-[16/10] w-full shadow-[0_12px_40px_rgba(17,17,17,0.15)]"
+                  />
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 space-y-2.5 shadow-sm">
+                    <p className="text-sm text-slate-800">
+                      <span className="font-semibold">To</span> {previewTo}
+                    </p>
+                    <p className="text-sm text-slate-600 italic line-clamp-3">[{previewMsg}]</p>
+                    <p className="text-sm text-slate-800">
+                      Best Wishes <span className="font-semibold">{previewFrom}</span>
+                    </p>
+                    <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        Gift Card / Voucher Code
+                      </p>
+                      <p className="text-sm font-mono font-semibold text-slate-400 mt-0.5">
+                        Will appear after payment
+                      </p>
+                    </div>
+                    <p className="text-center text-base font-extrabold text-[#6900AA] pt-1">
+                      {payLabel}
+                    </p>
+                    {quantity > 1 ? (
+                      <p className="text-center text-[11px] text-slate-500">
+                        {quantity} × {formatMoney(amount, { compact: true })}
+                      </p>
+                    ) : null}
+                    <p className="text-center text-[11px] text-slate-500">
+                      Expires after {validityLabel}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-[12px] text-slate-500 leading-relaxed text-center lg:text-left">
+                    Preview of your gift card. Confirm this is the design you selected before
+                    continuing to payment.
                   </p>
                 </div>
               </div>
-            </div>
+            </form>
           </div>
         )}
       </div>
@@ -484,7 +513,7 @@ export default function GiftCardBuyPage() {
         onClose={() => setLoginOpen(false)}
         onSuccess={() => {
           setLoginOpen(false);
-          toast.success("Signed in — tap Pay to continue");
+          toast.success("Signed in — tap Make Payment to continue");
         }}
       />
     </div>

@@ -323,6 +323,7 @@ export interface Movie {
   cast_text?: string | null;
   director?: string | null;
   status: 'draft' | 'coming_soon' | 'now_showing' | 'archived';
+  is_promoted?: boolean;
   is_active?: boolean;
   sort_order?: number;
   created_at?: string;
@@ -1091,6 +1092,7 @@ export interface PublicEvent {
   status?: string;
   rating?: number | string;
   reviews_count?: number;
+  is_promoted?: boolean;
 }
 
 /** Approved onboarded venue / artist partners for partner landing pages. */
@@ -1355,6 +1357,70 @@ export interface MovieEligiblePlatformOffer {
   discount_label: string;
 }
 
+export interface MarketingPlan {
+  id: number;
+  name: string;
+  duration_days: number;
+  price: number | string;
+  is_active?: boolean;
+  archived_at?: string | null;
+  module?: 'ALL' | 'DINING' | 'EVENTS' | 'MOVIES';
+  listing_boost?: boolean;
+  landing_slider?: boolean;
+  category_rail?: boolean;
+  allows_item_target?: boolean;
+  max_targets?: number;
+}
+
+export interface MarketingCampaign {
+  id: number;
+  business_id: string;
+  plan_id: number;
+  title?: string | null;
+  banner_image_url?: string | null;
+  cta_url?: string | null;
+  category?: string;
+  target_type?: 'BUSINESS' | 'RESTAURANT' | 'EVENT' | 'MOVIE';
+  target_id?: string | null;
+  start_date?: string;
+  end_date: string;
+  status: string;
+  admin_note?: string | null;
+  plan_name?: string;
+  business_name?: string;
+  duration_days?: number;
+  price?: number | string;
+  plan_module?: string;
+  listing_boost?: boolean;
+  landing_slider?: boolean;
+  category_rail?: boolean;
+  allows_item_target?: boolean;
+  amount?: number | string;
+  currency?: string;
+  payment_status?: 'UNPAID' | 'PENDING_VERIFICATION' | 'PAID' | 'FAILED' | 'REFUNDED' | 'ADMIN_WAIVED' | string;
+  payment_method?: string | null;
+  payment_reference?: string | null;
+  paid_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  requested_by?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+}
+
+export interface MarketingPaymentSummary {
+  total_entries: number;
+  paid_count: number;
+  waived_count: number;
+  unpaid_count: number;
+  refunded_count: number;
+  total_collected: number | string;
+  total_waived: number | string;
+  pending_requests?: number;
+  approved_requests?: number;
+  rejected_requests?: number;
+}
+
 export interface GiftCardProduct {
   id: string;
   name: string;
@@ -1428,15 +1494,56 @@ export interface GiftCardPurchaseResult {
   applicable_category?: string;
   recipient_name?: string | null;
   recipient_email?: string | null;
+  design_id?: string | null;
+  /** Number of cards purchased in this order (default 1). */
+  quantity?: number;
+  /** Total charged = initial_balance × quantity. */
+  total_payable?: number;
+  /** All issued cards when quantity > 1 (first card is also mirrored on root fields). */
+  cards?: GiftCardPurchaseResult[];
 }
 
 export interface GiftCardPurchaseBody {
-  product_id: string;
-  purchase_for: 'SELF' | 'SOMEONE_ELSE';
-  recipient_name?: string;
-  recipient_email?: string;
+  /** Customer-selected amount (preferred BookMyShow-style). */
+  denomination: number;
+  product_id?: string;
+  /** Superadmin-managed design id */
+  design_id: string;
+  /** Always SOMEONE_ELSE (gift-only flow). */
+  purchase_for?: 'SOMEONE_ELSE';
+  recipient_name: string;
+  recipient_email: string;
   sender_name?: string;
   personal_message?: string;
+  /** Number of identical gift cards to issue (1–10). */
+  quantity?: number;
+}
+
+export interface GiftCardDenominationOption {
+  denomination: number;
+  currency: string;
+  selling_price: number;
+  available: boolean;
+  validity_days?: number;
+}
+
+export interface GiftCardSettings {
+  validity_days: number;
+  default_validity_days?: number;
+  options?: number[];
+}
+
+export interface GiftCardDesign {
+  id: string;
+  title: string;
+  category: 'ENTERTAINING' | 'LOVE' | string;
+  image_url?: string | null;
+  color_gradient?: string | null;
+  caption_color?: string | null;
+  status?: string;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface GiftCardRedeemPreview {
@@ -1905,7 +2012,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
 
   endpoints: (builder) => ({
 
@@ -3172,8 +3279,14 @@ export const api = createApi({
       invalidatesTags: ['Businesses'],
     }),
 
-    getMarketingPlans: builder.query<PaginatedList<any>, PagedQuery | void>({
-      query: (params) => `/admin/marketing-plans${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+    getMarketingPlans: builder.query<PaginatedList<MarketingPlan>, (PagedQuery & { status?: string }) | void>({
+      query: (params) =>
+        `/admin/marketing-plans${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+          status: params?.status,
+        })}`,
       transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
       providesTags: ['MarketingPlans'],
     }),
@@ -3368,6 +3481,53 @@ export const api = createApi({
       providesTags: ['GiftCardProducts'],
     }),
 
+    getGiftCardStats: builder.query<
+      {
+        issued_count: number;
+        issued_value: number;
+        redeemed_value: number;
+        outstanding_balance: number;
+        active_cards: number;
+        active_designs: number;
+        total_designs: number;
+        validity_days?: number;
+      },
+      void
+    >({
+      query: () => '/admin/gift-card-stats',
+      transformResponse: (res: {
+        data: {
+          issued_count: number;
+          issued_value: number;
+          redeemed_value: number;
+          outstanding_balance: number;
+          active_cards: number;
+          active_designs: number;
+          total_designs: number;
+          validity_days?: number;
+        };
+      }) => res.data,
+      providesTags: ['GiftCardProducts', 'GiftCardDesigns', 'GiftCardSettings'],
+    }),
+
+    getGiftCardSettings: builder.query<GiftCardSettings, void>({
+      query: () => '/admin/gift-card-settings',
+      transformResponse: (res: { data: GiftCardSettings }) => res.data,
+      providesTags: ['GiftCardSettings'],
+    }),
+
+    patchGiftCardSettings: builder.mutation<
+      { message?: string; data: GiftCardSettings },
+      { validity_days: number }
+    >({
+      query: (body) => ({
+        url: '/admin/gift-card-settings',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['GiftCardSettings', 'GiftCardProducts', 'PublicGiftCardProducts'],
+    }),
+
     createGiftCardProduct: builder.mutation<GiftCardProduct, Partial<GiftCardProduct>>({
       query: (body) => ({
         url: '/admin/gift-card-products',
@@ -3412,6 +3572,108 @@ export const api = createApi({
       providesTags: ['PublicGiftCardProducts'],
     }),
 
+    getPublicGiftCardDenominations: builder.query<GiftCardDenominationOption[], void>({
+      query: () => '/gift-cards/denominations',
+      transformResponse: (res: {
+        data: GiftCardDenominationOption[];
+        validity_days?: number;
+      }) => {
+        const validity = res.validity_days;
+        return (res.data || []).map((d) => ({
+          ...d,
+          validity_days: d.validity_days ?? validity,
+        }));
+      },
+      providesTags: ['PublicGiftCardProducts'],
+    }),
+
+    getPublicGiftCardSettings: builder.query<GiftCardSettings, void>({
+      query: () => '/gift-cards/settings',
+      transformResponse: (res: { data: GiftCardSettings }) => res.data,
+      providesTags: ['GiftCardSettings'],
+    }),
+
+    getPublicGiftCardDesigns: builder.query<
+      GiftCardDesign[],
+      { category?: string } | void
+    >({
+      query: (arg) => {
+        const category = arg && typeof arg === 'object' ? arg.category : undefined;
+        const qs = category ? `?category=${encodeURIComponent(category)}` : '';
+        return `/gift-cards/designs${qs}`;
+      },
+      transformResponse: (res: { data: GiftCardDesign[] }) => res.data || [],
+      providesTags: ['GiftCardDesigns'],
+    }),
+
+    getPublicGiftCardDesign: builder.query<GiftCardDesign, string>({
+      query: (id) => `/gift-cards/designs/${id}`,
+      transformResponse: (res: { data: GiftCardDesign }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'GiftCardDesigns', id }],
+    }),
+
+    getGiftCardDesigns: builder.query<
+      PaginatedList<GiftCardDesign>,
+      (PagedQuery & { status?: string; category?: string }) | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.status) sp.set('status', params.status);
+        if (params?.category) sp.set('category', params.category);
+        const qs = sp.toString();
+        return `/admin/gift-card-designs${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: GiftCardDesign[] }) => unwrapPaginated(res),
+      providesTags: ['GiftCardDesigns'],
+    }),
+
+    createGiftCardDesign: builder.mutation<
+      { data: GiftCardDesign; message?: string },
+      Partial<GiftCardDesign> & { title: string; category: string }
+    >({
+      query: (body) => ({
+        url: '/admin/gift-card-designs',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['GiftCardDesigns'],
+    }),
+
+    updateGiftCardDesign: builder.mutation<
+      { data: GiftCardDesign; message?: string },
+      Partial<GiftCardDesign> & { id: string; title: string; category: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/gift-card-designs/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['GiftCardDesigns'],
+    }),
+
+    patchGiftCardDesignStatus: builder.mutation<
+      { data: GiftCardDesign; message?: string },
+      { id: string; status: string }
+    >({
+      query: ({ id, status }) => ({
+        url: `/admin/gift-card-designs/${id}/status`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      invalidatesTags: ['GiftCardDesigns'],
+    }),
+
+    deleteGiftCardDesign: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/gift-card-designs/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['GiftCardDesigns'],
+    }),
+
     purchaseGiftCard: builder.mutation<
       { message?: string; data: GiftCardPurchaseResult },
       GiftCardPurchaseBody
@@ -3421,7 +3683,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['MyGiftCards', 'GiftCardProducts'],
+      invalidatesTags: ['MyGiftCards', 'GiftCardProducts', 'PublicGiftCardProducts'],
     }),
 
     getMyGiftCards: builder.query<GiftCardMine[], void>({
@@ -3651,19 +3913,141 @@ export const api = createApi({
       invalidatesTags: ['AdminDiningGiftCardSettlements', 'DiningGiftCardRedemptions'],
     }),
 
-    getMarketingCampaigns: builder.query<PaginatedList<any>, PagedQuery | void>({
-      query: (params) => `/admin/marketing-campaigns${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
-      transformResponse: (res: { data: any[] }) => unwrapPaginated(res),
+    getMarketingCampaigns: builder.query<
+      PaginatedList<MarketingCampaign>,
+      (PagedQuery & { status?: string; payment_status?: string; partner_requests?: boolean; business_scope?: boolean }) | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.status) sp.set('status', params.status);
+        if (params?.payment_status) sp.set('payment_status', params.payment_status);
+        if (params?.partner_requests) sp.set('partner_requests', 'true');
+        if (params?.business_scope) sp.set('business_scope', 'true');
+        const qs = sp.toString();
+        return `/admin/marketing-campaigns${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: MarketingCampaign[] }) => unwrapPaginated(res),
       providesTags: ['MarketingCampaigns'],
     }),
 
-    assignMarketingCampaign: builder.mutation<any, { businessId: string; plan_id: number; end_date: string }>({
+    getMarketingPaymentSummary: builder.query<MarketingPaymentSummary, void>({
+      query: () => '/admin/marketing-payments/summary',
+      transformResponse: (res: { data?: MarketingPaymentSummary } | MarketingPaymentSummary) => {
+        if (res && typeof res === 'object' && 'data' in res && res.data) {
+          return res.data;
+        }
+        return res as MarketingPaymentSummary;
+      },
+      providesTags: ['MarketingCampaigns'],
+    }),
+
+    patchMarketingCampaignStatus: builder.mutation<
+      MarketingCampaign,
+      { id: number; status: string; admin_note?: string }
+    >({
+      query: ({ id, status, admin_note }) => ({
+        url: `/admin/marketing-campaigns/${id}/status`,
+        method: 'PATCH',
+        body: { status, admin_note },
+      }),
+      transformResponse: (res: { data: MarketingCampaign }) => res.data,
+      invalidatesTags: ['MarketingCampaigns', 'PublicMarketingPromotions', 'Businesses', 'PublicEvents', 'Movies'],
+    }),
+
+    assignMarketingCampaign: builder.mutation<
+      MarketingCampaign,
+      {
+        businessId: string;
+        plan_id: number;
+        end_date?: string;
+        title?: string;
+        banner_image_url?: string;
+        cta_url?: string;
+        category?: string;
+        target_type?: string;
+        target_id?: string;
+      }
+    >({
       query: ({ businessId, ...body }) => ({
         url: `/admin/businesses/${businessId}/marketing-campaigns`,
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['MarketingCampaigns', 'Businesses'],
+      invalidatesTags: ['MarketingCampaigns', 'Businesses', 'PublicMarketingPromotions'],
+    }),
+
+    getPublicMarketingPlans: builder.query<MarketingPlan[], { module?: string } | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.module) sp.set('module', params.module);
+        const qs = sp.toString();
+        return `/marketing/plans${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: MarketingPlan[] }) => res.data || [],
+      providesTags: ['MarketingPlans'],
+    }),
+
+    getActiveMarketingPromotions: builder.query<
+      MarketingCampaign[],
+      { category?: string; target_type?: string; target_id?: string; surface?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.category) sp.set('category', params.category);
+        if (params?.target_type) sp.set('target_type', params.target_type);
+        if (params?.target_id) sp.set('target_id', params.target_id);
+        if (params?.surface) sp.set('surface', params.surface);
+        const qs = sp.toString();
+        return `/marketing/promotions/active${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: MarketingCampaign[] }) => res.data || [],
+      providesTags: ['PublicMarketingPromotions'],
+    }),
+
+    requestMarketingCampaign: builder.mutation<
+      MarketingCampaign,
+      {
+        bizId: string;
+        plan_id: number;
+        title: string;
+        banner_image_url?: string;
+        cta_url?: string;
+        category?: string;
+        target_type?: string;
+        target_id?: string;
+      }
+    >({
+      query: ({ bizId, ...body }) => ({
+        url: `/businesses/${bizId}/marketing-campaigns/request`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (res: { data: MarketingCampaign }) => res.data,
+      invalidatesTags: ['MarketingCampaigns', 'PublicMarketingPromotions'],
+    }),
+
+    resubmitMarketingCampaign: builder.mutation<
+      MarketingCampaign,
+      {
+        bizId: string;
+        campaignId: number;
+        title: string;
+        banner_image_url?: string;
+        cta_url?: string;
+        target_type?: string;
+        target_id?: string;
+      }
+    >({
+      query: ({ bizId, campaignId, ...body }) => ({
+        url: `/businesses/${bizId}/marketing-campaigns/${campaignId}/resubmit`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: (res: { data: MarketingCampaign }) => res.data,
+      invalidatesTags: ['MarketingCampaigns', 'PublicMarketingPromotions'],
     }),
 
     // ── Admin Events & Commission ─────────────────────────────────────────────
@@ -5793,11 +6177,23 @@ export const {
   useGetDiningEligiblePlatformOffersQuery,
   useValidatePlatformPromoCodeMutation,
   useGetGiftCardProductsQuery,
+  useGetGiftCardStatsQuery,
+  useGetGiftCardSettingsQuery,
+  usePatchGiftCardSettingsMutation,
   useCreateGiftCardProductMutation,
   useUpdateGiftCardProductMutation,
   usePatchGiftCardProductStatusMutation,
   useDeleteGiftCardProductMutation,
+  useGetGiftCardDesignsQuery,
+  useCreateGiftCardDesignMutation,
+  useUpdateGiftCardDesignMutation,
+  usePatchGiftCardDesignStatusMutation,
+  useDeleteGiftCardDesignMutation,
   useGetPublicGiftCardProductsQuery,
+  useGetPublicGiftCardDenominationsQuery,
+  useGetPublicGiftCardSettingsQuery,
+  useGetPublicGiftCardDesignsQuery,
+  useGetPublicGiftCardDesignQuery,
   usePurchaseGiftCardMutation,
   useGetMyGiftCardsQuery,
   useGetMyGiftCardQuery,
@@ -5818,7 +6214,13 @@ export const {
   useGetAdminDiningGiftCardRedemptionsQuery,
   usePatchAdminDiningGiftCardSettlementMutation,
   useGetMarketingCampaignsQuery,
+  useGetMarketingPaymentSummaryQuery,
+  usePatchMarketingCampaignStatusMutation,
   useAssignMarketingCampaignMutation,
+  useGetPublicMarketingPlansQuery,
+  useGetActiveMarketingPromotionsQuery,
+  useRequestMarketingCampaignMutation,
+  useResubmitMarketingCampaignMutation,
   useGetBusinessCampaignsQuery,
   useGetAdminEventsQuery,
   useGetAdminEventDetailQuery,

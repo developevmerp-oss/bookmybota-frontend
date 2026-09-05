@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { ArrowLeft, CheckCircle, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import EventContractDocument from "@/components/EventAdminPanel/EventContractDocument";
@@ -14,13 +16,34 @@ import {
 } from "@/services/api";
 import { contractStatusLabel } from "@/lib/contractPlaceholders";
 import { extractApiError } from "@/lib/apiErrors";
+import {
+  adminEventContractSignSchema,
+  type AdminEventContractSignValues,
+} from "@/lib/adminFormSchemas";
+
+const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 export default function AdminEventContractDetailPage() {
   const params = useParams();
   const eventId = String(params.eventId);
-  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
-  const [otp, setOtp] = useState("");
   const [otpHint, setOtpHint] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    setValue,
+    formState: { errors },
+  } = useForm<AdminEventContractSignValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(adminEventContractSignSchema) as any,
+    defaultValues: { signature_url: "", otp: "" },
+    mode: "onSubmit",
+  });
 
   const { data: contract, isLoading, isError } = useGetAdminEventContractQuery(eventId);
   const [requestOtp, { isLoading: sendingOtp }] = useRequestAdminContractOtpMutation();
@@ -36,19 +59,15 @@ export default function AdminEventContractDetailPage() {
     }
   };
 
-  const handleSign = async () => {
-    if (!signatureUrl) {
-      toast.error("Upload your signature first.");
-      return;
-    }
-    if (!otp.trim()) {
-      toast.error("Enter the OTP from your email.");
-      return;
-    }
+  const onSign = async (values: AdminEventContractSignValues) => {
     try {
-      await signAdmin({ eventId, signature_url: signatureUrl, otp: otp.trim() }).unwrap();
+      await signAdmin({
+        eventId,
+        signature_url: values.signature_url,
+        otp: values.otp.trim(),
+      }).unwrap();
       toast.success("Signed as Super Admin.");
-      setOtp("");
+      setValue("otp", "");
     } catch (err) {
       toast.error(extractApiError(err, "Failed to sign"));
     }
@@ -87,26 +106,52 @@ export default function AdminEventContractDetailPage() {
       <EventContractDocument contract={contract} />
 
       {needsSign && (
-        <div className="glass-panel rounded-2xl border border-slate-200 p-5 space-y-5">
+        <form
+          onSubmit={handleSubmit(onSign)}
+          className="glass-panel rounded-2xl border border-slate-200 p-5 space-y-5"
+        >
           <h3 className="portal-heading text-lg font-semibold">Sign as Super Admin</h3>
           <p className="portal-muted text-sm">
             Upload your signature image, request OTP by email, then confirm to authorize this contract.
           </p>
-          <SignaturePad value={signatureUrl} onChange={setSignatureUrl} label="Super Admin signature" />
+          <div>
+            <Controller
+              name="signature_url"
+              control={control}
+              render={({ field }) => (
+                <SignaturePad
+                  value={field.value || null}
+                  onChange={(url) => field.onChange(url || "")}
+                  label={
+                    <>
+                      Super Admin signature <RequiredMark />
+                    </>
+                  }
+                />
+              )}
+            />
+            {errors.signature_url && (
+              <p className={fieldErrorClass}>{errors.signature_url.message}</p>
+            )}
+          </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
               <div className="flex-1">
                 <label className="portal-label text-xs font-bold uppercase tracking-wider mb-1.5 block">
-                OTP from email
+                  OTP from email <RequiredMark />
                 </label>
                 <input
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  {...register("otp", {
+                    onChange: (e) => {
+                      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    },
+                  })}
                   inputMode="numeric"
                   maxLength={6}
                   placeholder="Enter 6-digit OTP"
                   className="input-field w-full tracking-[0.25em]"
                 />
+                {errors.otp && <p className={fieldErrorClass}>{errors.otp.message}</p>}
                 {otpHint && <p className="text-xs portal-muted mt-1">Sent to {otpHint}</p>}
               </div>
               <button
@@ -119,9 +164,8 @@ export default function AdminEventContractDetailPage() {
                 Send OTP
               </button>
               <button
-                type="button"
+                type="submit"
                 disabled={signing}
-                onClick={handleSign}
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
               >
                 {signing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
@@ -129,7 +173,7 @@ export default function AdminEventContractDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </form>
       )}
     </div>
   );

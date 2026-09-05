@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { CalendarDays, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -11,6 +13,17 @@ import {
 import { extractApiError } from "@/lib/apiErrors";
 import ArtistMonthCalendar from "@/components/Shared/ArtistMonthCalendar";
 import { formatDate } from "@/lib/dateFormat";
+import {
+  emptyPartnerAvailabilityRangeValues,
+  partnerAvailabilityRangeSchema,
+  type PartnerAvailabilityRangeValues,
+} from "@/lib/partnerAvailabilityFormSchema";
+
+const fieldErrorClass = "mt-1.5 text-xs text-rose-500 font-medium";
+
+function RequiredMark() {
+  return <span className="text-rose-500">*</span>;
+}
 
 function todayYmd(): string {
   const today = new Date();
@@ -41,8 +54,22 @@ export default function ArtistAvailabilityPage() {
   const [createSlots, { isLoading: creating }] = useCreateArtistMySlotsMutation();
   const [deleteSlot, { isLoading: deleting }] = useDeleteArtistMySlotMutation();
 
-  const [rangeFrom, setRangeFrom] = useState("");
-  const [rangeTo, setRangeTo] = useState("");
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<PartnerAvailabilityRangeValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(partnerAvailabilityRangeSchema) as any,
+    defaultValues: emptyPartnerAvailabilityRangeValues(),
+    mode: "onSubmit",
+  });
+
+  const rangeFrom = watch("range_from");
+  const rangeTo = watch("range_to");
 
   const freeDates = useMemo(
     () => slots.filter((s) => !s.is_booked).map((s) => s.slot_date),
@@ -82,36 +109,28 @@ export default function ArtistAvailabilityPage() {
     }
     try {
       if (existing) {
-        await deleteSlot(existing.id).unwrap();
-        toast.success("Date removed from your free calendar.");
+        const res = await deleteSlot(existing.id).unwrap();
+        toast.success(res.message || "Date removed from your free calendar.");
       } else {
         const res = await createSlots({ dates: [date] }).unwrap();
         if (res.length === 0) toast.message("That date was already free.");
-        else toast.success("Date marked as free.");
+        else toast.success((res as { message?: string } & typeof res).message || "Date marked as free.");
       }
     } catch (err) {
       toast.error(extractApiError(err, "Could not update calendar"));
     }
   };
 
-  const onAddRange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rangeFrom || !rangeTo) {
-      toast.error("Choose both From and To dates.");
-      return;
-    }
-    if (rangeFrom > rangeTo) {
-      toast.error("From date must be on or before To date.");
-      return;
-    }
+  const onAddRange = async (values: PartnerAvailabilityRangeValues) => {
+    const from = values.range_from;
+    const to = values.range_to;
 
-    const candidates = datesInRange(rangeFrom, rangeTo).filter((d) => d >= minDate);
+    const candidates = datesInRange(from, to).filter((d) => d >= minDate);
     if (candidates.length === 0) {
       toast.error("No future dates in that range.");
       return;
     }
 
-    // Skip dates already free or booked
     const addable = candidates.filter((d) => !slotByDate.has(d));
 
     if (addable.length === 0) {
@@ -130,11 +149,11 @@ export default function ArtistAvailabilityPage() {
         toast.message("Those dates were already free.");
       } else {
         toast.success(
-          `${res.length} free day${res.length === 1 ? "" : "s"} added (${formatDate(rangeFrom)} → ${formatDate(rangeTo)}).`
+          (res as { message?: string } & typeof res).message ||
+            `${res.length} free day${res.length === 1 ? "" : "s"} added (${formatDate(from)} → ${formatDate(to)}).`
         );
       }
-      setRangeFrom("");
-      setRangeTo("");
+      reset(emptyPartnerAvailabilityRangeValues());
     } catch (err) {
       toast.error(extractApiError(err, "Could not add date range"));
     }
@@ -157,8 +176,9 @@ export default function ArtistAvailabilityPage() {
       ) : (
         <div className="space-y-6">
           <form
-            onSubmit={onAddRange}
+            onSubmit={handleSubmit(onAddRange)}
             className="glass-panel rounded-2xl p-5 space-y-4"
+            noValidate
           >
             <div>
               <h3 className="portal-heading font-semibold flex items-center gap-2">
@@ -173,34 +193,37 @@ export default function ArtistAvailabilityPage() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
               <div>
                 <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-                  From
+                  From <RequiredMark />
                 </label>
                 <input
                   type="date"
                   min={minDate}
-                  value={rangeFrom}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setRangeFrom(v);
-                    if (rangeTo && v && rangeTo < v) setRangeTo(v);
-                  }}
+                  {...register("range_from", {
+                    onChange: (e) => {
+                      const v = e.target.value as string;
+                      if (rangeTo && v && rangeTo < v) setValue("range_to", v);
+                    },
+                  })}
                   className="input-field"
                 />
+                {errors.range_from && <p className={fieldErrorClass}>{errors.range_from.message}</p>}
               </div>
               <div>
-                <label className="portal-label text-xs font-bold uppercase mb-1.5 block">To</label>
+                <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+                  To <RequiredMark />
+                </label>
                 <input
                   type="date"
                   min={rangeFrom || minDate}
-                  value={rangeTo}
-                  onChange={(e) => setRangeTo(e.target.value)}
+                  {...register("range_to")}
                   className="input-field"
                 />
+                {errors.range_to && <p className={fieldErrorClass}>{errors.range_to.message}</p>}
               </div>
               <div className="sm:col-span-2 lg:col-span-2 flex flex-wrap items-center gap-3">
                 <button
                   type="submit"
-                  disabled={creating || !rangeFrom || !rangeTo}
+                  disabled={creating}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50"
                 >
                   {creating ? (
@@ -214,10 +237,7 @@ export default function ArtistAvailabilityPage() {
                 {(rangeFrom || rangeTo) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setRangeFrom("");
-                      setRangeTo("");
-                    }}
+                    onClick={() => reset(emptyPartnerAvailabilityRangeValues())}
                     className="text-sm font-medium text-slate-500 hover:text-slate-800"
                   >
                     Clear

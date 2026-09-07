@@ -112,7 +112,8 @@ function FilterTag({
   );
 }
 
-function FilterSection({
+/** Desktop sidebar filter accordion card */
+function FilterCard({
   title,
   open,
   onToggle,
@@ -126,8 +127,8 @@ function FilterSection({
   children: ReactNode;
 }) {
   return (
-    <div className="border-b border-slate-100 last:border-b-0">
-      <div className="flex items-center gap-2 px-4 py-3">
+    <div className="bg-white rounded-xl border border-slate-100 shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 py-3">
         <button
           type="button"
           onClick={onToggle}
@@ -149,31 +150,7 @@ function FilterSection({
           Clear
         </button>
       </div>
-      {open ? <div className="px-4 pb-4">{children}</div> : null}
-    </div>
-  );
-}
-
-function FiltersPanel({
-  onClearAll,
-  children,
-}: {
-  onClearAll: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
-        <h3 className="font-bold text-slate-900 text-base">Filters</h3>
-        <button
-          type="button"
-          onClick={onClearAll}
-          className="text-sm font-medium text-[#6900AA] hover:text-[#57008E] cursor-pointer"
-        >
-          Clear All
-        </button>
-      </div>
-      {children}
+      {open ? <div className="px-3.5 pb-3.5">{children}</div> : null}
     </div>
   );
 }
@@ -222,6 +199,19 @@ export default function PublicEventsPage() {
   const { data: businessTypes = [] } = useGetBusinessTypesQuery("event", {
     skip: apiCategories.length > 0,
   });
+
+  const categoryPool = useMemo(() => {
+    if (apiCategories.length > 0) return apiCategories;
+    const fromTypes = businessTypes
+      .filter((t) => Boolean(t.parent_type_id))
+      .map((t) => ({
+        slug: (t.slug || t.name || "").trim().toLowerCase().replace(/\s+/g, "-"),
+        name: t.name,
+      }))
+      .filter((c) => c.slug && c.name);
+    if (fromTypes.length > 0) return fromTypes;
+    return EVENT_CATEGORY_OPTIONS.map((opt) => ({ slug: opt.key, name: opt.label }));
+  }, [apiCategories, businessTypes]);
 
   // Debounce search so every keystroke does not hit the API.
   useEffect(() => {

@@ -552,7 +552,7 @@ export default function DiningFiltersBar({
               <div
                 ref={sortMenuRef}
                 className="w-[min(92vw,320px)] max-h-[min(70vh,380px)] bg-white rounded-2xl border border-slate-200 shadow-xl p-4 flex flex-col"
-                style={{ position: "fixed", top: sortPos.top, left: sortPos.left, zIndex: 80 }}
+                style={{ position: "fixed", top: sortPos.top, left: sortPos.left, zIndex: 200 }}
               >
                 <div className="divide-y divide-slate-100 overflow-y-auto min-h-0 flex-1 pr-1">
                   {SORT_OPTIONS.map((opt) => (
@@ -661,8 +661,10 @@ export default function DiningFiltersBar({
         </div>
       </div>
 
-      {showFilter && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      {showFilter &&
+        typeof document !== "undefined" &&
+        createPortal(
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <button
             type="button"
             aria-label="Close filters"
@@ -859,7 +861,8 @@ export default function DiningFiltersBar({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

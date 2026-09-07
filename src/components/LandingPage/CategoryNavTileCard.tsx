@@ -45,7 +45,7 @@ export default function CategoryNavTileCard({
           </p>
         ))}
         <p className="text-white font-semibold type-tile-meta mt-1 sm:mt-1.5">
-          {card.count > 0 ? `${card.count}+ Events` : "Events"}
+          {card.count > 0 ? `${card.count}+ ${card.countLabel}` : card.countLabel}
         </p>
       </div>
     </Link>

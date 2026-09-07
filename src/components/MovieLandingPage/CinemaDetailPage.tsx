@@ -1,19 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  Car,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Coins,
   ExternalLink,
+  Film,
   Heart,
   Loader2,
   MapPin,
+  Moon,
+  Smartphone,
   Search,
+  Sun,
+  Sunset,
+  CloudMoon,
+  TicketX,
+  Utensils,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 import {
@@ -24,10 +36,21 @@ import {
   type PublicMovieShowtimeItem,
   type PublicRegisteredPartner,
 } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const PAGE_BG = "#F4F2F8";
 const BRAND = "#6900AA";
 const TIME_COLOR = "#C58B00";
+const DATE_ACTIVE_GRADIENT =
+  "linear-gradient(180deg, #A78BFA 0%, #8B5CF6 38%, #6D28D9 72%, #4C1D95 100%)";
+
+const CINEMA_FACILITIES = [
+  { label: "Ticket Cancellation", icon: TicketX },
+  { label: "F&B", icon: Utensils },
+  { label: "MTicket", icon: Smartphone },
+  { label: "Parking Facility", icon: Car },
+  { label: "Food Court", icon: UtensilsCrossed },
+] as const;
 
 type CinemaMovieRow = {
   movie: Movie;
@@ -103,23 +126,26 @@ function formatDuration(minutes?: number | null) {
   return `${h}h ${m}m`;
 }
 
-function generateDateOptions(count = 14) {
+function generateDateOptions(count = 7) {
   const options: Array<{
     dateStr: string;
     weekdayShort: string;
     dayNumber: string;
     monthName: string;
+    isWeekend: boolean;
   }> = [];
   const today = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
 
   for (let i = 0; i < count; i++) {
     const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    const weekdayShort = d.toLocaleDateString("en-US", { weekday: "short" });
     options.push({
       dateStr: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-      weekdayShort: d.toLocaleDateString("en-US", { weekday: "short" }),
+      weekdayShort,
       dayNumber: pad(d.getDate()),
       monthName: d.toLocaleDateString("en-US", { month: "short" }),
+      isWeekend: d.getDay() === 0 || d.getDay() === 6,
     });
   }
   return options;
@@ -165,7 +191,7 @@ const STATUS_DOT: Record<"available" | "filling" | "almost", string> = {
   almost: "bg-[#EF4444]",
 };
 
-type FilterOption = { value: string; label: string; hint?: string };
+type FilterOption = { value: string; label: string; hint?: string; icon?: ReactNode };
 
 const PRICE_BAND_OPTIONS: FilterOption[] = [
   { value: "0-200", label: "ETB 0-200" },
@@ -176,6 +202,33 @@ const PRICE_BAND_OPTIONS: FilterOption[] = [
   { value: "601-700", label: "ETB 601-700" },
   { value: "701-800", label: "ETB 701-800" },
   { value: "801+", label: "ETB 801+" },
+];
+
+const TIMING_OPTIONS: FilterOption[] = [
+  {
+    value: "morning",
+    label: "Morning",
+    hint: "12:00 AM - 11:59 AM",
+    icon: <Sun size={18} className="text-[#F59E0B]" />,
+  },
+  {
+    value: "afternoon",
+    label: "Afternoon",
+    hint: "12:00 PM - 3:59 PM",
+    icon: <Sunset size={18} className="text-[#F97316]" />,
+  },
+  {
+    value: "evening",
+    label: "Evening",
+    hint: "4:00 PM - 6:59 PM",
+    icon: <CloudMoon size={18} className="text-[#8B5CF6]" />,
+  },
+  {
+    value: "night",
+    label: "Night",
+    hint: "7:00 PM - 11:59 PM",
+    icon: <Moon size={18} className="text-[#6366F1]" />,
+  },
 ];
 
 function priceInBands(price: number, bands: string[]) {
@@ -189,7 +242,26 @@ function priceInBands(price: number, bands: string[]) {
   });
 }
 
-/** BMS-style segmented filter cell + glassy checkbox dropdown */
+function showHour(iso: string) {
+  const match = String(iso).match(/[T ](\d{2}):/);
+  if (match) return parseInt(match[1], 10);
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? 0 : d.getHours();
+}
+
+function matchesPreferredTime(iso: string, bands: string[]) {
+  if (bands.length === 0) return true;
+  const h = showHour(iso);
+  return bands.some((band) => {
+    if (band === "morning") return h >= 0 && h < 12;
+    if (band === "afternoon") return h >= 12 && h < 16;
+    if (band === "evening") return h >= 16 && h < 19;
+    if (band === "night") return h >= 19 && h <= 23;
+    return true;
+  });
+}
+
+/** Chip-style filter dropdown — portal menu so sticky/overflow parents never clip it */
 function BmsFilterDropdown({
   label,
   values,
@@ -197,6 +269,8 @@ function BmsFilterDropdown({
   onChange,
   open,
   onOpenChange,
+  icon,
+  emptyText = "No options available",
 }: {
   label: string;
   values: string[];
@@ -204,13 +278,47 @@ function BmsFilterDropdown({
   onChange: (values: string[]) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  icon?: ReactNode;
+  emptyText?: string;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; minWidth: number } | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const update = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const wantsWide = options.some((o) => Boolean(o.icon || o.hint));
+      const minWidth = Math.max(rect.width, wantsWide ? 280 : 240);
+      let left = rect.left;
+      if (left + minWidth > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - minWidth - 8);
+      }
+      setMenuPos({ top: rect.bottom + 6, left, minWidth });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, options]);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) onOpenChange(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      onOpenChange(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -221,75 +329,100 @@ function BmsFilterDropdown({
     else onChange([...values, value]);
   };
 
+  const active = open || values.length > 0;
+
+  const menu =
+    open && menuPos
+      ? createPortal(
+          <ul
+            ref={menuRef}
+            role="listbox"
+            aria-multiselectable
+            className="fixed z-[200] max-h-[min(20rem,60vh)] overflow-y-auto rounded-xl border border-[#E8E2F2] bg-white py-1.5 shadow-[0_12px_28px_rgba(0,0,0,0.14)]"
+            style={{
+              top: menuPos.top,
+              left: menuPos.left,
+              minWidth: menuPos.minWidth,
+            }}
+          >
+            {options.length === 0 ? (
+              <li className="px-3.5 py-3 text-[12px] text-[#9CA3AF]">{emptyText}</li>
+            ) : (
+              options.map((opt) => {
+                const checked = values.includes(opt.value);
+                return (
+                  <li key={opt.value} role="option" aria-selected={checked}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(opt.value)}
+                      className="w-full px-3.5 py-2.5 flex items-center gap-3 text-left text-[13px] text-[#333333] hover:bg-[#F7E9FF]/70 cursor-pointer transition-colors"
+                    >
+                      {opt.icon ? <span className="shrink-0">{opt.icon}</span> : null}
+                      <span className="flex-1 min-w-0">
+                        <span className="font-semibold block text-[#222222] leading-tight">
+                          {opt.label}
+                        </span>
+                        {opt.hint ? (
+                          <span className="block mt-0.5 text-[11px] text-[#9CA3AF] font-normal leading-tight">
+                            {opt.hint}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className={`h-4 w-4 shrink-0 rounded-[3px] border flex items-center justify-center ${
+                          checked
+                            ? "border-[#6900AA] bg-[#6900AA] text-white"
+                            : "border-[#9CA3AF] bg-white"
+                        }`}
+                        aria-hidden
+                      >
+                        {checked ? (
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                            <path
+                              d="M2.5 6.2L4.8 8.5L9.5 3.5"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        ) : null}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>,
+          document.body
+        )
+      : null;
+
   return (
-    <div ref={rootRef} className="relative flex-1 min-w-[9.5rem]">
+    <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className={`h-11 w-full px-3 sm:px-4 inline-flex items-center justify-between gap-3 bg-white text-[13px] focus:outline-none cursor-pointer ${
-          open || values.length > 0
-            ? "text-[#6900AA]"
-            : "text-[#4A4A4A] hover:text-[#6900AA]"
+        className={`h-9 sm:h-10 px-2.5 sm:px-3.5 inline-flex items-center gap-1.5 sm:gap-2 rounded-full border text-[12px] sm:text-[13px] font-medium cursor-pointer focus:outline-none transition-colors whitespace-nowrap ${
+          active
+            ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
+            : "border-[#E8E0F2] text-[#4B5563] bg-white hover:border-[#6900AA]/40"
         }`}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="truncate text-left">
+        {icon ? <span className="shrink-0">{icon}</span> : null}
+        <span className="truncate max-w-[6.5rem] sm:max-w-[9rem]">
           {values.length > 0 ? `${label} (${values.length})` : label}
         </span>
         <ChevronDown
           size={14}
-          className={`shrink-0 text-[#6B7280] transition-transform ${open ? "rotate-180" : ""}`}
+          className={`shrink-0 transition-transform ${open ? "rotate-180" : ""} ${
+            active ? "text-[#6900AA]" : "text-[#9CA3AF]"
+          }`}
         />
       </button>
-
-      {open ? (
-        <ul
-          role="listbox"
-          aria-multiselectable
-          className="absolute left-0 right-0 sm:right-auto sm:min-w-[15rem] top-full z-50 overflow-hidden border border-white/50 bg-white/60 py-1 shadow-[0_10px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150 ring-1 ring-black/5"
-        >
-          {options.map((opt) => {
-            const checked = values.includes(opt.value);
-            return (
-              <li key={opt.value} role="option" aria-selected={checked}>
-                <button
-                  type="button"
-                  onClick={() => toggle(opt.value)}
-                  className="w-full px-3.5 py-2.5 flex items-center gap-2.5 text-left text-[13px] text-[#333333] hover:bg-[#6900AA]/8 cursor-pointer transition-colors"
-                >
-                  <span
-                    className={`h-3.5 w-3.5 shrink-0 rounded-[2px] border flex items-center justify-center ${
-                      checked
-                        ? "border-[#6900AA] bg-[#6900AA] text-white"
-                        : "border-[#9CA3AF] bg-white/40"
-                    }`}
-                    aria-hidden
-                  >
-                    {checked ? (
-                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                        <path
-                          d="M2.5 6.2L4.8 8.5L9.5 3.5"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    ) : null}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="font-medium">{opt.label}</span>
-                    {opt.hint ? (
-                      <span className="ml-2 text-[#9CA3AF] font-normal">{opt.hint}</span>
-                    ) : null}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {menu}
     </div>
   );
 }
@@ -370,19 +503,21 @@ function TicketShowtimeButton({
 
 export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   const router = useRouter();
-  const dateOptions = useMemo(() => generateDateOptions(14), []);
+  const dateOptions = useMemo(() => generateDateOptions(7), []);
   const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.dateStr || "");
-  const [dateStart, setDateStart] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [languageFilters, setLanguageFilters] = useState<string[]>([]);
-  const [formatFilters, setFormatFilters] = useState<string[]>([]);
+  const [timeFilters, setTimeFilters] = useState<string[]>([]);
   const [priceFilters, setPriceFilters] = useState<string[]>([]);
-  const [openFilter, setOpenFilter] = useState<"language" | "format" | "price" | null>(null);
+  const [openFilter, setOpenFilter] = useState<"language" | "timing" | "price" | null>(null);
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<string | null>(null);
   const [movieSearch, setMovieSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const dateStripRef = useRef<HTMLDivElement>(null);
   const [city, setCity] = useState("");
   const [rows, setRows] = useState<CinemaMovieRow[]>([]);
   const [loadingShows, setLoadingShows] = useState(false);
@@ -403,14 +538,12 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     (apiCinema ? mapPartnerAddress(apiCinema) : null) ||
     showcase?.address ||
     "Address coming soon";
-  const cinemaDescription =
-    apiCinema?.description?.trim() || showcase?.description || "";
   const cinemaImage = apiCinema?.cover_image_url || showcase?.image || null;
 
   useEffect(() => {
     if (!showSearch) return;
     setOpenFilter(null);
-    const t = window.setTimeout(() => searchInputRef.current?.focus(), 220);
+    const t = window.setTimeout(() => searchInputRef.current?.focus(), 280);
     return () => window.clearTimeout(t);
   }, [showSearch]);
 
@@ -418,6 +551,44 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     setShowSearch(false);
     setMovieSearch("");
   };
+
+  const updateDateScrollState = () => {
+    const el = dateStripRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(maxScroll > 2 && el.scrollLeft < maxScroll - 2);
+  };
+
+  useEffect(() => {
+    const el = dateStripRef.current;
+    if (!el) return;
+    updateDateScrollState();
+    const onScroll = () => updateDateScrollState();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    const ro = new ResizeObserver(() => updateDateScrollState());
+    ro.observe(el);
+    window.addEventListener("resize", updateDateScrollState);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+      window.removeEventListener("resize", updateDateScrollState);
+    };
+  }, [dateOptions]);
+
+  const scrollDates = (dir: -1 | 1) => {
+    const el = dateStripRef.current;
+    if (!el) return;
+    const step = Math.max(120, Math.round(el.clientWidth * 0.55));
+    el.scrollBy({ left: dir * step, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const el = dateStripRef.current;
+    if (!el || !selectedDate) return;
+    const activeBtn = el.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`);
+    activeBtn?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  }, [selectedDate]);
 
   useEffect(() => {
     const applyCity = () => {
@@ -500,24 +671,15 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     };
   }, [apiCinema, cinemaId, selectedDate, city, moviesPage?.items, loadingMovies, fetchShowtimes]);
 
-  const visibleDates = dateOptions.slice(dateStart, dateStart + 6);
-  const canScrollLeft = dateStart > 0;
-  const canScrollRight = dateStart + 6 < dateOptions.length;
-
   const languageOptions = useMemo(() => {
     const set = new Set<string>();
-    rows.forEach((r) => r.showtimes.forEach((st) => st.language && set.add(st.language)));
+    rows.forEach((r) => {
+      r.showtimes.forEach((st) => st.language && set.add(st.language));
+      (r.movie.languages || []).forEach((l) => l && set.add(l));
+    });
     return Array.from(set)
       .sort()
       .map((l) => ({ value: l, label: l }));
-  }, [rows]);
-
-  const formatOptions = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((r) => r.showtimes.forEach((st) => st.format && set.add(st.format)));
-    return Array.from(set)
-      .sort()
-      .map((f) => ({ value: f, label: f }));
   }, [rows]);
 
   const filteredRows = useMemo(() => {
@@ -528,8 +690,8 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
         if (languageFilters.length > 0) {
           showtimes = showtimes.filter((st) => languageFilters.includes(st.language));
         }
-        if (formatFilters.length > 0) {
-          showtimes = showtimes.filter((st) => formatFilters.includes(st.format));
+        if (timeFilters.length > 0) {
+          showtimes = showtimes.filter((st) => matchesPreferredTime(st.starts_at, timeFilters));
         }
         if (priceFilters.length > 0) {
           showtimes = showtimes.filter((st) => {
@@ -548,7 +710,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
           row.languageFormat.toLowerCase().includes(q)
         );
       });
-  }, [rows, languageFilters, formatFilters, priceFilters, movieSearch]);
+  }, [rows, languageFilters, timeFilters, priceFilters, movieSearch]);
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     `${cinemaName} ${cinemaAddress}`
@@ -649,59 +811,107 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
           </div>
 
           {detailsOpen ? (
-            <div className="mt-4 rounded-xl border border-[#EDE4F7] bg-[#FAF8FC] px-4 py-3 text-sm text-[#4B5563] leading-relaxed">
-              {cinemaDescription ||
-                `${cinemaName} — book showtimes for movies playing at this cinema.`}
-              {apiCinema?.city_name ? (
-                <p className="mt-2 text-xs text-[#9CA3AF]">
-                  {[apiCinema.type_name, apiCinema.city_name, apiCinema.city_state]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              ) : null}
+            <div className="mt-4 rounded-xl border border-[#EDE4F7] bg-[#FAF8FC] px-4 py-4 sm:px-5 sm:py-5">
+              <h2 className="text-[15px] sm:text-base font-bold text-[#374151]">
+                Available Facilities
+              </h2>
+              <div className="mt-3 flex flex-wrap items-start gap-x-6 gap-y-3 sm:gap-x-8">
+                {CINEMA_FACILITIES.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.label}
+                      className="flex w-[4.75rem] flex-col items-center text-center gap-1.5"
+                    >
+                      <Icon size={26} strokeWidth={1.5} className="text-[#4B5563]" />
+                      <span className="text-[11px] font-medium text-[#4B5563] leading-snug">
+                        {item.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </div>
 
         {/* Date + filters */}
-        <div className="rounded-2xl border border-[#E8E2F2] bg-white/90 p-3 sm:p-4 shadow-sm backdrop-blur-sm sticky top-2 z-20 overflow-visible">
-          <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:gap-4">
+        <div className="rounded-2xl border border-[#E8E2F2] bg-white p-3 sm:p-4 shadow-sm sticky top-2 z-20 overflow-visible">
+          <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:gap-5">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <button
                 type="button"
                 disabled={!canScrollLeft}
-                onClick={() => setDateStart((s) => Math.max(0, s - 1))}
-                className="h-9 w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
+                onClick={() => scrollDates(-1)}
+                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
                 aria-label="Previous dates"
               >
                 <ChevronLeft size={16} />
               </button>
 
-              <div className="flex items-stretch gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1">
-                {visibleDates.map((opt) => {
+              <div
+                ref={dateStripRef}
+                className="flex items-end gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth pt-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1 min-w-0"
+              >
+                {dateOptions.map((opt) => {
                   const active = opt.dateStr === selectedDate;
                   return (
                     <button
                       key={opt.dateStr}
                       type="button"
+                      data-date={opt.dateStr}
                       onClick={() => setSelectedDate(opt.dateStr)}
-                      className={`shrink-0 rounded-xl px-3.5 py-2 text-center min-w-[76px] transition-colors cursor-pointer border ${
+                      className={`relative shrink-0 text-center cursor-pointer transition-transform ${
                         active
-                          ? "text-white border-transparent shadow-sm"
-                          : "text-[#4B5563] bg-[#F5F3F8] border-transparent hover:bg-[#EDE7F6]"
+                          ? "w-[3.35rem] sm:w-[3.75rem] pt-2.5"
+                          : "w-[3.15rem] sm:w-[3.5rem]"
                       }`}
-                      style={active ? { backgroundColor: BRAND } : undefined}
                     >
-                      <span
-                        className={`block text-[11px] font-semibold ${
-                          active ? "text-white/90" : "text-[#9CA3AF]"
-                        }`}
-                      >
-                        {opt.weekdayShort}
-                      </span>
-                      <span className="block text-sm font-extrabold leading-tight mt-0.5">
-                        {opt.dayNumber} {opt.monthName}
-                      </span>
+                      {active ? (
+                        <span className="relative block w-full">
+                          <span
+                            className="pointer-events-none absolute left-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
+                            aria-hidden
+                          />
+                          <span
+                            className="pointer-events-none absolute right-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
+                            aria-hidden
+                          />
+                          <span
+                            className="relative z-[1] flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] px-1.5 py-[0.65rem] text-white"
+                            style={{
+                              background: DATE_ACTIVE_GRADIENT,
+                              boxShadow: "0 6px 14px rgba(76,29,149,0.25)",
+                            }}
+                          >
+                            <span className="block text-[9px] sm:text-[10px] font-bold tracking-[0.08em] text-white leading-none">
+                              {opt.weekdayShort}
+                            </span>
+                            <span className="block text-[1.2rem] sm:text-[1.4rem] font-extrabold leading-none text-white">
+                              {opt.dayNumber}
+                            </span>
+                            <span className="block text-[9px] sm:text-[10px] font-bold tracking-[0.08em] text-white leading-none">
+                              {opt.monthName}
+                            </span>
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] bg-transparent px-1.5 py-[0.65rem]">
+                          <span className="block text-[9px] sm:text-[10px] font-bold tracking-wide text-[#6B7280] leading-none">
+                            {opt.weekdayShort}
+                          </span>
+                          <span
+                            className={`block text-[1.15rem] sm:text-[1.3rem] font-extrabold leading-none ${
+                              opt.isWeekend ? "text-[#E11D48]" : "text-[#222222]"
+                            }`}
+                          >
+                            {opt.dayNumber}
+                          </span>
+                          <span className="block text-[9px] sm:text-[10px] font-semibold tracking-wide text-[#9CA3AF] leading-none">
+                            {opt.monthName}
+                          </span>
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -710,67 +920,18 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
               <button
                 type="button"
                 disabled={!canScrollRight}
-                onClick={() => setDateStart((s) => Math.min(dateOptions.length - 6, s + 1))}
-                className="h-9 w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
+                onClick={() => scrollDates(1)}
+                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
                 aria-label="Next dates"
               >
                 <ChevronRight size={16} />
               </button>
             </div>
 
-            <div className="w-full xl:w-auto xl:min-w-[28rem] xl:max-w-[36rem] shrink-0">
-              <div
-                className={`relative flex items-stretch border border-[#E0E0E0] bg-white h-11 ${
-                  showSearch ? "overflow-hidden" : "overflow-visible"
-                }`}
-              >
-                {/* Filters — collapse when search opens (BMS-style) */}
-                <div
-                  className={`flex flex-1 min-w-0 items-stretch transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                    showSearch
-                      ? "max-w-0 opacity-0 pointer-events-none -translate-x-2"
-                      : "max-w-[100%] opacity-100 translate-x-0"
-                  }`}
-                >
-                  <div className="flex-1 border-r border-[#E0E0E0] min-w-0">
-                    <BmsFilterDropdown
-                      label="All Movie Languages"
-                      values={languageFilters}
-                      options={languageOptions}
-                      open={openFilter === "language"}
-                      onOpenChange={(next) => setOpenFilter(next ? "language" : null)}
-                      onChange={setLanguageFilters}
-                    />
-                  </div>
-                  <div className="flex-1 border-r border-[#E0E0E0] min-w-0">
-                    <BmsFilterDropdown
-                      label="All Show Types"
-                      values={formatFilters}
-                      options={formatOptions}
-                      open={openFilter === "format"}
-                      onOpenChange={(next) => setOpenFilter(next ? "format" : null)}
-                      onChange={setFormatFilters}
-                    />
-                  </div>
-                  <div className="flex-1 border-r border-[#E0E0E0] min-w-0">
-                    <BmsFilterDropdown
-                      label="Select Price Range"
-                      values={priceFilters}
-                      options={PRICE_BAND_OPTIONS}
-                      open={openFilter === "price"}
-                      onOpenChange={(next) => setOpenFilter(next ? "price" : null)}
-                      onChange={setPriceFilters}
-                    />
-                  </div>
-                </div>
-
-                {/* Expanding search field */}
-                <div
-                  className={`flex items-center overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                    showSearch ? "flex-1 min-w-0 opacity-100" : "w-0 min-w-0 max-w-0 opacity-0"
-                  }`}
-                >
-                  <div className="flex h-11 w-full items-center gap-2 pl-3 pr-1">
+            <div className="flex items-center gap-2 w-full xl:w-[38rem] xl:max-w-[38rem] xl:shrink-0 min-w-0">
+              <div className="flex-1 min-w-0 flex items-center gap-2">
+                {showSearch ? (
+                  <div className="flex h-10 w-full items-center gap-2 rounded-full border border-[#E8E0F2] bg-white pl-3 pr-3">
                     <Search size={16} className="shrink-0 text-[#9CA3AF]" />
                     <input
                       ref={searchInputRef}
@@ -784,32 +945,57 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                       className="h-full w-full bg-transparent text-[13px] text-[#333333] placeholder:text-[#9CA3AF] focus:outline-none"
                       aria-label="Search movies"
                     />
-                    <button
-                      type="button"
-                      onClick={closeSearch}
-                      className="h-8 w-8 shrink-0 flex items-center justify-center text-[#6B7280] hover:text-[#6900AA] cursor-pointer"
-                      aria-label="Close search"
-                    >
-                      <X size={16} />
-                    </button>
                   </div>
-                </div>
-
-                {/* Search icon trigger — fades when open */}
-                <button
-                  type="button"
-                  onClick={() => setShowSearch(true)}
-                  className={`h-11 w-11 shrink-0 flex items-center justify-center text-[#333333] hover:text-[#6900AA] cursor-pointer bg-white border-l border-[#E0E0E0] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                    showSearch
-                      ? "w-0 max-w-0 opacity-0 border-l-0 pointer-events-none overflow-hidden"
-                      : "opacity-100"
-                  }`}
-                  aria-label="Search movies"
-                  tabIndex={showSearch ? -1 : 0}
-                >
-                  <Search size={18} />
-                </button>
+                ) : (
+                  <>
+                    <BmsFilterDropdown
+                      label="All Movie Languages"
+                      values={languageFilters}
+                      options={languageOptions}
+                      open={openFilter === "language"}
+                      onOpenChange={(next) => setOpenFilter(next ? "language" : null)}
+                      onChange={setLanguageFilters}
+                      icon={<Film size={15} className="text-[#6900AA]" />}
+                      emptyText="No languages for this date"
+                    />
+                    <BmsFilterDropdown
+                      label="Select Timing"
+                      values={timeFilters}
+                      options={TIMING_OPTIONS}
+                      open={openFilter === "timing"}
+                      onOpenChange={(next) => setOpenFilter(next ? "timing" : null)}
+                      onChange={setTimeFilters}
+                      icon={<Clock size={15} className="text-[#6900AA]" />}
+                    />
+                    <BmsFilterDropdown
+                      label="Select Price Range"
+                      values={priceFilters}
+                      options={PRICE_BAND_OPTIONS}
+                      open={openFilter === "price"}
+                      onOpenChange={(next) => setOpenFilter(next ? "price" : null)}
+                      onChange={setPriceFilters}
+                      icon={<Coins size={15} className="text-[#F59E0B]" />}
+                    />
+                  </>
+                )}
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (showSearch) {
+                    closeSearch();
+                    return;
+                  }
+                  setOpenFilter(null);
+                  setShowSearch(true);
+                }}
+                className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm"
+                style={{ backgroundColor: BRAND }}
+                aria-label={showSearch ? "Close search" : "Search movies"}
+              >
+                {showSearch ? <X size={18} /> : <Search size={18} />}
+              </button>
             </div>
           </div>
 
@@ -880,17 +1066,17 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                   key={row.movie.id}
                   className="rounded-2xl border border-[#E8E2F2] bg-white p-4 sm:p-5 shadow-[0_2px_12px_rgba(30,27,75,0.04)]"
                 >
-                  <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
-                    <div className="flex items-start gap-3 sm:gap-4 min-w-0 lg:w-[340px] xl:w-[380px] shrink-0">
+                  <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
+                    <div className="flex items-start gap-3 sm:gap-4 min-w-0 shrink-0">
                       <Link
                         href={`/movies/${row.movie.slug || row.movie.id}`}
                         className="relative h-[88px] w-[64px] sm:h-[100px] sm:w-[72px] shrink-0 overflow-hidden rounded-xl bg-[#EDE4F7] border border-[#EDE4F7]"
                       >
-                        {row.movie.poster_url ? (
+                        {resolveMediaUrl(row.movie.poster_url) ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={row.movie.poster_url}
-                            alt=""
+                            src={resolveMediaUrl(row.movie.poster_url)}
+                            alt={row.movie.title}
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -940,7 +1126,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2.5 flex-1 content-start lg:justify-end">
+                    <div className="flex flex-wrap gap-2.5 min-w-0 flex-1 content-start pt-0.5">
                       {row.showtimes.map((st) => (
                         <TicketShowtimeButton
                           key={st.id}

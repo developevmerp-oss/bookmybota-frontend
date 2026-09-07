@@ -1,0 +1,962 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  Heart,
+  Loader2,
+  MapPin,
+  Search,
+  X,
+} from "lucide-react";
+import {
+  useGetPublicMoviesQuery,
+  useGetPublicRegisteredCinemasQuery,
+  useLazyGetPublicMovieShowtimesQuery,
+  type Movie,
+  type PublicMovieShowtimeItem,
+  type PublicRegisteredPartner,
+} from "@/services/api";
+
+const PAGE_BG = "#F4F2F8";
+const BRAND = "#6900AA";
+const TIME_COLOR = "#C58B00";
+
+type CinemaMovieRow = {
+  movie: Movie;
+  languageFormat: string;
+  showtimes: PublicMovieShowtimeItem[];
+};
+
+const SHOWCASE_BY_ID: Record<
+  string,
+  { name: string; address: string; description?: string; image?: string }
+> = {
+  c1: {
+    name: "PVR: Palladium Mall, Addis Ababa",
+    address: "4th floor, Palladium Mall, Bole Road, Addis Ababa, Ethiopia",
+  },
+  c2: {
+    name: "Cinepolis: City Centre, Addis Ababa",
+    address: "City Centre Mall, Mexico Square, Addis Ababa, Ethiopia",
+  },
+  c3: {
+    name: "Edna Mall Cinema, Addis Ababa",
+    address: "Edna Mall, Bole Medhanialem, Addis Ababa, Ethiopia",
+  },
+  c4: {
+    name: "Alliance Ethio-Française Cinema",
+    address: "Wollo Sefer, Near Mexico, Addis Ababa, Ethiopia",
+  },
+  c5: {
+    name: "Century Cinema: Merkato",
+    address: "Merkato Complex, Addis Ababa, Ethiopia",
+  },
+  c6: {
+    name: "Gas Cinema: CMC",
+    address: "CMC Michael, Addis Ababa, Ethiopia",
+  },
+};
+
+function parseIsoDateAndHours(iso: string) {
+  if (!iso) return { displayTime: "" };
+  const str = String(iso).trim();
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (match) {
+    const [, , , , hhStr, mmStr] = match;
+    const h = parseInt(hhStr, 10);
+    const minuteStr = mmStr || "00";
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return {
+      displayTime: `${String(h12).padStart(2, "0")}:${minuteStr} ${ampm}`,
+    };
+  }
+  const dateObj = new Date(iso);
+  if (isNaN(dateObj.getTime())) return { displayTime: "" };
+  const h = dateObj.getHours();
+  const minuteStr = String(dateObj.getMinutes()).padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return {
+    displayTime: `${String(h12).padStart(2, "0")}:${minuteStr} ${ampm}`,
+  };
+}
+
+function formatTime(iso: string) {
+  return parseIsoDateAndHours(iso).displayTime;
+}
+
+function formatDuration(minutes?: number | null) {
+  if (!minutes || minutes <= 0) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h <= 0) return `${m}m`;
+  if (m <= 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function generateDateOptions(count = 14) {
+  const options: Array<{
+    dateStr: string;
+    weekdayShort: string;
+    dayNumber: string;
+    monthName: string;
+  }> = [];
+  const today = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    options.push({
+      dateStr: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      weekdayShort: d.toLocaleDateString("en-US", { weekday: "short" }),
+      dayNumber: pad(d.getDate()),
+      monthName: d.toLocaleDateString("en-US", { month: "short" }),
+    });
+  }
+  return options;
+}
+
+function mapPartnerAddress(v: PublicRegisteredPartner) {
+  const cityPart = [v.city_name, v.city_state].filter(Boolean).join(", ");
+  return (
+    v.address?.trim() ||
+    [v.type_name, cityPart].filter(Boolean).join(" · ") ||
+    "Address coming soon"
+  );
+}
+
+function movieLanguageFormat(movie: Movie, showtimes: PublicMovieShowtimeItem[]) {
+  const fromShows = new Set<string>();
+  showtimes.forEach((st) => {
+    const label = [st.language, st.format].filter(Boolean).join(", ");
+    if (label) fromShows.add(label);
+  });
+  if (fromShows.size > 0) return Array.from(fromShows).join(" · ");
+  const langs = (movie.languages || []).join(", ");
+  const formats = (movie.formats || []).join(", ");
+  return [langs, formats].filter(Boolean).join(", ") || "—";
+}
+
+function showtimePrice(st: PublicMovieShowtimeItem) {
+  return st.min_price ?? st.tier_pricing?.[0]?.price ?? null;
+}
+
+/** Visual-only fill hint from showtime hour (no backend change). */
+function fillStatus(iso: string): "available" | "filling" | "almost" {
+  const match = String(iso).match(/[T ](\d{2}):/);
+  const h = match ? parseInt(match[1], 10) : new Date(iso).getHours();
+  if (h >= 18 && h < 21) return "filling";
+  if (h >= 21) return "almost";
+  return "available";
+}
+
+const STATUS_DOT: Record<"available" | "filling" | "almost", string> = {
+  available: "bg-[#22C55E]",
+  filling: "bg-[#EAB308]",
+  almost: "bg-[#EF4444]",
+};
+
+type FilterOption = { value: string; label: string; hint?: string };
+
+const PRICE_BAND_OPTIONS: FilterOption[] = [
+  { value: "0-200", label: "ETB 0-200" },
+  { value: "201-300", label: "ETB 201-300" },
+  { value: "301-400", label: "ETB 301-400" },
+  { value: "401-500", label: "ETB 401-500" },
+  { value: "501-600", label: "ETB 501-600" },
+  { value: "601-700", label: "ETB 601-700" },
+  { value: "701-800", label: "ETB 701-800" },
+  { value: "801+", label: "ETB 801+" },
+];
+
+function priceInBands(price: number, bands: string[]) {
+  if (bands.length === 0) return true;
+  return bands.some((band) => {
+    if (band === "801+") return price >= 801;
+    const [minStr, maxStr] = band.split("-");
+    const min = Number(minStr);
+    const max = Number(maxStr);
+    return price >= min && price <= max;
+  });
+}
+
+/** BMS-style segmented filter cell + glassy checkbox dropdown */
+function BmsFilterDropdown({
+  label,
+  values,
+  options,
+  onChange,
+  open,
+  onOpenChange,
+}: {
+  label: string;
+  values: string[];
+  options: FilterOption[];
+  onChange: (values: string[]) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) onOpenChange(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, onOpenChange]);
+
+  const toggle = (value: string) => {
+    if (values.includes(value)) onChange(values.filter((v) => v !== value));
+    else onChange([...values, value]);
+  };
+
+  return (
+    <div ref={rootRef} className="relative flex-1 min-w-[9.5rem]">
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        className={`h-11 w-full px-3 sm:px-4 inline-flex items-center justify-between gap-3 bg-white text-[13px] focus:outline-none cursor-pointer ${
+          open || values.length > 0
+            ? "text-[#6900AA]"
+            : "text-[#4A4A4A] hover:text-[#6900AA]"
+        }`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate text-left">
+          {values.length > 0 ? `${label} (${values.length})` : label}
+        </span>
+        <ChevronDown
+          size={14}
+          className={`shrink-0 text-[#6B7280] transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open ? (
+        <ul
+          role="listbox"
+          aria-multiselectable
+          className="absolute left-0 right-0 sm:right-auto sm:min-w-[15rem] top-full z-50 overflow-hidden border border-white/50 bg-white/60 py-1 shadow-[0_10px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150 ring-1 ring-black/5"
+        >
+          {options.map((opt) => {
+            const checked = values.includes(opt.value);
+            return (
+              <li key={opt.value} role="option" aria-selected={checked}>
+                <button
+                  type="button"
+                  onClick={() => toggle(opt.value)}
+                  className="w-full px-3.5 py-2.5 flex items-center gap-2.5 text-left text-[13px] text-[#333333] hover:bg-[#6900AA]/8 cursor-pointer transition-colors"
+                >
+                  <span
+                    className={`h-3.5 w-3.5 shrink-0 rounded-[2px] border flex items-center justify-center ${
+                      checked
+                        ? "border-[#6900AA] bg-[#6900AA] text-white"
+                        : "border-[#9CA3AF] bg-white/40"
+                    }`}
+                    aria-hidden
+                  >
+                    {checked ? (
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                        <path
+                          d="M2.5 6.2L4.8 8.5L9.5 3.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="font-medium">{opt.label}</span>
+                    {opt.hint ? (
+                      <span className="ml-2 text-[#9CA3AF] font-normal">{opt.hint}</span>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function TicketShowtimeButton({
+  st,
+  selected,
+  onClick,
+}: {
+  st: PublicMovieShowtimeItem;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const price = showtimePrice(st);
+  const status = fillStatus(st.starts_at);
+  const screenLabel = st.screen_type || st.format || "";
+
+  return (
+    <span
+      className={`inline-block transition-[filter] ${
+        selected
+          ? "[filter:drop-shadow(0_0_0.7px_#6900AA)]"
+          : "[filter:drop-shadow(0_0_0.65px_#C4C4C4)] hover:[filter:drop-shadow(0_0_0.7px_#6900AA)]"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className={`relative min-w-[104px] px-3.5 py-2.5 text-center cursor-pointer ${
+          selected ? "bg-[#6900AA]" : "bg-[#F7F5FB]"
+        }`}
+        style={{
+          WebkitMaskImage:
+            "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
+          WebkitMaskSize: "51% 100%, 51% 100%",
+          WebkitMaskPosition: "0 0, 100% 0",
+          WebkitMaskRepeat: "no-repeat",
+          maskImage:
+            "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
+          maskSize: "51% 100%, 51% 100%",
+          maskPosition: "0 0, 100% 0",
+          maskRepeat: "no-repeat",
+        }}
+      >
+        <span
+          className={`absolute top-1.5 right-2 h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]} ${
+            selected ? "ring-1 ring-white/70" : ""
+          }`}
+        />
+        <span
+          className={`block text-[13px] font-bold ${selected ? "text-white" : ""}`}
+          style={selected ? undefined : { color: TIME_COLOR }}
+        >
+          {formatTime(st.starts_at)}
+        </span>
+        {price != null ? (
+          <span
+            className={`mt-0.5 block text-[10px] font-semibold ${
+              selected ? "text-white/90" : "text-[#6B7280]"
+            }`}
+          >
+            ETB {price}
+          </span>
+        ) : screenLabel ? (
+          <span
+            className={`mt-0.5 block text-[10px] font-semibold uppercase tracking-wide ${
+              selected ? "text-white/90" : ""
+            }`}
+            style={selected ? undefined : { color: TIME_COLOR }}
+          >
+            {screenLabel}
+          </span>
+        ) : null}
+      </button>
+    </span>
+  );
+}
+
+export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
+  const router = useRouter();
+  const dateOptions = useMemo(() => generateDateOptions(14), []);
+  const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.dateStr || "");
+  const [dateStart, setDateStart] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+  const [languageFilters, setLanguageFilters] = useState<string[]>([]);
+  const [formatFilters, setFormatFilters] = useState<string[]>([]);
+  const [priceFilters, setPriceFilters] = useState<string[]>([]);
+  const [openFilter, setOpenFilter] = useState<"language" | "format" | "price" | null>(null);
+  const [selectedShowtimeId, setSelectedShowtimeId] = useState<string | null>(null);
+  const [movieSearch, setMovieSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [city, setCity] = useState("");
+  const [rows, setRows] = useState<CinemaMovieRow[]>([]);
+  const [loadingShows, setLoadingShows] = useState(false);
+
+  const { data: venues = [], isLoading: loadingCinema } = useGetPublicRegisteredCinemasQuery({});
+  const { data: moviesPage, isLoading: loadingMovies } = useGetPublicMoviesQuery({
+    status: "now_showing",
+    limit: 40,
+    ...(city ? { city } : {}),
+  });
+  const [fetchShowtimes] = useLazyGetPublicMovieShowtimesQuery();
+
+  const apiCinema = venues.find((v) => v.id === cinemaId);
+  const showcase = SHOWCASE_BY_ID[cinemaId];
+
+  const cinemaName = apiCinema?.name || showcase?.name || "Cinema";
+  const cinemaAddress =
+    (apiCinema ? mapPartnerAddress(apiCinema) : null) ||
+    showcase?.address ||
+    "Address coming soon";
+  const cinemaDescription =
+    apiCinema?.description?.trim() || showcase?.description || "";
+  const cinemaImage = apiCinema?.cover_image_url || showcase?.image || null;
+
+  useEffect(() => {
+    if (!showSearch) return;
+    setOpenFilter(null);
+    const t = window.setTimeout(() => searchInputRef.current?.focus(), 220);
+    return () => window.clearTimeout(t);
+  }, [showSearch]);
+
+  const closeSearch = () => {
+    setShowSearch(false);
+    setMovieSearch("");
+  };
+
+  useEffect(() => {
+    const applyCity = () => {
+      const stored = localStorage.getItem("selected_city") || "";
+      setCity(stored && stored !== "All Cities" ? stored : "");
+    };
+    applyCity();
+    window.addEventListener("selected_city_changed", applyCity);
+    return () => window.removeEventListener("selected_city_changed", applyCity);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("movie_cinema_favorites");
+      const list = raw ? (JSON.parse(raw) as string[]) : [];
+      setFavorited(list.includes(cinemaId));
+    } catch {
+      setFavorited(false);
+    }
+  }, [cinemaId]);
+
+  const toggleFavorite = () => {
+    setFavorited((prev) => {
+      const next = !prev;
+      try {
+        const raw = localStorage.getItem("movie_cinema_favorites");
+        const list: string[] = raw ? (JSON.parse(raw) as string[]) : [];
+        const updated = next
+          ? Array.from(new Set([...list, cinemaId]))
+          : list.filter((id) => id !== cinemaId);
+        localStorage.setItem("movie_cinema_favorites", JSON.stringify(updated));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!apiCinema || !selectedDate) {
+      setRows([]);
+      return;
+    }
+
+    const movies = moviesPage?.items ?? [];
+    if (loadingMovies) return;
+
+    let cancelled = false;
+
+    (async () => {
+      setLoadingShows(true);
+      const results = await Promise.all(
+        movies.map(async (movie) => {
+          try {
+            const res = await fetchShowtimes({
+              idOrSlug: movie.slug || movie.id,
+              date: selectedDate,
+              city_slug: city || undefined,
+            }).unwrap();
+            const group = (res.cinemas || []).find((c) => c.id === cinemaId);
+            if (!group?.showtimes?.length) return null;
+            return {
+              movie,
+              languageFormat: movieLanguageFormat(movie, group.showtimes),
+              showtimes: group.showtimes,
+            } satisfies CinemaMovieRow;
+          } catch {
+            return null;
+          }
+        })
+      );
+      if (!cancelled) {
+        setRows(results.filter((r): r is CinemaMovieRow => Boolean(r)));
+        setLoadingShows(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiCinema, cinemaId, selectedDate, city, moviesPage?.items, loadingMovies, fetchShowtimes]);
+
+  const visibleDates = dateOptions.slice(dateStart, dateStart + 6);
+  const canScrollLeft = dateStart > 0;
+  const canScrollRight = dateStart + 6 < dateOptions.length;
+
+  const languageOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => r.showtimes.forEach((st) => st.language && set.add(st.language)));
+    return Array.from(set)
+      .sort()
+      .map((l) => ({ value: l, label: l }));
+  }, [rows]);
+
+  const formatOptions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => r.showtimes.forEach((st) => st.format && set.add(st.format)));
+    return Array.from(set)
+      .sort()
+      .map((f) => ({ value: f, label: f }));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const q = movieSearch.trim().toLowerCase();
+    return rows
+      .map((row) => {
+        let showtimes = row.showtimes;
+        if (languageFilters.length > 0) {
+          showtimes = showtimes.filter((st) => languageFilters.includes(st.language));
+        }
+        if (formatFilters.length > 0) {
+          showtimes = showtimes.filter((st) => formatFilters.includes(st.format));
+        }
+        if (priceFilters.length > 0) {
+          showtimes = showtimes.filter((st) => {
+            const price = showtimePrice(st);
+            if (price == null) return false;
+            return priceInBands(price, priceFilters);
+          });
+        }
+        return { ...row, showtimes };
+      })
+      .filter((row) => {
+        if (row.showtimes.length === 0) return false;
+        if (!q) return true;
+        return (
+          row.movie.title.toLowerCase().includes(q) ||
+          row.languageFormat.toLowerCase().includes(q)
+        );
+      });
+  }, [rows, languageFilters, formatFilters, priceFilters, movieSearch]);
+
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    `${cinemaName} ${cinemaAddress}`
+  )}`;
+
+  const handleShowtimeClick = (id: string) => {
+    setSelectedShowtimeId(id);
+    router.push(`/movies/book/${id}`);
+  };
+
+  if (loadingCinema && !apiCinema && !showcase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
+        <Loader2 className="animate-spin text-[#6900AA]" size={32} />
+      </div>
+    );
+  }
+
+  if (!apiCinema && !showcase) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-3 px-4"
+        style={{ backgroundColor: PAGE_BG }}
+      >
+        <p className="text-slate-700 font-semibold">Cinema not found</p>
+        <Link href="/movies/cinemas" className="text-sm font-semibold text-[#6900AA] hover:underline">
+          Back to cinemas
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: PAGE_BG }}>
+      <div className="container mx-auto px-4 sm:px-8 lg:px-10 2xl:px-0 py-5 sm:py-7 space-y-5">
+        {/* Header */}
+        <div className="rounded-2xl border border-[#E8E2F2] bg-white/90 p-4 sm:p-5 shadow-sm backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+              <div className="relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-xl bg-[#EDE4F7] border border-[#E5E0EF]">
+                {cinemaImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cinemaImage} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-[#6900AA] text-lg font-bold">
+                    {cinemaName.slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 pt-0.5">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-[#1E1B4B] leading-snug truncate">
+                    {cinemaName}
+                  </h1>
+                  <button
+                    type="button"
+                    aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+                    aria-pressed={favorited}
+                    onClick={toggleFavorite}
+                    className="shrink-0 cursor-pointer"
+                  >
+                    <Heart
+                      size={18}
+                      className={
+                        favorited
+                          ? "fill-[#6900AA] text-[#6900AA]"
+                          : "text-slate-300 hover:text-[#6900AA]"
+                      }
+                    />
+                  </button>
+                </div>
+                <p className="mt-1.5 flex items-start gap-1.5 text-sm text-[#6B7280]">
+                  <MapPin size={14} className="mt-0.5 shrink-0 text-[#9CA3AF]" />
+                  <span className="leading-relaxed">
+                    {cinemaAddress}
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex align-middle ml-1.5 text-[#6900AA] hover:opacity-80"
+                      aria-label="Open in maps"
+                    >
+                      <ExternalLink size={13} />
+                    </a>
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setDetailsOpen((v) => !v)}
+              className="shrink-0 inline-flex items-center justify-center gap-1.5 self-start sm:self-center h-10 px-4 rounded-full border border-[#6900AA]/35 text-sm font-semibold text-[#6900AA] hover:bg-[#F3E8FF] transition-colors cursor-pointer"
+            >
+              View Details
+              <ArrowRight size={15} />
+            </button>
+          </div>
+
+          {detailsOpen ? (
+            <div className="mt-4 rounded-xl border border-[#EDE4F7] bg-[#FAF8FC] px-4 py-3 text-sm text-[#4B5563] leading-relaxed">
+              {cinemaDescription ||
+                `${cinemaName} — book showtimes for movies playing at this cinema.`}
+              {apiCinema?.city_name ? (
+                <p className="mt-2 text-xs text-[#9CA3AF]">
+                  {[apiCinema.type_name, apiCinema.city_name, apiCinema.city_state]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Date + filters */}
+        <div className="rounded-2xl border border-[#E8E2F2] bg-white/90 p-3 sm:p-4 shadow-sm backdrop-blur-sm sticky top-2 z-20 overflow-visible">
+          <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:gap-4">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <button
+                type="button"
+                disabled={!canScrollLeft}
+                onClick={() => setDateStart((s) => Math.max(0, s - 1))}
+                className="h-9 w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
+                aria-label="Previous dates"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              <div className="flex items-stretch gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1">
+                {visibleDates.map((opt) => {
+                  const active = opt.dateStr === selectedDate;
+                  return (
+                    <button
+                      key={opt.dateStr}
+                      type="button"
+                      onClick={() => setSelectedDate(opt.dateStr)}
+                      className={`shrink-0 rounded-xl px-3.5 py-2 text-center min-w-[76px] transition-colors cursor-pointer border ${
+                        active
+                          ? "text-white border-transparent shadow-sm"
+                          : "text-[#4B5563] bg-[#F5F3F8] border-transparent hover:bg-[#EDE7F6]"
+                      }`}
+                      style={active ? { backgroundColor: BRAND } : undefined}
+                    >
+                      <span
+                        className={`block text-[11px] font-semibold ${
+                          active ? "text-white/90" : "text-[#9CA3AF]"
+                        }`}
+                      >
+                        {opt.weekdayShort}
+                      </span>
+                      <span className="block text-sm font-extrabold leading-tight mt-0.5">
+                        {opt.dayNumber} {opt.monthName}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={!canScrollRight}
+                onClick={() => setDateStart((s) => Math.min(dateOptions.length - 6, s + 1))}
+                className="h-9 w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
+                aria-label="Next dates"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <div className="w-full xl:w-auto xl:min-w-[28rem] xl:max-w-[36rem] shrink-0">
+              <div
+                className={`relative flex items-stretch border border-[#E0E0E0] bg-white h-11 ${
+                  showSearch ? "overflow-hidden" : "overflow-visible"
+                }`}
+              >
+                {/* Filters — collapse when search opens (BMS-style) */}
+                <div
+                  className={`flex flex-1 min-w-0 items-stretch transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                    showSearch
+                      ? "max-w-0 opacity-0 pointer-events-none -translate-x-2"
+                      : "max-w-[100%] opacity-100 translate-x-0"
+                  }`}
+                >
+                  <div className="flex-1 border-r border-[#E0E0E0] min-w-0">
+                    <BmsFilterDropdown
+                      label="All Movie Languages"
+                      values={languageFilters}
+                      options={languageOptions}
+                      open={openFilter === "language"}
+                      onOpenChange={(next) => setOpenFilter(next ? "language" : null)}
+                      onChange={setLanguageFilters}
+                    />
+                  </div>
+                  <div className="flex-1 border-r border-[#E0E0E0] min-w-0">
+                    <BmsFilterDropdown
+                      label="All Show Types"
+                      values={formatFilters}
+                      options={formatOptions}
+                      open={openFilter === "format"}
+                      onOpenChange={(next) => setOpenFilter(next ? "format" : null)}
+                      onChange={setFormatFilters}
+                    />
+                  </div>
+                  <div className="flex-1 border-r border-[#E0E0E0] min-w-0">
+                    <BmsFilterDropdown
+                      label="Select Price Range"
+                      values={priceFilters}
+                      options={PRICE_BAND_OPTIONS}
+                      open={openFilter === "price"}
+                      onOpenChange={(next) => setOpenFilter(next ? "price" : null)}
+                      onChange={setPriceFilters}
+                    />
+                  </div>
+                </div>
+
+                {/* Expanding search field */}
+                <div
+                  className={`flex items-center overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                    showSearch ? "flex-1 min-w-0 opacity-100" : "w-0 min-w-0 max-w-0 opacity-0"
+                  }`}
+                >
+                  <div className="flex h-11 w-full items-center gap-2 pl-3 pr-1">
+                    <Search size={16} className="shrink-0 text-[#9CA3AF]" />
+                    <input
+                      ref={searchInputRef}
+                      type="search"
+                      value={movieSearch}
+                      onChange={(e) => setMovieSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") closeSearch();
+                      }}
+                      placeholder="Search for movies"
+                      className="h-full w-full bg-transparent text-[13px] text-[#333333] placeholder:text-[#9CA3AF] focus:outline-none"
+                      aria-label="Search movies"
+                    />
+                    <button
+                      type="button"
+                      onClick={closeSearch}
+                      className="h-8 w-8 shrink-0 flex items-center justify-center text-[#6B7280] hover:text-[#6900AA] cursor-pointer"
+                      aria-label="Close search"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search icon trigger — fades when open */}
+                <button
+                  type="button"
+                  onClick={() => setShowSearch(true)}
+                  className={`h-11 w-11 shrink-0 flex items-center justify-center text-[#333333] hover:text-[#6900AA] cursor-pointer bg-white border-l border-[#E0E0E0] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                    showSearch
+                      ? "w-0 max-w-0 opacity-0 border-l-0 pointer-events-none overflow-hidden"
+                      : "opacity-100"
+                  }`}
+                  aria-label="Search movies"
+                  tabIndex={showSearch ? -1 : 0}
+                >
+                  <Search size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-[#EEEAF4] flex flex-wrap items-center justify-between gap-2 text-xs text-[#6B7280]">
+            <div className="inline-flex flex-wrap items-center gap-4">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
+                Available
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#EAB308]" />
+                Filling Fast
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#EF4444]" />
+                Almost Full
+              </span>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-[#9CA3AF]">
+              <Clock size={13} />
+              Showtimes are in local time (EAT).
+            </span>
+          </div>
+        </div>
+
+        {/* Movie cards */}
+        <div className="space-y-4 min-h-[280px]">
+          {!apiCinema ? (
+            <div className="rounded-2xl border border-[#E8E2F2] bg-white px-5 py-16 text-center text-sm text-[#6B7280]">
+              Showtimes will appear here when this cinema is live with scheduled movies.
+            </div>
+          ) : loadingShows || loadingMovies ? (
+            <div className="rounded-2xl border border-[#E8E2F2] bg-white flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+              <Loader2 size={28} className="animate-spin text-[#6900AA]" />
+              <p className="text-sm font-medium">Loading showtimes…</p>
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div className="rounded-2xl border border-[#E8E2F2] bg-white px-5 py-16 text-center">
+              <p className="text-[#111111] font-semibold">No shows for this date</p>
+              <p className="mt-1 text-sm text-[#6B7280]">
+                Try another date, clear filters, or check back later.
+              </p>
+            </div>
+          ) : (
+            filteredRows.map((row) => {
+              const duration = formatDuration(row.movie.duration_minutes);
+              const genres = (row.movie.genres || []).join(", ");
+              const languages = Array.from(
+                new Set(
+                  row.showtimes
+                    .map((s) => s.language)
+                    .filter(Boolean)
+                    .concat(row.movie.languages || [])
+                )
+              ).slice(0, 2);
+              const formats = Array.from(
+                new Set(
+                  row.showtimes
+                    .map((s) => s.format)
+                    .filter(Boolean)
+                    .concat(row.movie.formats || [])
+                )
+              ).slice(0, 2);
+              const cert = row.movie.certificate;
+
+              return (
+                <article
+                  key={row.movie.id}
+                  className="rounded-2xl border border-[#E8E2F2] bg-white p-4 sm:p-5 shadow-[0_2px_12px_rgba(30,27,75,0.04)]"
+                >
+                  <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+                    <div className="flex items-start gap-3 sm:gap-4 min-w-0 lg:w-[340px] xl:w-[380px] shrink-0">
+                      <Link
+                        href={`/movies/${row.movie.slug || row.movie.id}`}
+                        className="relative h-[88px] w-[64px] sm:h-[100px] sm:w-[72px] shrink-0 overflow-hidden rounded-xl bg-[#EDE4F7] border border-[#EDE4F7]"
+                      >
+                        {row.movie.poster_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={row.movie.poster_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-[#6900AA] text-xs font-bold px-1 text-center">
+                            {row.movie.title.slice(0, 1)}
+                          </div>
+                        )}
+                      </Link>
+
+                      <div className="min-w-0 pt-0.5">
+                        <Link
+                          href={`/movies/${row.movie.slug || row.movie.id}`}
+                          className="text-[15px] sm:text-base font-bold text-[#1E1B4B] hover:text-[#6900AA] leading-snug"
+                        >
+                          {row.movie.title}
+                        </Link>
+
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {languages.map((l) => (
+                            <span
+                              key={`l-${l}`}
+                              className="inline-flex rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[10px] font-semibold text-[#6900AA]"
+                            >
+                              {l}
+                            </span>
+                          ))}
+                          {formats.map((f) => (
+                            <span
+                              key={`f-${f}`}
+                              className="inline-flex rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[10px] font-semibold text-[#6900AA]"
+                            >
+                              {f}
+                            </span>
+                          ))}
+                          {cert ? (
+                            <span className="inline-flex rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[10px] font-semibold text-[#6900AA]">
+                              {cert}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {(duration || genres) && (
+                          <p className="mt-2 text-xs text-[#6B7280]">
+                            {[duration, genres].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2.5 flex-1 content-start lg:justify-end">
+                      {row.showtimes.map((st) => (
+                        <TicketShowtimeButton
+                          key={st.id}
+                          st={st}
+                          selected={selectedShowtimeId === st.id}
+                          onClick={() => handleShowtimeClick(st.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

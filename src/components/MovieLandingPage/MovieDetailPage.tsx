@@ -430,15 +430,17 @@ export default function MovieDetailPage() {
       <MovieDetailBanner movie={movie} />
 
       {!movie.comingSoon && (
-        <section id="showtimes-section" className="py-10 bg-slate-950 text-white border-t border-b border-white/10">
+        <section id="showtimes-section" className="py-8 sm:py-10 bg-[#F5F5F5] border-t border-[#EAEAEA]">
           <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 space-y-4">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2.5">
-              <Ticket className="size-6 text-[#F84464]" />
-              Select Cinema &amp; Showtime
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Pick a date and cinema below to book your tickets and reserved seats.
-            </p>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#111111] flex items-center gap-2.5">
+                <Ticket className="size-6 text-[#6900AA]" />
+                Select Cinema &amp; Showtime
+              </h2>
+              <p className="mt-1 text-xs sm:text-sm text-[#6B7280]">
+                Pick a date and cinema below to book your tickets and reserved seats.
+              </p>
+            </div>
             <MovieShowtimeSelector
               movieIdOrSlug={idOrSlug}
               movieTitle={movie.title}

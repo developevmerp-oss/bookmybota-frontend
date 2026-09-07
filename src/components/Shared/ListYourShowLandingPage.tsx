@@ -164,7 +164,7 @@ export default function ListYourShowLandingPage() {
     <PartnerListYourShowLanding
       hostOnly
       layout="bms"
-      centeredPartnerHeader
+      hideBuiltInHeader
       slides={HERO_SLIDES}
       registerHref="/organizer/register"
       loginHref="/login"

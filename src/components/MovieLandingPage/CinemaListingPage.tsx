@@ -23,31 +23,37 @@ const SHOWCASE_CINEMAS: CinemaCard[] = [
     name: "PVR: Palladium Mall, Addis Ababa",
     address:
       "4th floor, Palladium Mall, Bole Road, Addis Ababa, Ethiopia",
+    href: "/movies/cinemas/c1",
   },
   {
     id: "c2",
     name: "Cinepolis: City Centre, Addis Ababa",
     address: "City Centre Mall, Mexico Square, Addis Ababa, Ethiopia",
+    href: "/movies/cinemas/c2",
   },
   {
     id: "c3",
     name: "Edna Mall Cinema, Addis Ababa",
     address: "Edna Mall, Bole Medhanialem, Addis Ababa, Ethiopia",
+    href: "/movies/cinemas/c3",
   },
   {
     id: "c4",
     name: "Alliance Ethio-Française Cinema",
     address: "Wollo Sefer, Near Mexico, Addis Ababa, Ethiopia",
+    href: "/movies/cinemas/c4",
   },
   {
     id: "c5",
     name: "Century Cinema: Merkato",
     address: "Merkato Complex, Addis Ababa, Ethiopia",
+    href: "/movies/cinemas/c5",
   },
   {
     id: "c6",
     name: "Gas Cinema: CMC",
     address: "CMC Michael, Addis Ababa, Ethiopia",
+    href: "/movies/cinemas/c6",
   },
 ];
 
@@ -61,7 +67,7 @@ function mapVenue(v: PublicRegisteredPartner): CinemaCard {
     id: v.id,
     name: v.name,
     address,
-    href: `/venues/${v.id}`,
+    href: `/movies/cinemas/${v.id}`,
   };
 }
 
@@ -74,14 +80,18 @@ function CinemaCardItem({
   favorited: boolean;
   onToggleFavorite: () => void;
 }) {
-  const content = (
+  const body = (
     <div className="flex items-start gap-3">
       <button
         type="button"
         aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
         aria-pressed={favorited}
-        onClick={onToggleFavorite}
-        className="mt-0.5 shrink-0 cursor-pointer"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggleFavorite();
+        }}
+        className="mt-0.5 shrink-0 cursor-pointer relative z-10"
       >
         <Heart
           size={18}
@@ -93,32 +103,25 @@ function CinemaCardItem({
         />
       </button>
       <div className="min-w-0">
-        {cinema.href ? (
-          <Link href={cinema.href} className="block group">
-            <h3 className="text-sm sm:text-base font-bold text-[#111111] leading-snug group-hover:text-[#6900AA] transition-colors">
-              {cinema.name}
-            </h3>
-            <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
-              {cinema.address}
-            </p>
-          </Link>
-        ) : (
-          <>
-            <h3 className="text-sm sm:text-base font-bold text-[#111111] leading-snug">
-              {cinema.name}
-            </h3>
-            <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
-              {cinema.address}
-            </p>
-          </>
-        )}
+        <h3 className="text-sm sm:text-base font-bold text-[#111111] leading-snug group-hover:text-[#6900AA] transition-colors">
+          {cinema.name}
+        </h3>
+        <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
+          {cinema.address}
+        </p>
       </div>
     </div>
   );
 
   return (
     <article className="h-full rounded-lg border border-slate-200 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
-      {content}
+      {cinema.href ? (
+        <Link href={cinema.href} className="block group h-full">
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
     </article>
   );
 }

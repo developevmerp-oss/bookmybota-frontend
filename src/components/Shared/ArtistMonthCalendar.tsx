@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const BRAND = "#6900AA";
 
 function ymd(d: Date): string {
   const y = d.getFullYear();
@@ -16,6 +17,10 @@ function monthLabel(year: number, month: number): string {
   return new Date(year, month, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
 }
 
+function monthLabelUpper(year: number, month: number): string {
+  return monthLabel(year, month).toUpperCase();
+}
+
 type Props = {
   /** Dates marked free (YYYY-MM-DD) */
   freeDates: string[];
@@ -25,6 +30,10 @@ type Props = {
   onSelectDate?: (date: string) => void;
   /** When true, clicking a free/open day toggles selection for artist editing */
   mode?: "view" | "pick" | "toggle";
+  /** Visual only. "glass" is the artist booking calendar look. */
+  variant?: "default" | "glass";
+  title?: string;
+  subtitle?: string;
   className?: string;
 };
 
@@ -34,9 +43,13 @@ export default function ArtistMonthCalendar({
   selectedDate = null,
   onSelectDate,
   mode = "pick",
+  variant = "default",
+  title,
+  subtitle,
   className = "",
 }: Props) {
   const today = ymd(new Date());
+  const glass = variant === "glass";
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -66,6 +79,130 @@ export default function ArtistMonthCalendar({
     });
   };
 
+  if (glass) {
+    return (
+      <div
+        className={`rounded-[1.5rem] border border-[#F0EAF7] bg-white p-4 sm:p-5 shadow-[0_10px_30px_rgba(105,0,170,0.07)] ${className}`}
+      >
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="min-w-0">
+            {title ? (
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[#111111]">{title}</h2>
+            ) : null}
+            {subtitle ? <p className="mt-1 text-sm text-[#8b8794]">{subtitle}</p> : null}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              className="h-8 w-8 rounded-full bg-[#F3F4F6] text-[#6b7280] hover:bg-[#E5E7EB] flex items-center justify-center cursor-pointer"
+              aria-label="Previous month"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              className="h-8 w-8 rounded-full bg-[#F3F4F6] text-[#6b7280] hover:bg-[#E5E7EB] flex items-center justify-center cursor-pointer"
+              aria-label="Next month"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        <p className="mb-3 text-center text-[11px] sm:text-xs font-bold tracking-[0.14em] text-[#1B1B3A]">
+          {monthLabelUpper(cursor.year, cursor.month)}
+        </p>
+
+        <div className="grid grid-cols-7 mb-2">
+          {WEEKDAYS.map((d) => (
+            <div
+              key={d}
+              className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#B0A8BC] py-1"
+            >
+              {d}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-y-1.5">
+          {cells.map((cell, i) => {
+            if (!cell) return <div key={`empty-${i}`} className="aspect-square" />;
+            const isPast = cell.date < today;
+            const isFree = freeSet.has(cell.date);
+            const isBooked = bookedSet.has(cell.date);
+            const isSelected = selectedDate === cell.date;
+            const clickable =
+              Boolean(onSelectDate) &&
+              !isPast &&
+              (mode === "toggle" || (mode === "pick" && isFree && !isBooked) || mode === "view");
+
+            let cls =
+              "mx-auto h-9 w-9 sm:h-10 sm:w-10 rounded-full text-sm flex items-center justify-center transition-colors ";
+
+            if (isPast) cls += "font-normal text-[#D1D5DB] cursor-default";
+            else if (isBooked)
+              cls += "font-semibold text-white cursor-default";
+            else if (isSelected)
+              cls += "font-bold text-white shadow-sm cursor-pointer";
+            else if (isFree)
+              cls += "font-semibold bg-[#F3E8FF] text-[#6900AA] hover:bg-[#E9D5FF] cursor-pointer";
+            else if (mode === "toggle")
+              cls += "font-semibold text-[#6900AA] hover:bg-[#F3E8FF] cursor-pointer";
+            else cls += "font-normal text-[#D1D5DB] cursor-default";
+
+            const fill =
+              isBooked && !isPast
+                ? { backgroundColor: BRAND }
+                : isSelected && !isPast && !isBooked
+                  ? { background: "linear-gradient(135deg, #C084FC 0%, #6900AA 100%)" }
+                  : undefined;
+
+            return (
+              <button
+                key={cell.date}
+                type="button"
+                disabled={!clickable}
+                onClick={() => onSelectDate?.(cell.date)}
+                className={cls}
+                style={fill}
+                title={
+                  isBooked
+                    ? "Booked"
+                    : isFree
+                      ? "Available"
+                      : mode === "toggle"
+                        ? "Click to mark free"
+                        : undefined
+                }
+              >
+                {cell.day}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-[#F0EAF7] flex flex-wrap gap-5 text-[11px] font-medium text-[#8b8794]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-[#C4B5FD] bg-transparent" />
+            Free
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: BRAND }} />
+            Booked
+          </span>
+          {mode === "toggle" ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-full border border-[#D1D5DB] bg-white" />
+              Click to add
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`rounded-2xl border border-slate-200 bg-white p-4 ${className}`}>
       <div className="flex items-center justify-between mb-3">
@@ -90,7 +227,10 @@ export default function ArtistMonthCalendar({
 
       <div className="grid grid-cols-7 gap-1 mb-1">
         {WEEKDAYS.map((d) => (
-          <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wide text-slate-400 py-1">
+          <div
+            key={d}
+            className="text-center text-[10px] font-bold uppercase tracking-wide text-slate-400 py-1"
+          >
             {d}
           </div>
         ))}

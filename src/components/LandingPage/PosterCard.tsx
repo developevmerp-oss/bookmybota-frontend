@@ -16,17 +16,18 @@ import {
 } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 
-/** 1 card: full-width landscape with capped height. 2 cards: 16/9. 3+: portrait. */
+/** 1 card: full-width landscape, shorter than before. 2 cards: 16/9. 3+: portrait. */
 function posterMediaClass(fluid: boolean, horizontal: boolean, columns: number) {
   if (horizontal && columns === 1) {
-    return "h-[180px] sm:h-[210px] md:h-[240px] lg:h-[280px] w-full";
+    return "h-[130px] sm:h-[150px] md:h-[170px] lg:h-[300px] w-full";
   }
   if (horizontal) return "aspect-[16/9] w-full";
   if (fluid) return "aspect-[3/4] w-full max-h-[280px]";
   return "aspect-[3/4] w-full";
 }
 
-function diningMediaClass() {
+function diningMediaClass(columns = 0) {
+  if (columns === 1) return "h-[130px] sm:h-[150px] md:h-[170px] lg:h-[300px] w-full";
   return "aspect-[4/3] w-full";
 }
 
@@ -282,13 +283,14 @@ export function DiningPosterCard({ place }: { place: Business }) {
     .filter(Boolean)
     .filter((v, i, arr) => arr.indexOf(v) === i);
   const fillSlot = Boolean(adaptive);
+  const columns = adaptive?.columns ?? 0;
   const widthClass = fillSlot
     ? "w-full"
     : "snap-start shrink-0 w-[240px] sm:w-[340px] md:w-[355px]";
 
   return (
     <Link href={`/restaurant/${place.id}`} className={`${widthClass} group block h-full ${cardShell}`}>
-      <div className={`${diningMediaClass()} overflow-hidden bg-[#F7F7F7] relative`}>
+      <div className={`${diningMediaClass(columns)} overflow-hidden bg-[#F7F7F7] relative`}>
         {image ? (
           <img
             src={image}

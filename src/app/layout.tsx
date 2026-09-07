@@ -144,12 +144,13 @@ export default function RootLayout({
     isPartnerRegisterPage ||
     isPartnerPublicAuth;
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
-  const isListYourShowPage =
-    pathname === "/list-your-show" || Boolean(pathname?.startsWith("/list-your-show/"));
+  const isListYourShowLanding = pathname === "/list-your-show";
+  const isListYourShowSubpage = Boolean(pathname?.startsWith("/list-your-show/"));
+  const isListYourShowPage = isListYourShowLanding || isListYourShowSubpage;
   const showPublicHeader =
     !isAdminOrBusiness &&
     !isEventBookingFlow &&
-    !isListYourShowPage &&
+    !isListYourShowSubpage &&
     !isPartnerMinimalHeaderPage;
   const showPartnerAuthHeader = isPartnerMinimalHeaderPage;
   const showLayoutFooter =

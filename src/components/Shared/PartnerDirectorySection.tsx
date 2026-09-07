@@ -7,7 +7,6 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const BRAND = "#6900AA";
 const BRAND_SOFT = "#F7E9FF";
-const BRAND_BORDER = "#EFD7FF";
 
 function PartnerCard({
   partner,
@@ -27,61 +26,70 @@ function PartnerCard({
           : "Registered venue")
       : partner.type_name || "Registered artist";
 
+  const detailLine =
+    kind === "artist"
+      ? partner.description?.trim() || place || null
+      : partner.address?.trim() || place || null;
+
+  const ctaLabel = "View free dates & inquire";
+
   const card = (
-    <div
-      className="w-full group bg-white rounded-2xl overflow-hidden border shadow-[0_8px_24px_rgba(105,0,170,0.06)] h-full"
-      style={{ borderColor: BRAND_BORDER }}
-    >
-      <div className="relative aspect-[3/4] overflow-hidden" style={{ backgroundColor: BRAND_SOFT }}>
-        {partner.cover_image_url ? (
-          <img
-            src={resolveMediaUrl(partner.cover_image_url)}
-            alt={partner.name}
-            className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ color: BRAND }}>
-            {kind === "venue" ? (
-              <Building2 size={40} strokeWidth={1.4} />
-            ) : (
-              <Mic2 size={40} strokeWidth={1.4} />
-            )}
-          </div>
-        )}
+    <div className="group relative w-full h-full min-h-[340px] sm:min-h-[380px] rounded-[1.75rem] overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.14)] bg-[#1a1a1a]">
+      {partner.cover_image_url ? (
+        <img
+          src={resolveMediaUrl(partner.cover_image_url)}
+          alt={partner.name}
+          className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+        />
+      ) : (
         <div
-          className="absolute top-3 left-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
-          style={{ color: BRAND }}
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ backgroundColor: BRAND_SOFT, color: BRAND }}
         >
-          Registered
+          {kind === "venue" ? (
+            <Building2 size={48} strokeWidth={1.4} />
+          ) : (
+            <Mic2 size={48} strokeWidth={1.4} />
+          )}
         </div>
+      )}
+
+      <div className="absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-black/90 via-black/55 to-transparent" />
+
+      <div className="absolute top-3 left-3 z-10">
+        <span className="inline-flex rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#111111]">
+          Registered
+        </span>
       </div>
-      <div className="px-3.5 pt-3.5 pb-4 text-left">
-        <h3 className="font-bold text-[#111111] text-[15px] leading-snug line-clamp-2">
+
+      <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1.5 p-3.5 sm:p-4 pt-0">
+        <h3 className="font-bold text-white text-[1.05rem] sm:text-lg leading-snug line-clamp-1 drop-shadow-sm">
           {partner.name}
         </h3>
-        {place ? (
-          <p className="mt-1.5 text-[12px] text-[#6b7280] flex items-start gap-1 line-clamp-1">
-            <MapPin size={12} className="mt-0.5 shrink-0" style={{ color: BRAND }} />
-            {place}
+
+        {detailLine ? (
+          <p className="text-[12px] sm:text-[13px] text-white/85 leading-relaxed line-clamp-1">
+            {detailLine}
           </p>
         ) : null}
-        <p className="mt-1 text-[12px] text-[#9ca3af] line-clamp-1">{subtitle}</p>
-        {kind === "venue" && partner.address ? (
-          <p className="mt-1 text-[11px] text-[#9ca3af] line-clamp-2">{partner.address}</p>
-        ) : null}
-        {kind === "artist" && partner.description ? (
-          <p className="mt-1 text-[11px] text-[#9ca3af] line-clamp-2">{partner.description}</p>
-        ) : null}
-        {kind === "artist" ? (
-          <p className="mt-2 text-[11px] font-semibold" style={{ color: BRAND }}>
-            View free dates &amp; inquire →
-          </p>
-        ) : null}
-        {kind === "venue" ? (
-          <p className="mt-2 text-[11px] font-semibold" style={{ color: BRAND }}>
-            View free dates &amp; inquire →
-          </p>
-        ) : null}
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {subtitle ? (
+            <span className="inline-flex items-center rounded-full bg-black/45 border border-white/15 px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold text-white/95">
+              {subtitle}
+            </span>
+          ) : null}
+          {place ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/45 border border-white/15 px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold text-white/95">
+              <MapPin size={11} className="shrink-0" />
+              <span className="line-clamp-1 max-w-[9rem]">{place}</span>
+            </span>
+          ) : null}
+        </div>
+
+        <span className="mt-0.5 inline-flex w-full items-center justify-center rounded-full bg-white px-4 py-2.5 text-[12px] sm:text-[13px] font-bold text-[#111111] shadow-sm group-hover:bg-[#F7E9FF] transition-colors">
+          {ctaLabel}
+        </span>
       </div>
     </div>
   );
@@ -146,13 +154,9 @@ export default function PartnerDirectorySection({
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl overflow-hidden border border-[#F3E8FF] bg-[#faf7fc] animate-pulse"
+                className="rounded-[1.75rem] overflow-hidden bg-[#f3f0f6] animate-pulse min-h-[340px] sm:min-h-[380px]"
               >
-                <div className="aspect-[3/4] bg-[#EFD7FF]" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 bg-[#EFD7FF] rounded w-3/4" />
-                  <div className="h-3 bg-[#F7E9FF] rounded w-1/2" />
-                </div>
+                <div className="h-full w-full bg-[#E5E7EB]" />
               </div>
             ))}
           </div>

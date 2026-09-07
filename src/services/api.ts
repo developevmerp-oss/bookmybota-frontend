@@ -6352,6 +6352,7 @@ export const {
   useGetPartnerMovieBookingsQuery,
   useUpdatePartnerMovieBookingStatusMutation,
   useGetPublicMovieShowtimesQuery,
+  useLazyGetPublicMovieShowtimesQuery,
   useGetMovieShowtimeLayoutQuery,
   useCreateMovieBookingMutation,
   useGetMovieBookingQuery,

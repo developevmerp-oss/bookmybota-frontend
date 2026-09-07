@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import Link from "next/link";
-import { ArrowLeft, Loader2, MapPin, Mic2, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, Briefcase, CalendarDays, Clock, Loader2, Mail, MapPin, MessageSquare, Mic2, Phone, User } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateArtistInquiryMutation,
@@ -21,11 +21,31 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ArtistMonthCalendar from "@/components/Shared/ArtistMonthCalendar";
 import PhoneInput from "@/components/Shared/PhoneInput";
+import PreferredTimeSelect from "@/components/Shared/PreferredTimeSelect";
 import { formatDate } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const BRAND = "#6900AA";
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
+const inquiryInput =
+  "w-full rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/20 focus:border-[#C4B5FD] focus:bg-white";
+
+function InquiryLabel({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof CalendarDays;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-1.5 flex items-center gap-1.5">
+      <Icon size={13} strokeWidth={2} className="shrink-0 text-[#9CA3AF]" />
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
+        {children}
+      </span>
+    </div>
+  );
+}
 
 export default function PublicArtistProfilePage({ artistId }: { artistId: string }) {
   const dispatch = useAppDispatch();
@@ -130,60 +150,86 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   }
 
   const place = [artist.city_name, artist.city_state].filter(Boolean).join(", ");
+  const coverSrc = artist.cover_image_url ? resolveMediaUrl(artist.cover_image_url) : "";
+  const metaParts = [artist.type_name || "Registered artist", place].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-[#faf7fc]">
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <Link
-          href="/artists"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-700 hover:text-violet-900"
-        >
-          <ArrowLeft size={16} /> All artists
-        </Link>
+      <header className="relative w-full overflow-hidden">
+        {coverSrc ? (
+          <img
+            src={coverSrc}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
+          />
+        ) : (
+          <div aria-hidden className="absolute inset-0 bg-[#EDE4F7]" />
+        )}
+        <div aria-hidden className="absolute inset-0 bg-white/78" />
 
-        <div className="bg-white rounded-3xl border border-[#EFD7FF] overflow-hidden shadow-sm">
-          <div className="grid md:grid-cols-[240px_1fr]">
-            <div className="aspect-[3/4] md:aspect-auto md:min-h-[280px] bg-[#F7E9FF] relative">
-              {artist.cover_image_url ? (
+        <div className="relative z-10 mx-auto max-w-5xl px-4 py-6 sm:py-8 md:py-10">
+          <Link
+            href="/artists"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B1B3A]/80 hover:text-[#6900AA]"
+          >
+            <ArrowLeft size={16} /> All artists
+          </Link>
+
+          <div className="mt-5 flex flex-col items-center gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-center md:gap-10 lg:gap-12">
+            <div className="relative h-56 w-44 shrink-0 overflow-hidden rounded-2xl bg-[#F3F4F6] shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:h-64 sm:w-48 md:h-72 md:w-52">
+              {coverSrc ? (
                 <img
-                  src={resolveMediaUrl(artist.cover_image_url)}
+                  src={coverSrc}
                   alt={artist.name}
-                  className="w-full h-full object-cover"
+                  className="h-full w-full object-cover object-top"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-violet-700">
+                <div className="flex h-full w-full items-center justify-center text-slate-500">
                   <Mic2 size={48} />
                 </div>
               )}
             </div>
-            <div className="p-6 md:p-8 space-y-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: BRAND }}>
-                {artist.type_name || "Registered artist"}
-              </p>
-              <h1 className="text-3xl font-black text-slate-900">{artist.name}</h1>
-              {place ? (
-                <p className="text-sm text-slate-500 flex items-center gap-1.5">
-                  <MapPin size={14} style={{ color: BRAND }} /> {place}
+
+            <div className="min-w-0 flex-1 text-center md:text-left">
+              {metaParts.length > 0 ? (
+                <p className="text-sm font-semibold text-[#1B1B3A]">
+                  {metaParts.join(" | ")}
                 </p>
               ) : null}
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-[#111111] sm:text-4xl md:text-5xl">
+                {artist.name}
+              </h1>
               {artist.description ? (
-                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#374151] sm:text-[15px] md:mx-0 mx-auto line-clamp-4 whitespace-pre-wrap">
                   {artist.description}
                 </p>
               ) : (
-                <p className="text-sm text-slate-400">No bio yet.</p>
+                <p className="mt-3 text-sm text-[#9ca3af]">No bio yet.</p>
               )}
+              <button
+                type="button"
+                onClick={() =>
+                  document
+                    .getElementById("artist-inquiry")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="mt-5 inline-flex h-11 items-center justify-center rounded-full bg-[#111111] px-7 text-sm font-bold text-white transition-opacity hover:opacity-90 cursor-pointer"
+              >
+                Send inquiry
+              </button>
             </div>
           </div>
         </div>
+      </header>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <h2 className="text-lg font-bold text-slate-800">Free dates</h2>
-            <p className="text-sm text-slate-500">
-              Green days are open. Select one to request a booking.
-            </p>
+      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <div className="grid lg:grid-cols-2 gap-6 items-start">
+          <div className="h-fit space-y-3">
             <ArtistMonthCalendar
+              variant="glass"
+              title="Book calendar"
+              subtitle="Highlighted days are open. Select one to request a booking."
               freeDates={freeDates}
               selectedDate={selectedDate || null}
               mode="pick"
@@ -192,131 +238,125 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               }
             />
             {freeDates.length === 0 ? (
-              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              <p className="text-sm text-amber-800 bg-amber-50/80 border border-amber-200 rounded-2xl px-3 py-2">
                 This artist has not published free days yet. Check back later.
               </p>
             ) : null}
           </div>
 
           <form
+            id="artist-inquiry"
             onSubmit={onSubmit}
-            className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 h-fit"
+            className="relative rounded-[1.5rem] border border-[#F0EAF7] bg-white p-5 sm:p-6 space-y-4 h-fit shadow-[0_10px_30px_rgba(105,0,170,0.07)] scroll-mt-28"
             noValidate
           >
-            <h2 className="text-lg font-bold text-slate-800">Send booking inquiry</h2>
-            <p className="text-xs text-slate-500">
-              The artist receives this request in their panel and by email.
-            </p>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                Selected date
-              </label>
-              <input
-                readOnly
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-3 text-sm font-semibold"
-                value={selectedDate ? formatDate(selectedDate) : "Pick a free day on the calendar"}
-              />
-              {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                Preferred time (optional)
-              </label>
-              <input type="time" className="input-field" {...register("event_time")} />
-              {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                Your name
-              </label>
-              <input className="input-field" {...register("contact_name")} />
-              {errors.contact_name && (
-                <p className={fieldErrorClass}>{errors.contact_name.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                Email
-              </label>
-              <input type="email" className="input-field" {...register("contact_email")} />
-              {errors.contact_email && (
-                <p className={fieldErrorClass}>{errors.contact_email.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                Phone
-              </label>
-              <Controller
-                name="contact_phone"
-                control={control}
-                render={({ field }) => (
-                  <PhoneInput
-                    value={field.value || ""}
-                    onChange={(v) => field.onChange(v)}
-                    onValidChange={() => undefined}
-                    required
-                  />
-                )}
-              />
-              {errors.contact_phone && (
-                <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
-              )}
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                  Event type
-                </label>
+                <InquiryLabel icon={CalendarDays}>Selected date</InquiryLabel>
                 <input
-                  className="input-field"
+                  readOnly
+                  className={`${inquiryInput} ${selectedDate ? "font-semibold text-[#1B1B3A]" : ""}`}
+                  value={selectedDate ? formatDate(selectedDate) : "Pick a free day on the calendar"}
+                />
+                {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
+              </div>
+
+              <div>
+                <InquiryLabel icon={Clock}>Preferred time (optional)</InquiryLabel>
+                <Controller
+                  name="event_time"
+                  control={control}
+                  render={({ field }) => (
+                    <PreferredTimeSelect value={field.value || ""} onChange={field.onChange} />
+                  )}
+                />
+                {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
+              </div>
+
+              <div>
+                <InquiryLabel icon={User}>Your name</InquiryLabel>
+                <input className={inquiryInput} {...register("contact_name")} />
+                {errors.contact_name && (
+                  <p className={fieldErrorClass}>{errors.contact_name.message}</p>
+                )}
+              </div>
+
+              <div>
+                <InquiryLabel icon={Mail}>Email</InquiryLabel>
+                <input
+                  type="email"
+                  className={inquiryInput}
+                  placeholder="you@email.com"
+                  {...register("contact_email")}
+                />
+                {errors.contact_email && (
+                  <p className={fieldErrorClass}>{errors.contact_email.message}</p>
+                )}
+              </div>
+
+              <div>
+                <InquiryLabel icon={Phone}>Phone</InquiryLabel>
+                <Controller
+                  name="contact_phone"
+                  control={control}
+                  render={({ field }) => (
+                    <PhoneInput
+                      value={field.value || ""}
+                      onChange={(v) => field.onChange(v)}
+                      onValidChange={() => undefined}
+                      required
+                      inputClassName={inquiryInput}
+                    />
+                  )}
+                />
+                {errors.contact_phone && (
+                  <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
+                )}
+              </div>
+
+              <div>
+                <InquiryLabel icon={Briefcase}>Event type</InquiryLabel>
+                <input
+                  className={inquiryInput}
                   placeholder="Wedding, corporate…"
                   {...register("event_type")}
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                  Location
-                </label>
+
+              <div className="sm:col-span-2">
+                <InquiryLabel icon={MapPin}>Location</InquiryLabel>
                 <input
-                  className="input-field"
+                  className={inquiryInput}
                   placeholder="Venue / city"
                   {...register("event_location")}
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">
-                Message
-              </label>
-              <textarea
-                rows={3}
-                className="input-field resize-none"
-                placeholder="Tell the artist about your event…"
-                {...register("message")}
-              />
-              {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
+              <div className="sm:col-span-2">
+                <InquiryLabel icon={MessageSquare}>Message</InquiryLabel>
+                <textarea
+                  rows={4}
+                  className={`${inquiryInput} resize-none min-h-[96px]`}
+                  placeholder="Tell the artist about your event…"
+                  {...register("message")}
+                />
+                {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={sending || freeDates.length === 0}
-              className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-xl text-white font-bold disabled:opacity-50"
-              style={{ backgroundColor: BRAND }}
+              className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-full px-5 text-white font-bold disabled:opacity-50 cursor-pointer shadow-[0_10px_24px_rgba(105,0,170,0.28)]"
+              style={{ background: "linear-gradient(90deg, #8B5CF6 0%, #C026D3 55%, #E879F9 100%)" }}
             >
-              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              {sending ? <Loader2 size={16} className="animate-spin" /> : null}
               Send inquiry
+              {!sending ? <ArrowRight size={16} /> : null}
             </button>
             {!customerId ? (
-              <p className="text-[11px] text-slate-400 text-center">
-                You can send without logging in. Signing in prefills your details.
+              <p className="text-[11px] text-[#9CA3AF] text-center">
+                You can send without logging in. Sign in to prefill your details.
               </p>
             ) : null}
           </form>

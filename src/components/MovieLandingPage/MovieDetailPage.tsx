@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
-import { ArrowRight, ChevronRight, Loader2, Play, Share2, Star, ThumbsUp, Ticket } from "lucide-react";
+import { ArrowRight, ChevronRight, Loader2, Play, Share2, Star, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import MovieTrailerModal from "@/components/MovieLandingPage/MovieTrailerModal";
 import {
@@ -22,7 +22,6 @@ import {
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
-import MovieShowtimeSelector from "@/components/MovieLandingPage/MovieShowtimeSelector";
 
 
 
@@ -296,21 +295,13 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
                 <span className={bookClass.replace("hover:opacity-90", "opacity-80 cursor-default")}>
                   Coming Soon
                 </span>
-              ) : movie.bookHref ? (
-                <Link href={movie.bookHref} className={bookClass}>
-                  {bookLabel}
-                </Link>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById("showtimes-section");
-                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                  }}
+                <Link
+                  href={movie.bookHref || `/movies/${movie.slug || movie.id}/showtimes`}
                   className={bookClass}
                 >
                   {bookLabel}
-                </button>
+                </Link>
               )}
 
               <MovieWishlistButton movieId={movie.id} />
@@ -428,27 +419,6 @@ export default function MovieDetailPage() {
   return (
     <div className="min-h-screen bg-white">
       <MovieDetailBanner movie={movie} />
-
-      {!movie.comingSoon && (
-        <section id="showtimes-section" className="py-8 sm:py-10 bg-[#F5F5F5] border-t border-[#EAEAEA]">
-          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 space-y-4">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-[#111111] flex items-center gap-2.5">
-                <Ticket className="size-6 text-[#6900AA]" />
-                Select Cinema &amp; Showtime
-              </h2>
-              <p className="mt-1 text-xs sm:text-sm text-[#6B7280]">
-                Pick a date and cinema below to book your tickets and reserved seats.
-              </p>
-            </div>
-            <MovieShowtimeSelector
-              movieIdOrSlug={idOrSlug}
-              movieTitle={movie.title}
-              movieCertificate={movie.certification}
-            />
-          </div>
-        </section>
-      )}
 
       <CategoryPromoBanners
         category="MOVIES"

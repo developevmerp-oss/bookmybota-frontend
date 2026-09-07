@@ -11,6 +11,7 @@ export const CATEGORY_NAV_TILES = [
     title: "Dining",
     keywords: ["dining"],
     fallbackSlug: "dining",
+    countLabel: "Places to dine",
     image: imageSrc(images.diningCard),
   },
   {
@@ -18,6 +19,7 @@ export const CATEGORY_NAV_TILES = [
     title: "Concert",
     keywords: ["concert"],
     fallbackSlug: "concert",
+    countLabel: "Live concerts",
     image: imageSrc(images.concertCard),
   },
   {
@@ -25,6 +27,7 @@ export const CATEGORY_NAV_TILES = [
     title: "Comedy",
     keywords: ["comedy"],
     fallbackSlug: "comedy",
+    countLabel: "Comedy shows",
     image: imageSrc(images.comedyCard),
   },
   {
@@ -32,6 +35,7 @@ export const CATEGORY_NAV_TILES = [
     title: "Music",
     keywords: ["music"],
     fallbackSlug: "music",
+    countLabel: "Music events",
     image: imageSrc(images.musicCard),
   },
   {
@@ -39,6 +43,7 @@ export const CATEGORY_NAV_TILES = [
     title: "Movie",
     keywords: ["movie", "movies", "film"],
     fallbackSlug: "movie",
+    countLabel: "Movies to watch",
     image: imageSrc(images.movieCard),
   },
   {
@@ -46,6 +51,7 @@ export const CATEGORY_NAV_TILES = [
     title: "Sports",
     keywords: ["sports", "sport"],
     fallbackSlug: "sports",
+    countLabel: "Sports events",
     image: imageSrc(images.sportsCard),
   },
 ] as const;
@@ -55,6 +61,7 @@ export type CategoryNavTile = {
   href: string;
   title: string;
   count: number;
+  countLabel: string;
   image: string;
 };
 
@@ -78,9 +85,10 @@ export function buildCategoryNavTiles(input: {
   categories: Array<{ slug: string; name: string }>;
   events: PublicEvent[];
   diningCount: number;
+  movieCount: number;
   city?: string;
 }): CategoryNavTile[] {
-  const { categories, events, diningCount, city } = input;
+  const { categories, events, diningCount, movieCount, city } = input;
   const cityQuery =
     city && city !== "All Cities" ? `?city=${encodeURIComponent(city)}` : "";
 
@@ -91,6 +99,18 @@ export function buildCategoryNavTiles(input: {
         href: `/dining${cityQuery}`,
         title: tile.title,
         count: diningCount,
+        countLabel: tile.countLabel,
+        image: tile.image,
+      };
+    }
+
+    if (tile.key === "movie") {
+      return {
+        key: tile.key,
+        href: "/movies",
+        title: tile.title,
+        count: movieCount,
+        countLabel: tile.countLabel,
         image: tile.image,
       };
     }
@@ -104,12 +124,10 @@ export function buildCategoryNavTiles(input: {
 
     return {
       key: tile.key,
-      href:
-        tile.key === "movie"
-          ? "/movies"
-          : `/events?category=${encodeURIComponent(matchedCategory?.slug || tile.fallbackSlug)}`,
+      href: `/events?category=${encodeURIComponent(matchedCategory?.slug || tile.fallbackSlug)}`,
       title: tile.title,
       count: matchedEvents.length,
+      countLabel: tile.countLabel,
       image: tile.image,
     };
   });

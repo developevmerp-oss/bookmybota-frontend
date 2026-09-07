@@ -6,25 +6,57 @@ import { ChevronLeft, ChevronRight, Mic2 } from "lucide-react";
 import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import {
+  SHOWCASE_ARTIST_CARDS,
+  type ShowcaseArtistCard,
+} from "@/data/showcaseArtistCards";
 import "./TopArtistsRail.css";
 
 const VISIBLE = 6;
 
-function ArtistCard({ artist }: { artist: PublicRegisteredPartner }) {
+type RailArtistCard = {
+  id: string;
+  name: string;
+  image: string;
+  roleLine: string;
+  href: string;
+};
+
+function mapApiArtist(artist: PublicRegisteredPartner): RailArtistCard {
   const role = artist.type_name || "Artist";
   const place = [artist.city_name, artist.city_state].filter(Boolean).join(", ");
+  return {
+    id: artist.id,
+    name: artist.name,
+    image: resolveMediaUrl(artist.cover_image_url),
+    roleLine: place ? `${role} · ${place}` : role,
+    href: `/artists/${artist.id}`,
+  };
+}
 
+function mapShowcaseArtist(artist: ShowcaseArtistCard): RailArtistCard {
+  return {
+    id: artist.id,
+    name: artist.name,
+    image: artist.image,
+    roleLine: `${artist.role} · ${artist.place}`,
+    href: artist.href,
+  };
+}
+
+function ArtistCard({ artist }: { artist: RailArtistCard }) {
   return (
     <Link
-      href={`/artists/${artist.id}`}
+      href={artist.href}
       className="top-artists-slot top-artists-slot-link"
       title={`View ${artist.name} availability and send an inquiry`}
     >
       <div className="top-artists-avatar">
         <div className="top-artists-avatar-inner">
-          {artist.cover_image_url ? (
+          {artist.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={resolveMediaUrl(artist.cover_image_url)}
+              src={artist.image}
               alt={artist.name}
               className="w-full h-full object-cover"
               loading="lazy"
@@ -38,7 +70,7 @@ function ArtistCard({ artist }: { artist: PublicRegisteredPartner }) {
         </div>
       </div>
       <p className="top-artists-name">{artist.name}</p>
-      <p className="top-artists-role">{place ? `${role} · ${place}` : role}</p>
+      <p className="top-artists-role">{artist.roleLine}</p>
     </Link>
   );
 }
@@ -46,7 +78,11 @@ function ArtistCard({ artist }: { artist: PublicRegisteredPartner }) {
 export default function TopArtistsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { data: artists = [], isLoading } = useGetPublicRegisteredArtistsQuery();
-  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [artists.length, isLoading]);
+  const useStatic = !isLoading && artists.length === 0;
+  const items = useStatic
+    ? SHOWCASE_ARTIST_CARDS.map(mapShowcaseArtist)
+    : artists.map(mapApiArtist);
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [items.length, useStatic, isLoading]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -77,11 +113,6 @@ export default function TopArtistsRail() {
               </div>
             ))}
           </div>
-        ) : artists.length === 0 ? (
-          <p className="text-sm text-[#6b6b6b] py-6">
-            No registered artists yet. After artists are approved, they will appear here with free
-            dates you can inquire about.
-          </p>
         ) : (
           <div className="relative">
             {scrollEdges.left && (
@@ -100,7 +131,7 @@ export default function TopArtistsRail() {
               className="top-artists-rail"
               style={{ ["--artists-visible" as string]: VISIBLE }}
             >
-              {artists.map((artist) => (
+              {items.map((artist) => (
                 <ArtistCard key={artist.id} artist={artist} />
               ))}
             </div>

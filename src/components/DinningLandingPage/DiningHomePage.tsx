@@ -2136,20 +2136,29 @@ className={`text-sm font-bold mt-2 transition-colors ${
       <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
         <div >
           {/* ── 4. Filter Section ───────────────────────────────────────────── */}
-          <section>
-            <DiningFiltersBar
-              cuisines={cuisineOptions}
-              filters={diningFilters}
-              onChange={setDiningFilters}
-              onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
-              categories={exploreDiningFilterCategories}
-              categoriesSelected={activeCategories}
-              onCategoriesChange={(next) => {
-                setActiveCategories(next);
-                setExploreCardId(exploreCardIdForCategories(next, businessTypes));
-                setCurrentPage(1);
-              }}
-            />
+          <section
+            className="sticky z-30  -mx-5 px-5 sm:mx-0 sm:px-0"
+            style={{
+              top:
+                siteHeaderHeight +
+                (showStickyCuisineNames ? 52 : 0),
+            }}
+          >
+            <div className="border-b border-slate-100/90 bg-white py-2 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+              <DiningFiltersBar
+                cuisines={cuisineOptions}
+                filters={diningFilters}
+                onChange={setDiningFilters}
+                onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
+                categories={exploreDiningFilterCategories}
+                categoriesSelected={activeCategories}
+                onCategoriesChange={(next) => {
+                  setActiveCategories(next);
+                  setExploreCardId(exploreCardIdForCategories(next, businessTypes));
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
           </section>
 
           {/* ── 5. Offer Section ────────────────────────────────────────────── */}

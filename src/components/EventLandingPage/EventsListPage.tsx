@@ -101,10 +101,10 @@ function FilterTag({
     <button
       type="button"
       onClick={onClick}
-      className={`px-2.5 py-1.5 text-[11px] rounded-md border cursor-pointer transition-colors ${
+      className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold border cursor-pointer transition-colors ${
         active
-          ? "border-[#6900AA] bg-[#6900AA] text-white"
-          : "border-slate-200 bg-white text-[#6900AA]"
+          ? "bg-[#6900AA] border-[#6900AA] text-white"
+          : "bg-white border-[#D4B3F0] text-[#6900AA] hover:bg-[#F7E9FF]"
       }`}
     >
       {label}
@@ -112,31 +112,35 @@ function FilterTag({
   );
 }
 
-/** Desktop sidebar filter accordion card */
-function FilterCard({
+/** Desktop sidebar filter section — matches movie Filters panel UI */
+function FilterSection({
   title,
   open,
   onToggle,
   onClear,
   children,
+  last = false,
 }: {
   title: string;
   open: boolean;
   onToggle: () => void;
   onClear: () => void;
   children: ReactNode;
+  last?: boolean;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
-      <div className="flex items-center gap-2 px-3.5 py-3">
+    <div className={last ? undefined : "border-b border-slate-100"}>
+      <div className="flex items-center gap-2 px-4 py-3">
         <button
           type="button"
           onClick={onToggle}
           className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer text-left"
         >
           <FaChevronDown
-            size={11}
-            className={`shrink-0 transition-transform ${open ? "rotate-180 text-[#6900AA]" : "text-slate-400"}`}
+            size={12}
+            className={`shrink-0 transition-transform ${
+              open ? "rotate-180 text-[#6900AA]" : "text-slate-400"
+            }`}
           />
           <span className={`text-sm font-semibold ${open ? "text-[#6900AA]" : "text-slate-800"}`}>
             {title}
@@ -145,12 +149,12 @@ function FilterCard({
         <button
           type="button"
           onClick={onClear}
-          className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer shrink-0"
+          className="text-xs sm:text-sm text-slate-400 hover:text-slate-600 cursor-pointer"
         >
           Clear
         </button>
       </div>
-      {open ? <div className="px-3.5 pb-3.5">{children}</div> : null}
+      {open ? <div className="px-4 pb-3">{children}</div> : null}
     </div>
   );
 }
@@ -478,6 +482,15 @@ export default function PublicEventsPage() {
   }, [calMonth]);
 
   const headingCity = city || "Ethiopia";
+  const hasActiveFilters =
+    selectedSlugs.length > 0 ||
+    Boolean(datePreset) ||
+    Boolean(dateFrom) ||
+    Boolean(dateTo) ||
+    Boolean(city) ||
+    selectedLanguages.length > 0 ||
+    selectedPriceBands.length > 0 ||
+    selectedMore.length > 0;
   const hasOfferHero = offerHeroEvents.length > 0;
   const activeHeroEvent = hasOfferHero ? offerHeroEvents[heroSlideIndex] : null;
   const activeHeroSrc = resolveMediaUrl(
@@ -773,7 +786,7 @@ export default function PublicEventsPage() {
             id="city-filter"
             className="lg:sticky lg:top-24 self-start h-fit max-h-none lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto [scrollbar-width:thin]"
           >
-            <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3 lg:mb-4">Filters</h3>
+            <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3 lg:hidden">Filters</h3>
 
             <div className="lg:hidden">
               <div className={`grid gap-1.5 ${moreOptions.length ? "grid-cols-3" : "grid-cols-5"}`}>
@@ -796,7 +809,7 @@ export default function PublicEventsPage() {
                 })}
               </div>
               {mobileFilterTab && (
-                <div className="mt-2 bg-white rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.06)] p-3">
+                <div className="mt-2 bg-white rounded-lg border border-slate-200 shadow-sm p-3">
                   {mobileFilterTab === "categories" && categoriesPanel()}
                   {mobileFilterTab === "date" && datePanel()}
                   {mobileFilterTab === "city" && cityPanel()}
@@ -807,62 +820,78 @@ export default function PublicEventsPage() {
               )}
             </div>
 
-            <div className="hidden lg:block space-y-2.5">
-              <FilterCard
+            <div className="hidden lg:block rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">Filters</h3>
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  disabled={!hasActiveFilters}
+                  className={`text-sm font-semibold cursor-pointer ${
+                    hasActiveFilters ? "text-[#6900AA]" : "text-[#6900AA]/40 cursor-default"
+                  }`}
+                >
+                  Clear All
+                </button>
+              </div>
+
+              <FilterSection
                 title="Categories"
                 open={openFilters.categories}
                 onToggle={() => toggleOpen("categories")}
                 onClear={() => setSelectedSlugs([])}
               >
                 {categoriesPanel()}
-              </FilterCard>
+              </FilterSection>
 
-              <FilterCard
+              <FilterSection
                 title="Date"
                 open={openFilters.date}
                 onToggle={() => toggleOpen("date")}
                 onClear={clearDateFilters}
               >
                 {datePanel()}
-              </FilterCard>
+              </FilterSection>
 
-              <FilterCard
+              <FilterSection
                 title="City"
                 open={openFilters.city}
                 onToggle={() => toggleOpen("city")}
                 onClear={clearCity}
               >
                 {cityPanel()}
-              </FilterCard>
+              </FilterSection>
 
-              <FilterCard
+              <FilterSection
                 title="Languages"
                 open={openFilters.languages}
                 onToggle={() => toggleOpen("languages")}
                 onClear={() => setSelectedLanguages([])}
               >
                 {languagesPanel()}
-              </FilterCard>
+              </FilterSection>
 
-              <FilterCard
+              <FilterSection
                 title="Price"
                 open={openFilters.price}
                 onToggle={() => toggleOpen("price")}
                 onClear={() => setSelectedPriceBands([])}
+                last={moreOptions.length === 0}
               >
                 {pricePanel()}
-              </FilterCard>
+              </FilterSection>
 
-              {moreOptions.length > 0 && (
-                <FilterCard
+              {moreOptions.length > 0 ? (
+                <FilterSection
                   title="More filters"
                   open={openFilters.more}
                   onToggle={() => toggleOpen("more")}
                   onClear={() => setSelectedMore([])}
+                  last
                 >
                   {morePanel()}
-                </FilterCard>
-              )}
+                </FilterSection>
+              ) : null}
             </div>
           </aside>
 

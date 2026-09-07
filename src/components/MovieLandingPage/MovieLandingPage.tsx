@@ -875,7 +875,7 @@ export default function MovieLandingPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <OfferShapeCard
                       href="#movies-listing"
                       title="Weekend Movie Marathon"
@@ -890,7 +890,7 @@ export default function MovieLandingPage() {
                       cta="Buy Gift Card"
                       tone="mint"
                     />
-                  </div>
+                  </div> */}
 
                   <MovieRail
                     title="Top Rated Movies"

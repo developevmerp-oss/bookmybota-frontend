@@ -59,13 +59,76 @@ export default function VenueLayoutViewer({
   const [activeBoxInfo, setActiveBoxInfo] = useState<Shape | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
+  const scaleRef = useRef(scale);
+  const pendingScrollRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
 
   const canvasWidth = layoutData?.data?.seating_config?.canvasWidth || 3200;
   const canvasHeight = layoutData?.data?.seating_config?.canvasHeight || 2400;
 
   const backgroundImageUrl = layoutData?.data?.seating_config?.bgImageUrl || null;
   const [bgImage] = useImage(backgroundImageUrl || "");
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
+    if (pendingScrollRef.current && containerRef.current) {
+      const { scrollLeft, scrollTop } = pendingScrollRef.current;
+      containerRef.current.scrollLeft = Math.max(0, scrollLeft);
+      containerRef.current.scrollTop = Math.max(0, scrollTop);
+      pendingScrollRef.current = null;
+    }
+  }, [scale]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const stageEl = canvasWrapperRef.current;
+      if (!stageEl) return;
+
+      const currentScale = scaleRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const stageRect = stageEl.getBoundingClientRect();
+
+      const mouseViewportX = e.clientX - containerRect.left;
+      const mouseViewportY = e.clientY - containerRect.top;
+
+      const mouseOnStageX = e.clientX - stageRect.left;
+      const mouseOnStageY = e.clientY - stageRect.top;
+
+      const contentX = mouseOnStageX / currentScale;
+      const contentY = mouseOnStageY / currentScale;
+
+      const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+      const newScale = Math.min(Math.max(Number((currentScale * factor).toFixed(3)), 0.15), 3.0);
+
+      if (Math.abs(newScale - currentScale) < 0.001) return;
+
+      const newMouseOnStageX = contentX * newScale;
+      const newMouseOnStageY = contentY * newScale;
+
+      const targetScrollLeft = stageEl.offsetLeft + newMouseOnStageX - mouseViewportX;
+      const targetScrollTop = stageEl.offsetTop + newMouseOnStageY - mouseViewportY;
+
+      pendingScrollRef.current = {
+        scrollLeft: targetScrollLeft,
+        scrollTop: targetScrollTop,
+      };
+
+      setScale(newScale);
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
 
   useEffect(() => {
     const updateScale = () => {
@@ -246,7 +309,11 @@ export default function VenueLayoutViewer({
           </button>
         </div>
 
-        <div style={{ width: canvasWidth * scale, height: canvasHeight * scale }} className="relative origin-top-left">
+        <div 
+          ref={canvasWrapperRef}
+          style={{ width: canvasWidth * scale, height: canvasHeight * scale }} 
+          className="relative origin-top-left inline-block"
+        >
           <Stage 
             width={canvasWidth * scale} 
             height={canvasHeight * scale} 

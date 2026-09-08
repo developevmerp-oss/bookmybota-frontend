@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const BRAND = "#6900AA";
+const FREE_BG = "#E9D5FF";
+const FREE_TEXT = "#57008E";
+const SELECTED_BG = "#6900AA";
+const BOOKED_BG = "#F43F5E";
 
 function ymd(d: Date): string {
   const y = d.getFullYear();
@@ -139,25 +142,26 @@ export default function ArtistMonthCalendar({
               (mode === "toggle" || (mode === "pick" && isFree && !isBooked) || mode === "view");
 
             let cls =
-              "mx-auto h-9 w-9 sm:h-10 sm:w-10 rounded-full text-sm flex items-center justify-center transition-colors ";
+              "mx-auto h-9 w-9 sm:h-10 sm:w-10 rounded-full text-sm flex items-center justify-center transition-all ";
 
-            if (isPast) cls += "font-normal text-[#D1D5DB] cursor-default";
-            else if (isBooked)
+            let style: CSSProperties | undefined;
+
+            if (isPast) {
+              cls += "font-normal text-[#D1D5DB] cursor-default";
+            } else if (isBooked) {
               cls += "font-semibold text-white cursor-default";
-            else if (isSelected)
-              cls += "font-bold text-white shadow-sm cursor-pointer";
-            else if (isFree)
-              cls += "font-semibold bg-[#F3E8FF] text-[#6900AA] hover:bg-[#E9D5FF] cursor-pointer";
-            else if (mode === "toggle")
+              style = { backgroundColor: BOOKED_BG };
+            } else if (isSelected) {
+              cls += "font-bold text-white cursor-pointer ring-2 ring-offset-2 ring-[#C084FC] shadow-md";
+              style = { backgroundColor: SELECTED_BG };
+            } else if (isFree) {
+              cls += "font-bold cursor-pointer hover:brightness-95";
+              style = { backgroundColor: FREE_BG, color: FREE_TEXT };
+            } else if (mode === "toggle") {
               cls += "font-semibold text-[#6900AA] hover:bg-[#F3E8FF] cursor-pointer";
-            else cls += "font-normal text-[#D1D5DB] cursor-default";
-
-            const fill =
-              isBooked && !isPast
-                ? { backgroundColor: BRAND }
-                : isSelected && !isPast && !isBooked
-                  ? { background: "linear-gradient(135deg, #C084FC 0%, #6900AA 100%)" }
-                  : undefined;
+            } else {
+              cls += "font-normal text-[#D1D5DB] cursor-default";
+            }
 
             return (
               <button
@@ -166,15 +170,17 @@ export default function ArtistMonthCalendar({
                 disabled={!clickable}
                 onClick={() => onSelectDate?.(cell.date)}
                 className={cls}
-                style={fill}
+                style={style}
                 title={
                   isBooked
                     ? "Booked"
-                    : isFree
-                      ? "Available"
-                      : mode === "toggle"
-                        ? "Click to mark free"
-                        : undefined
+                    : isSelected
+                      ? "Selected"
+                      : isFree
+                        ? "Available"
+                        : mode === "toggle"
+                          ? "Click to mark free"
+                          : undefined
                 }
               >
                 {cell.day}
@@ -183,13 +189,23 @@ export default function ArtistMonthCalendar({
           })}
         </div>
 
-        <div className="mt-4 pt-3 border-t border-[#F0EAF7] flex flex-wrap gap-5 text-[11px] font-medium text-[#8b8794]">
+        <div className="mt-4 pt-3 border-t border-[#F0EAF7] flex flex-wrap gap-4 text-[11px] font-medium text-[#8b8794]">
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded-full border-2 border-[#C4B5FD] bg-transparent" />
+            <span
+              className="w-3.5 h-3.5 rounded-full shrink-0"
+              style={{ backgroundColor: FREE_BG, border: `1px solid ${FREE_TEXT}` }}
+            />
             Free
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: BRAND }} />
+            <span
+              className="w-3.5 h-3.5 rounded-full shrink-0 ring-2 ring-offset-1 ring-[#C084FC]"
+              style={{ backgroundColor: SELECTED_BG }}
+            />
+            Selected
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: BOOKED_BG }} />
             Booked
           </span>
           {mode === "toggle" ? (
@@ -252,8 +268,10 @@ export default function ArtistMonthCalendar({
             "aspect-square rounded-xl text-sm font-semibold flex items-center justify-center border transition-colors ";
           if (isPast) cls += "border-transparent text-slate-300 bg-slate-50 cursor-default";
           else if (isBooked) cls += "border-rose-200 bg-rose-50 text-rose-700 cursor-default";
-          else if (isSelected) cls += "border-violet-500 bg-violet-600 text-white shadow-sm";
-          else if (isFree) cls += "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100";
+          else if (isSelected)
+            cls += "border-[#6900AA] bg-[#6900AA] text-white shadow-sm ring-2 ring-[#C084FC] ring-offset-1";
+          else if (isFree)
+            cls += "border-[#C084FC] bg-[#E9D5FF] text-[#57008E] hover:bg-[#DDD6FE]";
           else if (mode === "toggle")
             cls += "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50";
           else cls += "border-transparent text-slate-400 bg-slate-50 cursor-default";
@@ -268,11 +286,13 @@ export default function ArtistMonthCalendar({
               title={
                 isBooked
                   ? "Booked"
-                  : isFree
-                    ? "Available"
-                    : mode === "toggle"
-                      ? "Click to mark free"
-                      : undefined
+                  : isSelected
+                    ? "Selected"
+                    : isFree
+                      ? "Available"
+                      : mode === "toggle"
+                        ? "Click to mark free"
+                        : undefined
               }
             >
               {cell.day}
@@ -283,7 +303,10 @@ export default function ArtistMonthCalendar({
 
       <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-medium text-slate-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-300" /> Free
+          <span className="w-3 h-3 rounded bg-[#E9D5FF] border border-[#C084FC]" /> Free
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-[#6900AA] border border-[#6900AA]" /> Selected
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded bg-rose-50 border border-rose-200" /> Booked

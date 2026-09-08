@@ -1,11 +1,23 @@
 import * as yup from 'yup';
 import { PHONE_MAX_DIGITS, PHONE_MIN_DIGITS, sanitizePhoneInput } from '@/lib/validation';
 
+function todayYmd(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export const artistInquiryFormSchema = yup.object({
   event_date: yup
     .string()
-    .required('Select a free date from the calendar.')
-    .matches(/^\d{4}-\d{2}-\d{2}$/, 'Select a valid date.'),
+    .required('Event date is required.')
+    .matches(/^\d{4}-\d{2}-\d{2}$/, 'Select a valid date.')
+    .test('future', 'Choose today or a future date.', (value) => {
+      if (!value) return false;
+      return value >= todayYmd();
+    }),
   event_time: yup
     .string()
     .default('')

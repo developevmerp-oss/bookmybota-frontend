@@ -12,10 +12,10 @@ import { extractApiError } from "@/lib/apiErrors";
 import { formatDate, formatDateTime12h, formatHm12h } from "@/lib/dateFormat";
 
 const STATUS_STYLE: Record<string, string> = {
-  PENDING: "bg-amber-50 text-amber-800 border-amber-200",
-  ACCEPTED: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  DECLINED: "bg-rose-50 text-rose-800 border-rose-200",
-  CANCELLED: "bg-slate-100 text-slate-600 border-slate-200",
+  PENDING: "metric-warning",
+  ACCEPTED: "metric-positive",
+  DECLINED: "bg-rose-50 text-rose-700",
+  CANCELLED: "bg-muted text-muted-foreground",
 };
 
 export default function VenueInquiriesPage() {
@@ -42,22 +42,27 @@ export default function VenueInquiriesPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="portal-heading text-2xl font-bold flex items-center gap-2">
-          <Inbox className="text-violet-500" /> Venue booking inquiries
-        </h2>
-        <p className="portal-muted text-sm mt-1">
-          Requests from customers who picked one of your free dates. Accept or decline — they also get an email.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <p className="org-section-label mb-2">Bookings</p>
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Venue booking inquiries
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1.5">
+            Requests from customers who picked one of your free dates. Accept or decline — they also get an email.
+          </p>
+        </div>
         {pending.length > 0 ? (
-          <p className="text-sm text-amber-700 mt-2 font-semibold">{pending.length} pending</p>
+          <span className="metric-warning px-3 py-1.5 rounded-full text-xs font-bold w-fit">
+            {pending.length} pending
+          </span>
         ) : null}
       </div>
 
       {isLoading ? (
-        <p className="portal-muted py-10 text-center">Loading inquiries…</p>
+        <p className="text-muted-foreground py-10 text-center text-sm">Loading inquiries…</p>
       ) : inquiries.length === 0 ? (
-        <div className="glass-panel rounded-2xl p-10 text-center portal-muted">
+        <div className="org-card p-10 text-center text-muted-foreground text-sm">
           No inquiries yet. Mark free days on your availability calendar so customers can request your venue.
         </div>
       ) : (
@@ -65,16 +70,16 @@ export default function VenueInquiriesPage() {
           {inquiries.map((inq) => {
             const busy = updating && busyId === inq.id;
             return (
-              <div key={inq.id} className="glass-panel rounded-2xl p-5 space-y-3">
+              <div key={inq.id} className="org-card p-5 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold portal-heading text-lg">{inq.contact_name}</p>
-                    <p className="text-sm portal-muted">
+                    <p className="font-semibold text-foreground text-lg">{inq.contact_name}</p>
+                    <p className="text-sm text-muted-foreground">
                       {inq.contact_email} · {inq.contact_phone}
                     </p>
                   </div>
                   <span
-                    className={`text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border ${
+                    className={`text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full ${
                       STATUS_STYLE[inq.status] || STATUS_STYLE.PENDING
                     }`}
                   >
@@ -84,31 +89,31 @@ export default function VenueInquiriesPage() {
 
                 <div className="grid sm:grid-cols-2 gap-2 text-sm">
                   <p>
-                    <span className="portal-muted">Date:</span>{" "}
-                    <strong>{formatDate(inq.event_date)}</strong>
+                    <span className="text-muted-foreground">Date:</span>{" "}
+                    <strong className="text-foreground">{formatDate(inq.event_date)}</strong>
                     {inq.event_time ? ` · ${formatHm12h(inq.event_time)}` : ""}
                   </p>
                   {inq.event_type ? (
                     <p>
-                      <span className="portal-muted">Type:</span> {inq.event_type}
+                      <span className="text-muted-foreground">Type:</span> {inq.event_type}
                     </p>
                   ) : null}
                   {inq.guest_count != null ? (
                     <p>
-                      <span className="portal-muted">Guests:</span> {inq.guest_count}
+                      <span className="text-muted-foreground">Guests:</span> {inq.guest_count}
                     </p>
                   ) : null}
                   {inq.event_location ? (
                     <p className="sm:col-span-2">
-                      <span className="portal-muted">Notes:</span> {inq.event_location}
+                      <span className="text-muted-foreground">Notes:</span> {inq.event_location}
                     </p>
                   ) : null}
                   {inq.message ? (
-                    <p className="sm:col-span-2 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+                    <p className="sm:col-span-2 rounded-xl bg-muted/50 border border-border px-3 py-2">
                       {inq.message}
                     </p>
                   ) : null}
-                  <p className="sm:col-span-2 text-xs portal-muted">
+                  <p className="sm:col-span-2 text-xs text-muted-foreground">
                     Received {formatDateTime12h(inq.created_at)}
                   </p>
                 </div>
@@ -119,7 +124,7 @@ export default function VenueInquiriesPage() {
                       type="button"
                       disabled={busy}
                       onClick={() => respond(inq, "ACCEPTED")}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-success text-white text-sm font-semibold disabled:opacity-50"
                     >
                       {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                       Accept
@@ -128,7 +133,7 @@ export default function VenueInquiriesPage() {
                       type="button"
                       disabled={busy}
                       onClick={() => respond(inq, "DECLINED")}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 text-rose-700 text-sm font-semibold hover:bg-rose-50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
                     >
                       <X size={14} /> Decline
                     </button>

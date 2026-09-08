@@ -39,7 +39,7 @@ function statusBadge(status: string) {
 
 function FillBar({ percent }: { percent: number }) {
   const p = Math.min(100, Math.max(0, percent));
-  const color = p >= 90 ? "bg-rose-500" : p >= 70 ? "bg-amber-500" : "bg-violet-500";
+  const color = p >= 90 ? "bg-rose-500" : p >= 70 ? "bg-amber-500" : "bg-rose-500";
   return (
     <div className="h-2 rounded-full portal-progress-track overflow-hidden">
       <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${p}%` }} />
@@ -67,7 +67,7 @@ export default function OrganizerTicketStatsPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
         <h2 className="portal-heading text-2xl font-bold flex items-center gap-2">
-          <BarChart3 size={24} className="text-violet-600" />
+          <BarChart3 size={24} className="text-rose-600" />
           Ticket Statistics
         </h2>
         <p className="portal-muted mt-1 max-w-2xl">
@@ -75,9 +75,9 @@ export default function OrganizerTicketStatsPage() {
         </p>
       </div>
 
-      <div className="portal-toolbar glass-panel rounded-2xl p-4 sm:p-5">
+      <div className="portal-toolbar org-card p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-          <div className="flex items-center gap-2 text-violet-700 shrink-0">
+          <div className="flex items-center gap-2 text-rose-700 shrink-0">
             <Filter size={18} />
             <span className="text-sm font-semibold">Filters</span>
           </div>
@@ -108,11 +108,11 @@ export default function OrganizerTicketStatsPage() {
       </div>
 
       {isLoading ? (
-        <div className="glass-panel rounded-2xl p-10 text-center portal-muted">
+        <div className="org-card p-10 text-center portal-muted">
           Loading ticket statistics…
         </div>
       ) : isError || !overall ? (
-        <div className="glass-panel rounded-2xl p-10 text-center portal-muted">
+        <div className="org-card p-10 text-center portal-muted">
           Could not load statistics.
         </div>
       ) : (
@@ -137,7 +137,7 @@ export default function OrganizerTicketStatsPage() {
               label="Remaining"
               value={String(overall.total_remaining)}
               sub="Available to buy"
-              accent="text-violet-600"
+              accent="text-rose-600"
             />
             <StatCard
               icon={Users}
@@ -161,7 +161,7 @@ export default function OrganizerTicketStatsPage() {
               label="Your payout (est.)"
               value={formatPrice(overall.organizer_payout)}
               sub="After platform commission"
-              accent="text-violet-600"
+              accent="text-rose-600"
             />
           </div>
 
@@ -174,9 +174,9 @@ export default function OrganizerTicketStatsPage() {
           )}
 
           {eventStats.length === 0 ? (
-            <div className="glass-panel rounded-2xl p-10 text-center portal-muted">
+            <div className="org-card p-10 text-center portal-muted">
               No events yet.{" "}
-              <Link href="/organizer/events/new" className="text-violet-600 hover:text-violet-700 font-medium">
+              <Link href="/organizer/events/new" className="text-rose-600 hover:text-rose-700 font-medium">
                 Create an event
               </Link>{" "}
               to start selling tickets.
@@ -187,7 +187,7 @@ export default function OrganizerTicketStatsPage() {
                 {eventFilter ? "Event breakdown" : `All events (${eventStats.length})`}
               </h3>
               {eventStats.map((ev) => (
-                <div key={ev.event_id} className="glass-panel rounded-2xl overflow-hidden">
+                <div key={ev.event_id} className="org-card overflow-hidden">
                   <div className="p-5 border-b border-slate-200/80 flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -204,7 +204,7 @@ export default function OrganizerTicketStatsPage() {
                       </p>
                     </div>
                     <div className="text-right min-w-[100px]">
-                      <p className="text-2xl font-black text-violet-600">{ev.summary.fill_percent}%</p>
+                      <p className="text-2xl font-black text-rose-600">{ev.summary.fill_percent}%</p>
                       <p className="text-[10px] portal-stat-label uppercase tracking-wide">Filled</p>
                     </div>
                   </div>
@@ -225,7 +225,7 @@ export default function OrganizerTicketStatsPage() {
                             <th className="px-5 py-3 font-medium portal-table-head">Price</th>
                             <th className="px-5 py-3 font-medium portal-table-head">Total</th>
                             <th className="px-5 py-3 font-medium portal-table-head text-green-600">Sold</th>
-                            <th className="px-5 py-3 font-medium portal-table-head text-violet-600">Remaining</th>
+                            <th className="px-5 py-3 font-medium portal-table-head text-rose-600">Remaining</th>
                             <th className="px-5 py-3 font-medium portal-table-head">Fill</th>
                             <th className="px-5 py-3 font-medium portal-table-head text-right">Revenue</th>
                           </tr>
@@ -238,7 +238,7 @@ export default function OrganizerTicketStatsPage() {
                               <td className="px-5 py-3 portal-table-cell">{formatPrice(t.price)}</td>
                               <td className="px-5 py-3 portal-table-cell">{t.total_count}</td>
                               <td className="px-5 py-3 text-green-600 font-semibold">{t.sold}</td>
-                              <td className="px-5 py-3 text-violet-600 font-semibold">{t.remaining}</td>
+                              <td className="px-5 py-3 text-rose-600 font-semibold">{t.remaining}</td>
                               <td className="px-5 py-3 w-36">
                                 <div className="flex items-center gap-2">
                                   <FillBar percent={t.fill_percent} />
@@ -256,7 +256,7 @@ export default function OrganizerTicketStatsPage() {
                             </td>
                             <td className="px-5 py-3 portal-table-cell">{ev.summary.total_capacity}</td>
                             <td className="px-5 py-3 text-green-600">{ev.summary.total_sold}</td>
-                            <td className="px-5 py-3 text-violet-600">{ev.summary.total_remaining}</td>
+                            <td className="px-5 py-3 text-rose-600">{ev.summary.total_remaining}</td>
                             <td className="px-5 py-3 portal-table-cell">{ev.summary.fill_percent}%</td>
                             <td className="px-5 py-3 text-right portal-table-strong">
                               {formatPrice(ev.summary.ticket_revenue)}
@@ -270,7 +270,7 @@ export default function OrganizerTicketStatsPage() {
                   <div className="px-5 py-3 border-t border-slate-200/80 flex flex-wrap gap-4 text-xs portal-muted">
                     <Link
                       href={`/organizer/bookings?event=${ev.event_id}`}
-                      className="text-violet-600 hover:text-violet-700 font-medium"
+                      className="text-rose-600 hover:text-rose-700 font-medium"
                     >
                       View bookings →
                     </Link>
@@ -307,7 +307,7 @@ function StatCard({
   accent: string;
 }) {
   return (
-    <div className="glass-panel rounded-2xl p-4 sm:p-5">
+    <div className="org-card p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-2">
         <Icon size={16} className={`${accent} opacity-90`} />
         <p className="text-[10px] font-bold portal-stat-label uppercase tracking-wider">{label}</p>

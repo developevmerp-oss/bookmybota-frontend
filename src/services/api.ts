@@ -203,6 +203,7 @@ export interface BusinessSettings {
   average_cost?: number;
   collection_ids?: number[];
   venue_meta?: Record<string, unknown> | null;
+  artist_meta?: import("@/lib/artistMeta").ArtistMeta | Record<string, unknown> | null;
   venue_type_slug?: string | null;
   venue_type_name?: string | null;
   documents?: PartnerDocumentUpload[];
@@ -1121,6 +1122,9 @@ export interface ArtistAvailabilitySlot {
 
 export interface PublicArtistProfile extends PublicRegisteredPartner {
   phone?: string | null;
+  type_slug?: string | null;
+  gallery_images?: string[];
+  artist_meta?: import("@/lib/artistMeta").ArtistMeta | null;
   slots?: ArtistAvailabilitySlot[];
 }
 
@@ -1147,6 +1151,7 @@ export type VenueAvailabilitySlot = ArtistAvailabilitySlot;
 
 export interface PublicVenueProfile extends PublicRegisteredPartner {
   phone?: string | null;
+  gallery_images?: string[];
   slots?: VenueAvailabilitySlot[];
 }
 
@@ -2585,6 +2590,15 @@ export const api = createApi({
         // JSONB columns: node-pg serializes JS arrays as PG arrays (`{...}`), which is invalid JSON.
         if (Array.isArray(body.gallery_images)) {
           payload.gallery_images = JSON.stringify(body.gallery_images);
+        }
+        // Keep artist_meta as an object so the API can normalize it.
+        // (Stringifying here previously wiped media/social on save.)
+        if (body.artist_meta !== undefined && typeof body.artist_meta === "string") {
+          try {
+            payload.artist_meta = JSON.parse(body.artist_meta);
+          } catch {
+            payload.artist_meta = {};
+          }
         }
         if (Array.isArray(body.menu_images)) {
           payload.menu_images = JSON.stringify(body.menu_images);
@@ -6053,6 +6067,28 @@ export const api = createApi({
       },
       invalidatesTags: [],
     }),
+
+    uploadPartnerMedia: builder.mutation<
+      { url: string; mimetype?: string; size_bytes?: number },
+      FormData
+    >({
+      query: (formData) => ({
+        url: '/upload/media',
+        method: 'POST',
+        body: formData,
+      }),
+      transformResponse: (res: {
+        url?: string;
+        mimetype?: string;
+        size_bytes?: number;
+        data?: { url?: string; mimetype?: string; size_bytes?: number };
+      }) => ({
+        url: extractUploadUrl(res) || res?.url || res?.data?.url || "",
+        mimetype: res?.mimetype || res?.data?.mimetype,
+        size_bytes: res?.size_bytes ?? res?.data?.size_bytes,
+      }),
+      invalidatesTags: [],
+    }),
   }),
 });
 
@@ -6156,6 +6192,7 @@ export const {
   useUpdateSubscriptionMutation,
   useGetAnalyticsQuery,
   useUploadImageMutation,
+  useUploadPartnerMediaMutation,
   useGetReviewsQuery,
   useCreateReviewMutation,
   useCreateReviewReplyMutation,

@@ -78,7 +78,7 @@ export default function OrganizerContractPage() {
         <p className="portal-muted">
           No contract available yet. Super Admin will create it after reviewing your event.
         </p>
-        <Link href="/organizer/events" className="text-violet-600 hover:underline">
+        <Link href="/organizer/events" className="text-rose-600 hover:underline">
           ← Back to My Events
         </Link>
       </div>
@@ -92,7 +92,7 @@ export default function OrganizerContractPage() {
       <div>
         <Link
           href="/organizer/events"
-          className="inline-flex items-center gap-1 text-sm text-violet-600 hover:text-violet-800 mb-3"
+          className="inline-flex items-center gap-1 text-sm text-rose-600 hover:text-rose-800 mb-3"
         >
           <ArrowLeft size={16} /> Back to My Events
         </Link>
@@ -103,7 +103,7 @@ export default function OrganizerContractPage() {
       <EventContractDocument contract={contract} />
 
       {needsSign && (
-        <div className="glass-panel rounded-2xl p-5 space-y-5">
+        <div className="org-card p-5 space-y-5">
           <h3 className="portal-heading text-lg font-semibold">Authorize your signature</h3>
           <p className="text-sm portal-muted">
             Upload your signature image, request OTP by email, then confirm to sign this contract
@@ -129,7 +129,7 @@ export default function OrganizerContractPage() {
               type="button"
               disabled={sendingOtp}
               onClick={handleRequestOtp}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-violet-300 text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
             >
               {sendingOtp ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
               Send OTP
@@ -138,7 +138,7 @@ export default function OrganizerContractPage() {
               type="button"
               disabled={signing}
               onClick={handleSign}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 disabled:opacity-50"
             >
               {signing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
               Confirm &amp; sign

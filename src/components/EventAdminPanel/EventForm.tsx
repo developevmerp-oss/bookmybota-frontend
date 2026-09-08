@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -277,11 +277,14 @@ function CityLocationFields({
   }, [cities, countryFilter]);
 
   useEffect(() => {
-    if (cityId == null) return;
+    if (cityId == null) {
+      setCountryFilter("");
+      return;
+    }
     const selected = cities.find((c) => c.id === cityId);
     if (!selected) return;
-    if (selected.country && !countryFilter) setCountryFilter(selected.country.trim());
-  }, [cityId, cities]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (selected.country) setCountryFilter(selected.country.trim());
+  }, [cityId, cities]);
 
   return (
     <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
@@ -342,18 +345,18 @@ function VenueNameSearchField({
   labelClass,
   inputClass,
   errorClass,
-  onAddNewVenue,
+  onUnregisteredVenue,
   onVenueSelected,
-  onSearchAgain,
+  onRegisteredMatches,
 }: {
   index: number;
   readOnly: boolean;
   labelClass: string;
   inputClass: string;
   errorClass: string;
-  onAddNewVenue: (name: string) => void;
+  onUnregisteredVenue: (name: string) => void;
   onVenueSelected: () => void;
-  onSearchAgain: () => void;
+  onRegisteredMatches: () => void;
 }) {
   const {
     register,
@@ -386,10 +389,30 @@ function VenueNameSearchField({
     [allVenues, debouncedQ]
   );
 
+  // Auto-open manual venue form when the typed name is not registered.
+  const onUnregisteredRef = useRef(onUnregisteredVenue);
+  const onRegisteredMatchesRef = useRef(onRegisteredMatches);
+  onUnregisteredRef.current = onUnregisteredVenue;
+  onRegisteredMatchesRef.current = onRegisteredMatches;
+
+  useEffect(() => {
+    if (readOnly || venueBusinessId) return;
+    if (debouncedQ.length < 2 || isFetching) return;
+    if (venues.length === 0) {
+      onUnregisteredRef.current(debouncedQ);
+      setShowResults(false);
+      return;
+    }
+    onRegisteredMatchesRef.current();
+  }, [readOnly, venueBusinessId, debouncedQ, isFetching, venues.length]);
+
   const clearVenueSelection = () => {
     setValue(`showtimes.${index}.venue_business_id`, null, { shouldDirty: true });
     setValue(`showtimes.${index}.venue_source`, "manual", { shouldDirty: true });
     setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+    setValue(`showtimes.${index}.venue_address`, "", { shouldDirty: true });
+    setValue(`showtimes.${index}.city_id`, null, { shouldDirty: true });
+    setValue(`showtimes.${index}.location_id`, null, { shouldDirty: true });
     const mode = watch(`showtimes.${index}.layout_mode`);
     if (mode === "standard") {
       setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
@@ -413,17 +436,23 @@ function VenueNameSearchField({
       { shouldDirty: true, shouldValidate: true }
     );
     if (verified) {
-      const hasPublished =
+      const hasLive =
         Boolean(venue.default_layout_id) ||
         (typeof venue.published_layout_count === "number" && venue.published_layout_count > 0);
-      if (hasPublished) {
+      if (hasLive) {
         setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
         setValue(
           `showtimes.${index}.venue_layout_template_id`,
           venue.default_layout_id || null,
           { shouldDirty: true }
         );
+      } else {
+        setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+        setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
       }
+    } else {
+      setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+      setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
     }
     setShowResults(false);
     onVenueSelected();
@@ -439,13 +468,12 @@ function VenueNameSearchField({
         <input
           disabled={readOnly}
           className={`${inputClass} pl-9`}
-          placeholder="Search or type venue name — e.g. tagor hall"
+          placeholder="Search registered venue or type a new venue name"
           {...venueNameReg}
           onFocus={() => setShowResults(true)}
           onChange={(e) => {
             onVenueNameChange(e);
             if (venueBusinessId) clearVenueSelection();
-            onSearchAgain();
             setShowResults(true);
           }}
           onBlur={() => {
@@ -454,7 +482,7 @@ function VenueNameSearchField({
         />
       </div>
       <p className="text-xs text-slate-500 mt-1">
-        Search existing venues and select one. If not found, use Add venue to enter details.
+        Search and select a registered venue. If the venue is not in the system, enter its details below.
       </p>
       {errors.showtimes?.[index]?.venue_name && (
         <p className={errorClass}>{errors.showtimes[index]?.venue_name?.message}</p>
@@ -465,7 +493,6 @@ function VenueNameSearchField({
           type="button"
           onClick={() => {
             clearVenueSelection();
-            onSearchAgain();
             setShowResults(true);
           }}
           className="mt-1.5 text-xs text-slate-600 hover:text-rose-600"
@@ -474,28 +501,9 @@ function VenueNameSearchField({
         </button>
       )}
 
-      {showResults && !readOnly && debouncedQ.length >= 2 && !venueBusinessId && (
+      {showResults && !readOnly && debouncedQ.length >= 2 && !venueBusinessId && venues.length > 0 && (
         <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm">
           {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
-          {!isFetching && venues.length === 0 && (
-            <div className="px-3 py-3 space-y-2">
-              <p className="text-xs text-slate-500">
-                No matching venues for &quot;{debouncedQ}&quot;.
-              </p>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onAddNewVenue(debouncedQ);
-                  setShowResults(false);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
-              >
-                <Plus size={14} />
-                Add &quot;{debouncedQ}&quot; as new venue
-              </button>
-            </div>
-          )}
           {venues.map((v) => {
             const selected = venueBusinessId === v.id;
             const verified =
@@ -508,40 +516,24 @@ function VenueNameSearchField({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => applyVenue(v)}
-                className={`w-full text-left px-3 py-2 hover:bg-violet-50 transition-colors ${
-                  selected ? "bg-violet-50" : ""
+                className={`w-full text-left px-3 py-2 hover:bg-rose-50 transition-colors ${
+                  selected ? "bg-rose-50" : ""
                 }`}
               >
                 <p className="text-sm font-medium text-slate-800">{v.name}</p>
                 <p className="text-xs text-slate-500">
-                  {[v.city_name, v.city_state].filter(Boolean).join(", ") || "City not set"}
+                  {[v.address, v.city_name, v.city_state].filter(Boolean).join(" · ") || "Address not set"}
                   {typeof v.published_layout_count === "number" && verified
-                    ? ` · ${v.published_layout_count} published layout${v.published_layout_count === 1 ? "" : "s"}`
+                    ? ` · ${v.published_layout_count} live layout${v.published_layout_count === 1 ? "" : "s"}`
                     : ""}
                 </p>
                 <p className={`text-[11px] mt-0.5 ${verified ? "text-emerald-700" : "text-amber-700"}`}>
                   {verified ? "Verified partner" : "In system — not platform-authorized"}
-                  {verified && v.default_layout_name ? ` · Default: ${v.default_layout_name}` : ""}
+                  {verified && v.default_layout_name ? ` · Live: ${v.default_layout_name}` : ""}
                 </p>
               </button>
             );
           })}
-          {!isFetching && venues.length > 0 && (
-            <div className="px-3 py-2 border-t border-slate-100 bg-slate-50">
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onAddNewVenue(debouncedQ);
-                  setShowResults(false);
-                }}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:text-violet-900"
-              >
-                <Plus size={13} />
-                Not listed? Add &quot;{debouncedQ}&quot; as new venue
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -562,7 +554,6 @@ function SeatingLayoutFields({
   errorClass: string;
 }) {
   const {
-    register,
     watch,
     setValue,
     formState: { errors },
@@ -580,9 +571,14 @@ function SeatingLayoutFields({
     }
   );
 
+  const liveLayouts = useMemo(
+    () => (layoutData?.layouts || []).filter((l) => Boolean(l.is_default)),
+    [layoutData?.layouts]
+  );
+
   const selectedLayout = useMemo(
-    () => (layoutData?.layouts || []).find((l) => l.id === layoutId) || null,
-    [layoutData?.layouts, layoutId]
+    () => liveLayouts.find((l) => l.id === layoutId) || null,
+    [liveLayouts, layoutId]
   );
 
   const {
@@ -590,7 +586,6 @@ function SeatingLayoutFields({
     isLoading: templateLoading,
     isFetching: templateFetching,
     isError: templateError,
-    error: templateErrorObj,
   } = useGetOrganizerVenueLayoutQuery(
     { businessId: venueBusinessId!, templateId: layoutId! },
     {
@@ -623,284 +618,140 @@ function SeatingLayoutFields({
     }
   }, [layoutMode, templateDetail, index, setValue]);
 
-  /** Prefer default published layout when switching to Standard. */
+  // Keep selection aligned with live layouts only — no restriction messages / other modes.
   useEffect(() => {
-    if (readOnly || !isRegisteredPartner || layoutMode !== "standard") return;
-    if (layoutId) return;
-    const layouts = layoutData?.layouts || [];
-    if (!layouts.length) return;
-    const preferred = layouts.find((l) => l.is_default) || layouts[0];
-    if (preferred?.id) {
-      setValue(`showtimes.${index}.venue_layout_template_id`, preferred.id, {
+    if (readOnly) return;
+    if (!isRegisteredPartner) {
+      if (layoutMode !== "none") {
+        setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+      }
+      setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+      return;
+    }
+    if (layoutsFetching) return;
+    if (!liveLayouts.length) {
+      if (layoutMode !== "none") {
+        setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+      }
+      if (layoutId) {
+        setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+      }
+      return;
+    }
+    if (layoutMode !== "standard") {
+      setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
+    }
+    const stillValid = Boolean(layoutId && liveLayouts.some((l) => l.id === layoutId));
+    if (!stillValid) {
+      setValue(`showtimes.${index}.venue_layout_template_id`, liveLayouts[0].id, {
         shouldDirty: true,
         shouldValidate: true,
       });
     }
-  }, [readOnly, isRegisteredPartner, layoutMode, layoutId, layoutData?.layouts, index, setValue]);
+  }, [
+    readOnly,
+    isRegisteredPartner,
+    layoutsFetching,
+    liveLayouts,
+    layoutMode,
+    layoutId,
+    index,
+    setValue,
+  ]);
 
-  /** Unregistered / auto venues cannot create layouts — customers book by ticket type (default). */
-  useEffect(() => {
-    if (isRegisteredPartner || readOnly) return;
-    if (layoutMode !== "none") {
-      setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
-    }
-    setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
-    setValue(`showtimes.${index}.custom_layout_name`, "", { shouldDirty: true });
-    setValue(`showtimes.${index}.custom_layout_notes`, "", { shouldDirty: true });
-    setValue(`showtimes.${index}.custom_layout_images` as never, [] as never, { shouldDirty: true });
-  }, [isRegisteredPartner, readOnly, layoutMode, index, setValue]);
-
-  const setLayoutMode = (next: "none" | "standard" | "custom") => {
-    if (!isRegisteredPartner && next !== "none") return;
-    setValue(`showtimes.${index}.layout_mode`, next, { shouldDirty: true, shouldValidate: true });
-    if (next !== "standard") {
-      setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
-    }
-    if (next !== "custom") {
-      setValue(`showtimes.${index}.custom_layout_name`, "", { shouldDirty: true });
-      setValue(`showtimes.${index}.custom_layout_notes`, "", { shouldDirty: true });
-    } else if (!watch(`showtimes.${index}.custom_layout_name`)) {
-      const venueName = watch(`showtimes.${index}.venue_name`) || "Venue";
-      setValue(`showtimes.${index}.custom_layout_name`, `${venueName} custom layout`, { shouldDirty: true });
-    }
-  };
+  if (!isRegisteredPartner || (!layoutsFetching && liveLayouts.length === 0)) {
+    return null;
+  }
 
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
       <div>
-        <p className={labelClass}>Seating layout</p>
+        <p className={labelClass}>Live layouts for this venue</p>
         <p className="text-xs text-slate-500 mb-2">
-          {isRegisteredPartner
-            ? "Optional. Choose a published venue layout, request a custom one, or skip for now."
-            : "Layouts are only available for verified registered venues. New venues use the default booking flow — customers pick ticket types without a seat map."}
+          Choose the seating map customers will use when booking.
         </p>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <label className={`inline-flex items-center gap-2 ${!isRegisteredPartner ? "opacity-100" : ""}`}>
-            <input
-              type="radio"
-              disabled={readOnly}
-              checked={layoutMode === "none" || !isRegisteredPartner}
-              onChange={() => setLayoutMode("none")}
-            />
-            None (default booking)
-          </label>
-          <label
-            className={`inline-flex items-center gap-2 ${!isRegisteredPartner ? "opacity-50" : ""}`}
-            title={!isRegisteredPartner ? "Only for verified registered venues" : undefined}
-          >
-            <input
-              type="radio"
-              disabled={readOnly || !isRegisteredPartner}
-              checked={isRegisteredPartner && layoutMode === "standard"}
-              onChange={() => setLayoutMode("standard")}
-            />
-            Standard (published layout)
-          </label>
-          <label
-            className={`inline-flex items-center gap-2 ${!isRegisteredPartner ? "opacity-50" : ""}`}
-            title={!isRegisteredPartner ? "Only for verified registered venues" : undefined}
-          >
-            <input
-              type="radio"
-              disabled={readOnly || !isRegisteredPartner}
-              checked={isRegisteredPartner && layoutMode === "custom"}
-              onChange={() => setLayoutMode("custom")}
-            />
-            Custom request
-          </label>
-        </div>
-        {!isRegisteredPartner && (
-          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
-            This venue is not a verified partner, so seating layouts cannot be created. Customers will book using the
-            default ticket-type flow (no seat selection map).
-          </p>
+        {layoutsFetching && <p className="text-xs text-slate-500 mb-2">Loading venue layouts…</p>}
+        {liveLayouts.length > 0 ? (
+          <div className="grid sm:grid-cols-2 gap-2 mb-2">
+            {liveLayouts.map((l) => {
+              const active = layoutId === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() =>
+                    setValue(`showtimes.${index}.venue_layout_template_id`, l.id, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                    active
+                      ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
+                      : "border-slate-200 bg-white hover:border-rose-300 hover:bg-rose-50/40"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                    {active ? <Check size={14} className="text-emerald-600 shrink-0" /> : null}
+                    {l.name}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {l.capacity ? `${l.capacity} seats` : "Capacity not set"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        <select
+          disabled={readOnly || !liveLayouts.length}
+          className={inputClass}
+          value={layoutId || ""}
+          onChange={(e) =>
+            setValue(`showtimes.${index}.venue_layout_template_id`, e.target.value || null, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
+        >
+          <option value="">Select layout</option>
+          {liveLayouts.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+              {l.capacity ? ` · ${l.capacity} seats` : ""}
+            </option>
+          ))}
+        </select>
+        {errors.showtimes?.[index]?.venue_layout_template_id && (
+          <p className={errorClass}>{errors.showtimes[index]?.venue_layout_template_id?.message}</p>
         )}
       </div>
 
-      {isRegisteredPartner && layoutMode === "standard" && (
-        <div className="space-y-3">
+      {selectedLayout && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 space-y-3">
           <div>
-            <label className={labelClass}>Published layouts for this venue</label>
-            <p className="text-xs text-slate-500 mb-2">
-              Pick a layout below. Customers will use this seating map when booking (after you save the event).
+            <p className="text-sm font-semibold text-emerald-900">{selectedLayout.name}</p>
+            <p className="text-xs text-emerald-800">
+              {selectedLayout.capacity ? `${selectedLayout.capacity} seats · ` : ""}
+              Layout preview (read-only).
             </p>
-            {layoutsFetching && (
-              <p className="text-xs text-slate-500 mb-2">Loading venue layouts…</p>
-            )}
-            {(layoutData?.layouts || []).length > 0 ? (
-              <div className="grid sm:grid-cols-2 gap-2 mb-2">
-                {(layoutData?.layouts || []).map((l) => {
-                  const active = layoutId === l.id;
-                  return (
-                    <button
-                      key={l.id}
-                      type="button"
-                      disabled={readOnly}
-                      onClick={() =>
-                        setValue(`showtimes.${index}.venue_layout_template_id`, l.id, {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        })
-                      }
-                      className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
-                        active
-                          ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
-                          : "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/40"
-                      }`}
-                    >
-                      <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-                        {active ? <Check size={14} className="text-emerald-600 shrink-0" /> : null}
-                        {l.name}
-                        {l.is_default ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">
-                            Default
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {l.capacity ? `${l.capacity} seats` : "Capacity not set"}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-            <select
-              disabled={readOnly || !venueBusinessId}
-              className={inputClass}
-              value={layoutId || ""}
-              onChange={(e) =>
-                setValue(`showtimes.${index}.venue_layout_template_id`, e.target.value || null, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
+          </div>
+          {showTemplateLoading ? (
+            <p className="text-xs text-emerald-800">Loading seating map…</p>
+          ) : templateError ? (
+            <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+              Could not load this seating map. Try selecting the layout again.
+            </p>
+          ) : (
+            <VenueLayoutMapPreview
+              seats={templateDetail?.seats_json}
+              seatingConfig={
+                (templateDetail?.seating_config as Record<string, unknown> | null | undefined) ?? null
               }
-            >
-              <option value="">Select published layout</option>
-              {(layoutData?.layouts || []).map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                  {l.is_default ? " (default)" : ""}
-                  {l.capacity ? ` · ${l.capacity} seats` : ""}
-                </option>
-              ))}
-            </select>
-            {errors.showtimes?.[index]?.venue_layout_template_id && (
-              <p className={errorClass}>{errors.showtimes[index]?.venue_layout_template_id?.message}</p>
-            )}
-          </div>
-
-          {selectedLayout && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 space-y-3">
-              <div>
-                <p className="text-sm font-semibold text-emerald-900">{selectedLayout.name}</p>
-                <p className="text-xs text-emerald-800">
-                  {selectedLayout.capacity ? `${selectedLayout.capacity} seats · ` : ""}
-                  Preview of this venue&apos;s published layout (read-only).
-                </p>
-              </div>
-              {showTemplateLoading ? (
-                <p className="text-xs text-emerald-800">Loading seating map…</p>
-              ) : templateError ? (
-                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-                  Could not load this seating map.
-                  {" "}
-                  {(templateErrorObj as { data?: { error?: string } })?.data?.error ||
-                    "Try selecting the layout again."}
-                </p>
-              ) : (
-                <VenueLayoutMapPreview
-                  seats={templateDetail?.seats_json}
-                  seatingConfig={
-                    (templateDetail?.seating_config as Record<string, unknown> | null | undefined) ?? null
-                  }
-                  height={260}
-                />
-              )}
-            </div>
+              height={260}
+            />
           )}
-          {!selectedLayout && (layoutData?.layouts || []).length === 0 && venueBusinessId && !layoutsFetching && (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              No published layouts for this venue yet. Ask the venue admin / Super Admin to publish one, or use
-              None / Custom request.
-            </p>
-          )}
-        </div>
-      )}
-
-      {isRegisteredPartner && layoutMode === "custom" && (
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Layout name</label>
-            <input
-              disabled={readOnly}
-              className={inputClass}
-              {...register(`showtimes.${index}.custom_layout_name`)}
-              placeholder="Festival floor plan"
-            />
-            {errors.showtimes?.[index]?.custom_layout_name && (
-              <p className={errorClass}>{errors.showtimes[index]?.custom_layout_name?.message}</p>
-            )}
-          </div>
-          <div>
-            <label className={labelClass}>Layout type</label>
-            <select
-              disabled={readOnly}
-              className={inputClass}
-              {...register(`showtimes.${index}.custom_layout_type`)}
-            >
-              <option value="custom">Custom</option>
-              <option value="theater">Theater</option>
-              <option value="banquet">Banquet</option>
-              <option value="standing">Standing</option>
-              <option value="mixed">Mixed</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Expected capacity</label>
-            <input
-              disabled={readOnly}
-              type="number"
-              min={0}
-              className={inputClass}
-              {...register(`showtimes.${index}.custom_layout_capacity`, {
-                setValueAs: (v) => (v === "" || v == null ? null : Number(v)),
-              })}
-              placeholder="e.g. 500"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className={labelClass}>Notes / requirements</label>
-            <textarea
-              disabled={readOnly}
-              rows={2}
-              className={inputClass}
-              {...register(`showtimes.${index}.custom_layout_notes`)}
-              placeholder="Sections, VIP areas, stage position, accessibility…"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className={labelClass}>Reference images (URLs, one per line)</label>
-            <textarea
-              disabled={readOnly}
-              rows={3}
-              className={inputClass}
-              placeholder="https://…/layout-ref-1.jpg"
-              value={((watch(`showtimes.${index}.custom_layout_images`) as string[] | undefined) || []).join("\n")}
-              onChange={(e) => {
-                const urls = e.target.value
-                  .split("\n")
-                  .map((u) => u.trim())
-                  .filter(Boolean);
-                setValue(`showtimes.${index}.custom_layout_images` as never, urls as never, {
-                  shouldDirty: true,
-                });
-              }}
-            />
-          </div>
-          <p className="sm:col-span-2 text-xs text-slate-500">
-            Saved with the draft. Submitted to the platform when you submit the event for approval.
-          </p>
         </div>
       )}
     </div>
@@ -946,12 +797,12 @@ function EventDocUploadsList({
             )}
             {uploadedUrl ? (
               <div className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <FileText size={16} className="text-violet-600 shrink-0" />
+                <FileText size={16} className="text-rose-600 shrink-0" />
                 <a
                   href={uploadedUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-slate-800 truncate flex-1 hover:text-violet-700"
+                  className="text-sm text-slate-800 truncate flex-1 hover:text-rose-700"
                 >
                   View uploaded file
                 </a>
@@ -967,7 +818,7 @@ function EventDocUploadsList({
               </div>
             ) : (
               !readOnly && (
-                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-violet-400 cursor-pointer">
+                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-rose-400 cursor-pointer">
                   <Upload size={16} /> Upload PDF or image
                   <input
                     type="file"
@@ -1027,7 +878,7 @@ function EventTicketTypesFields({ readOnly }: { readOnly: boolean }) {
           <button
             type="button"
             onClick={() => append(defaultTicketType())}
-            className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1 shrink-0"
+            className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 shrink-0"
           >
             <Plus size={14} /> Add type
           </button>
@@ -1214,7 +1065,7 @@ function VenueBlock({
     (Boolean(venueName.trim()) && cityId == null) ||
     (Boolean(venueBusinessId) && !isVerifiedSelected && cityId == null);
   const labelClass = "portal-label block text-sm font-semibold mb-1.5";
-  const errorClass = "text-rose-600 text-xs mt-1";
+  const errorClass = "field-error";
   const inputClass = "input-field w-full";
 
   return (
@@ -1236,53 +1087,71 @@ function VenueBlock({
             labelClass={labelClass}
             inputClass={inputClass}
             errorClass={errorClass}
-            onAddNewVenue={(name) => {
+            onUnregisteredVenue={(name) => {
               setValue(`showtimes.${index}.venue_name`, name, { shouldDirty: true, shouldValidate: true });
               setValue(`showtimes.${index}.venue_source`, "manual", { shouldDirty: true });
               setValue(`showtimes.${index}.venue_business_id`, null, { shouldDirty: true });
-              setValue(`showtimes.${index}.city_id`, null, { shouldDirty: true });
+              setValue(`showtimes.${index}.venue_address`, "", { shouldDirty: true, shouldValidate: true });
+              setValue(`showtimes.${index}.city_id`, null, { shouldDirty: true, shouldValidate: true });
+              setValue(`showtimes.${index}.location_id`, null, { shouldDirty: true });
+              setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+              setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
               setAddingNewVenue(true);
             }}
             onVenueSelected={() => setAddingNewVenue(false)}
-            onSearchAgain={() => setAddingNewVenue(false)}
+            onRegisteredMatches={() => {
+              if (!venueBusinessId) setAddingNewVenue(false);
+            }}
           />
         </div>
 
         {venueBusinessId && (
-          <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5">
+          <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 space-y-1">
             <p className="text-sm font-medium text-slate-800">{venueName}</p>
-            {venueAddress && <p className="text-xs text-slate-600 mt-0.5">{venueAddress}</p>}
-            <p className={`text-[11px] mt-1 ${isVerifiedSelected ? "text-emerald-700" : "text-amber-700"}`}>
-              {isVerifiedSelected ? "Verified partner venue selected" : "Venue in system — not platform-authorized"}
+            <p className="text-xs text-slate-600">
+              <span className="font-semibold text-slate-700">Registered address: </span>
+              {venueAddress.trim() || "No registered address on file"}
+            </p>
+            {(() => {
+              const city = cities.find((c) => c.id === cityId);
+              const cityLine = [city?.name, city?.state, city?.country].filter(Boolean).join(", ");
+              return cityLine ? (
+                <p className="text-xs text-slate-600">
+                  <span className="font-semibold text-slate-700">City: </span>
+                  {cityLine}
+                </p>
+              ) : null;
+            })()}
+            <p className={`text-[11px] ${isVerifiedSelected ? "text-emerald-700" : "text-amber-700"}`}>
+              {isVerifiedSelected
+                ? "Verified partner venue selected — address is taken from venue registration."
+                : "Venue in system — not platform-authorized"}
             </p>
           </div>
         )}
 
         {showManualVenueFields && (
           <>
-            <div className="sm:col-span-2 flex items-center justify-between gap-3 rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2">
-              <p className="text-sm font-semibold text-violet-900">
-                Add new venue{venueName.trim() ? `: ${venueName.trim()}` : ""}
+            <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <p className="text-sm font-semibold text-amber-950">
+                This venue is not registered in the system
               </p>
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => setAddingNewVenue(false)}
-                  className="text-xs text-slate-600 hover:text-rose-600 shrink-0"
-                >
-                  Cancel
-                </button>
-          )}
-        </div>
+              <p className="text-xs text-amber-900 mt-1">
+                Add venue-related information below to continue.
+                {venueName.trim() ? ` Venue name: ${venueName.trim()}.` : ""}
+              </p>
+            </div>
             <div className="sm:col-span-2">
-          <label className={labelClass}>Venue address</label>
+              <label className={labelClass}>
+                Venue address <span className="text-rose-500">*</span>
+              </label>
               <input
                 disabled={readOnly}
                 className={inputClass}
                 {...register(`showtimes.${index}.venue_address`)}
-                placeholder="Full address"
+                placeholder="Full street address"
               />
-        </div>
+            </div>
           </>
         )}
 
@@ -1436,67 +1305,6 @@ function VenueBlock({
             ) : null}
           </div>
         )}
-
-        {ticketFields.length === 0 && (
-          <p className="text-xs text-slate-500">No ticket type selected yet. Click Add type to create one.</p>
-        )}
-        {ticketFields.map((field, ti) => (
-          <div key={field.id} className="grid sm:grid-cols-4 gap-3 items-start rounded-lg border border-slate-200 bg-white p-3">
-            <div>
-              <label className={labelClass}>Type name <span className="text-rose-500">*</span></label>
-              <input
-                disabled={readOnly}
-                className={inputClass}
-                {...register(`showtimes.${index}.ticket_types.${ti}.ticket_type`)}
-                placeholder="General, VIP..."
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Total seats <span className="text-rose-500">*</span></label>
-              <input
-                disabled={readOnly}
-                type="number"
-                min={1}
-                className={inputClass}
-                {...register(`showtimes.${index}.ticket_types.${ti}.total_count`, { valueAsNumber: true })}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Price (ETB) <span className="text-rose-500">*</span></label>
-              <input
-                disabled={readOnly}
-                type="number"
-                min={0}
-                step="0.01"
-                className={inputClass}
-                {...register(`showtimes.${index}.ticket_types.${ti}.price`, { valueAsNumber: true })}
-              />
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className={labelClass}>Max per order</label>
-                <input
-                  disabled={readOnly}
-                  type="number"
-                  min={1}
-                  className={inputClass}
-                  {...register(`showtimes.${index}.ticket_types.${ti}.max_per_order`, {
-                    valueAsNumber: true,
-                  })}
-                />
-              </div>
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => remove(ti)}
-                  className="p-2.5 text-slate-400 hover:text-rose-600 self-end"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
       </div>
 
       {index === 0 && venueDocuments.length > 0 && onDocumentUpload && onDocumentRemove && (
@@ -1546,7 +1354,7 @@ function ArtistBlock({
   const [showResults, setShowResults] = useState(false);
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const labelClass = "portal-label block text-sm font-semibold mb-1.5";
-  const errorClass = "text-rose-600 text-xs mt-1";
+  const errorClass = "field-error";
   const inputClass = "input-field w-full";
   const isRegistered = Boolean(businessId) && artistSource === "registered";
 
@@ -1734,8 +1542,8 @@ function ArtistBlock({
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => applyPartner(a)}
-                        className={`w-full text-left px-3 py-2 hover:bg-violet-50 flex items-center gap-3 ${
-                          businessId === a.id ? "bg-violet-50" : ""
+                        className={`w-full text-left px-3 py-2 hover:bg-rose-50 flex items-center gap-3 ${
+                          businessId === a.id ? "bg-rose-50" : ""
                         }`}
                       >
                         <div className="h-10 w-10 rounded-lg overflow-hidden bg-slate-200 shrink-0">
@@ -1797,7 +1605,7 @@ function ArtistBlock({
             aspect={1}
             disabled={readOnly || uploading}
             previewClassName="w-28 h-28 rounded-xl"
-            emptyClassName="flex flex-col items-center justify-center h-28 w-28 rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+            emptyClassName="flex flex-col items-center justify-center h-28 w-28 rounded-xl border border-dashed border-slate-300 hover:border-rose-400"
             onRemove={() => setValue(`artists.${index}.image_url`, "", { shouldDirty: true })}
             onCroppedFile={(file) => void uploadPersonPhoto(file)}
             emptyContent={
@@ -2326,7 +2134,7 @@ export default function EventForm({
   };
 
   const labelClass = "portal-label block text-sm font-semibold mb-1.5";
-  const errorClass = "text-rose-600 text-xs mt-1";
+  const errorClass = "field-error";
   const inputClass = "input-field w-full";
 
   const stepIndex = steps.findIndex((s) => s.id === stepId);
@@ -2519,7 +2327,7 @@ export default function EventForm({
         />
 
         {stepId === "details" && (
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+        <section className="org-card p-6 space-y-5">
           <div>
             <h3 className="portal-heading text-lg font-semibold">Event details</h3>
             <p className="portal-muted text-sm mt-1">
@@ -2542,11 +2350,11 @@ export default function EventForm({
                 }}
                 className={`text-left rounded-2xl border p-5 transition-all ${
                   hostingType === "single"
-                    ? "border-violet-500 bg-violet-50 shadow-sm"
-                    : "border-slate-200 bg-white hover:border-violet-300"
+                    ? "border-rose-500 bg-rose-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-rose-300"
                 }`}
               >
-                <div className="h-10 w-10 rounded-xl bg-violet-100 text-violet-700 inline-flex items-center justify-center mb-3">
+                <div className="h-10 w-10 rounded-xl bg-rose-100 text-rose-700 inline-flex items-center justify-center mb-3">
                   <CalendarDays size={20} />
                 </div>
                 <p className="font-semibold text-slate-900">Single Event</p>
@@ -2560,8 +2368,8 @@ export default function EventForm({
                 onClick={() => setHostingType("tour")}
                 className={`text-left rounded-2xl border p-5 transition-all ${
                   hostingType === "tour"
-                    ? "border-violet-500 bg-violet-50 shadow-sm"
-                    : "border-slate-200 bg-white hover:border-violet-300"
+                    ? "border-rose-500 bg-rose-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-rose-300"
                 }`}
               >
                 <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-700 inline-flex items-center justify-center mb-3">
@@ -2691,7 +2499,7 @@ export default function EventForm({
                     onClick={() => toggleGenre(g.name)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       genres.includes(g.name)
-                        ? "bg-violet-500/20 text-violet-700 border-violet-500/40"
+                        ? "bg-rose-500/20 text-rose-700 border-rose-500/40"
                         : "portal-muted border-slate-200 hover:bg-slate-50"
                     }`}
                   >
@@ -2718,7 +2526,7 @@ export default function EventForm({
                     onClick={() => toggleLanguage(l)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       languages.includes(l)
-                        ? "bg-violet-500/20 text-violet-700 border-violet-500/40"
+                        ? "bg-rose-500/20 text-rose-700 border-rose-500/40"
                         : "portal-muted border-slate-200 hover:bg-slate-50"
                     }`}
                   >
@@ -2756,7 +2564,7 @@ export default function EventForm({
                     onClick={() => toggleTicketMode(option.id)}
                     className={`rounded-xl border p-4 text-left transition-colors ${
                       selected
-                        ? "border-violet-500 bg-violet-500/10"
+                        ? "border-rose-500 bg-rose-500/10"
                         : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
@@ -2764,7 +2572,7 @@ export default function EventForm({
                       <span
                         className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
                           selected
-                            ? "border-violet-600 bg-violet-600 text-white"
+                            ? "border-rose-600 bg-rose-600 text-white"
                             : "border-slate-300 bg-white"
                         }`}
                       >
@@ -2808,7 +2616,7 @@ export default function EventForm({
         )}
 
         {stepId === "sport" && (
-          <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+          <section className="org-card p-6 space-y-5">
             <div>
               <h3 className="portal-heading text-lg font-semibold">Sport details</h3>
               <p className="portal-muted text-sm mt-1">
@@ -2834,7 +2642,7 @@ export default function EventForm({
                       onClick={() => toggleGenre(g.name)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                         genres.includes(g.name)
-                          ? "bg-violet-500/20 text-violet-700 border-violet-500/40"
+                          ? "bg-rose-500/20 text-rose-700 border-rose-500/40"
                           : "portal-muted border-slate-200 hover:bg-slate-50"
                       }`}
                     >
@@ -2957,7 +2765,7 @@ export default function EventForm({
 
         {stepId === "media" && (
         <>
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+        <section className="org-card p-6 space-y-5">
           <h3 className="portal-heading text-lg font-semibold">Posters</h3>
           <p className="portal-muted text-xs">Drag a crop box on the photo, then save. You can edit or remove any image later.</p>
           <div className="grid sm:grid-cols-2 gap-6">
@@ -2968,7 +2776,7 @@ export default function EventForm({
                 aspect={16 / 9}
                 disabled={readOnly || uploading}
                 previewClassName="w-full h-36 rounded-xl"
-                emptyClassName="flex flex-col items-center justify-center h-36 w-full rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+                emptyClassName="flex flex-col items-center justify-center h-36 w-full rounded-xl border border-dashed border-slate-300 hover:border-rose-400"
                 onRemove={() => setValue("poster_horizontal_url", "", { shouldDirty: true })}
                 onCroppedFile={(file) => uploadCropped(file, (url) => setValue("poster_horizontal_url", url, { shouldDirty: true }))}
                 emptyContent={
@@ -2986,7 +2794,7 @@ export default function EventForm({
                 aspect={2 / 3}
                 disabled={readOnly || uploading}
                 previewClassName="w-[200px] h-48 rounded-xl"
-                emptyClassName="flex flex-col items-center justify-center h-36 w-full max-w-[200px] rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+                emptyClassName="flex flex-col items-center justify-center h-36 w-full max-w-[200px] rounded-xl border border-dashed border-slate-300 hover:border-rose-400"
                 onRemove={() => setValue("poster_vertical_url", "", { shouldDirty: true })}
                 onCroppedFile={(file) => uploadCropped(file, (url) => setValue("poster_vertical_url", url, { shouldDirty: true }))}
                 emptyContent={
@@ -3000,7 +2808,7 @@ export default function EventForm({
           </div>
         </section>
 
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+        <section className="org-card p-6 space-y-4">
           <h3 className="portal-heading text-lg font-semibold">Gallery</h3>
           <p className="portal-muted text-sm">Photos customers will see on the event details page.</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -3033,7 +2841,7 @@ export default function EventForm({
               <ImageCropPicker
                 aspect={4 / 3}
                 disabled={uploading}
-                className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-slate-300 hover:border-violet-400"
+                className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-slate-300 hover:border-rose-400"
                 onCroppedFile={(file) =>
                   uploadCropped(file, (url) =>
                     setValue("gallery_images", [...galleryImages, url], { shouldDirty: true })
@@ -3047,7 +2855,7 @@ export default function EventForm({
           </div>
         </section>
 
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+        <section className="org-card p-6 space-y-4">
           <div>
             <h3 className="portal-heading text-lg font-semibold">YouTube video</h3>
             <p className="portal-muted text-sm mt-1">
@@ -3067,7 +2875,7 @@ export default function EventForm({
 
         {stepId === "documents" && (
         <>
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+        <section className="org-card p-6 space-y-4">
           <div>
             <h3 className="portal-heading text-lg font-semibold">Event-specific documents</h3>
             <p className="portal-muted text-sm mt-1">
@@ -3092,7 +2900,7 @@ export default function EventForm({
           )}
         </section>
 
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+        <section className="org-card p-6 space-y-4">
           <div>
             <h3 className="portal-heading text-lg font-semibold">Customer terms &amp; conditions</h3>
             <p className="portal-muted text-sm mt-1">
@@ -3113,7 +2921,7 @@ export default function EventForm({
                       <label
                         key={term.id}
                         className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${
-                          checked ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-slate-50"
+                          checked ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-slate-50"
                         } ${readOnly ? "cursor-default" : ""}`}
                       >
                         <input
@@ -3132,7 +2940,7 @@ export default function EventForm({
                     .map((term) => (
                       <label
                         key={`kept-${term.id}`}
-                        className="flex items-start gap-3 p-3 rounded-xl border border-violet-300 bg-violet-50"
+                        className="flex items-start gap-3 p-3 rounded-xl border border-rose-300 bg-rose-50"
                       >
                         <input
                           type="checkbox"
@@ -3190,7 +2998,7 @@ export default function EventForm({
                     <button
                       type="button"
                       onClick={addCustomTerm}
-                      className="px-3 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 inline-flex items-center gap-1"
+                      className="px-3 py-2 rounded-xl bg-rose-600 text-white text-sm font-medium hover:bg-rose-500 inline-flex items-center gap-1"
                     >
                       <Plus size={14} /> Add
                     </button>
@@ -3204,7 +3012,7 @@ export default function EventForm({
         )}
 
         {stepId === "venue" && (
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+        <section className="org-card p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="portal-heading text-lg font-semibold">
               {hostingType === "tour" ? "Tour stops & layouts" : "Venue & layout"}{" "}
@@ -3217,7 +3025,7 @@ export default function EventForm({
                   const tickets = (getValues("showtimes.0.ticket_types") || []).map((t) => ({ ...t }));
                   appendShowtime({ ...defaultVenue(), ticket_types: tickets });
                 }}
-                className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
+                className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1"
               >
                 <Plus size={14} /> Add venue
               </button>
@@ -3251,7 +3059,7 @@ export default function EventForm({
         )}
 
         {stepId === "artists" && (
-        <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
+        <section className="org-card p-6 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="portal-heading text-lg font-semibold">
@@ -3267,7 +3075,7 @@ export default function EventForm({
               <button
                 type="button"
                 onClick={() => appendArtist({ ...defaultArtist(), sort_order: artistFields.length })}
-                className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1"
+                className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1"
               >
                 <Plus size={14} /> {isSports ? "Add player" : "Add person"}
               </button>
@@ -3310,7 +3118,7 @@ export default function EventForm({
         )}
 
         {stepId === "review" && (
-          <section className="glass-panel rounded-2xl border border-white/5 p-6 space-y-6">
+          <section className="org-card p-6 space-y-6">
             <div>
               <h3 className="portal-heading text-lg font-semibold">Review & submit</h3>
               <p className="portal-muted text-sm mt-1">
@@ -3369,7 +3177,7 @@ export default function EventForm({
                         .join(" · ")
                     : "None added"}
                 </p>
-                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("details")}>
+                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("details")}>
                   Edit details
                 </button>
               </div>
@@ -3405,7 +3213,7 @@ export default function EventForm({
                   )}
                   <button
                     type="button"
-                    className="text-sm text-violet-700 font-medium"
+                    className="text-sm text-rose-700 font-medium"
                     onClick={() => goToStep("sport")}
                   >
                     Edit sport details
@@ -3474,7 +3282,7 @@ export default function EventForm({
                       href={watch("youtube_url")}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-violet-700 underline break-all"
+                      className="text-rose-700 underline break-all"
                     >
                       {watch("youtube_url")}
                     </a>
@@ -3482,7 +3290,7 @@ export default function EventForm({
                     "Not set"
                   )}
                 </p>
-                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("media")}>
+                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("media")}>
                   Edit media
                 </button>
               </div>
@@ -3517,7 +3325,7 @@ export default function EventForm({
                     </p>
                   </div>
                 ))}
-                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("venue")}>
+                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("venue")}>
                   Edit venue & tickets
                 </button>
               </div>
@@ -3545,7 +3353,7 @@ export default function EventForm({
                     </div>
                   ))
                 )}
-                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("artists")}>
+                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("artists")}>
                   {isSports ? "Edit teams / players" : "Edit lineup"}
                 </button>
               </div>
@@ -3589,7 +3397,7 @@ export default function EventForm({
                                 href={doc.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-200 bg-slate-50 text-slate-500 hover:border-violet-300 hover:text-violet-700"
+                                className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-200 bg-slate-50 text-slate-500 hover:border-rose-300 hover:text-rose-700"
                               >
                                 <FileText size={22} />
                                 <span className="text-[11px]">Open file</span>
@@ -3608,7 +3416,7 @@ export default function EventForm({
                 <p className="text-sm text-slate-600">
                   T&amp;C points: {selectedTerms.length} master + {customTerms.length} custom
                 </p>
-                <button type="button" className="text-sm text-violet-700 font-medium" onClick={() => goToStep("documents")}>
+                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("documents")}>
                   Edit documents
                 </button>
               </div>

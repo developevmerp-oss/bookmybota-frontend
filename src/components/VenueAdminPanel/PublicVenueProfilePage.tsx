@@ -179,6 +179,26 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
           </div>
         </div>
 
+        {Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0 ? (
+          <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <h2 className="text-lg font-bold text-slate-800">Gallery</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {venue.gallery_images.map((url, idx) => (
+                <div
+                  key={`${url}-${idx}`}
+                  className="aspect-[4/3] rounded-xl overflow-hidden border border-slate-100 bg-slate-50"
+                >
+                  <img
+                    src={resolveMediaUrl(url)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="space-y-3">
             <h2 className="text-lg font-bold text-slate-800">Free dates</h2>

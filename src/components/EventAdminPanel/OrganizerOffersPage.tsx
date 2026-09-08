@@ -203,7 +203,7 @@ function OfferFormPanel({
   });
 
   return (
-    <form onSubmit={onSubmit} className="glass-panel rounded-2xl p-5 space-y-5" noValidate>
+    <form onSubmit={onSubmit} className="org-card p-5 space-y-5" noValidate>
       <h3 className="portal-heading font-semibold text-lg">
         {editing ? "Edit offer" : "Create offer"}
       </h3>
@@ -474,7 +474,7 @@ function OfferFormPanel({
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold disabled:opacity-50"
+          className="px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold disabled:opacity-50"
         >
           {saving && <Loader2 size={14} className="inline animate-spin mr-1" />}
           {editing ? "Update" : "Create"}
@@ -563,7 +563,7 @@ export default function OrganizerOffersPage() {
       <div className="flex flex-wrap justify-between gap-3 items-start">
         <div>
           <h2 className="portal-heading text-2xl font-bold flex items-center gap-2">
-            <Tag className="text-violet-500" /> Event Offers
+            <Tag className="text-rose-500" /> Event Offers
           </h2>
           <p className="portal-muted text-sm mt-1">
             Create promo offers for <strong>Live</strong> or <strong>Pending Approval</strong>{" "}
@@ -583,7 +583,7 @@ export default function OrganizerOffersPage() {
             type="button"
             onClick={openCreate}
             disabled={eligibleEvents.length === 0}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
           >
             <Plus size={16} /> New offer
           </button>
@@ -610,13 +610,13 @@ export default function OrganizerOffersPage() {
       {isLoading ? (
         <p className="portal-muted text-center py-10">Loading offers...</p>
       ) : offers.length === 0 ? (
-        <div className="glass-panel rounded-2xl p-10 text-center portal-muted">
+        <div className="org-card p-10 text-center portal-muted">
           No offers yet. Create one for a live or pending event.
         </div>
       ) : (
         <div className="space-y-3">
           {offers.map((o) => (
-            <div key={o.id} className="glass-panel rounded-2xl p-4 flex flex-wrap justify-between gap-3">
+            <div key={o.id} className="org-card p-4 flex flex-wrap justify-between gap-3">
               <div>
                 <p className="font-semibold portal-heading">{o.title}</p>
                 <p className="text-sm portal-muted">

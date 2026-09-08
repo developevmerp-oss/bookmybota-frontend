@@ -28,8 +28,6 @@ import { EventListShimmer } from "@/components/Shared/Shimmer";
 import {
   EVENT_CATEGORY_OPTIONS,
   categorySlugsMatch,
-  isEventCategoryKey,
-  normalizeCategoryParam,
   resolveCategorySlug,
   resolveCategoryKeyFromSlug,
   type EventCategoryKey,
@@ -159,6 +157,30 @@ function FilterSection({
   );
 }
 
+function FiltersPanel({
+  onClearAll,
+  children,
+}: {
+  onClearAll: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-100 shadow-[0_1px_4px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
+        <h3 className="font-bold text-slate-900 text-base">Filters</h3>
+        <button
+          type="button"
+          onClick={onClearAll}
+          className="text-sm font-medium text-[#6900AA] hover:text-[#57008E] cursor-pointer"
+        >
+          Clear All
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function EventCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: string }) {
   return <EventPosterCard event={event} city={cityLabel} fullWidth />;
 }
@@ -169,7 +191,6 @@ export default function PublicEventsPage() {
   const [searchInput, setSearchInput] = useState("");
   const router = useRouter();
   const pathname = usePathname() || "/events";
-  const [urlQuery, setUrlQuery] = useState("");
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -198,6 +219,14 @@ export default function PublicEventsPage() {
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
 
+  const syncCategoryToUrl = (slug: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (slug) params.set("category", slug);
+    else params.delete("category");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
   const apiCategories = filterOptions?.categories ?? [];
   const { data: businessTypes = [] } = useGetBusinessTypesQuery("event", {
@@ -205,16 +234,10 @@ export default function PublicEventsPage() {
   });
 
   const categoryPool = useMemo(() => {
-    if (apiCategories.length > 0) return apiCategories;
-    const fromTypes = businessTypes
-      .filter((t) => Boolean(t.parent_type_id))
-      .map((t) => ({
-        slug: (t.slug || t.name || "").trim().toLowerCase().replace(/\s+/g, "-"),
-        name: t.name,
-      }))
-      .filter((c) => c.slug && c.name);
-    if (fromTypes.length > 0) return fromTypes;
-    return EVENT_CATEGORY_OPTIONS.map((opt) => ({ slug: opt.key, name: opt.label }));
+    if (apiCategories.length) return apiCategories;
+    return businessTypes
+      .filter((type) => type.parent_type_id && type.slug)
+      .map((type) => ({ slug: type.slug as string, name: type.name }));
   }, [apiCategories, businessTypes]);
 
   // Debounce search so every keystroke does not hit the API.
@@ -416,6 +439,12 @@ export default function PublicEventsPage() {
     syncCategoryToUrl(next[0] ?? null);
   };
 
+  const clearCity = () => {
+    setCity("");
+    localStorage.setItem("selected_city", "All Cities");
+    window.dispatchEvent(new Event("selected_city_changed"));
+  };
+
   const clearAllFilters = () => {
     setSelectedSlugs([]);
     setDatePreset("");
@@ -425,6 +454,10 @@ export default function PublicEventsPage() {
     clearCity();
     setSelectedLanguages([]);
     setSelectedPriceBands([]);
+    setSelectedMore([]);
+    setSearchInput("");
+    setSearch("");
+    setSort("recommended");
     syncCategoryToUrl(null);
   };
 
@@ -434,12 +467,6 @@ export default function PublicEventsPage() {
 
   const toggleOpen = (key: keyof typeof openFilters) => {
     setOpenFilters((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const clearCity = () => {
-    setCity("");
-    localStorage.setItem("selected_city", "All Cities");
-    window.dispatchEvent(new Event("selected_city_changed"));
   };
 
   const selectCity = (cityName: string) => {
@@ -786,9 +813,8 @@ export default function PublicEventsPage() {
             id="city-filter"
             className="lg:sticky lg:top-24 self-start h-fit max-h-none lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto [scrollbar-width:thin]"
           >
-            <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3 lg:hidden">Filters</h3>
-
-            <div className="lg:hidden">
+            <div className="lg:hidden mb-3">
+              <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3">Filters</h3>
               <div className={`grid gap-1.5 ${moreOptions.length ? "grid-cols-3" : "grid-cols-5"}`}>
                 {mobileTabs.map((tab) => {
                   const active = mobileFilterTab === tab.id;
@@ -820,78 +846,69 @@ export default function PublicEventsPage() {
               )}
             </div>
 
-            <div className="hidden lg:block rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                <h3 className="text-base sm:text-lg font-bold text-slate-900">Filters</h3>
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  disabled={!hasActiveFilters}
-                  className={`text-sm font-semibold cursor-pointer ${
-                    hasActiveFilters ? "text-[#6900AA]" : "text-[#6900AA]/40 cursor-default"
-                  }`}
-                >
-                  Clear All
-                </button>
-              </div>
-
-              <FilterSection
-                title="Categories"
-                open={openFilters.categories}
-                onToggle={() => toggleOpen("categories")}
-                onClear={() => setSelectedSlugs([])}
-              >
-                {categoriesPanel()}
-              </FilterSection>
-
-              <FilterSection
-                title="Date"
-                open={openFilters.date}
-                onToggle={() => toggleOpen("date")}
-                onClear={clearDateFilters}
-              >
-                {datePanel()}
-              </FilterSection>
-
-              <FilterSection
-                title="City"
-                open={openFilters.city}
-                onToggle={() => toggleOpen("city")}
-                onClear={clearCity}
-              >
-                {cityPanel()}
-              </FilterSection>
-
-              <FilterSection
-                title="Languages"
-                open={openFilters.languages}
-                onToggle={() => toggleOpen("languages")}
-                onClear={() => setSelectedLanguages([])}
-              >
-                {languagesPanel()}
-              </FilterSection>
-
-              <FilterSection
-                title="Price"
-                open={openFilters.price}
-                onToggle={() => toggleOpen("price")}
-                onClear={() => setSelectedPriceBands([])}
-                last={moreOptions.length === 0}
-              >
-                {pricePanel()}
-              </FilterSection>
-
-              {moreOptions.length > 0 ? (
+            <div className="hidden lg:block">
+              <FiltersPanel onClearAll={clearAllFilters}>
                 <FilterSection
-                  title="More filters"
-                  open={openFilters.more}
-                  onToggle={() => toggleOpen("more")}
-                  onClear={() => setSelectedMore([])}
-                  last
+                  title="Categories"
+                  open={openFilters.categories}
+                  onToggle={() => toggleOpen("categories")}
+                  onClear={() => {
+                    setSelectedSlugs([]);
+                    syncCategoryToUrl(null);
+                  }}
                 >
-                  {morePanel()}
+                  {categoriesPanel()}
                 </FilterSection>
-              ) : null}
+
+                <FilterSection
+                  title="Date"
+                  open={openFilters.date}
+                  onToggle={() => toggleOpen("date")}
+                  onClear={clearDateFilters}
+                >
+                  {datePanel()}
+                </FilterSection>
+
+                <FilterSection
+                  title="City"
+                  open={openFilters.city}
+                  onToggle={() => toggleOpen("city")}
+                  onClear={clearCity}
+                >
+                  {cityPanel()}
+                </FilterSection>
+
+                <FilterSection
+                  title="Languages"
+                  open={openFilters.languages}
+                  onToggle={() => toggleOpen("languages")}
+                  onClear={() => setSelectedLanguages([])}
+                >
+                  {languagesPanel()}
+                </FilterSection>
+
+                <FilterSection
+                  title="Price"
+                  open={openFilters.price}
+                  onToggle={() => toggleOpen("price")}
+                  onClear={() => setSelectedPriceBands([])}
+                  last={moreOptions.length === 0}
+                >
+                  {pricePanel()}
+                </FilterSection>
+
+                {moreOptions.length > 0 && (
+                  <FilterSection
+                    title="More filters"
+                    open={openFilters.more}
+                    onToggle={() => toggleOpen("more")}
+                    onClear={() => setSelectedMore([])}
+                    last
+                  >
+                    {morePanel()}
+                  </FilterSection>
+                )}
+              </FiltersPanel>
             </div>
           </aside>
 

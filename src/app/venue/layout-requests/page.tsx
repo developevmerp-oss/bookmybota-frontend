@@ -39,7 +39,7 @@ const LOG_ACTION_STYLES: Record<VenueLayoutTemplateLog["action"], string> = {
   REJECTED: "bg-rose-500/15 text-rose-300 border-rose-500/30",
   REQUESTED_LIVE: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   REJECTED_ALL: "bg-rose-500/15 text-rose-300 border-rose-500/30",
-  LIVE_CONFIRMED: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+  LIVE_CONFIRMED: "metric-brand border border-transparent",
   LIVE_DECLINED: "bg-amber-500/15 text-amber-300 border-amber-500/30",
 };
 
@@ -182,35 +182,36 @@ export default function VenueLayoutRequestsPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white">Layout site visit</h2>
-        <p className="text-zinc-400 mt-1">
+        <p className="org-section-label mb-2">Layouts</p>
+        <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Layout site visit</h2>
+        <p className="text-muted-foreground mt-1.5 text-sm">
           Request BookMyBota to visit your venue and create the seating layout. No layout details are
           needed here — our team will survey on site.
         </p>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
+      <div className="org-card overflow-hidden">
         <div className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-white">Request a site visit</h3>
-          <p className="text-sm text-zinc-400">
+          <h3 className="font-display text-lg font-bold text-foreground">Request a site visit</h3>
+          <p className="text-sm text-muted-foreground">
             We use your{" "}
-            <Link href="/venue/profile" className="text-amber-400 hover:text-amber-300 font-medium">
+            <Link href="/venue/profile" className="text-primary hover:opacity-80 font-medium">
               venue profile
             </Link>{" "}
             for venue name, address, and contact details.
           </p>
 
-          <div className="rounded-xl border border-white/10 bg-zinc-900/40 p-4 space-y-2 text-sm">
-            <p className="text-white font-medium">{venueName}</p>
-            <p className="text-zinc-400">{venueTypeLabel}</p>
-            <p className="text-zinc-400 flex items-start gap-2">
+          <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2 text-sm">
+            <p className="font-semibold text-foreground">{venueName}</p>
+            <p className="text-muted-foreground">{venueTypeLabel}</p>
+            <p className="text-muted-foreground flex items-start gap-2">
               <MapPin size={14} className="shrink-0 mt-0.5" />
               {venueAddress}
             </p>
           </div>
 
           {openVisitRequest ? (
-            <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">
+            <div className="rounded-xl border border-primary/20 bg-primary-soft px-4 py-3 text-sm text-primary">
               You already have a pending site visit request. BookMyBota team will visit your venue
               and mark it complete when done.
             </div>
@@ -227,11 +228,11 @@ export default function VenueLayoutRequestsPage() {
         </div>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/10 p-6">
+      <div className="org-card p-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
           <div>
-            <h3 className="text-lg font-semibold text-white">Layout options from Super Admin</h3>
-            <p className="text-sm text-zinc-400 mt-1">
+            <h3 className="font-display text-lg font-bold text-foreground">Layout options from Super Admin</h3>
+            <p className="text-sm text-muted-foreground mt-1.5 text-sm">
               {awaitingConfirmation.length > 0
                 ? "Your go-live request is with BookMyBota. No further approve/reject actions until they confirm."
                 : pendingLayoutOptions.length > 0
@@ -259,11 +260,11 @@ export default function VenueLayoutRequestsPage() {
         </div>
 
         {loadingOptions ? (
-          <p className="text-zinc-400">Loading layout options...</p>
+          <p className="text-muted-foreground">Loading layout options...</p>
         ) : layoutOptions.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/15 bg-zinc-900/30 p-10 text-center">
-            <p className="text-zinc-400">No layout options yet.</p>
-            <p className="text-sm text-zinc-500 mt-2">
+          <div className="rounded-xl border border-dashed border-border bg-muted/30 p-10 text-center">
+            <p className="text-muted-foreground">No layout options yet.</p>
+            <p className="text-sm text-muted-foreground mt-2">
               After your site visit, BookMyBota will create and submit multiple layout options for you
               to compare and approve.
             </p>
@@ -291,14 +292,14 @@ export default function VenueLayoutRequestsPage() {
                     live
                       ? "border-sky-500/40 bg-sky-950/20"
                       : awaitingLive
-                        ? "border-violet-500/40 bg-violet-950/20"
+                        ? "border-primary/30 bg-primary-soft"
                       : shortlisted
                         ? "border-emerald-500/40 bg-emerald-950/20"
                       : rejected
                         ? "border-rose-500/30 bg-rose-950/10"
                         : waiting
-                          ? "border-amber-500/30 bg-zinc-900/50"
-                          : "border-white/10 bg-zinc-900/40"
+                          ? "border-amber-500/30 bg-muted/50"
+                          : "border-border bg-muted/40"
                   }`}
                 >
                   <div className="p-3 border-b border-white/5 bg-black/20">
@@ -314,8 +315,8 @@ export default function VenueLayoutRequestsPage() {
                         <p className="text-xs font-bold uppercase tracking-wide text-amber-400/90">
                           Option {index + 1}
                         </p>
-                        <p className="font-semibold text-white truncate">{option.name}</p>
-                        <p className="text-xs text-zinc-400 mt-1">
+                        <p className="font-semibold text-foreground truncate">{option.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1.5 text-sm">
                           {option.hall_name || "Hall"} · {option.layout_type}
                           {option.seat_count ? ` · ${option.seat_count} seats` : ""}
                         </p>
@@ -325,14 +326,14 @@ export default function VenueLayoutRequestsPage() {
                           live
                             ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
                             : awaitingLive
-                              ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+                              ? "metric-brand border border-transparent"
                             : shortlisted
                               ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                             : rejected
                               ? "bg-rose-500/15 text-rose-300 border-rose-500/30"
                               : waiting
                                 ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                                : "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"
+                                : "bg-zinc-500/15 text-muted-foreground border-zinc-500/30"
                         }`}
                       >
                         {live
@@ -354,7 +355,7 @@ export default function VenueLayoutRequestsPage() {
                     ) : null}
 
                     {awaitingLive ? (
-                      <p className="text-xs text-violet-300/90">
+                      <p className="text-xs text-primary">
                         BookMyBota will confirm before this layout goes live.
                       </p>
                     ) : null}
@@ -363,7 +364,7 @@ export default function VenueLayoutRequestsPage() {
                       <button
                         type="button"
                         onClick={() => setViewingId(option.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/15 text-sm text-zinc-200 hover:bg-white/10"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm text-foreground hover:bg-muted"
                       >
                         <Eye size={14} /> View full
                       </button>
@@ -436,23 +437,23 @@ export default function VenueLayoutRequestsPage() {
         )}
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/10 p-6">
+      <div className="org-card p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <ScrollText size={18} className="text-zinc-400" />
-            <h3 className="text-lg font-semibold text-white">Activity log</h3>
+            <ScrollText size={18} className="text-muted-foreground" />
+            <h3 className="font-display text-lg font-bold text-foreground">Activity log</h3>
           </div>
-          <span className="text-xs text-zinc-500">{activityLogs.length} entries</span>
+          <span className="text-xs text-muted-foreground">{activityLogs.length} entries</span>
         </div>
-        <p className="text-sm text-zinc-400 mb-4">
+        <p className="text-sm text-muted-foreground mb-4">
           Every approve, reject, and go-live step is recorded here in order (newest first).
         </p>
         {loadingLogs ? (
-          <p className="text-zinc-400">Loading activity...</p>
+          <p className="text-muted-foreground">Loading activity...</p>
         ) : activityLogs.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/15 bg-zinc-900/30 p-8 text-center">
-            <p className="text-zinc-400">No activity yet.</p>
-            <p className="text-sm text-zinc-500 mt-1">
+          <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center">
+            <p className="text-muted-foreground">No activity yet.</p>
+            <p className="text-sm text-muted-foreground mt-1">
               When you approve, reject, or request a layout to go live, it will appear here.
             </p>
           </div>
@@ -461,30 +462,30 @@ export default function VenueLayoutRequestsPage() {
             {activityLogs.map((entry, index) => (
               <div
                 key={entry.id}
-                className={`flex gap-4 py-4 ${index < activityLogs.length - 1 ? "border-b border-white/10" : ""}`}
+                className={`flex gap-4 py-4 ${index < activityLogs.length - 1 ? "border-b border-border" : ""}`}
               >
                 <div className="shrink-0 w-2 mt-2 rounded-full bg-white/10 self-stretch min-h-[2.5rem]" />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span
                       className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border ${
-                        LOG_ACTION_STYLES[entry.action] || "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"
+                        LOG_ACTION_STYLES[entry.action] || "bg-zinc-500/15 text-muted-foreground border-zinc-500/30"
                       }`}
                     >
                       {LOG_ACTION_LABELS[entry.action] || entry.action}
                     </span>
                     {entry.created_at ? (
-                      <span className="text-xs text-zinc-500">{formatDateTime12h(entry.created_at)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDateTime12h(entry.created_at)}</span>
                     ) : null}
                   </div>
                   {entry.template_name ? (
                     <p className="text-sm font-medium text-white">{entry.template_name}</p>
                   ) : null}
                   {entry.message ? (
-                    <p className="text-sm text-zinc-400 mt-1 whitespace-pre-line">{entry.message}</p>
+                    <p className="text-sm text-muted-foreground mt-1.5 text-sm whitespace-pre-line">{entry.message}</p>
                   ) : null}
                   {entry.actor_label ? (
-                    <p className="text-xs text-zinc-500 mt-1">By {entry.actor_label}</p>
+                    <p className="text-xs text-muted-foreground mt-1">By {entry.actor_label}</p>
                   ) : null}
                 </div>
               </div>
@@ -493,23 +494,23 @@ export default function VenueLayoutRequestsPage() {
         )}
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/10 p-6">
+      <div className="org-card p-6">
         <div className="flex items-center justify-between gap-3 mb-4">
-          <h3 className="text-lg font-semibold text-white">Existing requests</h3>
-          <span className="text-xs text-zinc-500">{requests.length} total</span>
+          <h3 className="font-display text-lg font-bold text-foreground">Existing requests</h3>
+          <span className="text-xs text-muted-foreground">{requests.length} total</span>
         </div>
         {isLoading ? (
-          <p className="text-zinc-400">Loading requests...</p>
+          <p className="text-muted-foreground">Loading requests...</p>
         ) : requests.length === 0 ? (
-          <p className="text-zinc-500">No layout requests yet. Use the button above to request a site visit.</p>
+          <p className="text-muted-foreground">No layout requests yet. Use the button above to request a site visit.</p>
         ) : (
           <div className="space-y-3">
             {requests.map((request) => (
-              <div key={request.id} className="rounded-xl border border-white/10 bg-white/50 p-4">
+              <div key={request.id} className="rounded-xl border border-border bg-white/50 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-white font-semibold">{request.layout_name}</p>
-                    <p className="text-sm text-zinc-400 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1.5 text-sm">
                       {(request.hall_name || venueName)} · Site visit request
                     </p>
                     {request.visit_status === "VISIT_COMPLETE" ? (
@@ -558,7 +559,7 @@ export default function VenueLayoutRequestsPage() {
           onClick={() => setViewingId(null)}
         >
           <div
-            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-950 border border-white/10 p-5"
+            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-950 border border-border p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -566,8 +567,8 @@ export default function VenueLayoutRequestsPage() {
                 <p className="text-xs font-bold uppercase tracking-wide text-amber-400">
                   Option {layoutOptions.findIndex((o) => o.id === viewingId) + 1} of {layoutOptions.length}
                 </p>
-                <h3 className="text-lg font-semibold text-white">{viewingLayout?.name || "Layout option"}</h3>
-                <p className="text-sm text-zinc-400 mt-1">
+                <h3 className="font-display text-lg font-bold text-foreground">{viewingLayout?.name || "Layout option"}</h3>
+                <p className="text-sm text-muted-foreground mt-1.5 text-sm">
                   {viewingLayout?.hall_name || "Hall"} · {viewingLayout?.layout_type || ""} ·{" "}
                   {viewingLayout?.seat_count || 0} seats
                 </p>
@@ -575,13 +576,13 @@ export default function VenueLayoutRequestsPage() {
               <button
                 type="button"
                 onClick={() => setViewingId(null)}
-                className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center hover:bg-white/10"
+                className="h-8 w-8 rounded-full border border-border text-zinc-300 inline-flex items-center justify-center hover:bg-muted"
               >
                 <X size={16} />
               </button>
             </div>
             {loadingView ? (
-              <p className="text-zinc-400 py-10 text-center">Loading layout...</p>
+              <p className="text-muted-foreground py-10 text-center">Loading layout...</p>
             ) : (
               <LayoutSeatPreview
                 seats={viewingLayout?.seats_json}
@@ -596,7 +597,7 @@ export default function VenueLayoutRequestsPage() {
             viewingLayout.status === "PUBLISHED" &&
             !viewingLayout.is_default &&
             !reviewLocked ? (
-              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/10">
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
                 {!viewingLayout.venue_approved_at ? (
                   <button
                     type="button"
@@ -654,13 +655,13 @@ export default function VenueLayoutRequestsPage() {
           onClick={() => setRejectAllOpen(false)}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-white/10 p-5"
+            className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-border p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-white">Reject all layout options</h3>
-                <p className="text-sm text-zinc-400 mt-1">
+                <h3 className="font-display text-lg font-bold text-foreground">Reject all layout options</h3>
+                <p className="text-sm text-muted-foreground mt-1.5 text-sm">
                   This rejects all {pendingLayoutOptions.length} options waiting for approval. Super Admin
                   can revise and send new options.
                 </p>
@@ -668,7 +669,7 @@ export default function VenueLayoutRequestsPage() {
               <button
                 type="button"
                 onClick={() => setRejectAllOpen(false)}
-                className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center"
+                className="h-8 w-8 rounded-full border border-border text-zinc-300 inline-flex items-center justify-center"
               >
                 <X size={16} />
               </button>
@@ -718,18 +719,18 @@ export default function VenueLayoutRequestsPage() {
           onClick={() => setRejectingId(null)}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-white/10 p-5"
+            className="w-full max-w-lg rounded-2xl bg-zinc-950 border border-border p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-white">Reject layout option</h3>
-                <p className="text-sm text-zinc-400 mt-1">Add a reason so Super Admin can revise this option.</p>
+                <h3 className="font-display text-lg font-bold text-foreground">Reject layout option</h3>
+                <p className="text-sm text-muted-foreground mt-1.5 text-sm">Add a reason so Super Admin can revise this option.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setRejectingId(null)}
-                className="h-8 w-8 rounded-full border border-white/10 text-zinc-300 inline-flex items-center justify-center"
+                className="h-8 w-8 rounded-full border border-border text-zinc-300 inline-flex items-center justify-center"
               >
                 <X size={16} />
               </button>

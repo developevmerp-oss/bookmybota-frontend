@@ -112,7 +112,7 @@ export default function ArtistMediaSocialFields({
         return;
       }
       const fd = new FormData();
-      fd.append("media", file);
+      fd.append("file", file);
       const res = await uploadMedia(fd).unwrap();
       const url = res.url;
       if (!url) throw new Error("Upload failed");

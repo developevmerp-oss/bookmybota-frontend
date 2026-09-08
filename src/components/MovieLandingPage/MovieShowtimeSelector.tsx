@@ -1123,8 +1123,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   ? `No cinemas in ${selectedCity} have scheduled showtimes for ${selectedDate}.`
                   : `Cinemas haven't published showtimes for ${selectedDate} yet.`}
             </p>
-            {(languageFilters.length || priceFilters.length || timeFilters.length || cinemaSearch) >
-            0 ? (
+            {(languageFilters.length > 0 || priceFilters.length > 0 || timeFilters.length > 0 || Boolean(cinemaSearch)) ? (
               <button
                 type="button"
                 onClick={() => {

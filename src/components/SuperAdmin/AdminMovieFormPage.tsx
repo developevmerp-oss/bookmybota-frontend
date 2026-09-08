@@ -247,10 +247,10 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
     try {
       if (isEdit && movieId) {
         const res = await updateMovie({ id: movieId, body: payload }).unwrap();
-        toast.success(res.message || "Movie updated");
+        toast.success((res as any)?.message || "Movie updated");
       } else {
         const res = await createMovie(payload).unwrap();
-        toast.success(res.message || "Movie created");
+        toast.success((res as any)?.message || "Movie created");
       }
       router.push("/admin/movies");
     } catch (err) {

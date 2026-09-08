@@ -1,9 +1,12 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from "react";
 import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import { toast } from "sonner";
-import { Save, PlusSquare, MousePointer2, Trash2, Eraser, Undo2, Redo2, RotateCcw } from "lucide-react";
+import { 
+  Save, PlusSquare, MousePointer2, Trash2, Eraser, Undo2, Redo2, RotateCcw,
+  Hand, ZoomIn, ZoomOut, Maximize2
+} from "lucide-react";
 import { useGetOrganizerEventQuery, useUpdateEventLayoutMutation, useGetEventLayoutQuery } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 
@@ -81,7 +84,7 @@ export default function VenueLayoutBuilder({
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
   const [bgImage] = useImage(bgImageUrl || "");
-  const [mode, setMode] = useState<"select" | "add_seat" | "add_label" | "add_shape" | "bulk_seats" | "eraser">("select");
+  const [mode, setMode] = useState<"select" | "pan" | "add_seat" | "add_label" | "add_shape" | "bulk_seats" | "eraser">("select");
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
@@ -98,67 +101,278 @@ export default function VenueLayoutBuilder({
   const [bulkShape, setBulkShape] = useState<"grid" | "curve" | "circle">("grid");
   const [bulkRotation, setBulkRotation] = useState(0);
   const [bulkCurveAngle, setBulkCurveAngle] = useState(180);
-  const [zoomScale, setZoomScale] = useState(1);
+
+  // Zoom & Pan Interactive State
+  const [zoomScale, setZoomScale] = useState(0.48);
+  const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+
   const venueHydratedRef = React.useRef(false);
   const trRef = useRef<any>(null);
   const canvasScrollRef = useRef<HTMLDivElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<any>(null);
+  const pendingScrollRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
+  const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const isPanningRef = useRef(false);
+  const didPanRef = useRef(false);
+  const zoomScaleRef = useRef(zoomScale);
+
+  useEffect(() => {
+    zoomScaleRef.current = zoomScale;
+  }, [zoomScale]);
+
+  // Synchronously update scroll position after DOM re-renders with new canvas scale
+  useLayoutEffect(() => {
+    if (pendingScrollRef.current && canvasScrollRef.current) {
+      const { scrollLeft, scrollTop } = pendingScrollRef.current;
+      canvasScrollRef.current.scrollLeft = Math.max(0, scrollLeft);
+      canvasScrollRef.current.scrollTop = Math.max(0, scrollTop);
+      pendingScrollRef.current = null;
+    }
+  }, [zoomScale]);
+
+  // Native non-passive wheel listener for smooth, cursor-centered zoom
+  useEffect(() => {
+    const container = canvasScrollRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+
+      const stageEl = canvasWrapperRef.current;
+      if (!stageEl) return;
+
+      const currentScale = zoomScaleRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const stageRect = stageEl.getBoundingClientRect();
+
+      // Mouse position relative to the visible container viewport:
+      const mouseViewportX = e.clientX - containerRect.left;
+      const mouseViewportY = e.clientY - containerRect.top;
+
+      // Mouse position relative to the stage top-left:
+      const mouseOnStageX = e.clientX - stageRect.left;
+      const mouseOnStageY = e.clientY - stageRect.top;
+
+      // Coordinate in unscaled canvas space (0..3200, 0..2400):
+      const contentX = mouseOnStageX / currentScale;
+      const contentY = mouseOnStageY / currentScale;
+
+      // Calculate new scale with smooth step
+      // deltaY < 0 = scroll up = zoom in (+15%), deltaY > 0 = scroll down = zoom out (-15%)
+      const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+      const newScale = Math.min(Math.max(Number((currentScale * factor).toFixed(3)), 0.15), 4.0);
+
+      if (Math.abs(newScale - currentScale) < 0.001) return;
+
+      // New pixel offset within the stage canvas after scaling:
+      const newMouseOnStageX = contentX * newScale;
+      const newMouseOnStageY = contentY * newScale;
+
+      // Target scroll position so the content point stays precisely under the mouse cursor:
+      const targetScrollLeft = stageEl.offsetLeft + newMouseOnStageX - mouseViewportX;
+      const targetScrollTop = stageEl.offsetTop + newMouseOnStageY - mouseViewportY;
+
+      pendingScrollRef.current = {
+        scrollLeft: targetScrollLeft,
+        scrollTop: targetScrollTop,
+      };
+
+      setZoomScale(newScale);
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
+
+  // Spacebar key listener for pan mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") return;
+
+      if (e.code === "Space" && !e.repeat) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setIsSpacePressed(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  // Global mouse move & mouse up listeners for smooth panning
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanningRef.current || !panStartRef.current || !canvasScrollRef.current) return;
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      if (Math.hypot(dx, dy) > 4) {
+        didPanRef.current = true;
+      }
+      canvasScrollRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
+      canvasScrollRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+    };
+
+    const handleMouseUp = () => {
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        panStartRef.current = null;
+        setIsPanning(false);
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  const fitToScreen = useCallback(() => {
+    const container = canvasScrollRef.current;
+    if (!container) return;
+    const padding = 120;
+    const availableWidth = container.clientWidth - padding;
+    const availableHeight = container.clientHeight - padding;
+    const scaleX = availableWidth / 3200;
+    const scaleY = availableHeight / 2400;
+    const targetScale = Math.min(Math.max(Number(Math.min(scaleX, scaleY).toFixed(3)), 0.15), 1.0);
+    setZoomScale(targetScale);
+
+    setTimeout(() => {
+      if (canvasScrollRef.current && canvasWrapperRef.current) {
+        const c = canvasScrollRef.current;
+        const w = canvasWrapperRef.current;
+        const totalW = w.offsetWidth + 128;
+        const totalH = w.offsetHeight + 128;
+        c.scrollTo({
+          left: Math.max(0, (totalW - c.clientWidth) / 2),
+          top: Math.max(0, (totalH - c.clientHeight) / 2),
+          behavior: "smooth",
+        });
+      }
+    }, 60);
+  }, []);
+
+  const focusOnSection = useCallback((sectionName: string) => {
+    const sectionSeats = seats.filter(s => (s.section_name || "").toLowerCase() === sectionName.toLowerCase());
+    if (sectionSeats.length === 0) return;
+
+    const minX = Math.min(...sectionSeats.map(s => s.coordinate_x));
+    const maxX = Math.max(...sectionSeats.map(s => s.coordinate_x));
+    const minY = Math.min(...sectionSeats.map(s => s.coordinate_y));
+    const maxY = Math.max(...sectionSeats.map(s => s.coordinate_y));
+
+    const secWidth = Math.max(maxX - minX, 120);
+    const secHeight = Math.max(maxY - minY, 120);
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    const container = canvasScrollRef.current;
+    const availW = container ? container.clientWidth - 160 : 800;
+    const availH = container ? container.clientHeight - 160 : 600;
+
+    const idealScale = Math.min(Math.max(Math.min(availW / secWidth, availH / secHeight) * 0.75, 0.8), 2.5);
+    const targetScale = Number(idealScale.toFixed(2));
+    setZoomScale(targetScale);
+
+    setTimeout(() => {
+      if (canvasScrollRef.current && canvasWrapperRef.current) {
+        const c = canvasScrollRef.current;
+        const w = canvasWrapperRef.current;
+        const scrollLeft = w.offsetLeft + centerX * targetScale - c.clientWidth / 2;
+        const scrollTop = w.offsetTop + centerY * targetScale - c.clientHeight / 2;
+        c.scrollTo({
+          left: Math.max(0, scrollLeft),
+          top: Math.max(0, scrollTop),
+          behavior: "smooth",
+        });
+      }
+    }, 60);
+
+    toast.info(`Focused on ${sectionName} (${sectionSeats.length} seats)`);
+  }, [seats]);
+
+  const focusOnShape = useCallback((shapeId: string) => {
+    const shape = shapes.find(s => s.id === shapeId);
+    if (!shape) return;
+
+    const centerX = shape.x + shape.width / 2;
+    const centerY = shape.y + shape.height / 2;
+    const targetScale = 1.35;
+    setZoomScale(targetScale);
+
+    setTimeout(() => {
+      if (canvasScrollRef.current && canvasWrapperRef.current) {
+        const c = canvasScrollRef.current;
+        const w = canvasWrapperRef.current;
+        const scrollLeft = w.offsetLeft + centerX * targetScale - c.clientWidth / 2;
+        const scrollTop = w.offsetTop + centerY * targetScale - c.clientHeight / 2;
+        c.scrollTo({
+          left: Math.max(0, scrollLeft),
+          top: Math.max(0, scrollTop),
+          behavior: "smooth",
+        });
+      }
+    }, 60);
+
+    toast.info(`Focused on ${shape.text || 'Stage element'}`);
+  }, [shapes]);
+
+  const focusOnSeatsView = useCallback(() => {
+    const targetScale = 1.75;
+    setZoomScale(targetScale);
+    toast.info("Seat-by-seat inspection view (175%)");
+  }, []);
 
   const handleToggleZoomOnSection = (seat: Seat) => {
-    if (zoomScale > 0.8) {
+    if (zoomScale > 1.2) {
       // Zoom out to overview
-      setZoomScale(0.42);
+      fitToScreen();
       toast.info("Zoomed out to overview");
     } else {
-      // Zoom in focused on this section
-      const targetScale = 1.35;
-      setZoomScale(targetScale);
-      const sectionSeats = seats.filter(s => (s.section_name === seat.section_name && s.section_name) || s.internalId === seat.internalId);
-      const avgX = sectionSeats.length ? sectionSeats.reduce((acc, s) => acc + s.coordinate_x, 0) / sectionSeats.length : seat.coordinate_x;
-      const avgY = sectionSeats.length ? sectionSeats.reduce((acc, s) => acc + s.coordinate_y, 0) / sectionSeats.length : seat.coordinate_y;
-
-      setTimeout(() => {
-        if (canvasScrollRef.current) {
-          const container = canvasScrollRef.current;
-          const scrollLeft = avgX * targetScale - container.clientWidth / 2 + 32;
-          const scrollTop = avgY * targetScale - container.clientHeight / 2 + 32;
-          container.scrollTo({
-            left: Math.max(0, scrollLeft),
-            top: Math.max(0, scrollTop),
-            behavior: "smooth",
-          });
-        }
-      }, 50);
-
-      toast.info(`Focused on ${seat.section_name || 'Section'} (Double click again to zoom out)`);
+      // Focus on this section
+      focusOnSection(seat.section_name || "General");
     }
   };
 
   const handleToggleZoomOnShape = (shape: Shape) => {
-    if (zoomScale > 0.8) {
-      setZoomScale(0.42);
+    if (zoomScale > 1.2) {
+      fitToScreen();
       toast.info("Zoomed out to overview");
     } else {
-      const targetScale = 1.35;
-      setZoomScale(targetScale);
-      const centerX = shape.x + shape.width / 2;
-      const centerY = shape.y + shape.height / 2;
-
-      setTimeout(() => {
-        if (canvasScrollRef.current) {
-          const container = canvasScrollRef.current;
-          const scrollLeft = centerX * targetScale - container.clientWidth / 2 + 32;
-          const scrollTop = centerY * targetScale - container.clientHeight / 2 + 32;
-          container.scrollTo({
-            left: Math.max(0, scrollLeft),
-            top: Math.max(0, scrollTop),
-            behavior: "smooth",
-          });
-        }
-      }, 50);
-
-      toast.info(`Focused on ${shape.text || 'Element'} (Double click again to zoom out)`);
+      focusOnShape(shape.id);
     }
   };
+
+  const availableSections = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const seat of seats) {
+      const name = seat.section_name || "General";
+      map.set(name, (map.get(name) || 0) + 1);
+    }
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+  }, [seats]);
+
+  const availableStages = useMemo(() => {
+    return shapes.filter(s => s.text && (s.text.includes("STAGE") || s.text.includes("PITCH") || s.text.includes("RUNWAY") || s.text.includes("BOX")));
+  }, [shapes]);
 
   // Sync Konva Transformer with the selected Shape or Label node
   useEffect(() => {
@@ -327,7 +541,45 @@ export default function VenueLayoutBuilder({
       }))
     : eventDetails?.ticket_types || [];
 
+  const handleStageMouseDown = (e: any) => {
+    const isBg = e.target === e.target.getStage();
+    const isMiddleClick = e.evt.button === 1;
+    if (isBg || isSpacePressed || mode === "pan" || isMiddleClick) {
+      isPanningRef.current = true;
+      setIsPanning(true);
+      didPanRef.current = false;
+      if (canvasScrollRef.current) {
+        panStartRef.current = {
+          x: e.evt.clientX,
+          y: e.evt.clientY,
+          scrollLeft: canvasScrollRef.current.scrollLeft,
+          scrollTop: canvasScrollRef.current.scrollTop,
+        };
+      }
+    }
+  };
+
+  const handleContainerMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === canvasScrollRef.current || isSpacePressed || mode === "pan" || e.button === 1) {
+      isPanningRef.current = true;
+      setIsPanning(true);
+      didPanRef.current = false;
+      if (canvasScrollRef.current) {
+        panStartRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          scrollLeft: canvasScrollRef.current.scrollLeft,
+          scrollTop: canvasScrollRef.current.scrollTop,
+        };
+      }
+    }
+  };
+
   const handleStageClick = (e: any) => {
+    if (didPanRef.current) {
+      didPanRef.current = false;
+      return;
+    }
     const clickedOnEmpty = e.target === e.target.getStage();
     
     // Calculate correct position taking zoom scale into account
@@ -1858,6 +2110,13 @@ export default function VenueLayoutBuilder({
             <MousePointer2 size={16} /> Select
           </button>
           <button 
+            onClick={() => setMode("pan")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "pan" ? "bg-rose-50 text-rose-600 border-rose-200 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            title="Pan layout (or hold Spacebar + drag, or middle-click drag)"
+          >
+            <Hand size={16} /> Pan
+          </button>
+          <button 
             onClick={() => setMode("add_seat")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_seat" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
           >
@@ -1959,9 +2218,9 @@ export default function VenueLayoutBuilder({
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 p-1">
-            <button onClick={() => setZoomScale(s => Math.max(0.1, s - 0.1))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
-            <span className="text-xs font-semibold text-slate-600 min-w-[40px] text-center">{Math.round(zoomScale * 100)}%</span>
-            <button onClick={() => setZoomScale(s => Math.min(3, s + 0.1))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">+</button>
+            <button onClick={() => setZoomScale(s => Math.max(0.15, Number((s - 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
+            <span className="text-xs font-semibold text-slate-600 min-w-[44px] text-center">{Math.round(zoomScale * 100)}%</span>
+            <button onClick={() => setZoomScale(s => Math.min(4.0, Number((s + 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">+</button>
           </div>
           <button onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
             <Save size={16} /> {isSaving ? "Saving..." : venueAdapter ? "Save layout" : "Save Layout"}
@@ -1984,21 +2243,64 @@ export default function VenueLayoutBuilder({
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Canvas Area */}
-        <div ref={canvasScrollRef} className="flex-1 bg-slate-100 relative overflow-auto p-8 cursor-crosshair">
-          <div className="bg-white border border-slate-200 shadow-md mx-auto origin-top-left" style={{ width: 3200 * zoomScale, height: 2400 * zoomScale }}>
-            <Stage 
-              width={3200 * zoomScale} 
-              height={2400 * zoomScale} 
-              scaleX={zoomScale} 
-              scaleY={zoomScale} 
-              onClick={handleStageClick}
-              onDblClick={(e) => {
-                if (e.target === e.target.getStage()) {
-                  setZoomScale(s => s > 0.8 ? 0.42 : 1.35);
-                }
-              }}
+        {/* Canvas Area with Floating Navigation Dock */}
+        <div className="flex-1 relative overflow-hidden flex flex-col bg-slate-100">
+          {/* Top-Left Shortcut Guide & Seat Hover Details Badge */}
+          <div className="absolute top-4 left-6 z-20 pointer-events-none flex flex-wrap items-center gap-2">
+            <span className="px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md text-white/90 text-[11px] font-medium shadow-md flex items-center gap-2 border border-white/10">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>🖱️ <strong>Wheel:</strong> Zoom at cursor</span>
+              <span className="text-white/40">•</span>
+              <span>🖐️ <strong>Space+Drag / Middle click:</strong> Pan</span>
+              <span className="text-white/40">•</span>
+              <span>🔍 <strong>Double-click:</strong> Focus</span>
+            </span>
+            {hoveredSeat && (
+              <span className="px-3 py-1 rounded-full bg-rose-600 backdrop-blur-md text-white text-[11px] font-bold shadow-lg border border-rose-400/50 flex items-center gap-1.5 animate-in fade-in">
+                <span>Section: <strong>{hoveredSeat.section_name}</strong></span>
+                <span className="text-white/40">•</span>
+                <span>Row: <strong>{hoveredSeat.row_label}</strong></span>
+                <span className="text-white/40">•</span>
+                <span>Seat: <strong>{hoveredSeat.seat_label}</strong></span>
+              </span>
+            )}
+          </div>
+
+          <div 
+            ref={canvasScrollRef} 
+            onMouseDown={handleContainerMouseDown}
+            className={`flex-1 overflow-auto p-12 select-none ${
+              isPanning 
+                ? "cursor-grabbing" 
+                : (isSpacePressed || mode === "pan") 
+                ? "cursor-grab" 
+                : mode === "select" 
+                ? "cursor-default" 
+                : mode === "eraser" 
+                ? "cursor-pointer" 
+                : "cursor-crosshair"
+            }`}
+          >
+            <div 
+              ref={canvasWrapperRef}
+              className="bg-white border border-slate-200 shadow-xl origin-top-left relative inline-block" 
+              style={{ width: 3200 * zoomScale, height: 2400 * zoomScale }}
             >
+              <Stage 
+                ref={stageRef}
+                width={3200 * zoomScale} 
+                height={2400 * zoomScale} 
+                scaleX={zoomScale} 
+                scaleY={zoomScale} 
+                onMouseDown={handleStageMouseDown}
+                onClick={handleStageClick}
+                onDblClick={(e) => {
+                  if (e.target === e.target.getStage()) {
+                    if (zoomScale > 0.9) fitToScreen();
+                    else setZoomScale(1.75);
+                  }
+                }}
+              >
               <Layer>
                 {bgImage && (
                   <KonvaImage
@@ -2134,6 +2436,8 @@ export default function VenueLayoutBuilder({
           y={seat.coordinate_y + dy}
           draggable={isDraggable && mode === "select"}
           onDragEnd={isDraggable ? ((e) => handleDragEnd(e, seat.internalId)) : undefined}
+          onMouseEnter={() => setHoveredSeat(seat)}
+          onMouseLeave={() => setHoveredSeat((prev) => (prev?.internalId === seat.internalId ? null : prev))}
           onDblClick={() => handleToggleZoomOnSection(seat)}
           onDblTap={() => handleToggleZoomOnSection(seat)}
           onClick={() => {
@@ -2292,6 +2596,157 @@ export default function VenueLayoutBuilder({
             </Stage>
           </div>
         </div>
+
+        {/* Floating Zoom & Section Navigation Dock */}
+        <div className="absolute bottom-6 right-6 z-20 flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-2xl rounded-2xl p-2 text-slate-700 select-none">
+          {/* Section / Stage Quick Selector */}
+          {(availableSections.length > 0 || availableStages.length > 0) && (
+            <div className="flex items-center gap-1.5 pr-2 border-r border-slate-200">
+              <span className="text-[11px] font-semibold text-slate-400 pl-1 uppercase tracking-wide">Focus:</span>
+              <select
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!val) return;
+                  if (val === "__fit__") fitToScreen();
+                  else if (val === "__seats__") focusOnSeatsView();
+                  else if (val.startsWith("shape:")) focusOnShape(val.replace("shape:", ""));
+                  else if (val.startsWith("sec:")) focusOnSection(val.replace("sec:", ""));
+                  e.target.value = "";
+                }}
+                className="text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 text-slate-700 py-1 px-2.5 rounded-lg border border-slate-300/80 cursor-pointer outline-none transition-colors max-w-[170px]"
+                defaultValue=""
+              >
+                <option value="" disabled>Select section / stage...</option>
+                <option value="__fit__">🔍 Fit Layout</option>
+                <option value="__seats__">🪑 Seat-by-Seat (175%)</option>
+                {availableStages.length > 0 && (
+                  <optgroup label="🎭 Stage & Elements">
+                    {availableStages.map(s => (
+                      <option key={s.id} value={`shape:${s.id}`}>
+                        {s.text?.replace("\n", " ") || "Stage"}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {availableSections.length > 0 && (
+                  <optgroup label="🪑 Sections">
+                    {availableSections.map(sec => (
+                      <option key={sec.name} value={`sec:${sec.name}`}>
+                        {sec.name} ({sec.count} seats)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
+
+          {/* Pan Tool Toggle */}
+          <button
+            type="button"
+            onClick={() => setMode(m => m === "pan" ? "select" : "pan")}
+            className={`p-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all ${
+              mode === "pan" 
+                ? "bg-rose-500 text-white border-rose-600 shadow-sm" 
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+            }`}
+            title="Pan Mode (or hold Spacebar + Drag)"
+          >
+            <Hand size={15} />
+            <span className="hidden sm:inline">Pan</span>
+          </button>
+
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+
+          {/* Zoom Out */}
+          <button
+            type="button"
+            onClick={() => {
+              setZoomScale(s => Math.max(0.15, Number((s / 1.2).toFixed(3))));
+            }}
+            className="p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-xl text-slate-700 transition-colors"
+            title="Zoom Out (Mouse wheel down)"
+          >
+            <ZoomOut size={16} />
+          </button>
+
+          {/* Zoom Preset Selector */}
+          <select
+            value={Math.round(zoomScale * 100)}
+            onChange={(e) => setZoomScale(Number(e.target.value) / 100)}
+            className="text-xs font-mono font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 py-1 px-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer transition-colors text-center"
+          >
+            <option value={25}>25%</option>
+            <option value={40}>40%</option>
+            <option value={50}>50%</option>
+            <option value={75}>75%</option>
+            <option value={100}>100%</option>
+            <option value={125}>125%</option>
+            <option value={150}>150%</option>
+            <option value={175}>175%</option>
+            <option value={200}>200%</option>
+            <option value={250}>250%</option>
+            <option value={300}>300%</option>
+            <option value={350}>350%</option>
+            <option value={400}>400%</option>
+            {![25, 40, 50, 75, 100, 125, 150, 175, 200, 250, 300, 350, 400].includes(Math.round(zoomScale * 100)) && (
+              <option value={Math.round(zoomScale * 100)}>{Math.round(zoomScale * 100)}%</option>
+            )}
+          </select>
+
+          {/* Zoom In */}
+          <button
+            type="button"
+            onClick={() => {
+              setZoomScale(s => Math.min(4.0, Number((s * 1.2).toFixed(3))));
+            }}
+            className="p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-xl text-slate-700 transition-colors"
+            title="Zoom In (Mouse wheel up)"
+          >
+            <ZoomIn size={16} />
+          </button>
+
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+
+          {/* Fit to Screen */}
+          <button
+            type="button"
+            onClick={fitToScreen}
+            className="px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-xl text-slate-700 transition-colors flex items-center gap-1"
+            title="Fit Entire Layout to Screen"
+          >
+            <Maximize2 size={13} /> Fit
+          </button>
+
+          {/* 1:1 Reset */}
+          <button
+            type="button"
+            onClick={() => setZoomScale(1)}
+            className={`px-2 py-1 text-xs font-mono font-semibold rounded-xl transition-colors ${
+              Math.round(zoomScale * 100) === 100
+                ? "bg-rose-100 text-rose-700 font-bold"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+            }`}
+            title="Actual Size (100%)"
+          >
+            100%
+          </button>
+
+          {/* Seat Inspection Preset */}
+          <button
+            type="button"
+            onClick={focusOnSeatsView}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-xl transition-colors ${
+              zoomScale >= 1.6 && zoomScale <= 2.2
+                ? "bg-emerald-500 text-white shadow-sm font-bold"
+                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+            }`}
+            title="Zoom in to inspect individual seat numbers and rows"
+          >
+            🪑 Seat View
+          </button>
+        </div>
+      </div>
 
         {/* Properties Panel */}
         <div className="w-80 border-l border-slate-200 bg-white p-6 overflow-y-auto">

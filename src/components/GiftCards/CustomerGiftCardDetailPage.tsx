@@ -1,16 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
   Loader2,
   ShoppingBag,
   TrendingUp,
@@ -20,7 +16,15 @@ import {
 } from "lucide-react";
 import { useGetMyGiftCardQuery } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatGiftCardExpiryDate } from "@/lib/giftCardValidity";
+import {
+  getSentGiftClaimState,
+  isGiftCardInWallet,
+  isGiftCardSentGift,
+} from "@/lib/giftCardOwnership";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import GiftCardDesignFace from "@/components/GiftCards/GiftCardDesignFace";
+import GiftCardCodeReveal from "@/components/GiftCards/GiftCardCodeReveal";
 import images from "@/Images";
 
 function imgSrc(img: string | { src: string }) {
@@ -40,7 +44,6 @@ export default function CustomerGiftCardDetailPage() {
   const params = useParams();
   const id = String(params?.id || "");
   const { data: card, isLoading, isError } = useGetMyGiftCardQuery(id, { skip: !id });
-  const [showCode, setShowCode] = useState(false);
 
   const usedAmount = useMemo(() => {
     if (!card) return 0;
@@ -52,16 +55,19 @@ export default function CustomerGiftCardDetailPage() {
     card?.purchase_for === "SELF" ? "Purchased for myself (legacy)" : "Gift for someone else";
 
   const recipientLabel = card?.recipient_name?.trim() || "—";
+  const isSent = card ? isGiftCardSentGift(card) : false;
+  const isWallet = card ? isGiftCardInWallet(card) : false;
+  const claimState = card ? getSentGiftClaimState(card) : "unknown";
 
   return (
     <CustomerAccountLayout>
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 flex flex-col gap-4 sm:gap-5">
         <Link
-          href="/customer/gift-cards"
+          href={`/customer/gift-cards${isSent ? "?tab=sent" : ""}`}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-[#374151] hover:text-[#6900AA] w-fit"
         >
           <ArrowLeft size={16} />
-          My Gift Cards
+          {isSent ? "Sent gifts" : "My wallet"}
         </Link>
 
         {isLoading ? (
@@ -72,54 +78,98 @@ export default function CustomerGiftCardDetailPage() {
           <p className="text-center text-rose-600 py-10">Gift card not found.</p>
         ) : (
           <div className="flex flex-col gap-4 sm:gap-5">
-            {/* Featured purple card */}
-            <div className="relative overflow-hidden rounded-2xl bg-[#8200e3] text-white px-4 sm:px-6 py-4 sm:py-6">
-              <div
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-16 opacity-30"
-                aria-hidden
-                style={{
-                  backgroundImage:
-                    "radial-gradient(ellipse at 20% 100%, rgba(255,255,255,0.35) 0, transparent 55%), radial-gradient(ellipse at 70% 120%, rgba(255,255,255,0.25) 0, transparent 50%)",
-                }}
-              />
-              <div className="relative z-[1] flex flex-row items-center justify-between gap-3 sm:gap-4">
-                <div className="min-w-0 flex flex-col gap-2">
-                  <p className="text-[12px] sm:text-[13px] text-white/85 truncate">
-                    {card.product_name || "BookMyBota Gift Card"}
-                  </p>
-                  <p className="text-[1.75rem] sm:text-[2.35rem] font-extrabold leading-none tracking-tight">
-                    {formatMoney(Number(card.current_balance), { compact: true })}
-                  </p>
-                  <div className="flex flex-row items-center gap-2 mt-0.5 sm:mt-1">
-                    <p className="text-[12px] sm:text-sm text-white/80 font-mono tracking-wide break-all">
-                      {showCode ? card.code_masked : card.code_masked}
-                    </p>
-                  </div>
-                  <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-2.5 mt-1">
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${statusBadge(
-                        card.status
-                      )}`}
-                    >
-                      {card.status}
-                    </span>
-                    {card.expires_at ? (
-                      <span className="text-[11px] sm:text-[12px] text-white/80">
-                        Valid until {new Date(card.expires_at).toLocaleDateString()}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
+            {isSent ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13px] text-amber-950 leading-relaxed">
+                <p className="font-bold text-amber-900">Sent gift — tracking only</p>
+                <p className="mt-1 text-amber-900/85">
+                  {claimState === "awaiting_claim"
+                    ? `This card was purchased for ${recipientLabel}. They must claim the code from their email before they can spend it. You cannot redeem this balance on your bookings.`
+                    : `This card was claimed by the recipient (${recipientLabel}). You can track usage here, but you cannot spend this balance.`}
+                </p>
+              </div>
+            ) : isWallet ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-[13px] text-emerald-950 leading-relaxed">
+                <p className="font-bold text-emerald-900">In your wallet</p>
+                <p className="mt-1 text-emerald-900/85">
+                  Use this balance at Events or Dining checkout. Claiming is already done — redeem happens when you pay.
+                </p>
+              </div>
+            ) : null}
 
-                <div className="relative shrink-0 w-[72px] h-[72px] sm:w-[120px] sm:h-[120px] flex items-center justify-center">
-                  <Image
-                    src={imgSrc(images.giftbox)}
-                    alt=""
-                    width={110}
-                    height={110}
-                    className="relative z-[1] w-[64px] sm:w-[110px] h-auto object-contain drop-shadow-md"
-                    style={{ filter: "hue-rotate(-18deg) saturate(1.2) brightness(1.05)" }}
-                  />
+            {/* BMS-style design face + balance strip */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_2px_8px_rgba(17,17,17,0.05)]">
+              <GiftCardDesignFace
+                design={{
+                  title: (card.design_title || "Gift Card").trim() || "Gift Card",
+                  image_url: card.design_image_url,
+                  color_gradient: card.design_color_gradient,
+                  caption_color: card.design_caption_color || "#FFFFFF",
+                  text_color: card.design_text_color || "#FFFFFF",
+                }}
+                size="preview"
+                className="aspect-[16/9] w-full rounded-none!"
+              />
+              <div className="relative bg-[#6900AA] text-white px-4 sm:px-6 py-4 sm:py-5">
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-12 opacity-30"
+                  aria-hidden
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(ellipse at 20% 100%, rgba(255,255,255,0.35) 0, transparent 55%), radial-gradient(ellipse at 70% 120%, rgba(255,255,255,0.25) 0, transparent 50%)",
+                  }}
+                />
+                <div className="relative z-[1] flex flex-row items-center justify-between gap-3 sm:gap-4">
+                  <div className="min-w-0 flex flex-col gap-2">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/75 font-semibold">
+                      {isSent ? "Gift value / remaining" : "Available balance"}
+                    </p>
+                    <p className="text-[1.75rem] sm:text-[2.35rem] font-bold leading-none tracking-tight">
+                      {formatMoney(Number(card.current_balance), { compact: true })}
+                    </p>
+                    {isSent ? (
+                      <p className="text-[12px] text-white/75">
+                        Initial {formatMoney(Number(card.initial_balance), { compact: true })}
+                      </p>
+                    ) : null}
+                    <div className="flex flex-row items-center gap-2 mt-0.5 sm:mt-1 min-w-0">
+                      <GiftCardCodeReveal
+                        code={card.code}
+                        codeMasked={card.code_masked}
+                        tone="light"
+                        className="min-w-0"
+                      />
+                    </div>
+                    <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-2.5 mt-1">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${statusBadge(
+                          card.status
+                        )}`}
+                      >
+                        {isSent
+                          ? claimState === "awaiting_claim"
+                            ? "AWAITING CLAIM"
+                            : "CLAIMED"
+                          : card.status}
+                      </span>
+                      {card.expires_at ? (
+                        <span className="text-[11px] sm:text-[12px] text-white/80 inline-flex items-center gap-1">
+                          <CalendarDays size={12} />
+                          Valid until {formatGiftCardExpiryDate(card.expires_at)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="relative shrink-0 w-[64px] h-[64px] sm:w-[96px] sm:h-[96px] flex items-center justify-center">
+                    <Image
+                      src={imgSrc(images.giftbox)}
+                      alt=""
+                      width={96}
+                      height={96}
+                      className="relative z-[1] w-[56px] sm:w-[88px] h-auto object-contain drop-shadow-md"
+                      style={{ filter: "hue-rotate(-18deg) saturate(1.2) brightness(1.05)" }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -216,9 +266,13 @@ export default function CustomerGiftCardDetailPage() {
                 <ShieldCheck size={22} strokeWidth={2} />
               </span>
               <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                <p className="text-[14px] sm:text-[15px] font-bold text-[#1F2937]">Safe & Secure</p>
+                <p className="text-[14px] sm:text-[15px] font-bold text-[#1F2937]">
+                  {isSent ? "Gift delivery tracked" : "Safe & Secure"}
+                </p>
                 <p className="text-[12px] sm:text-[13px] text-[#6B7280] leading-snug">
-                  Your gift card is active and ready to use. Use it during checkout on BookMyBota.
+                  {isSent
+                    ? "Keep the purchase email for your records. Only the recipient can claim and spend this card."
+                    : "This card is in your wallet. Apply it during Events or Dining checkout on BookMyBota."}
                 </p>
               </div>
               <div className="hidden sm:flex shrink-0 w-16 h-16 items-center justify-center">

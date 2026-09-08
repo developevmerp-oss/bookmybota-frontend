@@ -1448,6 +1448,7 @@ export interface GiftCardProduct {
 
 export interface GiftCardMine {
   id: string;
+  code?: string | null;
   code_last4: string;
   code_masked: string;
   initial_balance: number | string;
@@ -1467,8 +1468,17 @@ export interface GiftCardMine {
   validity_days?: number;
   is_owner?: boolean;
   is_claimed_by_me?: boolean;
+  is_claimed?: boolean;
+  is_spendable?: boolean;
+  wallet_bucket?: 'wallet' | 'sent' | string;
   used_amount?: number | string;
   transactions?: GiftCardTransaction[];
+  design_id?: string | null;
+  design_title?: string | null;
+  design_image_url?: string | null;
+  design_color_gradient?: string | null;
+  design_caption_color?: string | null;
+  design_text_color?: string | null;
 }
 
 export interface GiftCardTransaction {
@@ -1500,12 +1510,16 @@ export interface GiftCardPurchaseResult {
   recipient_name?: string | null;
   recipient_email?: string | null;
   design_id?: string | null;
-  /** Number of cards purchased in this order (default 1). */
+  /** Number of cards purchased in this order (always 1). */
   quantity?: number;
   /** Total charged = initial_balance × quantity. */
   total_payable?: number;
   /** All issued cards when quantity > 1 (first card is also mirrored on root fields). */
   cards?: GiftCardPurchaseResult[];
+  /** When the gift email is / will be sent. */
+  scheduled_delivery_at?: string | null;
+  /** True when recipient email was sent immediately. */
+  email_sent?: boolean;
 }
 
 export interface GiftCardPurchaseBody {
@@ -1518,10 +1532,14 @@ export interface GiftCardPurchaseBody {
   purchase_for?: 'SOMEONE_ELSE';
   recipient_name: string;
   recipient_email: string;
+  recipient_phone?: string;
   sender_name?: string;
   personal_message?: string;
-  /** Number of identical gift cards to issue (1–10). */
-  quantity?: number;
+  /**
+   * Calendar date (YYYY-MM-DD) when the gift email should be sent.
+   * Today or past → email now. Future → scheduled delivery.
+   */
+  delivery_date?: string;
 }
 
 export interface GiftCardDenominationOption {
@@ -1541,12 +1559,42 @@ export interface GiftCardSettings {
 export interface GiftCardDesign {
   id: string;
   title: string;
-  category: 'ENTERTAINING' | 'LOVE' | string;
+  category: string;
   image_url?: string | null;
   color_gradient?: string | null;
   caption_color?: string | null;
+  text_color?: string | null;
   status?: string;
   sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GiftCardDesignCategory {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GiftCardTerm {
+  id: string;
+  body: string;
+  sort_order: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GiftCardFaq {
+  id: string;
+  question: string;
+  answer: string;
+  sort_order: number;
+  is_active?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -2017,7 +2065,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
 
   endpoints: (builder) => ({
 
@@ -3607,6 +3655,209 @@ export const api = createApi({
       providesTags: ['GiftCardSettings'],
     }),
 
+    getPublicGiftCardDesignCategories: builder.query<GiftCardDesignCategory[], void>({
+      query: () => '/gift-cards/design-categories',
+      transformResponse: (res: { data: GiftCardDesignCategory[] }) => res.data || [],
+      providesTags: ['GiftCardDesignCategories'],
+    }),
+
+    getGiftCardDesignCategories: builder.query<
+      PaginatedList<GiftCardDesignCategory>,
+      PagedQuery | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        const qs = sp.toString();
+        return `/admin/gift-card-design-categories${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: GiftCardDesignCategory[] }) => unwrapPaginated(res),
+      providesTags: ['GiftCardDesignCategories'],
+    }),
+
+    createGiftCardDesignCategory: builder.mutation<
+      { data: GiftCardDesignCategory; message?: string },
+      { name: string; description?: string; is_active?: boolean }
+    >({
+      query: (body) => ({
+        url: '/admin/gift-card-design-categories',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['GiftCardDesignCategories'],
+    }),
+
+    updateGiftCardDesignCategory: builder.mutation<
+      { data: GiftCardDesignCategory; message?: string },
+      {
+        id: string;
+        name: string;
+        description?: string;
+        is_active?: boolean;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/gift-card-design-categories/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['GiftCardDesignCategories'],
+    }),
+
+    patchGiftCardDesignCategoryStatus: builder.mutation<
+      { data: GiftCardDesignCategory; message?: string },
+      { id: string; is_active: boolean }
+    >({
+      query: ({ id, is_active }) => ({
+        url: `/admin/gift-card-design-categories/${id}/status`,
+        method: 'PATCH',
+        body: { is_active },
+      }),
+      invalidatesTags: ['GiftCardDesignCategories'],
+    }),
+
+    deleteGiftCardDesignCategory: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/gift-card-design-categories/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['GiftCardDesignCategories'],
+    }),
+
+    getPublicGiftCardTerms: builder.query<GiftCardTerm[], void>({
+      query: () => '/gift-cards/terms',
+      transformResponse: (res: { data: GiftCardTerm[] }) => res.data || [],
+      providesTags: ['GiftCardTerms'],
+    }),
+
+    getGiftCardTerms: builder.query<PaginatedList<GiftCardTerm>, PagedQuery | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        const qs = sp.toString();
+        return `/admin/gift-card-terms${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: GiftCardTerm[] }) => unwrapPaginated(res),
+      providesTags: ['GiftCardTerms'],
+    }),
+
+    createGiftCardTerm: builder.mutation<
+      { data: GiftCardTerm; message?: string },
+      { body: string; sort_order?: number; is_active?: boolean }
+    >({
+      query: (body) => ({
+        url: '/admin/gift-card-terms',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['GiftCardTerms'],
+    }),
+
+    updateGiftCardTerm: builder.mutation<
+      { data: GiftCardTerm; message?: string },
+      { id: string; body: string; sort_order?: number; is_active?: boolean }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/gift-card-terms/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['GiftCardTerms'],
+    }),
+
+    patchGiftCardTermStatus: builder.mutation<
+      { data: GiftCardTerm; message?: string },
+      { id: string; is_active: boolean }
+    >({
+      query: ({ id, is_active }) => ({
+        url: `/admin/gift-card-terms/${id}/status`,
+        method: 'PATCH',
+        body: { is_active },
+      }),
+      invalidatesTags: ['GiftCardTerms'],
+    }),
+
+    deleteGiftCardTerm: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/gift-card-terms/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['GiftCardTerms'],
+    }),
+
+    getPublicGiftCardFaqs: builder.query<GiftCardFaq[], void>({
+      query: () => '/gift-cards/faqs',
+      transformResponse: (res: { data: GiftCardFaq[] }) => res.data || [],
+      providesTags: ['GiftCardFaqs'],
+    }),
+
+    getGiftCardFaqs: builder.query<PaginatedList<GiftCardFaq>, PagedQuery | void>({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.q) sp.set('q', params.q);
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        const qs = sp.toString();
+        return `/admin/gift-card-faqs${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: GiftCardFaq[] }) => unwrapPaginated(res),
+      providesTags: ['GiftCardFaqs'],
+    }),
+
+    createGiftCardFaq: builder.mutation<
+      { data: GiftCardFaq; message?: string },
+      { question: string; answer: string; sort_order?: number; is_active?: boolean }
+    >({
+      query: (body) => ({
+        url: '/admin/gift-card-faqs',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['GiftCardFaqs'],
+    }),
+
+    updateGiftCardFaq: builder.mutation<
+      { data: GiftCardFaq; message?: string },
+      {
+        id: string;
+        question: string;
+        answer: string;
+        sort_order?: number;
+        is_active?: boolean;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/gift-card-faqs/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['GiftCardFaqs'],
+    }),
+
+    patchGiftCardFaqStatus: builder.mutation<
+      { data: GiftCardFaq; message?: string },
+      { id: string; is_active: boolean }
+    >({
+      query: ({ id, is_active }) => ({
+        url: `/admin/gift-card-faqs/${id}/status`,
+        method: 'PATCH',
+        body: { is_active },
+      }),
+      invalidatesTags: ['GiftCardFaqs'],
+    }),
+
+    deleteGiftCardFaq: builder.mutation<{ message?: string }, string>({
+      query: (id) => ({
+        url: `/admin/gift-card-faqs/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['GiftCardFaqs'],
+    }),
+
     getPublicGiftCardDesigns: builder.query<
       GiftCardDesign[],
       { category?: string } | void
@@ -3698,6 +3949,28 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['MyGiftCards', 'GiftCardProducts', 'PublicGiftCardProducts'],
+    }),
+
+    checkGiftCardBalance: builder.mutation<
+      {
+        data: {
+          code_masked: string;
+          code_last4: string;
+          initial_balance: number;
+          current_balance: number;
+          currency: string;
+          status: string;
+          expires_at?: string | null;
+        };
+      },
+      { code: string }
+    >({
+      query: (body) => ({
+        url: '/gift-cards/check-balance',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [],
     }),
 
     getMyGiftCards: builder.query<GiftCardMine[], void>({
@@ -6226,12 +6499,31 @@ export const {
   useUpdateGiftCardDesignMutation,
   usePatchGiftCardDesignStatusMutation,
   useDeleteGiftCardDesignMutation,
+  useGetPublicGiftCardDesignCategoriesQuery,
+  useGetGiftCardDesignCategoriesQuery,
+  useCreateGiftCardDesignCategoryMutation,
+  useUpdateGiftCardDesignCategoryMutation,
+  usePatchGiftCardDesignCategoryStatusMutation,
+  useDeleteGiftCardDesignCategoryMutation,
+  useGetPublicGiftCardTermsQuery,
+  useGetGiftCardTermsQuery,
+  useCreateGiftCardTermMutation,
+  useUpdateGiftCardTermMutation,
+  usePatchGiftCardTermStatusMutation,
+  useDeleteGiftCardTermMutation,
+  useGetPublicGiftCardFaqsQuery,
+  useGetGiftCardFaqsQuery,
+  useCreateGiftCardFaqMutation,
+  useUpdateGiftCardFaqMutation,
+  usePatchGiftCardFaqStatusMutation,
+  useDeleteGiftCardFaqMutation,
   useGetPublicGiftCardProductsQuery,
   useGetPublicGiftCardDenominationsQuery,
   useGetPublicGiftCardSettingsQuery,
   useGetPublicGiftCardDesignsQuery,
   useGetPublicGiftCardDesignQuery,
   usePurchaseGiftCardMutation,
+  useCheckGiftCardBalanceMutation,
   useGetMyGiftCardsQuery,
   useGetMyGiftCardQuery,
   useGetDiningWishlistQuery,

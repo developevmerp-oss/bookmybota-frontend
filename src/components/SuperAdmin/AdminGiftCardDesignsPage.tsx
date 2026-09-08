@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import {
   useCreateGiftCardDesignMutation,
   useDeleteGiftCardDesignMutation,
+  useGetGiftCardDesignCategoriesQuery,
   useGetGiftCardDesignsQuery,
   usePatchGiftCardDesignStatusMutation,
   useUpdateGiftCardDesignMutation,
@@ -79,12 +80,12 @@ function statusBadge(status?: string) {
 function designToForm(d: GiftCardDesign): AdminGiftCardDesignValues {
   return {
     title: d.title || "",
-    category: d.category === "LOVE" ? "LOVE" : "ENTERTAINING",
+    category: d.category || "",
     image_url: d.image_url || "",
     color_gradient: d.color_gradient || DEFAULT_DESIGN_GRADIENT,
     caption_color: d.caption_color || "#FFFFFF",
+    text_color: d.text_color || "#FFFFFF",
     status: d.status === "ACTIVE" || d.status === "PAUSED" ? d.status : "DRAFT",
-    sort_order: String(d.sort_order ?? 0),
   };
 }
 
@@ -98,6 +99,7 @@ export default function AdminGiftCardDesignsPage({
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSortOrder, setEditingSortOrder] = useState(0);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
@@ -120,6 +122,8 @@ export default function AdminGiftCardDesignsPage({
   const imageUrlWatch = watch("image_url");
   const gradientWatch = watch("color_gradient");
   const captionWatch = watch("caption_color");
+  const textColorWatch = watch("text_color");
+  const categoryWatch = watch("category");
 
   const listArg = {
     page,
@@ -129,6 +133,10 @@ export default function AdminGiftCardDesignsPage({
   };
 
   const { data, isLoading } = useGetGiftCardDesignsQuery(listArg);
+  const { data: categoriesData } = useGetGiftCardDesignCategoriesQuery({
+    page: 1,
+    limit: 100,
+  });
   const [createDesign, { isLoading: creating }] = useCreateGiftCardDesignMutation();
   const [updateDesign, { isLoading: updating }] = useUpdateGiftCardDesignMutation();
   const [patchStatus] = usePatchGiftCardDesignStatusMutation();
@@ -137,15 +145,23 @@ export default function AdminGiftCardDesignsPage({
 
   const designs = data?.items ?? [];
   const meta = data?.meta;
+  const allCategories = categoriesData?.items ?? [];
+  const activeCategories = allCategories.filter((c) => c.is_active !== false);
+  const categoryNameByCode = Object.fromEntries(
+    allCategories.map((c) => [c.code, c.name])
+  );
+  const defaultCategoryCode = activeCategories[0]?.code || "";
 
   const openCreate = () => {
     setEditingId(null);
-    reset(emptyAdminGiftCardDesignValues());
+    setEditingSortOrder(0);
+    reset(emptyAdminGiftCardDesignValues(defaultCategoryCode));
     setFormOpen(true);
   };
 
   const openEdit = (d: GiftCardDesign) => {
     setEditingId(d.id);
+    setEditingSortOrder(d.sort_order ?? 0);
     reset(designToForm(d));
     setFormOpen(true);
   };
@@ -174,8 +190,9 @@ export default function AdminGiftCardDesignsPage({
       image_url: values.image_url.trim() || null,
       color_gradient: values.color_gradient.trim() || null,
       caption_color: values.caption_color.trim() || "#FFFFFF",
+      text_color: values.text_color.trim() || "#FFFFFF",
       status: values.status,
-      sort_order: Number(values.sort_order) || 0,
+      sort_order: editingId ? editingSortOrder : 0,
     };
     try {
       if (editingId) {
@@ -186,7 +203,7 @@ export default function AdminGiftCardDesignsPage({
         toast.success(res.message || "Design created");
       }
       setFormOpen(false);
-      reset(emptyAdminGiftCardDesignValues());
+      reset(emptyAdminGiftCardDesignValues(defaultCategoryCode));
     } catch (err) {
       toast.error(extractApiError(err, "Failed to save design"));
     }
@@ -307,13 +324,12 @@ export default function AdminGiftCardDesignsPage({
             >
               <GiftCardDesignFace
                 design={d}
-                forceWhiteText
                 className="aspect-[16/10] w-full rounded-none"
               />
               <div className="p-3 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-xs text-zinc-400 truncate">
-                    {d.category === "LOVE" ? "Made with Love" : "Entertaining Gifts"}
+                    {categoryNameByCode[d.category] || d.category || "—"}
                   </p>
                   <div className="mt-1">{statusBadge(d.status)}</div>
                 </div>
@@ -392,8 +408,22 @@ export default function AdminGiftCardDesignsPage({
                     Category <RequiredMark />
                   </label>
                   <select {...register("category")} className={`${inputClass} px-3`}>
-                    <option value="ENTERTAINING">Entertaining Gifts</option>
-                    <option value="LOVE">Made with Love</option>
+                    {activeCategories.length === 0 ? (
+                      <option value="">Add a category first</option>
+                    ) : (
+                      activeCategories.map((c) => (
+                        <option key={c.id} value={c.code}>
+                          {c.name}
+                        </option>
+                      ))
+                    )}
+                    {editingId &&
+                      categoryWatch &&
+                      !activeCategories.some((c) => c.code === categoryWatch) && (
+                        <option value={categoryWatch}>
+                          {categoryNameByCode[categoryWatch] || categoryWatch} (inactive)
+                        </option>
+                      )}
                   </select>
                   {errors.category && (
                     <p className={fieldErrorClass}>{errors.category.message}</p>
@@ -421,9 +451,9 @@ export default function AdminGiftCardDesignsPage({
                       image_url: imageUrlWatch || null,
                       color_gradient: gradientWatch || DEFAULT_DESIGN_GRADIENT,
                       caption_color: captionWatch || "#FFFFFF",
+                      text_color: textColorWatch || "#FFFFFF",
                     }}
                     size="preview"
-                    forceWhiteText
                     className="aspect-[16/10] w-full border border-white/10"
                   />
                   <p className="text-[11px] text-zinc-500">
@@ -457,6 +487,29 @@ export default function AdminGiftCardDesignsPage({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>
+                    Text color <RequiredMark />
+                  </label>
+                  <Controller
+                    name="text_color"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        type="color"
+                        value={field.value || "#FFFFFF"}
+                        onChange={field.onChange}
+                        className="w-full h-10 bg-zinc-900/50 border border-white/10 rounded-xl px-1"
+                      />
+                    )}
+                  />
+                  <p className="mt-1 text-[11px] text-zinc-500">
+                    BookMyBota / gift CARD
+                  </p>
+                  {errors.text_color && (
+                    <p className={fieldErrorClass}>{errors.text_color.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelClass}>
                     Caption color <RequiredMark />
                   </label>
                   <Controller
@@ -471,17 +524,11 @@ export default function AdminGiftCardDesignsPage({
                       />
                     )}
                   />
+                  <p className="mt-1 text-[11px] text-zinc-500">
+                    Tagline + design title
+                  </p>
                   {errors.caption_color && (
                     <p className={fieldErrorClass}>{errors.caption_color.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Sort order <RequiredMark />
-                  </label>
-                  <input type="number" min={0} step={1} {...register("sort_order")} className={inputClass} />
-                  {errors.sort_order && (
-                    <p className={fieldErrorClass}>{errors.sort_order.message}</p>
                   )}
                 </div>
               </div>

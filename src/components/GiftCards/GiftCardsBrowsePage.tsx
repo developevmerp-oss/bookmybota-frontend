@@ -2,12 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Gift, Loader2, Ticket } from "lucide-react";
+import { Loader2, Ticket } from "lucide-react";
 import {
-  GIFT_CARD_DESIGN_CATEGORIES,
-  type GiftCardDesignCategoryFilter,
-} from "@/lib/giftCardDesigns";
-import {
+  useGetPublicGiftCardDesignCategoriesQuery,
   useGetPublicGiftCardDesignsQuery,
   useGetPublicGiftCardSettingsQuery,
 } from "@/services/api";
@@ -18,8 +15,9 @@ import {
 } from "@/lib/giftCardValidity";
 
 export default function GiftCardsBrowsePage() {
-  const [category, setCategory] = useState<GiftCardDesignCategoryFilter>("all");
+  const [category, setCategory] = useState<string>("all");
 
+  const { data: categories = [] } = useGetPublicGiftCardDesignCategoriesQuery();
   const queryArg = useMemo(
     () => (category === "all" ? undefined : { category }),
     [category]
@@ -28,6 +26,14 @@ export default function GiftCardsBrowsePage() {
   const { data: settings } = useGetPublicGiftCardSettingsQuery();
   const validityLabel = formatGiftCardValidityLabel(
     settings?.validity_days || DEFAULT_GIFT_CARD_VALIDITY_DAYS
+  );
+
+  const tabs = useMemo(
+    () => [
+      { key: "all", label: "All" },
+      ...categories.map((c) => ({ key: c.code, label: c.name })),
+    ],
+    [categories]
   );
 
   return (
@@ -39,12 +45,12 @@ export default function GiftCardsBrowsePage() {
           </h1>
           <p className="mt-2 text-sm sm:text-[15px] text-slate-500 max-w-xl mx-auto">
             Pick a design, choose an amount, and email an e-gift to someone special.
-            Cards are valid for {validityLabel} from purchase.
+            Cards are valid for {validityLabel} from delivery.
           </p>
         </div>
 
         <div className="flex flex-wrap justify-center gap-2 sm:gap-2.5 mb-7 sm:mb-10">
-          {GIFT_CARD_DESIGN_CATEGORIES.map((tab) => {
+          {tabs.map((tab) => {
             const active = category === tab.key;
             return (
               <button
@@ -98,27 +104,19 @@ export default function GiftCardsBrowsePage() {
               <Ticket size={22} strokeWidth={1.75} />
             </span>
             <div className="min-w-0">
-              <p className="font-bold text-[#111827] text-[14px] sm:text-[15px] leading-snug">
-                Already have a gift card code?
-              </p>
-              <p className="mt-0.5 text-[13px] sm:text-sm text-slate-500 leading-snug">
-                Redeem / claim it under My Gift Cards, then use the balance on bookings.
+              <p className="font-bold text-[#1a1a1a]">Already have a gift card?</p>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Claim it to your BookMyBota wallet and redeem at checkout.
               </p>
             </div>
           </div>
           <Link
-            href="/customer/gift-cards"
-            className="inline-flex items-center justify-center gap-1.5 h-10 w-full sm:w-auto px-4 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] transition-colors shrink-0"
+            href="/my-gift-cards"
+            className="shrink-0 inline-flex items-center justify-center h-10 px-5 rounded-full bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#56008a] transition-colors"
           >
-            Redeem gift card
-            <ArrowRight size={16} />
+            My Gift Cards
           </Link>
         </div>
-
-        <p className="mt-6 text-center text-[12px] text-slate-400 flex items-center justify-center gap-1.5">
-          <Gift size={14} />
-          Buy for someone else · Instant email delivery
-        </p>
       </div>
     </div>
   );

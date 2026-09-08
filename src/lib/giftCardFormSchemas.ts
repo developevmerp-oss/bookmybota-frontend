@@ -4,7 +4,7 @@ import { GIFT_CARD_DENOMINATIONS } from "@/lib/giftCardDenominations";
 import { GIFT_CARD_VALIDITY_OPTIONS } from "@/lib/giftCardValidity";
 
 export const MAX_GIFT_CARD_QTY = 10;
-export const GIFT_CARD_MESSAGE_MAX = 120;
+export const GIFT_CARD_MESSAGE_MAX = 250;
 
 const denominationList = GIFT_CARD_DENOMINATIONS as unknown as number[];
 
@@ -18,8 +18,9 @@ export const adminGiftCardDesignSchema = yup.object({
     .max(120, "Title must be at most 120 characters."),
   category: yup
     .string()
-    .oneOf(["ENTERTAINING", "LOVE"], "Select a valid category.")
-    .required("Category is required."),
+    .trim()
+    .required("Category is required.")
+    .min(1, "Select a category."),
   image_url: yup.string().trim().default(""),
   color_gradient: yup.string().trim().default(""),
   caption_color: yup
@@ -27,19 +28,15 @@ export const adminGiftCardDesignSchema = yup.object({
     .trim()
     .required("Caption color is required.")
     .matches(/^#[0-9A-Fa-f]{6}$/, "Use a valid hex color (e.g. #FFFFFF)."),
+  text_color: yup
+    .string()
+    .trim()
+    .required("Text color is required.")
+    .matches(/^#[0-9A-Fa-f]{6}$/, "Use a valid hex color (e.g. #FFFFFF)."),
   status: yup
     .string()
     .oneOf(["DRAFT", "ACTIVE", "PAUSED"], "Select a valid status.")
     .required("Status is required."),
-  sort_order: yup
-    .string()
-    .trim()
-    .required("Sort order is required.")
-    .test("sort-number", "Sort order must be a whole number.", (value) => {
-      if (value == null || value === "") return false;
-      const n = Number(value);
-      return Number.isFinite(n) && Number.isInteger(n) && n >= 0;
-    }),
 }).test(
   "image-or-gradient",
   "Upload an image or keep a color gradient.",
@@ -56,14 +53,38 @@ export const adminGiftCardDesignSchema = yup.object({
 
 export type AdminGiftCardDesignValues = yup.InferType<typeof adminGiftCardDesignSchema>;
 
-export const emptyAdminGiftCardDesignValues = (): AdminGiftCardDesignValues => ({
+export const emptyAdminGiftCardDesignValues = (
+  defaultCategory = ""
+): AdminGiftCardDesignValues => ({
   title: "",
-  category: "ENTERTAINING",
+  category: defaultCategory,
   image_url: "",
   color_gradient: DEFAULT_DESIGN_GRADIENT,
   caption_color: "#FFFFFF",
+  text_color: "#FFFFFF",
   status: "DRAFT",
-  sort_order: "0",
+});
+
+/** Superadmin — gift card design category master */
+export const adminGiftCardCategorySchema = yup.object({
+  name: yup
+    .string()
+    .trim()
+    .required("Category name is required.")
+    .min(2, "Name must be at least 2 characters.")
+    .max(80, "Name must be at most 80 characters."),
+  description: yup
+    .string()
+    .trim()
+    .default("")
+    .max(500, "Description must be at most 500 characters."),
+});
+
+export type AdminGiftCardCategoryValues = yup.InferType<typeof adminGiftCardCategorySchema>;
+
+export const emptyAdminGiftCardCategoryValues = (): AdminGiftCardCategoryValues => ({
+  name: "",
+  description: "",
 });
 
 /** Superadmin — gift card validity setting */
@@ -80,7 +101,7 @@ export const adminGiftCardValiditySchema = yup.object({
 
 export type AdminGiftCardValidityValues = yup.InferType<typeof adminGiftCardValiditySchema>;
 
-/** Customer — buy gift card */
+/** Customer — buy gift card (BookMyShow-style gift-only) */
 export const customerGiftCardBuySchema = yup.object({
   sender_name: yup
     .string()
@@ -99,23 +120,36 @@ export const customerGiftCardBuySchema = yup.object({
     .trim()
     .required("Recipient email is required.")
     .email("Enter a valid recipient email."),
+  recipient_phone: yup
+    .string()
+    .trim()
+    .required("Mobile number is required.")
+    .min(8, "Enter a valid mobile number.")
+    .max(20, "Mobile number is too long.")
+    .matches(/^[+\d][\d\s()-]{7,19}$/, "Enter a valid mobile number."),
   personal_message: yup
     .string()
     .trim()
     .max(GIFT_CARD_MESSAGE_MAX, `Message must be at most ${GIFT_CARD_MESSAGE_MAX} characters.`)
     .default(""),
+  /** When the gift email is delivered to the recipient (today = send now). */
+  delivery_date: yup
+    .string()
+    .trim()
+    .required("Please choose a delivery date.")
+    .matches(/^\d{4}-\d{2}-\d{2}$/, "Choose a valid delivery date.")
+    .test("not-past", "Delivery date cannot be in the past.", (value) => {
+      if (!value) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const picked = new Date(`${value}T00:00:00`);
+      return !Number.isNaN(picked.getTime()) && picked >= today;
+    }),
   denomination: yup
     .number()
     .typeError("Select an amount.")
     .required("Amount is required.")
     .oneOf(denominationList, "Select a valid gift card amount."),
-  quantity: yup
-    .number()
-    .typeError("Quantity is required.")
-    .required("Quantity is required.")
-    .integer("Quantity must be a whole number.")
-    .min(1, "Quantity must be at least 1.")
-    .max(MAX_GIFT_CARD_QTY, `Please enter value less than or equal to ${MAX_GIFT_CARD_QTY}`),
 });
 
 export type CustomerGiftCardBuyValues = yup.InferType<typeof customerGiftCardBuySchema>;

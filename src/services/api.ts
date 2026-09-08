@@ -902,6 +902,7 @@ export interface OrganizerEvent extends AdminEvent {
   contract?: EventContract | null;
   rating?: number | string;
   reviews_count?: number;
+  is_promoted?: boolean;
 }
 
 export interface EventFormPayload {

@@ -5,7 +5,7 @@ import useImage from "use-image";
 import { toast } from "sonner";
 import { 
   Save, PlusSquare, MousePointer2, Trash2, Eraser, Undo2, Redo2, RotateCcw,
-  Hand, ZoomIn, ZoomOut, Maximize2
+  Hand, ZoomIn, ZoomOut, Maximize2, Minimize2, SlidersHorizontal, X
 } from "lucide-react";
 import { useGetOrganizerEventQuery, useUpdateEventLayoutMutation, useGetEventLayoutQuery } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -107,6 +107,9 @@ export default function VenueLayoutBuilder({
   const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showProperties, setShowProperties] = useState(false);
+  const didInitialFitRef = useRef(false);
 
   const venueHydratedRef = React.useRef(false);
   const trRef = useRef<any>(null);
@@ -189,9 +192,13 @@ export default function VenueLayoutBuilder({
     };
   }, []);
 
-  // Spacebar key listener for pan mode
+  // Spacebar and Esc key listener for pan mode and fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+        return;
+      }
       const activeTag = (document.activeElement?.tagName || "").toLowerCase();
       if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") return;
 
@@ -244,31 +251,87 @@ export default function VenueLayoutBuilder({
     };
   }, []);
 
-  const fitToScreen = useCallback(() => {
+  const fitToScreen = useCallback((instant: boolean | React.SyntheticEvent = false) => {
+    const isInstant = instant === true;
     const container = canvasScrollRef.current;
     if (!container) return;
-    const padding = 120;
-    const availableWidth = container.clientWidth - padding;
-    const availableHeight = container.clientHeight - padding;
-    const scaleX = availableWidth / 3200;
-    const scaleY = availableHeight / 2400;
-    const targetScale = Math.min(Math.max(Number(Math.min(scaleX, scaleY).toFixed(3)), 0.15), 1.0);
+
+    // Calculate actual bounding box of all elements on the canvas
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    for (const s of seats) {
+      if (s.coordinate_x < minX) minX = s.coordinate_x;
+      if (s.coordinate_x > maxX) maxX = s.coordinate_x;
+      if (s.coordinate_y < minY) minY = s.coordinate_y;
+      if (s.coordinate_y > maxY) maxY = s.coordinate_y;
+    }
+    for (const sh of shapes) {
+      if (sh.x < minX) minX = sh.x;
+      if (sh.x + sh.width > maxX) maxX = sh.x + sh.width;
+      if (sh.y < minY) minY = sh.y;
+      if (sh.y + sh.height > maxY) maxY = sh.y + sh.height;
+    }
+    for (const l of labels) {
+      if (l.x < minX) minX = l.x;
+      if (l.x + 120 > maxX) maxX = l.x + 120;
+      if (l.y < minY) minY = l.y;
+      if (l.y + 40 > maxY) maxY = l.y + 40;
+    }
+
+    const hasContent = isFinite(minX) && isFinite(minY);
+    const pad = 48;
+    const bMinX = hasContent ? Math.max(0, minX - pad) : 200;
+    const bMinY = hasContent ? Math.max(0, minY - pad) : 100;
+    const bMaxX = hasContent ? Math.min(3200, maxX + pad) : 3000;
+    const bMaxY = hasContent ? Math.min(2400, maxY + pad) : 2300;
+
+    const contentWidth = Math.max(bMaxX - bMinX, 300);
+    const contentHeight = Math.max(bMaxY - bMinY, 300);
+    const centerX = (bMinX + bMaxX) / 2;
+    const centerY = (bMinY + bMaxY) / 2;
+
+    const availW = Math.max(container.clientWidth - 24, 200);
+    const availH = Math.max(container.clientHeight - 24, 200);
+
+    const scaleX = availW / contentWidth;
+    const scaleY = availH / contentHeight;
+    const idealScale = Math.min(scaleX, scaleY);
+    const targetScale = Math.min(Math.max(Number(idealScale.toFixed(2)), 0.18), 1.8);
+
     setZoomScale(targetScale);
 
-    setTimeout(() => {
-      if (canvasScrollRef.current && canvasWrapperRef.current) {
-        const c = canvasScrollRef.current;
-        const w = canvasWrapperRef.current;
-        const totalW = w.offsetWidth + 128;
-        const totalH = w.offsetHeight + 128;
+    const applyScroll = () => {
+      if (!canvasScrollRef.current) return;
+      const c = canvasScrollRef.current;
+      const targetScrollLeft = Math.max(0, Math.round(centerX * targetScale - c.clientWidth / 2));
+      const targetScrollTop = Math.max(0, Math.round(centerY * targetScale - c.clientHeight / 2));
+
+      if (isInstant) {
+        c.scrollLeft = targetScrollLeft;
+        c.scrollTop = targetScrollTop;
+      } else {
         c.scrollTo({
-          left: Math.max(0, (totalW - c.clientWidth) / 2),
-          top: Math.max(0, (totalH - c.clientHeight) / 2),
+          left: targetScrollLeft,
+          top: targetScrollTop,
           behavior: "smooth",
         });
       }
-    }, 60);
-  }, []);
+    };
+
+    setTimeout(applyScroll, 20);
+    setTimeout(applyScroll, 100);
+  }, [seats, shapes, labels]);
+
+  // Automatically fit content to screen upon initial load/hydration
+  useEffect(() => {
+    if ((seats.length > 0 || shapes.length > 0) && !didInitialFitRef.current) {
+      didInitialFitRef.current = true;
+      const t = setTimeout(() => {
+        fitToScreen(true);
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [seats.length, shapes.length, fitToScreen]);
 
   const focusOnSection = useCallback((sectionName: string) => {
     const sectionSeats = seats.filter(s => (s.section_name || "").toLowerCase() === sectionName.toLowerCase());
@@ -2099,7 +2162,11 @@ export default function VenueLayoutBuilder({
   const selectedShape = shapes.find(s => s.id === selectedShapeId);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+    <div className={`flex flex-col bg-white shadow-sm transition-all ${
+      isFullscreen 
+        ? "fixed inset-0 z-[999] w-screen h-screen rounded-none" 
+        : "h-full w-full flex-1 border border-slate-200 rounded-2xl overflow-hidden"
+    }`}>
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
         <div className="flex gap-3 items-center flex-wrap">
@@ -2216,12 +2283,43 @@ export default function VenueLayoutBuilder({
             </optgroup>
           </select>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 p-1">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
             <button onClick={() => setZoomScale(s => Math.max(0.15, Number((s - 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
             <span className="text-xs font-semibold text-slate-600 min-w-[44px] text-center">{Math.round(zoomScale * 100)}%</span>
             <button onClick={() => setZoomScale(s => Math.min(4.0, Number((s + 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">+</button>
           </div>
+
+          {/* Properties Toggle & Fullscreen Toggle */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowProperties(prev => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+                showProperties
+                  ? "bg-rose-50 text-rose-700 border-rose-300 shadow-inner"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+              title={showProperties ? "Hide properties panel to maximize canvas" : "Open properties panel"}
+            >
+              <SlidersHorizontal size={14} />
+              <span>{showProperties ? "Hide Panel" : "Properties"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(prev => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+                isFullscreen
+                  ? "bg-rose-600 text-white border-rose-600 shadow-sm hover:bg-rose-700"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+              title={isFullscreen ? "Exit Fullscreen (Esc)" : "Full Window"}
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              <span className="hidden sm:inline">{isFullscreen ? "Exit" : "Expand"}</span>
+            </button>
+          </div>
+
           <button onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
             <Save size={16} /> {isSaving ? "Saving..." : venueAdapter ? "Save layout" : "Save Layout"}
           </button>
@@ -2269,7 +2367,8 @@ export default function VenueLayoutBuilder({
           <div 
             ref={canvasScrollRef} 
             onMouseDown={handleContainerMouseDown}
-            className={`flex-1 overflow-auto p-12 select-none ${
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            className={`flex-1 overflow-auto p-2 select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
               isPanning 
                 ? "cursor-grabbing" 
                 : (isSpacePressed || mode === "pan") 
@@ -2749,8 +2848,22 @@ export default function VenueLayoutBuilder({
       </div>
 
         {/* Properties Panel */}
-        <div className="w-80 border-l border-slate-200 bg-white p-6 overflow-y-auto">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">Properties</h3>
+        {showProperties && (
+          <div className="w-80 border-l border-slate-200 bg-white p-5 overflow-y-auto shrink-0 shadow-lg animate-in slide-in-from-right-4 duration-200">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <SlidersHorizontal size={16} className="text-rose-500" />
+                Properties
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowProperties(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                title="Hide Properties"
+              >
+                <X size={16} />
+              </button>
+            </div>
           
           {mode === "bulk_seats" ? (
             <div className="space-y-4">
@@ -3025,6 +3138,7 @@ export default function VenueLayoutBuilder({
             <p className="text-slate-500 text-sm">Select a seat or label on the canvas, or click a toolbar action.</p>
           )}
         </div>
+      )}
       </div>
     </div>
   );

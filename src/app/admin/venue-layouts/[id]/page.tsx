@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Maximize2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   useConfirmAdminVenueLayoutLiveMutation,
@@ -95,6 +95,45 @@ export default function AdminVenueLayoutBuilderPage() {
   const [creatingNew, setCreatingNew] = useState(false);
   const [localTemplates, setLocalTemplates] = useState<VenueLayoutTemplate[]>([]);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
+  const [showInlineBuilder, setShowInlineBuilder] = useState(false);
+
+  const handleSaveTemplatePayload = async (payload: {
+    seating_config: { canvasWidth: number; canvasHeight: number; labels: unknown[]; shapes: unknown[]; bgImageUrl?: string | null };
+    seats: unknown[];
+  }) => {
+    const saved = await saveTemplate({
+      id,
+      name: optionName || activeTemplate?.name || request?.layout_name || "Layout option",
+      template_id: creatingNew ? undefined : selectedId || undefined,
+      save_as_new: creatingNew || !selectedId,
+      seating_config: payload.seating_config,
+      seats: payload.seats,
+      publish: false,
+    }).unwrap();
+    const merged: VenueLayoutTemplate = {
+      ...saved,
+      seats_json: payload.seats,
+      seating_config: payload.seating_config,
+    };
+    setLocalTemplates((prev) => {
+      const idx = prev.findIndex((item) => item.id === merged.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = merged;
+        return next;
+      }
+      return [merged, ...prev];
+    });
+    setCreatingNew(false);
+    setActiveTemplateId(merged.id);
+    setOptionName(merged.name);
+    setSelectedTemplateIds((prev) =>
+      prev.includes(merged.id) ? prev : [...prev, merged.id]
+    );
+    toast.success("Layout saved as draft. Select it in Saved options and submit to venue.");
+    void refetch();
+  };
 
   useEffect(() => {
     if (request?.templates) {
@@ -451,59 +490,96 @@ export default function AdminVenueLayoutBuilderPage() {
           </div>
         </aside>
 
-        <div className="min-h-[720px]">
-          <VenueLayoutBuilder
-            key={creatingNew ? "new-option" : activeTemplateId || selectedId || "empty"}
-            venueAdapter={{
-              sections,
-              initialSeats,
-              initialConfig: {
-                labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
-                shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
-              },
-              saving,
-              hideSubmitToVenue: true,
-              onSave: async (payload) => {
-                const saved = await saveTemplate({
-                  id,
-                  name: optionName || request.layout_name,
-                  template_id: creatingNew ? undefined : selectedId || undefined,
-                  save_as_new: creatingNew || !selectedId,
-                  seating_config: payload.seating_config,
-                  seats: payload.seats,
-                  publish: false,
-                }).unwrap();
-                const merged: VenueLayoutTemplate = {
-                  ...saved,
-                  seats_json: payload.seats,
-                  seating_config: payload.seating_config,
-                };
-                setLocalTemplates((prev) => {
-                  const idx = prev.findIndex((item) => item.id === merged.id);
-                  if (idx >= 0) {
-                    const next = [...prev];
-                    next[idx] = merged;
-                    return next;
-                  }
-                  return [merged, ...prev];
-                });
-                setCreatingNew(false);
-                setActiveTemplateId(merged.id);
-                setOptionName(merged.name);
-                setSelectedTemplateIds((prev) =>
-                  prev.includes(merged.id) ? prev : [...prev, merged.id]
-                );
-                toast.success("Layout saved as draft. Select it in Saved options and submit to venue.");
-                void refetch();
-              },
-              onBlankPage: () => {
-                setCreatingNew(true);
-                setActiveTemplateId(null);
-                setOptionName(`${request.layout_name} option ${templates.length + 1}`);
-                toast.info("Blank page ready — start building your layout.");
-              },
-            }}
-          />
+        <div className="space-y-4 min-w-0">
+          {/* Main Layout Card with Prominent Pop-up Button */}
+          <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-5 bg-gradient-to-b from-white/[0.08] to-white/[0.02]">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-md border border-amber-400/20">
+                    Active Layout Option
+                  </span>
+                  {activeTemplate && (
+                    <span className="text-[11px] font-medium text-zinc-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                      {optionStatusLabel(activeTemplate)}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-2xl font-extrabold text-white mt-2">
+                  {optionName || activeTemplate?.name || request.layout_name}
+                </h2>
+                <p className="text-sm text-zinc-400 mt-1">
+                  {initialSeats.length} seats mapped · {Array.isArray(sourceConfig.shapes) ? sourceConfig.shapes.length : 0} stage elements
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsLayoutModalOpen(true)}
+                className="btn-primary py-3 px-6 text-sm font-bold shadow-xl shadow-rose-500/20 flex items-center justify-center gap-2.5 hover:scale-[1.02] active:scale-[0.98] transition-all shrink-0"
+              >
+                <Maximize2 size={18} /> Open Layout in Pop-up Studio
+              </button>
+            </div>
+
+            {/* Layout Seat Preview with Click to Open Overlay */}
+            <div 
+              onClick={() => setIsLayoutModalOpen(true)} 
+              className="group relative cursor-pointer rounded-2xl border border-white/10 bg-black/40 p-4 hover:border-amber-400/60 transition-all overflow-hidden"
+              title="Click to open full-screen pop-up editor"
+            >
+              <LayoutSeatPreview
+                seats={sourceSeats}
+                config={sourceConfig}
+                heightClass="h-72 sm:h-96"
+              />
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex flex-col items-center justify-center gap-2 backdrop-blur-[2px]">
+                <span className="px-5 py-2.5 rounded-xl bg-white text-slate-900 font-bold text-sm shadow-2xl flex items-center gap-2 transform group-hover:scale-105 transition-transform">
+                  <Maximize2 size={18} /> Click to Open Full-Screen Pop-up Studio
+                </span>
+                <p className="text-xs text-white/80 font-medium">Full screen workspace with cursor zoom & pan</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10 text-xs text-zinc-400">
+              <span className="flex items-center gap-1.5">
+                💡 <span>Open the pop-up studio for full-screen seat inspection, cursor zoom in/out, and stage design.</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowInlineBuilder(b => !b)}
+                className="text-amber-400 hover:text-amber-300 font-medium transition-colors"
+              >
+                {showInlineBuilder ? "Hide inline editor ▲" : "Show inline editor ▼"}
+              </button>
+            </div>
+          </div>
+
+          {/* Optional Inline Editor if user toggles it */}
+          {showInlineBuilder && (
+            <div className="min-h-[720px] rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+              <VenueLayoutBuilder
+                key={creatingNew ? "new-option-inline" : `inline-${activeTemplateId || selectedId || "empty"}`}
+                venueAdapter={{
+                  sections,
+                  initialSeats,
+                  initialConfig: {
+                    labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
+                    shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
+                  },
+                  saving,
+                  hideSubmitToVenue: true,
+                  onSave: handleSaveTemplatePayload,
+                  onBlankPage: () => {
+                    setCreatingNew(true);
+                    setActiveTemplateId(null);
+                    setOptionName(`${request.layout_name} option ${templates.length + 1}`);
+                    toast.info("Blank page ready — start building your layout.");
+                  },
+                }}
+              />
+            </div>
+          )}
         </div>
 
         <aside className="glass-panel rounded-2xl border border-white/10 p-5 space-y-3 h-fit xl:sticky xl:top-4">
@@ -600,6 +676,60 @@ export default function AdminVenueLayoutBuilderPage() {
           </p>
         </aside>
       </div>
+
+      {/* Full-Screen Pop-up Layout Studio Modal */}
+      {isLayoutModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between pb-3 px-2 text-white border-b border-white/10 mb-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-3 py-1 rounded-lg border border-amber-400/20 shrink-0 flex items-center gap-1.5">
+                <Maximize2 size={13} /> Full Screen Layout Studio
+              </span>
+              <h2 className="text-lg font-bold text-white truncate">
+                {optionName || activeTemplate?.name || request.layout_name}
+              </h2>
+              <span className="text-xs text-zinc-400 hidden md:inline truncate">
+                ({request.venue_name} · {request.layout_type})
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsLayoutModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-colors flex items-center gap-2 border border-white/10 shadow-sm"
+              >
+                <X size={16} /> Close Studio
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden shadow-2xl border border-slate-700">
+            <VenueLayoutBuilder
+              key={creatingNew ? "new-option-modal" : `modal-${activeTemplateId || selectedId || "empty"}`}
+              venueAdapter={{
+                sections,
+                initialSeats,
+                initialConfig: {
+                  labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
+                  shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
+                },
+                saving,
+                hideSubmitToVenue: true,
+                onSave: async (payload) => {
+                  await handleSaveTemplatePayload(payload);
+                  setIsLayoutModalOpen(false);
+                },
+                onBlankPage: () => {
+                  setCreatingNew(true);
+                  setActiveTemplateId(null);
+                  setOptionName(`${request.layout_name} option ${templates.length + 1}`);
+                  toast.info("Blank page ready — start building your layout.");
+                },
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

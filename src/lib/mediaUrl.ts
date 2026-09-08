@@ -39,23 +39,31 @@ export function resolveMediaUrl(url?: string | null): string {
 
   const origin = getApiOrigin();
 
-  if (url.startsWith("/uploads/")) return `${origin}${url}`;
-  if (url.startsWith("uploads/")) return `${origin}/${url}`;
+  let clean = url.trim();
+  if (clean.startsWith("/public/uploads/")) clean = clean.replace(/^\/public/, "");
+  else if (clean.startsWith("public/uploads/")) clean = clean.replace(/^public\//, "/");
 
-  if (url.startsWith("http://") || url.startsWith("https://")) {
+  if (clean.startsWith("/uploads/")) return `${origin}${clean}`;
+  if (clean.startsWith("uploads/")) return `${origin}/${clean}`;
+
+  if (clean.startsWith("http://") || clean.startsWith("https://")) {
     try {
-      const parsed = new URL(url);
+      const parsed = new URL(clean);
+      let pathname = parsed.pathname;
+      if (pathname.startsWith("/public/uploads/")) {
+        pathname = pathname.replace(/^\/public/, "");
+      }
       // Rewrite API-hosted uploads (often saved as localhost) to the active API origin.
-      if (isBookMyBotaApiHost(parsed.hostname) && parsed.pathname.startsWith("/uploads/")) {
-        return `${origin}${parsed.pathname}${parsed.search}`;
+      if (isBookMyBotaApiHost(parsed.hostname) && pathname.startsWith("/uploads/")) {
+        return `${origin}${pathname}${parsed.search}`;
       }
     } catch {
       /* keep original */
     }
-    return url;
+    return clean;
   }
 
-  return url;
+  return clean;
 }
 
 /** Store uploads as /uploads/... paths when possible (stable across hosts).

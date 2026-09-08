@@ -94,7 +94,7 @@ export default function OrganizerTicketPurchase({
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Ticket size={20} className="text-violet-600" />
+              <Ticket size={20} className="text-rose-600" />
               Buy tickets for customer
             </h3>
             <p className="text-sm text-slate-500 mt-1">
@@ -136,7 +136,7 @@ export default function OrganizerTicketPurchase({
               type="button"
               disabled={!pickedEventId}
               onClick={handlePickEvent}
-              className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-bold text-sm"
+              className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-bold text-sm"
             >
               Continue to checkout
             </button>

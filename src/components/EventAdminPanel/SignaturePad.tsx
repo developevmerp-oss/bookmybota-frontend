@@ -43,7 +43,7 @@ export default function SignaturePad({ value, onChange, label = "Your signature"
           Upload signature image (PNG/JPG). The image will be placed on the digital contract.
         </p>
         <div className="flex flex-wrap gap-2">
-          <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 cursor-pointer">
+          <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 text-white text-sm font-medium hover:bg-rose-700 cursor-pointer">
             {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
             Upload signature image
             <input

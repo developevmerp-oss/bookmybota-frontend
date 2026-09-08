@@ -33,12 +33,12 @@ export default function VenueLocationFields({
 
   const labelClass =
     variant === "dark"
-      ? "block text-sm font-medium text-zinc-400 mb-2"
-      : "block text-sm font-medium text-[#1a1a2e] mb-2";
+      ? "portal-label block text-sm font-semibold mb-1.5"
+      : "portal-label block text-sm font-semibold mb-1.5";
   const inputClass =
     variant === "dark"
-      ? "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white"
-      : "w-full rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/30 focus:border-[#6900AA]";
+      ? "input-field w-full"
+      : "input-field w-full";
 
   useEffect(() => {
     if (!cityId || citiesLoading || !countryId) return;

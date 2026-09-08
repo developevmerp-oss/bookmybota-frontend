@@ -53,7 +53,7 @@ export default function EventStepperNav({
                     active
                       ? done
                         ? "border-emerald-600 bg-emerald-600 text-white"
-                        : "border-violet-600 bg-violet-600 text-white"
+                        : "border-primary bg-primary text-primary-foreground"
                       : done
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                         : "border-slate-200 bg-white text-slate-400"
@@ -66,7 +66,7 @@ export default function EventStepperNav({
                     active
                       ? done
                         ? "text-emerald-700"
-                        : "text-violet-700"
+                        : "text-primary"
                       : done
                         ? "text-emerald-700"
                         : "text-slate-400"
@@ -113,7 +113,7 @@ export default function EventStepperNav({
                   done
                     ? "h-5 w-5 bg-emerald-500 text-white"
                     : active
-                      ? "h-2 w-5 bg-violet-600"
+                      ? "h-2 w-5 bg-primary"
                       : "h-1.5 w-4 bg-slate-200"
                 }`}
               >

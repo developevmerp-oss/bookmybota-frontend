@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @theme {
+  --font-sans: var(--font-family-sans);
+  --font-display: var(--font-family-display);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
@@ -9,7 +11,27 @@
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --shadow-card: var(--elev-card);
+  --shadow-primary: var(--elev-primary);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
 
   /* Custom sizes used by the landing header (h-13, h-15, h-23, pl-13) */
   --spacing-13: 3.25rem;
@@ -40,6 +62,9 @@
 @layer base {
   :root,
   .customer-theme {
+    --radius: 0.5rem;
+    --font-family-sans: var(--font-manrope), "Manrope", sans-serif;
+    --font-family-display: var(--font-manrope), "Manrope", sans-serif;
     --background: #f8fafc;
     --foreground: #0f172a;
     --primary: #6900aa;
@@ -48,7 +73,24 @@
     --card-foreground: #0f172a;
     --border: rgba(0, 0, 0, 0.08);
     --accent: #f1f5f9;
+    --muted: #f1f5f9;
     --muted-foreground: #475569;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    --destructive: #e11d48;
+    --input: #e2e8f0;
+    --ring: #6900aa;
+    --primary-soft: #f7e9ff;
+    --success: #059669;
+    --success-soft: #ecfdf5;
+    --info: #2563eb;
+    --info-soft: #eff6ff;
+    --warning: #d97706;
+    --warning-soft: #fffbeb;
+    --elev-card: 0 1px 2px rgb(15 23 42 / 0.03), 0 8px 24px rgb(15 23 42 / 0.04);
+    --elev-primary: 0 8px 18px rgb(105 0 170 / 0.2);
+    --shadow-card: var(--elev-card);
+    --shadow-primary: var(--elev-primary);
 
     --brand-1: #9d00ff;
     --brand-2: #8c00e3;
@@ -74,28 +116,53 @@
   }
   
   .admin-theme {
-    --background: #f9fafb;
-    --foreground: #111827;
-    --primary: #e11d48;
-    --primary-foreground: #ffffff;
-    --card: #ffffff;
-    --card-foreground: #111827;
-    --border: rgba(0, 0, 0, 0.08);
-    --accent: #f3f4f6;
-    --muted-foreground: #6b7280;
+    --radius: 0.5rem;
+    --font-family-sans: var(--font-manrope), "Manrope", sans-serif;
+    --font-family-display: var(--font-manrope), "Manrope", sans-serif;
+    --background: oklch(0.975 0.004 255);
+    --foreground: oklch(0.22 0.025 265);
+    --primary: oklch(0.56 0.22 20);
+    --primary-foreground: oklch(1 0 0);
+    --primary-soft: oklch(0.95 0.025 20);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.129 0.042 264.695);
+    --border: oklch(0.9 0.008 255);
+    --accent: oklch(0.935 0.025 285);
+    --muted: oklch(0.94 0.007 255);
+    --muted-foreground: oklch(0.52 0.025 258);
+    --secondary: oklch(0.962 0.006 255);
+    --secondary-foreground: oklch(0.25 0.025 265);
+    --destructive: oklch(0.577 0.245 27.325);
+    --input: oklch(0.86 0.012 255);
+    --ring: oklch(0.56 0.22 20);
+    --success: oklch(0.52 0.15 155);
+    --success-soft: oklch(0.95 0.035 155);
+    --info: oklch(0.56 0.15 255);
+    --info-soft: oklch(0.95 0.025 255);
+    --warning: oklch(0.62 0.15 70);
+    --warning-soft: oklch(0.96 0.045 80);
+    --elev-card: 0 1px 2px oklch(0.2 0.02 260 / 0.03), 0 8px 24px oklch(0.2 0.02 260 / 0.04);
+    --elev-primary: 0 8px 18px oklch(0.56 0.22 20 / 0.2);
+    --shadow-card: var(--elev-card);
+    --shadow-primary: var(--elev-primary);
+    --sidebar: oklch(1 0 0);
+    --sidebar-foreground: oklch(0.22 0.025 265);
+    --sidebar-primary: oklch(0.56 0.22 20);
+    --sidebar-accent: oklch(0.95 0.025 20);
+    --sidebar-border: oklch(0.9 0.008 255);
 
-    --rose-50: #fff1f2;
-    --rose-100: #ffe4e6;
-    --rose-200: #fecdd3;
-    --rose-300: #fda4af;
-    --rose-400: #fb7185;
-    --rose-500: #f43f5e;
-    --rose-600: #e11d48;
-    --rose-700: #be123c;
-    --rose-800: #9f1239;
-    --rose-900: #881337;
+    --rose-50: oklch(0.97 0.015 20);
+    --rose-100: oklch(0.95 0.025 20);
+    --rose-200: oklch(0.9 0.05 20);
+    --rose-300: oklch(0.8 0.1 20);
+    --rose-400: oklch(0.7 0.16 20);
+    --rose-500: oklch(0.62 0.2 20);
+    --rose-600: oklch(0.56 0.22 20);
+    --rose-700: oklch(0.48 0.2 20);
+    --rose-800: oklch(0.4 0.16 20);
+    --rose-900: oklch(0.34 0.12 20);
 
-    --primary-glow: rgba(225, 29, 72, 0.25);
+    --primary-glow: oklch(0.56 0.22 20 / 0.25);
   }
   
   .dark {
@@ -126,10 +193,18 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: "Roboto", sans-serif;
+    font-family: var(--font-manrope), "Manrope", sans-serif;
+    letter-spacing: 0;
     background-attachment: fixed;
     min-height: 100vh;
     transition: background-color 0.3s, color 0.3s;
+  }
+
+  html.admin-theme body,
+  html.customer-theme body,
+  .font-display,
+  .font-sans {
+    font-family: var(--font-manrope), "Manrope", sans-serif;
   }
   
   /* Light pages — clean white background, no gradient bleed */
@@ -165,11 +240,53 @@
   }
 
   .btn-primary {
-    @apply bg-rose-600 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 hover:bg-rose-700 active:scale-95 cursor-pointer;
+    @apply bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold transition-all duration-300 hover:opacity-95 active:scale-[0.98] cursor-pointer;
+    box-shadow: var(--shadow-primary);
   }
   
   .btn-primary:hover {
-    box-shadow: 0 0 20px var(--primary-glow);
+    box-shadow: var(--shadow-primary);
+  }
+
+  .org-card {
+    background: var(--card);
+    color: var(--card-foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
+  }
+
+  .org-section-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary);
+  }
+
+  .field-error {
+    @apply text-xs font-medium mt-1.5;
+    color: var(--destructive);
+  }
+
+  .metric-positive {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+
+  .metric-brand {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  .metric-info {
+    background: var(--info-soft);
+    color: var(--info);
+  }
+
+  .metric-warning {
+    background: var(--warning-soft);
+    color: var(--warning);
   }
 
   .logo-box {
@@ -815,7 +932,8 @@ html.admin-theme .admin-dashboard-layout .input-field {
   border-radius: 0.75rem;
 }
 html.admin-theme .admin-dashboard-layout .input-field:focus {
-  border-color: #e11d48 !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px oklch(0.56 0.22 20 / 0.12);
 }
 
 /* Select / dropdown — match input-field (fixes black box on light organizer portal) */
@@ -842,8 +960,8 @@ html.admin-theme .admin-dashboard-layout select.portal-select {
 html.admin-theme .admin-dashboard-layout .portal-select:focus,
 html.admin-theme .admin-dashboard-layout select.portal-select:focus {
   outline: none;
-  border-color: #7c3aed !important;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px oklch(0.56 0.22 20 / 0.15);
 }
 
 html.admin-theme .admin-dashboard-layout .portal-select option {
@@ -938,7 +1056,47 @@ html.admin-theme .admin-dashboard-layout table button.text-white:hover {
   color: #e11d48 !important;
 }
 html.admin-theme .admin-dashboard-layout table a.portal-table-link:hover {
-  color: #7c3aed !important;
+  color: var(--primary) !important;
+}
+
+/* Partner shells (organizer / venue / artist) — light sidebar matching reference dashboard */
+html.admin-theme .organizer-shell .admin-sidebar,
+html.admin-theme .partner-shell .admin-sidebar {
+  background: var(--sidebar, #fff) !important;
+  border-right: 1px solid var(--sidebar-border, var(--border)) !important;
+  box-shadow: none !important;
+}
+
+html.admin-theme .organizer-shell .org-nav-item,
+html.admin-theme .partner-shell .org-nav-item {
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+}
+
+html.admin-theme .organizer-shell .org-nav-item:hover,
+html.admin-theme .partner-shell .org-nav-item:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+html.admin-theme .organizer-shell .org-nav-item.is-active,
+html.admin-theme .partner-shell .org-nav-item.is-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: transparent;
+}
+
+html.admin-theme .organizer-shell header.glass-panel,
+html.admin-theme .partner-shell header.glass-panel {
+  background: color-mix(in oklab, var(--card) 92%, transparent) !important;
+  backdrop-filter: blur(10px);
+}
+
+html.admin-theme .admin-dashboard-layout .glass-panel.org-card,
+html.admin-theme .admin-dashboard-layout .org-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-card) !important;
 }
 html.admin-theme .admin-dashboard-layout table td.portal-table-muted,
 html.admin-theme .admin-dashboard-layout table .portal-table-muted {

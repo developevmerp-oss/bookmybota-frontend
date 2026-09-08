@@ -49,7 +49,7 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
     <Link
       href={artist.href}
       className="top-artists-slot top-artists-slot-link"
-      title={`View ${artist.name} availability and send an inquiry`}
+      title={`View ${artist.name} and send an inquiry`}
     >
       <div className="top-artists-avatar">
         <div className="top-artists-avatar-inner">

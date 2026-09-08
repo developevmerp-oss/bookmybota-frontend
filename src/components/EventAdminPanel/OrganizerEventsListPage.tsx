@@ -2,31 +2,30 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { MoreVertical, Plus, Search } from "lucide-react";
 import { useGetOrganizerEventsQuery } from "@/services/api";
 import { contractStatusLabel, organizerWorkflowLabel } from "@/lib/contractPlaceholders";
-import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
 
 const STATUS_FILTERS = [
   { label: "All", value: "" },
-  { label: "Draft", value: "DRAFT" },
-  { label: "Pending", value: "PENDING_APPROVAL" },
-  { label: "Approved", value: "APPROVED" },
   { label: "Live", value: "LIVE" },
+  { label: "Approved", value: "APPROVED" },
+  { label: "Pending", value: "PENDING_APPROVAL" },
+  { label: "Draft", value: "DRAFT" },
   { label: "Closed", value: "CLOSED" },
 ];
 
-function statusBadge(status: string) {
+function statusPill(status: string) {
   const map: Record<string, string> = {
-    PENDING_APPROVAL: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    APPROVED: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    LIVE: "bg-green-500/10 text-green-400 border-green-500/20",
-    DRAFT: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-    CLOSED: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+    PENDING_APPROVAL: "metric-warning",
+    APPROVED: "metric-info",
+    LIVE: "metric-positive",
+    DRAFT: "bg-muted text-muted-foreground",
+    CLOSED: "bg-rose-50 text-rose-700",
   };
-  return map[status] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+  return map[status] || "bg-muted text-muted-foreground";
 }
 
 function formatEventDate(startsAt?: string | null, endsAt?: string | null): string {
@@ -51,6 +50,13 @@ function formatEventDate(startsAt?: string | null, endsAt?: string | null): stri
   return `${startLabel} – ${endLabel}`;
 }
 
+function formatEventTime(startsAt?: string | null): string {
+  if (!startsAt) return "";
+  const d = new Date(startsAt);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 export default function OrganizerEventsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -69,10 +75,13 @@ export default function OrganizerEventsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="portal-heading text-2xl font-bold">My Events</h2>
-          <p className="portal-muted mt-1">
+          <p className="org-section-label mb-2">Event management</p>
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Your events
+          </h2>
+          <p className="text-muted-foreground mt-1.5 text-sm">
             Create events, upload posters & documents, submit for review, then sign the platform contract.
           </p>
         </div>
@@ -81,114 +90,139 @@ export default function OrganizerEventsPage() {
         </Link>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput
-          value={search}
-          onChange={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
-          placeholder="Search by event name..."
-          className="flex-1"
-        />
-        <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.value || "all"}
-              onClick={() => {
-                setStatusFilter(f.value);
+      <section className="org-card p-4 sm:p-5 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
+          <div className="relative w-full lg:max-w-sm">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
                 setPage(1);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                statusFilter === f.value
-                  ? "bg-violet-500/10 text-violet-400 border-violet-500/30"
-                  : "text-zinc-400 border-white/10 hover:bg-white/5"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
+              placeholder="Search events or venues"
+              className="input-field w-full !pl-9 !py-2.5 text-sm"
+            />
+          </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+          <div className="flex flex-wrap gap-1.5">
+            {STATUS_FILTERS.map((f) => {
+              const active = statusFilter === f.value;
+              return (
+                <button
+                  key={f.value || "all"}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(f.value);
+                    setPage(1);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {isLoading ? (
-          <div className="p-10 text-center text-zinc-500">Loading events...</div>
+          <div className="py-14 text-center text-muted-foreground text-sm">Loading events...</div>
         ) : events.length === 0 ? (
-          <div className="p-10 text-center">
-            <p className="text-zinc-500 mb-4">No events yet.</p>
-            <Link href="/organizer/events/new" className="text-violet-400 hover:text-violet-300 text-sm font-medium">
+          <div className="py-14 text-center">
+            <p className="text-muted-foreground mb-3 text-sm">No events match this filter.</p>
+            <Link href="/organizer/events/new" className="text-primary text-sm font-semibold hover:underline">
               Create your first event →
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[720px]">
-              <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Event</th>
-                  <th className="px-6 py-4 font-medium">Event date</th>
-                  <th className="px-6 py-4 font-medium">Category</th>
-                  <th className="px-6 py-4 font-medium">Status</th>
-                  <th className="px-6 py-4 font-medium">Contract</th>
-                  <th className="px-6 py-4 font-medium">Visible</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-left min-w-[780px]">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground text-xs uppercase tracking-wide">
+                  <th className="px-3 py-3 font-semibold">Date</th>
+                  <th className="px-3 py-3 font-semibold">Event</th>
+                  <th className="px-3 py-3 font-semibold">Status</th>
+                  <th className="px-3 py-3 font-semibold">Contract</th>
+                  <th className="px-3 py-3 font-semibold">Visible</th>
+                  <th className="px-3 py-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-border">
                 {events.map((event) => (
-                  <tr key={event.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4">
+                  <tr key={event.id} className="hover:bg-muted/40 transition-colors">
+                    <td className="px-3 py-4 whitespace-nowrap align-top">
+                      <p className="text-sm font-semibold text-foreground">
+                        {formatEventDate(event.event_starts_at, event.event_ends_at)}
+                      </p>
+                      {formatEventTime(event.event_starts_at) && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {formatEventTime(event.event_starts_at)}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-4 align-top">
                       <Link
                         href={`/organizer/events/${event.id}`}
-                        className="font-medium portal-table-link hover:text-violet-600"
+                        className="font-semibold text-foreground hover:text-primary transition-colors"
                       >
                         {event.name}
                       </Link>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {event.category_name || "—"}
+                      </p>
                       {event.rejection_reason && (
-                        <p className="text-xs text-rose-400/80 mt-0.5 line-clamp-1">
+                        <p className="text-xs text-destructive mt-1 line-clamp-1">
                           Rejected: {event.rejection_reason}
                         </p>
                       )}
                     </td>
-                    <td className="px-6 py-4 portal-table-muted text-sm whitespace-nowrap">
-                      {formatEventDate(event.event_starts_at, event.event_ends_at)}
-                    </td>
-                    <td className="px-6 py-4 portal-table-muted">{event.category_name || "—"}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-4 align-top">
                       <span
-                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider border ${statusBadge(event.status)}`}
+                        className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${statusPill(event.status)}`}
                       >
                         {organizerWorkflowLabel(event)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 portal-table-muted text-sm">
+                    <td className="px-3 py-4 text-sm text-muted-foreground align-top">
                       {event.contract
                         ? contractStatusLabel(event.contract.status, {
                             eventStatus: event.status,
                           })
                         : "Waiting for Super Admin"}
                     </td>
-                    <td className="px-6 py-4 text-zinc-400 text-sm">
+                    <td className="px-3 py-4 text-sm text-muted-foreground align-top">
                       {event.is_visible ? "Yes" : "No"}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-3">
-                      <Link
-                        href={`/organizer/events/${event.id}`}
-                        className="text-sm text-violet-400 hover:text-violet-300"
-                      >
-                        {event.status === "DRAFT" || event.status === "PENDING_APPROVAL"
-                          ? "Edit"
-                          : "View"}
-                      </Link>
-                      {event.contract && (
+                    <td className="px-3 py-4 text-right align-top">
+                      <div className="inline-flex items-center gap-2">
                         <Link
-                          href={`/organizer/events/${event.id}/contract`}
-                          className="text-sm text-violet-600 hover:text-violet-800 font-medium"
+                          href={`/organizer/events/${event.id}`}
+                          className="text-sm font-semibold text-primary hover:opacity-80"
                         >
-                          {event.contract.organizer_signed_at ? "View contract" : "Sign contract →"}
+                          {event.status === "DRAFT" || event.status === "PENDING_APPROVAL"
+                            ? "Edit"
+                            : "View"}
                         </Link>
-                      )}
+                        {event.contract && (
+                          <Link
+                            href={`/organizer/events/${event.id}/contract`}
+                            className="text-sm font-medium text-foreground/70 hover:text-primary"
+                          >
+                            {event.contract.organizer_signed_at ? "Contract" : "Sign →"}
+                          </Link>
+                        )}
+                        <span className="text-muted-foreground/50 p-1" aria-hidden>
+                          <MoreVertical size={16} />
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -196,8 +230,13 @@ export default function OrganizerEventsPage() {
             </table>
           </div>
         )}
-        {data?.meta && <Pagination meta={data.meta} onPageChange={setPage} />}
-      </div>
+
+        {data?.meta && (
+          <div className="pt-2 border-t border-border">
+            <Pagination meta={data.meta} onPageChange={setPage} />
+          </div>
+        )}
+      </section>
     </div>
   );
 }

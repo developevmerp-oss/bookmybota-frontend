@@ -73,14 +73,14 @@ export default function OrganizerLedgerPage() {
     <div className="max-w-7xl mx-auto space-y-6">
       <div>
         <h2 className="portal-heading text-2xl font-bold flex items-center gap-2">
-          <Wallet className="text-violet-500" /> Revenue Ledger
+          <Wallet className="text-rose-500" /> Revenue Ledger
         </h2>
         <p className="portal-muted text-sm mt-1">
           Ticket revenue, platform commission, your earnings, and customer-wise booking entries.
         </p>
       </div>
 
-      <div className="glass-panel rounded-2xl p-4 space-y-4">
+      <div className="org-card p-4 space-y-4">
         <p className="portal-label text-xs font-bold uppercase tracking-wider">Filters</p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
@@ -144,7 +144,7 @@ export default function OrganizerLedgerPage() {
           <button
             type="button"
             onClick={applyFilters}
-            className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700"
+            className="px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700"
           >
             Apply filters
           </button>
@@ -170,7 +170,7 @@ export default function OrganizerLedgerPage() {
             <StatCard label="Ticket sales" value={money(summary?.ticket_amount)} />
             <StatCard label="Commission deducted" value={money(summary?.commission_total)} accent="text-amber-600" />
             <StatCard label="Your earnings" value={money(summary?.organizer_earned)} accent="text-emerald-600" />
-            <StatCard label="Paid by admin" value={money(summary?.total_paid)} accent="text-violet-600" />
+            <StatCard label="Paid by admin" value={money(summary?.total_paid)} accent="text-rose-600" />
             <StatCard label="Pending payout" value={money(summary?.pending_amount)} accent="text-rose-600" />
             <StatCard label="Bookings" value={String(summary?.bookings_count ?? 0)} />
             <StatCard label="Tickets sold" value={String(summary?.tickets_sold ?? 0)} />
@@ -181,7 +181,7 @@ export default function OrganizerLedgerPage() {
             />
           </div>
 
-          <div className="glass-panel rounded-2xl overflow-hidden">
+          <div className="org-card overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <h3 className="portal-heading font-semibold">By event</h3>
             </div>
@@ -222,7 +222,7 @@ export default function OrganizerLedgerPage() {
                         <td className="portal-table-cell px-4 py-3 text-right font-semibold">
                           {money(row.organizer_earned)}
                         </td>
-                        <td className="portal-table-cell px-4 py-3 text-right text-violet-700">
+                        <td className="portal-table-cell px-4 py-3 text-right text-rose-700">
                           {money(row.paid_amount)}
                         </td>
                         <td className="portal-table-cell px-4 py-3 text-right text-rose-600 font-semibold">
@@ -236,10 +236,10 @@ export default function OrganizerLedgerPage() {
             </div>
           </div>
 
-          <div className="glass-panel rounded-2xl overflow-hidden">
+          <div className="org-card overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
               <h3 className="portal-heading font-semibold flex items-center gap-2">
-                <Users size={18} className="text-violet-500" /> Customer-wise bookings
+                <Users size={18} className="text-rose-500" /> Customer-wise bookings
               </h3>
               {customersFetching && !customersLoading && (
                 <Loader2 size={14} className="animate-spin text-slate-400" />
@@ -361,7 +361,7 @@ export default function OrganizerLedgerPage() {
             )}
           </div>
 
-          <div className="glass-panel rounded-2xl p-5">
+          <div className="org-card p-5">
             <h3 className="portal-heading font-semibold mb-4 flex items-center gap-2">
               <Banknote size={18} /> Recent payouts from Super Admin
             </h3>
@@ -404,7 +404,7 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="glass-panel rounded-2xl p-4">
+    <div className="org-card p-4">
       <p className="portal-stat-label text-xs uppercase tracking-wider">{label}</p>
       <p className={`text-xl font-bold mt-1 ${accent}`}>{value}</p>
     </div>
@@ -432,8 +432,8 @@ function PaginationButton({
       disabled={disabled}
       className={`inline-flex items-center justify-center min-w-[2rem] h-9 px-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
         active
-          ? "bg-violet-600 text-white shadow-sm"
-          : "border border-slate-200 bg-white text-slate-700 hover:bg-violet-50 hover:border-violet-200"
+          ? "bg-rose-600 text-white shadow-sm"
+          : "border border-slate-200 bg-white text-slate-700 hover:bg-rose-50 hover:border-rose-200"
       } ${className}`}
       {...rest}
     >

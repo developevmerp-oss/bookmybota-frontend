@@ -303,26 +303,29 @@ export default function OrganizerScanPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-extrabold text-white tracking-tight">Scan event tickets</h2>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="org-section-label mb-2">Gate check-in</p>
+        <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          Scan event tickets
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1.5">
           Scan the guest&apos;s QR code at the gate. Each ticket can be checked in only once — scanning
           again will show that entry was already used. Tip: paste your{" "}
-          <span className="text-zinc-300">BMB-…</span> booking code or scan the QR.
+          <span className="font-medium text-foreground">BMB-…</span> booking code or scan the QR.
         </p>
         {lookingUp && (
-          <p className="text-sm text-violet-300 mt-2 inline-flex items-center gap-2">
+          <p className="text-sm text-primary mt-2 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Looking up booking…
           </p>
         )}
         {lastDecoded && !lookingUp && !scanned && (
-          <p className="text-xs text-zinc-500 mt-2 break-all">
+          <p className="text-xs text-muted-foreground mt-2 break-all">
             Last read: {lastDecoded}
           </p>
         )}
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 p-5 space-y-4">
+      <div className="org-card p-5 space-y-4">
         <div className="relative overflow-hidden rounded-xl bg-black min-h-[280px]">
           <div
             id={SCANNER_REGION_ID}
@@ -379,7 +382,7 @@ export default function OrganizerScanPage() {
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               placeholder="Paste BMB-… booking code, EVB-… QR code, or booking ID"
-              className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500"
+              className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500"
               {...register("manualToken")}
             />
             <button
@@ -397,7 +400,7 @@ export default function OrganizerScanPage() {
       </div>
 
       {scanned && (
-        <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
+        <div className="org-card p-6 space-y-5">
           {isJustCheckedIn ? (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex gap-3">
               <CheckCircle2 size={20} className="text-emerald-300 shrink-0 mt-0.5" />
@@ -514,7 +517,7 @@ export default function OrganizerScanPage() {
           </div>
 
           <p className="text-xs text-zinc-500">
-            Booking ref: <span className="font-mono text-violet-300">{shortBookingCode(scanned.id)}</span>
+            Booking ref: <span className="font-mono text-rose-300">{shortBookingCode(scanned.id)}</span>
             {scanned.qr_code ? (
               <>
                 {" "}

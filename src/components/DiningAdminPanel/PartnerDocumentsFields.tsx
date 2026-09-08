@@ -48,24 +48,14 @@ export default function PartnerDocumentsFields({
   });
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
 
-  const isDark = variant === "dark";
-  const sectionClass = isDark
-    ? "rounded-xl border border-white/10 bg-zinc-900/40 p-4 space-y-3"
-    : "rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3";
-  const titleClass = isDark ? "text-white font-semibold" : "text-slate-800 font-semibold";
-  const mutedClass = isDark ? "text-zinc-400 text-sm" : "text-slate-500 text-sm";
-  const cardClass = isDark
-    ? "p-3 rounded-lg border border-white/10 bg-zinc-950/40 space-y-2"
-    : "p-3 rounded-lg border border-slate-200 bg-white space-y-2";
-  const fileRowClass = isDark
-    ? "flex items-center gap-3 p-2.5 rounded-lg bg-zinc-900 border border-white/10"
-    : "flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200";
-  const linkClass = isDark
-    ? "text-sm text-zinc-200 truncate flex-1 hover:text-rose-300"
-    : "text-sm text-slate-800 truncate flex-1 hover:text-rose-600";
-  const uploadBtnClass = isDark
-    ? "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/20 text-sm text-zinc-300 hover:border-rose-400 cursor-pointer"
-    : "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:border-rose-400 cursor-pointer";
+  const sectionClass = "org-card p-5 sm:p-6 space-y-3";
+  const titleClass = "font-display text-lg font-bold text-foreground";
+  const mutedClass = "text-muted-foreground text-sm";
+  const cardClass = "p-3 rounded-xl border border-border bg-muted/30 space-y-2";
+  const fileRowClass = "flex items-center gap-3 p-2.5 rounded-lg bg-card border border-border";
+  const linkClass = "text-sm text-foreground truncate flex-1 hover:text-primary";
+  const uploadBtnClass =
+    "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:border-primary cursor-pointer";
 
   const handleUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -120,7 +110,7 @@ export default function PartnerDocumentsFields({
       {isLoading ? (
         <p className={mutedClass}>Loading document checklist...</p>
       ) : masters.length === 0 ? (
-        <p className={isDark ? "text-amber-400 text-sm" : "text-amber-700 text-sm"}>
+        <p className="text-amber-700 text-sm">
           No document types configured yet.
         </p>
       ) : (
@@ -131,7 +121,7 @@ export default function PartnerDocumentsFields({
               <div key={doc.id} className={cardClass}>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={isDark ? "text-zinc-100 font-medium text-sm" : "text-slate-800 font-medium text-sm"}>
+                    <span className="text-foreground font-medium text-sm">
                       {doc.name}
                     </span>
                     {doc.is_required && <span className="text-rose-500 text-sm">*</span>}

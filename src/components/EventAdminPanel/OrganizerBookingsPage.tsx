@@ -3,7 +3,7 @@
 import { useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CalendarCheck, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import OrganizerTicketPurchase from "@/components/EventAdminPanel/OrganizerTicketPurchase";
 import { useGetOrganizerBookingsQuery, useGetOrganizerEventsQuery } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
@@ -77,11 +77,11 @@ function OrganizerBookingsContent() {
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h2 className="portal-heading text-2xl font-bold flex items-center gap-2">
-            <CalendarCheck size={24} className="text-violet-600" />
-            Event Bookings
+          <p className="org-section-label mb-2">Operations</p>
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Event bookings
           </h2>
-          <p className="portal-muted mt-1">
+          <p className="text-muted-foreground mt-1.5 text-sm">
             Customer ticket purchases appear here in real time after checkout.
           </p>
         </div>
@@ -95,7 +95,7 @@ function OrganizerBookingsContent() {
           </button>
           <Link
             href="/organizer/tickets"
-            className="text-sm text-violet-600 hover:text-violet-700 font-medium inline-flex items-center px-3 py-2"
+            className="text-sm text-rose-600 hover:text-rose-700 font-medium inline-flex items-center px-3 py-2"
           >
             View ticket statistics →
           </Link>
@@ -118,13 +118,13 @@ function OrganizerBookingsContent() {
           <p className="text-[10px] text-green-700 uppercase tracking-wide font-semibold">Tickets (confirmed)</p>
           <p className="text-2xl font-bold text-green-600 mt-1">{totals.tickets}</p>
         </div>
-        <div className="glass-panel rounded-xl border border-violet-200 p-4 col-span-2 sm:col-span-1">
-          <p className="text-[10px] text-violet-700 uppercase tracking-wide font-semibold">Ticket revenue</p>
-          <p className="text-2xl font-bold text-violet-600 mt-1">{formatPrice(totals.revenue)}</p>
+        <div className="glass-panel rounded-xl border border-rose-200 p-4 col-span-2 sm:col-span-1">
+          <p className="text-[10px] text-rose-700 uppercase tracking-wide font-semibold">Ticket revenue</p>
+          <p className="text-2xl font-bold text-rose-600 mt-1">{formatPrice(totals.revenue)}</p>
         </div>
       </div>
 
-      <div className="portal-toolbar glass-panel rounded-2xl p-4 sm:p-5">
+      <div className="portal-toolbar org-card p-4 sm:p-5">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="relative flex-1 min-w-0">
             <SearchInput
@@ -183,7 +183,7 @@ function OrganizerBookingsContent() {
         </div>
       </div>
 
-      <div className="glass-panel rounded-2xl overflow-hidden">
+      <div className="org-card overflow-hidden">
         {isLoading ? (
           <div className="p-10 text-center portal-muted">Loading bookings…</div>
         ) : bookings.length === 0 ? (

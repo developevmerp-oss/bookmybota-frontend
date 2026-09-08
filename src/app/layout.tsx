@@ -1,5 +1,5 @@
 "use client";
-import { Roboto } from "next/font/google";
+import { Manrope } from "next/font/google";
 import { useEffect } from "react";
 import "./globals.css";
 import { usePathname } from "next/navigation";
@@ -9,9 +9,10 @@ import HomeHeader from "@/components/LandingPage/HomeHeader";
 import PartnerAuthHeader from "@/components/Shared/PartnerAuthHeader";
 import { isArtistAdminPath, isMovieAdminPath, isVenueAdminPath } from "@/lib/authStorage";
 
-const roboto = Roboto({
+const manrope = Manrope({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "700"],
+  variable: "--font-manrope",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 function Footer() {
@@ -177,7 +178,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
-      <body className={roboto.className}>
+      <body className={`${manrope.className} ${manrope.variable}`}>
         <StoreProvider>
           {showPartnerAuthHeader ? <PartnerAuthHeader /> : showPublicHeader ? <HomeHeader /> : null}
           <main className={isEventBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>

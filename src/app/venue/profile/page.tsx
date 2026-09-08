@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -17,17 +19,15 @@ import PhoneInput from "@/components/Shared/PhoneInput";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import PartnerDocumentsFields from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import VenueLocationFields from "@/components/VenueAdminPanel/VenueLocationFields";
+import PartnerPhotoGalleryFields, {
+  normalizeImageList,
+} from "@/components/Shared/PartnerPhotoGalleryFields";
 import { parseContactPerson, venueTypeDisplayName } from "@/lib/venuePartnerInfo";
 import { defaultVenueMeta, type VenueMeta } from "@/lib/venueCategoryConfig";
-
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className="text-sm text-white mt-1">{value?.trim() ? value : "—"}</p>
-    </div>
-  );
-}
+import {
+  venuePartnerProfileSchema,
+  type VenuePartnerProfileValues,
+} from "@/lib/partnerProfileFormSchemas";
 
 export default function VenueProfilePage() {
   const dispatch = useAppDispatch();
@@ -41,57 +41,74 @@ export default function VenueProfilePage() {
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
 
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [phone, setPhone] = useState("");
-  const [phoneValid, setPhoneValid] = useState(true);
-  const [description, setDescription] = useState("");
-  const [aboutText, setAboutText] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
-  const [countryId, setCountryId] = useState<number | "">("");
-  const [cityId, setCityId] = useState<number | "">("");
-  const [contactName, setContactName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [phoneValid, setPhoneValid] = useState(true);
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [venueMeta, setVenueMeta] = useState<VenueMeta>(() => defaultVenueMeta());
 
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<VenuePartnerProfileValues>({
+    resolver: yupResolver(venuePartnerProfileSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+      address: "",
+      aboutText: "",
+      contactName: "",
+      countryId: "",
+      cityId: "",
+    },
+    mode: "onSubmit",
+  });
+
+  const countryId = watch("countryId");
+  const cityId = watch("cityId");
   const venueTypeLabel = venueTypeDisplayName(settings?.venue_type_slug, settings?.venue_type_name);
+  const adminEmail = settings?.admin_email || user?.email || "";
 
   useEffect(() => {
     if (!settings) return;
-    setName(settings.name || "");
-    setAddress(settings.address || "");
-    setPhone(settings.phone || "");
-    setDescription(settings.description || "");
-    setAboutText(() => {
+    const about = (() => {
       const raw = (settings.description || "").trim();
       if (!raw) return "";
       return raw.replace(/Contact person:\s*.+/i, "").trim();
-    });
-    setCoverImageUrl(settings.cover_image_url || "");
-    setCityId(settings.city_id ?? "");
-    setAdminEmail(settings.admin_email || user?.email || "");
-    setContactName(parseContactPerson(settings.description));
-    setDocuments(Array.isArray(settings.documents) ? settings.documents : []);
+    })();
     const meta =
       settings.venue_meta && typeof settings.venue_meta === "object"
         ? (settings.venue_meta as VenueMeta)
         : defaultVenueMeta();
     setVenueMeta(meta);
-    setCountryId(
-      settings.country_id ?? meta.registration?.country_id ?? ""
-    );
-  }, [settings, user?.email]);
+    setCoverImageUrl(settings.cover_image_url || "");
+    setGalleryImages(normalizeImageList(settings.gallery_images));
+    setDocuments(Array.isArray(settings.documents) ? settings.documents : []);
+    reset({
+      name: settings.name || "",
+      phone: settings.phone || "",
+      address: settings.address || "",
+      aboutText: about,
+      contactName: parseContactPerson(settings.description),
+      countryId: settings.country_id ?? meta.registration?.country_id ?? "",
+      cityId: settings.city_id ?? "",
+    });
+  }, [settings, reset]);
 
-  if (isLoading || !user) {
-    return <div className="text-white p-10 text-center">Loading venue profile...</div>;
-  }
-
-  const saveProfile = async () => {
+  const onSave = handleSubmit(async (values) => {
+    if (!phoneValid) {
+      toast.error("Enter a valid phone number.");
+      return;
+    }
     try {
       const nextDescription = [
-        contactName.trim() ? `Contact person: ${contactName.trim()}` : "",
-        aboutText,
+        values.contactName.trim() ? `Contact person: ${values.contactName.trim()}` : "",
+        values.aboutText || "",
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -99,19 +116,20 @@ export default function VenueProfilePage() {
       await updateSettings({
         bizId,
         body: {
-          name,
-          address,
-          phone,
+          name: values.name,
+          address: values.address,
+          phone: values.phone,
           description: nextDescription,
           cover_image_url: coverImageUrl || "",
-          city_id: cityId ? Number(cityId) : null,
+          gallery_images: galleryImages,
+          city_id: values.cityId ? Number(values.cityId) : null,
           documents,
           venue_meta: {
             ...venueMeta,
             registration: {
               ...(venueMeta.registration || {}),
-              country_id: countryId ? Number(countryId) : null,
-              contact_name: contactName.trim(),
+              country_id: values.countryId ? Number(values.countryId) : null,
+              contact_name: values.contactName.trim(),
             },
           },
         },
@@ -120,147 +138,195 @@ export default function VenueProfilePage() {
     } catch (err) {
       toast.error(extractApiError(err, "Failed to save profile"));
     }
-  };
+  });
+
+  if (isLoading || !user) {
+    return (
+      <div className="p-10 text-center text-muted-foreground font-medium">Loading venue profile...</div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Venue profile</h2>
-        <p className="text-zinc-400 mt-1">
-          Your registered venue details, contact person, and onboarding documents.
-        </p>
-        <Link
-          href="/venue/layout-requests"
-          className="inline-block mt-2 text-sm font-medium text-amber-400 hover:text-amber-300"
-        >
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <p className="org-section-label mb-2">Venue workspace</p>
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Venue profile
+          </h2>
+          <p className="text-muted-foreground mt-1.5 text-sm">
+            Your registered venue details, contact person, and onboarding documents.
+          </p>
+        </div>
+        <Link href="/venue/layout-requests" className="text-sm font-semibold text-primary hover:opacity-80">
           Request a layout site visit →
         </Link>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-6">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Venue information</h3>
-          <p className="text-sm text-zinc-400 mt-1">Basic details registered with BookMyBota.</p>
-        </div>
-
-        <InfoRow label="Venue type" value={venueTypeLabel} />
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">Cover image</label>
-          <CroppedImageField
-            value={coverImageUrl}
-            aspect={16 / 9}
-            disabled={uploading}
-            previewClassName="w-full max-w-sm aspect-video rounded-2xl border border-white/10"
-            emptyClassName="flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-2xl border border-dashed border-white/20 hover:border-amber-400"
-            onRemove={() => setCoverImageUrl("")}
-            onCroppedFile={async (file) => {
-              const fd = new FormData();
-              fd.append("image", file);
-              try {
-                const res = await uploadImage(fd).unwrap();
-                if (res.url) {
-                  setCoverImageUrl(res.url);
-                  toast.success("Image uploaded");
-                }
-              } catch (err) {
-                toast.error(extractApiError(err, "Failed to upload image"));
-              }
-            }}
-            emptyContent={
-              <>
-                <ImagePlus className="text-zinc-400 mb-1" size={20} />
-                <span className="text-[10px] text-zinc-500">{uploading ? "Uploading…" : "Add cover"}</span>
-              </>
-            }
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={onSave} className="space-y-6" noValidate>
+        <section className="org-card p-5 sm:p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-2">Venue name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="input-field" />
+            <h3 className="font-display text-lg font-bold text-foreground">Venue information</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Basic details registered with BookMyBota.
+            </p>
           </div>
-          <PhoneInput
-            label="Phone"
-            labelClassName="block text-sm font-medium text-zinc-400 mb-2"
-            variant="dark"
-            value={phone}
-            onChange={setPhone}
-            onValidChange={setPhoneValid}
-            required={false}
-          />
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">Venue address</label>
-          <textarea
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white"
-            rows={2}
-          />
-        </div>
+          <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Venue type
+            </p>
+            <p className="text-sm font-semibold text-foreground mt-1">{venueTypeLabel || "—"}</p>
+          </div>
 
-        <VenueLocationFields
-          variant="dark"
-          countryId={countryId}
-          cityId={cityId}
-          onCountryChange={setCountryId}
-          onCityChange={setCityId}
-        />
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">About venue</label>
-          <textarea
-            value={aboutText}
-            onChange={(e) => setAboutText(e.target.value)}
-            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white"
-            rows={3}
-            placeholder="Short description of your venue"
-          />
-        </div>
-      </div>
-
-      <div className="glass-panel rounded-2xl border border-white/10 p-6 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Contact person</h3>
-          <p className="text-sm text-zinc-400 mt-1">Primary contact for BookMyBota coordination.</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-2">Contact person name</label>
-            <input
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              className="input-field"
-              placeholder="Full name"
+            <label className="portal-label block text-sm font-semibold mb-1.5">Cover image</label>
+            <CroppedImageField
+              value={coverImageUrl}
+              aspect={16 / 9}
+              disabled={uploading}
+              previewClassName="w-full max-w-sm aspect-video rounded-xl border border-border"
+              emptyClassName="flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-xl border border-dashed border-border hover:border-primary"
+              onRemove={() => setCoverImageUrl("")}
+              onCroppedFile={async (file) => {
+                const fd = new FormData();
+                fd.append("image", file);
+                try {
+                  const res = await uploadImage(fd).unwrap();
+                  if (res.url) {
+                    setCoverImageUrl(res.url);
+                    toast.success("Image uploaded");
+                  }
+                } catch (err) {
+                  toast.error(extractApiError(err, "Failed to upload image"));
+                }
+              }}
+              emptyContent={
+                <>
+                  <ImagePlus className="text-muted-foreground mb-1" size={20} />
+                  <span className="text-[10px] text-muted-foreground">
+                    {uploading ? "Uploading…" : "Add cover"}
+                  </span>
+                </>
+              }
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-2">Login email</label>
-            <input value={adminEmail} readOnly className="input-field opacity-80" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="portal-label block text-sm font-semibold mb-1.5">
+                Venue name <span className="text-destructive">*</span>
+              </label>
+              <input {...register("name")} className="input-field" placeholder="Venue name" />
+              {errors.name && <p className="field-error">{errors.name.message}</p>}
+            </div>
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <PhoneInput
+                  label="Phone"
+                  labelClassName="portal-label block text-sm font-semibold mb-1.5"
+                  variant="light"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onValidChange={setPhoneValid}
+                  required
+                  error={errors.phone?.message}
+                />
+              )}
+            />
           </div>
+
+          <div>
+            <label className="portal-label block text-sm font-semibold mb-1.5">
+              Venue address <span className="text-destructive">*</span>
+            </label>
+            <textarea
+              {...register("address")}
+              className="input-field min-h-[72px]"
+              rows={2}
+              placeholder="Street, area, landmarks"
+            />
+            {errors.address && <p className="field-error">{errors.address.message}</p>}
+          </div>
+
+          <div>
+            <VenueLocationFields
+              variant="light"
+              countryId={countryId ?? ""}
+              cityId={cityId ?? ""}
+              onCountryChange={(id) =>
+                setValue("countryId", id, { shouldValidate: true, shouldDirty: true })
+              }
+              onCityChange={(id) => setValue("cityId", id, { shouldValidate: true, shouldDirty: true })}
+            />
+            {(errors.countryId || errors.cityId) && (
+              <p className="field-error">
+                {errors.countryId?.message || errors.cityId?.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="portal-label block text-sm font-semibold mb-1.5">About venue</label>
+            <textarea
+              {...register("aboutText")}
+              className="input-field min-h-[96px]"
+              rows={3}
+              placeholder="Short description of your venue"
+            />
+            {errors.aboutText && <p className="field-error">{errors.aboutText.message}</p>}
+          </div>
+        </section>
+
+        <PartnerPhotoGalleryFields
+          value={galleryImages}
+          onChange={setGalleryImages}
+          title="Photo gallery"
+          description="Add photos of your venue. Customers see these on your public profile."
+        />
+
+        <section className="org-card p-5 sm:p-6 space-y-4">
+          <div>
+            <h3 className="font-display text-lg font-bold text-foreground">Contact person</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Primary contact for BookMyBota coordination.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="portal-label block text-sm font-semibold mb-1.5">
+                Contact person name <span className="text-destructive">*</span>
+              </label>
+              <input
+                {...register("contactName")}
+                className="input-field"
+                placeholder="Full name"
+              />
+              {errors.contactName && <p className="field-error">{errors.contactName.message}</p>}
+            </div>
+            <div>
+              <label className="portal-label block text-sm font-semibold mb-1.5">Login email</label>
+              <input value={adminEmail} readOnly className="input-field opacity-80 bg-muted/40" />
+            </div>
+          </div>
+        </section>
+
+        <PartnerDocumentsFields
+          module="venue"
+          value={documents}
+          onChange={setDocuments}
+          variant="light"
+          editable
+        />
+
+        <div className="flex justify-end">
+          <button type="submit" disabled={saving || !phoneValid} className="btn-primary disabled:opacity-50">
+            {saving ? "Saving..." : "Save profile"}
+          </button>
         </div>
-      </div>
-
-      <PartnerDocumentsFields
-        module="venue"
-        value={documents}
-        onChange={setDocuments}
-        variant="dark"
-        editable
-      />
-
-      <div className="flex justify-end">
-        <button
-          onClick={() => void saveProfile()}
-          disabled={saving || !phoneValid}
-          className="btn-primary disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save profile"}
-        </button>
-      </div>
+      </form>
     </div>
   );
 }

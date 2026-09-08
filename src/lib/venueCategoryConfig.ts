@@ -16,6 +16,7 @@ export type VenueMeta = {
     country_id?: number | null;
     state_id?: number | null;
     state_region?: string;
+    contact_name?: string;
   };
 };
 

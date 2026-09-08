@@ -1,10 +1,26 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Briefcase, CalendarDays, Clock, Loader2, Mail, MapPin, MessageSquare, Mic2, Phone, User } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Briefcase,
+  CalendarDays,
+  Clock,
+  Loader2,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Mic2,
+  Music2,
+  Phone,
+  User,
+  Video,
+} from "lucide-react";
+import { FaInstagram, FaYoutube } from "react-icons/fa";
 import { toast } from "sonner";
 import {
   useCreateArtistInquiryMutation,
@@ -19,16 +35,19 @@ import {
 import { sanitizePhoneInput } from "@/lib/validation";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import ArtistMonthCalendar from "@/components/Shared/ArtistMonthCalendar";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import PreferredTimeSelect from "@/components/Shared/PreferredTimeSelect";
-import { formatDate } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { normalizeArtistMetaClient } from "@/lib/artistMeta";
 
-const BRAND = "#6900AA";
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
 const inquiryInput =
   "w-full rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/20 focus:border-[#C4B5FD] focus:bg-white";
+
+function todayYmd(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function InquiryLabel({
   icon: Icon,
@@ -61,11 +80,6 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   });
   const [createInquiry, { isLoading: sending }] = useCreateArtistInquiryMutation();
 
-  const freeDates = useMemo(
-    () => (artist?.slots || []).map((s) => s.slot_date),
-    [artist?.slots]
-  );
-
   const form = useForm<ArtistInquiryFormValues>({
     resolver: yupResolver(artistInquiryFormSchema),
     defaultValues: {
@@ -86,12 +100,9 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
     control,
     handleSubmit,
     setValue,
-    watch,
     reset,
     formState: { errors },
   } = form;
-
-  const selectedDate = watch("event_date");
 
   useEffect(() => {
     if (!customerProfile) return;
@@ -152,6 +163,15 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   const place = [artist.city_name, artist.city_state].filter(Boolean).join(", ");
   const coverSrc = artist.cover_image_url ? resolveMediaUrl(artist.cover_image_url) : "";
   const metaParts = [artist.type_name || "Registered artist", place].filter(Boolean);
+  const artistMeta = normalizeArtistMetaClient(artist.artist_meta);
+  const spotlightVideos = artistMeta.spotlight_videos || [];
+  const audioClips = artistMeta.audio_clips || [];
+  const social = artistMeta.social || {};
+  const instagramUrl = social.instagram_url?.trim() || "";
+  const youtubeUrl = social.youtube_url?.trim() || "";
+  const galleryImages = (Array.isArray(artist.gallery_images) ? artist.gallery_images : []).filter(
+    (u): u is string => typeof u === "string" && !!u.trim()
+  );
 
   return (
     <div className="min-h-screen bg-[#faf7fc]">
@@ -218,149 +238,246 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               >
                 Send inquiry
               </button>
+
+              {(instagramUrl || youtubeUrl) && (
+                <div className="mt-5 flex flex-wrap items-center justify-center md:justify-start gap-3">
+                  {instagramUrl ? (
+                    <a
+                      href={instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Open Instagram profile"
+                      title="Instagram"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#E1306C] shadow-sm hover:border-[#E1306C]/40 hover:bg-[#FFF5F8] transition-colors"
+                    >
+                      <FaInstagram size={22} />
+                    </a>
+                  ) : null}
+                  {youtubeUrl ? (
+                    <a
+                      href={youtubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Open YouTube channel"
+                      title="YouTube"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#FF0000] shadow-sm hover:border-[#FF0000]/40 hover:bg-[#FFF5F5] transition-colors"
+                    >
+                      <FaYoutube size={22} />
+                    </a>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <div className="grid lg:grid-cols-2 gap-6 items-start">
-          <div className="h-fit space-y-3">
-            <ArtistMonthCalendar
-              variant="glass"
-              title="Book calendar"
-              subtitle="Highlighted days are open. Select one to request a booking."
-              freeDates={freeDates}
-              selectedDate={selectedDate || null}
-              mode="pick"
-              onSelectDate={(date) =>
-                setValue("event_date", date, { shouldDirty: true, shouldValidate: true })
-              }
-            />
-            {freeDates.length === 0 ? (
-              <p className="text-sm text-amber-800 bg-amber-50/80 border border-amber-200 rounded-2xl px-3 py-2">
-                This artist has not published free days yet. Check back later.
-              </p>
-            ) : null}
+      {galleryImages.length > 0 ? (
+        <section className="max-w-5xl mx-auto px-4 pt-8">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 sm:p-6 space-y-4 shadow-sm">
+            <h2 className="text-lg font-bold text-[#111111]">Gallery</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {galleryImages.map((url, idx) => (
+                <div
+                  key={`${url}-${idx}`}
+                  className="aspect-[4/3] rounded-xl overflow-hidden border border-[#F3F4F6] bg-[#FAFAFA]"
+                >
+                  <img
+                    src={resolveMediaUrl(url)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {spotlightVideos.length > 0 ? (
+        <section className="max-w-5xl mx-auto px-4 pt-8">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 sm:p-6 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Video size={18} className="text-[#6900AA]" />
+              <h2 className="text-lg font-bold text-[#111111]">Spotlight videos</h2>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {spotlightVideos.map((clip, idx) => (
+                <div
+                  key={`${clip.url}-${idx}`}
+                  className="rounded-xl border border-[#F3F4F6] bg-[#FAFAFA] p-3 space-y-2"
+                >
+                  <p className="text-sm font-semibold text-[#111111] truncate">
+                    {clip.title || `Spotlight ${idx + 1}`}
+                  </p>
+                  {clip.duration_sec > 0 ? (
+                    <p className="text-[11px] text-[#9CA3AF]">{clip.duration_sec}s</p>
+                  ) : null}
+                  <video
+                    src={resolveMediaUrl(clip.url)}
+                    controls
+                    playsInline
+                    className="w-full rounded-lg bg-black max-h-56"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {audioClips.length > 0 ? (
+        <section className="max-w-5xl mx-auto px-4 pt-8">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 sm:p-6 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Music2 size={18} className="text-[#6900AA]" />
+              <h2 className="text-lg font-bold text-[#111111]">Audio samples</h2>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {audioClips.map((clip, idx) => (
+                <div
+                  key={`${clip.url}-${idx}`}
+                  className="rounded-xl border border-[#F3F4F6] bg-[#FAFAFA] p-3 space-y-2"
+                >
+                  <p className="text-sm font-semibold text-[#111111] truncate">
+                    {clip.title || `Track ${idx + 1}`}
+                  </p>
+                  {clip.duration_sec > 0 ? (
+                    <p className="text-[11px] text-[#9CA3AF]">{clip.duration_sec}s</p>
+                  ) : null}
+                  <audio src={resolveMediaUrl(clip.url)} controls className="w-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <form
+          id="artist-inquiry"
+          onSubmit={onSubmit}
+          className="relative max-w-2xl mx-auto rounded-[1.5rem] border border-[#F0EAF7] bg-white p-5 sm:p-6 space-y-4 shadow-[0_10px_30px_rgba(105,0,170,0.07)] scroll-mt-28"
+          noValidate
+        >
+          <div>
+            <h2 className="text-lg font-bold text-[#111111]">Send inquiry</h2>
+            <p className="text-sm text-[#8b8794] mt-1">
+              Share your event details and this artist will get back to you.
+            </p>
           </div>
 
-          <form
-            id="artist-inquiry"
-            onSubmit={onSubmit}
-            className="relative rounded-[1.5rem] border border-[#F0EAF7] bg-white p-5 sm:p-6 space-y-4 h-fit shadow-[0_10px_30px_rgba(105,0,170,0.07)] scroll-mt-28"
-            noValidate
-          >
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <InquiryLabel icon={CalendarDays}>Selected date</InquiryLabel>
-                <input
-                  readOnly
-                  className={`${inquiryInput} ${selectedDate ? "font-semibold text-[#1B1B3A]" : ""}`}
-                  value={selectedDate ? formatDate(selectedDate) : "Pick a free day on the calendar"}
-                />
-                {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
-              </div>
-
-              <div>
-                <InquiryLabel icon={Clock}>Preferred time (optional)</InquiryLabel>
-                <Controller
-                  name="event_time"
-                  control={control}
-                  render={({ field }) => (
-                    <PreferredTimeSelect value={field.value || ""} onChange={field.onChange} />
-                  )}
-                />
-                {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
-              </div>
-
-              <div>
-                <InquiryLabel icon={User}>Your name</InquiryLabel>
-                <input className={inquiryInput} {...register("contact_name")} />
-                {errors.contact_name && (
-                  <p className={fieldErrorClass}>{errors.contact_name.message}</p>
-                )}
-              </div>
-
-              <div>
-                <InquiryLabel icon={Mail}>Email</InquiryLabel>
-                <input
-                  type="email"
-                  className={inquiryInput}
-                  placeholder="you@email.com"
-                  {...register("contact_email")}
-                />
-                {errors.contact_email && (
-                  <p className={fieldErrorClass}>{errors.contact_email.message}</p>
-                )}
-              </div>
-
-              <div>
-                <InquiryLabel icon={Phone}>Phone</InquiryLabel>
-                <Controller
-                  name="contact_phone"
-                  control={control}
-                  render={({ field }) => (
-                    <PhoneInput
-                      value={field.value || ""}
-                      onChange={(v) => field.onChange(v)}
-                      onValidChange={() => undefined}
-                      required
-                      inputClassName={inquiryInput}
-                    />
-                  )}
-                />
-                {errors.contact_phone && (
-                  <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
-                )}
-              </div>
-
-              <div>
-                <InquiryLabel icon={Briefcase}>Event type</InquiryLabel>
-                <input
-                  className={inquiryInput}
-                  placeholder="Wedding, corporate…"
-                  {...register("event_type")}
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <InquiryLabel icon={MapPin}>Location</InquiryLabel>
-                <input
-                  className={inquiryInput}
-                  placeholder="Venue / city"
-                  {...register("event_location")}
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <InquiryLabel icon={MessageSquare}>Message</InquiryLabel>
-                <textarea
-                  rows={4}
-                  className={`${inquiryInput} resize-none min-h-[96px]`}
-                  placeholder="Tell the artist about your event…"
-                  {...register("message")}
-                />
-                {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
-              </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <InquiryLabel icon={CalendarDays}>Event date</InquiryLabel>
+              <input
+                type="date"
+                min={todayYmd()}
+                className={inquiryInput}
+                {...register("event_date")}
+              />
+              {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
             </div>
 
-            <button
-              type="submit"
-              disabled={sending || freeDates.length === 0}
-              className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-full px-5 text-white font-bold disabled:opacity-50 cursor-pointer shadow-[0_10px_24px_rgba(105,0,170,0.28)]"
-              style={{ background: "linear-gradient(90deg, #8B5CF6 0%, #C026D3 55%, #E879F9 100%)" }}
-            >
-              {sending ? <Loader2 size={16} className="animate-spin" /> : null}
-              Send inquiry
-              {!sending ? <ArrowRight size={16} /> : null}
-            </button>
-            {!customerId ? (
-              <p className="text-[11px] text-[#9CA3AF] text-center">
-                You can send without logging in. Sign in to prefill your details.
-              </p>
-            ) : null}
-          </form>
-        </div>
+            <div>
+              <InquiryLabel icon={Clock}>Preferred time (optional)</InquiryLabel>
+              <Controller
+                name="event_time"
+                control={control}
+                render={({ field }) => (
+                  <PreferredTimeSelect value={field.value || ""} onChange={field.onChange} />
+                )}
+              />
+              {errors.event_time && <p className={fieldErrorClass}>{errors.event_time.message}</p>}
+            </div>
+
+            <div>
+              <InquiryLabel icon={User}>Your name</InquiryLabel>
+              <input className={inquiryInput} {...register("contact_name")} />
+              {errors.contact_name && (
+                <p className={fieldErrorClass}>{errors.contact_name.message}</p>
+              )}
+            </div>
+
+            <div>
+              <InquiryLabel icon={Mail}>Email</InquiryLabel>
+              <input
+                type="email"
+                className={inquiryInput}
+                placeholder="you@email.com"
+                {...register("contact_email")}
+              />
+              {errors.contact_email && (
+                <p className={fieldErrorClass}>{errors.contact_email.message}</p>
+              )}
+            </div>
+
+            <div>
+              <InquiryLabel icon={Phone}>Phone</InquiryLabel>
+              <Controller
+                name="contact_phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    value={field.value || ""}
+                    onChange={(v) => field.onChange(v)}
+                    onValidChange={() => undefined}
+                    required
+                    inputClassName={inquiryInput}
+                  />
+                )}
+              />
+              {errors.contact_phone && (
+                <p className={fieldErrorClass}>{errors.contact_phone.message}</p>
+              )}
+            </div>
+
+            <div>
+              <InquiryLabel icon={Briefcase}>Event type</InquiryLabel>
+              <input
+                className={inquiryInput}
+                placeholder="Wedding, corporate…"
+                {...register("event_type")}
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <InquiryLabel icon={MapPin}>Location</InquiryLabel>
+              <input
+                className={inquiryInput}
+                placeholder="Venue / city"
+                {...register("event_location")}
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <InquiryLabel icon={MessageSquare}>Message</InquiryLabel>
+              <textarea
+                rows={4}
+                className={`${inquiryInput} resize-none min-h-[96px]`}
+                placeholder="Tell the artist about your event…"
+                {...register("message")}
+              />
+              {errors.message && <p className={fieldErrorClass}>{errors.message.message}</p>}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={sending}
+            className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-full px-5 text-white font-bold disabled:opacity-50 cursor-pointer shadow-[0_10px_24px_rgba(105,0,170,0.28)]"
+            style={{ background: "linear-gradient(90deg, #8B5CF6 0%, #C026D3 55%, #E879F9 100%)" }}
+          >
+            {sending ? <Loader2 size={16} className="animate-spin" /> : null}
+            Send inquiry
+            {!sending ? <ArrowRight size={16} /> : null}
+          </button>
+          {!customerId ? (
+            <p className="text-[11px] text-[#9CA3AF] text-center">
+              You can send without logging in. Sign in to prefill your details.
+            </p>
+          ) : null}
+        </form>
       </div>
     </div>
   );

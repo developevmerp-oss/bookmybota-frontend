@@ -33,39 +33,40 @@ export default function VenueClaimEventsPage() {
   };
 
   if (!businessId) {
-    return <p className="text-zinc-400 p-6">Sign in as a venue partner to claim events.</p>;
+    return <p className="text-muted-foreground p-6">Sign in as a venue partner to claim events.</p>;
   }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Claim events at your venue</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="org-section-label mb-2">Event linking</p>
+        <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          Claim events at your venue
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
           Organizers may list your venue before you join the platform. Claim events to link them to your verified
           venue profile.
         </p>
       </div>
 
       {isLoading ? (
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-muted-foreground text-sm">Loading…</p>
       ) : showtimes.length === 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-zinc-400">
-          No claimable events right now.
-        </div>
+        <div className="org-card p-6 text-sm text-muted-foreground">No claimable events right now.</div>
       ) : (
         <ul className="space-y-3">
           {showtimes.map((s) => (
             <li
               key={s.showtime_id}
-              className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-wrap items-start justify-between gap-3"
+              className="org-card p-4 flex flex-wrap items-start justify-between gap-3"
             >
-              <div>
-                <p className="font-medium text-white">{s.event_name}</p>
-                <p className="text-sm text-zinc-400">
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground">{s.event_name}</p>
+                <p className="text-sm text-muted-foreground">
                   {s.venue_name}
                   {s.city_name ? ` · ${s.city_name}` : ""}
                 </p>
-                <p className="text-xs text-zinc-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {formatDateTime12h(s.starts_at)} · Organizer: {s.organizer_name || "—"}
                 </p>
               </div>
@@ -73,7 +74,7 @@ export default function VenueClaimEventsPage() {
                 type="button"
                 disabled={claiming}
                 onClick={() => onClaim(s.showtime_id)}
-                className="rounded-lg bg-violet-600 hover:bg-violet-500 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                className="btn-primary text-sm disabled:opacity-50"
               >
                 Claim event
               </button>

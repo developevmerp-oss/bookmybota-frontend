@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { CalendarDays, Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateArtistMySlotsMutation,
@@ -162,30 +162,31 @@ export default function ArtistAvailabilityPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
-        <h2 className="portal-heading text-2xl font-bold flex items-center gap-2">
-          <CalendarDays className="text-violet-500" /> Availability calendar
+        <p className="org-section-label mb-2">Calendar</p>
+        <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          Availability calendar
         </h2>
-        <p className="portal-muted text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1.5">
           Click days one by one, or add a date range in one step. Customers see free dates on your
           public profile and can send booking inquiries.
         </p>
       </div>
 
       {isLoading ? (
-        <p className="portal-muted py-10 text-center">Loading calendar…</p>
+        <p className="text-muted-foreground py-10 text-center">Loading calendar…</p>
       ) : (
         <div className="space-y-6">
           <form
             onSubmit={handleSubmit(onAddRange)}
-            className="glass-panel rounded-2xl p-5 space-y-4"
+            className="org-card p-5 space-y-4"
             noValidate
           >
             <div>
-              <h3 className="portal-heading font-semibold flex items-center gap-2">
-                <Plus size={16} className="text-violet-500" />
+              <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
+                <Plus size={16} className="text-primary" />
                 Add multiple free days
               </h3>
-              <p className="text-xs portal-muted mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Choose a From and To date to mark every day in that range as free (skips days you
                 already added).
               </p>
@@ -224,7 +225,7 @@ export default function ArtistAvailabilityPage() {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl btn-primary text-sm disabled:opacity-50"
                 >
                   {creating ? (
                     <Loader2 size={14} className="animate-spin" />
@@ -258,15 +259,15 @@ export default function ArtistAvailabilityPage() {
               />
             </div>
 
-            <div className="glass-panel rounded-2xl p-5 space-y-3">
-              <h3 className="portal-heading font-semibold">Upcoming free days</h3>
+            <div className="org-card p-5 space-y-3">
+              <h3 className="font-display font-semibold text-foreground">Upcoming free days</h3>
               {(creating || deleting) && (
-                <p className="text-xs text-violet-500 flex items-center gap-1.5">
+                <p className="text-xs text-primary flex items-center gap-1.5">
                   <Loader2 size={12} className="animate-spin" /> Saving…
                 </p>
               )}
               {upcoming.length === 0 ? (
-                <p className="text-sm portal-muted">
+                <p className="text-sm text-muted-foreground">
                   No free days yet. Add a date range above or click dates on the calendar.
                 </p>
               ) : (
@@ -280,7 +281,7 @@ export default function ArtistAvailabilityPage() {
                         <p className="text-sm font-semibold text-slate-800">
                           {formatDate(s.slot_date)}
                         </p>
-                        <p className="text-xs portal-muted">
+                        <p className="text-xs text-muted-foreground">
                           {s.is_booked
                             ? "Booked"
                             : s.start_time && s.end_time

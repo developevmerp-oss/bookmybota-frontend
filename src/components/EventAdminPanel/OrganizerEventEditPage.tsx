@@ -73,7 +73,7 @@ export default function EditOrganizerEventPage({
     return (
       <div className="text-center py-16">
         <p className="portal-muted mb-4">Event not found.</p>
-        <Link href="/organizer/events" className="text-violet-600 hover:text-violet-800">Back to events</Link>
+        <Link href="/organizer/events" className="text-rose-600 hover:text-rose-800">Back to events</Link>
       </div>
     );
   }

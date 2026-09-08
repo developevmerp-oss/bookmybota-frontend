@@ -5,6 +5,8 @@ import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { CalendarDays, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import AdminGiftCardCategoriesPanel from "@/components/SuperAdmin/AdminGiftCardCategoriesPanel";
+import AdminGiftCardContentPanel from "@/components/SuperAdmin/AdminGiftCardContentPanel";
 import AdminGiftCardDesignsPage from "@/components/SuperAdmin/AdminGiftCardDesignsPage";
 import {
   useGetGiftCardSettingsQuery,
@@ -96,8 +98,8 @@ export default function AdminGiftCardsPage() {
           Gift Cards
         </h1>
         <p className="text-zinc-400 mt-2 max-w-2xl">
-          Manage designs (customer picker), validity for new purchases, and issue/redeem stats.
-          Dining payouts are under Gift Card Settlements.
+          Manage design categories, designs (customer picker), validity for new purchases, and
+          issue/redeem stats. Dining payouts are under Gift Card Settlements.
         </p>
       </div>
 
@@ -128,8 +130,10 @@ export default function AdminGiftCardsPage() {
             Expiry for new gift cards <span className="text-rose-500">*</span>
           </p>
           <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
-            Decided at purchase time: expiry = purchase date + validity. Already issued cards keep
-            their original expiry. Default is 365 days (12 months).
+            Expiry = delivery calendar date + validity days, valid through the end of that day
+            (BookMyShow-style). Example: deliver on 09-08-2026 with 365 days → valid through
+            09-08-2027. Payment date does not change expiry. Already issued cards keep their
+            original expiry.
           </p>
           <Controller
             name="validity_days"
@@ -172,6 +176,10 @@ export default function AdminGiftCardsPage() {
           Save validity
         </button>
       </form>
+
+      <AdminGiftCardCategoriesPanel />
+
+      <AdminGiftCardContentPanel />
 
       <AdminGiftCardDesignsPage embedded />
     </div>

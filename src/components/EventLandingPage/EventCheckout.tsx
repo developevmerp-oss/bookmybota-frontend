@@ -49,6 +49,7 @@ import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { sanitizePhoneInput } from "@/lib/validation";
+import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import {
   emptyEventCheckoutContactValues,
   emptyEventCheckoutDeliveryValues,
@@ -459,7 +460,7 @@ export default function EventCheckout({
           bal > 0 &&
           (status === "ACTIVE" || status === "PARTIALLY_USED") &&
           (cat === "ALL" || cat === "EVENTS") &&
-          (c.is_claimed_by_me || c.purchase_for !== "SOMEONE_ELSE")
+          isGiftCardSpendable(c)
         );
       }),
     [myGiftCards]

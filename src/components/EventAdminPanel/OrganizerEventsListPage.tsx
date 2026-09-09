@@ -75,16 +75,7 @@ export default function OrganizerEventsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <p className="org-section-label mb-2">Event management</p>
-          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-            Your events
-          </h2>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            Create events, upload posters & documents, submit for review, then sign the platform contract.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Link href="/organizer/events/new" className="btn-primary inline-flex items-center gap-2 w-fit">
           <Plus size={18} /> Create event
         </Link>

@@ -5,7 +5,6 @@ import PromoBannerCarousel from "@/components/LandingPage/PromoBannerCarousel";
 import PopularDiningRail from "@/components/LandingPage/PopularDiningRail";
 import BarSceneRail from "@/components/LandingPage/BarSceneRail";
 import TopArtistsRail from "@/components/LandingPage/TopArtistsRail";
-import TopVenuesRail from "@/components/LandingPage/TopVenuesRail";
 import RecommendedMoviesRail from "@/components/LandingPage/RecommendedMoviesRail";
 import PopularEventsRail from "@/components/LandingPage/PopularEventsRail";
 import SpecialOffersRail from "@/components/LandingPage/SpecialOffersRail";
@@ -38,7 +37,6 @@ export default function Home() {
       <BarSceneRail city={city} />
       <TopArtistsRail />
       <RecommendedMoviesRail />
-      <TopVenuesRail />
       <PopularEventsRail city={city} />
       <SpecialOffersRail />
       {/* <EventsNearYouRail city={city} /> */}

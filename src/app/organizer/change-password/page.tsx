@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import ChangePasswordForm from "@/components/Shared/ChangePasswordForm";
 
-export default function OrganizerChangePasswordRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/organizer/profile#password");
-  }, [router]);
-  return <div className="text-zinc-400 py-10 text-center">Opening profile...</div>;
+export default function OrganizerChangePasswordPage() {
+  return (
+    <div className="w-full max-w-[1600px] mx-auto">
+      <div className="org-card p-4 sm:p-6 max-w-xl">
+        <ChangePasswordForm variant="portal" />
+      </div>
+    </div>
+  );
 }

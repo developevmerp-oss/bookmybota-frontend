@@ -8,17 +8,13 @@ import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import AuthGate from "@/components/Shared/AuthGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
+import PartnerProfileHoverMenu from "@/components/Shared/PartnerProfileHoverMenu";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
   Building2,
   CalendarDays,
-  CheckCircle2,
-  ChevronDown,
   ClipboardList,
   Inbox,
-  KeyRound,
-  LayoutGrid,
-  LogOut,
   Menu,
   Ticket,
   User,
@@ -31,15 +27,40 @@ const navigation = [
   { name: "Inquiries", href: "/venue/inquiries", icon: Inbox },
   { name: "Claim Events", href: "/venue/claim-events", icon: Ticket },
   { name: "Layout Requests", href: "/venue/layout-requests", icon: ClipboardList },
-  { name: "Change Password", href: "/venue/change-password", icon: KeyRound },
 ];
+
+const pageMeta: Record<string, { title: string; subtitle: string }> = {
+  "/venue/profile": {
+    title: "Venue profile",
+    subtitle: "Venue details, contact person, gallery, and onboarding documents.",
+  },
+  "/venue/availability": {
+    title: "Availability",
+    subtitle: "Mark free and busy dates so customers can request bookings.",
+  },
+  "/venue/inquiries": {
+    title: "Booking inquiries",
+    subtitle: "Customer requests for your free dates. Accept or decline each one.",
+  },
+  "/venue/claim-events": {
+    title: "Claim events",
+    subtitle: "Link events that list your venue to your verified profile.",
+  },
+  "/venue/layout-requests": {
+    title: "Layout requests",
+    subtitle: "Request a site visit and track layout plans for your venue.",
+  },
+  "/venue/change-password": {
+    title: "Change password",
+    subtitle: "Update the password for your venue partner login.",
+  },
+};
 
 function VenueShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const user = useAppSelector((state) => state.auth.user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
@@ -51,21 +72,14 @@ function VenueShell({ children }: { children: React.ReactNode }) {
     return (displayName.slice(0, 2) || "VN").toUpperCase();
   }, [displayName]);
 
-  const pageTitle = useMemo(
-    () => navigation.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`))?.name || "Venue Panel",
-    [pathname]
-  );
-
-  const todayLabel = useMemo(
-    () =>
-      new Date().toLocaleDateString(undefined, {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-    []
-  );
+  const { title: pageTitle, subtitle: pageSubtitle } = useMemo(() => {
+    const key = Object.keys(pageMeta).find(
+      (href) => pathname === href || pathname.startsWith(`${href}/`)
+    );
+    if (key) return pageMeta[key];
+    const nav = navigation.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`));
+    return { title: nav?.name || "Venue panel", subtitle: "" };
+  }, [pathname]);
 
   const isNavActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -122,21 +136,6 @@ function VenueShell({ children }: { children: React.ReactNode }) {
             </Link>
 
             <NavLinks />
-
-            <div className="p-3 border-t border-[var(--sidebar-border)] shrink-0">
-              <div className="rounded-xl border border-[var(--sidebar-border)] bg-muted/40 p-3 space-y-2">
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 size={16} className="text-success shrink-0 mt-0.5" />
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Keep profile, availability, and documents up to date for bookings.
-                  </p>
-                </div>
-                <div className="h-1.5 rounded-full bg-success/20 overflow-hidden">
-                  <div className="h-full w-full rounded-full bg-success" />
-                </div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-success">Venue health</p>
-              </div>
-            </div>
           </aside>
 
           {mobileMenuOpen && (
@@ -179,78 +178,28 @@ function VenueShell({ children }: { children: React.ReactNode }) {
                   <h1 className="font-display text-lg sm:text-xl font-semibold text-foreground truncate">
                     {pageTitle}
                   </h1>
-                  <p className="text-xs text-muted-foreground truncate hidden sm:block">{todayLabel}</p>
+                  {pageSubtitle ? (
+                    <p className="text-xs text-muted-foreground line-clamp-2 hidden sm:block max-w-2xl">
+                      {pageSubtitle}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
-                <Link
-                  href="/venue/profile"
-                  className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  title="Profile"
-                >
-                  <LayoutGrid size={16} />
-                </Link>
-
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setProfileOpen((v) => !v)}
-                    className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-1.5 hover:bg-muted/60 transition-colors"
-                  >
-                    <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                      {initials}
-                    </span>
-                    <span className="hidden sm:block text-left min-w-0">
-                      <span className="block text-sm font-semibold text-foreground truncate max-w-[140px]">
-                        {displayName}
-                      </span>
-                      <span className="block text-[11px] text-muted-foreground">Venue</span>
-                    </span>
-                    <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-                  </button>
-
-                  {profileOpen && (
-                    <>
-                      <button
-                        type="button"
-                        className="fixed inset-0 z-40 cursor-default"
-                        aria-label="Close profile menu"
-                        onClick={() => setProfileOpen(false)}
-                      />
-                      <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card shadow-card z-50 py-1 overflow-hidden">
-                        <Link
-                          href="/venue/profile"
-                          onClick={() => setProfileOpen(false)}
-                          className="block px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
-                        >
-                          Profile
-                        </Link>
-                        <Link
-                          href="/venue/change-password"
-                          onClick={() => setProfileOpen(false)}
-                          className="block px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
-                        >
-                          Change password
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfileOpen(false);
-                            handleLogout();
-                          }}
-                          className="w-full text-left px-3 py-2.5 text-sm font-medium text-destructive hover:bg-muted flex items-center gap-2"
-                        >
-                          <LogOut size={14} /> Sign out
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <PartnerProfileHoverMenu
+                  displayName={displayName}
+                  email={user?.email}
+                  initials={initials}
+                  roleLabel="Venue"
+                  profileHref="/venue/profile"
+                  changePasswordHref="/venue/change-password"
+                  onLogout={handleLogout}
+                />
               </div>
             </header>
 
-            <div className="p-4 sm:p-8">{children}</div>
+            <div className="p-3 sm:p-4 md:p-6 lg:p-8">{children}</div>
           </main>
         </div>
       </SessionGuard>

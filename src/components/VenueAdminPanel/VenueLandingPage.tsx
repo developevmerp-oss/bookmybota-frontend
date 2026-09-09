@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -152,7 +151,6 @@ const TESTIMONIALS = [
 
 export default function VenueLandingPage() {
   const router = useRouter();
-  const [loginOpen, setLoginOpen] = useState(false);
   const { data: registeredVenues = [], isLoading: venuesLoading } = useGetPublicRegisteredVenuesQuery();
 
   const openLogin = () => {
@@ -161,7 +159,7 @@ export default function VenueLandingPage() {
       router.push(homePathForRole("venue_admin"));
       return;
     }
-    setLoginOpen(true);
+    router.push("/venue/login");
   };
 
   return (
@@ -170,8 +168,8 @@ export default function VenueLandingPage() {
       centeredPartnerHeader
       loginHref="/venue/login"
       expectedRole="venue_admin"
-      loginTitle="Venue Admin Login"
-      loginSubtitle="Sign in to manage layouts and claim events"
+      loginTitle="Venue Login"
+      loginSubtitle="Sign in to manage your venue and bookings"
       registerHref="/venue/register"
       registerHint={
         <p className="text-[10px] text-slate-400">
@@ -215,8 +213,6 @@ export default function VenueLandingPage() {
         </p>
       }
       onOpenLogin={openLogin}
-      loginOpen={loginOpen}
-      onCloseLogin={() => setLoginOpen(false)}
     />
   );
 }

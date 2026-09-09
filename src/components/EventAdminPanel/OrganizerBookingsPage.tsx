@@ -75,16 +75,7 @@ function OrganizerBookingsContent() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <p className="org-section-label mb-2">Operations</p>
-          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-            Event bookings
-          </h2>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            Customer ticket purchases appear here in real time after checkout.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <div className="flex flex-wrap gap-2 w-fit">
           <button
             type="button"

@@ -8,8 +8,13 @@ export default function OrganizerLoginPage() {
     <AuthGate mode="guest" guestRoles={["event_admin"]}>
       <PartnerLoginForm
         expectedRole="event_admin"
-        title="Event Organizer Login"
-        subtitle="Sign in to manage your events"
+        title="Event Login"
+        subtitle="Sign in to create and manage your events"
+        showCustomerLink={false}
+        registerHref="/organizer/register"
+        registerPrompt="New organizer?"
+        registerLinkText="Register here"
+        sideImageSrc="/login/panel-event.jpg"
       />
     </AuthGate>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -149,7 +148,6 @@ const TESTIMONIALS = [
 
 export default function BusinessLandingPage() {
   const router = useRouter();
-  const [loginOpen, setLoginOpen] = useState(false);
 
   const openLogin = () => {
     const session = readSessionForRole("business_admin");
@@ -157,7 +155,7 @@ export default function BusinessLandingPage() {
       router.push(homePathForRole("business_admin"));
       return;
     }
-    setLoginOpen(true);
+    router.push("/business/login");
   };
 
   return (
@@ -166,7 +164,7 @@ export default function BusinessLandingPage() {
       centeredPartnerHeader
       loginHref="/business/login"
       expectedRole="business_admin"
-      loginTitle="Dining Admin Login"
+      loginTitle="Dining Login"
       loginSubtitle="Sign in to manage your restaurant"
       registerHref="/business/register"
       registerHint={
@@ -197,8 +195,6 @@ export default function BusinessLandingPage() {
         </p>
       }
       onOpenLogin={openLogin}
-      loginOpen={loginOpen}
-      onCloseLogin={() => setLoginOpen(false)}
     />
   );
 }

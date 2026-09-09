@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Inbox, Loader2, X } from "lucide-react";
+import { CalendarDays, Check, Loader2, Mail, MapPin, Phone, Tag, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetVenueMyInquiriesQuery,
@@ -17,6 +17,13 @@ const STATUS_STYLE: Record<string, string> = {
   DECLINED: "bg-rose-50 text-rose-700",
   CANCELLED: "bg-muted text-muted-foreground",
 };
+
+function displayOrDash(value: string | number | null | undefined): string {
+  if (value == null) return "-";
+  if (typeof value === "number") return String(value);
+  const t = value.trim();
+  return t || "-";
+}
 
 export default function VenueInquiriesPage() {
   const { data: inquiries = [], isLoading } = useGetVenueMyInquiriesQuery();
@@ -41,45 +48,45 @@ export default function VenueInquiriesPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <p className="org-section-label mb-2">Bookings</p>
-          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-            Venue booking inquiries
-          </h2>
-          <p className="text-muted-foreground text-sm mt-1.5">
-            Requests from customers who picked one of your free dates. Accept or decline — they also get an email.
-          </p>
-        </div>
-        {pending.length > 0 ? (
-          <span className="metric-warning px-3 py-1.5 rounded-full text-xs font-bold w-fit">
+    <div className="w-full max-w-[1600px] mx-auto space-y-4">
+      {pending.length > 0 ? (
+        <div className="flex justify-end">
+          <span className="metric-warning px-3 py-1.5 rounded-full text-xs font-bold w-fit shrink-0">
             {pending.length} pending
           </span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {isLoading ? (
         <p className="text-muted-foreground py-10 text-center text-sm">Loading inquiries…</p>
       ) : inquiries.length === 0 ? (
-        <div className="org-card p-10 text-center text-muted-foreground text-sm">
+        <div className="org-card p-8 sm:p-10 text-center text-muted-foreground text-sm">
           No inquiries yet. Mark free days on your availability calendar so customers can request your venue.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           {inquiries.map((inq) => {
             const busy = updating && busyId === inq.id;
             return (
-              <div key={inq.id} className="org-card p-5 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-foreground text-lg">{inq.contact_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {inq.contact_email} · {inq.contact_phone}
+              <article key={inq.id} className="org-card p-4 space-y-3 min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground text-base truncate">
+                      {displayOrDash(inq.contact_name)}
                     </p>
+                    <div className="mt-1 flex flex-col gap-0.5 text-sm text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 min-w-0 truncate">
+                        <Mail size={13} className="shrink-0 text-primary" aria-hidden />
+                        <span className="truncate">{displayOrDash(inq.contact_email)}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Phone size={13} className="shrink-0 text-primary" aria-hidden />
+                        {displayOrDash(inq.contact_phone)}
+                      </span>
+                    </div>
                   </div>
                   <span
-                    className={`text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full ${
+                    className={`text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full shrink-0 ${
                       STATUS_STYLE[inq.status] || STATUS_STYLE.PENDING
                     }`}
                   >
@@ -87,33 +94,31 @@ export default function VenueInquiriesPage() {
                   </span>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-2 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">Date:</span>{" "}
-                    <strong className="text-foreground">{formatDate(inq.event_date)}</strong>
-                    {inq.event_time ? ` · ${formatHm12h(inq.event_time)}` : ""}
+                <div className="flex flex-col gap-2 text-sm text-foreground w-full">
+                  <div className="flex items-start gap-2 w-full min-w-0">
+                    <CalendarDays size={14} className="text-primary mt-0.5 shrink-0" aria-hidden />
+                    <strong className="font-semibold min-w-0 break-words">
+                      {inq.event_date
+                        ? `${formatDate(inq.event_date)}${inq.event_time ? ` · ${formatHm12h(inq.event_time)}` : ""}`
+                        : "-"}
+                    </strong>
+                  </div>
+                  <div className="flex items-start gap-2 w-full min-w-0">
+                    <Tag size={14} className="text-primary mt-0.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 break-words">{displayOrDash(inq.event_type)}</span>
+                  </div>
+                  <div className="flex items-start gap-2 w-full min-w-0">
+                    <Users size={14} className="text-primary mt-0.5 shrink-0" aria-hidden />
+                    <span>{displayOrDash(inq.guest_count)}</span>
+                  </div>
+                  <div className="flex items-start gap-2 w-full min-w-0">
+                    <MapPin size={14} className="text-primary mt-0.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 break-words">{displayOrDash(inq.event_location)}</span>
+                  </div>
+                  <p className="rounded-xl bg-muted/50 border border-border px-3 py-2 line-clamp-4">
+                    {displayOrDash(inq.message)}
                   </p>
-                  {inq.event_type ? (
-                    <p>
-                      <span className="text-muted-foreground">Type:</span> {inq.event_type}
-                    </p>
-                  ) : null}
-                  {inq.guest_count != null ? (
-                    <p>
-                      <span className="text-muted-foreground">Guests:</span> {inq.guest_count}
-                    </p>
-                  ) : null}
-                  {inq.event_location ? (
-                    <p className="sm:col-span-2">
-                      <span className="text-muted-foreground">Notes:</span> {inq.event_location}
-                    </p>
-                  ) : null}
-                  {inq.message ? (
-                    <p className="sm:col-span-2 rounded-xl bg-muted/50 border border-border px-3 py-2">
-                      {inq.message}
-                    </p>
-                  ) : null}
-                  <p className="sm:col-span-2 text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Received {formatDateTime12h(inq.created_at)}
                   </p>
                 </div>
@@ -139,7 +144,7 @@ export default function VenueInquiriesPage() {
                     </button>
                   </div>
                 ) : null}
-              </div>
+              </article>
             );
           })}
         </div>

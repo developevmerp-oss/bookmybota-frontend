@@ -8,17 +8,13 @@ export default function MovieLoginPage() {
     <AuthGate mode="guest" guestRoles={["movie_admin"]}>
       <PartnerLoginForm
         expectedRole="movie_admin"
-        title="Movie Admin Login"
+        title="Movie Login"
         subtitle="Sign in to manage your cinema listings"
-        hint={
-          <span>
-            Need access?{" "}
-            <a href="/movie/register" className="text-violet-700 font-semibold hover:underline">
-              Register your cinema
-            </a>{" "}
-            or ask Super Admin to approve your account.
-          </span>
-        }
+        showCustomerLink={false}
+        registerHref="/movie/register"
+        registerPrompt="New cinema partner?"
+        registerLinkText="Register here"
+        sideImageSrc="/login/panel-movie.png"
       />
     </AuthGate>
   );

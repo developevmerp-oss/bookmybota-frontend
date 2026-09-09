@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  Building2,
   Clapperboard,
   Laugh,
   Mic2,
@@ -37,6 +38,8 @@ const TABS: SubNavTab[] = [
   { label: "Music", key: "music", Icon: Music },
   { label: "Movie", href: "/movies", match: "movie", Icon: Clapperboard },
   { label: "Sports", key: "sports", Icon: Trophy },
+  { label: "Venues", href: "/venues", match: "venues", Icon: Building2 },
+  { label: "Artists", href: "/artists", match: "artists", Icon: Mic2 },
   { label: "List Your Show", href: "/list-your-show", match: "list-your-show", Icon: Ticket, variant: "cta" },
 ];
 
@@ -61,6 +64,8 @@ export default function SubNavBar() {
   const onEvents = pathname === "/events" || pathname.startsWith("/events/");
   const onMovies = pathname === "/movies" || pathname.startsWith("/movies/");
   const onDining = pathname === "/dining" || pathname.startsWith("/restaurant/");
+  const onVenues = pathname === "/venues" || pathname.startsWith("/venues/");
+  const onArtists = pathname === "/artists" || pathname.startsWith("/artists/");
   const isLandingPage = pathname === "/";
   const [city, setCity] = useState("");
   const [hideOnScroll, setHideOnScroll] = useState(false);
@@ -112,6 +117,8 @@ export default function SubNavBar() {
   const isTabActive = (item: SubNavTab) => {
     if (item.match === "dining") return onDining;
     if (item.match === "movie") return onMovies;
+    if (item.match === "venues") return onVenues;
+    if (item.match === "artists") return onArtists;
     if (item.match === "list-your-show") {
       return pathname === "/list-your-show" || pathname.startsWith("/list-your-show/");
     }

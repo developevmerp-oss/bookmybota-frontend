@@ -37,32 +37,21 @@ export default function ArtistClaimEventsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <p className="org-section-label mb-2">Event linking</p>
-        <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          Claim events featuring you
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Organizers may list you on events before you join the platform. Claim them to link to your verified
-          artist profile.
-        </p>
-      </div>
-
+    <div className="w-full max-w-[1600px] mx-auto space-y-4">
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : events.length === 0 ? (
         <div className="org-card p-6 text-sm text-muted-foreground">No claimable events right now.</div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           {events.map((e) => (
             <li
               key={e.event_artist_id}
-              className="org-card p-4 flex flex-wrap items-start justify-between gap-3"
+              className="org-card p-4 sm:p-5 flex flex-col gap-3 min-w-0"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-foreground">{e.event_name}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {e.artist_name}
                   {e.role_title ? ` · ${e.role_title}` : ""}
                   {e.city_name ? ` · ${e.city_name}` : ""}
@@ -76,7 +65,7 @@ export default function ArtistClaimEventsPage() {
                 type="button"
                 disabled={claiming}
                 onClick={() => onClaim(e.event_artist_id)}
-                className="btn-primary text-sm disabled:opacity-50"
+                className="btn-primary text-sm disabled:opacity-50 shrink-0 w-full"
               >
                 Claim event
               </button>

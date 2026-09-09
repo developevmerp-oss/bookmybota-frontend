@@ -303,23 +303,14 @@ export default function OrganizerScanPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <p className="org-section-label mb-2">Gate check-in</p>
-        <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          Scan event tickets
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Scan the guest&apos;s QR code at the gate. Each ticket can be checked in only once — scanning
-          again will show that entry was already used. Tip: paste your{" "}
-          <span className="font-medium text-foreground">BMB-…</span> booking code or scan the QR.
-        </p>
         {lookingUp && (
-          <p className="text-sm text-primary mt-2 inline-flex items-center gap-2">
+          <p className="text-sm text-primary inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Looking up booking…
           </p>
         )}
         {lastDecoded && !lookingUp && !scanned && (
-          <p className="text-xs text-muted-foreground mt-2 break-all">
+          <p className="text-xs text-muted-foreground break-all">
             Last read: {lastDecoded}
           </p>
         )}

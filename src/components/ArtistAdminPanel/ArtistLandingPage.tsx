@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -154,7 +153,6 @@ const TESTIMONIALS = [
 
 export default function ArtistLandingPage() {
   const router = useRouter();
-  const [loginOpen, setLoginOpen] = useState(false);
   const { data: registeredArtists = [], isLoading: artistsLoading } =
     useGetPublicRegisteredArtistsQuery();
 
@@ -164,7 +162,7 @@ export default function ArtistLandingPage() {
       router.push(homePathForRole("artist_admin"));
       return;
     }
-    setLoginOpen(true);
+    router.push("/artist/login");
   };
 
   return (
@@ -218,8 +216,6 @@ export default function ArtistLandingPage() {
         </p>
       }
       onOpenLogin={openLogin}
-      loginOpen={loginOpen}
-      onCloseLogin={() => setLoginOpen(false)}
     />
   );
 }

@@ -7,14 +7,12 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import AuthGate from "@/components/Shared/AuthGate";
+import PartnerProfileHoverMenu from "@/components/Shared/PartnerProfileHoverMenu";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
+import { isComedyArtistSlug } from "@/lib/artistMeta";
 import {
-  CheckCircle2,
-  ChevronDown,
   Inbox,
-  KeyRound,
-  LayoutGrid,
-  LogOut,
+  Laugh,
   Menu,
   Mic2,
   Ticket,
@@ -26,19 +24,39 @@ const navigation = [
   { name: "Profile", href: "/artist/profile", icon: User },
   { name: "Inquiries", href: "/artist/inquiries", icon: Inbox },
   { name: "Claim Events", href: "/artist/claim-events", icon: Ticket },
-  { name: "Change Password", href: "/artist/change-password", icon: KeyRound },
 ];
+
+const pageMeta: Record<string, { title: string; subtitle: string }> = {
+  "/artist/profile": {
+    title: "Artist profile",
+    subtitle: "Basic details, gallery, social links, and media for your public page.",
+  },
+  "/artist/inquiries": {
+    title: "Customer inquiries",
+    subtitle: "Booking requests from customers. You also get an email for each new inquiry.",
+  },
+  "/artist/claim-events": {
+    title: "Claim events",
+    subtitle: "Link events that list you to your verified artist profile.",
+  },
+  "/artist/change-password": {
+    title: "Change password",
+    subtitle: "Update the password for your artist partner login.",
+  },
+};
 
 function ArtistShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const user = useAppSelector((state) => state.auth.user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const artistName = settings?.name || "Artist partner";
+  const isComedian = isComedyArtistSlug(settings?.venue_type_slug);
+  const BrandIcon = isComedian ? Laugh : Mic2;
+  const roleLabel = settings?.venue_type_name?.trim() || "Artist partner";
   const displayName = user?.name?.trim() || user?.email?.split("@")[0] || artistName;
   const initials = useMemo(() => {
     const parts = displayName.split(/\s+/).filter(Boolean);
@@ -46,21 +64,14 @@ function ArtistShell({ children }: { children: React.ReactNode }) {
     return (displayName.slice(0, 2) || "AR").toUpperCase();
   }, [displayName]);
 
-  const pageTitle = useMemo(
-    () => navigation.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`))?.name || "Artist Panel",
-    [pathname]
-  );
-
-  const todayLabel = useMemo(
-    () =>
-      new Date().toLocaleDateString(undefined, {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-    []
-  );
+  const { title: pageTitle, subtitle: pageSubtitle } = useMemo(() => {
+    const key = Object.keys(pageMeta).find(
+      (href) => pathname === href || pathname.startsWith(`${href}/`)
+    );
+    if (key) return pageMeta[key];
+    const nav = navigation.find((n) => pathname === n.href || pathname.startsWith(`${n.href}/`));
+    return { title: nav?.name || "Artist panel", subtitle: "" };
+  }, [pathname]);
 
   const isNavActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -104,33 +115,20 @@ function ArtistShell({ children }: { children: React.ReactNode }) {
           >
             <div className="flex items-center gap-3 min-w-0">
               <span className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-                <Mic2 size={18} />
+                <BrandIcon size={18} />
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-foreground" title={artistName}>
                   {artistName}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">Artist partner</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate" title={roleLabel}>
+                  {roleLabel}
+                </p>
               </div>
             </div>
           </Link>
 
           <NavLinks />
-
-          <div className="p-3 border-t border-[var(--sidebar-border)] shrink-0">
-            <div className="rounded-xl border border-[var(--sidebar-border)] bg-muted/40 p-3 space-y-2">
-              <div className="flex items-start gap-2">
-                <CheckCircle2 size={16} className="text-success shrink-0 mt-0.5" />
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Keep your profile, media, and social links updated so organizers can find and book you.
-                </p>
-              </div>
-              <div className="h-1.5 rounded-full bg-success/20 overflow-hidden">
-                <div className="h-full w-full rounded-full bg-success" />
-              </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-success">Artist health</p>
-            </div>
-          </div>
         </aside>
 
         {mobileMenuOpen && (
@@ -143,7 +141,7 @@ function ArtistShell({ children }: { children: React.ReactNode }) {
               <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-                    <Mic2 size={16} />
+                    <BrandIcon size={16} />
                   </span>
                   <span className="truncate font-bold text-sm">{artistName}</span>
                 </div>
@@ -173,78 +171,28 @@ function ArtistShell({ children }: { children: React.ReactNode }) {
                 <h1 className="font-display text-lg sm:text-xl font-semibold text-foreground truncate">
                   {pageTitle}
                 </h1>
-                <p className="text-xs text-muted-foreground truncate hidden sm:block">{todayLabel}</p>
+                {pageSubtitle ? (
+                  <p className="text-xs text-muted-foreground line-clamp-2 hidden sm:block max-w-2xl">
+                    {pageSubtitle}
+                  </p>
+                ) : null}
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <Link
-                href="/artist/profile"
-                className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Profile"
-              >
-                <LayoutGrid size={16} />
-              </Link>
-
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setProfileOpen((v) => !v)}
-                  className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-1.5 hover:bg-muted/60 transition-colors"
-                >
-                  <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                    {initials}
-                  </span>
-                  <span className="hidden sm:block text-left min-w-0">
-                    <span className="block text-sm font-semibold text-foreground truncate max-w-[140px]">
-                      {displayName}
-                    </span>
-                    <span className="block text-[11px] text-muted-foreground">Artist</span>
-                  </span>
-                  <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-                </button>
-
-                {profileOpen && (
-                  <>
-                    <button
-                      type="button"
-                      className="fixed inset-0 z-40 cursor-default"
-                      aria-label="Close profile menu"
-                      onClick={() => setProfileOpen(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card shadow-card z-50 py-1 overflow-hidden">
-                      <Link
-                        href="/artist/profile"
-                        onClick={() => setProfileOpen(false)}
-                        className="block px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
-                      >
-                        Profile
-                      </Link>
-                      <Link
-                        href="/artist/change-password"
-                        onClick={() => setProfileOpen(false)}
-                        className="block px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
-                      >
-                        Change password
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProfileOpen(false);
-                          handleLogout();
-                        }}
-                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-destructive hover:bg-muted flex items-center gap-2"
-                      >
-                        <LogOut size={14} /> Sign out
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              <PartnerProfileHoverMenu
+                displayName={displayName}
+                email={user?.email}
+                initials={initials}
+                roleLabel="Artist"
+                profileHref="/artist/profile"
+                changePasswordHref="/artist/change-password"
+                onLogout={handleLogout}
+              />
             </div>
           </header>
 
-          <div className="p-4 sm:p-8">{children}</div>
+          <div className="p-3 sm:p-4 md:p-6 lg:p-8">{children}</div>
         </main>
       </div>
     </AuthGate>

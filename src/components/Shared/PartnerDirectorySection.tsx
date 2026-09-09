@@ -137,7 +137,7 @@ export default function PartnerDirectorySection({
         showHeader ? "bg-white py-16 md:py-20" : "bg-[#faf7fc] py-8 md:py-10 border-t-0"
       }`}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className={`${showHeader ? "max-w-6xl" : "max-w-[1600px]"} mx-auto px-4 sm:px-6 lg:px-8`}>
         {showHeader ? (
           <div className="text-center max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#111111]">
@@ -149,7 +149,7 @@ export default function PartnerDirectorySection({
 
         {isLoading ? (
           <div
-            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5`}
+            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
           >
             {Array.from({ length: 8 }).map((_, i) => (
               <div
@@ -166,7 +166,7 @@ export default function PartnerDirectorySection({
           </p>
         ) : (
           <div
-            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5`}
+            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
           >
             {partners.map((p) => (
               <PartnerCard key={p.id} partner={p} kind={kind} />

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -66,7 +65,6 @@ const SERVICES = [
 
 export default function MovieLandingPage() {
   const router = useRouter();
-  const [loginOpen, setLoginOpen] = useState(false);
 
   const openLogin = () => {
     const session = readSessionForRole("movie_admin");
@@ -74,7 +72,7 @@ export default function MovieLandingPage() {
       router.push(homePathForRole("movie_admin"));
       return;
     }
-    setLoginOpen(true);
+    router.push("/movie/login");
   };
 
   return (
@@ -83,7 +81,7 @@ export default function MovieLandingPage() {
       centeredPartnerHeader
       loginHref="/movie/login"
       expectedRole="movie_admin"
-      loginTitle="Movie Admin Login"
+      loginTitle="Movie Login"
       loginSubtitle="Sign in to manage your cinema listings"
       registerHref="/movie/register"
       registerHint={
@@ -105,9 +103,7 @@ export default function MovieLandingPage() {
       servicesSubtitle="The movie admin panel follows the same onboarding and approval flow as event organizers — register, upload documents, wait for approval, then manage your cinema."
       servicesTiles={SERVICES}
       servicesFootnote="Movie listing, showtime, and booking tools will expand in this panel as the cinema module grows on Book My Bota."
-      loginOpen={loginOpen}
       onOpenLogin={openLogin}
-      onCloseLogin={() => setLoginOpen(false)}
     />
   );
 }

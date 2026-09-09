@@ -8,13 +8,13 @@ export default function BusinessLoginPage() {
     <AuthGate mode="guest" guestRoles={["business_admin"]}>
       <PartnerLoginForm
         expectedRole="business_admin"
-        title="Dining Admin Login"
+        title="Dining Login"
         subtitle="Sign in to manage your restaurant"
-        hint={
-          <p className="text-[10px] text-slate-400">
-            Dining admins: name@bookmybota.com / Admin@123
-          </p>
-        }
+        showCustomerLink={false}
+        registerHref="/business/register"
+        registerPrompt="New dining partner?"
+        registerLinkText="Register here"
+        sideImageSrc="/login/panel-dining.jpg"
       />
     </AuthGate>
   );

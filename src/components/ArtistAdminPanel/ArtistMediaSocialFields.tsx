@@ -1,16 +1,17 @@
 "use client";
 
-import { Loader2, Music2, RefreshCw, Trash2, Upload, Video } from "lucide-react";
+import { useState } from "react";
+import { Music2, Trash2, Upload, Video } from "lucide-react";
 import { FaInstagram, FaYoutube } from "react-icons/fa";
 import { toast } from "sonner";
 import { useUploadPartnerMediaMutation } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import {
   ARTIST_MEDIA_MAX,
   ARTIST_MEDIA_MAX_DURATION_SEC,
   ARTIST_VIDEO_MAX_BYTES,
-  formatFollowerCount,
   getArtistMediaKind,
   readMediaDurationSec,
   type ArtistMediaClip,
@@ -23,17 +24,24 @@ type Props = {
   value: ArtistMeta;
   onChange: (next: ArtistMeta) => void;
   disabled?: boolean;
-  /** True while parent is saving (counts refresh on save) */
   refreshingSocial?: boolean;
+  compact?: boolean;
+  /** Render media samples card (default true) */
+  showMedia?: boolean;
+  /** Render social links card (default true) */
+  showSocial?: boolean;
 };
 
 export default function ArtistMediaSocialFields({
   value,
   onChange,
   disabled = false,
-  refreshingSocial = false,
+  compact = false,
+  showMedia = true,
+  showSocial = true,
 }: Props) {
   const [uploadMedia, { isLoading: uploading }] = useUploadPartnerMediaMutation();
+  const [pendingKind, setPendingKind] = useState<ArtistMediaKind | null>(null);
   const social = value.social || {};
   const activeKind = getArtistMediaKind(value);
   const activeIsSpotlight = activeKind === "spotlight";
@@ -59,22 +67,23 @@ export default function ArtistMediaSocialFields({
     }
   };
 
-  const chooseKind = (kind: ArtistMediaKind) => {
-    if (disabled || kind === activeKind) return;
-    if (activeClips.length > 0) {
-      const ok = window.confirm(
-        `You can only use one media type. Switching to ${
-          kind === "spotlight" ? "spotlight videos" : "audio clips"
-        } will remove your current files. Continue?`
-      );
-      if (!ok) return;
-    }
+  const applyKind = (kind: ArtistMediaKind) => {
     onChange({
       ...value,
       media_kind: kind,
       spotlight_videos: [],
       audio_clips: [],
     });
+    setPendingKind(null);
+  };
+
+  const chooseKind = (kind: ArtistMediaKind) => {
+    if (disabled || kind === activeKind) return;
+    if (activeClips.length > 0) {
+      setPendingKind(kind);
+      return;
+    }
+    applyKind(kind);
   };
 
   const setSocial = (patch: Partial<NonNullable<ArtistMeta["social"]>>) => {
@@ -131,197 +140,219 @@ export default function ArtistMediaSocialFields({
     }
   };
 
+  const cardPad = compact ? "p-4 sm:p-5 space-y-3" : "p-5 sm:p-6 space-y-4";
+  const titleCls = compact ? "text-base" : "text-lg";
+  const both = showMedia && showSocial;
+
   return (
-    <div className="space-y-6">
-      <section className="org-card p-5 sm:p-6 space-y-4">
-        <div>
-          <h3 className="font-display text-lg font-bold text-foreground">Media samples</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Choose either spotlight videos or audio clips — not both. Up to {ARTIST_MEDIA_MAX} files
-            (max {ARTIST_MEDIA_MAX_DURATION_SEC}s each
-            {activeIsSpotlight ? ", 5 MB for video" : ""}).
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => chooseKind("spotlight")}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-              activeIsSpotlight
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-foreground border-border hover:border-primary"
-            }`}
-          >
-            <Video size={16} />
-            Spotlight video
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => chooseKind("audio")}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-              !activeIsSpotlight
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-foreground border-border hover:border-primary"
-            }`}
-          >
-            <Music2 size={16} />
-            Audio clip
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {activeClips.length === 0 ? (
-            <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border px-4 py-6 text-center">
-              No {activeIsSpotlight ? "videos" : "audio"} uploaded yet.
-            </p>
-          ) : (
-            activeClips.map((clip, idx) => (
-              <div
-                key={`${clip.url}-${idx}`}
-                className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-border bg-muted/30 px-3 py-3"
+    <div
+      className={
+        both
+          ? compact
+            ? "grid grid-cols-1 lg:grid-cols-2 gap-4 items-start"
+            : "space-y-4 sm:space-y-6"
+          : "w-full"
+      }
+    >
+      {showMedia ? (
+        <section className={`org-card ${cardPad} min-w-0 w-full`}>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className={`font-display font-bold text-foreground ${titleCls}`}>Media samples</h3>
+              {activeIsSpotlight ? (
+                <p className="mt-1.5 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  <span className="text-destructive font-bold" aria-hidden>
+                    *
+                  </span>{" "}
+                  Spotlight videos must be{" "}
+                  <span className="font-semibold text-foreground">max 5 MB</span> each (up to{" "}
+                  {ARTIST_MEDIA_MAX} files, {ARTIST_MEDIA_MAX_DURATION_SEC}s).
+                </p>
+              ) : (
+                <p className="mt-1.5 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  <span className="text-destructive font-bold" aria-hidden>
+                    *
+                  </span>{" "}
+                  Audio clips: up to {ARTIST_MEDIA_MAX} files, max {ARTIST_MEDIA_MAX_DURATION_SEC}s
+                  each.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => chooseKind("spotlight")}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-colors ${
+                  activeIsSpotlight
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:border-primary"
+                }`}
               >
-                <div className="flex items-center gap-2 shrink-0 text-primary">
-                  {activeIsSpotlight ? <Video size={16} /> : <Music2 size={16} />}
-                  <span className="text-xs font-semibold">{clip.duration_sec}s</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <input
-                    className="input-field !py-2 text-sm"
-                    value={clip.title || ""}
-                    disabled={disabled}
-                    placeholder={activeIsSpotlight ? "Spotlight title" : "Track title"}
-                    onChange={(e) => {
-                      const next = activeClips.map((c, i) =>
-                        i === idx ? { ...c, title: e.target.value } : c
-                      );
-                      setClips(next);
-                    }}
-                  />
+                <Video size={14} />
+                Spotlight video
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => chooseKind("audio")}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-colors ${
+                  !activeIsSpotlight
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:border-primary"
+                }`}
+              >
+                <Music2 size={14} />
+                Audio clip
+              </button>
+            </div>
+          </div>
+
+          <div
+            className={
+              !both && activeClips.length > 0
+                ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"
+                : "space-y-2"
+            }
+          >
+            {activeClips.length === 0 ? (
+              <div className="text-sm text-muted-foreground rounded-xl border border-dashed border-border px-3 py-6 text-center md:col-span-2 xl:col-span-3">
+                No {activeIsSpotlight ? "videos" : "audio"} uploaded yet.
+              </div>
+            ) : (
+              activeClips.map((clip, idx) => (
+                <div
+                  key={`${clip.url}-${idx}`}
+                  className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-primary shrink-0">
+                      {activeIsSpotlight ? <Video size={14} /> : <Music2 size={14} />}
+                      <span className="text-[11px] font-semibold">{clip.duration_sec}s</span>
+                    </span>
+                    <input
+                      className="input-field !py-1.5 text-sm flex-1 min-w-0"
+                      value={clip.title || ""}
+                      disabled={disabled}
+                      placeholder={activeIsSpotlight ? "Spotlight title" : "Track title"}
+                      onChange={(e) => {
+                        const next = activeClips.map((c, i) =>
+                          i === idx ? { ...c, title: e.target.value } : c
+                        );
+                        setClips(next);
+                      }}
+                    />
+                    {!disabled && (
+                      <button
+                        type="button"
+                        className="p-1.5 rounded-lg border border-border text-destructive hover:bg-muted shrink-0"
+                        onClick={() => setClips(activeClips.filter((_, i) => i !== idx))}
+                        title="Remove"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
                   {activeIsSpotlight ? (
                     <video
                       src={resolveMediaUrl(clip.url)}
                       controls
-                      className="mt-2 w-full max-w-md rounded-lg bg-black max-h-40"
+                      className="w-full rounded-lg bg-black max-h-44"
                     />
                   ) : (
-                    <audio src={resolveMediaUrl(clip.url)} controls className="mt-2 w-full" />
+                    <audio src={resolveMediaUrl(clip.url)} controls className="w-full" />
                   )}
                 </div>
-                {!disabled && (
-                  <button
-                    type="button"
-                    className="p-2 rounded-lg border border-border text-destructive hover:bg-muted self-start"
-                    onClick={() => setClips(activeClips.filter((_, i) => i !== idx))}
-                    title="Remove"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-
-        {!disabled && activeClips.length < ARTIST_MEDIA_MAX ? (
-          <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-border text-sm font-semibold text-foreground hover:border-primary cursor-pointer w-fit">
-            <Upload size={16} className="text-primary" />
-            {uploading
-              ? "Uploading…"
-              : activeIsSpotlight
-                ? "Add spotlight video"
-                : "Add audio clip"}
-            <input
-              type="file"
-              className="hidden"
-              accept={activeIsSpotlight ? "video/*" : "audio/*"}
-              disabled={uploading || disabled}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                void onPickFile(f);
-              }}
-            />
-          </label>
-        ) : null}
-      </section>
-
-      <section className="org-card p-5 sm:p-6 space-y-4">
-        <div>
-          <h3 className="font-display text-lg font-bold text-foreground">Social links</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Paste your Instagram and YouTube profile links. Follower / subscriber counts are fetched
-            automatically when you save, and refresh on your public page.
-          </p>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="portal-label block text-sm font-semibold mb-1.5 inline-flex items-center gap-1.5">
-              <FaInstagram size={14} className="text-[#E1306C]" /> Instagram URL
-            </label>
-            <input
-              className="input-field"
-              placeholder="https://instagram.com/yourhandle"
-              disabled={disabled}
-              value={social.instagram_url || ""}
-              onChange={(e) => setSocial({ instagram_url: e.target.value })}
-            />
-            <div className="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-3 py-2 text-sm">
-              <FaInstagram size={14} className="text-[#E1306C] shrink-0" />
-              <span className="text-muted-foreground">Followers</span>
-              <span className="ml-auto font-bold text-foreground tabular-nums">
-                {refreshingSocial ? (
-                  <Loader2 size={14} className="animate-spin inline" />
-                ) : (
-                  formatFollowerCount(social.instagram_followers)
-                )}
-              </span>
-            </div>
+              ))
+            )}
           </div>
 
-          <div className="space-y-2">
-            <label className="portal-label block text-sm font-semibold mb-1.5 inline-flex items-center gap-1.5">
-              <FaYoutube size={14} className="text-[#FF0000]" /> YouTube URL
+          {!disabled && activeClips.length < ARTIST_MEDIA_MAX ? (
+            <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-border text-sm font-semibold text-foreground hover:border-primary cursor-pointer w-fit">
+              <Upload size={15} className="text-primary" />
+              {uploading
+                ? "Uploading…"
+                : activeIsSpotlight
+                  ? "Add spotlight video"
+                  : "Add audio clip"}
+              <input
+                type="file"
+                className="hidden"
+                accept={activeIsSpotlight ? "video/*" : "audio/*"}
+                disabled={uploading || disabled}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  void onPickFile(f);
+                }}
+              />
             </label>
-            <input
-              className="input-field"
-              placeholder="https://youtube.com/@yourchannel"
-              disabled={disabled}
-              value={social.youtube_url || ""}
-              onChange={(e) => setSocial({ youtube_url: e.target.value })}
-            />
-            <div className="flex items-center gap-2 rounded-lg bg-muted/50 border border-border px-3 py-2 text-sm">
-              <FaYoutube size={14} className="text-[#FF0000] shrink-0" />
-              <span className="text-muted-foreground">Subscribers</span>
-              <span className="ml-auto font-bold text-foreground tabular-nums">
-                {refreshingSocial ? (
-                  <Loader2 size={14} className="animate-spin inline" />
-                ) : (
-                  formatFollowerCount(social.youtube_followers)
-                )}
-              </span>
+          ) : null}
+        </section>
+      ) : null}
+
+      {showSocial ? (
+        <section className={`org-card ${cardPad} min-w-0 h-fit w-full`}>
+          <div>
+            <h3 className={`font-display font-bold text-foreground ${titleCls}`}>Social links</h3>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+              Paste Instagram and YouTube links. Customers see icons on your public page.
+            </p>
+          </div>
+
+          <div className={`grid gap-3 ${!both ? "sm:grid-cols-2" : "grid-cols-1"}`}>
+            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+              <label className="portal-label flex items-center gap-2 text-xs sm:text-sm font-semibold text-foreground">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white border border-border shrink-0">
+                  <FaInstagram size={15} className="text-[#E1306C]" />
+                </span>
+                Instagram URL
+              </label>
+              <input
+                className="input-field"
+                placeholder="https://instagram.com/yourhandle"
+                disabled={disabled}
+                value={social.instagram_url || ""}
+                onChange={(e) => setSocial({ instagram_url: e.target.value })}
+              />
+            </div>
+
+            <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+              <label className="portal-label flex items-center gap-2 text-xs sm:text-sm font-semibold text-foreground">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white border border-border shrink-0">
+                  <FaYoutube size={15} className="text-[#FF0000]" />
+                </span>
+                YouTube URL
+              </label>
+              <input
+                className="input-field"
+                placeholder="https://youtube.com/@yourchannel"
+                disabled={disabled}
+                value={social.youtube_url || ""}
+                onChange={(e) => setSocial({ youtube_url: e.target.value })}
+              />
             </div>
           </div>
-        </div>
+        </section>
+      ) : null}
 
-        {social.followers_fetched_at ? (
-          <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-            <RefreshCw size={11} />
-            Counts last updated{" "}
-            {new Date(social.followers_fetched_at).toLocaleString(undefined, {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}
-          </p>
-        ) : (
-          <p className="text-[11px] text-muted-foreground">
-            Save your profile to fetch live follower counts from these links.
-          </p>
-        )}
-      </section>
+      <ConfirmDialog
+        open={pendingKind != null}
+        theme="light"
+        danger
+        title="Switch media type?"
+        body={
+          pendingKind === "audio"
+            ? "Switching to audio clips will remove your current spotlight videos. This cannot be undone from here."
+            : "Switching to spotlight videos will remove your current audio clips. This cannot be undone from here."
+        }
+        confirmLabel={pendingKind === "audio" ? "Switch to audio" : "Switch to spotlight"}
+        cancelLabel="Keep current"
+        onCancel={() => setPendingKind(null)}
+        onConfirm={() => {
+          if (pendingKind) applyKind(pendingKind);
+        }}
+      />
     </div>
   );
 }

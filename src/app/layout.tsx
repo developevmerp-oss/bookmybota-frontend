@@ -104,6 +104,8 @@ export default function RootLayout({
   const isArtistLogin = pathname === "/artist/login";
   const isMovieLogin = pathname === "/movie/login";
   const isBusinessLogin = pathname === "/business/login";
+  const isOrganizerLogin = pathname === "/organizer/login";
+  const isAdminLogin = pathname === "/admin/login";
   /** Partner login/register keep the public navbar (same as organizer register). */
   const isPartnerPublicAuth =
     isOrganizerRegister ||
@@ -112,21 +114,23 @@ export default function RootLayout({
     isMovieRegister ||
     isVenueLogin ||
     isArtistLogin ||
-    isMovieLogin;
+    isMovieLogin ||
+    isOrganizerLogin ||
+    isAdminLogin ||
+    isBusinessLogin;
 
   /** Minimal logo + Login bar (List Your Show style) — not customer HomeHeader. */
   const isPasswordAuthPage =
     pathname === "/forgot-password" || pathname === "/reset-password";
-  const isPartnerMinimalHeaderPage =
-    isPartnerRegisterPage || isBusinessLogin || isPasswordAuthPage;
+  const isPartnerMinimalHeaderPage = isPartnerRegisterPage || isPasswordAuthPage;
 
   const isAdminOrBusiness =
-    Boolean(pathname?.startsWith("/admin")) ||
+    (Boolean(pathname?.startsWith("/admin")) && !isAdminLogin) ||
     (Boolean(pathname?.startsWith("/business")) && !isBusinessRegister && !isBusinessLogin) ||
     ((isArtistAdminPath(pathname || "") && !isArtistRegister && !isArtistLogin) && !isArtistRegister) ||
     ((isVenueAdminPath(pathname || "") && !isVenueRegister) && !isVenueRegister && !isVenueLogin) ||
     (isMovieAdminPath(pathname || "") && !isMovieRegister && !isMovieLogin) ||
-    (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerRegister);
+    (Boolean(pathname?.startsWith("/organizer")) && !isOrganizerRegister && !isOrganizerLogin);
 
   const isLandingPage = pathname === "/";
   const isEventsPublicPage = pathname === "/events" || Boolean(pathname?.startsWith("/events/"));

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -192,7 +191,6 @@ export default function OrganizerLandingPage({
   category?: OrganizerCategory;
 } = {}) {
   const router = useRouter();
-  const [loginOpen, setLoginOpen] = useState(false);
   const categoryConfig = category ? PARTNER_CATEGORY_TYPES[category] : null;
 
   const openLogin = () => {
@@ -201,7 +199,7 @@ export default function OrganizerLandingPage({
       router.push(homePathForRole("event_admin"));
       return;
     }
-    setLoginOpen(true);
+    router.push("/organizer/login");
   };
 
   return (
@@ -210,8 +208,8 @@ export default function OrganizerLandingPage({
       centeredPartnerHeader
       loginHref="/organizer/login"
       expectedRole="event_admin"
-      loginTitle="Event Admin Login"
-      loginSubtitle="Sign in to manage your events"
+      loginTitle="Event Login"
+      loginSubtitle="Sign in to create and manage your events"
       registerHref="/organizer/register"
       registerHint={
         <p className="text-[10px] text-slate-400">
@@ -249,8 +247,6 @@ export default function OrganizerLandingPage({
         </p>
       }
       onOpenLogin={openLogin}
-      loginOpen={loginOpen}
-      onCloseLogin={() => setLoginOpen(false)}
     />
   );
 }

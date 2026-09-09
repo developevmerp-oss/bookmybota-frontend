@@ -144,13 +144,9 @@ function OrganizerDashboard() {
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <p className="org-section-label mb-2">Organizer overview</p>
-          <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          <h2 className="font-display text-xl sm:text-2xl font-bold text-foreground tracking-tight">
             {greeting}, {firstName}.
           </h2>
-          <p className="text-muted-foreground mt-1.5 text-sm sm:text-base">
-            Here&apos;s what&apos;s happening across your events today.
-          </p>
         </div>
         <Link href="/organizer/events/new" className="btn-primary inline-flex items-center gap-2 w-fit">
           <Plus size={18} /> Create event

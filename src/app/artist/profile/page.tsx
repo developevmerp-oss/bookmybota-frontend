@@ -106,129 +106,161 @@ export default function ArtistProfilePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <p className="org-section-label mb-2">Artist workspace</p>
-        <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          Artist profile
-        </h2>
-        <p className="text-muted-foreground mt-1.5 text-sm">
-          Update your profile, media samples, and social links after registration. Customers see these on your
-          public page.
-        </p>
-        {settings?.venue_type_name ? (
-          <p className="text-xs text-muted-foreground mt-2">
-            Type: <span className="font-semibold text-foreground">{settings.venue_type_name}</span>
-          </p>
-        ) : null}
+    <div className="w-full max-w-[1600px] mx-auto pb-28">
+      <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+        <button
+          type="button"
+          disabled={saving || !phoneValid}
+          onClick={() => void onSave()}
+          className="btn-primary disabled:opacity-50 shrink-0 hidden sm:inline-flex"
+        >
+          {saving ? "Saving..." : "Save profile"}
+        </button>
       </div>
 
-      <form onSubmit={onSave} className="space-y-6" noValidate>
-        <section className="org-card p-5 sm:p-6 space-y-5">
-          <div>
-            <label className="portal-label block text-sm font-semibold mb-1.5">Profile photo</label>
-            <CroppedImageField
-              value={coverImageUrl}
-              aspect={1}
-              disabled={uploading}
-              previewClassName="w-32 h-32 rounded-2xl border border-border"
-              emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-border hover:border-primary"
-              onRemove={() => setCoverImageUrl("")}
-              onCroppedFile={async (file) => {
-                const fd = new FormData();
-                fd.append("image", file);
-                try {
-                  const res = await uploadImage(fd).unwrap();
-                  if (res.url) {
-                    setCoverImageUrl(res.url);
-                    toast.success("Photo uploaded");
-                  }
-                } catch (err) {
-                  toast.error(extractApiError(err, "Failed to upload photo"));
-                }
-              }}
-              emptyContent={
-                <>
-                  <ImagePlus className="text-muted-foreground mb-1" size={20} />
-                  <span className="text-[10px] text-muted-foreground">
-                    {uploading ? "Uploading…" : "Add photo"}
-                  </span>
-                </>
-              }
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="portal-label block text-sm font-semibold mb-1.5">
-                Artist / stage name <span className="text-destructive">*</span>
-              </label>
-              <input {...register("name")} className="input-field" placeholder="Stage name" />
-              {errors.name && <p className="field-error">{errors.name.message}</p>}
+      <form onSubmit={onSave} className="space-y-4" noValidate>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+          {/* Basics — left */}
+          <section className="org-card p-4 sm:p-5 xl:col-span-5 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-display text-base font-bold text-foreground">Basic details</h3>
             </div>
-            <Controller
-              name="phone"
-              control={control}
-              render={({ field }) => (
-                <PhoneInput
-                  label="Phone"
-                  labelClassName="portal-label block text-sm font-semibold mb-1.5"
-                  variant="light"
-                  value={field.value}
-                  onChange={field.onChange}
-                  onValidChange={setPhoneValid}
-                  required
-                  error={errors.phone?.message}
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="shrink-0">
+                <label className="portal-label block text-xs font-semibold mb-1.5">Profile photo</label>
+                <CroppedImageField
+                  value={coverImageUrl}
+                  aspect={1}
+                  disabled={uploading}
+                  previewClassName="w-28 h-28 rounded-2xl border border-border"
+                  emptyClassName="flex flex-col items-center justify-center w-28 h-28 rounded-2xl border border-dashed border-border hover:border-primary"
+                  onRemove={() => setCoverImageUrl("")}
+                  onCroppedFile={async (file) => {
+                    const fd = new FormData();
+                    fd.append("image", file);
+                    try {
+                      const res = await uploadImage(fd).unwrap();
+                      if (res.url) {
+                        setCoverImageUrl(res.url);
+                        toast.success("Photo uploaded");
+                      }
+                    } catch (err) {
+                      toast.error(extractApiError(err, "Failed to upload photo"));
+                    }
+                  }}
+                  emptyContent={
+                    <>
+                      <ImagePlus className="text-muted-foreground mb-1" size={18} />
+                      <span className="text-[10px] text-muted-foreground">
+                        {uploading ? "Uploading…" : "Add photo"}
+                      </span>
+                    </>
+                  }
                 />
-              )}
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-3">
+                <div>
+                  <label className="portal-label block text-xs font-semibold mb-1">
+                    Artist / stage name <span className="text-destructive">*</span>
+                  </label>
+                  <input {...register("name")} className="input-field" placeholder="Stage name" />
+                  {errors.name && <p className="field-error">{errors.name.message}</p>}
+                </div>
+                <Controller
+                  name="phone"
+                  control={control}
+                  render={({ field }) => (
+                    <PhoneInput
+                      label="Phone"
+                      labelClassName="portal-label block text-xs font-semibold mb-1"
+                      variant="light"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onValidChange={setPhoneValid}
+                      required
+                      error={errors.phone?.message}
+                    />
+                  )}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="portal-label block text-xs font-semibold mb-1">
+                Address / base city <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                {...register("address")}
+                className="input-field min-h-[56px]"
+                rows={2}
+                placeholder="City or base location"
+              />
+              {errors.address && <p className="field-error">{errors.address.message}</p>}
+            </div>
+
+            <div>
+              <label className="portal-label block text-xs font-semibold mb-1">
+                Bio / description <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                {...register("description")}
+                className="input-field min-h-[100px]"
+                rows={4}
+                placeholder="Genre, experience, performance style..."
+              />
+              {errors.description && <p className="field-error">{errors.description.message}</p>}
+            </div>
+          </section>
+
+          {/* Gallery + social — right */}
+          <div className="xl:col-span-7 space-y-4 min-w-0">
+            <PartnerPhotoGalleryFields
+              value={galleryImages}
+              onChange={setGalleryImages}
+              title="Photo gallery"
+              description="Public artist page photos."
+              compact
+            />
+
+            <ArtistMediaSocialFields
+              typeSlug={settings?.venue_type_slug}
+              value={artistMeta}
+              onChange={setArtistMeta}
+              refreshingSocial={saving}
+              compact
+              showMedia={false}
+              showSocial
             />
           </div>
+        </div>
 
-          <div>
-            <label className="portal-label block text-sm font-semibold mb-1.5">
-              Address / base city <span className="text-destructive">*</span>
-            </label>
-            <textarea
-              {...register("address")}
-              className="input-field min-h-[72px]"
-              rows={2}
-              placeholder="City or base location"
-            />
-            {errors.address && <p className="field-error">{errors.address.message}</p>}
-          </div>
-
-          <div>
-            <label className="portal-label block text-sm font-semibold mb-1.5">
-              Bio / description <span className="text-destructive">*</span>
-            </label>
-            <textarea
-              {...register("description")}
-              className="input-field min-h-[120px]"
-              rows={4}
-              placeholder="Genre, experience, performance style..."
-            />
-            {errors.description && <p className="field-error">{errors.description.message}</p>}
-          </div>
-        </section>
-
-        <PartnerPhotoGalleryFields
-          value={galleryImages}
-          onChange={setGalleryImages}
-          title="Photo gallery"
-          description="Add photos for your public artist page."
-        />
-
+        {/* Media samples — full width below */}
         <ArtistMediaSocialFields
           typeSlug={settings?.venue_type_slug}
           value={artistMeta}
           onChange={setArtistMeta}
           refreshingSocial={saving}
+          compact
+          showMedia
+          showSocial={false}
         />
 
-        <div className="flex justify-end">
-          <button type="submit" disabled={saving || !phoneValid} className="btn-primary disabled:opacity-50">
-            {saving ? "Saving..." : "Save profile"}
-          </button>
+        {/* Mobile / sticky save */}
+        <div className="fixed bottom-0 inset-x-0 z-20 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 px-4 py-3 md:pl-[calc(16rem+1rem)]">
+          <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              Changes apply to your public artist page after save.
+            </p>
+            <button
+              type="submit"
+              disabled={saving || !phoneValid}
+              className="btn-primary disabled:opacity-50 ml-auto"
+            >
+              {saving ? "Saving..." : "Save profile"}
+            </button>
+          </div>
         </div>
       </form>
     </div>

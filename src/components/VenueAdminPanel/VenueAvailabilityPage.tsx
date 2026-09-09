@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateVenueMySlotsMutation,
@@ -95,6 +95,9 @@ export default function VenueAvailabilityPage() {
     [slots, minDate]
   );
 
+  const upcomingFree = useMemo(() => upcoming.filter((s) => !s.is_booked), [upcoming]);
+  const upcomingBooked = useMemo(() => upcoming.filter((s) => s.is_booked), [upcoming]);
+
   const rangePreviewCount = useMemo(() => {
     if (!rangeFrom || !rangeTo) return 0;
     const all = datesInRange(rangeFrom, rangeTo).filter((d) => d >= minDate);
@@ -159,79 +162,133 @@ export default function VenueAvailabilityPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-[1600px] mx-auto py-16 text-center text-muted-foreground text-sm">
+        Loading calendar…
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <p className="org-section-label mb-2">Calendar</p>
-        <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          Venue availability
-        </h2>
-        <p className="text-muted-foreground text-sm mt-1.5">
-          Click days one by one, or add a date range in one step. Customers see free dates on your
-          public profile and can send Venue booking inquiries.
-        </p>
+    <div className="w-full max-w-[1600px] mx-auto space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: "Free days", value: freeDates.length, hint: "Open for inquiries" },
+          { label: "Booked", value: bookedDates.length, hint: "Cannot be changed" },
+          { label: "Upcoming free", value: upcomingFree.length, hint: "From today onward" },
+          { label: "Upcoming booked", value: upcomingBooked.length, hint: "Confirmed holds" },
+        ].map((stat) => (
+          <div key={stat.label} className="org-card px-4 py-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {stat.label}
+            </p>
+            <p className="mt-1 text-2xl font-bold text-foreground tabular-nums">{stat.value}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{stat.hint}</p>
+          </div>
+        ))}
       </div>
 
-      {isLoading ? (
-        <p className="text-muted-foreground py-10 text-center">Loading calendar…</p>
-      ) : (
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        {/* Calendar column */}
+        <div className="xl:col-span-7 space-y-4">
+          <section className="org-card overflow-hidden">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-border flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="h-9 w-9 rounded-xl bg-primary-soft text-primary inline-flex items-center justify-center shrink-0">
+                  <CalendarDays size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-display text-base font-bold text-foreground">Availability calendar</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Click a day to mark free or remove it.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Free
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Booked
+                </span>
+              </div>
+            </div>
+            <div className="p-4 sm:p-5">
+              {(creating || deleting) && (
+                <p className="text-xs text-primary flex items-center gap-1.5 mb-3">
+                  <Loader2 size={12} className="animate-spin" /> Saving…
+                </p>
+              )}
+              <ArtistMonthCalendar
+                freeDates={freeDates}
+                bookedDates={bookedDates}
+                mode="toggle"
+                onSelectDate={onToggleDate}
+              />
+            </div>
+          </section>
+        </div>
+
+        {/* Side panel — range + list */}
+        <div className="xl:col-span-5 space-y-4">
           <form
             onSubmit={handleSubmit(onAddRange)}
-            className="org-card p-5 space-y-4"
+            className="org-card overflow-hidden"
             noValidate
           >
-            <div>
-              <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-border bg-gradient-to-r from-primary-soft/50 to-transparent">
+              <h3 className="font-display text-base font-bold text-foreground flex items-center gap-2">
                 <Plus size={16} className="text-primary" />
-                Add multiple free days
+                Add free days by range
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Choose a From and To date to mark every day in that range as free (skips days you
-                already added).
+                Marks each day in the range as free (skips days already on your calendar).
               </p>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-              <div>
-                <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-                  From <RequiredMark />
-                </label>
-                <input
-                  type="date"
-                  min={minDate}
-                  {...register("range_from", {
-                    onChange: (e) => {
-                      const v = e.target.value as string;
-                      if (rangeTo && v && rangeTo < v) setValue("range_to", v);
-                    },
-                  })}
-                  className="input-field"
-                />
-                {errors.range_from && <p className={fieldErrorClass}>{errors.range_from.message}</p>}
+            <div className="p-4 sm:p-5 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+                    From <RequiredMark />
+                  </label>
+                  <input
+                    type="date"
+                    min={minDate}
+                    {...register("range_from", {
+                      onChange: (e) => {
+                        const v = e.target.value as string;
+                        if (rangeTo && v && rangeTo < v) setValue("range_to", v);
+                      },
+                    })}
+                    className="input-field"
+                  />
+                  {errors.range_from && (
+                    <p className={fieldErrorClass}>{errors.range_from.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
+                    To <RequiredMark />
+                  </label>
+                  <input
+                    type="date"
+                    min={rangeFrom || minDate}
+                    {...register("range_to")}
+                    className="input-field"
+                  />
+                  {errors.range_to && <p className={fieldErrorClass}>{errors.range_to.message}</p>}
+                </div>
               </div>
-              <div>
-                <label className="portal-label text-xs font-bold uppercase mb-1.5 block">
-                  To <RequiredMark />
-                </label>
-                <input
-                  type="date"
-                  min={rangeFrom || minDate}
-                  {...register("range_to")}
-                  className="input-field"
-                />
-                {errors.range_to && <p className={fieldErrorClass}>{errors.range_to.message}</p>}
-              </div>
-              <div className="sm:col-span-2 lg:col-span-2 flex flex-wrap items-center gap-3">
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button
                   type="submit"
                   disabled={creating}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl btn-primary text-sm disabled:opacity-50"
                 >
-                  {creating ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Plus size={14} />
-                  )}
+                  {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                   Add range
                   {rangePreviewCount > 0 ? ` (${rangePreviewCount})` : ""}
                 </button>
@@ -239,7 +296,7 @@ export default function VenueAvailabilityPage() {
                   <button
                     type="button"
                     onClick={() => reset(emptyPartnerAvailabilityRangeValues())}
-                    className="text-sm font-medium text-slate-500 hover:text-slate-800"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground px-2 py-2"
                   >
                     Clear
                   </button>
@@ -248,65 +305,77 @@ export default function VenueAvailabilityPage() {
             </div>
           </form>
 
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-700">Or click days on the calendar</p>
-              <ArtistMonthCalendar
-                freeDates={freeDates}
-                bookedDates={bookedDates}
-                mode="toggle"
-                onSelectDate={onToggleDate}
-              />
+          <section className="org-card overflow-hidden">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-border flex items-center justify-between gap-2">
+              <div>
+                <h3 className="font-display text-base font-bold text-foreground">Upcoming free days</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Remove a day anytime if it is not booked.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-muted-foreground tabular-nums shrink-0">
+                {upcomingFree.length}
+              </span>
             </div>
-
-            <div className="org-card p-5 space-y-3">
-              <h3 className="font-display font-semibold text-foreground">Upcoming free days</h3>
-              {(creating || deleting) && (
-                <p className="text-xs text-primary flex items-center gap-1.5">
-                  <Loader2 size={12} className="animate-spin" /> Saving…
-                </p>
-              )}
-              {upcoming.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No free days yet. Add a date range above or click dates on the calendar.
-                </p>
+            <div className="p-3 sm:p-4 max-h-[min(28rem,55vh)] overflow-y-auto">
+              {upcomingFree.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center">
+                  <p className="text-sm text-muted-foreground">No free days yet.</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Add a date range or click days on the calendar.
+                  </p>
+                </div>
               ) : (
-                <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                  {upcoming.map((s) => (
+                <ul className="space-y-2">
+                  {upcomingFree.map((s) => (
                     <li
                       key={s.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5"
                     >
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          {formatDate(s.slot_date)}
-                        </p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{formatDate(s.slot_date)}</p>
                         <p className="text-xs text-muted-foreground">
-                          {s.is_booked
-                            ? "Booked"
-                            : s.start_time && s.end_time
-                              ? `${s.start_time} – ${s.end_time}`
-                              : "Full day available"}
+                          {s.start_time && s.end_time
+                            ? `${s.start_time} – ${s.end_time}`
+                            : "Full day available"}
                         </p>
                       </div>
-                      {!s.is_booked ? (
-                        <button
-                          type="button"
-                          onClick={() => onToggleDate(s.slot_date)}
-                          className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50"
-                          title="Remove"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => onToggleDate(s.slot_date)}
+                        className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 shrink-0"
+                        title="Remove"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
-          </div>
+          </section>
+
+          {upcomingBooked.length > 0 ? (
+            <section className="org-card overflow-hidden">
+              <div className="px-4 sm:px-5 py-3.5 border-b border-border">
+                <h3 className="font-display text-base font-bold text-foreground">Upcoming booked</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Locked — cannot be removed here.</p>
+              </div>
+              <ul className="p-3 sm:p-4 space-y-2 max-h-48 overflow-y-auto">
+                {upcomingBooked.map((s) => (
+                  <li
+                    key={s.id}
+                    className="rounded-xl border border-rose-100 bg-rose-50/50 px-3 py-2.5"
+                  >
+                    <p className="text-sm font-semibold text-foreground">{formatDate(s.slot_date)}</p>
+                    <p className="text-xs text-rose-600 font-medium mt-0.5">Booked</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
-      )}
+      </div>
     </div>
   );
 }

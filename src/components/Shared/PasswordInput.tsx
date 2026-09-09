@@ -28,6 +28,8 @@ interface PasswordInputProps {
   labelClassName?: string;
   /** Extra left padding when using icon wrapper (e.g. login page) */
   withLeftIcon?: boolean;
+  /** Classes for the show/hide password toggle button */
+  toggleClassName?: string;
 }
 
 const variantClasses: Record<InputVariant, string> = {
@@ -54,6 +56,7 @@ export default function PasswordInput({
   label,
   labelClassName,
   withLeftIcon = false,
+  toggleClassName,
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
   const [touched, setTouched] = useState(false);
@@ -108,7 +111,7 @@ export default function PasswordInput({
           type="button"
           tabIndex={-1}
           onClick={() => setVisible((v) => !v)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+          className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors ${toggleClassName || ""}`}
           aria-label={visible ? "Hide password" : "Show password"}
         >
           {visible ? <EyeOff size={18} /> : <Eye size={18} />}

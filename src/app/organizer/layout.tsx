@@ -7,12 +7,12 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
+import PartnerProfileHoverMenu from "@/components/Shared/PartnerProfileHoverMenu";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,
   BarChart3,
   CalendarDays,
-  LogOut,
   Menu,
   X,
   CalendarCheck,
@@ -20,9 +20,6 @@ import {
   Wallet,
   QrCode,
   Megaphone,
-  ChevronDown,
-  LayoutGrid,
-  CheckCircle2,
 } from "lucide-react";
 
 const navigation = [
@@ -36,12 +33,54 @@ const navigation = [
   { name: "Ledger", href: "/organizer/ledger", icon: Wallet },
 ];
 
+const pageMeta: Record<string, { title: string; subtitle: string }> = {
+  "/organizer": {
+    title: "Dashboard",
+    subtitle: "Overview of your events, bookings, and account activity.",
+  },
+  "/organizer/events": {
+    title: "My events",
+    subtitle: "Create and manage events, showtimes, and listings.",
+  },
+  "/organizer/bookings": {
+    title: "Bookings",
+    subtitle: "Customer ticket bookings across your events.",
+  },
+  "/organizer/scan": {
+    title: "Scan tickets",
+    subtitle: "Check in guests at the gate with QR codes.",
+  },
+  "/organizer/tickets": {
+    title: "Ticket stats",
+    subtitle: "Sales and attendance totals for your tickets.",
+  },
+  "/organizer/offers": {
+    title: "Offers",
+    subtitle: "Discounts and promo codes for your events.",
+  },
+  "/organizer/promotions": {
+    title: "Promotions",
+    subtitle: "Promote events to reach more customers.",
+  },
+  "/organizer/ledger": {
+    title: "Ledger",
+    subtitle: "Payments, payouts, and financial history.",
+  },
+  "/organizer/profile": {
+    title: "Organizer profile",
+    subtitle: "Business details shown with your events.",
+  },
+  "/organizer/change-password": {
+    title: "Change password",
+    subtitle: "Update the password for your organizer login.",
+  },
+};
+
 function OrganizerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const user = useAppSelector((state) => state.auth.user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
@@ -56,26 +95,19 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
     return (displayName.slice(0, 2) || "OR").toUpperCase();
   }, [displayName]);
 
-  const pageTitle = useMemo(() => {
-    if (pathname.startsWith("/organizer/profile") || pathname.startsWith("/organizer/change-password")) {
-      return "Profile";
-    }
+  const { title: pageTitle, subtitle: pageSubtitle } = useMemo(() => {
+    if (pathname.startsWith("/organizer/change-password")) return pageMeta["/organizer/change-password"];
+    if (pathname.startsWith("/organizer/profile")) return pageMeta["/organizer/profile"];
+    if (pathname === "/organizer") return pageMeta["/organizer"];
+    const key = Object.keys(pageMeta)
+      .filter((h) => h !== "/organizer")
+      .find((href) => pathname === href || pathname.startsWith(`${href}/`));
+    if (key) return pageMeta[key];
     const match = navigation.find((n) =>
       n.href === "/organizer" ? pathname === "/organizer" : pathname === n.href || pathname.startsWith(`${n.href}/`)
     );
-    return match?.name || "Organizer Panel";
+    return { title: match?.name || "Organizer panel", subtitle: "" };
   }, [pathname]);
-
-  const todayLabel = useMemo(
-    () =>
-      new Date().toLocaleDateString(undefined, {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-    []
-  );
 
   const isNavActive = (href: string) => {
     if (href === "/organizer") return pathname === "/organizer";
@@ -134,21 +166,6 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
         </Link>
 
         <NavLinks />
-
-        <div className="p-3 border-t border-[var(--sidebar-border)] shrink-0">
-          <div className="rounded-xl border border-[var(--sidebar-border)] bg-muted/40 p-3 space-y-2">
-            <div className="flex items-start gap-2">
-              <CheckCircle2 size={16} className="text-success shrink-0 mt-0.5" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                All account details are complete. You&apos;re ready to publish.
-              </p>
-            </div>
-            <div className="h-1.5 rounded-full bg-success/20 overflow-hidden">
-              <div className="h-full w-full rounded-full bg-success" />
-            </div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-success">Organizer health</p>
-          </div>
-        </div>
       </aside>
 
       {mobileMenuOpen && (
@@ -191,78 +208,28 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
               <h1 className="font-display text-lg sm:text-xl font-semibold text-foreground truncate">
                 {pageTitle}
               </h1>
-              <p className="text-xs text-muted-foreground truncate hidden sm:block">{todayLabel}</p>
+              {pageSubtitle ? (
+                <p className="text-xs text-muted-foreground line-clamp-2 hidden sm:block max-w-2xl">
+                  {pageSubtitle}
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/organizer"
-              className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Dashboard"
-            >
-              <LayoutGrid size={16} />
-            </Link>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setProfileOpen((v) => !v)}
-                className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-1.5 hover:bg-muted/60 transition-colors"
-              >
-                <span className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                  {initials}
-                </span>
-                <span className="hidden sm:block text-left min-w-0">
-                  <span className="block text-sm font-semibold text-foreground truncate max-w-[140px]">
-                    {displayName}
-                  </span>
-                  <span className="block text-[11px] text-muted-foreground">Organizer</span>
-                </span>
-                <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-              </button>
-
-              {profileOpen && (
-                <>
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-40 cursor-default"
-                    aria-label="Close profile menu"
-                    onClick={() => setProfileOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card shadow-card z-50 py-1 overflow-hidden">
-                    <Link
-                      href="/organizer/profile"
-                      onClick={() => setProfileOpen(false)}
-                      className="block px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
-                    >
-                      Profile
-                    </Link>
-                    <Link
-                      href="/organizer/change-password"
-                      onClick={() => setProfileOpen(false)}
-                      className="block px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
-                    >
-                      Change password
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-left px-3 py-2.5 text-sm font-medium text-destructive hover:bg-muted flex items-center gap-2"
-                    >
-                      <LogOut size={14} /> Sign out
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <PartnerProfileHoverMenu
+              displayName={displayName}
+              email={user?.email}
+              initials={initials}
+              roleLabel="Organizer"
+              profileHref="/organizer/profile"
+              changePasswordHref="/organizer/change-password"
+              onLogout={handleLogout}
+            />
           </div>
         </header>
 
-        <div className="p-4 sm:p-8">{children}</div>
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8">{children}</div>
       </main>
     </div>
   );

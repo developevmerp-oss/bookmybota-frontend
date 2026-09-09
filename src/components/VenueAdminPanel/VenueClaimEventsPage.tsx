@@ -37,32 +37,21 @@ export default function VenueClaimEventsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <p className="org-section-label mb-2">Event linking</p>
-        <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          Claim events at your venue
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Organizers may list your venue before you join the platform. Claim events to link them to your verified
-          venue profile.
-        </p>
-      </div>
-
+    <div className="w-full max-w-[1600px] mx-auto space-y-4">
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : showtimes.length === 0 ? (
         <div className="org-card p-6 text-sm text-muted-foreground">No claimable events right now.</div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           {showtimes.map((s) => (
             <li
               key={s.showtime_id}
-              className="org-card p-4 flex flex-wrap items-start justify-between gap-3"
+              className="org-card p-4 sm:p-5 flex flex-col gap-3 min-w-0"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-foreground">{s.event_name}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {s.venue_name}
                   {s.city_name ? ` · ${s.city_name}` : ""}
                 </p>
@@ -74,7 +63,7 @@ export default function VenueClaimEventsPage() {
                 type="button"
                 disabled={claiming}
                 onClick={() => onClaim(s.showtime_id)}
-                className="btn-primary text-sm disabled:opacity-50"
+                className="btn-primary text-sm disabled:opacity-50 shrink-0 w-full"
               >
                 Claim event
               </button>

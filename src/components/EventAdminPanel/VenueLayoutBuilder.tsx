@@ -50,6 +50,7 @@ type VenueAdapter = {
   sections?: Array<{ id: string; name: string; capacity?: number }>;
   initialSeats?: Seat[];
   initialConfig?: { labels?: Label[]; shapes?: Shape[]; bgImageUrl?: string | null };
+  maxCapacity?: number;
   saving?: boolean;
   onSave: (
     payload: { seating_config: { canvasWidth: number; canvasHeight: number; labels: Label[]; shapes: Shape[]; bgImageUrl?: string | null }; seats: Seat[] },
@@ -78,6 +79,17 @@ export default function VenueLayoutBuilder({
   const { data: layoutData, isLoading: layoutLoading, refetch } = useGetEventLayoutQuery(eventId || "", { skip: skipEvent });
   const [saveLayout, { isLoading: isEventSaving }] = useUpdateEventLayoutMutation();
   const isSaving = Boolean(venueAdapter?.saving) || isEventSaving;
+
+  const maxCapacity = useMemo(() => {
+    if (typeof venueAdapter?.maxCapacity === "number" && venueAdapter.maxCapacity > 0) {
+      return venueAdapter.maxCapacity;
+    }
+    const layoutCap = (layoutData as any)?.max_capacity ?? (layoutData as any)?.data?.max_capacity;
+    if (typeof layoutCap === "number" && layoutCap > 0) {
+      return layoutCap;
+    }
+    return 0;
+  }, [venueAdapter?.maxCapacity, layoutData]);
 
   const [seats, setSeats] = useState<Seat[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
@@ -514,6 +526,11 @@ export default function VenueLayoutBuilder({
   };
 
   const handleClearCanvas = () => {
+    const bookedSeats = seats.filter(s => s.status && s.status !== "AVAILABLE");
+    if (bookedSeats.length > 0) {
+      toast.error(`Cannot clear canvas: ${bookedSeats.length} seat(s) already have customer bookings!`);
+      return;
+    }
     if (seats.length === 0 && labels.length === 0 && shapes.length === 0 && !bgImageUrl) return;
     pushSnapshot([], [], [], null);
     setSelectedSeatId(null);
@@ -791,8 +808,15 @@ export default function VenueLayoutBuilder({
   };
 
   const updateSelectedSeat = (field: keyof Seat, value: string) => {
+    const selectedSeat = seats.find(s => s.internalId === selectedSeatId);
+    if (selectedSeat && selectedSeat.status && selectedSeat.status !== "AVAILABLE") {
+      if (field === "row_label" || field === "seat_label" || field === "section_name" || field === "ticket_type_id") {
+        toast.error(`Cannot edit ${field.replace('_', ' ')}: Seat ${selectedSeat.row_label}-${selectedSeat.seat_label} already has customer bookings!`);
+        return;
+      }
+    }
+
     if (moveEntireSection && selectedSeatId) {
-      const selectedSeat = seats.find(s => s.internalId === selectedSeatId);
       if (selectedSeat && selectedSeat.section_name) {
         // Bulk update the field for the entire section
         setSeats(seats.map(s => s.section_name === selectedSeat.section_name ? { ...s, [field]: value } : s));
@@ -805,11 +829,22 @@ export default function VenueLayoutBuilder({
   const deleteSelectedSeat = () => {
     if (!selectedSeatId) return;
 
+    const seatToDelete = seats.find(s => s.internalId === selectedSeatId);
+    if (seatToDelete && seatToDelete.status && seatToDelete.status !== "AVAILABLE") {
+      toast.error(`Cannot delete seat ${seatToDelete.row_label}-${seatToDelete.seat_label}: It is already ${seatToDelete.status.toLowerCase()}!`);
+      return;
+    }
+
     if (moveEntireSection) {
       const selectedSeat = seats.find(s => s.internalId === selectedSeatId);
       if (selectedSeat) {
         const groupId = selectedSeat.grid_id || selectedSeat.section_name;
         if (groupId) {
+          const bookedInGroup = seats.filter(s => (s.grid_id || s.section_name) === groupId && s.status && s.status !== "AVAILABLE");
+          if (bookedInGroup.length > 0) {
+            toast.error(`Cannot delete entire section: ${bookedInGroup.length} seat(s) are already booked/reserved!`);
+            return;
+          }
           setSeats(seats.filter(s => (s.grid_id || s.section_name) !== groupId));
           setSelectedSeatId(null);
           toast.success("Deleted entire grid!");
@@ -2114,6 +2149,13 @@ export default function VenueLayoutBuilder({
   };
 
   const handleSave = async (publish = false) => {
+    if (maxCapacity > 0 && seats.length > maxCapacity) {
+      toast.error(
+        `Validation Failed: Total seats placed (${seats.length}) exceeds the maximum room/screen capacity (${maxCapacity}). Please remove ${seats.length - maxCapacity} seat(s).`
+      );
+      return;
+    }
+
     if (!venueAdapter) {
       for (const tt of ticketTypes) {
         const assignedSeatsCount = seats.filter(s => s.ticket_type_id === tt.id).length;
@@ -2284,6 +2326,24 @@ export default function VenueLayoutBuilder({
           </select>
         </div>
         <div className="flex items-center gap-3">
+          {/* Live Capacity Indicator */}
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${
+            maxCapacity > 0 && seats.length > maxCapacity
+              ? "bg-rose-50 text-rose-700 border-rose-300 animate-pulse"
+              : "bg-white text-slate-700 border-slate-200 shadow-sm"
+          }`}>
+            <span>🪑 Seats: <strong>{seats.length}</strong></span>
+            {maxCapacity > 0 && (
+              <>
+                <span className="text-slate-400">/</span>
+                <span>Max: <strong>{maxCapacity}</strong></span>
+              </>
+            )}
+            {maxCapacity > 0 && seats.length > maxCapacity && (
+              <span className="text-rose-600 font-bold ml-1">(!Exceeds Cap)</span>
+            )}
+          </div>
+
           <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
             <button onClick={() => setZoomScale(s => Math.max(0.15, Number((s - 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
             <span className="text-xs font-semibold text-slate-600 min-w-[44px] text-center">{Math.round(zoomScale * 100)}%</span>
@@ -2541,6 +2601,10 @@ export default function VenueLayoutBuilder({
           onDblTap={() => handleToggleZoomOnSection(seat)}
           onClick={() => {
             if (mode === "eraser") {
+              if (seat.status && seat.status !== "AVAILABLE") {
+                toast.error(`Cannot erase seat ${seat.row_label}-${seat.seat_label}: already booked/reserved.`);
+                return;
+              }
               setSeats(prev => prev.filter(s => s.internalId !== seat.internalId));
               if (selectedSeatId === seat.internalId) setSelectedSeatId(null);
               return;
@@ -2553,6 +2617,10 @@ export default function VenueLayoutBuilder({
           }}
           onTap={() => {
             if (mode === "eraser") {
+              if (seat.status && seat.status !== "AVAILABLE") {
+                toast.error(`Cannot erase seat ${seat.row_label}-${seat.seat_label}: already booked/reserved.`);
+                return;
+              }
               setSeats(prev => prev.filter(s => s.internalId !== seat.internalId));
               if (selectedSeatId === seat.internalId) setSelectedSeatId(null);
               return;
@@ -2566,9 +2634,14 @@ export default function VenueLayoutBuilder({
         >
           <Circle
             radius={11}
-            fill={seat.status === 'AVAILABLE' ? (isSelected ? "#f43f5e" : color) : "#ef4444"}
-            stroke={isSelected ? "#ffffff" : "#ffffff"}
-            strokeWidth={isSelected ? 3 : 1.5}
+            fill={
+              seat.status && seat.status !== "AVAILABLE"
+                ? (isSelected ? "#be123c" : "#991b1b")
+                : (isSelected ? "#f43f5e" : color)
+            }
+            stroke={isSelected ? "#fbbf24" : (seat.status && seat.status !== "AVAILABLE" ? "#fca5a5" : "#ffffff")}
+            strokeWidth={isSelected ? 3 : (seat.status && seat.status !== "AVAILABLE" ? 2 : 1.5)}
+            dash={seat.status && seat.status !== "AVAILABLE" ? [3, 2] : undefined}
             perfectDrawEnabled={false}
             shadowForStrokeEnabled={false}
           />
@@ -3080,12 +3153,23 @@ export default function VenueLayoutBuilder({
             </div>
           ) : selectedSeat ? (
             <div className="space-y-4">
+              {selectedSeat.status && selectedSeat.status !== "AVAILABLE" && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <span>🔒 Seat {selectedSeat.row_label}-{selectedSeat.seat_label} is Booked</span>
+                  </div>
+                  <p className="text-amber-700">
+                    This seat already has customer bookings. Tier, row, seat label, and deletion are locked to protect tickets.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Ticket Type (Pricing Zone)</label>
                 <select 
                   value={selectedSeat.ticket_type_id || ""}
+                  disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
                   onChange={(e) => updateSelectedSeat("ticket_type_id", e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 >
                   <option value="">-- Select Type --</option>
                   {ticketTypes.map((t: any) => (
@@ -3096,8 +3180,22 @@ export default function VenueLayoutBuilder({
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Section / Row</label>
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="text" value={selectedSeat.section_name} onChange={(e) => updateSelectedSeat("section_name", e.target.value)} placeholder="Sec" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
-                  <input type="text" value={selectedSeat.row_label} onChange={(e) => updateSelectedSeat("row_label", e.target.value)} placeholder="Row" className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                  <input
+                    type="text"
+                    value={selectedSeat.section_name}
+                    disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                    onChange={(e) => updateSelectedSeat("section_name", e.target.value)}
+                    placeholder="Sec"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  />
+                  <input
+                    type="text"
+                    value={selectedSeat.row_label}
+                    disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                    onChange={(e) => updateSelectedSeat("row_label", e.target.value)}
+                    placeholder="Row"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  />
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2 bg-slate-50 p-2 rounded border border-slate-200">
@@ -3125,12 +3223,27 @@ export default function VenueLayoutBuilder({
               )}
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Seat Number / Label</label>
-                <input type="text" value={selectedSeat.seat_label} onChange={(e) => updateSelectedSeat("seat_label", e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                <input
+                  type="text"
+                  value={selectedSeat.seat_label}
+                  disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                  onChange={(e) => updateSelectedSeat("seat_label", e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                />
               </div>
               <div className="pt-4 border-t border-slate-100">
-                <p className="text-xs font-medium text-slate-500 mb-3">Status: <span className="text-slate-800">{selectedSeat.status}</span></p>
-                <button onClick={deleteSelectedSeat} className="w-full py-2 bg-rose-50 text-rose-600 rounded-lg text-sm font-medium hover:bg-rose-100 flex items-center justify-center gap-2">
-                  <Trash2 size={16} /> Remove Seat
+                <p className="text-xs font-medium text-slate-500 mb-3">Status: <span className="text-slate-800 font-semibold">{selectedSeat.status}</span></p>
+                <button
+                  onClick={deleteSelectedSeat}
+                  disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                  className={`w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    selectedSeat.status && selectedSeat.status !== "AVAILABLE"
+                      ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                      : "bg-rose-50 text-rose-600 hover:bg-rose-100"
+                  }`}
+                  title={selectedSeat.status && selectedSeat.status !== "AVAILABLE" ? "Booked seats cannot be deleted" : "Remove seat"}
+                >
+                  <Trash2 size={16} /> {selectedSeat.status && selectedSeat.status !== "AVAILABLE" ? "Seat Locked (Booked)" : "Remove Seat"}
                 </button>
               </div>
             </div>

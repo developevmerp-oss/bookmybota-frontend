@@ -7,7 +7,7 @@ import {
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
   ChevronLeft, X, Navigation, User,
   Send, ShieldCheck, ArrowRight, Check, ChevronDown, Tag, CheckCheck,
-  Sun, Moon, Sunrise
+  Sun, Moon, Sunrise, FileText, BadgeCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -49,6 +49,7 @@ import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import CategoryPromoBanners from '@/components/LandingPage/CategoryPromoBanners';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
+import BookingSuccessCheckAnimation from './BookingSuccessCheckAnimation';
 import DiningBookingPolicyModal, {
   type DiningBookingPolicySection,
 } from './DiningBookingPolicyModal';
@@ -2310,7 +2311,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           <div className="w-full bg-white flex flex-col pb-12 sm:pb-16">
 
             {/* Panel Content */}
-            <div className={`${drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : drawerStep === 1 ? 'pt-1 pb-2 bg-white' : 'p-5 bg-white'}`}>
+            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : drawerStep === 1 ? 'pt-1 pb-2 bg-white' : 'p-5 bg-white'}`}>
               {drawerStep === 1 && (() => {
                 const mealsConfig = (profile.operating_hours as any)?.meals || {
                   breakfast: { open: '08:00', close: '11:00', active: true },
@@ -3130,234 +3131,269 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               )}
 
               {drawerStep === 4 && (
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] gap-5 lg:gap-6 items-start">
-                    {/* Left — booking confirmed (Zomato-style) */}
-                    <div className="min-w-0">
-                    <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
-                      <div className="flex items-center justify-center gap-2 mb-1.5">
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 shrink-0">
-                          <Check size={16} strokeWidth={2.75} className="text-emerald-700" />
-                        </span>
-                        <p className="m-0 text-base sm:text-lg font-bold text-emerald-600 tracking-tight leading-none">
-                          Success
-                        </p>
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight mb-1.5">Booking confirmed</h3>
-                      <p className="text-sm text-zinc-500 font-medium leading-relaxed mb-4">
-                        <strong className="text-zinc-800">{profile.name}</strong> has confirmed your booking. Have a great meal!
-                      </p>
-
-                      {appliedOffer?.title && (
-                        <div className="rounded-lg bg-[#eef5ff] text-[#2563eb] text-xs font-semibold px-3 py-2.5 mb-4">
-                          Show this QR at the restaurant to avail {appliedOffer.title}.
-                      </div>
-                      )}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4 py-4 border-y border-dashed border-zinc-200">
-                        <div className="flex items-start gap-2.5 min-w-0">
-                          <Calendar size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
-                          <p className="text-sm font-semibold text-zinc-900 leading-snug">
-                            {selectedDateIndex === 0 ? 'Today' : selectedDateIndex === 1 ? 'Tomorrow' : bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short' })}{' '}
-                            {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}{' '}
-                            at {formatSlotLabel(selectedTime)}
+                <div className="w-full max-w-[960px] mx-auto">
+                  <div
+                    className="rounded-[22px] bg-white px-5 py-5 sm:px-8 sm:py-7"
+                    style={{
+                      border: 'none',
+                      boxShadow:
+                        '0 4px 6px rgba(80,40,120,0.04), 0 18px 48px rgba(80,40,120,0.12), 0 32px 64px rgba(40,20,80,0.06)',
+                    }}
+                  >
+                    {/* Header: success + booking id */}
+                    <div className="flex items-start justify-between gap-3 mb-6">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <BookingSuccessCheckAnimation
+                          playKey={lastBookingId || `success-${drawerStep}`}
+                        />
+                        <div className="min-w-0 pt-0.5">
+                          <h3 className="text-[22px] sm:text-[24px] font-bold text-[#1f9d55] tracking-wide leading-none">
+                            Table Booked Successfully!
+                          </h3>
+                          <p className="text-[13px] sm:text-sm text-[#8a8a98] font-medium mt-1.5 leading-snug">
+                            Your table is confirmed. We look forward to serving you!
                           </p>
-                      </div>
-                        <div className="flex items-start gap-2.5 min-w-0">
-                          <Users size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
-                          <p className="text-sm font-semibold text-zinc-900">
-                            {guests} {Number(guests) === 1 ? 'guest' : 'guests'}
-                          </p>
-                      </div>
-                        <div className="flex items-start gap-2.5 min-w-0">
-                          <MapPin size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
-                          <p className="text-sm font-semibold text-zinc-900 leading-snug">
-                            {profile.name}{city ? `, ${city}` : ''}
-                          </p>
-                      </div>
-                        {appliedOffer?.title ? (
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <Tag size={18} className="text-[#2563eb] shrink-0 mt-0.5" strokeWidth={1.75} />
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-zinc-900 leading-snug">{appliedOffer.title}</p>
-                              {appliedOffer.validity && (
-                                <p className="text-xs text-zinc-500 mt-0.5">{appliedOffer.validity}</p>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <Clock size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
-                            <div className="min-w-0">
-                              <p className="text-xs text-zinc-400 font-medium">Arrival</p>
-                              <p className="text-sm font-semibold text-zinc-900">{arrivalTime}</p>
-                            </div>
-                          </div>
-                        )}
-                    </div>
-
-                      {lastBookingId && (
-                        <div className="mt-4 flex items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs text-zinc-400 font-medium mb-0.5">Booking ID</p>
-                            <p className="text-xs sm:text-sm font-bold text-zinc-900 break-all leading-relaxed">{lastBookingId}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(lastBookingId);
-                                setBookingIdCopied(true);
-                                toast.success('Booking ID copied');
-                                setTimeout(() => setBookingIdCopied(false), 1600);
-                              } catch {
-                                toast.error('Could not copy Booking ID');
-                              }
-                            }}
-                            className="mt-4 shrink-0 text-zinc-400 hover:text-primary cursor-pointer"
-                            aria-label="Copy booking ID"
-                          >
-                            {bookingIdCopied ? <CheckCheck size={16} /> : <Copy size={16} />}
-                          </button>
                         </div>
-                      )}
+                      </div>
 
                       {lastBookingId && (
                         <button
                           type="button"
-                          onClick={() => {
-                            closeBookingPanel();
-                            router.push(`/customer/bookings/${lastBookingId}`);
+                          title={lastBookingId}
+                          aria-label="Copy booking ID"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(lastBookingId);
+                              setBookingIdCopied(true);
+                              toast.success('Booking ID copied');
+                              setTimeout(() => setBookingIdCopied(false), 1600);
+                            } catch {
+                              toast.error('Could not copy Booking ID');
+                            }
                           }}
-                          className="mt-5 inline-flex items-center justify-center px-4 py-2 rounded-lg border border-primary bg-white text-primary text-sm font-semibold hover:bg-primary/5 transition-colors cursor-pointer w-fit"
+                          className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-[#f1e9ff] px-3 py-2 hover:bg-[#e8dcff] transition-colors cursor-pointer"
                         >
-                          View booking details
+                          <Calendar size={15} className="text-[#6900AA] shrink-0" strokeWidth={2} />
+                          <span className="text-left leading-tight">
+                            <span className="block text-[10px] font-semibold text-[#6900AA]/80">Booking ID</span>
+                            <span className="block text-[12px] font-bold text-[#2b1848]">
+                              {bookingIdCopied
+                                ? 'Copied!'
+                                : `#${lastBookingId.replace(/-/g, '').slice(0, 8).toUpperCase()}`}
+                            </span>
+                          </span>
                         </button>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={closeBookingPanel}
-                      className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-[#6900AA] transition-colors cursor-pointer"
-                    >
-                      <ChevronLeft size={18} />
-                      Back
-                    </button>
+
+                    {/* Row: photo | details | QR — fixed sizes so layout never blows up */}
+                    <div className="flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
+                      <div
+                        className="relative shrink-0 rounded-2xl overflow-hidden bg-zinc-100 mx-auto lg:mx-0"
+                        style={{ width: 200, height: 200 }}
+                      >
+                        <img
+                          src={
+                            photos[0] ||
+                            resolveMediaUrl(profile.cover_image_url) ||
+                            'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80'
+                          }
+                          alt={profile.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80';
+                          }}
+                        />
+                        <span className="absolute bottom-2.5 left-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-full bg-black/80 text-white text-[10px] font-semibold px-2.5 py-1">
+                          {profile.name}
+                        </span>
+                      </div>
+
+                      <div className="flex-1 min-w-0 w-full">
+                        <span className="inline-flex items-center rounded-md bg-[#f1e9ff] text-[#6900AA] text-[11px] font-bold px-2 py-0.5">
+                          {profile.type_name || 'Restaurant'}
+                        </span>
+                        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                          <h4 className="text-[20px] sm:text-[22px] font-bold text-[#1a1a1a] tracking-tight leading-tight">
+                            {profile.name}
+                          </h4>
+                        
+                        </div>
+                        <p className="text-[13px] text-[#8a8a98] font-medium mt-0.5">
+                          {cuisineList.length > 0 ? cuisineList.join(' • ') : cuisines}
+                        </p>
+
+                        <div className="mt-4 space-y-2.5">
+                          <div className="flex items-start gap-2.5">
+                            <MapPin size={16} className="text-[#6900AA] shrink-0 mt-0.5" strokeWidth={1.75} />
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-semibold text-[#2b2b35] leading-snug">
+                                {profile.address || [city, country].filter(Boolean).join(', ')}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (profile.address) {
+                                    window.open(
+                                      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`,
+                                      '_blank',
+                                      'noopener,noreferrer'
+                                    );
+                                  } else {
+                                    toast.error('Address not available');
+                                  }
+                                }}
+                                className="mt-0.5 text-[13px] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                              >
+                                Get Direction →
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5">
+                            <Clock size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
+                            <p className="text-[13px] text-[#2b2b35]">
+                              <span className="font-semibold text-[#8a8a98]">Table Time </span>
+                              <span className="font-bold">
+                                {formatSlotLabel(selectedTime)}
+                                {' • '}
+                                {bookingDates[selectedDateIndex].toLocaleDateString('en-GB', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2.5">
+                            <Users size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
+                            <p className="text-[13px] text-[#2b2b35]">
+                              <span className="font-semibold text-[#8a8a98]">For </span>
+                              <span className="font-bold">
+                                {guests} {Number(guests) === 1 ? 'Person' : 'People'}
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2.5">
+                            <Clock size={16} className="text-[#6900AA] shrink-0" strokeWidth={1.75} />
+                            <p className="text-[13px] text-[#2b2b35]">
+                              <span className="font-semibold text-[#8a8a98]">Arrival </span>
+                              <span className="font-bold">{arrivalTime}</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 mx-auto lg:mx-0 text-center" style={{ width: 168 }}>
+                        <div className="rounded-2xl bg-[#f1e9ff] p-3">
+                          {lastQrToken ? (
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(lastQrToken)}`}
+                              alt="Booking check-in QR code"
+                              width={142}
+                              height={142}
+                              className="w-[142px] h-[142px] mx-auto rounded-lg bg-white object-contain p-1"
+                            />
+                          ) : (
+                            <div className="w-[142px] h-[142px] mx-auto rounded-lg bg-white/80 flex items-center justify-center text-[#9a9aa8] text-[11px] font-medium px-2">
+                              QR will appear once available for this booking.
+                            </div>
+                          )}
+                        </div>
+                        <p className="mt-2.5 text-[13px] font-bold text-[#2b2b35] leading-tight">Scan this QR code</p>
+                        <p className="text-[11px] text-[#9a9aa8] font-medium">at the restaurant</p>
+                      </div>
                     </div>
 
-                    {/* Right — venue card + check-in QR */}
-                    <div className="space-y-4">
-                      <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
-                        <div className="h-40 sm:h-44 bg-zinc-100 overflow-hidden">
+                    {/* Offer 3D card — no border, elevated shadow */}
+                    {appliedOffer?.title && (
+                      <div
+                        className="mt-6 rounded-[20px] overflow-hidden flex items-stretch"
+                        style={{
+                          border: 'none',
+                          background:
+                            'linear-gradient(105deg, #f4edff 0%, #ebe0ff 42%, #e0d0ff 100%)',
+                          boxShadow:
+                            '0 8px 24px rgba(105,0,170,0.14), 0 2px 6px rgba(80,40,120,0.08)',
+                        }}
+                      >
+                        <div className="flex-1 min-w-0 px-4 py-4 sm:px-6 sm:py-5 flex flex-col justify-center">
+                          <div className="flex items-center gap-1.5 text-[#6900AA] mb-1.5">
+                            <Tag size={15} strokeWidth={2.25} />
+                            <span className="text-[12px] font-bold">Special Offer</span>
+                          </div>
+                          <p className="text-[17px] sm:text-[19px] font-bold text-[#1a1a1a] leading-snug">
+                            {appliedOffer.title}
+                          </p>
+                          <span className="mt-2.5 inline-flex w-fit items-center rounded-full bg-white/90 text-[#6900AA] text-[10px] font-bold px-2.5 py-1 shadow-sm">
+                            Provided by BookMyBota
+                          </span>
+                          <p className="mt-2.5 text-[11px] text-[#8a8a98] font-medium">
+                            {appliedOffer.validity || 'Valid only for this booking • T&C apply'}
+                          </p>
+                        </div>
+                        <div
+                          className="relative shrink-0 flex items-center justify-center self-stretch pr-2 sm:pr-4 pl-1 py-2"
+                          style={{ width: 190, minHeight: 132 }}
+                        >
+                          <span className="absolute top-3 right-4 h-1.5 w-1.5 rotate-45 bg-[#6900AA]/55 rounded-[1px]" />
+                          <span className="absolute top-7 right-2 h-1 w-1 rotate-45 bg-[#6900AA]/40 rounded-[1px]" />
+                          <span className="absolute bottom-4 right-6 h-1 w-1 rotate-45 bg-[#6900AA]/35 rounded-[1px]" />
+                          {/* Offer food — natural cutout, no circle mask */}
                           <img
-                            src={
-                              photos[0] ||
-                              resolveMediaUrl(profile.cover_image_url) ||
-                              "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80"
-                            }
-                            alt={profile.name}
-                            className="w-full h-full object-cover"
+                            src="/images/booking-offer-food.png"
+                            alt=""
+                            width={168}
+                            height={140}
+                            className="relative z-[1] w-[150px] h-auto sm:w-[168px] object-contain drop-shadow-[0_10px_18px_rgba(60,20,100,0.28)]"
+                            style={{ border: 'none', borderRadius: 0 }}
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
+                              (e.target as HTMLImageElement).src = '/images/booking-offer-food.jpg';
                             }}
                           />
                         </div>
-                        <div className="p-4">
-                          <p className="text-base font-bold text-zinc-900 leading-snug">{profile.name}</p>
-                          {(city || profile.address) && (
-                            <p className="text-xs text-zinc-500 mt-0.5">{city || profile.address}</p>
-                          )}
-                          <div className="mt-3">
-                            <p className="text-xs text-zinc-400 font-medium">Phone</p>
-                            <a
-                              href={`tel:${profile.phone || ''}`}
-                              className="text-sm font-semibold text-zinc-800 hover:text-primary transition-colors"
-                            >
-                              {profile.phone || 'Not available'}
-                            </a>
-                          </div>
-                          <div className="mt-4 pt-3 border-t border-dashed border-zinc-200 grid grid-cols-2 gap-2">
+                      </div>
+                    )}
+
+                    {/* Actions — same destinations as before */}
+                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-5">
+                      <button
+                        type="button"
+                        disabled={!lastBookingId}
+                        onClick={() => {
+                          if (!lastBookingId) return;
+                          closeBookingPanel();
+                          router.push(`/customer/bookings/${lastBookingId}`);
+                        }}
+                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl bg-[#f8f2ff] border-[#6900AA] border-[1.5px] hover:bg-[#57008E] hover:text-white disabled:opacity-50 text-[#6900AA] text-[14px] font-bold px-4 py-3.5 transition-colors cursor-pointer"
+                      >
+                        <FileText size={16} strokeWidth={2} />
+                        View Booking Details
+                        <ArrowRight size={16} strokeWidth={2.25} />
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
-                                if (profile.address) {
-                                  window.open(
-                                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`,
-                                    '_blank',
-                                    'noopener,noreferrer'
-                                  );
-                                } else {
-                                  toast.error('Address not available');
-                                }
-                              }}
-                              className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-zinc-200 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors cursor-pointer"
-                            >
-                              <Navigation size={14} />
-                              Directions
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!profile.phone) {
-                                  toast.error('Phone not available');
-                                  return;
-                                }
-                                try {
-                                  await navigator.clipboard.writeText(profile.phone);
-                                  toast.success('Phone number copied');
-                                } catch {
-                                  toast.error('Could not copy number');
-                                }
-                              }}
-                              className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-zinc-200 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors cursor-pointer"
-                            >
-                              <Copy size={14} />
-                              Copy number
+                          closeBookingPanel();
+                          router.push('/dining');
+                        }}
+                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl border-[1.5px] border-[#6900AA] bg-white text-[#6900AA] text-[14px] font-bold px-4 py-3.5 hover:bg-[#f8f2ff] transition-colors cursor-pointer"
+                      >
+                        <Compass size={16} strokeWidth={2} />
+                        Explore More Restaurants
                       </button>
                     </div>
                   </div>
-                      </div>
 
-                      <div className="rounded-xl border border-zinc-200 bg-white p-4 flex flex-col items-center text-center">
-                        <p className="text-base font-bold text-zinc-900">Check-in QR</p>
-                        <p className="text-xs text-zinc-400 mt-0.5 mb-3 leading-snug">
-                          Show this QR at the restaurant to claim your offer
-                        </p>
-                        {lastQrToken ? (
-                          <div className="w-[168px] h-[168px] rounded-2xl border border-primary/20 bg-white p-2">
-                            <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(lastQrToken)}`}
-                              alt="Booking check-in QR code"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-[168px] h-[168px] rounded-2xl border border-zinc-200 bg-zinc-50 flex items-center justify-center text-zinc-400 text-xs font-medium px-4">
-                            QR will appear once available for this booking.
-                          </div>
-                        )}
-                        {selectedTime && (() => {
-                          const [h, m] = selectedTime.split(':').map(Number);
-                          if (Number.isNaN(h) || Number.isNaN(m)) return null;
-                          const fmt = (totalMins: number) => {
-                            const norm = ((totalMins % 1440) + 1440) % 1440;
-                            const hh = Math.floor(norm / 60);
-                            const mm = norm % 60;
-                            return formatSlotLabel(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
-                          };
-                          const base = h * 60 + m;
-                          return (
-                            <div className="mt-3 w-full rounded-xl bg-primary/5 px-3 py-2.5 flex items-center gap-2.5 text-left">
-                              <Clock size={16} className="text-primary shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-xs text-zinc-500 leading-tight">Check-in window</p>
-                                <p className="text-xs font-bold text-zinc-900">{fmt(base - 30)} - {fmt(base + 15)}</p>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
+                  <div className="mt-5 text-center space-y-1">
+                   
+                    <p className="text-[13px] text-[#9a9aa8] font-medium">
+                      Thank you for choosing <span className="text-[#6900AA] font-bold">BookMyBota</span>
+                    </p>
+                  </div>
                 </div>
               )}
 

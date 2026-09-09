@@ -43,7 +43,7 @@ export default function BarSceneRail({ city }: { city: string }) {
 
   return (
     <ContentRail
-      title="The Bar Scene"
+      title="Raise a Glass"
       seeAllHref={seeAllHref}
       label="bars"
       cardStyle="dining"

@@ -12,10 +12,13 @@ import {
   useAssignMarketingCampaignMutation,
   usePatchMarketingCampaignStatusMutation,
   useGetBusinessesQuery,
+  useGetAdminMoviesQuery,
+  useGetPublicEventsQuery,
   type MarketingCampaign,
   type MarketingPlan,
   type MarketingPaymentSummary,
 } from '@/services/api';
+import { promotionTargetLabel } from '@/lib/promotionTargetLabel';
 import {
   Plus,
   Calendar,
@@ -114,11 +117,14 @@ function campaignStatusBadge(status?: string) {
   );
 }
 
-function promotionScopeLabel(camp: MarketingCampaign) {
-  const targetType = (camp.target_type || 'BUSINESS').toUpperCase();
-  if (targetType === 'EVENT') return 'Single event';
-  if (targetType === 'MOVIE') return 'Single movie';
-  return 'Whole business';
+function promotionScopeLabel(
+  camp: MarketingCampaign,
+  lookups?: {
+    movieTitleById?: Map<string, string> | Record<string, string>;
+    eventNameById?: Map<string, string> | Record<string, string>;
+  }
+) {
+  return promotionTargetLabel(camp, lookups);
 }
 
 function isPlanArchived(plan: MarketingPlan) {
@@ -369,6 +375,22 @@ export default function AdminMarketingPage() {
   const requests = requestsData?.items ?? [];
   const paymentEntries = paymentsData?.items ?? [];
   const { data: businesses = [] } = useGetBusinessesQuery();
+  const { data: adminMoviesData } = useGetAdminMoviesQuery({ page: 1, limit: 200 });
+  const { data: publicEvents = [] } = useGetPublicEventsQuery();
+
+  const targetLookups = useMemo(() => {
+    const movieTitleById = new Map<string, string>();
+    for (const m of adminMoviesData?.items || []) {
+      if (m.id) movieTitleById.set(String(m.id), m.title);
+      if (m.slug) movieTitleById.set(String(m.slug), m.title);
+    }
+    const eventNameById = new Map<string, string>();
+    for (const e of publicEvents || []) {
+      if (e.id) eventNameById.set(String(e.id), e.name || String(e.id));
+    }
+    return { movieTitleById, eventNameById };
+  }, [adminMoviesData?.items, publicEvents]);
+
   const [assignCampaign, { isLoading: isAssigning }] = useAssignMarketingCampaignMutation();
   const [patchStatus, { isLoading: patching }] = usePatchMarketingCampaignStatusMutation();
 
@@ -988,7 +1010,7 @@ export default function AdminMarketingPage() {
                         />
                       ) : null}
                       <div className="text-white font-medium">{camp.title || '—'}</div>
-                      <div className="text-[10px] text-sky-400/90 mt-0.5">{promotionScopeLabel(camp)}</div>
+                      <div className="text-[10px] text-sky-400/90 mt-0.5">{promotionScopeLabel(camp, targetLookups)}</div>
                     </td>
                     <td className="p-4 text-zinc-300">{camp.plan_name}</td>
                     <td className="p-4 text-emerald-400 font-semibold text-sm">
@@ -1311,7 +1333,7 @@ export default function AdminMarketingPage() {
                         <td className="p-4 text-zinc-300">
                           {camp.title || camp.plan_name}
                           <div className="text-xs text-zinc-500">{camp.category}</div>
-                          <div className="text-[10px] text-sky-400/90 mt-0.5">{promotionScopeLabel(camp)}</div>
+                          <div className="text-[10px] text-sky-400/90 mt-0.5">{promotionScopeLabel(camp, targetLookups)}</div>
                           <div className="text-xs text-emerald-400/80 mt-0.5">
                             {formatMoneyDisplay(camp.amount ?? camp.price)}
                           </div>

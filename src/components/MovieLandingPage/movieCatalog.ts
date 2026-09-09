@@ -335,6 +335,7 @@ export function getCatalogMovie(idOrSlug: string) {
 }
 
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { isMoviePromoted } from "@/lib/movieDisplay";
 
 const FALLBACK_POSTER =
   "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&h=750&fit=crop&q=80";
@@ -412,7 +413,7 @@ export function mapApiMovieToDetail(movie: {
     trailers: mappedTrailers,
     inCinemas: movie.status === "now_showing",
     comingSoon,
-    promoted: Boolean(movie.is_promoted),
+    promoted: isMoviePromoted(movie.is_promoted),
     cast: mapCastCrewMembers(movie.cast),
     crew: mapCastCrewMembers(movie.crew),
   };

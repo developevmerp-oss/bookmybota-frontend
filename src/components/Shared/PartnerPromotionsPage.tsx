@@ -24,6 +24,7 @@ import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { defaultPartnerCtaUrl } from "@/lib/promotionCta";
+import { promotionTargetLabel } from "@/lib/promotionTargetLabel";
 import {
   emptyPartnerPromotionsFormValues,
   partnerPromotionsFormSchema,
@@ -188,6 +189,28 @@ export default function PartnerPromotionsPage({
     return [];
   }, [module, organizerEventsData?.items, moviesData?.items]);
 
+  const movieTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of moviesData?.items || []) {
+      if (m.id) map.set(String(m.id), m.title);
+      if (m.slug) map.set(String(m.slug), m.title);
+    }
+    return map;
+  }, [moviesData?.items]);
+
+  const eventNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of organizerEventsData?.items || []) {
+      if (e.id) map.set(String(e.id), e.name);
+    }
+    return map;
+  }, [organizerEventsData?.items]);
+
+  const targetLookups = useMemo(
+    () => ({ movieTitleById, eventNameById }),
+    [movieTitleById, eventNameById]
+  );
+
   if (!bizId) return null;
 
   const resetForm = () => {
@@ -310,7 +333,16 @@ export default function PartnerPromotionsPage({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {campaigns.map((camp: MarketingCampaign) => (
+          {campaigns.map((camp: MarketingCampaign) => {
+            const targetLabel = promotionTargetLabel(camp, targetLookups);
+            const showTargetName =
+              (String(camp.target_type || "").toUpperCase() === "MOVIE" ||
+                String(camp.target_type || "").toUpperCase() === "EVENT") &&
+              Boolean(camp.target_id)
+                ? targetLabel
+                : "";
+
+            return (
             <div key={camp.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
               {camp.banner_image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -320,8 +352,8 @@ export default function PartnerPromotionsPage({
                   className="w-full aspect-[21/9] object-cover"
                 />
               ) : (
-                <div className="w-full aspect-[21/9] bg-slate-100 flex items-center justify-center text-slate-400 text-sm">
-                  Listing boost only
+                <div className="w-full aspect-[21/9] bg-slate-100 flex items-center justify-center px-4 text-center text-slate-600 text-sm font-semibold">
+                  {showTargetName || "Listing boost only"}
                 </div>
               )}
               <div className="p-4 space-y-2">
@@ -338,6 +370,9 @@ export default function PartnerPromotionsPage({
                   </span>
                 </div>
                 <h4 className="font-bold text-slate-800">{camp.title || camp.plan_name}</h4>
+                {showTargetName ? (
+                  <p className="text-xs font-medium text-[#6900AA]">{showTargetName}</p>
+                ) : null}
                 <p className="text-xs text-slate-500">{camp.plan_name}</p>
                 {(camp.amount != null || camp.payment_reference) && (
                   <div className="text-xs text-slate-600 space-y-0.5 rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2">
@@ -384,7 +419,8 @@ export default function PartnerPromotionsPage({
                 ) : null}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

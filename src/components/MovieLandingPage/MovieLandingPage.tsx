@@ -24,22 +24,30 @@ import {
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
+  formatMovieCardMeta,
+  formatMovieCardTitle,
+  isMoviePromoted,
+  parseLanguageList,
+} from "@/lib/movieDisplay";
+import {
   SHOWCASE_NOW_SHOWING_MOVIE_CARDS,
   SHOWCASE_UPCOMING_MOVIE_CARDS,
   type ShowcaseMovieCard,
 } from "@/data/showcaseMovieCards";
 import "./MovieLandingPage.css";
+import "@/components/LandingPage/RecommendedMoviesRail.css";
 
 const PAGE_BG = "#f6f7f8";
 const BRAND = "#6900AA";
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
+const MOVIES_VISIBLE = 6;
 
 type MovieCardData = {
   id: string;
   title: string;
   poster: string;
   certification?: string;
-  language?: string;
+  languages: string[];
   genres: string[];
   formats?: string[];
   rating?: string;
@@ -117,14 +125,14 @@ type HeroSlide = {
 function mapCatalogMovieToCard(movie: Movie): MovieCardData {
   return {
     id: movie.id,
-    title: movie.title,
+    title: formatMovieCardTitle(movie.title, movie.release_date),
     poster: resolveMediaUrl(movie.poster_url),
     certification: movie.certificate?.trim() || undefined,
-    language: (movie.languages || []).join(", ") || undefined,
+    languages: parseLanguageList(movie.languages),
     genres: movie.genres || [],
     formats: movie.formats || [],
     comingSoon: movie.status === "coming_soon",
-    promoted: Boolean(movie.is_promoted),
+    promoted: isMoviePromoted(movie.is_promoted),
     href: `/movies/${movie.slug || movie.id}`,
   };
 }
@@ -132,12 +140,13 @@ function mapCatalogMovieToCard(movie: Movie): MovieCardData {
 function mapShowcaseMovieToCard(movie: ShowcaseMovieCard): MovieCardData {
   return {
     id: movie.id,
-    title: movie.title,
+    title: formatMovieCardTitle(movie.title, movie.year),
     poster: movie.poster,
     certification: movie.certification,
-    language: movie.language,
+    languages: parseLanguageList(movie.language),
     genres: [],
     comingSoon: movie.comingSoon,
+    promoted: Boolean(movie.promoted),
     href: movie.href,
   };
 }
@@ -182,68 +191,66 @@ function HeroBannerCard({ slide }: { slide: HeroSlide }) {
 }
 
 function MovieCard({ movie }: { movie: MovieCardData }) {
+  const meta = formatMovieCardMeta(movie.certification, movie.languages);
+
   const inner = (
-    <>
-      <div className="relative rounded-xl overflow-hidden bg-slate-200 transition-transform duration-300 group-hover:-translate-y-1">
-        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl">
+    <article className="flex h-full flex-col overflow-hidden rounded-[10px] bg-white border border-[#E5E5E5]">
+      <div className="relative shrink-0 overflow-hidden bg-[#111111]">
+        <div className="movie-listing-poster">
           {movie.poster ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={movie.poster}
               alt={movie.title}
-              className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+              className="movie-listing-poster-img"
               loading="lazy"
             />
           ) : (
-            <div className="h-full w-full bg-slate-200" />
-          )}
-
-          {movie.promoted && (
-            <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/70 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-red-600">
-              PROMOTED
-            </span>
-          )}
-          {movie.comingSoon && !movie.promoted && (
-            <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/70 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-green-600">
-              Coming Soon
-            </span>
-          )}
-
-          {(movie.likes || movie.rating) && (
-            <div className="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-1.5 bg-black/45 backdrop-blur-[2px] px-2 py-1.5 text-white">
-              {movie.likes ? (
-                <>
-                  <ThumbsUp className="size-3 shrink-0 text-[#22C55E]" fill="currentColor" />
-                  <span className="text-xs font-medium truncate">{movie.likes}</span>
-                </>
-              ) : (
-                <>
-                  <Star className="size-3 shrink-0 text-[#EF4444]" fill="currentColor" />
-                  <span className="text-xs font-semibold shrink-0">{movie.rating}</span>
-                  {movie.votes && (
-                    <span className="text-xs text-white/90 truncate">{movie.votes}</span>
-                  )}
-                </>
-              )}
-            </div>
+            <div className="movie-listing-poster-img bg-slate-200" />
           )}
         </div>
+
+        {movie.promoted && (
+          <span className="movie-listing-badge movie-listing-badge--promoted">Promoted</span>
+        )}
+        {movie.comingSoon && !movie.promoted && (
+          <span className="movie-listing-badge movie-listing-badge--soon">Coming Soon</span>
+        )}
+
+        {(movie.likes || movie.rating) && (
+          <div className="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-1.5 bg-black/45 backdrop-blur-[2px] px-2 py-1 text-white">
+            {movie.likes ? (
+              <>
+                <ThumbsUp className="size-3 shrink-0 text-[#22C55E]" fill="currentColor" />
+                <span className="text-[10px] font-medium truncate">{movie.likes}</span>
+              </>
+            ) : (
+              <>
+                <Star className="size-3 shrink-0 text-[#EF4444]" fill="currentColor" />
+                <span className="text-[10px] font-semibold shrink-0">{movie.rating}</span>
+                {movie.votes && (
+                  <span className="text-[10px] text-white/90 truncate">{movie.votes}</span>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
-      <h3 className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
-        {movie.title}
-      </h3>
-      {movie.certification && (
-        <p className="mt-0.5 text-xs sm:text-sm text-slate-500">{movie.certification}</p>
-      )}
-      {movie.language && (
-        <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{movie.language}</p>
-      )}
-    </>
+      <div className="movie-listing-meta shrink-0 px-3 pt-2.5 pb-3">
+        <h3 className="movie-listing-title text-[13px] sm:text-[14px] font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+          {movie.title}
+        </h3>
+        <p className="movie-listing-subtitle mt-0.5 text-[11px] sm:text-[12px] text-[#6B7280] line-clamp-1 leading-snug">
+          {meta || "\u00A0"}
+        </p>
+      </div>
+    </article>
   );
 
   const href = movie.href || `/movies/${movie.id}`;
 
   return (
-    <Link href={href} className="group block w-full min-w-0">
+    <Link href={href} className="group block h-full w-full min-w-0">
       {inner}
     </Link>
   );
@@ -295,16 +302,20 @@ function HScroll({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative">
-      <div ref={ref} className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-1">
+      <div
+        ref={ref}
+        className="movies-rail movie-page-rail"
+        style={{ ["--movies-visible" as string]: MOVIES_VISIBLE }}
+      >
         {children}
       </div>
       {canScroll.left && (
-        <button type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)} className={`${btnClass} left-0`}>
+        <button type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)} className={`${btnClass} -left-1 lg:-left-2`}>
           <ChevronLeft className="size-4" />
         </button>
       )}
       {canScroll.right && (
-        <button type="button" aria-label="Scroll right" onClick={() => scrollBy(1)} className={`${btnClass} right-0`}>
+        <button type="button" aria-label="Scroll right" onClick={() => scrollBy(1)} className={`${btnClass} -right-1 lg:-right-2`}>
           <ChevronRight className="size-4" />
         </button>
       )}
@@ -375,7 +386,7 @@ function MovieRail({
       </div>
       <HScroll>
         {movies.map((movie) => (
-          <div key={movie.id} className="shrink-0 w-1/2 sm:w-1/3 lg:w-1/4">
+          <div key={movie.id} className="movies-rail-slot">
             <MovieCard movie={movie} />
           </div>
         ))}
@@ -513,7 +524,6 @@ export default function MovieLandingPage() {
   const useStaticMovies =
     !isLoading &&
     !hasActiveFilters &&
-    !noCinemasInCity &&
     nowShowingSource.length === 0 &&
     comingSoonSource.length === 0;
 
@@ -810,7 +820,7 @@ export default function MovieLandingPage() {
                       )}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-6">
+                    <div className="movie-page-grid">
                       {viewAllMovies.map((movie) => (
                         <MovieCard key={movie.id} movie={movie} />
                       ))}
@@ -824,7 +834,7 @@ export default function MovieLandingPage() {
                       <Loader2 className="size-8 animate-spin text-[#6900AA]" />
                       <p className="text-sm sm:text-base font-medium">Loading movies...</p>
                     </div>
-                  ) : noCinemasInCity ? (
+                  ) : noCinemasInCity && !useStaticMovies ? (
                     <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
                       <p className="text-slate-600 font-medium">No cinemas in {headingCity} yet</p>
                       <p className="text-slate-400 text-sm sm:text-base mt-1">

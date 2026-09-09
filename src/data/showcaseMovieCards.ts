@@ -5,17 +5,20 @@ export type ShowcaseMovieCard = {
   poster: string;
   certification: string;
   language: string;
+  year?: string;
   comingSoon?: boolean;
+  promoted?: boolean;
   href: string;
 };
 
 export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
   {
     id: "showcase-movie-1",
-    title: "Toxic: A Fairy Tale for Grown-ups",
+    title: "Mirzapur: The Movie (2026)",
     poster: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&h=750&fit=crop&q=80",
-    certification: "A",
-    language: "Kannada, Telugu, Tamil, Hindi, Malayalam",
+    certification: "UA16+",
+    language: "Telugu, Hindi",
+    year: "2026",
     href: "/movies",
   },
   {
@@ -24,6 +27,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     poster: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=500&h=750&fit=crop&q=80",
     certification: "UA 7+",
     language: "Gujarati",
+    year: "2026",
     href: "/movies",
   },
   {
@@ -32,6 +36,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     poster: "https://images.unsplash.com/photo-1440404653325-ab127d49abb1?w=500&h=750&fit=crop&q=80",
     certification: "UA16+",
     language: "Gujarati",
+    year: "2026",
     href: "/movies",
   },
   {
@@ -40,6 +45,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     poster: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=500&h=750&fit=crop&q=80",
     certification: "U",
     language: "Gujarati",
+    year: "2025",
     href: "/movies",
   },
   {
@@ -49,6 +55,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     certification: "UA",
     language: "Amharic, English",
     comingSoon: true,
+    year: "2026",
     href: "/movies",
   },
   {
@@ -58,6 +65,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     certification: "UA16+",
     language: "Amharic, English",
     comingSoon: true,
+    year: "2026",
     href: "/movies",
   },
   {
@@ -67,6 +75,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     certification: "U",
     language: "English",
     comingSoon: true,
+    year: "2026",
     href: "/movies",
   },
 ];

@@ -58,29 +58,43 @@ export default function MovieCatalogBrowsePage() {
           No active movies in the catalog yet. Ask Super Admin to add titles.
         </div>
       ) : (
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 ${isFetching ? "opacity-70" : ""}`}>
+        <div
+          className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 sm:gap-4 ${
+            isFetching ? "opacity-70" : ""
+          }`}
+        >
           {movies.map((movie) => (
             <article
               key={movie.id}
-              className="glass-panel rounded-2xl border border-white/10 overflow-hidden"
+              className="glass-panel rounded-2xl border border-white/10 overflow-hidden flex flex-col"
             >
-              <div className="aspect-[2/3] bg-zinc-900">
+              <div className="relative w-full overflow-hidden bg-zinc-900 pb-[150%]">
                 {movie.poster_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={resolveMediaUrl(movie.poster_url)} alt={movie.title} className="w-full h-full object-cover" />
+                  <img
+                    src={resolveMediaUrl(movie.poster_url)}
+                    alt={movie.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
                 ) : null}
               </div>
-              <div className="p-4 space-y-1">
-                <p className="text-white font-semibold">{movie.title}</p>
-                <p className="text-xs text-zinc-500">
-                  {[STATUS_LABEL[movie.status] || movie.status, movie.certificate, movie.duration_minutes ? `${movie.duration_minutes} min` : null]
+              <div className="p-3 sm:p-4 space-y-1 flex flex-col flex-1">
+                <p className="text-white font-semibold text-sm sm:text-[15px] line-clamp-2 leading-snug">
+                  {movie.title}
+                </p>
+                <p className="text-xs text-zinc-500 line-clamp-1">
+                  {[
+                    STATUS_LABEL[movie.status] || movie.status,
+                    movie.certificate,
+                    movie.duration_minutes ? `${movie.duration_minutes} min` : null,
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
-                <p className="text-xs text-zinc-400 line-clamp-2">
+                <p className="text-xs text-zinc-400 line-clamp-1">
                   {(movie.languages || []).join(", ") || "—"}
                 </p>
-                <div className="pt-2 border-t border-white/5">
+                <div className="pt-2 mt-auto border-t border-white/5">
                   <Link
                     href={`/movie/showtimes?movie_id=${movie.id}`}
                     className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 px-3 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-300 text-xs font-bold transition-colors"

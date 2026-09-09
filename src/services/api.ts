@@ -263,6 +263,7 @@ export interface VenueLayoutTemplate {
   id: string;
   business_id?: string;
   request_id?: string | null;
+  hall_id?: string | null;
   name: string;
   layout_type: string;
   capacity: number;
@@ -382,6 +383,10 @@ export interface CinemaScreen {
   pending_seat_count?: number | null;
   pending_seating_config?: Record<string, unknown> | null;
   pending_seats_json?: unknown[] | null;
+  pending_options_count?: number;
+  shortlisted_options_count?: number;
+  awaiting_live_count?: number;
+  total_reviewable_options_count?: number;
   layout_request_comments?: string | null;
   latest_rejection_reason?: string | null;
   description?: string | null;
@@ -3007,12 +3012,12 @@ export const api = createApi({
 
     rejectAllVenueLayoutTemplates: builder.mutation<
       { message?: string; rejected_count?: number },
-      { bizId: string; reason: string; request_id?: string }
+      { bizId: string; reason: string; request_id?: string; hall_id?: string }
     >({
-      query: ({ bizId, reason, request_id }) => ({
+      query: ({ bizId, reason, request_id, hall_id }) => ({
         url: `/businesses/${bizId}/venue-layout-templates/reject-all`,
         method: 'POST',
-        body: { reason, request_id },
+        body: { reason, request_id, hall_id },
       }),
       transformResponse: (res: { message?: string; rejected_count?: number }) => res,
       invalidatesTags: ['VenueLayouts', 'VenueLayoutLogs', 'CinemaScreens'],
@@ -5926,6 +5931,27 @@ export const api = createApi({
       invalidatesTags: (_r, _e, arg) => [{ type: 'CinemaScreens', id: arg.bizId }, 'CinemaScreens'],
     }),
 
+    updateCinemaScreenLayout: builder.mutation<
+      { message: string; seat_count: number },
+      {
+        bizId: string;
+        screenId: string;
+        seating_config: any;
+        seats: any[];
+      }
+    >({
+      query: ({ bizId, screenId, seating_config, seats }) => ({
+        url: `/businesses/${bizId}/cinema-screens/${screenId}/layout`,
+        method: 'PUT',
+        body: { seating_config, seats },
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'CinemaScreens', id: arg.bizId },
+        'CinemaScreens',
+      ],
+    }),
+
+
     // ── Cinema Partner Movie Showtimes ─────────────────────────────────────────
 
     getPartnerMovieShowtimes: builder.query<
@@ -6675,6 +6701,7 @@ export const {
   useGetCinemaScreensQuery,
   useCreateCinemaScreenMutation,
   useUpdateCinemaScreenMutation,
+  useUpdateCinemaScreenLayoutMutation,
   useGetPartnerMovieShowtimesQuery,
   useCreatePartnerMovieShowtimeMutation,
   useUpdatePartnerMovieShowtimeMutation,

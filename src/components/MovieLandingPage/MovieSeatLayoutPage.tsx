@@ -52,10 +52,11 @@ interface MovieSeatLayoutPageProps {
 interface GridSeat {
   id: string;
   row: string;
-  number: number;
+  number: string | number;
   tierName: string;
   price: number;
   isBooked: boolean;
+  isAisleGap?: boolean;
 }
 
 interface GridRow {
@@ -107,16 +108,176 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const screen = layoutData?.screen;
   const bookedSet = useMemo(() => new Set(layoutData?.booked_seat_identifiers ?? []), [layoutData]);
 
+  // Check if template explicitly defines screen position (e.g. top vs bottom)
+  const screenPosition = useMemo<"top" | "bottom">(() => {
+    const shapes = layoutData?.layout_template?.seating_config?.shapes;
+    if (Array.isArray(shapes) && shapes.length > 0) {
+      const screenShape = shapes.find((s: any) =>
+        String(s.text || "").toLowerCase().includes("screen")
+      );
+      if (screenShape) {
+        const rawSeats = Array.isArray(layoutData?.layout_template?.seats_json)
+          ? layoutData.layout_template.seats_json
+          : [];
+        if (rawSeats.length > 0) {
+          const minY = Math.min(...rawSeats.map((s: any) => Number(s.coordinate_y ?? 0)));
+          if (Number(screenShape.y ?? 0) < minY) {
+            return "top";
+          }
+        }
+      }
+    }
+    return "bottom";
+  }, [layoutData]);
+
   // Generate structured cinema seat layout
   const gridRows = useMemo<GridRow[]>(() => {
     if (!layoutData) return [];
 
+    let rawSeats: any[] | null = null;
+    if (Array.isArray(layoutData.layout_template?.seats_json)) {
+      rawSeats = layoutData.layout_template.seats_json;
+    } else if (typeof layoutData.layout_template?.seats_json === "string") {
+      try {
+        rawSeats = JSON.parse(layoutData.layout_template.seats_json);
+      } catch {
+        rawSeats = null;
+      }
+    }
+
+    // Helper to resolve tier price
+    const getTierPrice = (sectionName: string, sectionIdx: number): number => {
+      const tiers = showtime?.tier_pricing;
+      if (!tiers || tiers.length === 0) return 200;
+
+      const cleanSec = (sectionName || "").trim().toLowerCase();
+
+      // 1. Direct or partial name match
+      const matched = tiers.find((t: any) => {
+        const tName = String(t.tier_name || t.name || t.section_name || "").trim().toLowerCase();
+        return tName && (tName === cleanSec || cleanSec.includes(tName) || tName.includes(cleanSec));
+      });
+      if (matched && !isNaN(Number(matched.price))) {
+        return Number(matched.price);
+      }
+
+      // 2. Positional index match (e.g. section 0 -> tier 0, section 1 -> tier 1)
+      if (tiers[sectionIdx] && !isNaN(Number(tiers[sectionIdx].price))) {
+        return Number(tiers[sectionIdx].price);
+      }
+
+      // 3. Last tier fallback
+      const lastTier = tiers[tiers.length - 1];
+      return Number(lastTier?.price || 200);
+    };
+
+    // 1. Preferred: Approved dynamic layout from venue_layout_templates (seats_json array)
+    if (Array.isArray(rawSeats) && rawSeats.length > 0) {
+      // Group seats by section_name
+      const sectionMap = new Map<string, any[]>();
+      for (const s of rawSeats) {
+        const secName = (s.section_name || "Standard").trim();
+        if (!sectionMap.has(secName)) {
+          sectionMap.set(secName, []);
+        }
+        sectionMap.get(secName)!.push(s);
+      }
+
+      // Sort sections vertically by minimum coordinate_y
+      const sortedSections = Array.from(sectionMap.entries())
+        .map(([secName, seats]) => {
+          const minY = Math.min(...seats.map((s: any) => Number(s.coordinate_y ?? 0)));
+          return { secName, seats, minY };
+        })
+        .sort((a, b) => a.minY - b.minY);
+
+      const rows: GridRow[] = [];
+
+      sortedSections.forEach((sec, secIdx) => {
+        const price = getTierPrice(sec.secName, secIdx);
+
+        // Group seats in section by row_label
+        const rowMap = new Map<string, any[]>();
+        for (const s of sec.seats) {
+          const r = String(s.row_label || "A").trim();
+          if (!rowMap.has(r)) rowMap.set(r, []);
+          rowMap.get(r)!.push(s);
+        }
+
+        // Sort rows within section by average coordinate_y (or alphabetical row_label)
+        const sortedRows = Array.from(rowMap.entries())
+          .map(([rowLabel, seats]) => {
+            const avgY =
+              seats.reduce((sum: number, s: any) => sum + Number(s.coordinate_y ?? 0), 0) /
+              (seats.length || 1);
+            // Sort seats left-to-right by coordinate_x
+            seats.sort((a: any, b: any) => Number(a.coordinate_x ?? 0) - Number(b.coordinate_x ?? 0));
+            return { rowLabel, seats, avgY };
+          })
+          .sort((a, b) => a.avgY - b.avgY);
+
+        for (const rowObj of sortedRows) {
+          const rowSeats = rowObj.seats;
+
+          // Detect typical step between consecutive seats in this row to identify physical aisle gaps
+          const steps: number[] = [];
+          for (let i = 0; i < rowSeats.length - 1; i++) {
+            const diff = Number(rowSeats[i + 1].coordinate_x ?? 0) - Number(rowSeats[i].coordinate_x ?? 0);
+            if (diff > 5) steps.push(diff);
+          }
+          const normalStep = steps.length > 0 ? Math.min(...steps) : 40;
+
+          const gridSeats: GridSeat[] = rowSeats.map((seat: any, seatIdx: number) => {
+            const seatNum =
+              seat.seat_label != null && String(seat.seat_label).trim() !== ""
+                ? String(seat.seat_label).trim()
+                : String(seatIdx + 1);
+            const seatId = `${rowObj.rowLabel}${seatNum}`;
+            const nextSeat = rowSeats[seatIdx + 1];
+            const isAisleGap = nextSeat
+              ? Number(nextSeat.coordinate_x ?? 0) - Number(seat.coordinate_x ?? 0) > normalStep * 1.6
+              : false;
+
+            const isStatusUnavailable =
+              seat.status &&
+              !["AVAILABLE", "ACTIVE"].includes(String(seat.status).toUpperCase());
+
+            const isBooked =
+              bookedSet.has(seatId) ||
+              bookedSet.has(`${rowObj.rowLabel}${Number(seatNum)}`) ||
+              (seat.internalId && bookedSet.has(seat.internalId)) ||
+              Boolean(isStatusUnavailable);
+
+            return {
+              id: seatId,
+              row: rowObj.rowLabel,
+              number: seatNum,
+              tierName: sec.secName,
+              price,
+              isBooked,
+              isAisleGap,
+            };
+          });
+
+          rows.push({
+            rowLabel: rowObj.rowLabel,
+            tierName: sec.secName,
+            price,
+            seats: gridSeats,
+          });
+        }
+      });
+
+      if (rows.length > 0) {
+        return rows;
+      }
+    }
+
+    // 2. Legacy fallback if approved layout template has structured sections/rows
     const customTemplate =
       layoutData.layout_template?.seating_config ||
-      layoutData.layout_template?.seats_json ||
       (layoutData.layout_template as any)?.data;
 
-    // 1. If approved layout template has structured sections/rows
     if (
       customTemplate?.sections &&
       Array.isArray(customTemplate.sections) &&
@@ -159,7 +320,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       return rows;
     }
 
-    // 2. Standard cinema layout from tier pricing
+    // 3. Fallback: Standard cinema layout from tier pricing
     const tiers =
       showtime?.tier_pricing && showtime.tier_pricing.length > 0
         ? showtime.tier_pricing
@@ -439,6 +600,18 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
           {/* Seat Grid Layout Container */}
           <div className="rounded-3xl border border-white/10 bg-slate-950/60 backdrop-blur-md p-6 sm:p-8 overflow-x-auto space-y-8 shadow-2xl">
+            {/* Cinema Screen Indicator at Top (when screen is at top) */}
+            {screenPosition === "top" && (
+              <div className="pb-8 pt-2 text-center space-y-3">
+                <p className="text-xs uppercase tracking-widest font-extrabold text-slate-400 flex items-center justify-center gap-2">
+                  <Tv className="size-3.5 text-[#F84464]" /> All eyes this way please • Screen
+                </p>
+                <div className="relative mx-auto w-4/5 max-w-lg h-3">
+                  <div className="absolute inset-0 rounded-[50%] border-b-4 border-[#F84464] shadow-[0_8px_20px_rgba(248,68,100,0.4)]" />
+                </div>
+              </div>
+            )}
+
             {gridRows.map((rowGroup, idx) => {
               const prevRow = gridRows[idx - 1];
               const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
@@ -468,7 +641,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       {rowGroup.seats.map((seat, seatIdx) => {
                         const isSelected = selectedSeats.some((s) => s.seat_identifier === seat.id);
-                        const isAisleGap = seatIdx === 3 || seatIdx === 9;
+                        const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
 
                         return (
                           <div key={seat.id} className="flex items-center">
@@ -506,15 +679,17 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               );
             })}
 
-            {/* Cinema Screen Curved Indicator at the Bottom */}
-            <div className="pt-10 pb-2 text-center space-y-3">
-              <div className="relative mx-auto w-4/5 max-w-lg h-3">
-                <div className="absolute inset-0 rounded-[50%] border-t-4 border-[#F84464] shadow-[0_-8px_20px_rgba(248,68,100,0.4)]" />
+            {/* Cinema Screen Curved Indicator at the Bottom (when screen is at bottom) */}
+            {screenPosition === "bottom" && (
+              <div className="pt-10 pb-2 text-center space-y-3">
+                <div className="relative mx-auto w-4/5 max-w-lg h-3">
+                  <div className="absolute inset-0 rounded-[50%] border-t-4 border-[#F84464] shadow-[0_-8px_20px_rgba(248,68,100,0.4)]" />
+                </div>
+                <p className="text-xs uppercase tracking-widest font-extrabold text-slate-400 flex items-center justify-center gap-2">
+                  <Tv className="size-3.5 text-[#F84464]" /> All eyes this way please • Screen
+                </p>
               </div>
-              <p className="text-xs uppercase tracking-widest font-extrabold text-slate-400 flex items-center justify-center gap-2">
-                <Tv className="size-3.5 text-[#F84464]" /> All eyes this way please • Screen
-              </p>
-            </div>
+            )}
           </div>
         </section>
 

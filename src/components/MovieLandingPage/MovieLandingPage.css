@@ -65,3 +65,123 @@
     right: 1.25rem;
   }
 }
+
+/* Equal-size movie listing cards (portrait 2:3 poster + meta block) */
+.movie-listing-poster {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 150%;
+  overflow: hidden;
+  background: #111111;
+}
+
+.movie-listing-poster-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.movie-listing-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  left: auto;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 9999px;
+  background: #ffffff;
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+}
+
+.movie-listing-badge--promoted {
+  color: #e11d48;
+}
+
+.movie-listing-badge--soon {
+  color: #15803d;
+}
+
+.movie-listing-meta {
+  min-height: 3.75rem;
+  box-sizing: border-box;
+}
+
+.movie-listing-title {
+  min-height: 2.1rem;
+}
+
+.movie-listing-subtitle {
+  min-height: 1rem;
+}
+
+/* Match home Recommended Movies card widths (sidebar makes %/6 too small). */
+.movie-page-rail.movies-rail .movies-rail-slot {
+  width: 128px;
+}
+
+@media (min-width: 640px) {
+  .movie-page-rail.movies-rail .movies-rail-slot {
+    width: 140px;
+  }
+}
+
+@media (min-width: 768px) {
+  .movie-page-rail.movies-rail .movies-rail-slot {
+    width: 156px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .movie-page-rail.movies-rail .movies-rail-slot {
+    width: 168px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .movie-page-rail.movies-rail .movies-rail-slot {
+    width: 180px;
+  }
+}
+
+.movie-page-grid {
+  display: grid;
+  gap: 1rem 0.65rem;
+  grid-template-columns: repeat(auto-fill, 128px);
+  justify-content: start;
+}
+
+@media (min-width: 640px) {
+  .movie-page-grid {
+    gap: 1.25rem 0.75rem;
+    grid-template-columns: repeat(auto-fill, 140px);
+  }
+}
+
+@media (min-width: 768px) {
+  .movie-page-grid {
+    gap: 1.25rem 0.85rem;
+    grid-template-columns: repeat(auto-fill, 156px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .movie-page-grid {
+    grid-template-columns: repeat(auto-fill, 168px);
+  }
+}
+
+@media (min-width: 1280px) {
+  .movie-page-grid {
+    grid-template-columns: repeat(auto-fill, 180px);
+  }
+}

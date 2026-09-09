@@ -811,7 +811,7 @@ export default function PublicEventsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[260px_1fr] gap-5 lg:gap-8">
           <aside
             id="city-filter"
-            className="lg:sticky lg:top-24 self-start h-fit max-h-none lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto [scrollbar-width:thin]"
+            className="lg:sticky lg:top-33 self-start h-fit max-h-none lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto [scrollbar-width:thin]"
           >
             <div className="lg:hidden mb-3">
               <h3 className="font-bold text-slate-900 text-base sm:text-lg mb-3">Filters</h3>

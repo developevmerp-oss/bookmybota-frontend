@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -14,8 +14,14 @@ import {
   Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useGetRelatedPublicMoviesQuery } from "@/services/api";
+import { useGetRelatedPublicMoviesQuery, type Movie } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import {
+  formatMovieCardMeta,
+  formatMovieCardTitle,
+  isMoviePromoted,
+  parseLanguageList,
+} from "@/lib/movieDisplay";
 import {
   movieDetailPath,
   type MovieDetailData,
@@ -23,6 +29,7 @@ import {
   type MoviePerson,
   type MovieReviewItem,
 } from "@/components/MovieLandingPage/movieCatalog";
+import "@/components/LandingPage/RecommendedMoviesRail.css";
 
 const BRAND = "#6900AA";
 
@@ -179,7 +186,15 @@ function HeaderScrollArrows({
   );
 }
 
-function HScroll({ children }: { children: React.ReactNode }) {
+function HScroll({
+  children,
+  trackClassName = "flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-1",
+  trackStyle,
+}: {
+  children: ReactNode;
+  trackClassName?: string;
+  trackStyle?: CSSProperties;
+}) {
   const childCount = Array.isArray(children) ? children.length : 1;
   const { ref, canScroll, scrollBy } = useHorizontalScroll(childCount);
 
@@ -188,10 +203,7 @@ function HScroll({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative">
-      <div
-        ref={ref}
-        className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-1"
-      >
+      <div ref={ref} className={trackClassName} style={trackStyle}>
         {children}
       </div>
       {canScroll.left && (
@@ -470,6 +482,85 @@ function ReviewsSection({
   );
 }
 
+function RelatedMovieCard({ movie }: { movie: Movie }) {
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const languages = parseLanguageList(movie.languages);
+  const multiLang = languages.length > 1;
+  const certification = movie.certificate?.trim() || undefined;
+  const title = formatMovieCardTitle(movie.title, movie.release_date);
+  const poster = resolveMediaUrl(movie.poster_url);
+  const promoted = isMoviePromoted(movie.is_promoted);
+  const comingSoon = movie.status === "coming_soon";
+  const summaryMeta = formatMovieCardMeta(certification, languages);
+  const fullMeta = [certification, languages.join(", ")].filter(Boolean).join(" | ");
+  const href = movieDetailPath({ id: movie.id, slug: movie.slug });
+
+  return (
+    <div className="movies-rail-slot">
+      <article className="group flex h-full flex-col overflow-hidden rounded-[10px] bg-white border border-[#E5E5E5]">
+        <Link href={href} className="relative shrink-0 overflow-hidden bg-[#111111] block">
+          <div className="movies-rail-poster">
+            {poster ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={poster}
+                alt={title}
+                className="movies-rail-poster-img"
+                loading="lazy"
+              />
+            ) : (
+              <div className="movies-rail-poster-img bg-slate-200" />
+            )}
+          </div>
+          {promoted ? (
+            <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
+          ) : null}
+          {comingSoon && !promoted ? (
+            <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
+          ) : null}
+        </Link>
+
+        <div className="movies-rail-meta shrink-0 px-3 pt-2.5 pb-3">
+          <Link href={href}>
+            <h3 className="movies-rail-title text-[13px] sm:text-[14px] font-bold text-[#111111] line-clamp-2 leading-snug group-hover:text-[#6900AA] transition-colors">
+              {title}
+            </h3>
+          </Link>
+
+          {/* Desktop: summary with language count; hover reveals full language list */}
+          <p className="movies-rail-subtitle mt-0.5 text-[11px] sm:text-[12px] text-[#6B7280] leading-snug line-clamp-1 max-md:hidden group-hover:hidden">
+            {summaryMeta || "\u00A0"}
+          </p>
+          <p className="movies-rail-subtitle mt-0.5 text-[11px] sm:text-[12px] text-[#6B7280] leading-snug max-md:hidden hidden group-hover:block">
+            {fullMeta || "\u00A0"}
+          </p>
+
+          {/* Mobile: collapsed summary; tap expands to full languages */}
+          <div className="md:hidden">
+            <p
+              className={`movies-rail-subtitle mt-0.5 text-[11px] text-[#6B7280] leading-snug ${
+                mobileExpanded && multiLang ? "" : "line-clamp-1"
+              }`}
+            >
+              {(mobileExpanded && multiLang ? fullMeta : summaryMeta) || "\u00A0"}
+            </p>
+            {multiLang ? (
+              <button
+                type="button"
+                className="mt-1 text-[10px] font-semibold text-[#6900AA] cursor-pointer"
+                aria-expanded={mobileExpanded}
+                onClick={() => setMobileExpanded((open) => !open)}
+              >
+                {mobileExpanded ? "Show less" : `+${languages.length - 1} more languages`}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </article>
+    </div>
+  );
+}
+
 function YouMightAlsoLike({ idOrSlug, currentId }: { idOrSlug: string; currentId: string }) {
   const { data: related = [], isLoading } = useGetRelatedPublicMoviesQuery(
     { idOrSlug, limit: 8 },
@@ -482,39 +573,13 @@ function YouMightAlsoLike({ idOrSlug, currentId }: { idOrSlug: string; currentId
   return (
     <SectionShell className="pb-12 sm:pb-16">
       <SectionHeading title="You might also like" action={<ViewAllButton label="View all" href="/movies" />} />
-      <HScroll>
-        {list.map((m) => {
-          const poster = resolveMediaUrl(m.poster_url);
-          const languages = m.languages || [];
-          return (
-            <Link
-              key={m.id}
-              href={movieDetailPath({ id: m.id, slug: m.slug })}
-              className="group shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
-            >
-              <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-slate-200">
-                {poster ? (
-                  <img
-                    src={poster}
-                    alt={m.title}
-                    className="h-full w-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-slate-200" />
-                )}
-              </div>
-              <h3 className="mt-2 text-sm font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
-                {m.title}
-              </h3>
-              {m.certificate && (
-                <p className="mt-0.5 text-xs text-slate-500">{m.certificate}</p>
-              )}
-              {languages.length > 0 && (
-                <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{languages.join(", ")}</p>
-              )}
-            </Link>
-          );
-        })}
+      <HScroll
+        trackClassName="movies-rail"
+        trackStyle={{ ["--movies-visible" as string]: 6 } as CSSProperties}
+      >
+        {list.map((m) => (
+          <RelatedMovieCard key={m.id} movie={m} />
+        ))}
       </HScroll>
     </SectionShell>
   );

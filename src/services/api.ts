@@ -5926,6 +5926,27 @@ export const api = createApi({
       invalidatesTags: (_r, _e, arg) => [{ type: 'CinemaScreens', id: arg.bizId }, 'CinemaScreens'],
     }),
 
+    updateCinemaScreenLayout: builder.mutation<
+      { message: string; seat_count: number },
+      {
+        bizId: string;
+        screenId: string;
+        seating_config: any;
+        seats: any[];
+      }
+    >({
+      query: ({ bizId, screenId, seating_config, seats }) => ({
+        url: `/businesses/${bizId}/cinema-screens/${screenId}/layout`,
+        method: 'PUT',
+        body: { seating_config, seats },
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'CinemaScreens', id: arg.bizId },
+        'CinemaScreens',
+      ],
+    }),
+
+
     // ── Cinema Partner Movie Showtimes ─────────────────────────────────────────
 
     getPartnerMovieShowtimes: builder.query<
@@ -6675,6 +6696,7 @@ export const {
   useGetCinemaScreensQuery,
   useCreateCinemaScreenMutation,
   useUpdateCinemaScreenMutation,
+  useUpdateCinemaScreenLayoutMutation,
   useGetPartnerMovieShowtimesQuery,
   useCreatePartnerMovieShowtimeMutation,
   useUpdatePartnerMovieShowtimeMutation,

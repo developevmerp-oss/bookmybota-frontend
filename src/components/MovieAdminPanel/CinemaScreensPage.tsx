@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { CheckCircle, Clapperboard, Eye, Plus, RefreshCw } from "lucide-react";
+import { CheckCircle, Clapperboard, Edit3, Eye, Plus, RefreshCw } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
 import {
   useApproveVenueLayoutTemplateMutation,
@@ -15,10 +16,16 @@ import {
   useGetVenueLayoutTemplatesQuery,
   useRejectVenueLayoutTemplateMutation,
   useUpdateCinemaScreenMutation,
+  useUpdateCinemaScreenLayoutMutation,
   type CinemaScreen,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
+
+const VenueLayoutBuilder = dynamic(
+  () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
+  { ssr: false, loading: () => <p className="p-8 text-center text-zinc-400">Loading layout editor…</p> }
+);
 import {
   cinemaScreenFormSchema,
   emptyCinemaScreenFormValues,
@@ -113,11 +120,13 @@ export default function CinemaScreensPage() {
   const [approveLayout, { isLoading: approving }] = useApproveVenueLayoutTemplateMutation();
   const [publishLayout, { isLoading: publishing }] = usePublishVenueLayoutTemplateMutation();
   const [rejectLayout, { isLoading: rejecting }] = useRejectVenueLayoutTemplateMutation();
+  const [updateScreenLayout, { isLoading: isUpdatingScreenLayout }] = useUpdateCinemaScreenLayoutMutation();
   const [rejectId, setRejectId] = useState<string | null>(null);
 
   const [layoutScreenId, setLayoutScreenId] = useState<string | null>(null);
   const [previewScreenId, setPreviewScreenId] = useState<string | null>(null);
   const [reviewScreenId, setReviewScreenId] = useState<string | null>(null);
+  const [editingScreenId, setEditingScreenId] = useState<string | null>(null);
 
   const {
     register: registerScreen,
@@ -156,6 +165,44 @@ export default function CinemaScreensPage() {
     () => screens.find((s) => s.id === reviewScreenId) || null,
     [screens, reviewScreenId]
   );
+  const editingScreen = useMemo(
+    () => screens.find((s) => s.id === editingScreenId) || null,
+    [screens, editingScreenId]
+  );
+
+  const editingTemplate = useMemo(() => {
+    if (!editingScreen) return null;
+    const tId = editingScreen.venue_layout_template_id || editingScreen.layout_template_id;
+    return layoutOptions.find((t) => t.id === tId) || null;
+  }, [editingScreen, layoutOptions]);
+
+  const editingInitialSeats = useMemo(() => {
+    if (!editingScreen) return [];
+    const raw = editingTemplate?.seats_json ?? editingScreen.layout_seats_json;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [editingScreen, editingTemplate]);
+
+  const editingInitialConfig = useMemo(() => {
+    if (!editingScreen) return undefined;
+    const raw = editingTemplate?.seating_config ?? editingScreen.layout_seating_config;
+    if (raw && typeof raw === "object") return raw;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  }, [editingScreen, editingTemplate]);
 
   const openRejectModal = (templateId: string) => {
     setRejectId(templateId);
@@ -602,8 +649,16 @@ export default function CinemaScreensPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setLayoutScreenId(screen.id)}
+                          onClick={() => setEditingScreenId(screen.id)}
                           className="btn-secondary text-sm inline-flex items-center gap-1.5"
+                          title="Move or adjust seats, rows, or customize layout for this screen"
+                        >
+                          <Edit3 size={14} /> Edit layout
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLayoutScreenId(screen.id)}
+                          className="px-3 py-2 rounded-xl text-sm border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 inline-flex items-center gap-1.5"
                           disabled={!screen.hall_id}
                           title="Ask Super Admin for an updated seat map"
                         >
@@ -767,6 +822,61 @@ export default function CinemaScreensPage() {
           </div>
         </div>
       )}
+
+      {editingScreen && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-2 sm:p-4">
+          <div className="w-full h-full max-w-7xl bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-6 py-3 bg-zinc-900 text-white border-b border-zinc-800">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <span>🎬 Customizing Layout: {editingScreen.name}</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
+                    Max Capacity: {editingScreen.capacity}
+                  </span>
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Move, add or adjust seats. Seat count cannot exceed screen capacity ({editingScreen.capacity}) and booked seats are locked.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingScreenId(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+              >
+                Close Editor
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden relative">
+              <VenueLayoutBuilder
+                key={`screen-builder-${editingScreen.id}`}
+                venueAdapter={{
+                  initialSeats: editingInitialSeats,
+                  initialConfig: editingInitialConfig,
+                  maxCapacity: Number(editingScreen.capacity) || 0,
+                  saving: isUpdatingScreenLayout,
+                  hideSubmitToVenue: true,
+                  onSave: async (payload) => {
+                    try {
+                      await updateScreenLayout({
+                        bizId,
+                        screenId: editingScreen.id,
+                        seating_config: payload.seating_config,
+                        seats: payload.seats,
+                      }).unwrap();
+                      toast.success("Screen layout customized and saved successfully!");
+                      setEditingScreenId(null);
+                      refetch();
+                    } catch (err) {
+                      toast.error(extractApiError(err, "Failed to save screen layout."));
+                    }
+                  },
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

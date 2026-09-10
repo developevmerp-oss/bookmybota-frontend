@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
@@ -25,13 +25,45 @@ import {
   ChevronRight,
   Armchair,
   Tv,
+  Maximize2,
+  Minimize2,
+  Map as MapIcon,
+  LayoutGrid,
+  X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import {
   useGetMovieShowtimeLayoutQuery,
   useCreateMovieBookingMutation,
   type MovieBookingSeatPayload,
 } from "@/services/api";
+
+const VenueLayoutViewer = dynamic(
+  () => import("@/components/EventLandingPage/VenueLayoutViewer"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[550px] flex flex-col items-center justify-center gap-3 text-slate-400 bg-slate-950/80 rounded-2xl">
+        <Loader2 className="size-8 animate-spin text-[#F84464]" />
+        <p className="text-sm">Loading interactive seating map…</p>
+      </div>
+    ),
+  }
+);
+
+function getCinemaSectionColor(secName: string): string {
+  const name = (secName || "").toLowerCase();
+  if (name.includes("recliner")) return "#0284c7"; // Sky Blue
+  if (name.includes("prime")) return "#3b82f6";    // Royal Blue
+  if (name.includes("classic")) return "#6366f1";  // Indigo
+  if (name.includes("vip") || name.includes("premium")) return "#f59e0b"; // Amber
+  if (name.includes("platinum")) return "#06b6d4"; // Cyan
+  if (name.includes("gold")) return "#a855f7";     // Purple
+  if (name.includes("dress")) return "#ec4899";    // Pink
+  if (name.includes("balcony")) return "#8b5cf6";  // Violet
+  return "#3b82f6";
+}
 import { useAppSelector } from "@/lib/hooks";
 import { extractApiError } from "@/lib/apiErrors";
 import { sanitizePhoneInput } from "@/lib/validation";
@@ -108,6 +140,93 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const screen = layoutData?.screen;
   const bookedSet = useMemo(() => new Set(layoutData?.booked_seat_identifiers ?? []), [layoutData]);
 
+  const [viewMode, setViewMode] = useState<"canvas" | "grid">("canvas");
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+
+  const hasCanvasLayout = useMemo(() => {
+    return Boolean(
+      layoutData?.layout_template?.seats_json &&
+      Array.isArray(layoutData.layout_template.seats_json) &&
+      layoutData.layout_template.seats_json.length > 0
+    );
+  }, [layoutData]);
+
+  // Helper to resolve tier price
+  const getTierPrice = useCallback((sectionName: string, sectionIdx: number = 0): number => {
+    const tiers = showtime?.tier_pricing;
+    if (!tiers || tiers.length === 0) return 200;
+
+    const cleanSec = (sectionName || "").trim().toLowerCase();
+
+    // 1. Direct or partial name match
+    const matched = tiers.find((t: any) => {
+      const tName = String(t.tier_name || t.name || t.section_name || "").trim().toLowerCase();
+      return tName && (tName === cleanSec || cleanSec.includes(tName) || tName.includes(cleanSec));
+    });
+    if (matched && !isNaN(Number(matched.price))) {
+      return Number(matched.price);
+    }
+
+    // 2. Positional index match (e.g. section 0 -> tier 0, section 1 -> tier 1)
+    if (tiers[sectionIdx] && !isNaN(Number(tiers[sectionIdx].price))) {
+      return Number(tiers[sectionIdx].price);
+    }
+
+    // 3. Last tier fallback
+    const lastTier = tiers[tiers.length - 1];
+    return Number(lastTier?.price || 200);
+  }, [showtime?.tier_pricing]);
+
+  const cinemaLegend = useMemo(() => {
+    if (!layoutData?.layout_template?.seats_json || !Array.isArray(layoutData.layout_template.seats_json)) return [];
+    const secMap = new Map<string, number>();
+    for (const s of layoutData.layout_template.seats_json) {
+      const sec = s.section_name || "Standard";
+      secMap.set(sec, (secMap.get(sec) || 0) + 1);
+    }
+    return Array.from(secMap.entries()).map(([secName, count], idx) => {
+      const price = getTierPrice(secName, idx);
+      const color = getCinemaSectionColor(secName);
+      return { name: secName, color, price, count };
+    });
+  }, [layoutData, getTierPrice]);
+
+  const canvasLayoutData = useMemo(() => {
+    if (!hasCanvasLayout || !layoutData?.layout_template) return null;
+    const rawSeats = layoutData.layout_template.seats_json || [];
+    return {
+      data: {
+        seats: rawSeats.map((s: any) => {
+          const seatId = `${s.row_label || ""}${s.seat_label || ""}`;
+          const isBooked =
+            bookedSet.has(seatId) ||
+            bookedSet.has(`${s.row_label || ""}${Number(s.seat_label)}`) ||
+            (s.internalId && bookedSet.has(s.internalId)) ||
+            (s.status && !["AVAILABLE", "ACTIVE"].includes(String(s.status).toUpperCase()));
+          return {
+            ...s,
+            id: seatId,
+            status: isBooked ? "BOOKED" : "AVAILABLE",
+          };
+        }),
+        seating_config: layoutData.layout_template.seating_config,
+      },
+    };
+  }, [layoutData, hasCanvasLayout, bookedSet]);
+
+  const handleCanvasSeatsSelected = useCallback((chosenSeats: any[]) => {
+    const newSelected = chosenSeats.map((cs) => {
+      const secName = cs.section_name || "Standard";
+      const price = getTierPrice(secName, 0);
+      return {
+        seat_identifier: cs.id,
+        tier_name: secName,
+        unit_price: price,
+      };
+    });
+    setSelectedSeats(newSelected);
+  }, [getTierPrice]);
+
   // Check if template explicitly defines screen position (e.g. top vs bottom)
   const screenPosition = useMemo<"top" | "bottom">(() => {
     const shapes = layoutData?.layout_template?.seating_config?.shapes;
@@ -144,32 +263,6 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         rawSeats = null;
       }
     }
-
-    // Helper to resolve tier price
-    const getTierPrice = (sectionName: string, sectionIdx: number): number => {
-      const tiers = showtime?.tier_pricing;
-      if (!tiers || tiers.length === 0) return 200;
-
-      const cleanSec = (sectionName || "").trim().toLowerCase();
-
-      // 1. Direct or partial name match
-      const matched = tiers.find((t: any) => {
-        const tName = String(t.tier_name || t.name || t.section_name || "").trim().toLowerCase();
-        return tName && (tName === cleanSec || cleanSec.includes(tName) || tName.includes(cleanSec));
-      });
-      if (matched && !isNaN(Number(matched.price))) {
-        return Number(matched.price);
-      }
-
-      // 2. Positional index match (e.g. section 0 -> tier 0, section 1 -> tier 1)
-      if (tiers[sectionIdx] && !isNaN(Number(tiers[sectionIdx].price))) {
-        return Number(tiers[sectionIdx].price);
-      }
-
-      // 3. Last tier fallback
-      const lastTier = tiers[tiers.length - 1];
-      return Number(lastTier?.price || 200);
-    };
 
     // 1. Preferred: Approved dynamic layout from venue_layout_templates (seats_json array)
     if (Array.isArray(rawSeats) && rawSeats.length > 0) {
@@ -578,119 +671,194 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
       {/* Main Seat Layout & Booking Content */}
       <main className="max-w-7xl mx-auto flex-1 w-full px-4 sm:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Interactive Seat Grid & Screen */}
+        {/* Left Column: Interactive Seat Grid / Canvas & Screen */}
         <section className="lg:col-span-8 space-y-6">
-          {/* Seat Status Legend */}
-          <div className="flex flex-wrap items-center justify-center gap-6 py-2.5 px-4 rounded-2xl bg-white/5 border border-white/10 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-white/10 border border-white/25" />
-              <span className="text-slate-300">Available</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-gradient-to-r from-[#F84464] to-[#6900AA] border border-[#F84464] shadow shadow-[#F84464]/50" />
-              <span className="text-white font-bold">Selected</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-slate-800 border border-slate-700 opacity-60 relative">
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500">✕</span>
+          {/* Layout Mode & Control Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white/5 border border-white/10 p-2.5 rounded-2xl">
+            {hasCanvasLayout ? (
+              <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 rounded-xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("canvas")}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === "canvas"
+                      ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <MapIcon className="size-3.5" />
+                  <span>Interactive Map</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/20 text-white font-extrabold uppercase">
+                    Live
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === "grid"
+                      ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <LayoutGrid className="size-3.5" />
+                  <span>Grid View</span>
+                </button>
               </div>
-              <span className="text-slate-500">Sold / Reserved</span>
-            </div>
-          </div>
-
-          {/* Seat Grid Layout Container */}
-          <div className="rounded-3xl border border-white/10 bg-slate-950/60 backdrop-blur-md p-6 sm:p-8 overflow-x-auto space-y-8 shadow-2xl">
-            {/* Cinema Screen Indicator at Top (when screen is at top) */}
-            {screenPosition === "top" && (
-              <div className="pb-8 pt-2 text-center space-y-3">
-                <p className="text-xs uppercase tracking-widest font-extrabold text-slate-400 flex items-center justify-center gap-2">
-                  <Tv className="size-3.5 text-[#F84464]" /> All eyes this way please • Screen
-                </p>
-                <div className="relative mx-auto w-4/5 max-w-lg h-3">
-                  <div className="absolute inset-0 rounded-[50%] border-b-4 border-[#F84464] shadow-[0_8px_20px_rgba(248,68,100,0.4)]" />
-                </div>
+            ) : (
+              <div className="flex items-center gap-2 px-2 text-xs font-bold text-slate-300">
+                <LayoutGrid className="size-4 text-[#F84464]" />
+                <span>Cinema Seating Layout</span>
               </div>
             )}
 
-            {gridRows.map((rowGroup, idx) => {
-              const prevRow = gridRows[idx - 1];
-              const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
+            {/* Quick action buttons (Fullscreen toggle) */}
+            {hasCanvasLayout && viewMode === "canvas" && (
+              <button
+                type="button"
+                onClick={() => setIsMapFullscreen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-semibold transition-all cursor-pointer shadow-sm hover:scale-105"
+                title="Open fullscreen interactive map"
+              >
+                <Maximize2 className="size-3.5 text-rose-400" />
+                <span>Fullscreen</span>
+              </button>
+            )}
+          </div>
 
-              return (
-                <div key={`${rowGroup.tierName}-${rowGroup.rowLabel}`} className="space-y-2.5 min-w-[560px]">
-                  {/* Tier Divider Banner */}
-                  {isNewTier && (
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2 pt-3 text-xs">
-                      <span className="font-extrabold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-fuchsia-400 to-purple-400">
-                        {rowGroup.tierName} TIER
-                      </span>
-                      <span className="text-white font-extrabold bg-white/10 px-2.5 py-0.5 rounded-full">
-                        {rowGroup.price} ETB
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Row of Seats */}
-                  <div className="flex items-center justify-center gap-3">
-                    {/* Row Label (Left) */}
-                    <span className="w-5 text-center text-xs font-bold text-slate-400 shrink-0">
-                      {rowGroup.rowLabel}
-                    </span>
-
-                    {/* Seat Buttons with Aisle Separation */}
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      {rowGroup.seats.map((seat, seatIdx) => {
-                        const isSelected = selectedSeats.some((s) => s.seat_identifier === seat.id);
-                        const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
-
-                        return (
-                          <div key={seat.id} className="flex items-center">
-                            <button
-                              type="button"
-                              disabled={seat.isBooked}
-                              onClick={() => handleSeatClick(seat)}
-                              className={`size-7 sm:size-8 rounded-lg text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${
-                                seat.isBooked
-                                  ? "bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed"
-                                  : isSelected
-                                  ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white border border-white/40 shadow-lg shadow-[#F84464]/40 scale-110 z-10"
-                                  : "bg-white/5 border border-white/15 text-slate-300 hover:bg-white/15 hover:border-white/35 hover:scale-105 cursor-pointer"
-                              }`}
-                              title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
-                            >
-                              {seat.number}
-                            </button>
-
-                            {/* Cinema Aisle Gap */}
-                            {isAisleGap && (
-                              <div className="w-3 sm:w-5" aria-hidden="true" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Row Label (Right) */}
-                    <span className="w-5 text-center text-xs font-bold text-slate-400 shrink-0">
-                      {rowGroup.rowLabel}
-                    </span>
+          {/* Interactive Live Canvas View */}
+          {viewMode === "canvas" && hasCanvasLayout && canvasLayoutData ? (
+            <div className="relative rounded-3xl border border-white/10 bg-slate-950 overflow-hidden shadow-2xl h-[620px] sm:h-[680px]">
+              <VenueLayoutViewer
+                layoutData={canvasLayoutData}
+                ticketTypes={[]}
+                onSeatsSelected={handleCanvasSeatsSelected}
+                initialSelectedSeats={selectedSeats.map((s) => ({
+                  id: s.seat_identifier,
+                  seat_identifier: s.seat_identifier,
+                  tier_name: s.tier_name,
+                  unit_price: s.unit_price,
+                }))}
+                maxSelectable={10}
+                cinemaMode={true}
+                customLegend={cinemaLegend}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Seat Status Legend */}
+              <div className="flex flex-wrap items-center justify-center gap-6 py-2.5 px-4 rounded-2xl bg-white/5 border border-white/10 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="size-4 rounded-md bg-white/10 border border-white/25" />
+                  <span className="text-slate-300">Available</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="size-4 rounded-md bg-gradient-to-r from-[#F84464] to-[#6900AA] border border-[#F84464] shadow shadow-[#F84464]/50" />
+                  <span className="text-white font-bold">Selected</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="size-4 rounded-md bg-slate-800 border border-slate-700 opacity-60 relative">
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500">✕</span>
                   </div>
+                  <span className="text-slate-500">Sold / Reserved</span>
                 </div>
-              );
-            })}
-
-            {/* Cinema Screen Curved Indicator at the Bottom (when screen is at bottom) */}
-            {screenPosition === "bottom" && (
-              <div className="pt-10 pb-2 text-center space-y-3">
-                <div className="relative mx-auto w-4/5 max-w-lg h-3">
-                  <div className="absolute inset-0 rounded-[50%] border-t-4 border-[#F84464] shadow-[0_-8px_20px_rgba(248,68,100,0.4)]" />
-                </div>
-                <p className="text-xs uppercase tracking-widest font-extrabold text-slate-400 flex items-center justify-center gap-2">
-                  <Tv className="size-3.5 text-[#F84464]" /> All eyes this way please • Screen
-                </p>
               </div>
-            )}
-          </div>
+
+              {/* Seat Grid Layout Container */}
+              <div className="rounded-3xl border border-white/10 bg-slate-950/60 backdrop-blur-md p-6 sm:p-8 overflow-x-auto space-y-8 shadow-2xl">
+                {/* Cinema Screen Indicator at Top (when screen is at top) */}
+                {screenPosition === "top" && (
+                  <div className="pb-8 pt-2 text-center space-y-3">
+                    <p className="text-xs uppercase tracking-widest font-extrabold text-slate-400 flex items-center justify-center gap-2">
+                      <Tv className="size-3.5 text-[#F84464]" /> All eyes this way please • Screen
+                    </p>
+                    <div className="relative mx-auto w-4/5 max-w-lg h-3">
+                      <div className="absolute inset-0 rounded-[50%] border-b-4 border-[#F84464] shadow-[0_8px_20px_rgba(248,68,100,0.4)]" />
+                    </div>
+                  </div>
+                )}
+
+                {gridRows.map((rowGroup, idx) => {
+                  const prevRow = gridRows[idx - 1];
+                  const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
+
+                  return (
+                    <div key={`${rowGroup.tierName}-${rowGroup.rowLabel}`} className="space-y-2.5 min-w-[560px]">
+                      {/* Tier Divider Banner */}
+                      {isNewTier && (
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2 pt-3 text-xs">
+                          <span className="font-extrabold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-fuchsia-400 to-purple-400">
+                            {rowGroup.tierName} TIER
+                          </span>
+                          <span className="text-white font-extrabold bg-white/10 px-2.5 py-0.5 rounded-full">
+                            {rowGroup.price} ETB
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Row of Seats */}
+                      <div className="flex items-center justify-center gap-3">
+                        {/* Row Label (Left) */}
+                        <span className="w-5 text-center text-xs font-bold text-slate-400 shrink-0">
+                          {rowGroup.rowLabel}
+                        </span>
+
+                        {/* Seat Buttons with Aisle Separation */}
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          {rowGroup.seats.map((seat, seatIdx) => {
+                            const isSelected = selectedSeats.some((s) => s.seat_identifier === seat.id);
+                            const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
+
+                            return (
+                              <div key={seat.id} className="flex items-center">
+                                <button
+                                  type="button"
+                                  disabled={seat.isBooked}
+                                  onClick={() => handleSeatClick(seat)}
+                                  className={`size-7 sm:size-8 rounded-lg text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${
+                                    seat.isBooked
+                                      ? "bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed"
+                                      : isSelected
+                                      ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white border border-white/40 shadow-lg shadow-[#F84464]/40 scale-110 z-10"
+                                      : "bg-white/5 border border-white/15 text-slate-300 hover:bg-white/15 hover:border-white/35 hover:scale-105 cursor-pointer"
+                                  }`}
+                                  title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
+                                >
+                                  {seat.number}
+                                </button>
+
+                                {/* Cinema Aisle Gap */}
+                                {isAisleGap && (
+                                  <div className="w-3 sm:w-5" aria-hidden="true" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Row Label (Right) */}
+                        <span className="w-5 text-center text-xs font-bold text-slate-400 shrink-0">
+                          {rowGroup.rowLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Cinema Screen Curved Indicator at the Bottom (when screen is at bottom) */}
+                {screenPosition === "bottom" && (
+                  <div className="pt-10 pb-2 text-center space-y-3">
+                    <div className="relative mx-auto w-4/5 max-w-lg h-3">
+                      <div className="absolute inset-0 rounded-[50%] border-t-4 border-[#F84464] shadow-[0_-8px_20px_rgba(248,68,100,0.4)]" />
+                    </div>
+                    <p className="text-xs uppercase tracking-widest font-extrabold text-slate-400 flex items-center justify-center gap-2">
+                      <Tv className="size-3.5 text-[#F84464]" /> All eyes this way please • Screen
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </section>
 
         {/* Right Column: Checkout Summary & Guest Details Drawer */}
@@ -889,6 +1057,82 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           </form>
         </aside>
       </main>
+
+      {/* Fullscreen Interactive Canvas Modal */}
+      {isMapFullscreen && hasCanvasLayout && canvasLayoutData && (
+        <div className="fixed inset-0 z-50 bg-slate-950/98 backdrop-blur-2xl flex flex-col p-3 sm:p-6 animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[#F84464]">
+                <Film className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                  {movie?.title}
+                  <span className="text-xs font-normal text-slate-400">
+                    ({cinema?.name} • {screen?.name})
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Select your preferred seats on the interactive layout (Pinch / Scroll to zoom)
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsMapFullscreen(false)}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-bold transition-all cursor-pointer"
+            >
+              <Minimize2 className="size-4" />
+              <span>Close Fullscreen</span>
+            </button>
+          </div>
+
+          {/* Canvas in Fullscreen */}
+          <div className="flex-1 w-full relative overflow-hidden rounded-2xl my-3 border border-white/10 bg-slate-950">
+            <VenueLayoutViewer
+              layoutData={canvasLayoutData}
+              ticketTypes={[]}
+              onSeatsSelected={handleCanvasSeatsSelected}
+              initialSelectedSeats={selectedSeats.map((s) => ({
+                id: s.seat_identifier,
+                seat_identifier: s.seat_identifier,
+                tier_name: s.tier_name,
+                unit_price: s.unit_price,
+              }))}
+              maxSelectable={10}
+              cinemaMode={true}
+              customLegend={cinemaLegend}
+            />
+          </div>
+
+          {/* Bottom Bar in Fullscreen */}
+          <div className="flex items-center justify-between pt-3 border-t border-white/10 bg-slate-950/80 px-2 flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <Armchair className="size-4 text-[#F84464]" />
+              <span className="text-xs text-slate-400">Selected:</span>
+              <strong className="text-sm font-bold text-white">
+                {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"}
+              </strong>
+              {selectedSeats.length > 0 && (
+                <span className="text-xs font-bold text-rose-400">
+                  ({grandTotal} ETB)
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsMapFullscreen(false)}
+              className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-xs font-bold shadow-lg shadow-[#F84464]/30 hover:scale-105 transition-all cursor-pointer"
+            >
+              Done Picking Seats
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

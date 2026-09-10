@@ -20,6 +20,7 @@ import {
   User,
   Tag,
   Ticket,
+  FileSignature,
   X,
 } from "lucide-react";
 
@@ -35,6 +36,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
 
   const navigation = [
     { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
+    { name: "Contract", href: "/movie/contract", icon: FileSignature },
     { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
     { name: "Movies", href: "/movie/movies", icon: Film },
     { name: "Movie Offers", href: "/movie/offers", icon: Tag },

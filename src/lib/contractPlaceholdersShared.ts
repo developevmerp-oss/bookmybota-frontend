@@ -60,10 +60,14 @@ export function buildProseContractHtml(
 }
 
 /** Convert stored HTML with {{tokens}} into visual chips for the editor */
-export function htmlWithTokenChips(html: string): string {
+export function htmlWithTokenChips(
+  html: string,
+  dynamicFields?: readonly { label: string; token: string }[]
+): string {
   if (!html) return '';
+  const fields = dynamicFields || CONTRACT_DYNAMIC_FIELDS;
   return html.replace(/\{\{(\w+)\}\}/g, (_, token: string) => {
-    const field = CONTRACT_DYNAMIC_FIELDS.find((f) => f.token === token);
+    const field = fields.find((f) => f.token === token) || CONTRACT_DYNAMIC_FIELDS.find((f) => f.token === token);
     const label = field?.label ?? token;
     return `<span class="${TOKEN_CHIP_CLASS}" data-token="${token}" contenteditable="false">${label}</span>`;
   });
@@ -95,14 +99,16 @@ export function replaceContractPlaceholders(
 /** Preview: replace tokens with styled value chips (not raw {{tags}}) */
 export function htmlWithMergedValues(
   html: string,
-  data: Record<string, string | number | null | undefined>
+  data: Record<string, string | number | null | undefined>,
+  dynamicFields?: readonly { label: string; token: string }[]
 ): string {
   if (!html) return '';
+  const fields = dynamicFields || CONTRACT_DYNAMIC_FIELDS;
   const normalized = htmlFromTokenChips(html);
   return normalized.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
     const val = data[key];
     const display = val === undefined || val === null || val === '' ? '—' : String(val);
-    const field = CONTRACT_DYNAMIC_FIELDS.find((f) => f.token === key);
+    const field = fields.find((f) => f.token === key) || CONTRACT_DYNAMIC_FIELDS.find((f) => f.token === key);
     const label = field?.label ?? key;
     return `<span class="contract-value-chip" title="${label}">${display}</span>`;
   });

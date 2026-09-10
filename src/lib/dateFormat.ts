@@ -8,6 +8,14 @@ const DISPLAY_LOCALE = 'en-US';
 /** MM-DD-YYYY */
 export function formatDate(value?: string | Date | null): string {
   if (!value) return '—';
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    // Pure calendar date from API — never shift by timezone.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [yyyy, mm, dd] = trimmed.split('-');
+      return `${mm}-${dd}-${yyyy}`;
+    }
+  }
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -75,10 +83,22 @@ export function fromDateAndTime(dateYmd: string, timeHm: string): string {
 
 export function toDateInput(iso?: string | null): string {
   if (!iso) return '';
-  const d = new Date(iso);
+  const s = String(iso).trim();
+  // Already a calendar date (or ISO starting with one) — do not shift by local TZ.
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(s);
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** Alias for settlement / API date-only params */
+export function toDateOnlyParam(value?: string | Date | null): string {
+  if (!value) return '';
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  return toDateInput(String(value));
 }
 
 export function toTimeInput(iso?: string | null): string {

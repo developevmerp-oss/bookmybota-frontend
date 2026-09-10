@@ -32,6 +32,7 @@ import { extractUploadUrl, resolveMediaUrl } from "@/lib/mediaUrl";
 import { formatDate } from "@/lib/dateFormat";
 import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import Pagination from "@/components/Shared/Pagination";
+import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { defaultPartnerCtaUrl } from "@/lib/promotionCta";
 import { promotionTargetLabel } from "@/lib/promotionTargetLabel";
@@ -390,23 +391,23 @@ export default function PartnerPromotionsPage({
           <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
             Banner image <RequiredMark />
           </span>
-          {bannerUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={resolveMediaUrl(bannerUrl)}
-              alt="Banner"
-              className="w-full aspect-[21/9] object-cover rounded-xl border border-slate-200"
-            />
-          ) : (
-            <div className="w-full aspect-[21/9] rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-slate-400">
-              <ImagePlus size={28} />
-            </div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => void onUpload(e.target.files?.[0] || null)}
-            className="block w-full text-xs"
+          <CroppedImageField
+            value={bannerUrl || ""}
+            aspect={21 / 9}
+            disabled={uploading}
+            previewClassName="w-full aspect-[21/9] object-cover rounded-xl border border-slate-200 overflow-hidden"
+            emptyClassName="flex flex-col items-center justify-center w-full aspect-[21/9] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
+            emptyLabel="Upload & crop banner"
+            emptyContent={
+              <>
+                <ImagePlus size={28} className="mb-2" />
+                <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+                  Upload & crop banner
+                </span>
+              </>
+            }
+            onRemove={() => setValue("banner_image_url", "", { shouldValidate: true, shouldDirty: true })}
+            onCroppedFile={(file) => void onUpload(file)}
           />
           {errors.banner_image_url && (
             <p className={fieldErrorClass}>{errors.banner_image_url.message}</p>

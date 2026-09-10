@@ -577,9 +577,9 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
             <CroppedImageField
               value={posterUrl || ""}
               aspect={2 / 3}
-              previewClassName="w-full h-56 rounded-xl border border-slate-200"
-              emptyClassName="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
-              emptyLabel="Add poster"
+              previewClassName="w-[180px] aspect-[2/3] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+              emptyClassName="flex flex-col items-center justify-center w-[180px] aspect-[2/3] border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
+              emptyLabel="Add poster (2:3)"
               onRemove={() => setValue("poster_url", "", { shouldValidate: true, shouldDirty: true })}
               onCroppedFile={(file) => uploadField(file, "poster_url")}
             />
@@ -591,9 +591,9 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
             <CroppedImageField
               value={bannerUrl || ""}
               aspect={16 / 9}
-              previewClassName="w-full h-56 rounded-xl border border-slate-200"
-              emptyClassName="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
-              emptyLabel="Add banner"
+              previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+              emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
+              emptyLabel="Add banner (16:9)"
               onRemove={() => setValue("banner_url", "", { shouldValidate: true, shouldDirty: true })}
               onCroppedFile={(file) => uploadField(file, "banner_url")}
             />

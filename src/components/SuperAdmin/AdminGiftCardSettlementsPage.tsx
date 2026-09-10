@@ -1,367 +1,429 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import { CheckCircle2, Loader2, Wallet } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
+import Link from "next/link";
 import {
-  useGetAdminDiningGiftCardRedemptionsQuery,
-  useGetBusinessesQuery,
-  usePatchAdminDiningGiftCardSettlementMutation,
-  type DiningGiftCardRedemptionRow,
+  ArrowRight,
+  CalendarDays,
+  CreditCard,
+  RotateCcw,
+  Store,
+  Ticket,
+  Wallet,
+} from "lucide-react";
+import {
+  useGetAdminEventGiftCardRedemptionsQuery,
+  useGetAdminGiftCardSettlementOverviewQuery,
 } from "@/services/api";
-import { extractApiError } from "@/lib/apiErrors";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 import {
-  adminSettlementNotesSchema,
-  type AdminSettlementNotesValues,
-} from "@/lib/adminFormSchemas";
+  AdminCallout,
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminSegmentedTabs,
+  AdminStatCard,
+  AdminStatusBadge,
+  adminFinancePageClass,
+} from "@/components/SuperAdmin/AdminFinanceChrome";
 
-type StatusTab = "ALL" | "PENDING" | "APPROVED" | "PAID" | "CANCELLED";
+type VerticalTab = "overview" | "dining" | "events";
 
-const TABS: { key: StatusTab; label: string }[] = [
-  { key: "ALL", label: "All" },
-  { key: "PENDING", label: "Pending" },
-  { key: "APPROVED", label: "Approved" },
-  { key: "PAID", label: "Paid" },
-  { key: "CANCELLED", label: "Cancelled" },
-];
-
-const fieldErrorClass = "mt-1 text-[11px] font-semibold text-rose-400";
-
-function statusBadge(status?: string) {
-  const s = (status || "PENDING").toUpperCase();
-  const colors: Record<string, string> = {
-    PENDING: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-    APPROVED: "bg-sky-500/15 text-sky-300 border-sky-500/30",
-    PAID: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-    CANCELLED: "bg-rose-500/15 text-rose-300 border-rose-500/30",
-  };
-  return (
-    <span
-      className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-        colors[s] || colors.PENDING
-      }`}
-    >
-      {s}
-    </span>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent?: string;
-}) {
-  return (
-    <div className="glass-panel rounded-2xl border border-white/5 p-4">
-      <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">{label}</p>
-      <p className={`text-xl font-extrabold mt-1 ${accent || "text-white"}`}>{value}</p>
-    </div>
-  );
-}
-
-function SettlementRowActions({
-  row,
-  busy,
-  onUpdate,
-}: {
-  row: DiningGiftCardRedemptionRow;
-  busy: boolean;
-  onUpdate: (row: DiningGiftCardRedemptionRow, status: string, notes: string) => Promise<void>;
-}) {
-  const isPaid = row.settlement_status === "PAID";
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<AdminSettlementNotesValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: yupResolver(adminSettlementNotesSchema) as any,
-    defaultValues: { notes: row.settlement_notes || "" },
-    mode: "onSubmit",
-  });
-
-  const run = (status: string) =>
-    handleSubmit(async (values) => {
-      await onUpdate(row, status, values.notes?.trim() || "");
-    })();
-
-  return (
-    <td className="px-4 py-3 align-top min-w-[220px]">
-      <input
-        {...register("notes")}
-        disabled={isPaid}
-        placeholder="Settlement note / ref"
-        className="w-full mb-1 bg-zinc-900/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white disabled:opacity-50"
-      />
-      {errors.notes && <p className={fieldErrorClass}>{errors.notes.message}</p>}
-      <div className="flex flex-wrap gap-1.5 mt-1.5">
-        {row.settlement_status === "PENDING" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run("APPROVED")}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-sky-600/80 hover:bg-sky-500 text-white disabled:opacity-50"
-          >
-            Approve
-          </button>
-        )}
-        {(row.settlement_status === "PENDING" || row.settlement_status === "APPROVED") && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run("PAID")}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-600/80 hover:bg-emerald-500 text-white disabled:opacity-50"
-          >
-            {busy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-            Mark paid
-          </button>
-        )}
-        {row.settlement_status !== "PAID" && row.settlement_status !== "CANCELLED" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run("CANCELLED")}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-        )}
-        {row.settlement_status === "CANCELLED" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run("PENDING")}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-white/15 text-zinc-300 hover:bg-white/5 disabled:opacity-50"
-          >
-            Reopen
-          </button>
-        )}
-      </div>
-    </td>
-  );
-}
-
+/**
+ * Gift Card Ledger — liability + usage visibility.
+ * Partner payments happen under Partner Payouts.
+ */
 export default function AdminGiftCardSettlementsPage() {
-  const [tab, setTab] = useState<StatusTab>("PENDING");
+  const [vertical, setVertical] = useState<VerticalTab>("overview");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [businessId, setBusinessId] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
-  const { data: restaurants = [] } = useGetBusinessesQuery({ module: "dining" });
-  const { data, isLoading, isError } = useGetAdminDiningGiftCardRedemptionsQuery({
-    page,
-    limit: PAGE_SIZE,
-    ...(tab !== "ALL" ? { status: tab } : {}),
-    ...(businessId ? { business_id: businessId } : {}),
-    ...(q.trim() ? { q: q.trim() } : {}),
-  });
-  const [patchSettlement] = usePatchAdminDiningGiftCardSettlementMutation();
+  const { data: overview, isLoading: overviewLoading } =
+    useGetAdminGiftCardSettlementOverviewQuery(undefined, {
+      skip: vertical !== "overview" && vertical !== "dining",
+    });
 
-  const rows = data?.items ?? [];
-  const meta = data?.meta;
-  const summary = data?.summary;
+  const { data: eventData, isLoading: eventLoading, isError: eventError } =
+    useGetAdminEventGiftCardRedemptionsQuery(
+      {
+        page,
+        limit: PAGE_SIZE,
+        ...(q.trim() ? { q: q.trim() } : {}),
+        ...(fromDate ? { from: fromDate } : {}),
+        ...(toDate ? { to: toDate } : {}),
+      },
+      { skip: vertical !== "events" }
+    );
 
-  const restaurantOptions = useMemo(
-    () => [...restaurants].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
-    [restaurants]
-  );
+  const eventRows = eventData?.items ?? [];
+  const eventMeta = eventData?.meta;
+  const eventSummary = eventData?.summary;
 
-  const updateStatus = async (
-    row: DiningGiftCardRedemptionRow,
-    settlement_status: string,
-    notes: string
-  ) => {
-    setBusyId(row.id);
-    try {
-      const res = await patchSettlement({
-        id: row.id,
-        settlement_status,
-        settlement_notes: notes || undefined,
-      }).unwrap();
-      toast.success(res.message || "Settlement updated");
-    } catch (err) {
-      toast.error(extractApiError(err, "Failed to update settlement"));
-    } finally {
-      setBusyId(null);
-    }
+  const switchVertical = (next: VerticalTab) => {
+    setVertical(next);
+    setPage(1);
+    setQ("");
+    setFromDate("");
+    setToDate("");
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Wallet className="text-violet-400" size={24} />
-          Gift Card Settlements
-        </h2>
-        <p className="text-zinc-400 text-sm mt-1">
-          Dining gift cards redeemed at restaurants. BookMyBota owes the restaurant the gift-card
-          amount used — approve then mark paid after payout.
-        </p>
-      </div>
+    <div className={adminFinancePageClass}>
+      <AdminSegmentedTabs
+        tabs={[
+          { key: "overview", label: "Overview", icon: Wallet },
+          { key: "dining", label: "Dining", icon: Store },
+          { key: "events", label: "Events", icon: Ticket },
+        ]}
+        active={vertical}
+        onChange={switchVertical}
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Pending payable"
-          value={formatMoney(summary?.pending_amount || 0)}
-          accent="text-amber-300"
-        />
-        <StatCard
-          label="Approved"
-          value={formatMoney(summary?.approved_amount || 0)}
-          accent="text-sky-300"
-        />
-        <StatCard
-          label="Paid to restaurants"
-          value={formatMoney(summary?.paid_amount || 0)}
-          accent="text-emerald-300"
-        />
-        <StatCard
-          label="Counts P / A / Paid"
-          value={`${summary?.pending_count || 0} / ${summary?.approved_count || 0} / ${summary?.paid_count || 0}`}
-          accent="text-violet-300"
-        />
-      </div>
+      {vertical === "overview" && (
+        <>
+          {overviewLoading ? (
+            <AdminListShimmer rows={4} columns={4} showTabs={false} showToolbar={false} />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-amber-500 to-amber-400/30" />
+                  <div className="p-5 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-xl bg-amber-500/15 border border-amber-500/25 p-2.5 text-amber-300">
+                        <Store size={18} />
+                      </span>
+                      <div>
+                        <p className="text-base font-bold text-white">Dining</p>
+                        <p className="text-xs text-zinc-500">POS redeem → restaurant payable</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                        Pending payable
+                      </p>
+                      <p className="text-2xl font-extrabold text-emerald-600 tabular-nums mt-1">
+                        {formatMoney(overview?.dining?.pending_amount || 0)}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {overview?.dining?.pending_count || 0} redemption(s) awaiting approval
+                      </p>
+                    </div>
+                    <Link
+                      href="/admin/organizer-payouts?tab=dining"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors"
+                    >
+                      Settle dining <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                </div>
 
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => {
-              setTab(t.key);
-              setPage(1);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border transition-colors ${
-              tab === t.key
-                ? "bg-violet-600/30 border-violet-500/50 text-violet-200"
-                : "bg-white/5 border-white/10 text-zinc-400 hover:text-white"
-            }`}
+                <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-sky-500 to-sky-400/30" />
+                  <div className="p-5 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-xl bg-sky-500/15 border border-sky-500/25 p-2.5 text-sky-300">
+                        <Ticket size={18} />
+                      </span>
+                      <div>
+                        <p className="text-base font-bold text-white">Events</p>
+                        <p className="text-xs text-zinc-500">GC vs cash · organizer share unchanged</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                          GC used
+                        </p>
+                        <p className="text-xl font-extrabold text-emerald-600 tabular-nums mt-1">
+                          {formatMoney(overview?.events?.gift_card_redeemed || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                          Organizer share
+                        </p>
+                        <p className="text-xl font-extrabold text-emerald-600 tabular-nums mt-1">
+                          {formatMoney(overview?.events?.organizer_payout_total || 0)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href="/admin/organizer-payouts?tab=events"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors"
+                      >
+                        Settle events <ArrowRight size={14} />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => switchVertical("events")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-white/10 text-zinc-300 hover:bg-white/5 transition-colors"
+                      >
+                        View GC usage
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+                  Platform gift-card float
+                </p>
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  <AdminStatCard
+                    icon={Wallet}
+                    label="Liability outstanding"
+                    value={formatMoney(
+                      overview?.gift_card_liability?.outstanding_liability || 0
+                    )}
+                    hint={`${overview?.gift_card_liability?.active_cards || 0} active cards`}
+                    accent="text-emerald-600"
+                  />
+                  <AdminStatCard
+                    icon={CreditCard}
+                    label="All redeemed"
+                    value={formatMoney(overview?.ledger?.total_redeemed || 0)}
+                    hint="All verticals"
+                    accent="text-emerald-600"
+                  />
+                  <AdminStatCard
+                    icon={Store}
+                    label="Dining redeemed"
+                    value={formatMoney(overview?.ledger?.dining_redeemed || 0)}
+                    accent="text-emerald-600"
+                  />
+                  <AdminStatCard
+                    icon={Ticket}
+                    label="Event redeemed"
+                    value={formatMoney(overview?.ledger?.event_redeemed || 0)}
+                    accent="text-emerald-600"
+                  />
+                  <AdminStatCard
+                    icon={RotateCcw}
+                    label="Reversed"
+                    value={formatMoney(overview?.ledger?.total_reversed || 0)}
+                    hint="Cancels / restores"
+                    accent="text-emerald-600"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {vertical === "dining" && (
+        <div className="space-y-5">
+          <AdminCallout
+            tone="amber"
+            action={
+              <Link
+                href="/admin/organizer-payouts?tab=dining"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
+              >
+                Open Dining payables <ArrowRight size={14} />
+              </Link>
+            }
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
+            Snapshot of restaurant gift-card payables. Approve and mark paid under{" "}
+            <span className="font-semibold">Partner Payouts → Dining</span>.
+          </AdminCallout>
 
-      <div className="flex flex-col lg:flex-row gap-3">
-        <div className="flex-1">
-          <SearchInput
-            value={q}
-            onChange={(v) => {
-              setQ(v);
-              setPage(1);
-            }}
-            placeholder="Search restaurant, guest, last4…"
-          />
+          {overviewLoading ? (
+            <AdminListShimmer rows={2} columns={4} showTabs={false} showToolbar={false} />
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <AdminStatCard
+                label="Pending"
+                value={formatMoney(overview?.dining?.pending_amount || 0)}
+                hint={`${overview?.dining?.pending_count || 0} redemptions`}
+                accent="text-emerald-600"
+              />
+              <AdminStatCard
+                label="Approved"
+                value={formatMoney(overview?.dining?.approved_amount || 0)}
+                hint={`${overview?.dining?.approved_count || 0} ready`}
+                accent="text-emerald-600"
+              />
+              <AdminStatCard
+                label="Paid"
+                value={formatMoney(overview?.dining?.paid_amount || 0)}
+                hint={`${overview?.dining?.paid_count || 0} settled`}
+                accent="text-emerald-600"
+              />
+              <AdminStatCard
+                label="GC redeemed"
+                value={formatMoney(overview?.ledger?.dining_redeemed || 0)}
+                accent="text-emerald-600"
+              />
+            </div>
+          )}
         </div>
-        <select
-          value={businessId}
-          onChange={(e) => {
-            setBusinessId(e.target.value);
-            setPage(1);
-          }}
-          className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white min-w-[220px]"
-        >
-          <option value="">All restaurants</option>
-          {restaurantOptions.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      )}
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
-            <Loader2 className="animate-spin" size={18} /> Loading settlements…
+      {vertical === "events" && (
+        <div className="space-y-5">
+          <AdminCallout
+            tone="sky"
+            action={
+              <Link
+                href="/admin/organizer-payouts?tab=events"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
+              >
+                Open Partner Payouts <ArrowRight size={14} />
+              </Link>
+            }
+          >
+            Usage visibility only — organizer money is paid via{" "}
+            <span className="font-semibold">Partner Payouts → Events</span>.
+          </AdminCallout>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <AdminStatCard
+              label="GC redeemed"
+              value={formatMoney(eventSummary?.gift_card_redeemed || 0)}
+              hint={`${eventSummary?.bookings_count || 0} bookings`}
+              accent="text-emerald-600"
+            />
+            <AdminStatCard
+              label="Customer cash"
+              value={formatMoney(eventSummary?.customer_cash_total || 0)}
+              hint="After gift card"
+              accent="text-emerald-600"
+            />
+            <AdminStatCard
+              label="Organizer entitlement"
+              value={formatMoney(eventSummary?.organizer_payout_total || 0)}
+              hint="Ticket − commission"
+              accent="text-emerald-600"
+            />
+            <AdminStatCard
+              label="Bookings"
+              value={String(eventSummary?.bookings_count || 0)}
+              accent="text-zinc-200"
+            />
           </div>
-        ) : isError ? (
-          <p className="text-center text-rose-400 py-16">Could not load settlements.</p>
-        ) : rows.length === 0 ? (
-          <p className="text-center text-zinc-500 py-16">No redemptions match these filters.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Restaurant</th>
-                  <th className="px-4 py-3 font-semibold">Gift card</th>
-                  <th className="px-4 py-3 font-semibold">Bill / GC / Guest pays</th>
-                  <th className="px-4 py-3 font-semibold">Payable</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {rows.map((row) => {
-                  const busy = busyId === row.id;
-                  return (
-                    <tr key={row.id} className="hover:bg-white/[0.02]">
-                      <td className="px-4 py-3 align-top">
-                        <p className="font-semibold text-white">{row.business_name || "—"}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5">
-                          {row.redeemed_at
-                            ? `${formatDate(row.redeemed_at)} ${formatTime12h(row.redeemed_at)}`
-                            : "—"}
-                        </p>
-                        {(row.guest_name || row.guest_phone) && (
-                          <p className="text-xs text-zinc-400 mt-1">
-                            {[row.guest_name, row.guest_phone].filter(Boolean).join(" · ")}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <p className="text-white font-mono text-xs">****{row.code_last4}</p>
-                        <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">
-                          {row.product_name || "Gift Card"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-top text-xs text-zinc-300 space-y-0.5">
-                        <p>Bill {formatMoney(row.bill_amount)}</p>
-                        <p className="text-violet-300">GC −{formatMoney(row.gift_card_amount)}</p>
-                        <p>Guest {formatMoney(row.customer_payable)}</p>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <p className="font-extrabold text-violet-300">
-                          {formatMoney(row.settlement_amount ?? row.gift_card_amount)}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        {statusBadge(row.settlement_status)}
-                        {row.settled_at && (
-                          <p className="text-[10px] text-zinc-500 mt-1">
-                            {formatDate(row.settled_at)}
-                          </p>
-                        )}
-                      </td>
-                      <SettlementRowActions
-                        key={`${row.id}-${row.settlement_status}-${row.settlement_notes || ""}`}
-                        row={row}
-                        busy={busy}
-                        onUpdate={updateStatus}
-                      />
+
+          <AdminFilterBar>
+            <div className="flex-1 min-w-0">
+              <SearchInput
+                value={q}
+                onChange={(v) => {
+                  setQ(v);
+                  setPage(1);
+                }}
+                placeholder="Search event, organizer, guest, last4…"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <label className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
+                <CalendarDays size={14} />
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
+                  aria-label="From date"
+                />
+              </label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setPage(1);
+                }}
+                className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
+                aria-label="To date"
+              />
+            </div>
+          </AdminFilterBar>
+
+          <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+            {eventLoading ? (
+              <AdminListShimmer rows={6} columns={6} showTabs={false} showToolbar={false} />
+            ) : eventError ? (
+              <p className="text-center text-rose-400 py-16">Could not load event gift card usage.</p>
+            ) : eventRows.length === 0 ? (
+              <AdminEmptyState
+                icon={Ticket}
+                title="No event gift card redemptions yet"
+                description="When guests apply a gift card at checkout, usage appears here."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[760px]">
+                  <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                    <tr>
+                      <th className="px-4 py-3.5 font-semibold">Event / Organizer</th>
+                      <th className="px-4 py-3.5 font-semibold">Guest / Card</th>
+                      <th className="px-4 py-3.5 font-semibold">Ticket / Fee</th>
+                      <th className="px-4 py-3.5 font-semibold">Paid with</th>
+                      <th className="px-4 py-3.5 font-semibold">Organizer</th>
+                      <th className="px-4 py-3.5 font-semibold">Status</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {eventRows.map((row) => (
+                      <tr key={row.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="font-semibold text-white">{row.event_name || "—"}</p>
+                          <p className="text-xs text-zinc-400 mt-0.5">{row.organizer_name || "—"}</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            {row.redeemed_at
+                              ? `${formatDate(row.redeemed_at)} ${formatTime12h(row.redeemed_at)}`
+                              : "—"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="text-sm text-zinc-200">{row.guest_name || "—"}</p>
+                          <p className="text-xs text-zinc-500">{row.guest_email || ""}</p>
+                          <p className="text-xs font-mono text-zinc-400 mt-1">
+                            ****{row.code_last4 || "————"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top text-xs text-emerald-600 space-y-0.5">
+                          <p>Ticket {formatMoney(row.ticket_amount || 0)}</p>
+                          <p>
+                            Commission −{formatMoney(row.commission_total || 0)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top text-xs space-y-0.5 text-emerald-600">
+                          <p className="font-semibold">
+                            GC {formatMoney(row.gift_card_amount)}
+                          </p>
+                          <p className="text-emerald-600/80">Cash {formatMoney(row.grand_total || 0)}</p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="font-bold text-emerald-600 tabular-nums">
+                            {formatMoney(row.organizer_payout || 0)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <AdminStatusBadge status={row.booking_status} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {meta && <Pagination meta={meta} onPageChange={setPage} />}
+          {eventMeta && <Pagination meta={eventMeta} onPageChange={setPage} />}
+        </div>
+      )}
     </div>
   );
 }

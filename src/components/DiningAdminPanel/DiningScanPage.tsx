@@ -1312,7 +1312,17 @@ export default function DiningScanPage() {
                         {row.redeemed_at ? ` · ${formatDate(row.redeemed_at)}` : ""}
                       </p>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border border-amber-200 bg-amber-50 text-amber-700">
+                    <span
+                    className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border ${
+                      String(row.settlement_status).toUpperCase() === "PAID"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                        : String(row.settlement_status).toUpperCase() === "APPROVED"
+                          ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
+                          : String(row.settlement_status).toUpperCase() === "CANCELLED"
+                            ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                            : "border-amber-200 bg-amber-50 text-amber-700"
+                    }`}
+                  >
                       {row.settlement_status}
                     </span>
                   </li>

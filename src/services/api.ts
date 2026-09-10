@@ -1656,6 +1656,8 @@ export interface DiningGiftCardRedemptionRow {
   settlement_status: string;
   settlement_amount?: number | string;
   settlement_notes?: string | null;
+  payment_reference?: string | null;
+  balance_reversed_at?: string | null;
   settled_at?: string | null;
   settled_by?: string | null;
   settled_by_email?: string | null;
@@ -1671,6 +1673,60 @@ export interface DiningGiftCardSettlementSummary {
   pending_amount: number;
   approved_amount: number;
   paid_amount: number;
+}
+
+export interface EventGiftCardRedemptionRow {
+  id: string;
+  redeemed_at?: string;
+  booking_status?: string;
+  ticket_amount?: number | string;
+  discount_amount?: number | string;
+  convenience_fee_total?: number | string;
+  commission_total?: number | string;
+  gift_card_amount: number | string;
+  order_total?: number | string;
+  grand_total?: number | string;
+  organizer_payout?: number | string;
+  guest_name?: string | null;
+  guest_email?: string | null;
+  event_id?: string;
+  event_name?: string;
+  organizer_id?: string;
+  organizer_name?: string;
+  code_last4?: string | null;
+  product_name?: string | null;
+}
+
+export interface EventGiftCardRedemptionSummary {
+  bookings_count: number;
+  gift_card_redeemed: number;
+  organizer_payout_total: number;
+  customer_cash_total: number;
+}
+
+export interface GiftCardSettlementOverview {
+  dining: DiningGiftCardSettlementSummary;
+  events: {
+    bookings_count: number;
+    gift_card_redeemed: number;
+    organizer_payout_total?: number;
+    customer_cash_total?: number;
+  };
+  ledger: {
+    dining_redeemed: number;
+    /** EVENT + SPORTS booking types (sports is an event type). */
+    event_redeemed: number;
+    total_redeemed: number;
+    total_reversed: number;
+  };
+  gift_card_liability?: {
+    outstanding_liability: number;
+    active_cards: number;
+  };
+  verticals: Record<
+    string,
+    { label: string; settlement_mode: string; description: string }
+  >;
 }
 
 export interface OfferRedemption {
@@ -1891,9 +1947,49 @@ export interface OrganizerPayout {
   payment_reference?: string | null;
   notes?: string | null;
   paid_at?: string | null;
-  created_at?: string;
   organizer_name?: string;
-  event_name?: string;
+  event_name?: string | null;
+  created_at?: string;
+}
+
+export type OrganizerSettlementStatus = 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED';
+
+export interface OrganizerSettlementLine {
+  id: string;
+  run_id: string;
+  booking_id: string;
+  event_id?: string | null;
+  event_name?: string | null;
+  guest_name?: string | null;
+  booking_status?: string | null;
+  ticket_amount: number | string;
+  commission_total: number | string;
+  organizer_payout: number | string;
+  gift_card_amount: number | string;
+  cash_amount: number | string;
+  booking_created_at?: string | null;
+}
+
+export interface OrganizerSettlementRun {
+  id: string;
+  business_id: string;
+  organizer_name?: string;
+  period_from: string;
+  period_to: string;
+  status: OrganizerSettlementStatus;
+  gross_ticket: number | string;
+  commission_total: number | string;
+  organizer_payable: number | string;
+  gift_card_funded: number | string;
+  cash_funded: number | string;
+  bookings_count: number;
+  payment_reference?: string | null;
+  notes?: string | null;
+  paid_at?: string | null;
+  organizer_payout_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  lines?: OrganizerSettlementLine[];
 }
 
 export interface Table {
@@ -2071,7 +2167,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
 
   endpoints: (builder) => ({
 
@@ -4127,13 +4223,19 @@ export const api = createApi({
     }),
 
     getMerchantGiftCardRedemptions: builder.query<
-      { data: DiningGiftCardRedemptionRow[]; meta?: { total?: number } },
-      { page?: number; limit?: number } | void
+      {
+        data: DiningGiftCardRedemptionRow[];
+        items?: DiningGiftCardRedemptionRow[];
+        meta?: { total?: number; page?: number; limit?: number };
+        summary?: DiningGiftCardSettlementSummary;
+      },
+      { page?: number; limit?: number; status?: string } | void
     >({
       query: (params) => {
         const sp = new URLSearchParams();
         sp.set('page', String(params?.page || 1));
         sp.set('limit', String(params?.limit || 10));
+        if (params?.status) sp.set('status', params.status);
         return `/gift-cards/merchant/redemptions?${sp.toString()}`;
       },
       providesTags: ['DiningGiftCardRedemptions'],
@@ -4196,14 +4298,70 @@ export const api = createApi({
 
     patchAdminDiningGiftCardSettlement: builder.mutation<
       { message?: string; data: DiningGiftCardRedemptionRow },
-      { id: string; settlement_status: string; settlement_notes?: string }
+      {
+        id: string;
+        settlement_status: string;
+        settlement_notes?: string;
+        payment_reference?: string;
+      }
     >({
       query: ({ id, ...body }) => ({
         url: `/admin/dining-gift-card-redemptions/${id}/settlement`,
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: ['AdminDiningGiftCardSettlements', 'DiningGiftCardRedemptions'],
+      invalidatesTags: ['AdminDiningGiftCardSettlements', 'DiningGiftCardRedemptions', 'MyGiftCards'],
+    }),
+
+    getAdminEventGiftCardRedemptions: builder.query<
+      {
+        items: EventGiftCardRedemptionRow[];
+        meta: import('@/lib/pagination').PaginationMeta;
+        summary: EventGiftCardRedemptionSummary;
+        note?: string;
+      },
+      { page?: number; limit?: number; q?: string; from?: string; to?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.q) sp.set('q', params.q);
+        if (params?.from) sp.set('from', params.from);
+        if (params?.to) sp.set('to', params.to);
+        const qs = sp.toString();
+        return `/admin/event-gift-card-redemptions${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: {
+        data?: EventGiftCardRedemptionRow[];
+        meta?: import('@/lib/pagination').PaginationMeta;
+        summary?: EventGiftCardRedemptionSummary;
+        note?: string;
+      }) => ({
+        items: res.data || [],
+        meta: res.meta || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          total_pages: 0,
+          has_prev: false,
+          has_next: false,
+        },
+        summary: res.summary || {
+          bookings_count: 0,
+          gift_card_redeemed: 0,
+          organizer_payout_total: 0,
+          customer_cash_total: 0,
+        },
+        note: res.note,
+      }),
+      providesTags: ['AdminDiningGiftCardSettlements'],
+    }),
+
+    getAdminGiftCardSettlementOverview: builder.query<GiftCardSettlementOverview, void>({
+      query: () => '/admin/gift-card-settlement-overview',
+      transformResponse: (res: { data: GiftCardSettlementOverview }) => res.data,
+      providesTags: ['AdminDiningGiftCardSettlements'],
     }),
 
     getMarketingCampaigns: builder.query<
@@ -4730,6 +4888,110 @@ export const api = createApi({
       providesTags: ['OrganizerLedgerCustomers'],
     }),
 
+    getMyOrganizerSettlements: builder.query<
+      PaginatedList<OrganizerSettlementRun>,
+      { status?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/events/organizer/settlements${toListQuery({
+          status: params?.status,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerSettlementRun[] }) => unwrapPaginated(res),
+      providesTags: ['OrganizerSettlements'],
+    }),
+
+    getMyOrganizerSettlement: builder.query<OrganizerSettlementRun, string>({
+      query: (id) => `/events/organizer/settlements/${id}`,
+      transformResponse: (res: { data: OrganizerSettlementRun }) => res.data,
+      providesTags: ['OrganizerSettlements'],
+    }),
+
+    getMyOrganizerPendingSettlements: builder.query<
+      {
+        items: Array<{
+          booking_id: string;
+          created_at?: string;
+          booking_status?: string;
+          guest_name?: string | null;
+          ticket_amount: number | string;
+          commission_total: number | string;
+          organizer_payout: number | string;
+          gift_card_amount: number | string;
+          cash_amount: number | string;
+          event_id?: string;
+          event_name?: string;
+        }>;
+        meta?: { total?: number; page?: number; limit?: number };
+        summary: {
+          bookings_count: number;
+          gross_ticket: number;
+          commission_total: number;
+          organizer_payable: number;
+          gift_card_funded: number;
+          cash_funded: number;
+          period_from?: string | null;
+          period_to?: string | null;
+        };
+      },
+      { page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/events/organizer/settlements/pending${toListQuery({
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: {
+        data?: Array<{
+          booking_id: string;
+          created_at?: string;
+          booking_status?: string;
+          guest_name?: string | null;
+          ticket_amount: number | string;
+          commission_total: number | string;
+          organizer_payout: number | string;
+          gift_card_amount: number | string;
+          cash_amount: number | string;
+          event_id?: string;
+          event_name?: string;
+        }>;
+        meta?: { total?: number; page?: number; limit?: number };
+        summary?: {
+          bookings_count: number;
+          gross_ticket: number;
+          commission_total: number;
+          organizer_payable: number;
+          gift_card_funded: number;
+          cash_funded: number;
+          period_from?: string | null;
+          period_to?: string | null;
+        };
+      }) => {
+        const unwrapped = unwrapPaginated(
+          res as {
+            data?: typeof res.data;
+            meta?: import('@/lib/pagination').PaginationMeta;
+          }
+        );
+        return {
+          items: unwrapped.items,
+          meta: unwrapped.meta,
+          summary: res.summary || {
+            bookings_count: 0,
+            gross_ticket: 0,
+            commission_total: 0,
+            organizer_payable: 0,
+            gift_card_funded: 0,
+            cash_funded: 0,
+            period_from: null,
+            period_to: null,
+          },
+        };
+      },
+      providesTags: ['OrganizerSettlements'],
+    }),
+
     createOrganizerPayout: builder.mutation<
       { data: OrganizerPayout },
       {
@@ -4746,7 +5008,13 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['OrganizerLedger', 'OrganizerLedgerCustomers', 'AdminCommission', 'OrganizerPayouts'],
+      invalidatesTags: [
+        'OrganizerLedger',
+        'OrganizerLedgerCustomers',
+        'AdminCommission',
+        'OrganizerPayouts',
+        'OrganizerSettlements',
+      ],
     }),
 
     getOrganizerPayouts: builder.query<
@@ -4762,6 +5030,162 @@ export const api = createApi({
         })}`,
       transformResponse: (res: { data: OrganizerPayout[] }) => unwrapPaginated(res),
       providesTags: ['OrganizerPayouts'],
+    }),
+
+    getOrganizerSettlements: builder.query<
+      PaginatedList<OrganizerSettlementRun>,
+      { business_id?: string; status?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/organizer-settlements${toListQuery({
+          business_id: params?.business_id,
+          status: params?.status,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: OrganizerSettlementRun[] }) => unwrapPaginated(res),
+      providesTags: ['OrganizerSettlements'],
+    }),
+
+    getPendingOrganizerSettlements: builder.query<
+      {
+        items: Array<{
+          booking_id: string;
+          created_at?: string;
+          booking_status?: string;
+          guest_name?: string | null;
+          ticket_amount: number | string;
+          commission_total: number | string;
+          organizer_payout: number | string;
+          gift_card_amount: number | string;
+          cash_amount: number | string;
+          event_id?: string;
+          event_name?: string;
+          business_id: string;
+          organizer_name?: string;
+        }>;
+        meta?: { total?: number; page?: number; limit?: number };
+        by_organizer: Array<{
+          business_id: string;
+          organizer_name: string;
+          bookings_count: number;
+          gross_ticket: number;
+          commission_total: number;
+          organizer_payable: number;
+          gift_card_funded: number;
+          cash_funded: number;
+          period_from: string;
+          period_to: string;
+        }>;
+        summary: {
+          organizers_count: number;
+          bookings_count: number;
+          organizer_payable: number;
+          gift_card_funded: number;
+          cash_funded: number;
+        };
+      },
+      { business_id?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/admin/organizer-settlements/pending${toListQuery({
+          business_id: params?.business_id,
+          page: params?.page ?? 1,
+          limit: params?.limit ?? 20,
+        })}`,
+      transformResponse: (res: {
+        data?: unknown[];
+        meta?: { total?: number; page?: number; limit?: number };
+        by_organizer?: unknown[];
+        summary?: {
+          organizers_count: number;
+          bookings_count: number;
+          organizer_payable: number;
+          gift_card_funded: number;
+          cash_funded: number;
+        };
+      }) => {
+        const unwrapped = unwrapPaginated(res as { data: unknown[] });
+        return {
+          items: (unwrapped.items || []) as Array<{
+            booking_id: string;
+            created_at?: string;
+            booking_status?: string;
+            guest_name?: string | null;
+            ticket_amount: number | string;
+            commission_total: number | string;
+            organizer_payout: number | string;
+            gift_card_amount: number | string;
+            cash_amount: number | string;
+            event_id?: string;
+            event_name?: string;
+            business_id: string;
+            organizer_name?: string;
+          }>,
+          meta: unwrapped.meta,
+          by_organizer: (res.by_organizer || []) as Array<{
+            business_id: string;
+            organizer_name: string;
+            bookings_count: number;
+            gross_ticket: number;
+            commission_total: number;
+            organizer_payable: number;
+            gift_card_funded: number;
+            cash_funded: number;
+            period_from: string;
+            period_to: string;
+          }>,
+          summary: res.summary || {
+            organizers_count: 0,
+            bookings_count: 0,
+            organizer_payable: 0,
+            gift_card_funded: 0,
+            cash_funded: 0,
+          },
+        };
+      },
+      providesTags: ['OrganizerSettlements'],
+    }),
+
+    getOrganizerSettlement: builder.query<OrganizerSettlementRun, string>({
+      query: (id) => `/admin/organizer-settlements/${id}`,
+      transformResponse: (res: { data: OrganizerSettlementRun }) => res.data,
+      providesTags: ['OrganizerSettlements'],
+    }),
+
+    generateOrganizerSettlement: builder.mutation<
+      { data: OrganizerSettlementRun; message?: string },
+      { business_id: string; period_from?: string; period_to?: string; notes?: string }
+    >({
+      query: (body) => ({
+        url: '/admin/organizer-settlements',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['OrganizerSettlements', 'OrganizerPayouts', 'OrganizerLedger'],
+    }),
+
+    patchOrganizerSettlement: builder.mutation<
+      { data: OrganizerSettlementRun; message?: string },
+      {
+        id: string;
+        status: 'APPROVED' | 'PAID' | 'CANCELLED';
+        payment_reference?: string;
+        notes?: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/organizer-settlements/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: [
+        'OrganizerSettlements',
+        'OrganizerPayouts',
+        'OrganizerLedger',
+        'OrganizerLedgerCustomers',
+        'AdminCommission',
+      ],
     }),
 
     // ── Analytics ─────────────────────────────────────────────────────────────
@@ -6569,6 +6993,8 @@ export const {
   useGetMerchantGiftCardRedemptionsQuery,
   useGetAdminDiningGiftCardRedemptionsQuery,
   usePatchAdminDiningGiftCardSettlementMutation,
+  useGetAdminEventGiftCardRedemptionsQuery,
+  useGetAdminGiftCardSettlementOverviewQuery,
   useGetMarketingCampaignsQuery,
   useGetMarketingPaymentSummaryQuery,
   usePatchMarketingCampaignStatusMutation,
@@ -6607,8 +7033,16 @@ export const {
   useDeleteEventOfferMutation,
   useGetOrganizerLedgerQuery,
   useGetOrganizerLedgerCustomersQuery,
+  useGetMyOrganizerSettlementsQuery,
+  useGetMyOrganizerSettlementQuery,
+  useGetMyOrganizerPendingSettlementsQuery,
   useCreateOrganizerPayoutMutation,
   useGetOrganizerPayoutsQuery,
+  useGetOrganizerSettlementsQuery,
+  useGetPendingOrganizerSettlementsQuery,
+  useGetOrganizerSettlementQuery,
+  useGenerateOrganizerSettlementMutation,
+  usePatchOrganizerSettlementMutation,
   useGetOrganizerEventsQuery,
   useGetOrganizerEventQuery,
   useSearchOrganizerVenuesQuery,

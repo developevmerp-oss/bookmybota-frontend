@@ -355,5 +355,10 @@ export const adminSettlementNotesSchema = yup.object({
     .trim()
     .max(1000, 'Notes must be at most 1000 characters.')
     .default(''),
+  payment_reference: yup
+    .string()
+    .trim()
+    .max(255, 'Payment reference must be at most 255 characters.')
+    .default(''),
 });
 export type AdminSettlementNotesValues = yup.InferType<typeof adminSettlementNotesSchema>;

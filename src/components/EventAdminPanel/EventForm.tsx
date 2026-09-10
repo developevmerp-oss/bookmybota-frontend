@@ -2775,14 +2775,14 @@ export default function EventForm({
                 value={posterHorizontal}
                 aspect={16 / 9}
                 disabled={readOnly || uploading}
-                previewClassName="w-full h-36 rounded-xl"
-                emptyClassName="flex flex-col items-center justify-center h-36 w-full rounded-xl border border-dashed border-slate-300 hover:border-rose-400"
+                previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
                 onRemove={() => setValue("poster_horizontal_url", "", { shouldDirty: true })}
                 onCroppedFile={(file) => uploadCropped(file, (url) => setValue("poster_horizontal_url", url, { shouldDirty: true }))}
                 emptyContent={
                   <>
                     <ImagePlus className="text-slate-400 mb-2" size={28} />
-                    <span className="text-xs portal-muted">Add landscape poster</span>
+                    <span className="text-xs portal-muted">Add landscape poster (16:9)</span>
                   </>
                 }
               />
@@ -2793,14 +2793,14 @@ export default function EventForm({
                 value={posterVertical}
                 aspect={2 / 3}
                 disabled={readOnly || uploading}
-                previewClassName="w-[200px] h-48 rounded-xl"
-                emptyClassName="flex flex-col items-center justify-center h-36 w-full max-w-[200px] rounded-xl border border-dashed border-slate-300 hover:border-rose-400"
+                previewClassName="w-[160px] sm:w-[180px] aspect-[2/3] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                emptyClassName="flex flex-col items-center justify-center w-[160px] sm:w-[180px] aspect-[2/3] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
                 onRemove={() => setValue("poster_vertical_url", "", { shouldDirty: true })}
                 onCroppedFile={(file) => uploadCropped(file, (url) => setValue("poster_vertical_url", url, { shouldDirty: true }))}
                 emptyContent={
                   <>
                     <ImagePlus className="text-slate-400 mb-2" size={28} />
-                    <span className="text-xs portal-muted">Add portrait poster</span>
+                    <span className="text-xs portal-muted">Add portrait poster (2:3)</span>
                   </>
                 }
               />
@@ -2818,7 +2818,7 @@ export default function EventForm({
                 value={url}
                 aspect={4 / 3}
                 disabled={readOnly || uploading}
-                previewClassName="h-28 rounded-xl w-full"
+                previewClassName="aspect-[4/3] rounded-xl w-full border border-slate-200 overflow-hidden bg-slate-100"
                 onRemove={() =>
                   setValue(
                     "gallery_images",
@@ -2841,7 +2841,7 @@ export default function EventForm({
               <ImageCropPicker
                 aspect={4 / 3}
                 disabled={uploading}
-                className="flex flex-col items-center justify-center h-28 rounded-xl border border-dashed border-slate-300 hover:border-rose-400"
+                className="flex flex-col items-center justify-center aspect-[4/3] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
                 onCroppedFile={(file) =>
                   uploadCropped(file, (url) =>
                     setValue("gallery_images", [...galleryImages, url], { shouldDirty: true })

@@ -438,7 +438,7 @@ export default function AdminPartnerDocumentsPage() {
           {terms.map((term) => (
             <div key={term.id} className="p-3 rounded-xl border border-white/10 bg-black/10 flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm text-zinc-100">{term.text}</p>
+                <p className="text-sm text-slate-800">{term.text}</p>
                 <p className="text-xs text-zinc-500 mt-1">{MODULE_LABEL[term.module] || term.module}</p>
               </div>
               <div className="flex items-center gap-2">

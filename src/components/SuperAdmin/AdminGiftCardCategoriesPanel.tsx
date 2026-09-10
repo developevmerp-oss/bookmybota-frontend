@@ -25,9 +25,8 @@ import {
 } from "@/lib/giftCardFormSchemas";
 
 const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
-const labelClass = "block text-xs font-semibold text-zinc-400 uppercase mb-2";
-const inputClass =
-  "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white";
+const labelClass = "block text-xs font-semibold text-slate-500 uppercase mb-2";
+const inputClass = "input-field";
 
 function RequiredMark() {
   return <span className="text-rose-500">*</span>;
@@ -174,14 +173,14 @@ export default function AdminGiftCardCategoriesPanel() {
     : false;
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-5 space-y-4">
+    <section className="glass-panel rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-white inline-flex items-center gap-2">
-            <Tags size={18} className="text-rose-400" />
+          <h2 className="text-lg font-bold text-slate-900 inline-flex items-center gap-2">
+            <Tags size={18} className="text-rose-500" />
             Design categories
           </h2>
-          <p className="mt-1 text-xs text-zinc-400 max-w-xl">
+          <p className="mt-1 text-xs text-slate-500 max-w-xl">
             Master list for Add Design and customer filters on /gift-cards. Name is the label
             customers see; description is for admin reference.
           </p>
@@ -200,7 +199,7 @@ export default function AdminGiftCardCategoriesPanel() {
       <form
         onSubmit={handleSubmit(onValid)}
         noValidate
-        className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end rounded-xl border border-white/10 bg-zinc-950/40 p-3"
+        className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end rounded-xl border border-slate-200 bg-slate-50 p-3"
       >
         <div className="sm:col-span-4">
           <label className={labelClass}>
@@ -229,7 +228,7 @@ export default function AdminGiftCardCategoriesPanel() {
             <button
               type="button"
               onClick={cancelEdit}
-              className="h-11 flex-1 rounded-xl border border-white/10 text-zinc-300 text-sm font-semibold hover:bg-white/5"
+              className="h-11 flex-1 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-100"
             >
               Cancel
             </button>
@@ -287,7 +286,7 @@ export default function AdminGiftCardCategoriesPanel() {
                     }`}
                   >
                     <td className="px-3 py-2.5 text-white font-medium">{row.name}</td>
-                    <td className="px-3 py-2.5 text-zinc-400 max-w-[280px] truncate">
+                    <td className="px-3 py-2.5 text-slate-700 max-w-[280px] truncate">
                       {row.description?.trim() || "—"}
                     </td>
                     <td className="px-3 py-2.5">

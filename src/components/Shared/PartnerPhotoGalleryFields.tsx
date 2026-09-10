@@ -1,11 +1,11 @@
 "use client";
 
-import { ImagePlus, Trash2, Upload } from "lucide-react";
+import { ImagePlus, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useUploadImageMutation } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
-import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { VENUE_GALLERY_MAX } from "@/lib/artistMeta";
+import ImageCropPicker, { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 
 export function normalizeImageList(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -49,30 +49,34 @@ export default function PartnerPhotoGalleryFields({
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const images = value || [];
 
-  const uploadInput = (
-    <input
-      type="file"
-      accept="image/*"
-      className="hidden"
+  const uploadCropped = async (file: File, replaceIndex?: number) => {
+    const fd = new FormData();
+    fd.append("image", file);
+    try {
+      const res = await uploadImage(fd).unwrap();
+      if (!res.url) return;
+      if (typeof replaceIndex === "number") {
+        onChange(images.map((u, i) => (i === replaceIndex ? res.url : u)));
+      } else {
+        onChange([...images, res.url].slice(0, max));
+      }
+      toast.success("Gallery photo uploaded");
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to upload photo"));
+    }
+  };
+
+  const addPhotoButton = !disabled && images.length > 0 && images.length < max ? (
+    <ImageCropPicker
+      aspect={4 / 3}
       disabled={uploading}
-      onChange={async (e) => {
-        const file = e.target.files?.[0];
-        e.target.value = "";
-        if (!file) return;
-        const fd = new FormData();
-        fd.append("image", file);
-        try {
-          const res = await uploadImage(fd).unwrap();
-          if (res.url) {
-            onChange([...images, res.url].slice(0, max));
-            toast.success("Gallery photo uploaded");
-          }
-        } catch (err) {
-          toast.error(extractApiError(err, "Failed to upload photo"));
-        }
-      }}
-    />
-  );
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-border text-xs font-semibold text-foreground hover:border-primary cursor-pointer shrink-0"
+      onCroppedFile={(file) => void uploadCropped(file)}
+    >
+      <Upload size={14} className="text-primary" />
+      {uploading ? "Uploading…" : "Add photo"}
+    </ImageCropPicker>
+  ) : null;
 
   return (
     <section className={`org-card ${compact ? "p-4 sm:p-5 space-y-3" : "p-5 sm:p-6 space-y-4"}`}>
@@ -82,16 +86,10 @@ export default function PartnerPhotoGalleryFields({
             {title}
           </h3>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            {description} Up to {max} photos.
+            {description} Up to {max} photos. Crop like Photos — move any side or corner.
           </p>
         </div>
-        {!disabled && images.length > 0 && images.length < max ? (
-          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-border text-xs font-semibold text-foreground hover:border-primary cursor-pointer shrink-0">
-            <Upload size={14} className="text-primary" />
-            {uploading ? "Uploading…" : "Add photo"}
-            {uploadInput}
-          </label>
-        ) : null}
+        {addPhotoButton}
       </div>
 
       {images.length === 0 ? (
@@ -103,38 +101,33 @@ export default function PartnerPhotoGalleryFields({
           <ImagePlus className="mx-auto text-muted-foreground" size={compact ? 22 : 28} />
           <p className="text-sm text-muted-foreground">No gallery photos yet.</p>
           {!disabled ? (
-            <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold cursor-pointer">
+            <ImageCropPicker
+              aspect={4 / 3}
+              disabled={uploading}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
+              onCroppedFile={(file) => void uploadCropped(file)}
+            >
               <Upload size={15} />
               {uploading ? "Uploading…" : "Add first photo"}
-              {uploadInput}
-            </label>
+            </ImageCropPicker>
           ) : null}
         </div>
       ) : (
         <div
           className={`grid gap-2.5 ${
-            compact
-              ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5"
-              : "grid-cols-2 sm:grid-cols-3"
+            compact ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5" : "grid-cols-2 sm:grid-cols-3"
           }`}
         >
           {images.map((url, idx) => (
-            <div
+            <CroppedImageField
               key={`${url}-${idx}`}
-              className="relative group rounded-xl overflow-hidden border border-border aspect-[4/3] bg-muted"
-            >
-              <img src={resolveMediaUrl(url)} alt="" className="w-full h-full object-cover" />
-              {!disabled ? (
-                <button
-                  type="button"
-                  className="absolute top-1.5 right-1.5 p-1.5 rounded-lg bg-white/90 text-destructive opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                  onClick={() => onChange(images.filter((_, i) => i !== idx))}
-                  title="Remove"
-                >
-                  <Trash2 size={13} />
-                </button>
-              ) : null}
-            </div>
+              value={url}
+              aspect={4 / 3}
+              disabled={disabled || uploading}
+              previewClassName="rounded-xl border border-border aspect-[4/3] bg-muted w-full overflow-hidden"
+              onRemove={() => onChange(images.filter((_, i) => i !== idx))}
+              onCroppedFile={(file) => void uploadCropped(file, idx)}
+            />
           ))}
         </div>
       )}

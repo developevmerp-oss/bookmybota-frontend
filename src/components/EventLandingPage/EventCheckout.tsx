@@ -459,7 +459,7 @@ export default function EventCheckout({
         return (
           bal > 0 &&
           (status === "ACTIVE" || status === "PARTIALLY_USED") &&
-          (cat === "ALL" || cat === "EVENTS") &&
+          (cat === "ALL" || cat === "EVENTS" || cat === "SPORTS") &&
           isGiftCardSpendable(c)
         );
       }),

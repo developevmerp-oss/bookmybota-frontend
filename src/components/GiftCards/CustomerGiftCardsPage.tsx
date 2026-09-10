@@ -330,7 +330,7 @@ export default function CustomerGiftCardsPage() {
           </p>
         ) : (
           <p className="text-[12px] text-slate-500 -mt-2">
-            Cards claimed to this account. Use them when paying for Events or Dining.
+            Cards claimed to this account. Use them at Events checkout, or present the code at a dining restaurant POS.
           </p>
         )}
 

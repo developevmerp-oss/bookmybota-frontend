@@ -22,6 +22,7 @@ import {
   QrCode,
   Tag,
   BadgePercent,
+  Wallet,
 } from "lucide-react";
 
 export default function BusinessLayout({ children }: { children: React.ReactNode }) {
@@ -68,6 +69,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
     { name: "Scan guest QR", href: "/business/scan", icon: QrCode },
     { name: "Offers", href: "/business/offers", icon: BadgePercent },
     { name: "Offer Redemptions", href: "/business/offer-redemptions", icon: Tag },
+    { name: "Gift Card Settlements", href: "/business/settlements", icon: Wallet },
     { name: "Table Management", href: "/business/tables", icon: LayoutGrid },
     { name: "Analytics", href: "/business/analytics", icon: Clock },
     { name: "Profile", href: "/business/profile", icon: Settings },

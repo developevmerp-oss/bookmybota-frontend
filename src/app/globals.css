@@ -127,9 +127,9 @@
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.129 0.042 264.695);
     --border: oklch(0.9 0.008 255);
-    --accent: oklch(0.935 0.025 285);
-    --muted: oklch(0.94 0.007 255);
-    --muted-foreground: oklch(0.52 0.025 258);
+    --accent: oklch(0.96 0.004 255);
+    --muted: oklch(0.955 0.005 255);
+    --muted-foreground: oklch(0.45 0.02 258);
     --secondary: oklch(0.962 0.006 255);
     --secondary-foreground: oklch(0.25 0.025 265);
     --destructive: oklch(0.577 0.245 27.325);
@@ -864,40 +864,118 @@ html.admin-theme .admin-dashboard-layout .text-white {
   color: var(--foreground) !important;
 }
 
-html.admin-theme .admin-dashboard-layout .text-zinc-400 {
-  color: var(--muted-foreground) !important;
+/* Pale dark-theme text colors are unreadable on light admin glass — remap to ink. */
+html.admin-theme .admin-dashboard-layout .text-amber-100,
+html.admin-theme .admin-dashboard-layout .text-amber-100\/90,
+html.admin-theme .admin-dashboard-layout .text-amber-200,
+html.admin-theme .admin-dashboard-layout .text-amber-200\/80 {
+  color: #92400e !important;
+}
+html.admin-theme .admin-dashboard-layout .text-sky-100,
+html.admin-theme .admin-dashboard-layout .text-sky-100\/90,
+html.admin-theme .admin-dashboard-layout .text-sky-200 {
+  color: #075985 !important;
+}
+html.admin-theme .admin-dashboard-layout .text-rose-100,
+html.admin-theme .admin-dashboard-layout .text-rose-100\/90,
+html.admin-theme .admin-dashboard-layout .text-rose-200 {
+  color: #9f1239 !important;
+}
+html.admin-theme .admin-dashboard-layout .text-emerald-100,
+html.admin-theme .admin-dashboard-layout .text-emerald-100\/90 {
+  color: #065f46 !important;
+}
+html.admin-theme .admin-dashboard-layout .text-violet-100,
+html.admin-theme .admin-dashboard-layout .text-violet-200 {
+  color: #5b21b6 !important;
 }
 
+html.admin-theme .admin-dashboard-layout .text-zinc-100,
+html.admin-theme .admin-dashboard-layout .text-zinc-200,
 html.admin-theme .admin-dashboard-layout .text-zinc-300 {
-  color: var(--muted-foreground) !important;
+  color: #1e293b !important;
+}
+
+html.admin-theme .admin-dashboard-layout .text-zinc-400 {
+  color: #475569 !important;
 }
 
 html.admin-theme .admin-dashboard-layout .text-zinc-500 {
-  color: #9ca3af !important;
+  color: #64748b !important;
+}
+
+html.admin-theme .admin-dashboard-layout .text-zinc-600 {
+  color: #475569 !important;
+}
+
+/* Table body copy must stay readable on white cards */
+html.admin-theme .admin-dashboard-layout table td {
+  color: #1e293b;
+}
+html.admin-theme .admin-dashboard-layout table th {
+  color: #64748b !important;
 }
 
 html.admin-theme .admin-dashboard-layout .bg-zinc-900\/40,
 html.admin-theme .admin-dashboard-layout .bg-zinc-900\/50,
-html.admin-theme .admin-dashboard-layout .bg-white\/5 {
-  background-color: var(--accent) !important;
+html.admin-theme .admin-dashboard-layout .bg-zinc-900\/80,
+html.admin-theme .admin-dashboard-layout .bg-zinc-900,
+html.admin-theme .admin-dashboard-layout .bg-zinc-950\/40,
+html.admin-theme .admin-dashboard-layout .bg-zinc-950\/50,
+html.admin-theme .admin-dashboard-layout .bg-zinc-950,
+html.admin-theme .admin-dashboard-layout .bg-black\/10,
+html.admin-theme .admin-dashboard-layout .bg-black\/40,
+html.admin-theme .admin-dashboard-layout .bg-white\/5,
+html.admin-theme .admin-dashboard-layout .bg-white\/\[0\.02\],
+html.admin-theme .admin-dashboard-layout .bg-white\/\[0\.03\],
+html.admin-theme .admin-dashboard-layout .bg-white\/\[0\.04\] {
+  background-color: #f8fafc !important;
+}
+
+html.admin-theme .admin-dashboard-layout .bg-zinc-800,
+html.admin-theme .admin-dashboard-layout .bg-zinc-800\/50 {
+  background-color: #f1f5f9 !important;
+  color: #1f2937 !important;
+}
+
+/* Dark-theme form controls → solid white fields on light admin */
+html.admin-theme .admin-dashboard-layout input.bg-zinc-900\/50,
+html.admin-theme .admin-dashboard-layout input.bg-zinc-900\/80,
+html.admin-theme .admin-dashboard-layout input.bg-zinc-900,
+html.admin-theme .admin-dashboard-layout input.bg-black\/40,
+html.admin-theme .admin-dashboard-layout textarea.bg-zinc-900\/50,
+html.admin-theme .admin-dashboard-layout textarea.bg-zinc-900,
+html.admin-theme .admin-dashboard-layout select.bg-zinc-900\/50,
+html.admin-theme .admin-dashboard-layout select.bg-zinc-900,
+html.admin-theme .admin-dashboard-layout select.bg-zinc-900\/80 {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #d1d5db !important;
+}
+html.admin-theme .admin-dashboard-layout input.bg-zinc-900\/50::placeholder,
+html.admin-theme .admin-dashboard-layout input.bg-zinc-900\/80::placeholder,
+html.admin-theme .admin-dashboard-layout input.bg-zinc-900::placeholder,
+html.admin-theme .admin-dashboard-layout textarea.bg-zinc-900\/50::placeholder,
+html.admin-theme .admin-dashboard-layout textarea.bg-zinc-900::placeholder {
+  color: #9ca3af !important;
 }
 
 html.admin-theme .admin-dashboard-layout .border-white\/5,
-html.admin-theme .admin-dashboard-layout .border-white\/10 {
-  border-color: var(--border) !important;
+html.admin-theme .admin-dashboard-layout .border-white\/10,
+html.admin-theme .admin-dashboard-layout .border-zinc-700,
+html.admin-theme .admin-dashboard-layout .border-zinc-800 {
+  border-color: #e2e8f0 !important;
 }
 
 html.admin-theme .admin-dashboard-layout .divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
-  border-color: var(--border) !important;
+  border-color: #e2e8f0 !important;
 }
 
-html.admin-theme .admin-dashboard-layout .hover\:bg-white\/5:hover {
-  background-color: var(--accent) !important;
-}
-
-html.admin-theme .admin-dashboard-layout .bg-zinc-800 {
-  background-color: #e5e7eb !important;
-  color: #1f2937 !important;
+html.admin-theme .admin-dashboard-layout .hover\:bg-white\/5:hover,
+html.admin-theme .admin-dashboard-layout .hover\:bg-white\/\[0\.02\]:hover,
+html.admin-theme .admin-dashboard-layout .hover\:bg-white\/\[0\.03\]:hover,
+html.admin-theme .admin-dashboard-layout .hover\:bg-zinc-800\/50:hover {
+  background-color: #f1f5f9 !important;
 }
 
 /* Keep explicit elements white */
@@ -1012,8 +1090,17 @@ html.admin-theme .admin-dashboard-layout .portal-banner-warning {
   color: #92400e !important;
 }
 html.admin-theme .admin-dashboard-layout .portal-banner-warning p,
-html.admin-theme .admin-dashboard-layout .portal-banner-warning svg {
+html.admin-theme .admin-dashboard-layout .portal-banner-warning > div,
+html.admin-theme .admin-dashboard-layout .portal-banner-warning svg:not(button svg) {
   color: #92400e !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-warning .font-semibold,
+html.admin-theme .admin-dashboard-layout .portal-banner-warning strong {
+  color: #78350f !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-warning a,
+html.admin-theme .admin-dashboard-layout .portal-banner-warning button {
+  color: #ffffff !important;
 }
 
 html.admin-theme .admin-dashboard-layout .portal-banner-error {
@@ -1022,8 +1109,17 @@ html.admin-theme .admin-dashboard-layout .portal-banner-error {
   color: #9f1239 !important;
 }
 html.admin-theme .admin-dashboard-layout .portal-banner-error p,
-html.admin-theme .admin-dashboard-layout .portal-banner-error svg {
+html.admin-theme .admin-dashboard-layout .portal-banner-error > div,
+html.admin-theme .admin-dashboard-layout .portal-banner-error svg:not(button svg) {
   color: #9f1239 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-error .font-semibold,
+html.admin-theme .admin-dashboard-layout .portal-banner-error strong {
+  color: #881337 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-error a,
+html.admin-theme .admin-dashboard-layout .portal-banner-error button {
+  color: #ffffff !important;
 }
 
 html.admin-theme .admin-dashboard-layout .portal-banner-success {
@@ -1031,8 +1127,38 @@ html.admin-theme .admin-dashboard-layout .portal-banner-success {
   border-color: #6ee7b7 !important;
   color: #065f46 !important;
 }
-html.admin-theme .admin-dashboard-layout .portal-banner-success p {
+html.admin-theme .admin-dashboard-layout .portal-banner-success p,
+html.admin-theme .admin-dashboard-layout .portal-banner-success > div {
   color: #065f46 !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-banner-info {
+  background-color: #f0f9ff !important;
+  border-color: #7dd3fc !important;
+  color: #075985 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-info p,
+html.admin-theme .admin-dashboard-layout .portal-banner-info > div,
+html.admin-theme .admin-dashboard-layout .portal-banner-info svg:not(button svg) {
+  color: #075985 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-info .font-semibold,
+html.admin-theme .admin-dashboard-layout .portal-banner-info strong {
+  color: #0c4a6e !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-info a,
+html.admin-theme .admin-dashboard-layout .portal-banner-info button {
+  color: #ffffff !important;
+}
+
+html.admin-theme .admin-dashboard-layout .portal-banner-neutral {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+html.admin-theme .admin-dashboard-layout .portal-banner-neutral p,
+html.admin-theme .admin-dashboard-layout .portal-banner-neutral > div {
+  color: #334155 !important;
 }
 
 html.admin-theme .admin-dashboard-layout .portal-label {

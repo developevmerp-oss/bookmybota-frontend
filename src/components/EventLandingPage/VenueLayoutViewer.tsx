@@ -43,18 +43,24 @@ export default function VenueLayoutViewer({
   onSeatsSelected,
   maxSelectable = Number.MAX_SAFE_INTEGER,
   initialSelectedSeats = [],
+  cinemaMode = false,
+  hideSidePanel = false,
+  customLegend,
 }: {
   layoutData: any;
   ticketTypes: any[];
   onSeatsSelected: (seats: Seat[]) => void;
   maxSelectable?: number;
   initialSelectedSeats?: any[];
+  cinemaMode?: boolean;
+  hideSidePanel?: boolean;
+  customLegend?: Array<{ name: string; color: string; price?: number }>;
 }) {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>(
-    initialSelectedSeats.map(s => s.id)
+    initialSelectedSeats.map((s: any) => s.id || s.seat_identifier || s.internalId)
   );
   const [activeBoxInfo, setActiveBoxInfo] = useState<Shape | null>(null);
 
@@ -64,10 +70,15 @@ export default function VenueLayoutViewer({
   const scaleRef = useRef(scale);
   const pendingScrollRef = useRef<{ scrollLeft: number; scrollTop: number } | null>(null);
 
-  const canvasWidth = layoutData?.data?.seating_config?.canvasWidth || 3200;
-  const canvasHeight = layoutData?.data?.seating_config?.canvasHeight || 2400;
+  const config =
+    layoutData?.data?.seating_config ||
+    layoutData?.seating_config ||
+    layoutData?.layout_template?.seating_config ||
+    {};
+  const canvasWidth = config?.canvasWidth || 3200;
+  const canvasHeight = config?.canvasHeight || 2400;
 
-  const backgroundImageUrl = layoutData?.data?.seating_config?.bgImageUrl || null;
+  const backgroundImageUrl = config?.bgImageUrl || null;
   const [bgImage] = useImage(backgroundImageUrl || "");
 
   useEffect(() => {
@@ -131,38 +142,91 @@ export default function VenueLayoutViewer({
   }, []);
 
   useEffect(() => {
+    const rawSeats =
+      layoutData?.data?.seats ||
+      layoutData?.seats ||
+      layoutData?.layout_template?.seats_json ||
+      [];
+    const rawConfig =
+      layoutData?.data?.seating_config ||
+      layoutData?.seating_config ||
+      layoutData?.layout_template?.seating_config ||
+      {};
+
+    if (Array.isArray(rawSeats) && rawSeats.length > 0) {
+      setSeats(
+        rawSeats.map((s: any) => ({
+          ...s,
+          id: s.id || s.internalId || `${s.row_label || ""}${s.seat_label || ""}`,
+          coordinate_x: Number(s.coordinate_x),
+          coordinate_y: Number(s.coordinate_y),
+        }))
+      );
+    }
+    if (rawConfig?.labels && Array.isArray(rawConfig.labels)) {
+      setLabels(rawConfig.labels);
+    }
+    if (rawConfig?.shapes && Array.isArray(rawConfig.shapes)) {
+      setShapes(rawConfig.shapes);
+    }
+  }, [layoutData]);
+
+  useEffect(() => {
+    if (initialSelectedSeats) {
+      const incomingIds = initialSelectedSeats.map((s: any) => s.id || s.seat_identifier || s.internalId);
+      setSelectedSeatIds(incomingIds);
+    }
+  }, [initialSelectedSeats]);
+
+  useEffect(() => {
     const updateScale = () => {
       if (containerRef.current) {
         const { clientWidth, clientHeight } = containerRef.current;
-        const scaleX = (clientWidth - 32) / canvasWidth;
-        const scaleY = (clientHeight - 32) / canvasHeight;
-        const fitScale = Math.min(scaleX, scaleY, 1);
-        setScale(Math.max(0.2, fitScale));
+        if (!clientWidth || !clientHeight) return;
+
+        // Calculate bounding box of all seats and shapes to center and scale perfectly
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const s of seats) {
+          if (s.coordinate_x < minX) minX = s.coordinate_x;
+          if (s.coordinate_x > maxX) maxX = s.coordinate_x;
+          if (s.coordinate_y < minY) minY = s.coordinate_y;
+          if (s.coordinate_y > maxY) maxY = s.coordinate_y;
+        }
+        for (const sh of shapes) {
+          if (sh.x < minX) minX = sh.x;
+          if (sh.x + sh.width > maxX) maxX = sh.x + sh.width;
+          if (sh.y < minY) minY = sh.y;
+          if (sh.y + sh.height > maxY) maxY = sh.y + sh.height;
+        }
+
+        const hasContent = isFinite(minX) && isFinite(maxX) && maxX > minX;
+        const contentW = hasContent ? (maxX - minX + 160) : canvasWidth;
+        const contentH = hasContent && isFinite(minY) && isFinite(maxY) ? (maxY - minY + 160) : canvasHeight;
+
+        const scaleX = (clientWidth - 32) / contentW;
+        const scaleY = (clientHeight - 32) / contentH;
+        const fitScale = Math.min(scaleX, scaleY, 1.2);
+        const resolvedScale = Math.max(0.25, Math.min(fitScale, 1.0));
+        setScale(resolvedScale);
+
+        // Center directly on the seat content
+        if (hasContent) {
+          const centerX = (minX + (maxX - minX) / 2) * resolvedScale;
+          const centerY = (minY + (maxY - minY) / 2) * resolvedScale;
+          setTimeout(() => {
+            if (containerRef.current) {
+              containerRef.current.scrollLeft = Math.max(0, centerX - clientWidth / 2);
+              containerRef.current.scrollTop = Math.max(0, centerY - clientHeight / 2);
+            }
+          }, 60);
+        }
       }
     };
     
     updateScale();
     window.addEventListener("resize", updateScale);
     return () => window.removeEventListener("resize", updateScale);
-  }, [canvasWidth, canvasHeight]);
-
-  useEffect(() => {
-    if (layoutData?.data?.seats) {
-      setSeats(
-        layoutData.data.seats.map((s: any) => ({
-          ...s,
-          coordinate_x: Number(s.coordinate_x),
-          coordinate_y: Number(s.coordinate_y),
-        }))
-      );
-    }
-    if (layoutData?.data?.seating_config?.labels) {
-      setLabels(layoutData.data.seating_config.labels);
-    }
-    if (layoutData?.data?.seating_config?.shapes) {
-      setShapes(layoutData.data.seating_config.shapes);
-    }
-  }, [layoutData]);
+  }, [canvasWidth, canvasHeight, seats, shapes]);
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status !== "AVAILABLE") return;
@@ -283,7 +347,7 @@ export default function VenueLayoutViewer({
     return "#3b82f6";                                // Blue default
   };
 
-  if (!layoutData?.data?.seats || seats.length === 0) return null;
+  if (seats.length === 0) return null;
 
   return (
     <div className="flex flex-col md:flex-row h-full w-full bg-slate-900 text-white rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
@@ -497,73 +561,129 @@ export default function VenueLayoutViewer({
         </div>
       </div>
 
-      {/* Side Info Panel for Diamond Boxes */}
-      <div className="w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 p-5 flex flex-col justify-between shrink-0">
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
-            <h3 className="text-sm font-bold tracking-wider text-amber-400 uppercase">
-              For Each Diamond Box
-            </h3>
+      {/* Side Info Panel for Diamond Boxes or Cinema Overview */}
+      {!hideSidePanel && (
+        <div className="w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 p-5 flex flex-col justify-between shrink-0">
+          <div>
+            {cinemaMode ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full bg-[#F84464] animate-pulse" />
+                  <h3 className="text-sm font-bold tracking-wider text-white uppercase">
+                    Cinema Hall Map
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Live layout configured for this screen. Pick up to {maxSelectable} seats directly on the map.
+                </p>
+
+                <div className="space-y-2 pt-3 border-t border-slate-800 text-xs">
+                  <p className="text-slate-300 font-semibold mb-2">Seat Tiers & Pricing:</p>
+                  {(customLegend && customLegend.length > 0 ? customLegend : [
+                    { name: "Recliner", color: "#0284c7" },
+                    { name: "Prime", color: "#3b82f6" },
+                    { name: "Classic Plus", color: "#6366f1" },
+                  ]).map((tier) => (
+                    <div key={tier.name} className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: tier.color }} />
+                        <span className="text-slate-200 font-medium">{tier.name}</span>
+                      </div>
+                      {tier.price != null && (
+                        <span className="font-mono text-slate-400 font-bold">{tier.price} ETB</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-3 space-y-1.5 text-[11px] text-slate-400">
+                  <p className="flex items-center gap-1.5">
+                    <span className="text-rose-400 font-bold">•</span> Double-click any section to zoom in
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <span className="text-rose-400 font-bold">•</span> Use +/- buttons or wheel to zoom
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <span className="text-rose-400 font-bold">•</span> Drag canvas to pan across screen
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
+                  <h3 className="text-sm font-bold tracking-wider text-amber-400 uppercase">
+                    For Each Diamond Box
+                  </h3>
+                </div>
+
+                <ul className="space-y-2.5 text-xs text-slate-300 leading-relaxed border-t border-slate-800 pt-4">
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    Select 1 seat / ticket to view Diamond Box availability
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    Accommodates 5 people
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    Exclusive access to your personal diamond lounge
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    An ensuite, private powder room
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    Personalised service
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    Specially curated food & beverages menu
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    Complimentary high-speed Wi-Fi
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">•</span>
+                    Personalised reminders at show start and intermission
+                  </li>
+                </ul>
+
+                {activeBoxInfo && (
+                  <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <p className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                      Selected: {activeBoxInfo.text}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Luxury Private Box • 5 Guests Capacity
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <ul className="space-y-2.5 text-xs text-slate-300 leading-relaxed border-t border-slate-800 pt-4">
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              Select 1 seat / ticket to view Diamond Box availability
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              Accommodates 5 people
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              Exclusive access to your personal diamond lounge
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              An ensuite, private powder room
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              Personalised service
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              Specially curated food & beverages menu
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              Complimentary high-speed Wi-Fi
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 font-bold">•</span>
-              Personalised reminders at show start and intermission
-            </li>
-          </ul>
-
-          {activeBoxInfo && (
-            <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-              <p className="text-xs font-bold text-amber-300 uppercase tracking-wide">
-                Selected: {activeBoxInfo.text}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Luxury Private Box • 5 Guests Capacity
-              </p>
+          {/* Legend */}
+          {cinemaMode ? (
+            <div className="border-t border-slate-800 pt-4 mt-4 flex flex-wrap gap-3 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-rose-500" /> Selected</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-slate-700" /> Sold / Reserved</div>
+            </div>
+          ) : (
+            <div className="border-t border-slate-800 pt-4 mt-4 flex flex-wrap gap-4 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-cyan-500" /> Platinum</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-purple-500" /> Gold</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-pink-500" /> Dress Circle</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-amber-500" /> Lower Balcony</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-violet-500" /> Upper Balcony</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-rose-500" /> Selected</div>
             </div>
           )}
         </div>
-
-        {/* Legend */}
-        <div className="border-t border-slate-800 pt-4 mt-4 flex flex-wrap gap-4 text-xs text-slate-400">
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-cyan-500" /> Platinum</div>
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-purple-500" /> Gold</div>
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-pink-500" /> Dress Circle</div>
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-amber-500" /> Lower Balcony</div>
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-violet-500" /> Upper Balcony</div>
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-rose-500" /> Selected</div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

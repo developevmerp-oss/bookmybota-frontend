@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Stage, Layer, Circle, Text, Rect, Group, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 
@@ -178,55 +178,59 @@ export default function VenueLayoutViewer({
     }
   }, [initialSelectedSeats]);
 
+  const boundingBox = useMemo(() => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const s of seats) {
+      if (s.coordinate_x < minX) minX = s.coordinate_x;
+      if (s.coordinate_x > maxX) maxX = s.coordinate_x;
+      if (s.coordinate_y < minY) minY = s.coordinate_y;
+      if (s.coordinate_y > maxY) maxY = s.coordinate_y;
+    }
+    for (const sh of shapes) {
+      if (sh.x < minX) minX = sh.x;
+      if (sh.x + sh.width > maxX) maxX = sh.x + sh.width;
+      if (sh.y < minY) minY = sh.y;
+      if (sh.y + sh.height > maxY) maxY = sh.y + sh.height;
+    }
+    for (const lb of labels) {
+      if (lb.x < minX) minX = lb.x;
+      if (lb.x > maxX) maxX = lb.x;
+      if (lb.y < minY) minY = lb.y;
+      if (lb.y > maxY) maxY = lb.y;
+    }
+    if (!isFinite(minX) || !isFinite(maxX) || maxX <= minX) {
+      return { minX: 0, maxX: canvasWidth, minY: 0, maxY: canvasHeight, contentW: canvasWidth, contentH: canvasHeight };
+    }
+    const padX = 60;
+    const padY = 60;
+    return {
+      minX: minX - padX,
+      minY: minY - padY,
+      maxX: maxX + padX,
+      maxY: maxY + padY,
+      contentW: maxX - minX + padX * 2,
+      contentH: maxY - minY + padY * 2,
+    };
+  }, [seats, shapes, labels, canvasWidth, canvasHeight]);
+
   useEffect(() => {
     const updateScale = () => {
       if (containerRef.current) {
         const { clientWidth, clientHeight } = containerRef.current;
         if (!clientWidth || !clientHeight) return;
 
-        // Calculate bounding box of all seats and shapes to center and scale perfectly
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const s of seats) {
-          if (s.coordinate_x < minX) minX = s.coordinate_x;
-          if (s.coordinate_x > maxX) maxX = s.coordinate_x;
-          if (s.coordinate_y < minY) minY = s.coordinate_y;
-          if (s.coordinate_y > maxY) maxY = s.coordinate_y;
-        }
-        for (const sh of shapes) {
-          if (sh.x < minX) minX = sh.x;
-          if (sh.x + sh.width > maxX) maxX = sh.x + sh.width;
-          if (sh.y < minY) minY = sh.y;
-          if (sh.y + sh.height > maxY) maxY = sh.y + sh.height;
-        }
-
-        const hasContent = isFinite(minX) && isFinite(maxX) && maxX > minX;
-        const contentW = hasContent ? (maxX - minX + 160) : canvasWidth;
-        const contentH = hasContent && isFinite(minY) && isFinite(maxY) ? (maxY - minY + 160) : canvasHeight;
-
-        const scaleX = (clientWidth - 32) / contentW;
-        const scaleY = (clientHeight - 32) / contentH;
+        const scaleX = (clientWidth - 48) / boundingBox.contentW;
+        const scaleY = (clientHeight - 48) / boundingBox.contentH;
         const fitScale = Math.min(scaleX, scaleY, 1.2);
         const resolvedScale = Math.max(0.25, Math.min(fitScale, 1.0));
         setScale(resolvedScale);
-
-        // Center directly on the seat content
-        if (hasContent) {
-          const centerX = (minX + (maxX - minX) / 2) * resolvedScale;
-          const centerY = (minY + (maxY - minY) / 2) * resolvedScale;
-          setTimeout(() => {
-            if (containerRef.current) {
-              containerRef.current.scrollLeft = Math.max(0, centerX - clientWidth / 2);
-              containerRef.current.scrollTop = Math.max(0, centerY - clientHeight / 2);
-            }
-          }, 60);
-        }
       }
     };
     
     updateScale();
     window.addEventListener("resize", updateScale);
     return () => window.removeEventListener("resize", updateScale);
-  }, [canvasWidth, canvasHeight, seats, shapes]);
+  }, [boundingBox]);
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status !== "AVAILABLE") return;
@@ -375,37 +379,40 @@ export default function VenueLayoutViewer({
 
         <div 
           ref={canvasWrapperRef}
-          style={{ width: canvasWidth * scale, height: canvasHeight * scale }} 
+          style={{ width: boundingBox.contentW * scale, height: boundingBox.contentH * scale }} 
           className="relative origin-top-left inline-block"
         >
           <Stage 
-            width={canvasWidth * scale} 
-            height={canvasHeight * scale} 
-            scaleX={scale} 
-            scaleY={scale}
+            width={boundingBox.contentW * scale} 
+            height={boundingBox.contentH * scale} 
             onDblClick={(e) => {
               if (e.target === e.target.getStage()) {
                 setScale(s => s > 0.65 ? 0.4 : 0.95);
               }
             }}
           >
-            <Layer>
+            <Layer
+              scaleX={scale}
+              scaleY={scale}
+              x={-boundingBox.minX * scale}
+              y={-boundingBox.minY * scale}
+            >
               {bgImage && (
                 <KonvaImage
                   image={bgImage}
-                  x={0}
-                  y={0}
-                  width={canvasWidth}
-                  height={canvasHeight}
+                  x={boundingBox.minX}
+                  y={boundingBox.minY}
+                  width={boundingBox.contentW}
+                  height={boundingBox.contentH}
                   listening={false}
                 />
               )}
               {/* Shapes / VIP Boxes / Stage */}
-              {shapes.map(shape => {
+              {shapes.map((shape, sIdx) => {
                 const isBox = shape.text?.includes("DIAMOND") || shape.text?.includes("BOX");
                 return (
                   <Group
-                    key={shape.id}
+                    key={shape.id || `shape-${shape.text || ''}-${sIdx}`}
                     x={shape.x + shape.width / 2}
                     y={shape.y + shape.height / 2}
                     offsetX={shape.width / 2}
@@ -476,7 +483,7 @@ export default function VenueLayoutViewer({
               })}
 
               {/* Seats */}
-              {seats.map((seat) => {
+              {seats.map((seat, sIdx) => {
                 const isSelected = selectedSeatIds.includes(seat.id);
                 const isAvailable = seat.status === "AVAILABLE";
                 const categoryColor = getSeatColorBySection(seat.section_name);
@@ -499,7 +506,7 @@ export default function VenueLayoutViewer({
 
                 return (
                   <Group
-                    key={seat.id}
+                    key={seat.internalId || `${seat.section_name || ''}-${seat.row_label || ''}-${seat.seat_label || ''}-${seat.id || ''}-${sIdx}`}
                     x={seat.coordinate_x}
                     y={seat.coordinate_y}
                     opacity={opacity}
@@ -544,9 +551,9 @@ export default function VenueLayoutViewer({
               })}
 
               {/* Text Labels */}
-              {labels.map((label) => (
+              {labels.map((label, lIdx) => (
                 <Text
-                  key={label.id}
+                  key={label.id || `label-${label.text || ''}-${lIdx}`}
                   text={label.text}
                   x={label.x}
                   y={label.y}

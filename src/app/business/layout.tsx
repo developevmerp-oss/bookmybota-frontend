@@ -18,7 +18,7 @@ import {
   X,
   Star,
   Megaphone,
-  KeyRound,
+  // KeyRound,
   QrCode,
   Tag,
   BadgePercent,
@@ -70,10 +70,10 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
     { name: "Offer Redemptions", href: "/business/offer-redemptions", icon: Tag },
     { name: "Table Management", href: "/business/tables", icon: LayoutGrid },
     { name: "Analytics", href: "/business/analytics", icon: Clock },
-    { name: "Profile Editor", href: "/business/profile", icon: Settings },
+    { name: "Profile", href: "/business/profile", icon: Settings },
     { name: "Reviews", href: "/business/reviews", icon: Star },
     { name: "Promotions", href: "/business/promotions", icon: Megaphone },
-    { name: "Change Password", href: "/business/change-password", icon: KeyRound },
+    // { name: "Change Password", href: "/business/change-password", icon: KeyRound },
   ];
 
   const handleLogout = () => {

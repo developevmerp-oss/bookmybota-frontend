@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Html5Qrcode } from "html5-qrcode";
-import { Camera, ImageUp, Loader2, QrCode, Tag, Users, Clock, UtensilsCrossed, Gift, MessageSquare } from "lucide-react";
+import { Camera, ImageUp, Loader2, QrCode, Tag, Users, Clock, UtensilsCrossed, Gift, MessageSquare, Search, Check, Calculator, Link2, CreditCard, User, Phone, ArrowRight, Coins } from "lucide-react";
 import { toast } from "sonner";
 import {
   useScanDiningBookingQrMutation,
@@ -83,25 +83,25 @@ function buildPromoBillPreview(
 
 function OfferBillBreakdown({ preview }: { preview: PromoBillPreview }) {
   return (
-    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 space-y-1.5">
-      <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Promo validated</p>
-      {preview.title && <p className="text-sm font-semibold text-white">{preview.title}</p>}
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 space-y-1">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Promo validated</p>
+      {preview.title && <p className="text-sm font-semibold text-slate-800">{preview.title}</p>}
       {preview.discount_label && (
-        <p className="text-xs text-emerald-300">{preview.discount_label}</p>
+        <p className="text-xs text-emerald-700">{preview.discount_label}</p>
       )}
-      <div className="flex justify-between text-sm text-zinc-200 pt-1">
+      <div className="flex justify-between text-sm text-slate-600 pt-0.5">
         <span>Total bill</span>
-        <span className="font-semibold text-white">
+        <span className="font-semibold text-slate-800">
           {formatMoney(preview.bill_amount, { compact: true })}
         </span>
       </div>
-      <div className="flex justify-between text-sm text-emerald-300">
+      <div className="flex justify-between text-sm text-emerald-700">
         <span>Discount</span>
         <span className="font-semibold">
           −{formatMoney(preview.discount_amount, { compact: true })}
         </span>
       </div>
-      <div className="flex justify-between text-sm font-bold text-white pt-1 border-t border-white/10">
+      <div className="flex justify-between text-sm font-bold text-slate-900 pt-1 border-t border-emerald-200">
         <span>Guest pays</span>
         <span>{formatMoney(preview.final_amount, { compact: true })}</span>
       </div>
@@ -571,7 +571,7 @@ export default function DiningScanPage() {
   };
 
   if (!user?.business_id) {
-    return <p className="text-zinc-400">Loading restaurant account...</p>;
+    return <p className="text-slate-500">Loading restaurant account...</p>;
   }
 
   const offer = scanned?.applied_offer;
@@ -584,243 +584,326 @@ export default function DiningScanPage() {
     scanned.status === "CANCELLED" ||
     !offer?.title;
 
+  const fieldWrap =
+    "flex h-11 items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3.5 focus-within:border-rose-400 focus-within:ring-2 focus-within:ring-rose-500/10 transition-shadow";
+  const fieldInput =
+    "w-full bg-transparent border-0 p-0 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none";
+  const primaryBtn =
+    "inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white bg-[#e11d48] hover:bg-[#be123c] shadow-sm shadow-rose-600/20 disabled:opacity-60 transition-all";
+  const secondaryBtn =
+    "inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 disabled:opacity-60 transition-all";
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-extrabold text-white tracking-tight">Scan guest QR</h2>
-        <p className="text-sm text-zinc-400 mt-1">
-          Scan guest QR for offers, redeem walk-in promos, or redeem a BookMyBota Gift Card against the food bill.
-        </p>
+    <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8">
+      <div className="max-w-6xl mx-auto space-y-5 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl sm:text-[1.75rem] font-bold text-slate-900 tracking-tight">
+            Scan guest QR
+          </h2>
+          <p className="text-sm text-slate-500 mt-1 max-w-xl">
+            Scan guest QR for offers, redeem walk-in promos, or redeem a BookMyBota Gift Card against the food bill.
+          </p>
+        </div>
+        
       </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 p-5 space-y-4">
-        <div className="relative overflow-hidden rounded-xl bg-black min-h-[280px]">
-          <div id={SCANNER_REGION_ID} className="w-full overflow-hidden rounded-xl [&>video]:w-full [&>video]:rounded-xl [&>img]:hidden" />
-          {!cameraOn && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-400 gap-2 pointer-events-none">
-              <QrCode size={40} />
-              <p className="text-sm">{starting ? "Starting camera..." : "Camera is off"}</p>
-            </div>
-          )}
-        </div>
-        {cameraError && <p className="text-xs text-amber-400">{cameraError}</p>}
-        <div className="flex flex-wrap gap-2">
-          {!cameraOn ? (
-            <button
-              type="button"
-              onClick={() => void startCamera()}
-              disabled={starting}
-              className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-            >
-              {starting ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-              {starting ? "Starting..." : "Start camera"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void stopCamera()}
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold border border-white/10 text-white hover:bg-white/5"
-            >
-              Stop camera
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-          >
-            <ImageUp size={16} /> Upload QR image
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => void handleScanFile(e.target.files?.[0])}
-          />
-        </div>
-        <form
-          className="flex flex-col sm:flex-row gap-2"
-          onSubmit={onTokenLookup}
-          noValidate
-        >
-          <div className="flex-1">
-            <label className="sr-only">
-              QR token <RequiredMark />
-            </label>
-            <input
-              placeholder="Or paste / type QR code (DNB-...)"
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500"
-              {...registerToken("token")}
+      {/* Top row: Scanner + Manual lookup */}
+      <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Scanner */}
+        <div className="relative overflow-hidden rounded-3xl bg-slate-900 shadow-lg min-h-[280px] flex flex-col">
+          <div className="relative flex-1 min-h-[220px]">
+            <div
+              id={SCANNER_REGION_ID}
+              className="absolute inset-0 w-full h-full overflow-hidden [&>video]:w-full [&>video]:h-full [&>video]:object-cover [&>img]:hidden"
             />
-            {tokenErrors.token && (
-              <p className={fieldErrorClass}>{tokenErrors.token.message}</p>
+            {!cameraOn && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-slate-800 to-slate-950">
+                <div className="relative w-40 h-40 flex items-center justify-center">
+                  <span className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white rounded-tl-lg" />
+                  <span className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-white rounded-tr-lg" />
+                  <span className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-white rounded-bl-lg" />
+                  <span className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white rounded-br-lg" />
+                  <div className="text-center text-white px-2">
+                    <QrCode size={36} className="mx-auto mb-2 opacity-90" />
+                    <p className="text-sm font-semibold">
+                      {starting ? "Starting camera..." : "Scan QR code"}
+                    </p>
+                    <p className="text-[11px] text-white/70 mt-1">
+                      Position the QR code within the frame.
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={isScanning}
-            className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60"
-          >
-            {isScanning ? "Looking up..." : "Lookup"}
-          </button>
-        </form>
+          {cameraError && (
+            <p className="px-4 py-1.5 text-xs text-amber-300 bg-black/40">{cameraError}</p>
+          )}
+          <div className="absolute bottom-4 left-0 right-0 flex flex-wrap justify-center gap-2 px-4">
+            {!cameraOn ? (
+              <button
+                type="button"
+                onClick={() => void startCamera()}
+                disabled={starting}
+                className={primaryBtn}
+              >
+                {starting ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                {starting ? "Starting..." : "Start camera"}
+              </button>
+            ) : (
+              <button type="button" onClick={() => void stopCamera()} className={secondaryBtn}>
+                Stop camera
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white bg-white/15 hover:bg-white/25 backdrop-blur border border-white/20 transition-all"
+            >
+              <ImageUp size={16} /> Upload QR image
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => void handleScanFile(e.target.files?.[0])}
+            />
+          </div>
+        </div>
+
+        {/* Manual lookup */}
+        <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col">
+          <div className="flex items-start gap-3 mb-5">
+            <span className="h-11 w-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <Search size={20} />
+            </span>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Manual Token Lookup</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Paste or type the guest QR token if the camera is unavailable.
+              </p>
+            </div>
+          </div>
+
+          <form className="space-y-4 flex-1 flex flex-col" onSubmit={onTokenLookup} noValidate>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-start">
+              <div className="flex-1 w-full min-w-0">
+                <label className="sr-only">
+                  QR token <RequiredMark />
+                </label>
+                <div className={fieldWrap}>
+                  <Search size={16} className="text-slate-400 shrink-0" />
+                  <input
+                    placeholder="Or paste / type QR code (DNB-...)"
+                    className={fieldInput}
+                    {...registerToken("token")}
+                  />
+                </div>
+                {tokenErrors.token && (
+                  <p className={fieldErrorClass}>{tokenErrors.token.message}</p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={isScanning}
+                className={`${primaryBtn} shrink-0 w-full sm:w-auto sm:self-start`}
+              >
+                {isScanning ? "Looking up..." : "Lookup"}
+                {!isScanning && <ArrowRight size={16} />}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <span className="flex-1 h-px bg-slate-200" />
+              OR
+              <span className="flex-1 h-px bg-slate-200" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-auto w-full rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 px-4 py-8 text-center transition-colors cursor-pointer"
+            >
+              <QrCode size={28} className="mx-auto text-rose-500 mb-2" />
+              <p className="text-sm font-semibold text-slate-700">
+                Drag &amp; drop a QR image here or click to upload
+              </p>
+            </button>
+          </form>
+        </div>
       </div>
 
+      {/* Guest details when scanned — keep all existing controls */}
       {scanned && (
-        <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Guest details</p>
-              <h3 className="text-xl font-bold text-white mt-0.5">
+        <div className="relative rounded-3xl bg-white border border-slate-100 shadow-lg p-5 sm:p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                Guest details
+              </p>
+              <h3 className="text-lg font-bold text-slate-900 mt-0.5 truncate">
                 {scanned.customer_name || scanned.guest_name || "Guest"}
               </h3>
-              <p className="text-sm text-zinc-300 mt-1">
+              <p className="text-sm text-slate-600 mt-0.5">
                 {scanned.customer_phone || scanned.guest_phone || "No phone on file"}
               </p>
               {scanned.qr_token && (
-                <p className="text-[11px] font-mono text-zinc-500 mt-1">{scanned.qr_token}</p>
+                <p className="text-[11px] font-mono text-slate-400 mt-0.5">{scanned.qr_token}</p>
               )}
             </div>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-              scanned.status === "COMPLETED"
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                : scanned.status === "CANCELLED"
-                ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                : "bg-amber-500/10 text-amber-300 border-amber-500/20"
-            }`}>
+            <span
+              className={`shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
+                scanned.status === "COMPLETED"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : scanned.status === "CANCELLED"
+                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
+              }`}
+            >
               {scanned.status}
             </span>
           </div>
 
           {scanned.special_request?.trim() ? (
-            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
-              <p className="text-[11px] uppercase tracking-wider text-amber-300 font-bold flex items-center gap-1.5">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-[11px] uppercase tracking-wider text-amber-700 font-bold flex items-center gap-1.5">
                 <MessageSquare size={13} /> Special request
               </p>
-              <p className="text-sm text-white mt-1.5 leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-slate-800 mt-1 leading-relaxed whitespace-pre-wrap">
                 {scanned.special_request.trim()}
               </p>
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-              <p className="text-[11px] text-zinc-500 flex items-center gap-1"><Clock size={12} /> Time</p>
-              <p className="text-sm font-semibold text-white mt-1">{formatDate(scanned.booking_time)}</p>
-              <p className="text-xs text-zinc-400">{formatTime12h(scanned.booking_time)}</p>
-            </div>
-            <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-              <p className="text-[11px] text-zinc-500 flex items-center gap-1"><Users size={12} /> Guests</p>
-              <p className="text-sm font-semibold text-white mt-1">{scanned.guests ?? "—"}</p>
-            </div>
-            <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-              <p className="text-[11px] text-zinc-500 flex items-center gap-1"><UtensilsCrossed size={12} /> Table</p>
-              <p className="text-sm font-semibold text-white mt-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <Clock size={13} className="text-slate-400" />
+              <span className="font-semibold text-slate-800">{formatDate(scanned.booking_time)}</span>
+              <span className="text-slate-500">{formatTime12h(scanned.booking_time)}</span>
+            </span>
+            <span className="text-slate-300 hidden sm:inline">|</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Users size={13} className="text-slate-400" />
+              Guests <span className="font-semibold text-slate-800">{scanned.guests ?? "—"}</span>
+            </span>
+            <span className="text-slate-300 hidden sm:inline">|</span>
+            <span className="inline-flex items-center gap-1.5">
+              <UtensilsCrossed size={13} className="text-slate-400" />
+              <span className="font-semibold text-slate-800">
                 {scanned.table_number ? `Table ${scanned.table_number}` : "Unassigned"}
-              </p>
-            </div>
+              </span>
+            </span>
           </div>
 
-          <div className="rounded-2xl border border-dashed border-rose-400/40 bg-rose-500/10 p-4">
-            <p className="text-[11px] uppercase tracking-wider text-rose-300 font-bold flex items-center gap-1.5">
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4 space-y-1">
+            <p className="text-[11px] uppercase tracking-wider text-rose-600 font-bold flex items-center gap-1.5">
               <Tag size={13} /> Offer selected at booking
             </p>
             {offer?.title ? (
               <>
-                <p className="text-lg font-extrabold text-white mt-1">{offer.title}</p>
+                <p className="text-base font-extrabold text-slate-900">{offer.title}</p>
                 {offer.promo_code && (
-                  <p className="text-sm font-mono text-rose-300 mt-0.5">{offer.promo_code}</p>
+                  <p className="text-sm font-mono text-rose-600">{offer.promo_code}</p>
                 )}
-                <p className="text-xs text-zinc-300 mt-0.5">
+                <p className="text-xs text-slate-600">
                   {isPlatformOffer ? "BookMyBota platform offer" : offer.type || "Merchant offer"}
                 </p>
-                <p className="text-xs text-emerald-300 mt-1">
+                <p className="text-xs text-emerald-700">
                   {formatDiningOfferDiscount(offer as Parameters<typeof formatDiningOfferDiscount>[0])}
                 </p>
                 {isPlatformOffer && offer.min_bill_amount != null && Number(offer.min_bill_amount) > 0 && (
-                  <p className="text-xs text-amber-300 mt-1">
+                  <p className="text-xs text-amber-700">
                     Min bill {formatMoney(Number(offer.min_bill_amount))} to redeem
                   </p>
                 )}
-                <p className="text-xs text-zinc-400 mt-2">
+                <p className="text-xs text-slate-500 pt-0.5">
                   {isPlatformOffer
                     ? "Apply this BookMyBota discount on the food bill. BookMyBota funds the discount — enter bill amount, validate the code, then redeem."
                     : "Apply this discount on the food bill at your restaurant. BookMyBota does not charge the guest online for dining."}
                 </p>
               </>
             ) : (
-              <p className="text-sm text-zinc-400 mt-1">No offer is attached to this booking.</p>
+              <p className="text-sm text-slate-500">No offer is attached to this booking.</p>
             )}
           </div>
 
           {scanned.status !== "CANCELLED" && scanned.status !== "COMPLETED" && (
-            <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">
+            <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+              <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
                 {offer?.title ? "Redeem offer on bill" : "Complete visit"}
               </p>
 
               {offer?.title ? (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {offer.promo_code ? (
                       <div>
-                        <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
                           Promo code *
                         </label>
-                        <input
-                          value={promoCode}
-                          onChange={(e) => {
-                            setPromoCode(e.target.value.toUpperCase());
-                            setPromoPreview(null);
-                            setPromoValidated(false);
-                          }}
-                          placeholder={offer.promo_code}
-                          className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-rose-500"
-                        />
-                        <p className="text-[11px] text-zinc-500 mt-1">
+                        <div className={fieldWrap}>
+                          <Tag size={15} className="text-slate-400 shrink-0" />
+                          <input
+                            value={promoCode}
+                            onChange={(e) => {
+                              setPromoCode(e.target.value.toUpperCase());
+                              setPromoPreview(null);
+                              setPromoValidated(false);
+                            }}
+                            placeholder={offer.promo_code}
+                            className={`${fieldInput} font-mono`}
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">
                           Pre-filled from the offer chosen at booking.
                         </p>
                       </div>
                     ) : (
-                      <div className="rounded-xl bg-white/5 border border-white/5 p-3 sm:col-span-2">
-                        <p className="text-xs text-zinc-400">
+                      <div className="rounded-xl bg-white border border-slate-200 p-3 sm:col-span-2">
+                        <p className="text-xs text-slate-500">
                           This offer has no promo code — enter the bill amount and redeem directly.
                         </p>
                       </div>
                     )}
                     <div className={offer.promo_code ? "" : "sm:col-span-2"}>
-                      <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
                         Total bill amount (ETB) <RequiredMark />
                       </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={billAmount}
-                        onChange={(e) => {
-                          setBillAmount(e.target.value);
-                          setPromoPreview(null);
-                          setPromoValidated(false);
-                        }}
-                        placeholder="e.g. 1500"
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
-                      />
+                      <div className={fieldWrap}>
+                        <Coins size={15} className="text-slate-400 shrink-0" />
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={billAmount}
+                          onChange={(e) => {
+                            setBillAmount(e.target.value);
+                            setPromoPreview(null);
+                            setPromoValidated(false);
+                          }}
+                          placeholder="e.g. 1500"
+                          className={fieldInput}
+                        />
+                      </div>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                      Notes (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={redemptionNotes}
-                      onChange={(e) => setRedemptionNotes(e.target.value)}
-                      placeholder="e.g. 20% off applied on main course"
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
-                    />
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                        Notes (optional)
+                      </label>
+                      <div className={fieldWrap}>
+                        <MessageSquare size={15} className="text-slate-400 shrink-0" />
+                        <input
+                          type="text"
+                          value={redemptionNotes}
+                          onChange={(e) => setRedemptionNotes(e.target.value)}
+                          placeholder="e.g. 20% off applied on main course"
+                          className={fieldInput}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {promoPreview && promoValidated && <OfferBillBreakdown preview={promoPreview} />}
@@ -831,11 +914,12 @@ export default function DiningScanPage() {
                         type="button"
                         onClick={() => void handleValidateBookingPromo()}
                         disabled={validatingPromo || validatingPlatformPromo}
-                        className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+                        className={secondaryBtn}
                       >
                         {(validatingPromo || validatingPlatformPromo) && (
                           <Loader2 size={16} className="animate-spin" />
                         )}
+                        <Check size={16} />
                         Validate code
                       </button>
                     )}
@@ -847,9 +931,10 @@ export default function DiningScanPage() {
                         Boolean(offer.promo_code && !promoValidated) ||
                         !billAmount.trim()
                       }
-                      className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+                      className={primaryBtn}
                     >
                       {isCheckingOut && <Loader2 size={16} className="animate-spin" />}
+                      <Gift size={16} />
                       Redeem offer & complete visit
                     </button>
                   </div>
@@ -857,24 +942,27 @@ export default function DiningScanPage() {
               ) : (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
                       Bill amount (optional)
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={billAmount}
-                      onChange={(e) => setBillAmount(e.target.value)}
-                      placeholder="e.g. 1500"
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
-                    />
+                    <div className={fieldWrap}>
+                      <Coins size={15} className="text-slate-400 shrink-0" />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={billAmount}
+                        onChange={(e) => setBillAmount(e.target.value)}
+                        placeholder="e.g. 1500"
+                        className={fieldInput}
+                      />
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => void handleCompleteVisitOnly()}
                     disabled={isCheckingOut}
-                    className="w-full btn-primary rounded-xl py-3 text-sm font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                    className={`w-full ${primaryBtn}`}
                   >
                     {isCheckingOut && <Loader2 size={16} className="animate-spin" />}
                     Complete visit
@@ -887,300 +975,353 @@ export default function DiningScanPage() {
           {scanned.status === "COMPLETED" && (
             <div className="space-y-2 text-center">
               {scanned.checked_out_at && (
-                <p className="text-xs text-emerald-400">
-                  Checked out at {formatDate(scanned.checked_out_at)} {formatTime12h(scanned.checked_out_at)}
+                <p className="text-xs text-emerald-700">
+                  Checked out at {formatDate(scanned.checked_out_at)}{" "}
+                  {formatTime12h(scanned.checked_out_at)}
                 </p>
               )}
               {scanned.offer_redeemed_at ? (
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-left">
-                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Offer redeemed</p>
-                  <p className="text-sm text-white mt-1">{offer?.title || "Merchant offer"}</p>
-                  <p className="text-xs text-zinc-400 mt-1">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                    Offer redeemed
+                  </p>
+                  <p className="text-sm text-slate-800 mt-1">{offer?.title || "Merchant offer"}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     {formatDate(scanned.offer_redeemed_at)} {formatTime12h(scanned.offer_redeemed_at)}
                   </p>
                   {scanned.bill_amount != null && Number(scanned.bill_amount) > 0 && (
-                    <p className="text-xs text-zinc-300 mt-1">
+                    <p className="text-xs text-slate-600 mt-0.5">
                       Bill recorded: {formatMoney(scanned.bill_amount, { compact: true })}
                     </p>
                   )}
                   {scanned.offer_redemption_notes && (
-                    <p className="text-xs text-zinc-400 mt-1">{scanned.offer_redemption_notes}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{scanned.offer_redemption_notes}</p>
                   )}
                 </div>
               ) : offer?.title ? (
-                <p className="text-xs text-zinc-500">Visit completed — offer was not marked as redeemed.</p>
+                <p className="text-xs text-slate-500">
+                  Visit completed — offer was not marked as redeemed.
+                </p>
               ) : null}
             </div>
           )}
         </div>
       )}
 
-      {showWalkInPromo && (
-      <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
-        <div>
-          <h3 className="text-lg font-bold text-white">Walk-in promo redemption</h3>
-          <p className="text-sm text-zinc-400 mt-1">
-            Guest without a booking? Enter your restaurant promo code and bill amount to record redemption.
-          </p>
-        </div>
+      {/* Bottom row: Walk-in + Gift card */}
+      <div className={`relative grid grid-cols-1 gap-4 ${showWalkInPromo ? "lg:grid-cols-2" : ""}`}>
+        {showWalkInPromo && (
+          <div className="rounded-3xl border border-orange-100 bg-orange-50/40 shadow-sm p-5 sm:p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="h-11 w-11 rounded-2xl bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">
+                <Tag size={20} />
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Walk-in promo redemption</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Guest without a booking? Enter your restaurant promo code and bill amount to record
+                  redemption.
+                </p>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">Promo code</label>
-            <input
-              value={walkInCode}
-              onChange={(e) => {
-                setWalkInCode(e.target.value.toUpperCase());
-                setWalkInPreview(null);
-              }}
-              placeholder="LUNCH20"
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-rose-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">Bill amount (ETB) *</label>
-            <input
-              type="number"
-              min="0"
-              value={walkInBill}
-              onChange={(e) => {
-                setWalkInBill(e.target.value);
-                setWalkInPreview(null);
-              }}
-              placeholder="1500"
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">Guest name (optional)</label>
-            <input
-              value={walkInName}
-              onChange={(e) => setWalkInName(e.target.value)}
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
-            />
-          </div>
-          <div>
-            <PhoneInput
-              label="Guest phone (optional)"
-              labelClassName="block text-xs font-semibold text-zinc-400 uppercase mb-2"
-              variant="dark"
-              value={walkInPhone}
-              onChange={setWalkInPhone}
-              required={false}
-              helperText="9–12 digits if provided"
-            />
-          </div>
-        </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                  Promo Code
+                </label>
+                <div className={fieldWrap}>
+                  <Tag size={15} className="text-orange-400 shrink-0" />
+                  <input
+                    value={walkInCode}
+                    onChange={(e) => {
+                      setWalkInCode(e.target.value.toUpperCase());
+                      setWalkInPreview(null);
+                    }}
+                    placeholder="LUNCH20"
+                    className={`${fieldInput} font-mono`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                  Bill Amount (ETB) <RequiredMark />
+                </label>
+                <div className={fieldWrap}>
+                  <Coins size={15} className="text-orange-400 shrink-0" />
+                  <input
+                    type="number"
+                    min="0"
+                    value={walkInBill}
+                    onChange={(e) => {
+                      setWalkInBill(e.target.value);
+                      setWalkInPreview(null);
+                    }}
+                    placeholder="1500"
+                    className={fieldInput}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                  Guest Name (Optional)
+                </label>
+                <div className={fieldWrap}>
+                  <User size={15} className="text-orange-400 shrink-0" />
+                  <input
+                    value={walkInName}
+                    onChange={(e) => setWalkInName(e.target.value)}
+                    className={fieldInput}
+                  />
+                </div>
+              </div>
+              <div>
+                <PhoneInput
+                  label="Guest Phone (Optional)"
+                  labelClassName="block text-[11px] font-semibold text-slate-500 mb-1.5"
+                  variant="light"
+                  value={walkInPhone}
+                  onChange={setWalkInPhone}
+                  required={false}
+                  helperText="9–12 digits if provided"
+                  showIcon
+                />
+              </div>
+            </div>
 
-        {walkInPreview && <OfferBillBreakdown preview={walkInPreview} />}
+            {walkInPreview && <OfferBillBreakdown preview={walkInPreview} />}
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void handleValidateWalkIn()}
-            disabled={validatingWalkIn}
-            className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-          >
-            {validatingWalkIn && <Loader2 size={16} className="animate-spin" />}
-            Validate code
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleRedeemWalkIn()}
-            disabled={redeemingWalkIn || !walkInPreview}
-            className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-          >
-            {redeemingWalkIn && <Loader2 size={16} className="animate-spin" />}
-            Redeem walk-in offer
-          </button>
-        </div>
-      </div>
-      )}
-
-      <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-4">
-        <div>
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Gift size={18} className="text-violet-300" />
-            Gift Card Redemption
-          </h3>
-          <p className="text-sm text-zinc-400 mt-1">
-            Guest pays with a BookMyBota Gift Card at the restaurant. BookMyBota settles the redeemed amount with you later.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-              Gift card code *
-            </label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                value={gcCode}
-                onChange={(e) => {
-                  setGcCode(e.target.value.toUpperCase());
-                  resetGiftCardForm();
-                }}
-                placeholder="BOTA-XXXX-XXXX-XXXX"
-                className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-violet-500"
-              />
+            <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => void handleVerifyGiftCard()}
-                disabled={verifyingGc}
-                className="btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+                onClick={() => void handleValidateWalkIn()}
+                disabled={validatingWalkIn}
+                className={secondaryBtn}
               >
-                {verifyingGc && <Loader2 size={16} className="animate-spin" />}
-                Verify
+                {validatingWalkIn ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                Validate code
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRedeemWalkIn()}
+                disabled={redeemingWalkIn || !walkInPreview}
+                className={`flex-1 min-w-[180px] ${primaryBtn}`}
+              >
+                {redeemingWalkIn ? <Loader2 size={16} className="animate-spin" /> : <Gift size={16} />}
+                Redeem walk-in offer
               </button>
             </div>
           </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-              Restaurant bill amount (ETB) *
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={gcBill}
-              onChange={(e) => {
-                setGcBill(e.target.value);
-                setGcPreview(null);
-              }}
-              placeholder="1500"
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-              Link scanned booking
-            </label>
-            <div className="h-[42px] flex items-center rounded-xl border border-white/10 bg-zinc-900/40 px-4 text-sm text-zinc-300">
-              {scanned?.id
-                ? `${scanned.customer_name || scanned.guest_name || "Guest"} · linked`
-                : "Optional — scan guest QR first"}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-              Guest name (optional)
-            </label>
-            <input
-              value={gcGuestName}
-              onChange={(e) => setGcGuestName(e.target.value)}
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-              Guest phone (optional)
-            </label>
-            <input
-              value={gcGuestPhone}
-              onChange={(e) => setGcGuestPhone(e.target.value)}
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500"
-            />
-          </div>
-        </div>
-
-        {gcVerified && (
-          <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 space-y-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-violet-300">Gift card</p>
-            <p className="text-sm font-semibold text-white">
-              {gcVerified.product_name} · {gcVerified.code_masked}
-            </p>
-            {gcVerified.customer_name && (
-              <p className="text-xs text-zinc-300">Customer: {gcVerified.customer_name}</p>
-            )}
-            <p className="text-sm text-violet-200">
-              Available balance: {formatMoney(gcVerified.current_balance, { compact: true })}
-            </p>
-            <p className="text-xs text-zinc-400">
-              Status: {gcVerified.status}
-              {gcVerified.expires_at
-                ? ` · Expiry ${formatDate(gcVerified.expires_at)}`
-                : ""}
-            </p>
-          </div>
         )}
 
-        {gcPreview && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 space-y-1.5">
-            <div className="flex justify-between text-sm text-zinc-200">
-              <span>Food bill</span>
-              <span className="font-semibold text-white">
-                {formatMoney(gcPreview.bill_amount, { compact: true })}
-              </span>
+        <div className="rounded-3xl border border-emerald-100 bg-emerald-50/40 shadow-sm p-5 sm:p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <span className="h-11 w-11 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+              <Gift size={20} />
+            </span>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Gift Card Redemption</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Guest pays with a BookMyBota Gift Card at the restaurant. BookMyBota settles the redeemed
+                amount with you later.
+              </p>
             </div>
-            <div className="flex justify-between text-sm text-emerald-300">
-              <span>Redeem from gift card</span>
-              <span className="font-semibold">
-                −{formatMoney(gcPreview.amount_applicable, { compact: true })}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm font-bold text-white pt-1 border-t border-white/10">
-              <span>Customer pays restaurant</span>
-              <span>{formatMoney(gcPreview.customer_payable, { compact: true })}</span>
-            </div>
-            <p className="text-[11px] text-zinc-400">
-              Remaining gift card after redeem:{" "}
-              {formatMoney(gcPreview.balance_after, { compact: true })} · Settlement to restaurant:{" "}
-              {formatMoney(gcPreview.amount_applicable, { compact: true })} (pending)
-            </p>
           </div>
-        )}
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void handlePreviewGiftCard()}
-            disabled={previewingGc || !gcVerified}
-            className="btn-secondary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-          >
-            {previewingGc && <Loader2 size={16} className="animate-spin" />}
-            Calculate split
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleRedeemGiftCard()}
-            disabled={redeemingGc || !gcVerified || !gcPreview}
-            className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-          >
-            {redeemingGc && <Loader2 size={16} className="animate-spin" />}
-            Redeem Gift Card
-          </button>
-        </div>
-
-        {recentGcRedemptions.length > 0 && (
-          <div className="pt-2 border-t border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
-              Recent gift card redemptions
-            </p>
-            <ul className="space-y-2">
-              {recentGcRedemptions.map((row) => (
-                <li
-                  key={row.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 border border-white/5 px-3 py-2 text-xs"
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                Gift Card Code <RequiredMark />
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className={`flex-1 ${fieldWrap}`}>
+                  <CreditCard size={15} className="text-emerald-500 shrink-0" />
+                  <input
+                    value={gcCode}
+                    onChange={(e) => {
+                      setGcCode(e.target.value.toUpperCase());
+                      resetGiftCardForm();
+                    }}
+                    placeholder="BOTA-XXXX-XXXX-XXXX"
+                    className={`${fieldInput} font-mono`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleVerifyGiftCard()}
+                  disabled={verifyingGc}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-200 disabled:opacity-60 shrink-0"
                 >
-                  <div>
-                    <p className="text-white font-semibold">
-                      ****{row.code_last4} · {formatMoney(row.gift_card_amount, { compact: true })}
-                    </p>
-                    <p className="text-zinc-400">
-                      Bill {formatMoney(row.bill_amount, { compact: true })} · Guest pays{" "}
-                      {formatMoney(row.customer_payable, { compact: true })}
-                      {row.redeemed_at ? ` · ${formatDate(row.redeemed_at)}` : ""}
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300">
-                    {row.settlement_status}
+                  {verifyingGc && <Loader2 size={16} className="animate-spin" />}
+                  Verify
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                  Restaurant Bill Amount (ETB) <RequiredMark />
+                </label>
+                <div className={fieldWrap}>
+                  <Coins size={15} className="text-emerald-500 shrink-0" />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={gcBill}
+                    onChange={(e) => {
+                      setGcBill(e.target.value);
+                      setGcPreview(null);
+                    }}
+                    placeholder="1500"
+                    className={fieldInput}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                  Link Scanned Booking
+                </label>
+                <div className={`${fieldWrap} bg-slate-50`}>
+                  <Link2 size={15} className="text-emerald-500 shrink-0" />
+                  <span className="text-sm text-slate-600 truncate">
+                    {scanned?.id
+                      ? `${scanned.customer_name || scanned.guest_name || "Guest"} · linked`
+                      : "Optional — scan guest QR first"}
                   </span>
-                </li>
-              ))}
-            </ul>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                  Guest Name (Optional)
+                </label>
+                <div className={fieldWrap}>
+                  <User size={15} className="text-emerald-500 shrink-0" />
+                  <input
+                    value={gcGuestName}
+                    onChange={(e) => setGcGuestName(e.target.value)}
+                    className={fieldInput}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                  Guest Phone (Optional)
+                </label>
+                <div className={fieldWrap}>
+                  <Phone size={15} className="text-emerald-500 shrink-0" />
+                  <input
+                    value={gcGuestPhone}
+                    onChange={(e) => setGcGuestPhone(e.target.value)}
+                    className={fieldInput}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+
+          {gcVerified && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 space-y-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Gift card</p>
+              <p className="text-sm font-semibold text-slate-800">
+                {gcVerified.product_name} · {gcVerified.code_masked}
+              </p>
+              {gcVerified.customer_name && (
+                <p className="text-xs text-slate-600">Customer: {gcVerified.customer_name}</p>
+              )}
+              <p className="text-sm text-emerald-700">
+                Available balance: {formatMoney(gcVerified.current_balance, { compact: true })}
+              </p>
+              <p className="text-xs text-slate-500">
+                Status: {gcVerified.status}
+                {gcVerified.expires_at ? ` · Expiry ${formatDate(gcVerified.expires_at)}` : ""}
+              </p>
+            </div>
+          )}
+
+          {gcPreview && (
+            <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 space-y-1.5">
+              <div className="flex justify-between text-sm text-slate-600">
+                <span>Food bill</span>
+                <span className="font-semibold text-slate-800">
+                  {formatMoney(gcPreview.bill_amount, { compact: true })}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm text-emerald-700">
+                <span>Redeem from gift card</span>
+                <span className="font-semibold">
+                  −{formatMoney(gcPreview.amount_applicable, { compact: true })}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm font-bold text-slate-900 pt-1 border-t border-emerald-100">
+                <span>Customer pays restaurant</span>
+                <span>{formatMoney(gcPreview.customer_payable, { compact: true })}</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Remaining gift card after redeem:{" "}
+                {formatMoney(gcPreview.balance_after, { compact: true })} · Settlement to restaurant:{" "}
+                {formatMoney(gcPreview.amount_applicable, { compact: true })} (pending)
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => void handlePreviewGiftCard()}
+              disabled={previewingGc || !gcVerified}
+              className={secondaryBtn}
+            >
+              {previewingGc ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Calculator size={16} />
+              )}
+              Calculate split
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleRedeemGiftCard()}
+              disabled={redeemingGc || !gcVerified || !gcPreview}
+              className={`flex-1 min-w-[180px] ${primaryBtn}`}
+            >
+              {redeemingGc ? <Loader2 size={16} className="animate-spin" /> : <Gift size={16} />}
+              Redeem Gift Card
+            </button>
+          </div>
+
+          {recentGcRedemptions.length > 0 && (
+            <div className="pt-2 border-t border-emerald-100">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                Recent gift card redemptions
+              </p>
+              <ul className="space-y-1.5">
+                {recentGcRedemptions.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white border border-emerald-100 px-3 py-2 text-xs"
+                  >
+                    <div>
+                      <p className="text-slate-800 font-semibold">
+                        ****{row.code_last4} · {formatMoney(row.gift_card_amount, { compact: true })}
+                      </p>
+                      <p className="text-slate-500">
+                        Bill {formatMoney(row.bill_amount, { compact: true })} · Guest pays{" "}
+                        {formatMoney(row.customer_payable, { compact: true })}
+                        {row.redeemed_at ? ` · ${formatDate(row.redeemed_at)}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border border-amber-200 bg-amber-50 text-amber-700">
+                      {row.settlement_status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
       </div>
     </div>
   );

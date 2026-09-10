@@ -2144,7 +2144,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
                 (showStickyCuisineNames ? 52 : 0),
             }}
           >
-            <div className="border-b border-slate-100/90 bg-white py-2 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+            <div className="border-b border-slate-100/90  bg-white py-2 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
               <DiningFiltersBar
                 cuisines={cuisineOptions}
                 filters={diningFilters}

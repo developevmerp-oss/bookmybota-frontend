@@ -1,18 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-  Archive,
-  ArchiveRestore,
-  BadgePercent,
-  Loader2,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-} from "lucide-react";
+  FaArchive,
+  FaCalendarAlt,
+  FaClock,
+  FaFileAlt,
+  FaPause,
+  FaPencilAlt,
+  FaPlay,
+  FaPlus,
+  FaSpinner,
+  FaTag,
+  FaTimes,
+} from "react-icons/fa";
+import { MdUnarchive } from "react-icons/md";
 import { toast } from "sonner";
 import {
   useGetBusinessSettingsQuery,
@@ -21,7 +27,6 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import {
-  diningOfferStatusBadgeClass,
   formatDiningOfferDiscount,
   getEffectiveDiningOfferStatus,
   normalizeDiningOffers,
@@ -52,11 +57,24 @@ const STATUS_TABS: { key: TabKey; label: string }[] = [
 ];
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
-const labelClass = "block text-xs font-semibold text-zinc-400 uppercase mb-2";
-const inputClass = "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white";
+const labelClass = "block text-[11px] font-semibold text-slate-500 mb-1.5";
+const inputClass =
+  "w-full h-11 bg-white border border-slate-200 rounded-xl px-3.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-500/10";
 
 function RequiredMark() {
   return <span className="text-rose-500">*</span>;
+}
+
+function lightStatusBadgeClass(status: DiningOfferStatus): string {
+  const colors: Record<DiningOfferStatus, string> = {
+    ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    SCHEDULED: "bg-sky-50 text-sky-700 border-sky-100",
+    DRAFT: "bg-slate-50 text-slate-600 border-slate-200",
+    PAUSED: "bg-amber-50 text-amber-700 border-amber-100",
+    EXPIRED: "bg-rose-50 text-rose-600 border-rose-100",
+    ARCHIVED: "bg-violet-50 text-violet-700 border-violet-100",
+  };
+  return colors[status] || colors.DRAFT;
 }
 
 function offerToForm(offer: DiningOffer): DiningOfferFormValues {
@@ -80,7 +98,7 @@ function StatusBadge({ offer }: { offer: DiningOffer }) {
   const status = getEffectiveDiningOfferStatus(offer);
   return (
     <span
-      className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${diningOfferStatusBadgeClass(status)}`}
+      className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${lightStatusBadgeClass(status)}`}
     >
       {status}
     </span>
@@ -127,6 +145,23 @@ export default function DiningOffersPage() {
       setOffers(normalizeDiningOffers(settings.dining_offers));
     }
   }, [settings?.dining_offers]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<DiningOfferStatus | "TOTAL", number> = {
+      TOTAL: offers.length,
+      ACTIVE: 0,
+      SCHEDULED: 0,
+      DRAFT: 0,
+      PAUSED: 0,
+      EXPIRED: 0,
+      ARCHIVED: 0,
+    };
+    for (const offer of offers) {
+      const status = getEffectiveDiningOfferStatus(offer);
+      counts[status] += 1;
+    }
+    return counts;
+  }, [offers]);
 
   const filteredOffers = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -259,344 +294,457 @@ export default function DiningOffersPage() {
   };
 
   if (!user?.business_id) {
-    return <p className="text-zinc-400 p-10 text-center">Loading restaurant account...</p>;
+    return <p className="text-slate-500 p-10 text-center">Loading restaurant account...</p>;
   }
 
+  const stats = [
+    {
+      label: "Total Offers",
+      value: statusCounts.TOTAL,
+      icon: FaTag,
+      iconWrap: "bg-rose-50 text-[#e11d48]",
+    },
+    {
+      label: "Active",
+      value: statusCounts.ACTIVE,
+      icon: FaPlay,
+      iconWrap: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      label: "Scheduled",
+      value: statusCounts.SCHEDULED,
+      icon: FaClock,
+      iconWrap: "bg-sky-50 text-sky-600",
+    },
+    {
+      label: "Draft",
+      value: statusCounts.DRAFT,
+      icon: FaFileAlt,
+      iconWrap: "bg-violet-50 text-violet-600",
+    },
+    {
+      label: "Paused",
+      value: statusCounts.PAUSED,
+      icon: FaPause,
+      iconWrap: "bg-amber-50 text-amber-600",
+    },
+    {
+      label: "Expired",
+      value: statusCounts.EXPIRED,
+      icon: FaCalendarAlt,
+      iconWrap: "bg-rose-50 text-rose-500",
+    },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-            <span className="bg-rose-500/20 text-rose-500 p-2 rounded-xl">
-              <BadgePercent size={28} />
-            </span>
-            Restaurant Offers
-          </h1>
-          <p className="text-zinc-400 mt-2">
-            Create promo codes for bookings and walk-in redemption at your restaurant.
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <SearchInput
-            value={q}
-            onChange={setQ}
-            placeholder="Search offers or codes"
+    <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
+      <div className="max-w-7xl mx-auto space-y-5">
+        {/* Hero */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm min-h-[200px] sm:min-h-[230px]">
+          <Image
+            src="/images/dining-offers-banner.jpg"
+            alt="Restaurant offers"
+            fill
+            className="object-cover object-right"
+            sizes="100vw"
+            priority
           />
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all whitespace-nowrap"
-          >
-            <Plus size={18} />
-            Create Offer
-          </button>
+          <div className="relative z-10 p-6 sm:p-8 max-w-xl">
+            <span className="inline-flex w-fit items-center rounded-full bg-rose-50 text-[#e11d48] px-3 py-1 text-[10px] font-bold uppercase tracking-wider mb-3">
+              Boost your bookings
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Restaurant Offers
+            </h1>
+            <p className="text-sm text-slate-500 mt-2 max-w-md leading-relaxed">
+              Create promo codes for bookings and walk-in redemption at your restaurant.
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="flex gap-2 flex-wrap border-b border-white/10 pb-1">
-        {STATUS_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-xs sm:text-sm font-semibold rounded-t-lg transition-all border-b-2 ${
-              tab === t.key
-                ? "border-rose-500 text-rose-500 bg-rose-500/5"
-                : "border-transparent text-zinc-400 hover:text-white"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={stat.label}
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm flex items-center gap-3"
+              >
+                <span
+                  className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${stat.iconWrap}`}
+                >
+                  <Icon size={16} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 truncate">
+                    {stat.label}
+                  </p>
+                  <p className="text-lg font-bold text-slate-900 tabular-nums leading-tight">
+                    {stat.value}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-      <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-white/5 border-b border-white/5">
-              <th className="p-4 text-xs font-bold text-zinc-400 uppercase">Offer</th>
-              <th className="p-4 text-xs font-bold text-zinc-400 uppercase hidden md:table-cell">
-                Discount
-              </th>
-              <th className="p-4 text-xs font-bold text-zinc-400 uppercase hidden lg:table-cell">
-                Schedule
-              </th>
-              <th className="p-4 text-xs font-bold text-zinc-400 uppercase">Status</th>
-              <th className="p-4 text-xs font-bold text-zinc-400 uppercase text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-zinc-400">
-                  <Loader2 className="animate-spin inline mr-2" size={18} />
-                  Loading offers…
-                </td>
-              </tr>
-            ) : filteredOffers.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-zinc-500">
-                  {offers.length === 0
-                    ? "No offers yet. Create your first promo code (e.g. LUNCH20)."
-                    : "No offers match this filter."}
-                </td>
-              </tr>
-            ) : (
-              filteredOffers.map((offer) => {
-                const effective = getEffectiveDiningOfferStatus(offer);
-                const isArchived = effective === "ARCHIVED";
-                return (
-                  <tr key={offer.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                    <td className="p-4">
-                      <p className="font-semibold text-white">{offer.title}</p>
-                      <p className="text-xs text-rose-400 font-mono mt-0.5">
-                        {offer.promo_code || "—"}
-                      </p>
-                      <p className="text-xs text-zinc-500 mt-1">{offer.type}</p>
-                    </td>
-                    <td className="p-4 hidden md:table-cell text-sm text-zinc-300">
-                      {formatDiningOfferDiscount(offer)}
-                      {(offer.min_bill_amount ?? 0) > 0 && (
-                        <span className="block text-xs text-zinc-500 mt-0.5">
-                          Min bill {offer.min_bill_amount} ETB
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 hidden lg:table-cell text-xs text-zinc-400">
-                      {offer.start_at || offer.end_at ? (
-                        <>
-                          {offer.start_at ? formatDate(offer.start_at) : "—"} –{" "}
-                          {offer.end_at ? formatDate(offer.end_at) : "—"}
-                        </>
-                      ) : (
-                        "Always on"
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <StatusBadge offer={offer} />
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(offer)}
-                          className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5"
-                          title="Edit"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        {!isArchived && (
-                          <button
-                            type="button"
-                            onClick={() => void handleTogglePause(offer)}
-                            disabled={saving}
-                            className="p-2 text-zinc-400 hover:text-amber-300 rounded-lg hover:bg-white/5 disabled:opacity-50"
-                            title={effective === "PAUSED" ? "Activate" : "Pause"}
-                          >
-                            {effective === "PAUSED" ? <Play size={16} /> : <Pause size={16} />}
-                          </button>
-                        )}
-                        {isArchived ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleRestore(offer)}
-                            disabled={saving}
-                            className="p-2 text-zinc-400 hover:text-emerald-400 rounded-lg hover:bg-white/5 disabled:opacity-50"
-                            title="Restore to draft"
-                          >
-                            <ArchiveRestore size={16} />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setPendingArchiveId(offer.id || null)}
-                            className="p-2 text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-white/5"
-                            title="Archive"
-                          >
-                            <Archive size={16} />
-                          </button>
-                        )}
-                      </div>
+        {/* Toolbar + table */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            <div className="flex gap-1 flex-wrap overflow-x-auto">
+              {STATUS_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  className={`px-3 py-2 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all border-b-2 ${
+                    tab === t.key
+                      ? "border-[#e11d48] text-[#e11d48]"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
+              <SearchInput
+                value={q}
+                onChange={setQ}
+                placeholder="Search offers or codes..."
+                className="w-full sm:w-56"
+              />
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold text-white bg-gradient-to-r from-[#f43f5e] to-[#e11d48] shadow-[0_8px_18px_rgba(225,29,72,0.28)] hover:from-[#e11d48] hover:to-[#be123c] transition-all whitespace-nowrap"
+              >
+                <FaPlus size={16} />
+                Create Offer
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[820px]">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-100">
+                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Offer
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">
+                    Discount
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell">
+                    Schedule
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="py-10 text-center text-slate-400 text-sm">
+                      <FaSpinner className="animate-spin inline mr-2" size={18} />
+                      Loading offers…
                     </td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                ) : filteredOffers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-10 text-center text-slate-400 text-sm font-medium">
+                      {offers.length === 0
+                        ? "No offers yet. Create your first promo code (e.g. LUNCH20)."
+                        : "No offers match this filter."}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOffers.map((offer) => {
+                    const effective = getEffectiveDiningOfferStatus(offer);
+                    const isArchived = effective === "ARCHIVED";
+                    return (
+                      <tr
+                        key={offer.id}
+                        className="border-b border-slate-50 hover:bg-slate-50/70 transition-colors"
+                      >
+                        <td className="py-3.5 px-4">
+                          <p className="text-sm font-semibold text-slate-900">{offer.title}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{offer.type}</p>
+                          {offer.promo_code ? (
+                            <p className="text-[11px] text-[#e11d48] font-mono mt-0.5">
+                              {offer.promo_code}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="py-3.5 px-4 hidden md:table-cell text-sm text-slate-700">
+                          {formatDiningOfferDiscount(offer)}
+                          {(offer.min_bill_amount ?? 0) > 0 && (
+                            <span className="block text-[11px] text-slate-400 mt-0.5">
+                              Min bill {offer.min_bill_amount} ETB
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 hidden lg:table-cell text-xs text-slate-500">
+                          <span className="inline-flex items-center gap-1.5">
+                            <FaCalendarAlt size={13} className="text-slate-400 shrink-0" />
+                            {offer.start_at || offer.end_at ? (
+                              <>
+                                {offer.start_at ? formatDate(offer.start_at) : "—"} –{" "}
+                                {offer.end_at ? formatDate(offer.end_at) : "—"}
+                              </>
+                            ) : (
+                              "Always on"
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <StatusBadge offer={offer} />
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openEdit(offer)}
+                              className="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+                              title="Edit"
+                            >
+                              <FaPencilAlt size={14} />
+                            </button>
+                            {!isArchived && (
+                              <button
+                                type="button"
+                                onClick={() => void handleTogglePause(offer)}
+                                disabled={saving}
+                                className="p-2 text-slate-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                                title={effective === "PAUSED" ? "Activate" : "Pause"}
+                              >
+                                {effective === "PAUSED" ? (
+                                  <FaPlay size={14} />
+                                ) : (
+                                  <FaPause size={14} />
+                                )}
+                              </button>
+                            )}
+                            {isArchived ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleRestore(offer)}
+                                disabled={saving}
+                                className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 disabled:opacity-50 transition-colors"
+                                title="Restore to draft"
+                              >
+                                <MdUnarchive size={16} />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPendingArchiveId(offer.id || null)}
+                                className="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                                title="Archive"
+                              >
+                                <FaArchive size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-2xl glass-panel border border-white/10 rounded-2xl p-6 my-8">
-            <h2 className="text-xl font-bold text-white mb-1">
-              {editingId ? "Edit Restaurant Offer" : "Create Restaurant Offer"}
-            </h2>
-            <p className="text-sm text-zinc-400 mb-6">
-              Guests can pick this offer when booking. Staff redeem it via Scan QR or walk-in promo.
-            </p>
+      {formOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[200] flex items-start justify-center p-4 overflow-y-auto bg-black/55 backdrop-blur-sm animate-fadeIn">
+            <div className="absolute inset-0" onClick={() => setFormOpen(false)} aria-hidden />
+            <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-2xl p-6 my-8 shadow-2xl">
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="absolute top-4 right-4 h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                aria-label="Close"
+              >
+                <FaTimes size={14} />
+              </button>
+              <h2 className="text-xl font-bold text-slate-900 mb-1 pr-8">
+                {editingId ? "Edit Restaurant Offer" : "Create Restaurant Offer"}
+              </h2>
+              <p className="text-sm text-slate-500 mb-6">
+                Guests can pick this offer when booking. Staff redeem it via Scan QR or walk-in promo.
+              </p>
 
-            <form onSubmit={onSubmit} className="space-y-4" noValidate>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>
-                    Offer title <RequiredMark />
-                  </label>
-                  <input
-                    className={inputClass}
-                    placeholder="Lunch Special"
-                    {...register("title")}
-                  />
-                  {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Promo code <RequiredMark />
-                  </label>
-                  <input
-                    className={`${inputClass} font-mono uppercase`}
-                    placeholder="LUNCH20"
-                    {...register("promo_code", {
-                      setValueAs: (v) => String(v ?? "").toUpperCase(),
-                    })}
-                  />
-                  {errors.promo_code && (
-                    <p className={fieldErrorClass}>{errors.promo_code.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Offer type label</label>
-                  <input
-                    className={inputClass}
-                    placeholder="Pre-Book Offer"
-                    {...register("type")}
-                  />
-                  {errors.type && <p className={fieldErrorClass}>{errors.type.message}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>Status</label>
-                  <select className={inputClass} {...register("status")}>
-                    <option value="DRAFT">Draft</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="PAUSED">Paused</option>
-                  </select>
-                  {errors.status && <p className={fieldErrorClass}>{errors.status.message}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className={labelClass}>Discount type</label>
-                  <select className={`${inputClass} px-3`} {...register("discount_type")}>
-                    <option value="PERCENT">Percentage (%)</option>
-                    <option value="FLAT">Flat (ETB)</option>
-                  </select>
-                  {errors.discount_type && (
-                    <p className={fieldErrorClass}>{errors.discount_type.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Discount value <RequiredMark />
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step={discountType === "PERCENT" ? "0.01" : "1"}
-                    className={`${inputClass} px-3`}
-                    placeholder={discountType === "PERCENT" ? "e.g. 20" : "e.g. 200"}
-                    {...register("discount_value")}
-                  />
-                  <p className="text-[11px] text-zinc-500 mt-1">
-                    {discountType === "PERCENT"
-                      ? "Percent off the food bill"
-                      : "Fixed ETB amount off the bill"}
-                  </p>
-                  {errors.discount_value && (
-                    <p className={fieldErrorClass}>{errors.discount_value.message}</p>
-                  )}
-                </div>
-                {discountType === "PERCENT" && (
+              <form onSubmit={onSubmit} className="space-y-4" noValidate>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Max discount (ETB)</label>
+                    <label className={labelClass}>
+                      Offer title <RequiredMark />
+                    </label>
+                    <input
+                      className={inputClass}
+                      placeholder="Lunch Special"
+                      {...register("title")}
+                    />
+                    {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
+                  </div>
+                  <div>
+                    <label className={labelClass}>
+                      Promo code <RequiredMark />
+                    </label>
+                    <input
+                      className={`${inputClass} font-mono uppercase`}
+                      placeholder="LUNCH20"
+                      {...register("promo_code", {
+                        setValueAs: (v) => String(v ?? "").toUpperCase(),
+                      })}
+                    />
+                    {errors.promo_code && (
+                      <p className={fieldErrorClass}>{errors.promo_code.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Offer type label</label>
+                    <input
+                      className={inputClass}
+                      placeholder="Pre-Book Offer"
+                      {...register("type")}
+                    />
+                    {errors.type && <p className={fieldErrorClass}>{errors.type.message}</p>}
+                  </div>
+                  <div>
+                    <label className={labelClass}>Status</label>
+                    <select className={inputClass} {...register("status")}>
+                      <option value="DRAFT">Draft</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="PAUSED">Paused</option>
+                    </select>
+                    {errors.status && <p className={fieldErrorClass}>{errors.status.message}</p>}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className={labelClass}>Discount type</label>
+                    <select className={inputClass} {...register("discount_type")}>
+                      <option value="PERCENT">Percentage (%)</option>
+                      <option value="FLAT">Flat (ETB)</option>
+                    </select>
+                    {errors.discount_type && (
+                      <p className={fieldErrorClass}>{errors.discount_type.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelClass}>
+                      Discount value <RequiredMark />
+                    </label>
                     <input
                       type="number"
                       min="0"
-                      className={`${inputClass} px-3`}
-                      placeholder="Optional cap"
-                      {...register("max_discount")}
+                      step={discountType === "PERCENT" ? "0.01" : "1"}
+                      className={inputClass}
+                      placeholder={discountType === "PERCENT" ? "e.g. 20" : "e.g. 200"}
+                      {...register("discount_value")}
                     />
-                    {errors.max_discount && (
-                      <p className={fieldErrorClass}>{errors.max_discount.message}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {discountType === "PERCENT"
+                        ? "Percent off the food bill"
+                        : "Fixed ETB amount off the bill"}
+                    </p>
+                    {errors.discount_value && (
+                      <p className={fieldErrorClass}>{errors.discount_value.message}</p>
                     )}
                   </div>
-                )}
-                <div>
-                  <label className={labelClass}>Min bill (ETB)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className={`${inputClass} px-3`}
-                    {...register("min_bill_amount")}
-                  />
-                  {errors.min_bill_amount && (
-                    <p className={fieldErrorClass}>{errors.min_bill_amount.message}</p>
+                  {discountType === "PERCENT" && (
+                    <div>
+                      <label className={labelClass}>Max discount (ETB)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className={inputClass}
+                        placeholder="Optional cap"
+                        {...register("max_discount")}
+                      />
+                      {errors.max_discount && (
+                        <p className={fieldErrorClass}>{errors.max_discount.message}</p>
+                      )}
+                    </div>
                   )}
+                  <div>
+                    <label className={labelClass}>Min bill (ETB)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className={inputClass}
+                      {...register("min_bill_amount")}
+                    />
+                    {errors.min_bill_amount && (
+                      <p className={fieldErrorClass}>{errors.min_bill_amount.message}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className={labelClass}>Start date</label>
-                  <input type="date" className={inputClass} {...register("start_at")} />
-                  {errors.start_at && (
-                    <p className={fieldErrorClass}>{errors.start_at.message}</p>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelClass}>Start date</label>
+                    <input type="date" className={inputClass} {...register("start_at")} />
+                    {errors.start_at && (
+                      <p className={fieldErrorClass}>{errors.start_at.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelClass}>End date</label>
+                    <input type="date" className={inputClass} {...register("end_at")} />
+                    {errors.end_at && <p className={fieldErrorClass}>{errors.end_at.message}</p>}
+                  </div>
+                  <div>
+                    <label className={labelClass}>Daily limit</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Unlimited"
+                      className={inputClass}
+                      {...register("per_day_limit")}
+                    />
+                    {errors.per_day_limit && (
+                      <p className={fieldErrorClass}>{errors.per_day_limit.message}</p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className={labelClass}>End date</label>
-                  <input type="date" className={inputClass} {...register("end_at")} />
-                  {errors.end_at && <p className={fieldErrorClass}>{errors.end_at.message}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>Daily limit</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Unlimited"
-                    className={inputClass}
-                    {...register("per_day_limit")}
-                  />
-                  {errors.per_day_limit && (
-                    <p className={fieldErrorClass}>{errors.per_day_limit.message}</p>
-                  )}
-                </div>
-              </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setFormOpen(false)}
-                  className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"
-                >
-                  {saving && <Loader2 size={16} className="animate-spin" />}
-                  {editingId ? "Save changes" : "Create offer"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormOpen(false)}
+                    className="h-11 px-5 rounded-full text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="h-11 px-5 rounded-full text-sm font-semibold text-white bg-gradient-to-r from-[#f43f5e] to-[#e11d48] shadow-[0_8px_18px_rgba(225,29,72,0.28)] hover:from-[#e11d48] hover:to-[#be123c] inline-flex items-center gap-2 disabled:opacity-60 transition-all"
+                  >
+                    {saving && <FaSpinner size={16} className="animate-spin" />}
+                    {editingId ? "Save changes" : "Create offer"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
 
       <ConfirmDialog
         open={Boolean(pendingArchiveId)}

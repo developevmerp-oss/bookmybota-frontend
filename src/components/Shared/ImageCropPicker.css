@@ -1,41 +1,109 @@
-/* Make mid-edge handles easy to see/grab (library shows them when aspect prop is omitted). */
+/* Crop modal layout — image fits the stage, no inner scroll */
 .image-crop-modal {
-  --rc-drag-handle-size: 14px;
-  --rc-drag-handle-mobile-size: 22px;
-  --rc-drag-bar-size: 12px;
+  --rc-drag-handle-size: 16px;
+  --rc-drag-handle-mobile-size: 24px;
+  --rc-drag-bar-size: 14px;
   --rc-drag-handle-bg-colour: #ffffff;
   --rc-border-color: #111111;
+  --crop-stage-h: clamp(220px, calc(92dvh - 220px), 460px);
 }
 
-/* Keep mid-edge handles visible on touch devices too */
-@media (pointer: coarse) {
-  .image-crop-modal .ReactCrop .ord-n,
-  .image-crop-modal .ReactCrop .ord-e,
-  .image-crop-modal .ReactCrop .ord-s,
-  .image-crop-modal .ReactCrop .ord-w {
-    display: block !important;
-  }
+.image-crop-modal .image-crop-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--crop-stage-h);
+  max-height: var(--crop-stage-h);
+  padding: 18px;
+  overflow: hidden; /* no scrollbar — image is scaled to fit */
+}
+
+.image-crop-modal .image-crop-react {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-crop-modal .ReactCrop {
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+.image-crop-modal .ReactCrop__child-wrapper,
+.image-crop-modal .ReactCrop > div {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-crop-modal .image-crop-media,
+.image-crop-modal .ReactCrop img {
+  display: block;
+  max-width: 100% !important;
+  max-height: calc(var(--crop-stage-h) - 36px) !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain;
+}
+
+/* Force all 8 handles visible */
+.image-crop-modal .ReactCrop .ord-n,
+.image-crop-modal .ReactCrop .ord-e,
+.image-crop-modal .ReactCrop .ord-s,
+.image-crop-modal .ReactCrop .ord-w,
+.image-crop-modal .ReactCrop .ord-ne,
+.image-crop-modal .ReactCrop .ord-nw,
+.image-crop-modal .ReactCrop .ord-se,
+.image-crop-modal .ReactCrop .ord-sw {
+  display: block !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .image-crop-modal .ReactCrop__drag-handle {
   border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-  z-index: 2;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+  background: #fff;
 }
 
 .image-crop-modal .ReactCrop__drag-bar {
-  z-index: 1;
+  z-index: 4;
 }
 
-/* Larger mid-edge handles for left/right/up/down */
 .image-crop-modal .ReactCrop__drag-handle.ord-n,
 .image-crop-modal .ReactCrop__drag-handle.ord-s {
-  width: 28px;
-  height: 12px;
+  width: 36px !important;
+  height: 14px !important;
+  margin-left: -18px;
 }
 
 .image-crop-modal .ReactCrop__drag-handle.ord-e,
 .image-crop-modal .ReactCrop__drag-handle.ord-w {
-  width: 12px;
-  height: 28px;
+  width: 14px !important;
+  height: 36px !important;
+  margin-top: -18px;
+}
+
+.image-crop-modal .ReactCrop__drag-handle.ord-ne,
+.image-crop-modal .ReactCrop__drag-handle.ord-nw,
+.image-crop-modal .ReactCrop__drag-handle.ord-se,
+.image-crop-modal .ReactCrop__drag-handle.ord-sw {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.image-crop-modal .ReactCrop__drag-bar.ord-n,
+.image-crop-modal .ReactCrop__drag-bar.ord-s {
+  height: 16px !important;
+}
+
+.image-crop-modal .ReactCrop__drag-bar.ord-e,
+.image-crop-modal .ReactCrop__drag-bar.ord-w {
+  width: 16px !important;
+}
+
+@media (max-height: 700px) {
+  .image-crop-modal {
+    --crop-stage-h: clamp(180px, calc(92dvh - 200px), 320px);
+  }
 }

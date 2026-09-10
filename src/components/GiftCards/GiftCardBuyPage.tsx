@@ -392,7 +392,7 @@ export default function GiftCardBuyPage() {
                   </span>
                 </h1>
                 <p className="mt-2 sm:mt-2.5 text-white/75 text-xs sm:text-sm max-w-xl">
-                  {design.title} · Events, Sports, Dining and more
+                  {design.title} · Events & Dining
                 </p>
               </div>
             </div>

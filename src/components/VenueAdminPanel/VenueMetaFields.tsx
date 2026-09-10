@@ -165,29 +165,48 @@ export default function VenueMetaFields({
               )}
             </div>
           ) : (
-            <label
-              className={`flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-lg border border-dashed cursor-pointer ${
-                variant === "dark"
-                  ? "border-white/20 hover:border-amber-400"
-                  : "border-slate-300 hover:border-[#6900AA]"
-              } ${disabled ? "opacity-50 pointer-events-none" : ""}`}
-            >
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                className="hidden"
+            <div className="space-y-2 max-w-sm">
+              <CroppedImageField
+                value=""
+                aspect={16 / 9}
                 disabled={disabled || uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void uploadFile(field.key, file);
-                  e.target.value = "";
-                }}
+                previewClassName="w-full aspect-video rounded-lg border border-slate-200"
+                emptyClassName={`flex flex-col items-center justify-center w-full aspect-video rounded-lg border border-dashed cursor-pointer ${
+                  variant === "dark"
+                    ? "border-white/20 hover:border-amber-400"
+                    : "border-slate-300 hover:border-[#6900AA]"
+                } ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+                onRemove={() => patchField(field.key, "")}
+                onCroppedFile={(file) => void uploadFile(field.key, file)}
+                emptyContent={
+                  <>
+                    <ImagePlus size={22} className={variant === "dark" ? "text-zinc-500" : "text-slate-400"} />
+                    <span className={`text-xs mt-1 ${variant === "dark" ? "text-zinc-500" : "text-slate-500"}`}>
+                      {uploading ? "Uploading…" : "Upload & crop image"}
+                    </span>
+                  </>
+                }
               />
-              <FileText size={22} className={variant === "dark" ? "text-zinc-500" : "text-slate-400"} />
-              <span className={`text-xs mt-1 ${variant === "dark" ? "text-zinc-500" : "text-slate-500"}`}>
-                {uploading ? "Uploading…" : "Upload seating plan / blueprint"}
-              </span>
-            </label>
+              <label
+                className={`inline-flex items-center gap-1.5 text-xs cursor-pointer ${
+                  variant === "dark" ? "text-zinc-400 hover:text-zinc-200" : "text-slate-500 hover:text-slate-800"
+                } ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+              >
+                <FileText size={14} />
+                Or upload PDF
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="hidden"
+                  disabled={disabled || uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadFile(field.key, file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
           )}
         </div>
       );

@@ -79,7 +79,7 @@ export default function GiftCardDesignFace({
             }`}
             style={{ color: captionColor }}
           >
-            Events, Sports, Dining and more.
+            Events & Dining.
           </p>
         </div>
 
@@ -101,7 +101,7 @@ export default function GiftCardDesignFace({
         style={{ color: captionColor, opacity: 0.7 }}
         aria-hidden
       >
-        Events · Sports · Dining
+        Events · Dining
       </p>
     </div>
   );

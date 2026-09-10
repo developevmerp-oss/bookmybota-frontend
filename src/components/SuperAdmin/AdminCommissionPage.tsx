@@ -68,31 +68,31 @@ export default function AdminCommissionPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         <div className="glass-panel rounded-2xl border border-white/5 p-4">
           <div className="text-xs text-zinc-500 uppercase tracking-wider">Ticket amount</div>
-          <div className="text-2xl font-bold text-white mt-1">{money(totals?.ticket_amount)}</div>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">{money(totals?.ticket_amount)}</div>
         </div>
         <div className="glass-panel rounded-2xl border border-white/5 p-4">
           <div className="text-xs text-zinc-500 uppercase tracking-wider">Convenience fee</div>
-          <div className="text-2xl font-bold text-amber-400 mt-1">
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
             {money(totals?.convenience_fee_total)}
           </div>
           <div className="text-[0.625rem] text-zinc-500 mt-1">From customers</div>
         </div>
         <div className="glass-panel rounded-2xl border border-white/5 p-4">
           <div className="text-xs text-zinc-500 uppercase tracking-wider">Commission</div>
-          <div className="text-2xl font-bold text-violet-400 mt-1">
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
             {money(totals?.commission_total)}
           </div>
           <div className="text-[0.625rem] text-zinc-500 mt-1">From organizers</div>
         </div>
         <div className="glass-panel rounded-2xl border border-white/5 p-4">
           <div className="text-xs text-zinc-500 uppercase tracking-wider">Platform earned</div>
-          <div className="text-2xl font-bold text-rose-400 mt-1">
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
             {money(totals?.platform_earned)}
           </div>
         </div>
         <div className="glass-panel rounded-2xl border border-white/5 p-4">
           <div className="text-xs text-zinc-500 uppercase tracking-wider">Organizer payout</div>
-          <div className="text-2xl font-bold text-emerald-400 mt-1">
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
             {money(totals?.organizer_payout)}
           </div>
         </div>
@@ -144,25 +144,25 @@ export default function AdminCommissionPage() {
                   </div>
                   <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Ticket $</span>
-                    <div className="admin-data-card-value">{money(row.ticket_amount)}</div>
+                    <div className="admin-data-card-value text-emerald-600">{money(row.ticket_amount)}</div>
                   </div>
                   <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Convenience</span>
-                    <div className="admin-data-card-value text-amber-400">{money(row.convenience_fee_total)}</div>
+                    <div className="admin-data-card-value text-emerald-600">{money(row.convenience_fee_total)}</div>
                   </div>
                   <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Commission</span>
-                    <div className="admin-data-card-value text-violet-400">{money(row.commission_total)}</div>
+                    <div className="admin-data-card-value text-emerald-600">{money(row.commission_total)}</div>
                   </div>
                   <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Platform</span>
-                    <div className="admin-data-card-value text-rose-400 font-medium">
+                    <div className="admin-data-card-value text-emerald-600 font-medium">
                       {money(row.platform_earned)}
                     </div>
                   </div>
                   <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Org payout</span>
-                    <div className="admin-data-card-value text-emerald-400">{money(row.organizer_payout)}</div>
+                    <div className="admin-data-card-value text-emerald-600">{money(row.organizer_payout)}</div>
                   </div>
                 </div>
               </article>
@@ -221,13 +221,13 @@ export default function AdminCommissionPage() {
                         </td>
                       )}
                       <td className="px-6 py-4 text-zinc-300">{row.tickets_sold}</td>
-                      <td className="px-6 py-4 text-zinc-300">{money(row.ticket_amount)}</td>
-                      <td className="px-6 py-4 text-amber-400">{money(row.convenience_fee_total)}</td>
-                      <td className="px-6 py-4 text-violet-400">{money(row.commission_total)}</td>
-                      <td className="px-6 py-4 text-rose-400 font-medium">
+                      <td className="px-6 py-4 text-emerald-600">{money(row.ticket_amount)}</td>
+                      <td className="px-6 py-4 text-emerald-600">{money(row.convenience_fee_total)}</td>
+                      <td className="px-6 py-4 text-emerald-600">{money(row.commission_total)}</td>
+                      <td className="px-6 py-4 text-emerald-600 font-medium">
                         {money(row.platform_earned)}
                       </td>
-                      <td className="px-6 py-4 text-emerald-400">{money(row.organizer_payout)}</td>
+                      <td className="px-6 py-4 text-emerald-600">{money(row.organizer_payout)}</td>
                     </tr>
                   ))}
                 </tbody>

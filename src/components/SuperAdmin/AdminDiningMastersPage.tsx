@@ -309,8 +309,8 @@ export default function AdminDiningMastersPage() {
                 <CroppedImageField
                   value={cuisineImageUrl}
                   aspect={1}
-                  previewClassName="w-full h-40 rounded-xl border border-white/10"
-                  emptyClassName="flex flex-col items-center justify-center w-full h-40 border-2 border-zinc-700 border-dashed rounded-xl bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+                  previewClassName="w-40 h-40 rounded-xl border border-white/10 overflow-hidden"
+                  emptyClassName="flex flex-col items-center justify-center w-40 h-40 border-2 border-zinc-700 border-dashed rounded-xl bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
                   emptyLabel="Add cuisine image"
                   onRemove={() =>
                     cuisineForm.setValue("image_url", "", { shouldValidate: true, shouldDirty: true })
@@ -480,8 +480,8 @@ export default function AdminDiningMastersPage() {
                 <CroppedImageField
                   value={collectionImageUrl}
                   aspect={3 / 4}
-                  previewClassName="w-full h-40 rounded-xl border border-white/10"
-                  emptyClassName="flex flex-col items-center justify-center w-full h-40 border-2 border-zinc-700 border-dashed rounded-xl bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+                  previewClassName="w-[140px] aspect-[3/4] rounded-xl border border-white/10 overflow-hidden"
+                  emptyClassName="flex flex-col items-center justify-center w-[140px] aspect-[3/4] border-2 border-zinc-700 border-dashed rounded-xl bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
                   emptyLabel="Add collection image"
                   onRemove={() =>
                     collectionForm.setValue("image_url", "", { shouldValidate: true, shouldDirty: true })

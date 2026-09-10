@@ -27,9 +27,8 @@ import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
 
 const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
-const labelClass = "block text-xs font-semibold text-zinc-400 uppercase mb-2";
-const inputClass =
-  "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white";
+const labelClass = "block text-xs font-semibold text-slate-500 uppercase mb-2";
+const inputClass = "input-field";
 
 function RequiredMark() {
   return <span className="text-rose-500">*</span>;
@@ -245,11 +244,11 @@ export default function AdminGiftCardContentPanel() {
   };
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-5 space-y-4">
+    <section className="glass-panel rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-white">Terms & FAQs</h2>
-          <p className="mt-1 text-xs text-zinc-400 max-w-xl">
+          <h2 className="text-lg font-bold text-slate-900">Terms & FAQs</h2>
+          <p className="mt-1 text-xs text-slate-500 max-w-xl">
             Content shown in the customer gift card buy page modals. Only enabled items appear to
             customers.
           </p>
@@ -296,7 +295,7 @@ export default function AdminGiftCardContentPanel() {
         <form
           onSubmit={termForm.handleSubmit(onSaveTerm)}
           noValidate
-          className="space-y-3 rounded-xl border border-white/10 bg-zinc-950/40 p-3"
+          className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
         >
           <div>
             <label className={labelClass}>
@@ -339,7 +338,7 @@ export default function AdminGiftCardContentPanel() {
         <form
           onSubmit={faqForm.handleSubmit(onSaveFaq)}
           noValidate
-          className="space-y-3 rounded-xl border border-white/10 bg-zinc-950/40 p-3"
+          className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
         >
           <div>
             <label className={labelClass}>
@@ -433,7 +432,7 @@ export default function AdminGiftCardContentPanel() {
                   const active = row.is_active !== false;
                   return (
                     <tr key={row.id} className="border-b border-white/5 last:border-0">
-                      <td className="px-3 py-2.5 text-zinc-200 max-w-xl">{row.body}</td>
+                      <td className="px-3 py-2.5 text-slate-800 max-w-xl">{row.body}</td>
                       <td className="px-3 py-2.5">
                         <span
                           className={`text-xs font-bold uppercase ${
@@ -491,8 +490,8 @@ export default function AdminGiftCardContentPanel() {
                 return (
                   <tr key={row.id} className="border-b border-white/5 last:border-0">
                     <td className="px-3 py-2.5">
-                      <p className="text-white font-medium">{row.question}</p>
-                      <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{row.answer}</p>
+                      <p className="text-slate-900 font-medium">{row.question}</p>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{row.answer}</p>
                     </td>
                     <td className="px-3 py-2.5">
                       <span

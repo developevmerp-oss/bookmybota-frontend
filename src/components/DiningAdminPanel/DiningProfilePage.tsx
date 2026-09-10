@@ -436,8 +436,8 @@ export default function ProfilePage() {
                     <CroppedImageField
                       value={coverUrl}
                       aspect={16 / 9}
-                      previewClassName="mt-2 w-full h-48 rounded-xl border border-slate-200"
-                      emptyClassName="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-200 border-dashed rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+                      previewClassName="mt-2 w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden"
+                      emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] border-2 border-slate-200 border-dashed rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
                       onRemove={() => setCoverUrl('')}
                       onCroppedFile={(file) => uploadCropped(file, 'cover')}
                       emptyContent={
@@ -555,7 +555,7 @@ export default function ProfilePage() {
                           key={`${url}-${idx}`}
                           value={url}
                           aspect={4 / 3}
-                          previewClassName="h-24 rounded-xl w-full border border-slate-200"
+                          previewClassName="aspect-[4/3] rounded-xl w-full border border-slate-200 overflow-hidden"
                           onRemove={() => removeImage(idx, 'gallery')}
                           onCroppedFile={async (file) => {
                             const formData = new FormData();
@@ -591,7 +591,7 @@ export default function ProfilePage() {
                           key={`${url}-${idx}`}
                           value={url}
                           aspect={3 / 4}
-                          previewClassName="h-32 rounded-xl w-full border border-slate-200"
+                          previewClassName="aspect-[3/4] rounded-xl w-full border border-slate-200 overflow-hidden max-w-[160px]"
                           onRemove={() => removeImage(idx, 'menu')}
                           onCroppedFile={async (file) => {
                             const formData = new FormData();

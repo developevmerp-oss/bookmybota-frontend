@@ -22,8 +22,9 @@ function posterMediaClass(fluid: boolean, horizontal: boolean, columns: number) 
     return "h-[130px] sm:h-[150px] md:h-[170px] lg:h-[300px] w-full";
   }
   if (horizontal) return "aspect-[16/9] w-full";
-  if (fluid) return "aspect-[3/4] w-full max-h-[280px]";
-  return "aspect-[3/4] w-full";
+  // Match event vertical poster crop (2:3)
+  if (fluid) return "aspect-[2/3] w-full max-h-[280px]";
+  return "aspect-[2/3] w-full";
 }
 
 function diningMediaClass(columns = 0) {

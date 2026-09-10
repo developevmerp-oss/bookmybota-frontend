@@ -30,7 +30,7 @@ const navigation = [
   { name: "Ticket Stats", href: "/organizer/tickets", icon: BarChart3 },
   { name: "Offers", href: "/organizer/offers", icon: Tag },
   { name: "Promotions", href: "/organizer/promotions", icon: Megaphone },
-  { name: "Ledger", href: "/organizer/ledger", icon: Wallet },
+  { name: "Revenue & Payouts", href: "/organizer/ledger", icon: Wallet },
 ];
 
 const pageMeta: Record<string, { title: string; subtitle: string }> = {

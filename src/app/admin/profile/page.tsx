@@ -273,7 +273,7 @@ function AdminProfileContent() {
   ];
 
   return (
-    <div className="w-full max-w-5xl">
+    <div className="w-full">
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
         <aside className="w-full lg:w-[240px] shrink-0">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">

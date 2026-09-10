@@ -10,47 +10,106 @@ import ReactCrop, {
   type PixelCrop,
 } from "react-image-crop";
 import { Pencil, X } from "lucide-react";
-import { enforceAspectCrop } from "@/lib/imageCropAspect";
+import { fitAspectInsideSelection } from "@/lib/imageCropAspect";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import "react-image-crop/dist/ReactCrop.css";
 import "./ImageCropPicker.css";
 
-function createInitialCrop(width: number, height: number, aspect?: number): PercentCrop {
-  if (aspect && aspect > 0) {
-    return centerCrop(
-      makeAspectCrop({ unit: "%", width: 90 }, aspect, width, height),
-      width,
-      height
-    );
-  }
-  return centerCrop({ unit: "%", width: 90, height: 90, x: 0, y: 0 }, width, height);
+const MAX_EDGE = 1600;
+const MIN_EDGE = 320;
+
+/** Human-readable crop ratio label for the modal. */
+export function cropAspectLabel(aspect?: number): string | null {
+  if (!aspect || aspect <= 0) return null;
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.02;
+  if (near(aspect, 16 / 9)) return "Horizontal · 16:9";
+  if (near(aspect, 2 / 3)) return "Vertical · 2:3";
+  if (near(aspect, 3 / 4)) return "Vertical · 3:4";
+  if (near(aspect, 4 / 3)) return "Landscape · 4:3";
+  if (near(aspect, 1)) return "Square · 1:1";
+  if (near(aspect, 16 / 10)) return "Wide · 16:10";
+  if (near(aspect, 21 / 9)) return "Banner · 21:9";
+  if (aspect > 1) return `Horizontal · ${aspect.toFixed(2)}:1`;
+  return `Vertical · 1:${(1 / aspect).toFixed(2)}`;
 }
 
-async function cropImageToBlob(image: HTMLImageElement, crop: PixelCrop): Promise<Blob> {
+/**
+ * Preview box class that matches the crop aspect (avoids object-cover re-cropping).
+ */
+export function cropPreviewClass(aspect?: number, extra = ""): string {
+  const base = "rounded-xl overflow-hidden border border-slate-200 bg-slate-100";
+  if (!aspect || aspect <= 0) return `${base} w-28 h-28 ${extra}`.trim();
+  if (Math.abs(aspect - 1) < 0.02) return `${base} w-28 h-28 ${extra}`.trim();
+  if (aspect > 1) return `${base} w-full aspect-[var(--crop-aspect)] ${extra}`.trim();
+  return `${base} w-[160px] sm:w-[180px] aspect-[var(--crop-aspect)] ${extra}`.trim();
+}
+
+function createInitialCrop(width: number, height: number, aspect?: number): PercentCrop {
+  if (aspect && aspect > 0) {
+    // Start inset (~80%) so top/side handles stay visible and grabable.
+    const imageAspect = width / height;
+    const seed =
+      aspect >= imageAspect
+        ? makeAspectCrop({ unit: "%", width: 80 }, aspect, width, height)
+        : makeAspectCrop({ unit: "%", height: 80 }, aspect, width, height);
+    return centerCrop(seed, width, height);
+  }
+  return centerCrop({ unit: "%", width: 80, height: 80, x: 0, y: 0 }, width, height);
+}
+
+async function cropImageToBlob(
+  image: HTMLImageElement,
+  crop: PixelCrop,
+  outputAspect?: number
+): Promise<Blob> {
   if (!crop.width || !crop.height) {
     throw new Error("Select a crop area first.");
   }
 
   const scaleX = image.naturalWidth / image.width;
   const scaleY = image.naturalHeight / image.height;
-  const sx = crop.x * scaleX;
-  const sy = crop.y * scaleY;
-  const sw = Math.max(1, crop.width * scaleX);
-  const sh = Math.max(1, crop.height * scaleY);
+  const sx = Math.max(0, crop.x * scaleX);
+  const sy = Math.max(0, crop.y * scaleY);
+  const sw = Math.max(1, Math.min(crop.width * scaleX, image.naturalWidth - sx));
+  const sh = Math.max(1, Math.min(crop.height * scaleY, image.naturalHeight - sy));
 
-  const outW = Math.min(1600, Math.max(320, Math.round(sw)));
-  const outH = Math.max(320, Math.round((outW * sh) / sw));
+  const ratio = outputAspect && outputAspect > 0 ? outputAspect : sw / sh;
+  const longest = Math.max(sw, sh);
+  const scale = Math.min(1, MAX_EDGE / longest);
+
+  let outW = Math.round(sw * scale);
+  let outH = Math.round(sh * scale);
+
+  if (ratio >= 1) {
+    outW = Math.max(MIN_EDGE, outW);
+    outH = Math.max(1, Math.round(outW / ratio));
+  } else {
+    outH = Math.max(MIN_EDGE, outH);
+    outW = Math.max(1, Math.round(outH * ratio));
+  }
+
+  const longOut = Math.max(outW, outH);
+  if (longOut > MAX_EDGE) {
+    const down = MAX_EDGE / longOut;
+    outW = Math.max(1, Math.round(outW * down));
+    outH = Math.max(1, Math.round(outH * down));
+  }
 
   const canvas = document.createElement("canvas");
   canvas.width = outW;
   canvas.height = outH;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas not available");
+  ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(image, sx, sy, sw, sh, 0, 0, outW, outH);
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Crop failed"))), "image/jpeg", 0.92);
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Crop failed"))),
+      "image/jpeg",
+      0.92
+    );
   });
 }
 
@@ -68,46 +127,27 @@ export function ImageCropModal({
   onPickAnother?: () => void;
 }) {
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const prevPixelRef = useRef<PixelCrop | null>(null);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const lockedAspect = aspect && aspect > 0 ? aspect : undefined;
+  const label = cropAspectLabel(lockedAspect);
 
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget;
     const next = createInitialCrop(width, height, lockedAspect);
     const pixel = convertToPixelCrop(next, width, height);
-    prevPixelRef.current = pixel;
-    setCrop(pixel);
-    setCompletedCrop(pixel);
-  };
-
-  const applyCropChange = (pixel: PixelCrop) => {
-    const img = imgRef.current;
-    if (!img || !img.width || !img.height) {
-      setCrop(pixel);
-      return;
-    }
-
-    if (!lockedAspect) {
-      prevPixelRef.current = pixel;
-      setCrop(pixel);
-      return;
-    }
-
-    const prev = prevPixelRef.current || pixel;
-    const next = enforceAspectCrop(prev, pixel, lockedAspect, img.width, img.height);
-    prevPixelRef.current = next;
     setCrop(next);
+    setCompletedCrop(pixel);
   };
 
   const confirm = async () => {
     const img = imgRef.current;
     if (!img) return;
 
-    const pixel =
+    let pixel =
       completedCrop && completedCrop.width > 0 && completedCrop.height > 0
         ? completedCrop
         : crop
@@ -116,67 +156,70 @@ export function ImageCropModal({
 
     if (!pixel) return;
 
+    // Free-form selection in the UI (like Photos app). If a target ratio is
+    // required, take the largest matching area inside what the user framed.
+    if (lockedAspect) {
+      pixel = fitAspectInsideSelection(pixel, lockedAspect, img.width, img.height);
+    }
+
     setBusy(true);
+    setError(null);
     try {
-      onConfirm(await cropImageToBlob(img, pixel));
+      onConfirm(await cropImageToBlob(img, pixel, lockedAspect));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Crop failed. Try another photo.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="image-crop-modal fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-[#F5F5F5] rounded-2xl w-full max-w-3xl overflow-hidden shadow-xl">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E5]">
-          <p className="font-semibold text-slate-800">Crop image</p>
+    <div className="image-crop-modal fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-[#F5F5F5] rounded-2xl w-full max-w-3xl max-h-[min(92dvh,920px)] shadow-xl flex flex-col overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[#E5E5E5]">
+          <div>
+            <p className="font-semibold text-slate-800">Crop image</p>
+            {label ? <p className="text-xs text-slate-500 mt-0.5">{label}</p> : null}
+          </div>
           <button type="button" onClick={onCancel} className="p-1 text-slate-500 hover:text-slate-800">
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
-          <div className="relative mx-auto bg-[#E8E8E8] flex items-center justify-center overflow-auto rounded-lg py-3 px-2 max-h-[60vh]">
+        <div className="min-h-0 flex-1 flex flex-col px-4 pt-3 pb-2 gap-2">
+          <div className="image-crop-stage relative mx-auto w-full bg-[#E8E8E8] rounded-lg">
             <ReactCrop
               crop={crop}
-              // Do NOT pass `aspect` here — library hides/breaks edge handles when aspect is set.
-              // We enforce aspect ourselves in onChange so left/right/up/down all work.
+              // Free-form like the Photos app video: each side handle moves
+              // only that side; corners resize freely. Aspect is applied on export.
               keepSelection
+              ruleOfThirds
               minWidth={40}
               minHeight={40}
-              onChange={(pixel) => applyCropChange(pixel)}
-              onComplete={(pixel) => {
-                const img = imgRef.current;
-                if (!img || !lockedAspect) {
-                  setCompletedCrop(pixel);
-                  prevPixelRef.current = pixel;
-                  return;
-                }
-                const prev = prevPixelRef.current || pixel;
-                const next = enforceAspectCrop(prev, pixel, lockedAspect, img.width, img.height);
-                prevPixelRef.current = next;
-                setCrop(next);
-                setCompletedCrop(next);
-              }}
-              className="max-w-full"
+              onChange={(_pixel, percent) => setCrop(percent)}
+              onComplete={(pixel) => setCompletedCrop(pixel)}
+              className="image-crop-react"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 ref={imgRef}
                 src={src}
                 alt="Crop"
+                crossOrigin={src.startsWith("blob:") || src.startsWith("data:") ? undefined : "anonymous"}
                 onLoad={onImageLoad}
-                className="select-none block max-w-full max-h-[55vh]"
+                className="image-crop-media select-none"
                 draggable={false}
               />
             </ReactCrop>
           </div>
-          <p className="text-xs text-slate-500 text-center">
-            Drag the box to move it. Resize from corners or from the top, bottom, left, and right edges
-            {lockedAspect ? " (aspect ratio stays locked)." : "."}
+          <p className="shrink-0 text-xs text-slate-500 text-center px-1">
+            Drag to move. Resize from any corner, or from the top, bottom, left, or right edge
+            {lockedAspect ? ` — final image will be saved as ${label?.split("·")[0]?.trim() || "the required shape"}.` : "."}
           </p>
+          {error ? <p className="shrink-0 text-xs text-rose-600 text-center font-medium">{error}</p> : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-[#E5E5E5] bg-[#EFEFEF]">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-[#E5E5E5] bg-[#EFEFEF]">
           {onPickAnother ? (
             <button type="button" onClick={onPickAnother} className="px-4 py-2 text-sm rounded-xl border bg-[#F5F5F5]">
               Choose another photo
@@ -272,7 +315,7 @@ export function CroppedImageField({
   value,
   aspect,
   disabled,
-  previewClassName = "w-28 h-28 rounded-2xl",
+  previewClassName,
   emptyClassName,
   emptyLabel = "Add photo",
   emptyContent,
@@ -301,9 +344,21 @@ export function CroppedImageField({
     await onCroppedFile(new File([blob], "cropped.jpg", { type: "image/jpeg" }));
   };
 
+  const previewStyle =
+    aspect && aspect > 0 ? ({ ["--crop-aspect" as string]: String(aspect) } as React.CSSProperties) : undefined;
+  const resolvedPreviewClass = previewClassName || cropPreviewClass(aspect);
+  const resolvedEmptyClass =
+    emptyClassName ||
+    `flex flex-col items-center justify-center border border-dashed border-slate-300 hover:border-rose-400 ${cropPreviewClass(aspect, "border-dashed")}`;
+
   if (!value) {
     return (
-      <ImageCropPicker aspect={aspect} disabled={disabled} className={emptyClassName} onCroppedFile={onCroppedFile}>
+      <ImageCropPicker
+        aspect={aspect}
+        disabled={disabled}
+        className={resolvedEmptyClass}
+        onCroppedFile={onCroppedFile}
+      >
         {emptyContent || <span className="text-xs">{emptyLabel}</span>}
       </ImageCropPicker>
     );
@@ -311,7 +366,7 @@ export function CroppedImageField({
 
   return (
     <>
-      <div className={`relative overflow-hidden border border-slate-200 ${previewClassName}`}>
+      <div className={`relative ${resolvedPreviewClass}`} style={previewStyle}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={resolveMediaUrl(value)} alt="" className="w-full h-full object-cover" />
         {!disabled && (

@@ -18,8 +18,11 @@ type FormatMoneyOptions = {
 
 /**
  * Format an amount for display across the app.
+ * Default: hides trailing .00 (e.g. "2,000 ETB") but keeps cents when present ("129.99 ETB").
  * @example formatMoney(30, { compact: true }) → "30 ETB"
- * @example formatMoney(1250.5) → "1,250.50 ETB"
+ * @example formatMoney(1250) → "1,250 ETB"
+ * @example formatMoney(1250.5) → "1,250.5 ETB"
+ * @example formatMoney(1250.5, { decimals: 2 }) → "1,250.50 ETB"
  */
 export function formatMoney(
   amount: number | string | undefined | null,
@@ -27,19 +30,24 @@ export function formatMoney(
 ): string {
   const n = Number(amount ?? 0);
   if (!Number.isFinite(n)) {
-    const decimals = options?.compact ? 0 : (options?.decimals ?? 2);
-    const zero = (0).toLocaleString(CURRENCY_LOCALE, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-    return `${zero} ${CURRENCY_SYMBOL}`;
+    return `0 ${CURRENCY_SYMBOL}`;
   }
-  const decimals = options?.compact ? 0 : (options?.decimals ?? 2);
-  const formatted = n.toLocaleString(CURRENCY_LOCALE, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-  return `${formatted} ${CURRENCY_SYMBOL}`;
+
+  if (options?.compact) {
+    const formatted = Math.round(n).toLocaleString(CURRENCY_LOCALE);
+    return `${formatted} ${CURRENCY_SYMBOL}`;
+  }
+
+  if (options?.decimals != null) {
+    const formatted = n.toLocaleString(CURRENCY_LOCALE, {
+      minimumFractionDigits: options.decimals,
+      maximumFractionDigits: options.decimals,
+    });
+    return `${formatted} ${CURRENCY_SYMBOL}`;
+  }
+
+  // Project default: hide .00, show fractional cents when present
+  return formatMoneyDisplay(amount);
 }
 
 /**

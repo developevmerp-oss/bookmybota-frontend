@@ -7,7 +7,6 @@ import {
   Archive,
   ImagePlus,
   Loader2,
-  Palette,
   Pause,
   Pencil,
   Play,
@@ -33,6 +32,7 @@ import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { DEFAULT_DESIGN_GRADIENT } from "@/lib/giftCardDesigns";
 import GiftCardDesignFace from "@/components/GiftCards/GiftCardDesignFace";
+import ImageCropPicker from "@/components/Shared/ImageCropPicker";
 import {
   adminGiftCardDesignSchema,
   emptyAdminGiftCardDesignValues,
@@ -50,9 +50,8 @@ const STATUS_TABS: { key: TabKey; label: string }[] = [
 ];
 
 const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
-const labelClass = "block text-xs font-semibold text-zinc-400 uppercase mb-2";
-const inputClass =
-  "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white";
+const labelClass = "block text-xs font-semibold text-slate-500 uppercase mb-2";
+const inputClass = "input-field";
 
 function RequiredMark() {
   return <span className="text-rose-500">*</span>;
@@ -245,29 +244,14 @@ export default function AdminGiftCardDesignsPage({
   };
 
   return (
-    <div className={embedded ? "space-y-6" : "max-w-7xl mx-auto space-y-6"}>
+    <div className={embedded ? "space-y-6" : "w-full space-y-6"}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-        {!embedded ? (
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-              <span className="bg-violet-500/20 text-violet-400 p-2 rounded-xl">
-                <Palette size={28} />
-              </span>
-              Gift Card Designs
-            </h1>
-            <p className="text-zinc-400 mt-2">
-              Designs shown on the customer gift card picker. Upload artwork, set title &amp; category,
-              then activate.
-            </p>
-          </div>
-        ) : (
-          <div>
-            <p className="text-sm text-zinc-400">
-              Upload artwork, set title &amp; category, then set Active so it appears for customers.
-            </p>
-          </div>
-        )}
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        {embedded ? (
+          <p className="text-sm text-zinc-400">
+            Upload artwork, set title &amp; category, then set Active so it appears for customers.
+          </p>
+        ) : null}
+        <div className={`flex flex-col sm:flex-row gap-3 w-full sm:w-auto ${embedded ? "" : "sm:ml-auto"}`}>
           <SearchInput
             value={q}
             onChange={(value) => {
@@ -459,25 +443,19 @@ export default function AdminGiftCardDesignsPage({
                   <p className="text-[11px] text-zinc-500">
                     Same face customers see on /gift-cards. Prefer a full-bleed card image.
                   </p>
-                  <label className="inline-flex items-center justify-center gap-2 cursor-pointer bg-zinc-900/80 border border-white/10 hover:border-rose-500/50 text-white font-semibold py-2.5 px-4 rounded-xl">
+                  <ImageCropPicker
+                    aspect={16 / 10}
+                    disabled={uploading}
+                    className="inline-flex items-center justify-center gap-2 cursor-pointer bg-white border border-slate-200 hover:border-rose-400 text-slate-800 font-semibold py-2.5 px-4 rounded-xl"
+                    onCroppedFile={(file) => void handleUpload(file)}
+                  >
                     {uploading ? (
                       <Loader2 size={16} className="animate-spin" />
                     ) : (
                       <ImagePlus size={16} />
                     )}
-                    {uploading ? "Uploading…" : "Upload image"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void handleUpload(file);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
+                    {uploading ? "Uploading…" : "Upload & crop image"}
+                  </ImageCropPicker>
                   {errors.image_url && (
                     <p className={fieldErrorClass}>{errors.image_url.message}</p>
                   )}

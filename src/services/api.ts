@@ -288,12 +288,12 @@ export interface VenueLayoutTemplateLog {
   template_id?: string | null;
   template_name?: string | null;
   action:
-    | 'APPROVED'
-    | 'REJECTED'
-    | 'REQUESTED_LIVE'
-    | 'REJECTED_ALL'
-    | 'LIVE_CONFIRMED'
-    | 'LIVE_DECLINED';
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'REQUESTED_LIVE'
+  | 'REJECTED_ALL'
+  | 'LIVE_CONFIRMED'
+  | 'LIVE_DECLINED';
   message?: string | null;
   actor_user_id?: string | null;
   actor_label?: string | null;
@@ -886,6 +886,50 @@ export interface ContractPrefill {
   showtimes: AdminEvent['showtimes'];
   ticket_types: AdminEvent['ticket_types'];
   existing_contract: EventContract | null;
+  suggested: {
+    contract_number: string;
+    convenience_fee_percent: number;
+    commission_percent: number;
+    terms_and_conditions: string;
+    body_html: string;
+    dynamic_data: Record<string, string | number>;
+  };
+}
+
+export interface MovieContract {
+  id: string;
+  business_id: string;
+  contract_number: string;
+  body_html: string;
+  terms_and_conditions?: string | null;
+  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
+  convenience_fee_percent: number | string;
+  commission_percent: number | string;
+  dynamic_data?: Record<string, string | number> | null;
+  admin_signed_at?: string | null;
+  cinema_signed_at?: string | null;
+  admin_signature_url?: string | null;
+  cinema_signature_url?: string | null;
+  rejection_reason?: string | null;
+  cinema_name?: string;
+  cinema_phone?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EligibleContractCinema {
+  id: string;
+  name: string;
+  phone?: string | null;
+  address?: string | null;
+  contract_id?: string | null;
+  contract_status?: string | null;
+}
+
+export interface MovieContractPrefill {
+  business: Business & { total_screens?: number; module_slug?: string };
+  cinema_admin: { name?: string; email?: string } | null;
+  existing_contract: MovieContract | null;
   suggested: {
     contract_number: string;
     convenience_fee_percent: number;
@@ -2167,7 +2211,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens' , 'MovieShowtimes'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
 
   endpoints: (builder) => ({
 
@@ -2296,17 +2340,17 @@ export const api = createApi({
 
     verifyCustomerOtp: builder.mutation<
       | {
-          next: 'authenticated';
-          token: string;
-          user: AuthUser;
-          message?: string;
-        }
+        next: 'authenticated';
+        token: string;
+        user: AuthUser;
+        message?: string;
+      }
       | {
-          next: 'register';
-          verification_token: string;
-          expires_in?: number;
-          message?: string;
-        },
+        next: 'register';
+        verification_token: string;
+        expires_in?: number;
+        message?: string;
+      },
       { phone: string; otp: string }
     >({
       query: (body) => ({
@@ -2754,8 +2798,8 @@ export const api = createApi({
           payload.menu_images = JSON.stringify(body.menu_images);
         }
         return {
-        url: `/businesses/${bizId}/settings`,
-        method: 'PUT',
+          url: `/businesses/${bizId}/settings`,
+          method: 'PUT',
           body: payload,
         };
       },
@@ -4681,6 +4725,113 @@ export const api = createApi({
       invalidatesTags: ['OrganizerEvents', 'EventContracts'],
     }),
 
+    // ── Movie Cinema Contracts ──────────────────────────────────────────────────
+
+    getEligibleContractCinemas: builder.query<EligibleContractCinema[], void>({
+      query: () => '/admin/movie-contracts/eligible-cinemas',
+      transformResponse: (res: { data: EligibleContractCinema[] }) => res.data || [],
+      providesTags: ['MovieContracts'],
+    }),
+
+    getMovieContractPrefill: builder.query<MovieContractPrefill, string>({
+      query: (businessId) => `/admin/movie-contracts/prefill/${businessId}`,
+      transformResponse: (res: { data: MovieContractPrefill }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'MovieContracts', id: `prefill-${id}` }],
+    }),
+
+    getMovieContracts: builder.query<PaginatedList<MovieContract>, PagedQuery | void>({
+      query: (params) => `/admin/movie-contracts${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+      transformResponse: (res: { data: MovieContract[] }) => unwrapPaginated(res),
+      providesTags: ['MovieContracts'],
+    }),
+
+    getAdminMovieContract: builder.query<MovieContract, string>({
+      query: (businessId) => `/admin/movie-contracts/cinema/${businessId}`,
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'MovieContracts', id }],
+    }),
+
+    createMovieContract: builder.mutation<
+      MovieContract,
+      {
+        business_id: string;
+        body_html: string;
+        terms_and_conditions?: string;
+        convenience_fee_percent?: number;
+        commission_percent?: number;
+      }
+    >({
+      query: (body) => ({ url: '/admin/movie-contracts', method: 'POST', body }),
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      invalidatesTags: ['MovieContracts', 'Businesses'],
+    }),
+
+    requestAdminMovieContractOtp: builder.mutation<
+      { message?: string; email_hint?: string; expires_in_seconds?: number },
+      string
+    >({
+      query: (businessId) => ({
+        url: `/admin/movie-contracts/cinema/${businessId}/request-otp-admin`,
+        method: 'POST',
+      }),
+      invalidatesTags: [],
+    }),
+
+    signAdminMovieContract: builder.mutation<
+      MovieContract,
+      { businessId: string; signature_url: string; otp: string }
+    >({
+      query: ({ businessId, signature_url, otp }) => ({
+        url: `/admin/movie-contracts/cinema/${businessId}/sign-admin`,
+        method: 'POST',
+        body: { signature_url, otp },
+      }),
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      invalidatesTags: ['MovieContracts', 'Businesses'],
+    }),
+
+    getCinemaContract: builder.query<MovieContract, void>({
+      query: () => '/movies/cinema/contract',
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      providesTags: ['MovieContracts'],
+    }),
+
+    requestCinemaContractOtp: builder.mutation<
+      { message?: string; email_hint?: string; expires_in_seconds?: number },
+      void
+    >({
+      query: () => ({
+        url: '/movies/cinema/contract/request-otp',
+        method: 'POST',
+      }),
+      invalidatesTags: [],
+    }),
+
+    signCinemaContract: builder.mutation<
+      MovieContract,
+      { signature_url: string; otp: string }
+    >({
+      query: ({ signature_url, otp }) => ({
+        url: '/movies/cinema/contract/sign',
+        method: 'POST',
+        body: { signature_url, otp },
+      }),
+      transformResponse: (res: { data: MovieContract }) => res.data,
+      invalidatesTags: ['MovieContracts', 'Businesses', 'BusinessSettings'],
+    }),
+
+    rejectCinemaContract: builder.mutation<
+      { message?: string },
+      { rejection_reason?: string }
+    >({
+      query: (body) => ({
+        url: '/movies/cinema/contract/reject',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['MovieContracts'],
+    }),
+
     // ── Event reviews ─────────────────────────────────────────────────────────
 
     getPublicEventReviews: builder.query<EventReview[], string>({
@@ -5910,9 +6061,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items
           ? [
-              ...result.items.map((m) => ({ type: 'Movies' as const, id: m.id })),
-              { type: 'Movies', id: 'LIST' },
-            ]
+            ...result.items.map((m) => ({ type: 'Movies' as const, id: m.id })),
+            { type: 'Movies', id: 'LIST' },
+          ]
           : [{ type: 'Movies', id: 'LIST' }],
     }),
 
@@ -5967,9 +6118,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items?.length
           ? [
-              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `lang-${item.id}` })),
-              { type: 'MovieMasters', id: 'LANGUAGE_LIST' },
-            ]
+            ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `lang-${item.id}` })),
+            { type: 'MovieMasters', id: 'LANGUAGE_LIST' },
+          ]
           : [{ type: 'MovieMasters', id: 'LANGUAGE_LIST' }],
     }),
 
@@ -6025,9 +6176,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items?.length
           ? [
-              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `genre-${item.id}` })),
-              { type: 'MovieMasters', id: 'GENRE_LIST' },
-            ]
+            ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `genre-${item.id}` })),
+            { type: 'MovieMasters', id: 'GENRE_LIST' },
+          ]
           : [{ type: 'MovieMasters', id: 'GENRE_LIST' }],
     }),
 
@@ -6083,9 +6234,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items?.length
           ? [
-              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `format-${item.id}` })),
-              { type: 'MovieMasters', id: 'FORMAT_LIST' },
-            ]
+            ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `format-${item.id}` })),
+            { type: 'MovieMasters', id: 'FORMAT_LIST' },
+          ]
           : [{ type: 'MovieMasters', id: 'FORMAT_LIST' }],
     }),
 
@@ -6141,9 +6292,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items?.length
           ? [
-              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `crew-role-${item.id}` })),
-              { type: 'MovieMasters', id: 'CREW_ROLE_LIST' },
-            ]
+            ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `crew-role-${item.id}` })),
+            { type: 'MovieMasters', id: 'CREW_ROLE_LIST' },
+          ]
           : [{ type: 'MovieMasters', id: 'CREW_ROLE_LIST' }],
     }),
 
@@ -6196,9 +6347,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items?.length
           ? [
-              ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `cert-${item.id}` })),
-              { type: 'MovieMasters', id: 'CERTIFICATE_LIST' },
-            ]
+            ...result.items.map((item) => ({ type: 'MovieMasters' as const, id: `cert-${item.id}` })),
+            { type: 'MovieMasters', id: 'CERTIFICATE_LIST' },
+          ]
           : [{ type: 'MovieMasters', id: 'CERTIFICATE_LIST' }],
     }),
 
@@ -6556,9 +6707,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items
           ? [
-              ...result.items.map((c) => ({ type: 'CityMasters' as const, id: c.id })),
-              { type: 'CityMasters', id: 'LIST' },
-            ]
+            ...result.items.map((c) => ({ type: 'CityMasters' as const, id: c.id })),
+            { type: 'CityMasters', id: 'LIST' },
+          ]
           : [{ type: 'CityMasters', id: 'LIST' }],
     }),
 
@@ -6744,9 +6895,9 @@ export const api = createApi({
       providesTags: (result) =>
         result?.items
           ? [
-              ...result.items.map((t) => ({ type: 'EventMasters' as const, id: `term-${t.id}` })),
-              { type: 'EventMasters', id: 'TERM_LIST' },
-            ]
+            ...result.items.map((t) => ({ type: 'EventMasters' as const, id: `term-${t.id}` })),
+            { type: 'EventMasters', id: 'TERM_LIST' },
+          ]
           : [{ type: 'EventMasters', id: 'TERM_LIST' }],
     }),
 
@@ -7020,6 +7171,17 @@ export const {
   useRequestOrganizerContractOtpMutation,
   useSignOrganizerEventContractMutation,
   useRejectOrganizerEventContractMutation,
+  useGetEligibleContractCinemasQuery,
+  useGetMovieContractPrefillQuery,
+  useGetMovieContractsQuery,
+  useGetAdminMovieContractQuery,
+  useCreateMovieContractMutation,
+  useRequestAdminMovieContractOtpMutation,
+  useSignAdminMovieContractMutation,
+  useGetCinemaContractQuery,
+  useRequestCinemaContractOtpMutation,
+  useSignCinemaContractMutation,
+  useRejectCinemaContractMutation,
   useGetPublicEventReviewsQuery,
   useCreateEventReviewMutation,
   useGetOrganizerEventReviewsQuery,

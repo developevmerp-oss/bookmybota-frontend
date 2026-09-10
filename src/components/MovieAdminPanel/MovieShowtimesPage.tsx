@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -19,6 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  AlertCircle,
+  FileSignature,
 } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
 import {
@@ -28,6 +31,7 @@ import {
   useCreatePartnerMovieShowtimeMutation,
   useUpdatePartnerMovieShowtimeMutation,
   useDeletePartnerMovieShowtimeMutation,
+  useGetCinemaContractQuery,
   type MovieShowtime,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -107,6 +111,9 @@ export default function MovieShowtimesPage() {
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [screenFilter, setScreenFilter] = useState<string>("");
   const [movieFilter, setMovieFilter] = useState<string>("");
+
+  const { data: contract, isLoading: loadingContract } = useGetCinemaContractQuery();
+  const isContractActive = contract?.status === "ACTIVE";
 
   const { data: screens = [] } = useGetCinemaScreensQuery(bizId, { skip: !bizId });
   const { data: catalogData } = useGetPartnerMovieCatalogQuery({ page: 1, limit: 100 });
@@ -188,6 +195,10 @@ export default function MovieShowtimesPage() {
   };
 
   const openCreateModal = () => {
+    if (!isContractActive) {
+      toast.error("Active contract required. Please review and sign your cinema agreement under Contract first.");
+      return;
+    }
     setEditingShowtime(null);
     reset(
       emptyMovieShowtimeFormValues({
@@ -319,12 +330,41 @@ export default function MovieShowtimesPage() {
         <button
           type="button"
           onClick={openCreateModal}
-          disabled={screens.length === 0 || catalogMovies.length === 0}
-          className="btn-primary flex items-center gap-2 self-start sm:self-auto py-2.5 px-4 text-sm font-semibold rounded-xl"
+          disabled={!isContractActive || screens.length === 0 || catalogMovies.length === 0}
+          className="btn-primary flex items-center gap-2 self-start sm:self-auto py-2.5 px-4 text-sm font-semibold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+          title={!isContractActive ? "Sign contract first" : undefined}
         >
           <Plus size={18} /> Schedule Show
         </button>
       </div>
+
+      {!loadingContract && !isContractActive && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={22} className="text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white text-base">Cinema Platform Agreement Required</p>
+              <p className="text-xs text-amber-300/80 mt-1">
+                Your cinema contract is currently{" "}
+                <span className="font-semibold text-amber-200">
+                  {contract?.status === "PENDING_SIGNATURES"
+                    ? "awaiting digital signatures"
+                    : contract?.status === "REJECTED"
+                    ? "rejected"
+                    : "not yet created"}
+                </span>
+                . Both Super Admin and Cinema Admin must sign with OTP before showtimes can be scheduled.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/movie/contract"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 text-black font-semibold text-xs hover:bg-amber-400 shrink-0 transition-colors"
+          >
+            <FileSignature size={16} /> View &amp; Sign Agreement
+          </Link>
+        </div>
+      )}
 
       <div className="glass-panel rounded-2xl border border-white/10 p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">

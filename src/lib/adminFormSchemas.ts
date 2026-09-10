@@ -240,6 +240,15 @@ export const adminEventContractCreateSchema = yup.object({
 });
 export type AdminEventContractCreateValues = yup.InferType<typeof adminEventContractCreateSchema>;
 
+export const adminMovieContractCreateSchema = yup.object({
+  business_id: yup.string().required('Select a cinema.'),
+  body_html: yup.string().trim().required('Enter contract content.'),
+  terms: yup.string().trim().default(''),
+  convenience_fee: yup.string().trim().required('Convenience fee is required.'),
+  commission: yup.string().trim().required('Commission is required.'),
+});
+export type AdminMovieContractCreateValues = yup.InferType<typeof adminMovieContractCreateSchema>;
+
 export const adminCustomerEditSchema = yup.object({
   name: yup
     .string()

@@ -13,6 +13,8 @@ interface ContractRichTextEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: string;
+  disabled?: boolean;
+  dynamicFields?: readonly { label: string; token: string }[];
 }
 
 export default function ContractRichTextEditor({
@@ -20,12 +22,16 @@ export default function ContractRichTextEditor({
   onChange,
   placeholder = "Enter contract terms, clauses, and responsibilities…",
   minHeight = "280px",
+  disabled = false,
+  dynamicFields = CONTRACT_DYNAMIC_FIELDS,
 }: ContractRichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [showSource, setShowSource] = useState(false);
   const [source, setSource] = useState("");
   const [fieldOpen, setFieldOpen] = useState(false);
   const syncing = useRef(false);
+
+  const activeFields = dynamicFields && dynamicFields.length > 0 ? dynamicFields : CONTRACT_DYNAMIC_FIELDS;
 
   useEffect(() => {
     if (showSource) {
@@ -34,11 +40,11 @@ export default function ContractRichTextEditor({
     }
     const el = editorRef.current;
     if (!el || syncing.current) return;
-    const display = htmlWithTokenChips(htmlFromTokenChips(value));
+    const display = htmlWithTokenChips(htmlFromTokenChips(value), activeFields);
     if (el.innerHTML !== display) {
       el.innerHTML = display || "";
     }
-  }, [value, showSource]);
+  }, [value, showSource, activeFields]);
 
   const emitChange = useCallback(() => {
     const el = editorRef.current;
@@ -51,13 +57,15 @@ export default function ContractRichTextEditor({
   }, [onChange]);
 
   const exec = (cmd: string, val?: string) => {
+    if (disabled) return;
     document.execCommand(cmd, false, val);
     editorRef.current?.focus();
     emitChange();
   };
 
   const insertField = (token: string) => {
-    const field = CONTRACT_DYNAMIC_FIELDS.find((f) => f.token === token);
+    if (disabled) return;
+    const field = activeFields.find((f) => f.token === token);
     if (!field || !editorRef.current) return;
     editorRef.current.focus();
     const chip = `<span class="contract-token-chip" data-token="${token}" contenteditable="false">${field.label}</span>&nbsp;`;
@@ -77,14 +85,15 @@ export default function ContractRichTextEditor({
         <div className="relative">
           <button
             type="button"
+            disabled={disabled}
             onClick={() => setFieldOpen((o) => !o)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
           >
             <Plus size={14} /> Insert Dynamic Field
           </button>
           {fieldOpen && (
             <div className="absolute left-0 top-full mt-1 z-20 w-56 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
-              {CONTRACT_DYNAMIC_FIELDS.map((f) => (
+              {activeFields.map((f) => (
                 <button
                   key={f.token}
                   type="button"

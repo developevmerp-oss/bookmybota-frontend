@@ -196,16 +196,34 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     const rawSeats = layoutData.layout_template.seats_json || [];
     return {
       data: {
-        seats: rawSeats.map((s: any) => {
-          const seatId = `${s.row_label || ""}${s.seat_label || ""}`;
+        seats: rawSeats.map((s: any, idx: number) => {
+          const rowLabel = String(s.row_label || "").trim();
+          const seatLabel = String(s.seat_label || "").trim();
+          const secName = String(s.section_name || "Standard").trim();
+          const labelId = `${rowLabel}${seatLabel}`;
+
+          // If multiple sections have this exact same row and seat label, disambiguate with section name
+          const isDupe = rawSeats.filter((o: any) =>
+            String(o.row_label || "").trim() === rowLabel &&
+            String(o.seat_label || "").trim() === seatLabel
+          ).length > 1;
+
+          const friendlyId = isDupe && secName ? `${secName} ${labelId}` : labelId;
+          const seatId = friendlyId || s.internalId || s.id || `seat-${idx}`;
+
           const isBooked =
             bookedSet.has(seatId) ||
-            bookedSet.has(`${s.row_label || ""}${Number(s.seat_label)}`) ||
+            bookedSet.has(labelId) ||
+            bookedSet.has(friendlyId) ||
             (s.internalId && bookedSet.has(s.internalId)) ||
+            bookedSet.has(`${rowLabel}${Number(seatLabel)}`) ||
             (s.status && !["AVAILABLE", "ACTIVE"].includes(String(s.status).toUpperCase()));
+
           return {
             ...s,
             id: seatId,
+            internalId: s.internalId,
+            friendlyId,
             status: isBooked ? "BOOKED" : "AVAILABLE",
           };
         }),
@@ -219,7 +237,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       const secName = cs.section_name || "Standard";
       const price = getTierPrice(secName, 0);
       return {
-        seat_identifier: cs.id,
+        seat_identifier: cs.friendlyId || cs.id,
         tier_name: secName,
         unit_price: price,
       };
@@ -325,7 +343,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               seat.seat_label != null && String(seat.seat_label).trim() !== ""
                 ? String(seat.seat_label).trim()
                 : String(seatIdx + 1);
-            const seatId = `${rowObj.rowLabel}${seatNum}`;
+            const labelId = `${rowObj.rowLabel}${seatNum}`;
+            const isDupe = rawSeats.filter((o: any) =>
+              String(o.row_label || "").trim() === rowObj.rowLabel &&
+              String(o.seat_label || "").trim() === seatNum
+            ).length > 1;
+            const friendlyId = isDupe && sec.secName ? `${sec.secName} ${labelId}` : labelId;
+            const seatId = friendlyId;
             const nextSeat = rowSeats[seatIdx + 1];
             const isAisleGap = nextSeat
               ? Number(nextSeat.coordinate_x ?? 0) - Number(seat.coordinate_x ?? 0) > normalStep * 1.6
@@ -337,6 +361,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
             const isBooked =
               bookedSet.has(seatId) ||
+              bookedSet.has(labelId) ||
+              bookedSet.has(friendlyId) ||
               bookedSet.has(`${rowObj.rowLabel}${Number(seatNum)}`) ||
               (seat.internalId && bookedSet.has(seat.internalId)) ||
               Boolean(isStatusUnavailable);
@@ -377,6 +403,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       customTemplate.sections.length > 0
     ) {
       const rows: GridRow[] = [];
+      const isMultiSec = customTemplate.sections.length > 1;
       for (const sec of customTemplate.sections) {
         const tierName = sec.tier_name || sec.name || "Standard";
         const tierObj = showtime?.tier_pricing?.find(
@@ -391,14 +418,15 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           const seats: GridSeat[] = [];
 
           for (let i = 1; i <= seatCount; i++) {
-            const seatId = `${rowLabel}${i}`;
+            const labelId = `${rowLabel}${i}`;
+            const seatId = isMultiSec ? `${tierName} ${labelId}` : labelId;
             seats.push({
               id: seatId,
               row: rowLabel,
               number: i,
               tierName,
               price,
-              isBooked: bookedSet.has(seatId),
+              isBooked: bookedSet.has(seatId) || bookedSet.has(labelId),
             });
           }
 
@@ -783,7 +811,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
 
                   return (
-                    <div key={`${rowGroup.tierName}-${rowGroup.rowLabel}`} className="space-y-2.5 min-w-[560px]">
+                    <div key={`row-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`} className="space-y-2.5 min-w-[560px]">
                       {/* Tier Divider Banner */}
                       {isNewTier && (
                         <div className="flex items-center justify-between border-b border-white/10 pb-2 pt-3 text-xs">
@@ -810,7 +838,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                             const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
 
                             return (
-                              <div key={seat.id} className="flex items-center">
+                              <div key={`${idx}-${rowGroup.tierName}-${seat.id}-${seatIdx}`} className="flex items-center">
                                 <button
                                   type="button"
                                   disabled={seat.isBooked}

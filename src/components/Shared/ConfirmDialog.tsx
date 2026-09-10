@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+
 type ConfirmVariant = "danger" | "success" | "warning";
 
 interface ConfirmDialogProps {
@@ -30,12 +33,18 @@ export default function ConfirmDialog({
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
-  if (!open) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!open || !mounted) return null;
 
   const tone: ConfirmVariant = danger ? "danger" : variant ?? "warning";
   const confirmClass =
     tone === "danger"
-      ? "bg-rose-600 hover:bg-rose-500"
+      ? "bg-[#e11d48] hover:bg-[#be123c]"
       : tone === "success"
         ? "bg-emerald-600 hover:bg-emerald-500"
         : theme === "light"
@@ -44,9 +53,9 @@ export default function ConfirmDialog({
 
   const light = theme === "light";
 
-  return (
+  return createPortal(
     <div
-      className={`fixed inset-0 z-[80] flex items-center justify-center p-4 ${
+      className={`fixed inset-0 z-[200] flex items-center justify-center p-4 ${
         light ? "bg-black/40 backdrop-blur-sm" : "bg-black/80 backdrop-blur-sm"
       }`}
       role="dialog"
@@ -69,11 +78,11 @@ export default function ConfirmDialog({
       >
         <h3
           id="confirm-dialog-title"
-          className={`text-lg sm:text-xl font-bold mb-2 ${light ? "text-foreground" : "text-white"}`}
+          className={`text-lg sm:text-xl font-bold mb-2 ${light ? "text-foreground" : "text-gray-800"}`}
         >
           {title}
         </h3>
-        <p className={`text-sm mb-6 leading-relaxed ${light ? "text-muted-foreground" : "text-zinc-400"}`}>
+        <p className={`text-sm mb-6 leading-relaxed ${light ? "text-muted-foreground" : "text-zinc-600"}`}>
           {body}
         </p>
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
@@ -84,7 +93,7 @@ export default function ConfirmDialog({
             className={`px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 ${
               light
                 ? "border border-border bg-background text-foreground hover:bg-muted"
-                : "text-zinc-300 hover:text-white hover:bg-white/10"
+                : "text-zinc-600 hover:text-white hover:bg-white/10"
             }`}
           >
             {cancelLabel}
@@ -93,12 +102,13 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className={`px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 ${confirmClass}`}
+            className={`px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors ${confirmClass}`}
           >
             {busy ? "Please wait..." : confirmLabel}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

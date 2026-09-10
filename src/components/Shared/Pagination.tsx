@@ -87,8 +87,13 @@ export default function Pagination({
           <ChevronLeft size={16} className="shrink-0" />
           <span className="hidden sm:inline">Previous</span>
         </button>
-        <span className="min-w-[2.75rem] sm:min-w-[3.5rem] text-center text-[0.8125rem] sm:text-sm font-semibold tabular-nums text-slate-600">
-          {totalPages > 0 ? `${page} / ${totalPages}` : "0 / 0"}
+        <span className="inline-flex items-center gap-1.5 sm:gap-2">
+          <span className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full text-[0.8125rem] sm:text-sm font-bold text-white-keep bg-gradient-to-r from-[#f43f5e] to-[#e11d48] shadow-sm shadow-rose-600/25 tabular-nums">
+            {totalPages > 0 ? page : 0}
+          </span>
+          <span className="text-[0.8125rem] sm:text-sm font-semibold tabular-nums text-slate-400">
+            / {totalPages}
+          </span>
         </span>
         <button
           type="button"

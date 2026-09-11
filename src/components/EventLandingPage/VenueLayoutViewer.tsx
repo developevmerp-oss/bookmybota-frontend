@@ -5,6 +5,7 @@ import useImage from "use-image";
 
 type Seat = {
   id: string;
+  internalId?: string;
   ticket_type_id: string;
   section_name: string;
   row_label: string;

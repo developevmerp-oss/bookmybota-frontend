@@ -350,7 +350,7 @@ export default function PartnerPromotionsPage({
               selectedPlan
                 ? {
                     duration_days: selectedPlan.duration_days,
-                    price: selectedPlan.price,
+                    price: selectedPlan.price != null ? Number(selectedPlan.price) : null,
                     listing_boost: selectedPlan.listing_boost,
                     landing_slider: selectedPlan.landing_slider,
                     category_rail: selectedPlan.category_rail,

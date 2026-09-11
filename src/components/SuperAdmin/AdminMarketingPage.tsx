@@ -859,7 +859,7 @@ export default function AdminMarketingPage() {
                                     description={plan.description}
                                     details={{
                                       duration_days: plan.duration_days,
-                                      price: plan.price,
+                                      price: plan.price != null ? Number(plan.price) : null,
                                       listing_boost: plan.listing_boost,
                                       landing_slider: plan.landing_slider,
                                       category_rail: plan.category_rail,

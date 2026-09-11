@@ -132,7 +132,6 @@ function generateDateOptions(count = 7) {
     weekdayShort: string;
     dayNumber: string;
     monthName: string;
-    isWeekend: boolean;
   }> = [];
   const today = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -145,7 +144,6 @@ function generateDateOptions(count = 7) {
       weekdayShort,
       dayNumber: pad(d.getDate()),
       monthName: d.toLocaleDateString("en-US", { month: "short" }),
-      isWeekend: d.getDay() === 0 || d.getDay() === 6,
     });
   }
   return options;
@@ -902,7 +900,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                           </span>
                           <span
                             className={`block text-[1.15rem] sm:text-[1.3rem] font-extrabold leading-none ${
-                              opt.isWeekend ? "text-[#E11D48]" : "text-[#222222]"
+                              "text-[#222222]"
                             }`}
                           >
                             {opt.dayNumber}

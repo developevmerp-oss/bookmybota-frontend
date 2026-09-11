@@ -13,10 +13,14 @@ import {
   isMoviePromoted,
   parseLanguageList,
 } from "@/lib/movieDisplay";
+import AdaptiveCardRow, { useAdaptiveCard } from "./AdaptiveCardRow";
 import "./RecommendedMoviesRail.css";
 
-const VISIBLE = 6;
+const MIN_VISIBLE = 5;
 const MOVIES_HOME_HREF = "/movies";
+
+const cardShell =
+  "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
 type RailMovieCard = {
   id: string;
@@ -55,27 +59,41 @@ function mapShowcaseMovie(movie: ShowcaseMovieCard): RailMovieCard {
   };
 }
 
+/** Match EventPosterCard media sizing on landing sports/event rails. */
+function moviePosterMediaClass(fluid: boolean, horizontal: boolean, columns: number) {
+  if (horizontal && columns === 1) {
+    return "h-[130px] sm:h-[150px] md:h-[170px] lg:h-[300px] w-full";
+  }
+  if (horizontal) return "aspect-[16/9] w-full";
+  if (fluid) return "aspect-[3/4] w-full max-h-[280px]";
+  return "aspect-[3/4] w-full";
+}
+
 function MovieCard({ movie }: { movie: RailMovieCard }) {
+  const adaptive = useAdaptiveCard();
+  const fluid = adaptive?.fluid ?? false;
+  const horizontal = adaptive?.horizontal ?? false;
+  const columns = adaptive?.columns ?? MIN_VISIBLE;
   const meta = formatMovieCardMeta(movie.certification, movie.languages);
 
   return (
-    <Link href={movie.href} className="movies-rail-slot group block h-full">
-      <article className="flex h-full flex-col overflow-hidden rounded-[10px] bg-white border border-[#E5E5E5]">
-        <div className="relative shrink-0 overflow-hidden bg-[#111111]">
-          <div className="movies-rail-poster">
-            {movie.poster ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={movie.poster}
-                alt={movie.title}
-                className="movies-rail-poster-img"
-                loading="lazy"
-                draggable={false}
-              />
-            ) : (
-              <div className="movies-rail-poster-img bg-slate-200" />
-            )}
-          </div>
+    <Link href={movie.href} className={`group block h-full w-full ${cardShell}`}>
+      <article className="flex h-full flex-col">
+        <div
+          className={`relative ${moviePosterMediaClass(fluid, horizontal, columns)} overflow-hidden bg-[#F3F4F6]`}
+        >
+          {movie.poster ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={movie.poster}
+              alt={movie.title}
+              className="w-full h-full object-cover object-top group-hover:scale-[1.04] transition-transform duration-500 ease-out"
+              loading="lazy"
+              draggable={false}
+            />
+          ) : (
+            <div className="w-full h-full bg-slate-200" />
+          )}
           {movie.promoted ? (
             <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
           ) : null}
@@ -83,11 +101,11 @@ function MovieCard({ movie }: { movie: RailMovieCard }) {
             <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
           ) : null}
         </div>
-        <div className="movies-rail-meta shrink-0 px-3 pt-2.5 pb-3">
-          <h3 className="movies-rail-title text-[13px] sm:text-[14px] font-bold text-[#111111] line-clamp-2 leading-snug group-hover:text-[#6900AA] transition-colors">
+        <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">
+          <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
             {movie.title}
           </h3>
-          <p className="movies-rail-subtitle mt-0.5 text-[11px] sm:text-[12px] text-[#6B7280] line-clamp-1 leading-snug">
+          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">
             {meta || "\u00A0"}
           </p>
         </div>
@@ -166,31 +184,25 @@ export default function RecommendedMoviesRail() {
           )}
 
           {isLoading ? (
-            <div className="movies-rail" style={{ ["--movies-visible" as string]: VISIBLE }}>
-              {Array.from({ length: VISIBLE }).map((_, i) => (
-                <div key={i} className="movies-rail-slot">
-                  <div className="overflow-hidden rounded-[10px] border border-[#E5E5E5] bg-white">
-                    <div className="movies-rail-poster bg-[#F7F7F7]" />
-                    <div className="movies-rail-meta px-3 pt-2.5 pb-3 space-y-1.5">
-                      <div className="h-3.5 w-4/5 rounded bg-[#F7F7F7]" />
-                      <div className="h-2.5 w-2/5 rounded bg-[#F7F7F7]" />
-                    </div>
+            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
+              {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
+                <div key={i} className="w-full overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white">
+                  <div className="aspect-[3/4] w-full bg-[#F7F7F7]" />
+                  <div className="px-3.5 pt-3.5 pb-4 space-y-2">
+                    <div className="h-4 w-4/5 rounded bg-[#F7F7F7]" />
+                    <div className="h-3.5 w-3/5 rounded bg-[#F7F7F7]" />
                   </div>
                 </div>
               ))}
-            </div>
+            </AdaptiveCardRow>
           ) : items.length === 0 ? (
             <p className="text-sm text-[#6B7280] py-6">No movies available yet.</p>
           ) : (
-            <div
-              ref={scrollerRef}
-              className="movies-rail"
-              style={{ ["--movies-visible" as string]: VISIBLE }}
-            >
+            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {items.map((movie) => (
                 <MovieCard key={movie.id} movie={movie} />
               ))}
-            </div>
+            </AdaptiveCardRow>
           )}
 
           {scrollEdges.right && (

@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import AuthGate from "@/components/Shared/AuthGate";
 import PasswordInput from "@/components/Shared/PasswordInput";
+import { resolvePartnerLoginHref } from "@/components/Shared/PartnerAuthHeader";
 import { useResetPasswordMutation } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { isValidPassword } from "@/lib/validation";
@@ -15,6 +16,10 @@ function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = useMemo(() => (searchParams.get("token") || "").trim(), [searchParams]);
+  const loginHref = useMemo(
+    () => resolvePartnerLoginHref(searchParams.get("from")),
+    [searchParams]
+  );
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -74,7 +79,7 @@ function ResetPasswordForm() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-md">
         <Link
-          href="/login"
+          href={loginHref}
           className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-6"
         >
           <ArrowLeft size={16} /> Back to login
@@ -92,7 +97,7 @@ function ResetPasswordForm() {
               </div>
               <button
                 type="button"
-                onClick={() => router.push("/login")}
+                onClick={() => router.push(loginHref)}
                 className="w-full bg-slate-800 hover:bg-slate-900 text-white rounded-2xl py-3.5 text-sm font-bold"
               >
                 Go to login

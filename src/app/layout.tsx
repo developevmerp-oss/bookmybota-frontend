@@ -1,6 +1,6 @@
 "use client";
 import { Manrope } from "next/font/google";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import "./globals.css";
 import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/providers/StoreProvider";
@@ -106,7 +106,11 @@ export default function RootLayout({
   const isBusinessLogin = pathname === "/business/login";
   const isOrganizerLogin = pathname === "/organizer/login";
   const isAdminLogin = pathname === "/admin/login";
+<<<<<<< Updated upstream
   /** Partner login/register are auth pages (footer hidden; no customer chrome). */
+=======
+  /** Partner public auth pages (login/register) — used to hide footer, etc. */
+>>>>>>> Stashed changes
   const isPartnerPublicAuth =
     isOrganizerRegister ||
     isVenueRegister ||
@@ -123,11 +127,19 @@ export default function RootLayout({
   const isPasswordAuthPage =
     pathname === "/forgot-password" || pathname === "/reset-password";
   const isPartnerLoginPage =
+<<<<<<< Updated upstream
     isBusinessLogin ||
     isOrganizerLogin ||
     isVenueLogin ||
     isArtistLogin ||
     isMovieLogin ||
+=======
+    isVenueLogin ||
+    isArtistLogin ||
+    isMovieLogin ||
+    isBusinessLogin ||
+    isOrganizerLogin ||
+>>>>>>> Stashed changes
     isAdminLogin;
   const isPartnerMinimalHeaderPage =
     isPartnerRegisterPage || isPasswordAuthPage || isPartnerLoginPage;
@@ -205,8 +217,19 @@ export default function RootLayout({
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={`${manrope.className} ${manrope.variable}`}>
         <StoreProvider>
+<<<<<<< Updated upstream
           {showPartnerAuthHeader ? <PartnerAuthHeader /> : showPublicHeader ? <HomeHeader /> : null}
           <main className={isImmersiveBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
+=======
+          {showPartnerAuthHeader ? (
+            <Suspense fallback={<div className="h-[64px] sm:h-[72px] border-b border-[#EBEBEB] bg-white" />}>
+              <PartnerAuthHeader />
+            </Suspense>
+          ) : showPublicHeader ? (
+            <HomeHeader />
+          ) : null}
+          <main className={isEventBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
+>>>>>>> Stashed changes
             {children}
             {showLayoutFooter && <Footer />}
           </main>

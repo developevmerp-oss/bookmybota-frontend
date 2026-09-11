@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import AuthGate from "@/components/Shared/AuthGate";
+import { resolvePartnerLoginHref } from "@/components/Shared/PartnerAuthHeader";
 import { useForgotPasswordMutation } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 
 function ForgotPasswordForm() {
+  const searchParams = useSearchParams();
+  const loginHref = useMemo(
+    () => resolvePartnerLoginHref(searchParams.get("from")),
+    [searchParams]
+  );
+
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -73,7 +81,7 @@ function ForgotPasswordForm() {
               .
             </p>
             <Link
-              href="/login"
+              href={loginHref}
               className="inline-flex w-full justify-center items-center gap-2 rounded-2xl bg-slate-800 text-white py-3 text-sm font-bold"
             >
               Return to login
@@ -112,7 +120,7 @@ function ForgotPasswordForm() {
               {isLoading ? "Sending…" : "Send reset link"}
             </button>
             <Link
-              href="/login"
+              href={loginHref}
               className="inline-flex w-full justify-center items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800"
             >
               <ArrowLeft size={16} /> Back to login
@@ -127,7 +135,15 @@ function ForgotPasswordForm() {
 export default function ForgotPasswordPage() {
   return (
     <AuthGate mode="guest" guestRoles={[]}>
-      <ForgotPasswordForm />
+      <Suspense
+        fallback={
+          <div className="min-h-[calc(100dvh-72px)] flex items-center justify-center bg-slate-50 text-slate-500">
+            Loading...
+          </div>
+        }
+      >
+        <ForgotPasswordForm />
+      </Suspense>
     </AuthGate>
   );
 }

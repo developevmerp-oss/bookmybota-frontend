@@ -106,7 +106,7 @@ export default function RootLayout({
   const isBusinessLogin = pathname === "/business/login";
   const isOrganizerLogin = pathname === "/organizer/login";
   const isAdminLogin = pathname === "/admin/login";
-  /** Partner login/register keep the public navbar (same as organizer register). */
+  /** Partner login/register are auth pages (footer hidden; no customer chrome). */
   const isPartnerPublicAuth =
     isOrganizerRegister ||
     isVenueRegister ||
@@ -119,10 +119,18 @@ export default function RootLayout({
     isAdminLogin ||
     isBusinessLogin;
 
-  /** Minimal logo + Login bar (List Your Show style) — not customer HomeHeader. */
+  /** Minimal logo + Login bar — not customer HomeHeader (search / category nav). */
   const isPasswordAuthPage =
     pathname === "/forgot-password" || pathname === "/reset-password";
-  const isPartnerMinimalHeaderPage = isPartnerRegisterPage || isPasswordAuthPage;
+  const isPartnerLoginPage =
+    isBusinessLogin ||
+    isOrganizerLogin ||
+    isVenueLogin ||
+    isArtistLogin ||
+    isMovieLogin ||
+    isAdminLogin;
+  const isPartnerMinimalHeaderPage =
+    isPartnerRegisterPage || isPasswordAuthPage || isPartnerLoginPage;
 
   const isAdminOrBusiness =
     (Boolean(pathname?.startsWith("/admin")) && !isAdminLogin) ||
@@ -149,12 +157,20 @@ export default function RootLayout({
     isPartnerRegisterPage ||
     isPartnerPublicAuth;
   const isEventBookingFlow = Boolean(pathname?.match(/^\/events\/[^/]+\/book\/?$/));
+  const isMovieBookFlow = Boolean(pathname?.match(/^\/movies\/book(\/|$)/));
+  const isMovieConfirmationFlow = Boolean(
+    pathname?.match(/^\/movies\/booking-confirmation(\/|$)/)
+  );
+  const hidePublicChromeForMovieBooking = isMovieBookFlow || isMovieConfirmationFlow;
+  /** Full-viewport lock only for seat/review booking — confirmation must scroll so the full ticket shows */
+  const isImmersiveBookingFlow = isEventBookingFlow || isMovieBookFlow;
   const isListYourShowLanding = pathname === "/list-your-show";
   const isListYourShowSubpage = Boolean(pathname?.startsWith("/list-your-show/"));
   const isListYourShowPage = isListYourShowLanding || isListYourShowSubpage;
   const showPublicHeader =
     !isAdminOrBusiness &&
-    !isEventBookingFlow &&
+    !isImmersiveBookingFlow &&
+    !hidePublicChromeForMovieBooking &&
     !isListYourShowSubpage &&
     !isPartnerMinimalHeaderPage;
   const showPartnerAuthHeader = isPartnerMinimalHeaderPage;
@@ -164,28 +180,33 @@ export default function RootLayout({
     !isAuthPage &&
     !isEventsPublicPage &&
     !isOrganizerMarketingPage &&
-    !isListYourShowPage;
+    !isListYourShowPage &&
+    !hidePublicChromeForMovieBooking;
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
 
   useEffect(() => {
-    if (!isEventBookingFlow) return;
-    document.documentElement.classList.add("overflow-hidden");
-    document.body.classList.add("overflow-hidden");
-    return () => {
-      document.documentElement.classList.remove("overflow-hidden");
-      document.body.classList.remove("overflow-hidden");
-    };
-  }, [isEventBookingFlow]);
+    if (isImmersiveBookingFlow) {
+      document.documentElement.classList.add("overflow-hidden");
+      document.body.classList.add("overflow-hidden");
+      return () => {
+        document.documentElement.classList.remove("overflow-hidden");
+        document.body.classList.remove("overflow-hidden");
+      };
+    }
+    // Confirmation (and other pages) must scroll — clear any leftover lock from seat/review
+    document.documentElement.classList.remove("overflow-hidden");
+    document.body.classList.remove("overflow-hidden");
+  }, [isImmersiveBookingFlow]);
 
   return (
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={`${manrope.className} ${manrope.variable}`}>
         <StoreProvider>
           {showPartnerAuthHeader ? <PartnerAuthHeader /> : showPublicHeader ? <HomeHeader /> : null}
-          <main className={isEventBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
+          <main className={isImmersiveBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
             {children}
             {showLayoutFooter && <Footer />}
           </main>

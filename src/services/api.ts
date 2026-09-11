@@ -503,6 +503,14 @@ export interface MovieShowtimeLayoutData {
     preview_image_url?: string | null;
   } | null;
   booked_seat_identifiers: string[];
+  held_seat_identifiers?: string[];
+  own_hold?: {
+    id: string;
+    seat_identifiers: string[];
+    seats_json?: any;
+    expires_at: string;
+    status: string;
+  } | null;
 }
 
 export interface MovieBookingSeatPayload {
@@ -522,6 +530,10 @@ export interface CreateMovieBookingPayload {
   promo_code?: string;
   platform_offer_id?: string;
   payment_method?: string;
+  gift_card_id?: string;
+  gift_card_code?: string;
+  hold_id?: string;
+  session_token?: string;
 }
 
 export interface MovieBookingResult {
@@ -1774,6 +1786,36 @@ export interface EventGiftCardRedemptionSummary {
   customer_cash_total: number;
 }
 
+export interface MovieGiftCardRedemptionRow {
+  id: string;
+  redeemed_at?: string;
+  booking_status?: string;
+  ticket_amount?: number | string;
+  discount_amount?: number | string;
+  convenience_fee_total?: number | string;
+  commission_total?: number | string;
+  gift_card_amount: number | string;
+  order_total?: number | string;
+  grand_total?: number | string;
+  cinema_payable?: number | string;
+  guest_name?: string | null;
+  guest_email?: string | null;
+  booking_code?: string | null;
+  movie_id?: string;
+  movie_title?: string;
+  cinema_id?: string;
+  cinema_name?: string;
+  code_last4?: string | null;
+  product_name?: string | null;
+}
+
+export interface MovieGiftCardRedemptionSummary {
+  bookings_count: number;
+  gift_card_redeemed: number;
+  cinema_payable_total: number;
+  customer_cash_total: number;
+}
+
 export interface GiftCardSettlementOverview {
   dining: DiningGiftCardSettlementSummary;
   events: {
@@ -1782,10 +1824,17 @@ export interface GiftCardSettlementOverview {
     organizer_payout_total?: number;
     customer_cash_total?: number;
   };
+  movies?: {
+    bookings_count: number;
+    gift_card_redeemed: number;
+    cinema_payable_total?: number;
+    customer_cash_total?: number;
+  };
   ledger: {
     dining_redeemed: number;
     /** EVENT + SPORTS booking types (sports is an event type). */
     event_redeemed: number;
+    movie_redeemed?: number;
     total_redeemed: number;
     total_reversed: number;
   };
@@ -2237,7 +2286,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'CinemaSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
 
   endpoints: (builder) => ({
 
@@ -4243,7 +4292,7 @@ export const api = createApi({
 
     previewGiftCardRedeem: builder.mutation<
       GiftCardRedeemPreview,
-      { gift_card_id?: string; code?: string; amount: number; category?: 'EVENTS' | 'SPORTS' | 'DINING' }
+      { gift_card_id?: string; code?: string; amount: number; category?: 'EVENTS' | 'SPORTS' | 'DINING' | 'MOVIES' }
     >({
       query: (body) => ({
         url: '/gift-cards/preview-redeem',
@@ -4428,11 +4477,53 @@ export const api = createApi({
       providesTags: ['AdminDiningGiftCardSettlements'],
     }),
 
-    getAdminGiftCardSettlementOverview: builder.query<GiftCardSettlementOverview, void>({
-      query: () => '/admin/gift-card-settlement-overview',
-      transformResponse: (res: { data: GiftCardSettlementOverview }) => res.data,
+    getAdminMovieGiftCardRedemptions: builder.query<
+      {
+        items: MovieGiftCardRedemptionRow[];
+        meta: import('@/lib/pagination').PaginationMeta;
+        summary: MovieGiftCardRedemptionSummary;
+        note?: string;
+      },
+      { page?: number; limit?: number; q?: string; from?: string; to?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.q) sp.set('q', params.q);
+        if (params?.from) sp.set('from', params.from);
+        if (params?.to) sp.set('to', params.to);
+        const qs = sp.toString();
+        return `/admin/movie-gift-card-redemptions${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: {
+        data?: MovieGiftCardRedemptionRow[];
+        meta?: import('@/lib/pagination').PaginationMeta;
+        summary?: MovieGiftCardRedemptionSummary;
+        note?: string;
+      }) => ({
+        items: res.data || [],
+        meta: res.meta || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          total_pages: 0,
+          has_prev: false,
+          has_next: false,
+        },
+        summary: res.summary || {
+          bookings_count: 0,
+          gift_card_redeemed: 0,
+          cinema_payable_total: 0,
+          customer_cash_total: 0,
+        },
+        note: res.note,
+      }),
       providesTags: ['AdminDiningGiftCardSettlements'],
     }),
+
+    // Overview is registered via giftCardSettlementApi.injectEndpoints below
+    // (explicit export avoids HMR / mega-bundle hook dropouts).
 
     getMarketingCampaigns: builder.query<
       PaginatedList<MarketingCampaign>,
@@ -5890,12 +5981,52 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id: `public-${id}` }],
     }),
 
+    createEventSeatHold: builder.mutation<
+      {
+        message: string;
+        data: {
+          hold_id: string;
+          session_token: string;
+          expires_at: string;
+          event_seat_ids: string[];
+          ttl_seconds: number;
+        };
+      },
+      {
+        eventId: string;
+        event_seat_ids: string[];
+        showtime_id?: string;
+        session_token?: string;
+      }
+    >({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/public/${eventId}/holds`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'EventLayouts', id: arg.eventId },
+        { type: 'EventLayouts', id: `public-${arg.eventId}` },
+      ],
+    }),
+
+    releaseEventSeatHold: builder.mutation<
+      { message: string },
+      { holdId: string; session_token?: string }
+    >({
+      query: ({ holdId, session_token }) => ({
+        url: `/events/holds/${holdId}`,
+        method: 'DELETE',
+        body: session_token ? { session_token } : {},
+      }),
+    }),
+
     createEventBooking: builder.mutation<
       { message?: string; booking_id?: string; qr_code?: string; grand_total?: number; ticket_qty?: number },
       {
         event_id: string;
         showtime_id: string;
-        items: Array<{ ticket_type_id: string; qty: number }>;
+        items: Array<{ ticket_type_id: string; qty: number; event_seat_id?: string }>;
         guest_name: string;
         guest_phone: string;
         guest_email?: string;
@@ -5908,6 +6039,8 @@ export const api = createApi({
         delivery_address_line?: string;
         delivery_city?: string;
         delivery_notes?: string;
+        hold_id?: string;
+        session_token?: string;
         /** When true, POST to organizer booking API (event_admin selling for a customer) */
         for_organizer?: boolean;
       }
@@ -6681,11 +6814,52 @@ export const api = createApi({
 
     getMovieShowtimeLayout: builder.query<
       MovieShowtimeLayoutData,
-      string
+      string | { showtimeId: string; session_token?: string }
     >({
-      query: (showtimeId) => `/movies/showtimes/${showtimeId}/layout`,
+      query: (arg) => {
+        if (typeof arg === 'string') return `/movies/showtimes/${arg}/layout`;
+        return {
+          url: `/movies/showtimes/${arg.showtimeId}/layout`,
+          params: arg.session_token ? { session_token: arg.session_token } : undefined,
+        };
+      },
       transformResponse: (res: { data: MovieShowtimeLayoutData }) => res.data,
-      providesTags: (_r, _e, showtimeId) => [{ type: 'MovieShowtimes', id: `layout-${showtimeId}` }],
+      providesTags: (_r, _e, arg) => {
+        const id = typeof arg === 'string' ? arg : arg.showtimeId;
+        return [{ type: 'MovieShowtimes', id: `layout-${id}` }];
+      },
+    }),
+
+    createMovieSeatHold: builder.mutation<
+      {
+        message: string;
+        data: {
+          hold_id: string;
+          session_token: string;
+          expires_at: string;
+          seats: MovieBookingSeatPayload[];
+          ttl_seconds: number;
+        };
+      },
+      { showtimeId: string; seats: MovieBookingSeatPayload[]; session_token?: string }
+    >({
+      query: ({ showtimeId, ...body }) => ({
+        url: `/movies/showtimes/${showtimeId}/holds`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, arg) => [{ type: 'MovieShowtimes', id: `layout-${arg.showtimeId}` }],
+    }),
+
+    releaseMovieSeatHold: builder.mutation<
+      { message: string },
+      { holdId: string; session_token?: string }
+    >({
+      query: ({ holdId, session_token }) => ({
+        url: `/movies/holds/${holdId}`,
+        method: 'DELETE',
+        body: session_token ? { session_token } : {},
+      }),
     }),
 
     createMovieBooking: builder.mutation<
@@ -6700,6 +6874,207 @@ export const api = createApi({
       invalidatesTags: (_r, _e, arg) => [
         { type: 'MovieShowtimes', id: `layout-${arg.showtime_id}` },
         'MovieShowtimes',
+      ],
+    }),
+
+    scanCinemaMovieBooking: builder.mutation<
+      { data: MovieBookingDetail & {
+          can_check_in?: boolean;
+          already_checked_in?: boolean;
+          check_in_message?: string;
+          just_checked_in?: boolean;
+        } },
+      { qr_token: string }
+    >({
+      query: (body) => ({
+        url: '/movies/cinema/bookings/scan',
+        method: 'POST',
+        body,
+      }),
+    }),
+
+    checkInCinemaMovieBooking: builder.mutation<
+      {
+        message: string;
+        data: MovieBookingDetail & {
+          can_check_in?: boolean;
+          already_checked_in?: boolean;
+          check_in_message?: string;
+          just_checked_in?: boolean;
+        };
+      },
+      string
+    >({
+      query: (id) => ({
+        url: `/movies/cinema/bookings/${id}/check-in`,
+        method: 'PUT',
+      }),
+    }),
+
+    getCinemaSettlements: builder.query<any[], { status?: string } | void>({
+      query: (params) => ({
+        url: '/movies/cinema/settlements',
+        params: params?.status ? { status: params.status } : undefined,
+      }),
+      transformResponse: (res: { data: any[] }) => res.data ?? [],
+      providesTags: ['CinemaSettlements'],
+    }),
+
+    getCinemaLedger: builder.query<
+      {
+        summary: {
+          bookings_count: number;
+          tickets_sold: number;
+          ticket_amount: number;
+          commission_total: number;
+          cinema_earned: number;
+          total_paid: number;
+          pending_amount: number;
+          unsettled_payable: number;
+          open_runs_payable: number;
+          movies_count: number;
+        };
+        rows: Array<{
+          movie_id: string;
+          movie_title: string;
+          movie_status?: string;
+          bookings_count: number;
+          tickets_sold: number;
+          ticket_amount: number;
+          commission_total: number;
+          cinema_earned: number;
+          paid_amount: number;
+          pending_amount: number;
+        }>;
+        recent_settlements: any[];
+        movies: Array<{ id: string; title: string }>;
+      },
+      { movie_id?: string; q?: string; from?: string; to?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.movie_id) sp.set('movie_id', params.movie_id);
+        if (params?.q) sp.set('q', params.q);
+        if (params?.from) sp.set('from', params.from);
+        if (params?.to) sp.set('to', params.to);
+        const qs = sp.toString();
+        return `/movies/cinema/ledger${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: { data: any }) => res.data,
+      providesTags: ['CinemaSettlements'],
+    }),
+
+    getCinemaLedgerCustomers: builder.query<
+      {
+        items: Array<{
+          booking_id: string;
+          movie_id: string;
+          movie_title: string;
+          guest_name?: string | null;
+          guest_phone?: string | null;
+          guest_email?: string | null;
+          booking_code?: string | null;
+          ticket_qty: number;
+          ticket_amount: number;
+          commission_total: number;
+          cinema_earned: number;
+          grand_total: number;
+          status: string;
+          created_at: string;
+        }>;
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          total_pages: number;
+          has_prev: boolean;
+          has_next: boolean;
+        };
+      },
+      { movie_id?: string; q?: string; from?: string; to?: string; page: number }
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        sp.set('page', String(params.page));
+        if (params.movie_id) sp.set('movie_id', params.movie_id);
+        if (params.q) sp.set('q', params.q);
+        if (params.from) sp.set('from', params.from);
+        if (params.to) sp.set('to', params.to);
+        return `/movies/cinema/ledger/customers?${sp.toString()}`;
+      },
+      transformResponse: (res: { data: any }) => res.data,
+      providesTags: ['CinemaSettlements'],
+    }),
+
+    getCinemaSettlementsPending: builder.query<
+      {
+        data: any[];
+        summary: {
+          bookings_count: number;
+          cinema_payable: number;
+          gift_card_amount: number;
+          cash_amount: number;
+          period_from?: string | null;
+          period_to?: string | null;
+        };
+      },
+      void
+    >({
+      query: () => '/movies/cinema/settlements/pending',
+      providesTags: ['CinemaSettlements'],
+    }),
+
+    getCinemaSettlement: builder.query<any, string>({
+      query: (id) => `/movies/cinema/settlements/${id}`,
+      transformResponse: (res: { data: any }) => res.data,
+      providesTags: (_result, _error, id) => [{ type: 'CinemaSettlements', id }],
+    }),
+
+    getAdminCinemaSettlementsPending: builder.query<any[], { business_id?: string } | void>({
+      query: (params) => ({
+        url: '/admin/cinema-settlements/pending',
+        params: params || undefined,
+      }),
+      transformResponse: (res: { data: any[] }) => res.data ?? [],
+      providesTags: ['CinemaSettlements'],
+    }),
+
+    getAdminCinemaSettlements: builder.query<any[], { business_id?: string; status?: string } | void>({
+      query: (params) => ({
+        url: '/admin/cinema-settlements',
+        params: params || undefined,
+      }),
+      transformResponse: (res: { data: any[] }) => res.data ?? [],
+      providesTags: ['CinemaSettlements'],
+    }),
+
+    getAdminCinemaSettlement: builder.query<any, string>({
+      query: (id) => `/admin/cinema-settlements/${id}`,
+      transformResponse: (res: { data: any }) => res.data,
+      providesTags: (_result, _error, id) => [{ type: 'CinemaSettlements', id }],
+    }),
+
+    generateAdminCinemaSettlement: builder.mutation<{ message: string; data: any }, { business_id: string }>({
+      query: (body) => ({
+        url: '/admin/cinema-settlements',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['CinemaSettlements'],
+    }),
+
+    patchAdminCinemaSettlement: builder.mutation<
+      { message: string; data: any },
+      { id: string; status: string; notes?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/cinema-settlements/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        'CinemaSettlements',
+        { type: 'CinemaSettlements', id },
       ],
     }),
 
@@ -7173,7 +7548,7 @@ export const {
   useGetAdminDiningGiftCardRedemptionsQuery,
   usePatchAdminDiningGiftCardSettlementMutation,
   useGetAdminEventGiftCardRedemptionsQuery,
-  useGetAdminGiftCardSettlementOverviewQuery,
+  useGetAdminMovieGiftCardRedemptionsQuery,
   useGetMarketingCampaignsQuery,
   useGetMarketingPaymentSummaryQuery,
   usePatchMarketingCampaignStatusMutation,
@@ -7277,6 +7652,8 @@ export const {
   useUpdateVenueMyInquiryMutation,
   useGetPublicEventQuery,
   useGetPublicEventLayoutQuery,
+  useCreateEventSeatHoldMutation,
+  useReleaseEventSeatHoldMutation,
   useCreateEventBookingMutation,
   useGetCustomerEventBookingsQuery,
   useGetEventBookingByIdQuery,
@@ -7335,7 +7712,21 @@ export const {
   useGetPublicMovieShowtimesQuery,
   useLazyGetPublicMovieShowtimesQuery,
   useGetMovieShowtimeLayoutQuery,
+  useCreateMovieSeatHoldMutation,
+  useReleaseMovieSeatHoldMutation,
   useCreateMovieBookingMutation,
+  useScanCinemaMovieBookingMutation,
+  useCheckInCinemaMovieBookingMutation,
+  useGetCinemaSettlementsQuery,
+  useGetCinemaLedgerQuery,
+  useGetCinemaLedgerCustomersQuery,
+  useGetCinemaSettlementsPendingQuery,
+  useGetCinemaSettlementQuery,
+  useGetAdminCinemaSettlementsPendingQuery,
+  useGetAdminCinemaSettlementsQuery,
+  useGetAdminCinemaSettlementQuery,
+  useGenerateAdminCinemaSettlementMutation,
+  usePatchAdminCinemaSettlementMutation,
   useGetMovieBookingQuery,
   useGetCustomerMovieBookingsQuery,
   useGetCitiesQuery,
@@ -7356,6 +7747,20 @@ export const {
   useUpdateAdminEventTermMutation,
   useDeleteAdminEventTermMutation,
 } = api;
+
+/** Gift-card ledger overview — injected so the hook always exists at runtime. */
+export const giftCardSettlementApi = api.injectEndpoints({
+  overrideExisting: true,
+  endpoints: (builder) => ({
+    getAdminGiftCardSettlementOverview: builder.query<GiftCardSettlementOverview, void>({
+      query: () => '/admin/gift-card-settlement-overview',
+      transformResponse: (res: { data: GiftCardSettlementOverview }) => res.data,
+      providesTags: ['AdminDiningGiftCardSettlements'],
+    }),
+  }),
+});
+
+export const { useGetAdminGiftCardSettlementOverviewQuery } = giftCardSettlementApi;
 
 /** Injected so HMR can re-register with overrideExisting against the same api instance. */
 export const eventInterestApi = api.injectEndpoints({

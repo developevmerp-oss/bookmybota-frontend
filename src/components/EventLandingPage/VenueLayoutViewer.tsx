@@ -353,25 +353,44 @@ export default function VenueLayoutViewer({
 
   if (seats.length === 0) return null;
 
+  const shellClass = cinemaMode
+    ? "flex flex-col md:flex-row h-full w-full bg-white text-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-200"
+    : "flex flex-col md:flex-row h-full w-full bg-slate-900 text-white rounded-2xl overflow-hidden shadow-2xl border border-slate-800";
+  const canvasClass = cinemaMode
+    ? "flex-1 overflow-auto p-4 cursor-grab flex justify-center items-center relative bg-[#F5F5F7]"
+    : "flex-1 overflow-auto p-4 cursor-grab flex justify-center items-center relative bg-slate-950";
+  const zoomBarClass = cinemaMode
+    ? "absolute top-4 right-4 z-10 flex items-center gap-2 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl p-1.5 shadow-md"
+    : "absolute top-4 right-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-1.5 shadow-lg";
+  const zoomBtnClass = cinemaMode
+    ? "w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-slate-700 font-bold transition-colors"
+    : "w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-200 font-bold transition-colors";
+  const zoomLabelClass = cinemaMode
+    ? "text-xs font-mono text-slate-600 px-1"
+    : "text-xs font-mono text-slate-300 px-1";
+  const sidePanelClass = cinemaMode
+    ? "w-full md:w-80 bg-white border-t md:border-t-0 md:border-l border-slate-200 p-5 flex flex-col justify-between shrink-0"
+    : "w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 p-5 flex flex-col justify-between shrink-0";
+
   return (
-    <div className="flex flex-col md:flex-row h-full w-full bg-slate-900 text-white rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
+    <div className={shellClass}>
       {/* Canvas Area */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto p-4 cursor-grab flex justify-center items-center relative bg-slate-950"
+        className={canvasClass}
       >
         {/* Zoom Controls Overlay */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-1.5 shadow-lg">
+        <div className={zoomBarClass}>
           <button 
             onClick={() => setScale(s => Math.max(0.15, s - 0.05))} 
-            className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-200 font-bold transition-colors"
+            className={zoomBtnClass}
           >
             -
           </button>
-          <span className="text-xs font-mono text-slate-300 px-1">{Math.round(scale * 100)}%</span>
+          <span className={zoomLabelClass}>{Math.round(scale * 100)}%</span>
           <button 
             onClick={() => setScale(s => Math.min(1.5, s + 0.05))} 
-            className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-200 font-bold transition-colors"
+            className={zoomBtnClass}
           >
             +
           </button>
@@ -488,10 +507,10 @@ export default function VenueLayoutViewer({
                 const isAvailable = seat.status === "AVAILABLE";
                 const categoryColor = getSeatColorBySection(seat.section_name);
                 
-                let fill = "#334155"; // Unavailable
-                let stroke = "#475569";
+                let fill = cinemaMode ? "#cbd5e1" : "#334155"; // Unavailable
+                let stroke = cinemaMode ? "#94a3b8" : "#475569";
                 let strokeWidth = 1;
-                let opacity = 0.4;
+                let opacity = cinemaMode ? 0.7 : 0.4;
 
                 if (isSelected) {
                   fill = "#f43f5e"; // Rose-500
@@ -560,7 +579,7 @@ export default function VenueLayoutViewer({
                   rotation={label.rotation || 0}
                   fontSize={label.fontSize || 16}
                   fontStyle="bold"
-                  fill="#f1f5f9"
+                  fill={cinemaMode ? "#334155" : "#f1f5f9"}
                 />
               ))}
             </Layer>
@@ -570,48 +589,48 @@ export default function VenueLayoutViewer({
 
       {/* Side Info Panel for Diamond Boxes or Cinema Overview */}
       {!hideSidePanel && (
-        <div className="w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 p-5 flex flex-col justify-between shrink-0">
+        <div className={sidePanelClass}>
           <div>
             {cinemaMode ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-3 h-3 rounded-full bg-[#F84464] animate-pulse" />
-                  <h3 className="text-sm font-bold tracking-wider text-white uppercase">
+                  <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase">
                     Cinema Hall Map
                   </h3>
                 </div>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   Live layout configured for this screen. Pick up to {maxSelectable} seats directly on the map.
                 </p>
 
-                <div className="space-y-2 pt-3 border-t border-slate-800 text-xs">
-                  <p className="text-slate-300 font-semibold mb-2">Seat Tiers & Pricing:</p>
+                <div className="space-y-2 pt-3 border-t border-slate-200 text-xs">
+                  <p className="text-slate-700 font-semibold mb-2">Seat Tiers & Pricing:</p>
                   {(customLegend && customLegend.length > 0 ? customLegend : [
                     { name: "Recliner", color: "#0284c7" },
                     { name: "Prime", color: "#3b82f6" },
                     { name: "Classic Plus", color: "#6366f1" },
                   ]).map((tier) => (
-                    <div key={tier.name} className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                    <div key={tier.name} className="flex items-center justify-between py-1 border-b border-slate-100">
                       <div className="flex items-center gap-2">
                         <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: tier.color }} />
-                        <span className="text-slate-200 font-medium">{tier.name}</span>
+                        <span className="text-slate-800 font-medium">{tier.name}</span>
                       </div>
                       {tier.price != null && (
-                        <span className="font-mono text-slate-400 font-bold">{tier.price} ETB</span>
+                        <span className="font-mono text-slate-500 font-bold">{tier.price} ETB</span>
                       )}
                     </div>
                   ))}
                 </div>
 
-                <div className="pt-3 space-y-1.5 text-[11px] text-slate-400">
+                <div className="pt-3 space-y-1.5 text-[11px] text-slate-500">
                   <p className="flex items-center gap-1.5">
-                    <span className="text-rose-400 font-bold">•</span> Double-click any section to zoom in
+                    <span className="text-[#F84464] font-bold">•</span> Double-click any section to zoom in
                   </p>
                   <p className="flex items-center gap-1.5">
-                    <span className="text-rose-400 font-bold">•</span> Use +/- buttons or wheel to zoom
+                    <span className="text-[#F84464] font-bold">•</span> Use +/- buttons or wheel to zoom
                   </p>
                   <p className="flex items-center gap-1.5">
-                    <span className="text-rose-400 font-bold">•</span> Drag canvas to pan across screen
+                    <span className="text-[#F84464] font-bold">•</span> Drag canvas to pan across screen
                   </p>
                 </div>
               </div>
@@ -675,9 +694,9 @@ export default function VenueLayoutViewer({
 
           {/* Legend */}
           {cinemaMode ? (
-            <div className="border-t border-slate-800 pt-4 mt-4 flex flex-wrap gap-3 text-xs text-slate-400">
+            <div className="border-t border-slate-200 pt-4 mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-rose-500" /> Selected</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-slate-700" /> Sold / Reserved</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-slate-300" /> Sold / Reserved</div>
             </div>
           ) : (
             <div className="border-t border-slate-800 pt-4 mt-4 flex flex-wrap gap-4 text-xs text-slate-400">

@@ -822,12 +822,26 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     return rows;
   }, [cinemas, languageFilters, priceFilters, timeFilters, cinemaSearch, sortBy]);
 
+  const [seatQtyModal, setSeatQtyModal] = useState<{
+    showtime: PublicMovieShowtimeItem;
+    cinema: PublicMovieCinemaGroup;
+  } | null>(null);
+  const [seatQty, setSeatQty] = useState(2);
+
   const handleShowtimeClick = (showtime: PublicMovieShowtimeItem, cinema: PublicMovieCinemaGroup) => {
     if (onSelectShowtime) {
       onSelectShowtime(showtime, cinema);
       return;
     }
-    router.push(`/movies/book/${showtime.id}`);
+    setSeatQty(2);
+    setSeatQtyModal({ showtime, cinema });
+  };
+
+  const confirmSeatQty = () => {
+    if (!seatQtyModal) return;
+    const qty = Math.min(10, Math.max(1, seatQty));
+    router.push(`/movies/book/${seatQtyModal.showtime.id}?qty=${qty}`);
+    setSeatQtyModal(null);
   };
 
   const primaryLanguage = movie.languages[0];
@@ -1276,6 +1290,60 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   );
                 })()
               : null}
+
+            {seatQtyModal ? (
+              <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+                <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E8E8]">
+                    <h3 className="text-base font-bold text-[#222]">How many seats?</h3>
+                    <button
+                      type="button"
+                      onClick={() => setSeatQtyModal(null)}
+                      className="p-1.5 rounded-lg text-[#6B7280] hover:bg-[#F5F5F5] cursor-pointer"
+                      aria-label="Close"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="px-5 py-4 space-y-4">
+                    <p className="text-sm text-[#6B7280]">
+                      {seatQtyModal.cinema.name} ·{" "}
+                      {seatQtyModal.showtime.starts_at
+                        ? new Date(
+                            String(seatQtyModal.showtime.starts_at).replace(" ", "T")
+                          ).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                        : "Showtime"}
+                    </p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setSeatQty(n)}
+                          className={`h-11 rounded-xl text-sm font-bold cursor-pointer transition ${
+                            seatQty === n
+                              ? "bg-[#6900AA] text-white"
+                              : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7]"
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={confirmSeatQty}
+                      className="w-full h-11 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-bold cursor-pointer"
+                    >
+                      Select seats
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </>
         )}
       </div>

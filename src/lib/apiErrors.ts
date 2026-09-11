@@ -6,12 +6,8 @@ export function extractApiError(error: unknown, fallback = 'Something went wrong
 
   const err = error as FetchBaseQueryError & { error?: string; message?: string };
 
-  if ('error' in err && typeof err.error === 'string') {
-    return err.error;
-  }
-
-  if ('message' in err && typeof err.message === 'string') {
-    return err.message;
+  if ('status' in err && err.status === 'FETCH_ERROR') {
+    return 'Network error — check if the backend is running.';
   }
 
   if ('data' in err && err.data) {
@@ -31,8 +27,18 @@ export function extractApiError(error: unknown, fallback = 'Something went wrong
     if (typeof data === 'string') return data;
   }
 
+  if ('error' in err && typeof err.error === 'string' && err.error.trim()) {
+    if (/failed to fetch/i.test(err.error)) {
+      return 'Network error — check if the backend is running.';
+    }
+    return err.error;
+  }
+
+  if ('message' in err && typeof err.message === 'string') {
+    return err.message;
+  }
+
   if ('status' in err) {
-    if (err.status === 'FETCH_ERROR') return 'Network error — check if the backend is running.';
     if (err.status === 'PARSING_ERROR') return 'Invalid response from server.';
     if (typeof err.status === 'number') {
       if (err.status === 400) return 'Invalid request. Please check your input.';

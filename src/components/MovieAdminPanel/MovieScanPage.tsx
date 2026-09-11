@@ -9,36 +9,54 @@ import {
   Camera,
   CheckCircle2,
   Clock,
+  Film,
   ImageUp,
   Loader2,
   MapPin,
   QrCode,
   Ticket,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  useCheckInOrganizerEventBookingMutation,
-  useScanOrganizerEventBookingMutation,
-  type EventBooking,
+  useCheckInCinemaMovieBookingMutation,
+  useScanCinemaMovieBookingMutation,
+  type MovieBookingDetail,
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
-import { ticketModeLabel } from "@/lib/eventTicketMode";
-import { expandEventScanTokens, isEventBookingCheckedIn } from "@/lib/eventScanToken";
-import { shortBookingCode } from "@/lib/eventTicketPdf";
 import {
   organizerScanTokenSchema,
   type OrganizerScanTokenValues,
 } from "@/lib/organizerPartnerFormSchemas";
 
-const SCANNER_REGION_ID = "organizer-event-qr-reader";
+const SCANNER_REGION_ID = "cinema-movie-qr-reader";
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
 const reqStar = <span className="text-rose-500">*</span>;
 
-export default function OrganizerScanPage() {
+type ScannedMovie = MovieBookingDetail & {
+  can_check_in?: boolean;
+  already_checked_in?: boolean;
+  check_in_message?: string;
+  just_checked_in?: boolean;
+  checked_in_at?: string;
+  showtime_starts_at?: string;
+  movie_title?: string;
+  cinema_name?: string;
+  cinema_address?: string;
+  screen_name?: string;
+};
+
+function isMovieCheckedIn(b: Partial<ScannedMovie>) {
+  return (
+    String(b.status || "").toUpperCase() === "USED" ||
+    Boolean(b.already_checked_in) ||
+    Boolean(b.checked_in_at)
+  );
+}
+
+export default function MovieScanPage() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
 
@@ -53,9 +71,12 @@ export default function OrganizerScanPage() {
 
   const {
     register,
-    handleSubmit,
+    getValues,
+    setValue,
     reset: resetManualForm,
     formState: { errors: manualErrors },
+    setError,
+    clearErrors,
   } = useForm<OrganizerScanTokenValues>({
     resolver: yupResolver(organizerScanTokenSchema),
     defaultValues: { manualToken: "" },
@@ -65,12 +86,12 @@ export default function OrganizerScanPage() {
   const [cameraOn, setCameraOn] = useState(false);
   const [starting, setStarting] = useState(false);
   const [cameraError, setCameraError] = useState("");
-  const [scanned, setScanned] = useState<EventBooking | null>(null);
+  const [scanned, setScanned] = useState<ScannedMovie | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
   const [lastDecoded, setLastDecoded] = useState("");
 
-  const [scanQr, { isLoading: isScanning }] = useScanOrganizerEventBookingMutation();
-  const [checkIn, { isLoading: isCheckingIn }] = useCheckInOrganizerEventBookingMutation();
+  const [scanQr, { isLoading: isScanning }] = useScanCinemaMovieBookingMutation();
+  const [checkIn, { isLoading: isCheckingIn }] = useCheckInCinemaMovieBookingMutation();
 
   const stopCamera = useCallback(async () => {
     const scanner = scannerRef.current;
@@ -80,9 +101,7 @@ export default function OrganizerScanPage() {
       return;
     }
     try {
-      if (scanner.isScanning) {
-        await scanner.stop();
-      }
+      if (scanner.isScanning) await scanner.stop();
       scanner.clear();
     } catch {
       /* already stopped */
@@ -96,7 +115,7 @@ export default function OrganizerScanPage() {
     };
   }, [stopCamera]);
 
-  const applyScanResult = useCallback((booking: EventBooking) => {
+  const applyScanResult = useCallback((booking: ScannedMovie) => {
     setScanned(booking);
 
     if (booking.just_checked_in) {
@@ -104,7 +123,7 @@ export default function OrganizerScanPage() {
       return;
     }
 
-    if (isEventBookingCheckedIn(booking)) {
+    if (isMovieCheckedIn(booking)) {
       toast.warning(
         booking.check_in_message ||
           "This ticket was already checked in. It cannot be used again for entry."
@@ -136,17 +155,14 @@ export default function OrganizerScanPage() {
 
       try {
         const result = await scanQr({ qr_token: token }).unwrap();
-        applyScanResult(result.data);
+        applyScanResult(result.data as ScannedMovie);
         await stopCamera();
       } catch (err) {
         lastTokenRef.current = "";
-        const tokens = expandEventScanTokens(token);
         toast.error(
           extractApiError(
             err,
-            tokens.length
-              ? `No booking found for "${tokens[0]}". Use the organizer account for this event.`
-              : "No booking found for this code at your events."
+            `No booking found for "${token}". Use the cinema account for this ticket.`
           )
         );
       } finally {
@@ -175,7 +191,10 @@ export default function OrganizerScanPage() {
         throw new Error("Camera is not available in this browser. Use HTTPS or upload a QR image.");
       }
 
-      const permissionStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const permissionStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
       permissionStream.getTracks().forEach((track) => track.stop());
 
       await stopCamera();
@@ -188,7 +207,8 @@ export default function OrganizerScanPage() {
       }
 
       const rearCam =
-        cameras.find((cam) => /back|rear|environment/i.test(cam.label)) || cameras[cameras.length - 1];
+        cameras.find((cam) => /back|rear|environment/i.test(cam.label)) ||
+        cameras[cameras.length - 1];
 
       const config = {
         fps: 12,
@@ -247,23 +267,36 @@ export default function OrganizerScanPage() {
       const scanner = new Html5Qrcode(SCANNER_REGION_ID, { verbose: false });
       scannerRef.current = scanner;
       const decoded = await scanner.scanFile(file, true);
-      await resolveBooking(decoded, true);
+      try {
+        scanner.clear();
+      } catch {
+        /* ignore */
+      }
+      scannerRef.current = null;
+      await resolveBooking(String(decoded || "").trim(), true);
     } catch (err) {
-      const message = extractApiError(err, "Could not read a QR code from that image.");
-      toast.error(message);
+      toast.error(extractApiError(err, "Could not read a QR code from that image."));
     } finally {
       setLookingUp(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const onManualLookup = handleSubmit((values) => {
-    void resolveBooking(values.manualToken, true);
-  });
+  const onManualLookup = async () => {
+    clearErrors("manualToken");
+    const raw = String(getValues("manualToken") || "").trim();
+    if (!raw) {
+      setError("manualToken", { type: "required", message: "Booking code is required." });
+      return;
+    }
+    const token = raw.toUpperCase();
+    setValue("manualToken", token);
+    await resolveBooking(token, true);
+  };
 
   const handleCheckIn = async () => {
     if (!scanned?.id) return;
-    if (isEventBookingCheckedIn(scanned)) {
+    if (isMovieCheckedIn(scanned)) {
       toast.warning(
         scanned.check_in_message || "This ticket was already checked in and cannot be used again."
       );
@@ -271,11 +304,15 @@ export default function OrganizerScanPage() {
     }
     try {
       const result = await checkIn(scanned.id).unwrap();
-      setScanned(result.data);
+      setScanned(result.data as ScannedMovie);
       if (result.data?.just_checked_in) {
-        toast.success(result.data.check_in_message || result.message || "Guest checked in successfully.");
-      } else if (result.already_checked_in || result.data?.already_checked_in) {
-        toast.warning(result.message || result.data?.check_in_message || "This ticket was already checked in.");
+        toast.success(
+          result.data.check_in_message || result.message || "Guest checked in successfully."
+        );
+      } else if (result.data?.already_checked_in) {
+        toast.warning(
+          result.data.check_in_message || result.message || "This ticket was already checked in."
+        );
       } else {
         toast.success(result.message || "Guest checked in successfully.");
       }
@@ -285,20 +322,20 @@ export default function OrganizerScanPage() {
   };
 
   if (!user?.business_id) {
-    return <p className="text-zinc-400">Loading organizer account...</p>;
+    return <p className="portal-muted">Loading cinema account…</p>;
   }
 
-  const ticketSummary = scanned?.items?.length
-    ? scanned.items.map((i) => `${i.ticket_type || "Ticket"} × ${i.qty}`).join(", ")
-    : scanned?.ticket_qty
-      ? `${scanned.ticket_qty} ticket(s)`
-      : "—";
-
-  const venue = [scanned?.venue_name, scanned?.venue_address].filter(Boolean).join(", ");
+  const seatsLabel =
+    scanned?.seats?.map((s) => s.seat_identifier).filter(Boolean).join(", ") ||
+    (scanned?.ticket_qty ? `${scanned.ticket_qty} seat(s)` : "—");
   const isJustCheckedIn = Boolean(scanned?.just_checked_in);
-  const isAlreadyUsed = isEventBookingCheckedIn(scanned || {});
+  const isAlreadyUsed = isMovieCheckedIn(scanned || {});
   const isBlocked =
     isAlreadyUsed || scanned?.status === "CANCELLED" || scanned?.status === "REFUNDED";
+  const showAt = scanned?.showtime_starts_at;
+  const venue = [scanned?.cinema_name, scanned?.screen_name, scanned?.cinema_address]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -310,9 +347,7 @@ export default function OrganizerScanPage() {
           </p>
         )}
         {lastDecoded && !lookingUp && !scanned && (
-          <p className="text-xs text-muted-foreground break-all">
-            Last read: {lastDecoded}
-          </p>
+          <p className="text-xs portal-muted break-all">Last read: {lastDecoded}</p>
         )}
       </div>
 
@@ -341,7 +376,9 @@ export default function OrganizerScanPage() {
             </div>
           )}
         </div>
+
         {cameraError && <p className="text-xs text-amber-600">{cameraError}</p>}
+
         <div className="relative z-10 flex flex-wrap items-center gap-2">
           {!cameraOn ? (
             <button
@@ -380,19 +417,27 @@ export default function OrganizerScanPage() {
             onChange={(e) => void handleScanFile(e.target.files?.[0])}
           />
         </div>
-        <form className="relative z-10 space-y-2 border-t border-slate-200 pt-4" onSubmit={onManualLookup} noValidate>
+
+        <div className="relative z-10 space-y-2 border-t border-slate-200 pt-4">
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
             Manual booking code {reqStar}
           </label>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
-              placeholder="Paste BMB-… booking code, EVB-… QR code, or booking ID"
+              placeholder="Paste BMB-… booking code or BMB-MOV-… QR token"
               className="input-field flex-1 rounded-xl px-4 py-3 text-sm focus:outline-none"
               autoComplete="off"
               {...register("manualToken")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void onManualLookup();
+                }
+              }}
             />
             <button
-              type="submit"
+              type="button"
+              onClick={() => void onManualLookup()}
               disabled={isScanning || lookingUp}
               className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-60"
             >
@@ -402,22 +447,22 @@ export default function OrganizerScanPage() {
           {manualErrors.manualToken && (
             <p className={fieldErrorClass}>{manualErrors.manualToken.message}</p>
           )}
-        </form>
+        </div>
       </div>
 
       {scanned && (
         <div className="org-card p-6 space-y-5">
           {isJustCheckedIn ? (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex gap-3">
-              <CheckCircle2 size={20} className="text-emerald-300 shrink-0 mt-0.5" />
+              <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-bold text-emerald-200">Checked in successfully</p>
-                <p className="text-sm text-emerald-100/90 mt-1 leading-relaxed">
+                <p className="text-sm font-bold text-emerald-700">Checked in successfully</p>
+                <p className="text-sm text-emerald-800/90 mt-1 leading-relaxed">
                   {scanned.check_in_message ||
                     "Guest entry is confirmed. This ticket cannot be checked in again."}
                 </p>
                 {scanned.checked_in_at && (
-                  <p className="text-xs text-emerald-200/80 mt-2">
+                  <p className="text-xs text-emerald-700/80 mt-2">
                     Checked in: {formatDate(scanned.checked_in_at)}{" "}
                     {formatTime12h(scanned.checked_in_at)}
                   </p>
@@ -426,15 +471,15 @@ export default function OrganizerScanPage() {
             </div>
           ) : isAlreadyUsed ? (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex gap-3">
-              <AlertTriangle size={20} className="text-amber-300 shrink-0 mt-0.5" />
+              <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-bold text-amber-200">Already checked in</p>
-                <p className="text-sm text-amber-100/90 mt-1 leading-relaxed">
+                <p className="text-sm font-bold text-amber-700">Already checked in</p>
+                <p className="text-sm text-amber-800/90 mt-1 leading-relaxed">
                   {scanned.check_in_message ||
                     "This ticket was already used for entry and cannot be checked in again."}
                 </p>
                 {scanned.checked_in_at && (
-                  <p className="text-xs text-amber-200/80 mt-2">
+                  <p className="text-xs text-amber-700/80 mt-2">
                     Checked in: {formatDate(scanned.checked_in_at)}{" "}
                     {formatTime12h(scanned.checked_in_at)}
                   </p>
@@ -443,20 +488,21 @@ export default function OrganizerScanPage() {
             </div>
           ) : scanned.can_check_in ? (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex gap-3">
-              <CheckCircle2 size={20} className="text-emerald-300 shrink-0 mt-0.5" />
+              <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-bold text-emerald-200">Ready for entry</p>
-                <p className="text-sm text-emerald-100/90 mt-1 leading-relaxed">
-                  {scanned.check_in_message || "Confirm check-in to allow this guest into the event."}
+                <p className="text-sm font-bold text-emerald-700">Ready for entry</p>
+                <p className="text-sm text-emerald-800/90 mt-1 leading-relaxed">
+                  {scanned.check_in_message ||
+                    "Confirm check-in to allow this guest into the cinema."}
                 </p>
               </div>
             </div>
           ) : (
             <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 flex gap-3">
-              <AlertTriangle size={20} className="text-rose-300 shrink-0 mt-0.5" />
+              <AlertTriangle size={20} className="text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-bold text-rose-200">Check-in not allowed</p>
-                <p className="text-sm text-rose-100/90 mt-1 leading-relaxed">
+                <p className="text-sm font-bold text-rose-700">Check-in not allowed</p>
+                <p className="text-sm text-rose-800/90 mt-1 leading-relaxed">
                   {scanned.check_in_message || "This booking cannot be checked in."}
                 </p>
               </div>
@@ -465,18 +511,18 @@ export default function OrganizerScanPage() {
 
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Guest</p>
-              <h3 className="text-xl font-bold text-white">{scanned.guest_name || "Guest"}</h3>
-              <p className="text-sm text-zinc-400">{scanned.guest_phone ? `+251 ${scanned.guest_phone}` : "—"}</p>
-              <p className="text-sm text-zinc-500 truncate">{scanned.guest_email || "—"}</p>
+              <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Guest</p>
+              <h3 className="text-xl font-bold portal-heading">{scanned.guest_name || "Guest"}</h3>
+              <p className="text-sm portal-muted">{scanned.guest_phone || "—"}</p>
+              <p className="text-sm text-slate-500 truncate">{scanned.guest_email || "—"}</p>
             </div>
             <span
               className={`text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${
                 scanned.status === "USED"
-                  ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                  ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
                   : scanned.status === "CANCELLED" || scanned.status === "REFUNDED"
-                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    ? "bg-rose-500/10 text-rose-700 border-rose-500/20"
+                    : "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
               }`}
             >
               {scanned.status === "USED" ? "CHECKED IN" : scanned.status}
@@ -484,50 +530,43 @@ export default function OrganizerScanPage() {
           </div>
 
           <div>
-            <p className="text-xs uppercase tracking-wider text-zinc-500 font-semibold">Event</p>
-            <p className="text-lg font-bold text-white mt-1">{scanned.event_name || "Event"}</p>
-            {venue && (
-              <p className="text-sm text-zinc-400 mt-1 flex items-start gap-1.5">
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-1">
+              <Film size={12} /> Movie
+            </p>
+            <p className="text-lg font-bold portal-heading mt-1">{scanned.movie_title || "Movie"}</p>
+            {venue ? (
+              <p className="text-sm portal-muted mt-1 flex items-start gap-1.5">
                 <MapPin size={14} className="mt-0.5 shrink-0" />
                 <span>{venue}</span>
               </p>
-            )}
+            ) : null}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-              <p className="text-[11px] text-zinc-500 flex items-center gap-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+              <p className="text-[11px] text-slate-500 flex items-center gap-1">
                 <Clock size={12} /> Showtime
               </p>
-              <p className="text-sm font-semibold text-white mt-1">
-                {scanned.starts_at ? formatDate(scanned.starts_at) : "—"}
+              <p className="text-sm font-semibold portal-heading mt-1">
+                {showAt ? formatDate(showAt) : "—"}
               </p>
-              <p className="text-xs text-zinc-400">
-                {scanned.starts_at ? formatTime12h(scanned.starts_at) : ""}
-              </p>
+              <p className="text-xs portal-muted">{showAt ? formatTime12h(showAt) : ""}</p>
             </div>
-            <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-              <p className="text-[11px] text-zinc-500 flex items-center gap-1">
-                <Ticket size={12} /> Tickets
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+              <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                <Ticket size={12} /> Seats
               </p>
-              <p className="text-sm font-semibold text-white mt-1">{ticketSummary}</p>
-            </div>
-            <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-              <p className="text-[11px] text-zinc-500 flex items-center gap-1">
-                <Users size={12} /> Ticket mode
-              </p>
-              <p className="text-sm font-semibold text-white mt-1">
-                {ticketModeLabel(scanned.ticket_mode)}
-              </p>
+              <p className="text-sm font-semibold portal-heading mt-1">{seatsLabel}</p>
             </div>
           </div>
 
-          <p className="text-xs text-zinc-500">
-            Booking ref: <span className="font-mono text-rose-300">{shortBookingCode(scanned.id)}</span>
-            {scanned.qr_code ? (
+          <p className="text-xs text-slate-500">
+            Booking ref:{" "}
+            <span className="font-mono text-rose-600">{scanned.booking_code || "—"}</span>
+            {scanned.qr_code_token ? (
               <>
                 {" "}
-                · QR: <span className="font-mono text-zinc-400">{scanned.qr_code}</span>
+                · QR: <span className="font-mono text-slate-500">{scanned.qr_code_token}</span>
               </>
             ) : null}
           </p>

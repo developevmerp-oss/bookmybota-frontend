@@ -18,16 +18,19 @@ import {
   Ticket,
   Users,
   UtensilsCrossed,
+  Film,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetCustomerBookingsQuery,
   useGetCustomerEventBookingsQuery,
+  useGetCustomerMovieBookingsQuery,
   useCancelBookingMutation,
   useCancelEventBookingMutation,
   Booking,
   EventBooking,
+  MovieBookingDetail,
 } from "@/services/api";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -40,12 +43,14 @@ const DEFAULT_DINING_IMAGE =
   "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
 const DEFAULT_EVENT_IMAGE =
   "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80";
+const DEFAULT_MOVIE_IMAGE =
+  "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&q=80";
 
-type KindTab = "all" | "dining" | "event";
+type KindTab = "all" | "dining" | "event" | "movie";
 type StatusTab = "all" | "upcoming" | "past" | "cancelled";
 
 type UnifiedBooking = {
-  kind: "dining" | "event";
+  kind: "dining" | "event" | "movie";
   id: string;
   title: string;
   when: string;
@@ -65,6 +70,11 @@ function diningUpcoming(b: Booking) {
 
 function eventUpcoming(b: EventBooking) {
   return !!b.starts_at && new Date(b.starts_at) > new Date() && b.status === "CONFIRMED";
+}
+
+function movieUpcoming(b: MovieBookingDetail) {
+  const starts = (b as any).showtime_starts_at as string | undefined;
+  return !!starts && new Date(String(starts).replace(" ", "T")) > new Date() && b.status === "CONFIRMED";
 }
 
 function shortBookingCode(id: string) {
@@ -152,6 +162,10 @@ export default function CustomerDashboard() {
     customerId,
     { skip: !customerId }
   );
+  const { data: movieBookings = [], isLoading: moviesLoading } = useGetCustomerMovieBookingsQuery(
+    undefined,
+    { skip: !customerId }
+  );
   const [cancelDining] = useCancelBookingMutation();
   const [cancelEvent] = useCancelEventBookingMutation();
   const [pendingCancel, setPendingCancel] = useState<UnifiedBooking | null>(null);
@@ -185,16 +199,32 @@ export default function CustomerDashboard() {
       canCancel: eventUpcoming(b),
       ticketQty: b.ticket_qty,
     }));
-    return [...dining, ...events].sort(
+    const movies: UnifiedBooking[] = movieBookings.map((b) => ({
+      kind: "movie",
+      id: b.id,
+      title: (b as any).movie_title || "Movie",
+      when: String((b as any).showtime_starts_at || b.created_at || "").replace(" ", "T"),
+      status: b.status,
+      href: `/movies/booking-confirmation/${b.id}`,
+      address: [(b as any).cinema_name, (b as any).screen_name].filter(Boolean).join(" · ") || undefined,
+      extra: b.ticket_qty
+        ? `${b.ticket_qty} seat${b.ticket_qty === 1 ? "" : "s"}`
+        : undefined,
+      image: (b as any).movie_poster || DEFAULT_MOVIE_IMAGE,
+      canCancel: false,
+      ticketQty: b.ticket_qty,
+    }));
+    return [...dining, ...events, ...movies].sort(
       (a, b) => new Date(b.when).getTime() - new Date(a.when).getTime()
     );
-  }, [diningBookings, eventBookings]);
+  }, [diningBookings, eventBookings, movieBookings]);
 
   const kindCounts = useMemo(
     () => ({
       all: unified.length,
       dining: unified.filter((b) => b.kind === "dining").length,
       event: unified.filter((b) => b.kind === "event").length,
+      movie: unified.filter((b) => b.kind === "movie").length,
     }),
     [unified]
   );
@@ -202,6 +232,7 @@ export default function CustomerDashboard() {
   const byKind = useMemo(() => {
     if (kind === "dining") return unified.filter((b) => b.kind === "dining");
     if (kind === "event") return unified.filter((b) => b.kind === "event");
+    if (kind === "movie") return unified.filter((b) => b.kind === "movie");
     return unified;
   }, [unified, kind]);
 
@@ -240,7 +271,7 @@ export default function CustomerDashboard() {
     }
   };
 
-  if (diningLoading || eventsLoading || !user) {
+  if (diningLoading || eventsLoading || moviesLoading || !user) {
     return (
       <CustomerAccountLayout>
         <div className="flex items-center justify-center text-slate-500 py-20">
@@ -254,6 +285,7 @@ export default function CustomerDashboard() {
     { key: "all", label: "All", count: kindCounts.all },
     { key: "dining", label: "Dining", count: kindCounts.dining },
     { key: "event", label: "Events", count: kindCounts.event },
+    { key: "movie", label: "Movies", count: kindCounts.movie },
   ];
   const statusTabs: { key: StatusTab; label: string }[] = [
     { key: "all", label: "All" },
@@ -272,7 +304,7 @@ export default function CustomerDashboard() {
               Welcome back, {welcomeName}! 👋
             </h1>
             <p className="text-slate-500 text-base sm:text-lg lg:text-sm mt-1">
-              Manage your table reservations and event tickets.
+              Manage your dining, events, and movie bookings.
             </p>
           </div>
           <Link
@@ -284,10 +316,17 @@ export default function CustomerDashboard() {
         </div>
 
         <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_8px_30px_rgba(88,28,180,0.06)] p-4 sm:p-5">
-          <div className="flex sm:grid sm:grid-cols-3 items-stretch gap-2 sm:gap-3 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex sm:grid sm:grid-cols-4 items-stretch gap-2 sm:gap-3 mb-4 overflow-x-auto pb-1 scrollbar-hide">
             {kindTabs.map((tab) => {
               const active = kind === tab.key;
-              const Icon = tab.key === "dining" ? UtensilsCrossed : tab.key === "event" ? Ticket : LayoutGrid;
+              const Icon =
+                tab.key === "dining"
+                  ? UtensilsCrossed
+                  : tab.key === "event"
+                    ? Ticket
+                    : tab.key === "movie"
+                      ? Film
+                      : LayoutGrid;
               return (
                 <button
                   key={tab.key}
@@ -361,7 +400,14 @@ export default function CustomerDashboard() {
             <div className="grid gap-4">
               {filteredBookings.map((b) => {
                 const isEvent = b.kind === "event";
-                const KindIcon = isEvent ? Ticket : UtensilsCrossed;
+                const isMovie = b.kind === "movie";
+                const KindIcon = isMovie ? Film : isEvent ? Ticket : UtensilsCrossed;
+                const kindLabel = isMovie ? "Movie" : isEvent ? "Event" : "Dining";
+                const fallbackImage = isMovie
+                  ? DEFAULT_MOVIE_IMAGE
+                  : isEvent
+                    ? DEFAULT_EVENT_IMAGE
+                    : DEFAULT_DINING_IMAGE;
                 return (
                   <div
                     key={`${b.kind}-${b.id}`}
@@ -369,20 +415,14 @@ export default function CustomerDashboard() {
                   >
                     <div className="relative w-full h-40 sm:h-44 lg:w-52 lg:h-40 xl:w-56 xl:h-44 shrink-0">
                       <img
-                        src={
-                          resolveMediaUrl(b.image) ||
-                          (isEvent ? DEFAULT_EVENT_IMAGE : DEFAULT_DINING_IMAGE)
-                        }
+                        src={resolveMediaUrl(b.image) || fallbackImage}
                         alt={b.title}
                         className="w-full h-full rounded-2xl object-cover bg-violet-50"
                         onError={(e) => {
                           const el = e.currentTarget;
-                          const fallback = isEvent
-                            ? DEFAULT_EVENT_IMAGE
-                            : DEFAULT_DINING_IMAGE;
                           if (el.dataset.fallbackApplied === "1") return;
                           el.dataset.fallbackApplied = "1";
-                          el.src = fallback;
+                          el.src = fallbackImage;
                         }}
                       />
                       <span className="absolute bottom-2.5 left-2.5 w-8 h-8 rounded-lg bg-white/70 backdrop-blur-[2px] text-[#6900AA] flex items-center justify-center shadow-sm">
@@ -393,7 +433,7 @@ export default function CustomerDashboard() {
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <span className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-md bg-[#F7E9FF] text-[#6900AA] text-[0.625rem] font-bold uppercase tracking-wider">
                         <KindIcon size={11} />
-                        {isEvent ? "Event" : "Dining"}
+                        {kindLabel}
                       </span>
                       <h3 className="text-xl sm:text-2xl lg:text-xl font-extrabold text-black mt-1.5 truncate">{b.title}</h3>
                       {b.address && (
@@ -500,6 +540,11 @@ export default function CustomerDashboard() {
         onConfirm={async () => {
           if (!pendingCancel) return;
           const b = pendingCancel;
+          if (b.kind === "movie") {
+            toast.error("Movie bookings cannot be cancelled from the dashboard yet.");
+            setPendingCancel(null);
+            return;
+          }
           const label = b.kind === "event" ? "ticket booking" : "reservation";
           setConfirmBusy(true);
           try {

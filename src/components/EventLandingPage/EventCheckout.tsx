@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
+  AlertCircle,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -23,6 +24,7 @@ import {
   Smartphone,
   Star,
   Ticket,
+  Timer,
   Truck,
   User,
   Users,
@@ -32,6 +34,8 @@ import {
 import { toast } from "sonner";
 import {
   useCreateEventBookingMutation,
+  useCreateEventSeatHoldMutation,
+  useReleaseEventSeatHoldMutation,
   useGetCustomerProfileQuery,
   useGetMyGiftCardsQuery,
   usePreviewGiftCardRedeemMutation,
@@ -50,6 +54,7 @@ import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { sanitizePhoneInput } from "@/lib/validation";
 import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
+import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import {
   emptyEventCheckoutContactValues,
   emptyEventCheckoutDeliveryValues,
@@ -72,6 +77,27 @@ import images from "@/Images";
 
 const fieldErrorClass = "mt-1.5 text-[0.8125rem] font-medium text-rose-500";
 const reqStar = <span className="text-rose-500">*</span>;
+const HOLD_SESSION_KEY = "bmb_event_hold_session";
+
+function formatHoldCountdown(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const mm = Math.floor(s / 60)
+    .toString()
+    .padStart(2, "0");
+  const ss = (s % 60).toString().padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function readHoldSessionToken(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const t = sessionStorage.getItem(HOLD_SESSION_KEY);
+  return t && t.trim() ? t.trim() : undefined;
+}
+
+function writeHoldSessionToken(token: string) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(HOLD_SESSION_KEY, token);
+}
 
 const VenueLayoutViewer = dynamic(
   () => import("@/components/EventLandingPage/VenueLayoutViewer"),
@@ -178,6 +204,7 @@ export default function EventCheckout({
   const [selectedGiftCardId, setSelectedGiftCardId] = useState("");
   const [appliedGiftCard, setAppliedGiftCard] = useState<GiftCardRedeemPreview | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [holding, setHolding] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [expandedCity, setExpandedCity] = useState<string>("");
@@ -187,6 +214,11 @@ export default function EventCheckout({
   const [cancelTxnOpen, setCancelTxnOpen] = useState(false);
   const [cancelTxnAction, setCancelTxnAction] = useState<"back" | "exit">("back");
   const [ticketMode, setTicketMode] = useState<TicketDeliveryMode>("M_TICKET");
+  const [sessionToken, setSessionToken] = useState<string | undefined>(undefined);
+  const [holdId, setHoldId] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [timeOutOpen, setTimeOutOpen] = useState(false);
   const dateScrollRef = useRef<HTMLDivElement>(null);
 
   const contactForm = useForm<EventCheckoutContactValues>({
@@ -265,8 +297,14 @@ export default function EventCheckout({
   const activeLayoutData = isOrganizer ? layoutData : publicLayoutData;
 
   const [createEventBooking] = useCreateEventBookingMutation();
+  const [createEventSeatHold] = useCreateEventSeatHoldMutation();
+  const [releaseEventSeatHold] = useReleaseEventSeatHoldMutation();
   const [validatePromo, { isLoading: validatingPromo }] = useValidateEventPromoCodeMutation();
   const [previewGiftCard, { isLoading: validatingGiftCard }] = usePreviewGiftCardRedeemMutation();
+
+  useEffect(() => {
+    setSessionToken(readHoldSessionToken());
+  }, []);
 
   const showtimes = event.showtimes || [];
   const allTicketTypes = event.ticket_types || [];
@@ -487,8 +525,43 @@ export default function EventCheckout({
     setCancelTxnOpen(true);
   };
 
-  const confirmCancelTransaction = () => {
+  const clearSeatHoldState = () => {
+    setHoldId(null);
+    setExpiresAt(null);
+    setSecondsLeft(null);
+    setTimeOutOpen(false);
+  };
+
+  const releaseActiveHold = async () => {
+    if (!holdId) return;
+    try {
+      await releaseEventSeatHold({
+        holdId,
+        session_token: sessionToken || readHoldSessionToken(),
+      }).unwrap();
+    } catch {
+      // best-effort release
+    }
+  };
+
+  const resetToSeatsAfterTimeout = async () => {
+    await releaseActiveHold();
+    clearSeatHoldState();
+    setSelectedSeats([]);
+    setQtyByType({});
+    setAppliedPromo(null);
+    setPromoInput("");
+    setAppliedGiftCard(null);
+    setGiftCardInput("");
+    setSelectedGiftCardId("");
+    setIsMapFullscreen(false);
+    setStep(2);
+  };
+
+  const confirmCancelTransaction = async () => {
     setCancelTxnOpen(false);
+    await releaseActiveHold();
+    clearSeatHoldState();
     if (cancelTxnAction === "exit") {
       onClose();
       return;
@@ -583,6 +656,14 @@ export default function EventCheckout({
 
     setSubmitting(true);
     try {
+      if (selectedSeats.length > 0) {
+        if (!holdId || timeOutOpen || (secondsLeft !== null && secondsLeft <= 0)) {
+          setTimeOutOpen(true);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const items: any[] = [];
       if (selectedSeats.length > 0) {
         selectedSeats.forEach((s) => {
@@ -608,6 +689,14 @@ export default function EventCheckout({
             }
           : {};
 
+      const holdPayload =
+        selectedSeats.length > 0 && holdId
+          ? {
+              hold_id: holdId,
+              session_token: sessionToken || readHoldSessionToken(),
+            }
+          : {};
+
       let result;
       if (isOrganizer) {
         result = await createEventBooking({
@@ -621,6 +710,7 @@ export default function EventCheckout({
           for_organizer: true,
           ticket_mode: ticketMode,
           ...deliveryPayload,
+          ...holdPayload,
         }).unwrap();
       } else {
         result = await createEventBooking({
@@ -636,8 +726,11 @@ export default function EventCheckout({
           gift_card_id: appliedGiftCard?.gift_card_id,
           ticket_mode: ticketMode,
           ...deliveryPayload,
+          ...holdPayload,
         }).unwrap();
       }
+
+      clearSeatHoldState();
 
       if (isOrganizer) {
         toast.success(result.message || `Tickets booked and sent to ${contact.email.trim()}.`);
@@ -656,6 +749,24 @@ export default function EventCheckout({
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (step !== 4 || !expiresAt || !holdId) {
+      setSecondsLeft(null);
+      return;
+    }
+    const tick = () => {
+      const remainingMs = new Date(expiresAt).getTime() - Date.now();
+      const secs = Math.max(0, Math.ceil(remainingMs / 1000));
+      setSecondsLeft(secs);
+      if (secs <= 0) {
+        setTimeOutOpen(true);
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [step, expiresAt, holdId]);
 
   if (!open) return null;
 
@@ -691,7 +802,12 @@ export default function EventCheckout({
   });
   const detailsReady =
     contactDetailsReady && (isOrganizer || isCustomerLoggedIn);
-  const canConfirm = detailsReady && !submitting && Boolean(ticketMode);
+  const canConfirm =
+    detailsReady &&
+    !submitting &&
+    Boolean(ticketMode) &&
+    (selectedSeats.length === 0 ||
+      (Boolean(holdId) && !timeOutOpen && (secondsLeft === null || secondsLeft > 0)));
   const deliveryDetailsReady =
     ticketMode !== "PHYSICAL_DELIVERY" ||
     (Boolean(deliveryAddressLine.trim()) && Boolean(deliveryCity.trim()));
@@ -706,7 +822,7 @@ export default function EventCheckout({
     setStep(3);
   };
 
-  const proceedToReview = () => {
+  const proceedToReview = async () => {
     if (!canProceedFromTicketMode) {
       if (!isOrganizer && !isCustomerLoggedIn) {
         setAuthModalOpen(true);
@@ -723,6 +839,40 @@ export default function EventCheckout({
       }
       return;
     }
+
+    if (selectedSeats.length > 0) {
+      setHolding(true);
+      try {
+        const existing = sessionToken || readHoldSessionToken();
+        const res = await createEventSeatHold({
+          eventId: event.id,
+          event_seat_ids: selectedSeats.map((s) => String(s.id)),
+          showtime_id: showtimeId || undefined,
+          session_token: existing,
+        }).unwrap();
+
+        const nextToken = res.data.session_token;
+        writeHoldSessionToken(nextToken);
+        setSessionToken(nextToken);
+        setHoldId(res.data.hold_id);
+        setExpiresAt(
+          resolveHoldExpiresAt({
+            expires_at: res.data.expires_at,
+            ttl_seconds: res.data.ttl_seconds,
+          })
+        );
+        setTimeOutOpen(false);
+        setStep(4);
+        toast.success(res.message || "Seats held for 10 minutes.");
+      } catch (err) {
+        toast.error(extractApiError(err, "Could not hold seats. Please try again."));
+      } finally {
+        setHolding(false);
+      }
+      return;
+    }
+
+    clearSeatHoldState();
     setStep(4);
   };
 
@@ -738,6 +888,13 @@ export default function EventCheckout({
   const navigateToStep = (targetStep: number) => {
     if (!canNavigateToStep(targetStep)) return;
     if (targetStep !== 2) setIsMapFullscreen(false);
+    if (targetStep === 4) {
+      void proceedToReview();
+      return;
+    }
+    if (targetStep < 4 && holdId) {
+      void releaseActiveHold().then(() => clearSeatHoldState());
+    }
     setStep(targetStep);
   };
 
@@ -1489,6 +1646,23 @@ export default function EventCheckout({
 
           {step === 4 && (
             <form id="event-checkout-form" onSubmit={handleConfirm} className="space-y-4">
+              {holdId && secondsLeft !== null && (
+                <div
+                  className={`rounded-xl px-4 py-2.5 text-center text-sm font-bold border ${
+                    secondsLeft <= 60
+                      ? "bg-rose-50 border-rose-200 text-rose-700"
+                      : "bg-amber-50 border-amber-200 text-amber-800"
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Timer className="size-4" />
+                    Complete booking in{" "}
+                    <span className="font-mono text-base tracking-wider">
+                      {formatHoldCountdown(secondsLeft)}
+                    </span>
+                  </span>
+                </div>
+              )}
               <aside
                 className={`overflow-hidden ${
                   isPage ? "" : "rounded-[0.75rem] border border-slate-200 bg-white shadow-sm"
@@ -1860,13 +2034,19 @@ export default function EventCheckout({
               </button>
               <button
                 type="button"
-                onClick={proceedToReview}
-                disabled={!canProceedFromTicketMode}
-                className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed ${
+                onClick={() => void proceedToReview()}
+                disabled={!canProceedFromTicketMode || holding}
+                className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${
                   isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
                 }`}
               >
-                Continue to review
+                {holding ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Holding seats…
+                  </>
+                ) : (
+                  "Continue to review"
+                )}
               </button>
             </div>
           )}
@@ -2107,7 +2287,7 @@ export default function EventCheckout({
             <div className="mt-6 grid grid-cols-2 gap-3">
             <button
                 type="button"
-                onClick={confirmCancelTransaction}
+                onClick={() => void confirmCancelTransaction()}
                 className="py-2.5 rounded-[0.5rem] border border-[#6900AA] text-[#6900AA] text-[1.0625rem] font-bold cursor-pointer hover:bg-[#F7E9FF]"
               >
                 Yes, Cancel
@@ -2122,6 +2302,25 @@ export default function EventCheckout({
         </div>
       </div>
     </div>
+      )}
+
+      {timeOutOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 text-center">
+            <AlertCircle className="size-12 text-[#6900AA] mx-auto" />
+            <h3 className="text-xl font-extrabold text-slate-900">Your time is out</h3>
+            <p className="text-sm text-slate-500">
+              Your seat hold has expired. Please select your seats again to continue booking.
+            </p>
+            <button
+              type="button"
+              onClick={() => void resetToSeatsAfterTimeout()}
+              className="w-full py-3 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white text-sm font-extrabold cursor-pointer"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
       )}
     </>
   );

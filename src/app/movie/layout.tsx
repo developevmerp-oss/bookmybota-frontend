@@ -21,6 +21,8 @@ import {
   Tag,
   Ticket,
   FileSignature,
+  QrCode,
+  Wallet,
   X,
 } from "lucide-react";
 
@@ -43,6 +45,8 @@ function MovieShell({ children }: { children: React.ReactNode }) {
     { name: "Promotions", href: "/movie/promotions", icon: Megaphone },
     { name: "Showtimes", href: "/movie/showtimes", icon: Clapperboard },
     { name: "Bookings", href: "/movie/bookings", icon: Ticket },
+    { name: "Revenue & Payouts", href: "/movie/settlements", icon: Wallet },
+    { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
     { name: "Profile", href: "/movie/profile", icon: User },
     { name: "Change Password", href: "/movie/change-password", icon: KeyRound },
   ];

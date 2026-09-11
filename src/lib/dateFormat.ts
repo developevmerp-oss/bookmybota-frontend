@@ -78,18 +78,21 @@ export function fromDatetimeLocal(val: string): string {
 
 export function fromDateAndTime(dateYmd: string, timeHm: string): string {
   if (!dateYmd || !timeHm) return '';
-  return fromDatetimeLocal(`${dateYmd}T${timeHm}`);
+  const normalized = normalizeTimeToHm(timeHm);
+  if (!normalized) return '';
+  return fromDatetimeLocal(`${dateYmd}T${normalized}`);
 }
 
 export function toDateInput(iso?: string | null): string {
   if (!iso) return '';
   const s = String(iso).trim();
-  // Already a calendar date (or ISO starting with one) — do not shift by local TZ.
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  // Date-only values stay as-is (no timezone shift).
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Datetimes must use local calendar date to match toTimeInput (local clock).
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** Alias for settlement / API date-only params */
@@ -107,6 +110,18 @@ export function toTimeInput(iso?: string | null): string {
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Normalize any time string to `HH:mm` (drops seconds). Empty if invalid. */
+export function normalizeTimeToHm(raw?: string | null): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?/);
+  if (!m) return '';
+  const h = Math.min(23, Math.max(0, Number.parseInt(m[1], 10)));
+  const min = Math.min(59, Math.max(0, Number.parseInt(m[2], 10)));
+  if (Number.isNaN(h) || Number.isNaN(min)) return '';
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
 export function inferDurationType(startsAt?: string | null, endsAt?: string | null): 'ONE_DAY' | 'MULTI_DAY' {

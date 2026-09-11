@@ -32,30 +32,42 @@ function isBookMyBotaApiHost(host: string) {
   }
 }
 
-/** Normalize upload paths and API-hosted media URLs for browser display. */
+function uploadsPathname(pathname: string): string | null {
+  let p = pathname || "";
+  if (p.startsWith("/public/uploads/")) p = p.replace(/^\/public/, "");
+  if (p.startsWith("public/uploads/")) p = `/${p.replace(/^public\//, "")}`;
+  if (p.startsWith("/uploads/")) return p;
+  if (p.startsWith("uploads/")) return `/${p}`;
+  return null;
+}
+
+/**
+ * Normalize upload paths and API-hosted media URLs for browser display.
+ * Always points `/uploads/...` at the backend origin (port 5000 locally),
+ * never the Next.js frontend origin (port 3000).
+ */
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return "";
   if (url.startsWith("blob:") || url.startsWith("data:")) return url;
 
   const origin = getApiOrigin();
-
   let clean = url.trim();
-  if (clean.startsWith("/public/uploads/")) clean = clean.replace(/^\/public/, "");
-  else if (clean.startsWith("public/uploads/")) clean = clean.replace(/^public\//, "/");
 
-  if (clean.startsWith("/uploads/")) return `${origin}${clean}`;
-  if (clean.startsWith("uploads/")) return `${origin}/${clean}`;
+  const relativeUploads = uploadsPathname(clean);
+  if (relativeUploads) return `${origin}${relativeUploads}`;
 
   if (clean.startsWith("http://") || clean.startsWith("https://")) {
     try {
       const parsed = new URL(clean);
-      let pathname = parsed.pathname;
-      if (pathname.startsWith("/public/uploads/")) {
-        pathname = pathname.replace(/^\/public/, "");
-      }
-      // Rewrite API-hosted uploads (often saved as localhost) to the active API origin.
-      if (isBookMyBotaApiHost(parsed.hostname) && pathname.startsWith("/uploads/")) {
-        return `${origin}${pathname}${parsed.search}`;
+      const path = uploadsPathname(parsed.pathname);
+      if (!path) return clean;
+
+      // Rewrite frontend (3000) or any localhost / known API host uploads → active API origin
+      const host = parsed.hostname.toLowerCase();
+      const port = parsed.port || (parsed.protocol === "https:" ? "443" : "80");
+      const isFrontendDevPort = isLocalHostName(host) && (port === "3000" || port === "3001");
+      if (isFrontendDevPort || isBookMyBotaApiHost(host)) {
+        return `${origin}${path}${parsed.search}`;
       }
     } catch {
       /* keep original */
@@ -71,11 +83,14 @@ export function resolveMediaUrl(url?: string | null): string {
 export function normalizeUploadPath(url?: string | null): string {
   if (!url) return "";
   if (url.startsWith("blob:") || url.startsWith("data:")) return url;
-  if (url.startsWith("/uploads/")) return url;
-  if (url.startsWith("uploads/")) return `/${url}`;
+
+  const asUploads = uploadsPathname(url);
+  if (asUploads) return asUploads;
+
   try {
     const parsed = new URL(url);
-    if (parsed.pathname.startsWith("/uploads/")) return parsed.pathname;
+    const path = uploadsPathname(parsed.pathname);
+    if (path) return path;
     // Cloudinary / external CDN — persist full URL
     if (parsed.protocol === "http:" || parsed.protocol === "https:") return url;
   } catch {

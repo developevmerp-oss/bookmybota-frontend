@@ -145,7 +145,7 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen flex bg-background admin-dashboard-layout organizer-shell">
+    <div className="min-h-screen flex bg-background admin-dashboard-layout organizer-shell partner-shell">
       <aside className="admin-sidebar w-64 fixed inset-y-0 left-0 z-40 hidden md:flex flex-col overflow-hidden">
         <Link
           href="/organizer/profile"

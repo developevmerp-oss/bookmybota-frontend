@@ -44,8 +44,8 @@ function SectionBlock({ title, children }: { title: string; children: React.Reac
   return (
     <section className="bg-white">
       <div className="flex items-stretch border-b border-[#E3BCFF]">
-        <div className="w-1.5 shrink-0 bg-[#6900AA]" />
-        <h3 className="flex-1 bg-[#F7E9FF] px-4 sm:px-5 py-2.5 text-sm font-bold text-[#111111]">
+        <div className="w-1.5 shrink-0 bg-[#e11d48]" />
+        <h3 className="flex-1 bg-[#fff0f3] px-4 sm:px-5 py-2.5 text-sm font-bold text-[#111111]">
           {title}
         </h3>
       </div>
@@ -56,7 +56,7 @@ function SectionBlock({ title, children }: { title: string; children: React.Reac
 
 const labelClass = "block text-sm font-medium text-[#1a1a2e] mb-2";
 const inputClass =
-  "w-full rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6900AA]/30 focus:border-[#6900AA]";
+  "w-full rounded-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#e11d48]/30 focus:border-[#e11d48]";
 const textareaClass = `${inputClass} min-h-[96px] resize-y`;
 
 interface OrganizerAccountSetupFormProps {
@@ -434,9 +434,9 @@ export default function OrganizerAccountSetupForm({
                 disabled={!unlocked}
                 className={`relative px-2 sm:px-4 py-4 text-center text-xs sm:text-sm font-semibold transition-colors ${
                   active
-                    ? "text-[#6900AA]"
+                    ? "text-[#e11d48]"
                     : unlocked
-                      ? "text-slate-600 hover:text-[#6900AA]"
+                      ? "text-slate-600 hover:text-[#e11d48]"
                       : "text-slate-300 cursor-not-allowed"
                 }`}
               >
@@ -446,7 +446,7 @@ export default function OrganizerAccountSetupForm({
                 <span
                   className={`absolute left-0 right-0 bottom-0 h-1 ${
                     active
-                      ? "bg-[#6900AA]"
+                      ? "bg-[#e11d48]"
                       : s.id === 1 && step1Done
                         ? "bg-[#E3BCFF]"
                         : "bg-transparent"
@@ -557,8 +557,8 @@ export default function OrganizerAccountSetupForm({
                       }
                       emptyClassName={
                         module === "artist"
-                          ? "flex flex-col items-center justify-center w-36 h-36 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA] bg-slate-50"
-                          : "flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
+                          ? "flex flex-col items-center justify-center w-36 h-36 rounded-2xl border border-dashed border-slate-300 hover:border-[#e11d48] bg-slate-50"
+                          : "flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-2xl border border-dashed border-slate-300 hover:border-[#e11d48]"
                       }
                       onRemove={() => {
                         setCoverImageUrl("");
@@ -684,7 +684,7 @@ export default function OrganizerAccountSetupForm({
                     type="checkbox"
                     checked={acceptTerms}
                     onChange={(e) => setAcceptTerms(e.target.checked)}
-                    className="mt-1 accent-[#6900AA] h-4 w-4"
+                    className="mt-1 accent-[#e11d48] h-4 w-4"
                   />
                   <span>
                     I confirm the documents are valid and I accept the platform onboarding terms and
@@ -694,7 +694,7 @@ export default function OrganizerAccountSetupForm({
                 <button
                   type="button"
                   onClick={() => setShowTermsModal(true)}
-                  className="text-sm text-[#6900AA] font-semibold hover:underline"
+                  className="text-sm text-[#e11d48] font-semibold hover:underline"
                 >
                   View terms and conditions
                 </button>
@@ -719,7 +719,7 @@ export default function OrganizerAccountSetupForm({
                 <button
                   type="button"
                   onClick={() => void handleProceedStep1()}
-                  className="h-11 px-8 rounded-md bg-[#6900AA] text-white text-sm font-bold hover:bg-[#57008E] transition-colors cursor-pointer"
+                  className="h-11 px-8 rounded-md bg-[#e11d48] text-white text-sm font-bold hover:bg-[#be123c] transition-colors cursor-pointer"
                 >
                   Proceed
                 </button>
@@ -738,7 +738,7 @@ export default function OrganizerAccountSetupForm({
                   type="button"
                   onClick={handleSubmitStep2}
                   disabled={isLoading || !acceptTerms}
-                  className="h-11 px-8 rounded-md bg-[#6900AA] text-white text-sm font-bold hover:bg-[#57008E] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer inline-flex items-center justify-center gap-2"
+                  className="h-11 px-8 rounded-md bg-[#e11d48] text-white text-sm font-bold hover:bg-[#be123c] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer inline-flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>
@@ -794,7 +794,7 @@ export default function OrganizerAccountSetupForm({
                   setAcceptTerms(true);
                   setShowTermsModal(false);
                 }}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#6900AA] hover:bg-[#57008E] cursor-pointer"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#e11d48] hover:bg-[#be123c] cursor-pointer"
               >
                 Accept terms
               </button>

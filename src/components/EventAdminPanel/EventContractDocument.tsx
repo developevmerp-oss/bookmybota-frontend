@@ -16,7 +16,7 @@ export default function EventContractDocument({
   return (
     <article className="contract-document overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
       {/* Accent bar + document title — EVM-style clean header */}
-      <div className="h-1 w-full bg-[#6900AA]" aria-hidden />
+      <div className="h-1 w-full bg-[#e11d48]" aria-hidden />
       <div className="border-b border-slate-200 bg-slate-50 px-6 sm:px-8 py-3.5">
         <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
           Your Contract / Agreement

@@ -82,7 +82,9 @@ export function contractStatusLabel(
     case 'PENDING_SIGNATURES':
       return 'Awaiting signatures';
     case 'ACTIVE':
-      return 'Active — event is public';
+      return options?.eventStatus === 'LIVE'
+        ? 'Active — event is live'
+        : 'Signed — awaiting Super Admin publish';
     case 'REJECTED':
       return 'Rejected';
     default:
@@ -100,7 +102,8 @@ export function organizerWorkflowLabel(event: {
   } | null;
 }): string {
   if (event.status === 'CLOSED') return 'Closed';
-  if (event.contract?.status === 'ACTIVE' && event.is_visible) return 'Public';
+  if (event.status === 'LIVE' && event.is_visible) return 'Public';
+  if (event.status === 'LIVE') return 'Live (hidden)';
   if (event.status === 'DRAFT') return 'Draft';
   if (event.status === 'PENDING_APPROVAL') return 'Awaiting Super Admin review';
   if (!event.contract || event.contract.status === 'REJECTED') {
@@ -112,6 +115,9 @@ export function organizerWorkflowLabel(event: {
     if (!event.contract.organizer_signed_at) return 'Sign contract';
     if (!event.contract.admin_signed_at) return 'Awaiting Super Admin signature';
     return 'Awaiting signatures';
+  }
+  if (event.contract.status === 'ACTIVE' && event.status === 'APPROVED') {
+    return 'Awaiting Super Admin publish';
   }
   return event.status.replace(/_/g, ' ');
 }

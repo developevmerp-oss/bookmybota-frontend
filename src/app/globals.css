@@ -318,6 +318,45 @@
     @apply bg-zinc-900/50 border border-zinc-800 text-white focus:border-rose-500;
   }
 
+  /* Native date/time: remove Windows/Chrome blue segment highlight */
+  input[type="time"],
+  input[type="date"],
+  input[type="datetime-local"] {
+    color-scheme: light;
+  }
+
+  input[type="time"]::-webkit-datetime-edit-hour-field,
+  input[type="time"]::-webkit-datetime-edit-minute-field,
+  input[type="time"]::-webkit-datetime-edit-second-field,
+  input[type="time"]::-webkit-datetime-edit-ampm-field,
+  input[type="date"]::-webkit-datetime-edit-day-field,
+  input[type="date"]::-webkit-datetime-edit-month-field,
+  input[type="date"]::-webkit-datetime-edit-year-field {
+    padding: 0 1px;
+  }
+
+  input[type="time"]::-webkit-datetime-edit-hour-field:focus,
+  input[type="time"]::-webkit-datetime-edit-minute-field:focus,
+  input[type="time"]::-webkit-datetime-edit-second-field:focus,
+  input[type="time"]::-webkit-datetime-edit-ampm-field:focus,
+  input[type="date"]::-webkit-datetime-edit-day-field:focus,
+  input[type="date"]::-webkit-datetime-edit-month-field:focus,
+  input[type="date"]::-webkit-datetime-edit-year-field:focus {
+    background-color: #fff0f3;
+    color: inherit;
+    outline: none;
+    border-radius: 2px;
+  }
+
+  input[type="time"]::selection,
+  input[type="date"]::selection,
+  input[type="time"]::-webkit-datetime-edit-hour-field::selection,
+  input[type="time"]::-webkit-datetime-edit-minute-field::selection,
+  input[type="time"]::-webkit-datetime-edit-ampm-field::selection {
+    background: #ffe4ea;
+    color: #111827;
+  }
+
   /* Micro-animations */
   .hover-lift {
     @apply transition-transform duration-300 hover:-translate-y-1;
@@ -1216,6 +1255,115 @@ html.admin-theme .organizer-shell header.glass-panel,
 html.admin-theme .partner-shell header.glass-panel {
   background: color-mix(in oklab, var(--card) 92%, transparent) !important;
   backdrop-filter: blur(10px);
+}
+
+/*
+ * Partner admin palette (event / venue / artist)
+ * Crimson primary + soft blush selection. Inputs stay white (no purple fill).
+ */
+html.admin-theme .organizer-shell,
+html.admin-theme .partner-shell {
+  --primary: #e11d48;
+  --primary-foreground: #ffffff;
+  --primary-soft: #fff0f3;
+  --ring: #e11d48;
+  --primary-glow: rgba(225, 29, 72, 0.28);
+  --elev-primary: 0 8px 18px rgba(225, 29, 72, 0.22);
+  --shadow-primary: var(--elev-primary);
+  --sidebar-primary: #e11d48;
+  --sidebar-accent: #fff0f3;
+  --partner-input-bg: #ffffff;
+  --partner-surface-tint: #f8fafc;
+  --destructive: #e11d48;
+  --success: #00c48c;
+  --success-soft: #e6fbf4;
+  --rose-50: #fff0f3;
+  --rose-100: #ffe4ea;
+  --rose-200: #fecdd6;
+  --rose-300: #fda4b5;
+  --rose-400: #fb7185;
+  --rose-500: #f43f5e;
+  --rose-600: #e11d48;
+  --rose-700: #be123c;
+  --rose-800: #9f1239;
+  --rose-900: #881337;
+}
+
+html.admin-theme .organizer-shell .input-field,
+html.admin-theme .partner-shell .input-field,
+html.admin-theme .organizer-shell textarea.input-field,
+html.admin-theme .partner-shell textarea.input-field {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.75rem;
+}
+
+html.admin-theme .organizer-shell .input-field:focus,
+html.admin-theme .partner-shell .input-field:focus,
+html.admin-theme .organizer-shell textarea.input-field:focus,
+html.admin-theme .partner-shell textarea.input-field:focus {
+  border-color: var(--primary) !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
+}
+
+html.admin-theme .organizer-shell .portal-select,
+html.admin-theme .partner-shell .portal-select,
+html.admin-theme .organizer-shell select.portal-select,
+html.admin-theme .partner-shell select.portal-select,
+html.admin-theme .organizer-shell select.input-field,
+html.admin-theme .partner-shell select.input-field {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #111827 !important;
+}
+
+html.admin-theme .organizer-shell .portal-select:focus,
+html.admin-theme .partner-shell .portal-select:focus,
+html.admin-theme .organizer-shell select.portal-select:focus,
+html.admin-theme .partner-shell select.portal-select:focus,
+html.admin-theme .organizer-shell select.input-field:focus,
+html.admin-theme .partner-shell select.input-field:focus {
+  border-color: var(--primary) !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
+}
+
+html.admin-theme .organizer-shell .btn-primary,
+html.admin-theme .partner-shell .btn-primary {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+  box-shadow: var(--elev-primary);
+}
+
+html.admin-theme .organizer-shell .org-nav-item.is-active,
+html.admin-theme .partner-shell .org-nav-item.is-active {
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+}
+
+html.admin-theme .organizer-shell table thead,
+html.admin-theme .partner-shell table thead,
+html.admin-theme .organizer-shell .portal-table-head,
+html.admin-theme .partner-shell .portal-table-head {
+  background: var(--partner-surface-tint);
+}
+
+html.admin-theme .organizer-shell .metric-brand,
+html.admin-theme .partner-shell .metric-brand,
+html.admin-theme .organizer-shell .bg-primary-soft,
+html.admin-theme .partner-shell .bg-primary-soft {
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+}
+
+html.admin-theme .organizer-shell .pagination-active,
+html.admin-theme .partner-shell .pagination-active,
+html.admin-theme .organizer-shell [data-active-page="true"],
+html.admin-theme .partner-shell [data-active-page="true"] {
+  background: var(--primary) !important;
+  color: #ffffff !important;
 }
 
 html.admin-theme .admin-dashboard-layout .glass-panel.org-card,

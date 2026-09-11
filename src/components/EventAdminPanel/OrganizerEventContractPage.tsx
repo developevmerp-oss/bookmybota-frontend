@@ -52,7 +52,9 @@ export default function OrganizerContractPage() {
     }
     try {
       await sign({ eventId, signature_url: signatureUrl, otp: otp.trim() }).unwrap();
-      toast.success("Contract signed. Event goes public once Super Admin has also signed.");
+      toast.success(
+        "Contract signed. After both parties sign, Super Admin must publish before the event goes live."
+      );
       setOtp("");
     } catch (err) {
       toast.error(extractApiError(err, "Failed to sign"));

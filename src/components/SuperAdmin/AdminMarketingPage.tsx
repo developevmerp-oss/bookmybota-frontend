@@ -51,6 +51,7 @@ import ConfirmDialog from '@/components/Shared/ConfirmDialog';
 import SearchInput from '@/components/Shared/SearchInput';
 import Pagination from '@/components/Shared/Pagination';
 import { AdminListShimmer } from '@/components/Shared/Shimmer';
+import PlanInfoButton from '@/components/Shared/PlanInfoButton';
 import { PAGE_SIZE } from '@/lib/pagination';
 
 type Tab = 'plans' | 'requests' | 'active' | 'payments';
@@ -66,6 +67,7 @@ type PlanConfirmState = {
 
 const PLAN_FORM_DEFAULTS: AdminMarketingPlanValues = {
   name: '',
+  description: '',
   duration_days: 30,
   price: 0,
   module: 'ALL',
@@ -156,6 +158,7 @@ function planStatusNode(plan: MarketingPlan) {
 function planToFormValues(plan: MarketingPlan): AdminMarketingPlanValues {
   return {
     name: plan.name,
+    description: plan.description || '',
     duration_days: plan.duration_days,
     price: Number(plan.price),
     module: (plan.module || 'ALL') as AdminMarketingPlanValues['module'],
@@ -726,6 +729,22 @@ export default function AdminMarketingPage() {
                     )}
                   </div>
                   <div>
+                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      {...planForm.register('description')}
+                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50 resize-y min-h-[84px]"
+                      placeholder="What partners see when they tap the info button on this plan"
+                    />
+                    {planForm.formState.errors.description && (
+                      <p className="mt-1.5 text-xs text-rose-400 font-medium">
+                        {planForm.formState.errors.description.message}
+                      </p>
+                    )}
+                  </div>
+                  <div>
                     <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Module</label>
                     <select
                       {...planForm.register('module')}
@@ -828,9 +847,26 @@ export default function AdminMarketingPage() {
                               className={`hover:bg-white/[0.02] transition-colors ${archived || !enabled ? 'opacity-80' : ''}`}
                             >
                               <td className="p-4">
-                                <div className="font-semibold text-white">{plan.name}</div>
-                                <div className="text-xs text-zinc-500 flex items-center gap-1 mt-1">
-                                  <Calendar size={12} /> {plan.duration_days} days
+                                <div className="flex items-start gap-2 min-w-0">
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-white">{plan.name}</div>
+                                    <div className="text-xs text-zinc-500 flex items-center gap-1 mt-1">
+                                      <Calendar size={12} /> {plan.duration_days} days
+                                    </div>
+                                  </div>
+                                  <PlanInfoButton
+                                    title={plan.name}
+                                    description={plan.description}
+                                    details={{
+                                      duration_days: plan.duration_days,
+                                      price: plan.price,
+                                      listing_boost: plan.listing_boost,
+                                      landing_slider: plan.landing_slider,
+                                      category_rail: plan.category_rail,
+                                    }}
+                                    tone="dark"
+                                    className="mt-0.5"
+                                  />
                                 </div>
                               </td>
                               <td className="p-4 text-zinc-300 text-sm">{plan.module || 'ALL'}</td>

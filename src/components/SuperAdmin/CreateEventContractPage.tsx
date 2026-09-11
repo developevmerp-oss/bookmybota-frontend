@@ -176,7 +176,8 @@ export default function CreateEventContractPage() {
         <h2 className="text-2xl font-bold text-white">Create Event Contract</h2>
         <p className="text-zinc-400 mt-1">
           Select a pending event, review auto-filled details, compose the contract with dynamic fields,
-          then open the contract and sign with your signature + email OTP. The event goes public only after the organizer also signs.
+          then open the contract and sign with your signature + email OTP. After both parties sign, use
+          Publish on the event to make it live for customers.
         </p>
       </div>
 

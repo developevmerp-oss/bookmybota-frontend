@@ -14,6 +14,7 @@ import {
   type VenueMeta,
 } from "@/lib/venueCategoryConfig";
 import { useUploadImageMutation } from "@/services/api";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 type VenueMetaFieldsProps = {
   venueTypeSlug?: string | null;
@@ -24,7 +25,7 @@ type VenueMetaFieldsProps = {
 };
 
 const lightInput =
-  "w-full rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/30 focus:border-[#6900AA]";
+  "w-full rounded-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#e11d48]/30 focus:border-[#e11d48]";
 const darkInput =
   "w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white";
 
@@ -92,7 +93,7 @@ export default function VenueMetaFields({
             disabled={disabled}
             checked={current === true || current === "true"}
             onChange={(e) => patchField(field.key, e.target.checked)}
-            className="rounded border-slate-300 text-[#6900AA] focus:ring-[#6900AA]"
+            className="rounded border-slate-300 text-[#e11d48] focus:ring-[#e11d48]"
           />
           <span className={variant === "dark" ? "text-sm text-zinc-300" : "text-sm text-slate-700"}>
             {field.label}
@@ -147,7 +148,7 @@ export default function VenueMetaFields({
           ) : url ? (
             <div className="flex items-center gap-3">
               <a
-                href={url}
+                href={resolveMediaUrl(url)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 text-sm text-violet-700 hover:underline"
@@ -174,7 +175,7 @@ export default function VenueMetaFields({
                 emptyClassName={`flex flex-col items-center justify-center w-full aspect-video rounded-lg border border-dashed cursor-pointer ${
                   variant === "dark"
                     ? "border-white/20 hover:border-amber-400"
-                    : "border-slate-300 hover:border-[#6900AA]"
+                    : "border-slate-300 hover:border-[#e11d48]"
                 } ${disabled ? "opacity-50 pointer-events-none" : ""}`}
                 onRemove={() => patchField(field.key, "")}
                 onCroppedFile={(file) => void uploadFile(field.key, file)}

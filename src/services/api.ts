@@ -720,6 +720,24 @@ export interface AdminEvent {
     selected?: Array<{ id?: number; text?: string } | string>;
     custom?: string[];
   };
+  promotions?: Array<{
+    id: number | string;
+    title?: string | null;
+    status?: string | null;
+    payment_status?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    banner_image_url?: string | null;
+    amount?: number | string | null;
+    plan_name?: string | null;
+    plan_price?: number | string | null;
+    duration_days?: number | null;
+    listing_boost?: boolean;
+    landing_slider?: boolean;
+    category_rail?: boolean;
+    plan_description?: string | null;
+    admin_note?: string | null;
+  }>;
 }
 
 export interface EventDocumentUpload {
@@ -988,6 +1006,13 @@ export interface EventFormPayload {
   allowed_ticket_modes?: Array<'M_TICKET' | 'BOX_OFFICE' | 'PHYSICAL_DELIVERY'>;
   /** Category-specific extras (e.g. sport.match details). */
   category_meta?: Record<string, unknown> | null;
+  /** Optional promotion request saved with this event (PENDING marketing campaign). */
+  promotion_request?: {
+    plan_id: number;
+    title: string;
+    banner_image_url?: string;
+    start_date: string;
+  } | null;
   ticket_types: Array<{ ticket_type: string; total_count: number; price: number; max_per_order?: number }>;
   artists?: Array<{
     artist_source: 'registered' | 'external' | 'auto_registered';
@@ -1415,6 +1440,7 @@ export interface MovieEligiblePlatformOffer {
 export interface MarketingPlan {
   id: number;
   name: string;
+  description?: string | null;
   duration_days: number;
   price: number | string;
   is_active?: boolean;
@@ -4513,6 +4539,7 @@ export const api = createApi({
         category?: string;
         target_type?: string;
         target_id?: string;
+        start_date: string;
       }
     >({
       query: ({ bizId, ...body }) => ({
@@ -4534,6 +4561,7 @@ export const api = createApi({
         cta_url?: string;
         target_type?: string;
         target_id?: string;
+        start_date?: string;
       }
     >({
       query: ({ bizId, campaignId, ...body }) => ({

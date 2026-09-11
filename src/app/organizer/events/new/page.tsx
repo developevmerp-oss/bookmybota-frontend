@@ -20,7 +20,11 @@ export default function NewOrganizerEventPage() {
   const handleSaveDraft = async (payload: EventFormPayload) => {
     try {
       await createEvent(payload).unwrap();
-      toast.success("Draft saved. You can continue editing anytime from My Events.");
+      toast.success(
+        payload.promotion_request
+          ? "Draft saved with promotion request. You can continue editing anytime from My Events."
+          : "Draft saved. You can continue editing anytime from My Events."
+      );
       router.push("/organizer/events");
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save draft"));
@@ -32,7 +36,11 @@ export default function NewOrganizerEventPage() {
     try {
       const created = await createEvent(payload).unwrap();
       await submitEvent({ id: created.id, body: payload }).unwrap();
-      toast.success("Event submitted for Super Admin approval");
+      toast.success(
+        payload.promotion_request
+          ? "Event and promotion submitted for Super Admin approval"
+          : "Event submitted for Super Admin approval"
+      );
       router.push("/organizer/events");
     } catch (e) {
       toast.error(extractApiError(e, "Failed to submit event"));

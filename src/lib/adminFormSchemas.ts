@@ -115,6 +115,11 @@ export const adminCollectionCreateSchema = yup.object({
 
 export const adminMarketingPlanSchema = yup.object({
   name: yup.string().trim().required('Plan name is required.'),
+  description: yup
+    .string()
+    .trim()
+    .default('')
+    .max(1000, 'Description must be at most 1000 characters.'),
   duration_days: yup
     .number()
     .typeError('Duration must be a number.')

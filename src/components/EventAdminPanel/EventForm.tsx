@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check } from "lucide-react";
+import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check, Megaphone, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetBusinessTypesQuery,
@@ -15,6 +16,7 @@ import {
   useGetOrganizerVenueLayoutsQuery,
   useGetOrganizerVenueLayoutQuery,
   useSearchOrganizerArtistsQuery,
+  useGetPublicMarketingPlansQuery,
   type CityMaster,
   type EventDocumentMaster,
   type EventDocumentUpload,
@@ -24,6 +26,9 @@ import {
   type OrganizerArtistSearchResult,
 } from "@/services/api";
 import { fuzzyFilter } from "@/lib/fuzzySearch";
+import { formatMoneyDisplay } from "@/lib/currencyFormat";
+import PlanInfoButton from "@/components/Shared/PlanInfoButton";
+import { resolveMediaUrl, extractUploadUrl } from "@/lib/mediaUrl";
 
 const VenueLayoutMapPreview = dynamic(
   () => import("@/components/EventAdminPanel/VenueLayoutMapPreview"),
@@ -57,6 +62,7 @@ import {
   formatDateTime12h,
   formatTime12h,
   inferDurationType,
+  normalizeTimeToHm,
   toDateInput,
   toDatetimeLocal,
   toTimeInput,
@@ -154,6 +160,20 @@ function ticketsForShow(
 function eventToValues(event?: OrganizerEvent | null): EventFormValues {
   if (!event) return defaultEventFormValues();
   const gallery = Array.isArray(event.gallery_images) ? event.gallery_images : [];
+  const promo = Array.isArray(event.promotions) ? event.promotions[0] : undefined;
+  const promoStartRaw = promo?.start_date ? String(promo.start_date) : "";
+  const promoStartDate = /^\d{4}-\d{2}-\d{2}/.test(promoStartRaw)
+    ? promoStartRaw.slice(0, 10)
+    : promoStartRaw
+      ? (() => {
+          const d = new Date(promoStartRaw);
+          if (Number.isNaN(d.getTime())) return "";
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${y}-${m}-${day}`;
+        })()
+      : "";
   return {
     name: event.name || "",
     category_type_id: event.category_type_id ?? null,
@@ -162,6 +182,12 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     poster_vertical_url: event.poster_vertical_url || "",
     gallery_images: gallery,
     youtube_url: event.youtube_url || "",
+    want_promotion: Boolean(promo?.plan_id && promo?.title),
+    promo_plan_id: promo?.plan_id != null ? String(promo.plan_id) : "",
+    promo_title: promo?.title ? String(promo.title) : "",
+    promo_banner_url: promo?.banner_image_url ? String(promo.banner_image_url) : "",
+    promo_start_date: promoStartDate,
+    promo_landing_slider: Boolean(promo?.landing_slider),
     languages: parseEventLanguages(event.language),
     about_event: event.about_event || "",
     age_group: event.age_group || "",
@@ -228,13 +254,81 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
           duration_type: durationType,
           event_date: toDateInput(s.starts_at),
           start_time: toTimeInput(s.starts_at),
-          end_time: toTimeInput(s.ends_at || s.starts_at),
+          // ONE_DAY end is derived from duration on save; avoid stale end_time causing before-start errors.
+          end_time: durationType === "MULTI_DAY" ? toTimeInput(s.ends_at || s.starts_at) : "",
           starts_at: toDatetimeLocal(s.starts_at),
-          ends_at: toDatetimeLocal(s.ends_at),
+          ends_at: durationType === "MULTI_DAY" ? toDatetimeLocal(s.ends_at) : "",
           ticket_types: ticketsForShow(event, s.id, i),
         };
       }) as EventFormValues["showtimes"]) || [defaultVenue()],
   };
+}
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
+/** Hours + minutes only (no seconds) — avoids native time-picker second segment bugs. */
+function TimeHmFields({
+  value,
+  onChange,
+  disabled,
+  inputClass,
+}: {
+  value?: string | null;
+  onChange: (hm: string) => void;
+  disabled?: boolean;
+  inputClass: string;
+}) {
+  const hm = normalizeTimeToHm(value);
+  const [hour, minute] = hm ? hm.split(":") : ["", ""];
+
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <select
+        disabled={disabled}
+        aria-label="Hour"
+        className={inputClass}
+        value={hour}
+        onChange={(e) => {
+          const h = e.target.value;
+          if (!h) {
+            onChange("");
+            return;
+          }
+          onChange(`${h}:${minute || "00"}`);
+        }}
+      >
+        <option value="">HH</option>
+        {HOUR_OPTIONS.map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      <span className="text-slate-400 font-semibold shrink-0">:</span>
+      <select
+        disabled={disabled}
+        aria-label="Minute"
+        className={inputClass}
+        value={minute}
+        onChange={(e) => {
+          const m = e.target.value;
+          if (!m) {
+            onChange("");
+            return;
+          }
+          onChange(`${hour || "00"}:${m}`);
+        }}
+      >
+        <option value="">MM</option>
+        {MINUTE_OPTIONS.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 function CityLocationFields({
@@ -799,7 +893,7 @@ function EventDocUploadsList({
               <div className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                 <FileText size={16} className="text-rose-600 shrink-0" />
                 <a
-                  href={uploadedUrl}
+                  href={resolveMediaUrl(uploadedUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-slate-800 truncate flex-1 hover:text-rose-700"
@@ -819,10 +913,10 @@ function EventDocUploadsList({
             ) : (
               !readOnly && (
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-rose-400 cursor-pointer">
-                  <Upload size={16} /> Upload PDF or image
+                  <Upload size={16} /> Upload JPG, PNG, or PDF
                   <input
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,.pdf,application/pdf"
                     className="hidden"
                     disabled={uploading}
                     onChange={(e) => onUpload(e, doc.id)}
@@ -877,7 +971,24 @@ function EventTicketTypesFields({ readOnly }: { readOnly: boolean }) {
         {!readOnly && (
           <button
             type="button"
-            onClick={() => append(defaultTicketType())}
+            onClick={() => {
+              // Preserve schedule fields — nested field-array append can drop siblings
+              const rows = [...(getValues("showtimes") || [])];
+              const row0 = rows[0] ? { ...rows[0] } : defaultVenue();
+              append(defaultTicketType());
+              // Re-apply schedule after tick so append cannot drop date/time
+              requestAnimationFrame(() => {
+                const latest = [...(getValues("showtimes") || [])];
+                if (!latest[0]) latest[0] = defaultVenue();
+                latest[0] = {
+                  ...latest[0],
+                  event_date: row0.event_date || latest[0].event_date || "",
+                  start_time: normalizeTimeToHm(row0.start_time || latest[0].start_time || ""),
+                  end_time: normalizeTimeToHm(row0.end_time || latest[0].end_time || ""),
+                };
+                setValue("showtimes", latest, { shouldDirty: true });
+              });
+            }}
             className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 shrink-0"
           >
             <Plus size={14} /> Add type
@@ -981,6 +1092,7 @@ function VenueBlock({
     register,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useFormContext<EventFormValues>();
 
@@ -1217,16 +1329,36 @@ function VenueBlock({
               </div>
               <div>
                 <label className={labelClass}>Start time <span className="text-rose-500">*</span></label>
-                <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.start_time`)} />
+                <TimeHmFields
+                  disabled={readOnly}
+                  inputClass={inputClass}
+                  value={startTime}
+                  onChange={(hm) => {
+                    const rows = [...(getValues("showtimes") || [])];
+                    if (!rows[index]) return;
+                    rows[index] = { ...rows[index], start_time: hm };
+                    setValue("showtimes", rows, { shouldDirty: true });
+                  }}
+                />
                 {startTime && eventDate && (
-                  <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${startTime}`)}</p>
+                  <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${normalizeTimeToHm(startTime)}`)}</p>
                 )}
               </div>
               <div>
                 <label className={labelClass}>End time</label>
-                <input disabled={readOnly} type="time" className={inputClass} {...register(`showtimes.${index}.end_time`)} />
+                <TimeHmFields
+                  disabled={readOnly}
+                  inputClass={inputClass}
+                  value={endTime}
+                  onChange={(hm) => {
+                    const rows = [...(getValues("showtimes") || [])];
+                    if (!rows[index]) return;
+                    rows[index] = { ...rows[index], end_time: hm };
+                    setValue("showtimes", rows, { shouldDirty: true });
+                  }}
+                />
                 {endTime && eventDate && (
-                  <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${endTime}`)}</p>
+                  <p className="text-xs text-slate-600 mt-1">{formatTime12h(`${eventDate}T${normalizeTimeToHm(endTime)}`)}</p>
                 )}
               </div>
             </div>
@@ -1658,6 +1790,7 @@ export default function EventForm({
 }: EventFormProps) {
   const { data: businessTypes = [] } = useGetBusinessTypesQuery();
   const { data: cities = [] } = useGetCitiesQuery();
+  const { data: promoPlans = [] } = useGetPublicMarketingPlansQuery({ module: "EVENTS" });
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const [documents, setDocuments] = useState<EventDocumentUpload[]>(() =>
     normalizeFormDocuments(event?.documents)
@@ -1673,6 +1806,7 @@ export default function EventForm({
   const [visitedSteps, setVisitedSteps] = useState<EventStepperStepId[]>(() =>
     event ? getEventStepperSteps(event.category_slug).map((s) => s.id) : ["details"]
   );
+  const [promoModalOpen, setPromoModalOpen] = useState(false);
 
   const categories = useMemo(
     () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
@@ -1681,7 +1815,8 @@ export default function EventForm({
 
   const methods = useForm<EventFormValues>({
     defaultValues: eventToValues(event),
-    resolver: yupResolver(eventDraftSchema),
+    // raw: true — yup cast/defaults must not wipe sibling fields (e.g. event_date) on trigger()
+    resolver: yupResolver(eventDraftSchema, undefined, { raw: true }),
     mode: "onBlur",
   });
   const {
@@ -1703,6 +1838,13 @@ export default function EventForm({
   const posterHorizontal = watch("poster_horizontal_url");
   const posterVertical = watch("poster_vertical_url");
   const galleryImages = watch("gallery_images") || [];
+  const wantPromotion = watch("want_promotion");
+  const promoPlanId = watch("promo_plan_id");
+  const promoBannerUrl = watch("promo_banner_url");
+  const selectedPromoPlan = useMemo(
+    () => promoPlans.find((p) => String(p.id) === String(promoPlanId || "")),
+    [promoPlans, promoPlanId]
+  );
   const allowedTicketModes = watch("allowed_ticket_modes") || [];
   const aboutEvent = watch("about_event") || "";
   const durationMinutesTotal = Number(watch("duration_minutes") || 0);
@@ -1956,6 +2098,15 @@ export default function EventForm({
         };
       }),
       showtimes,
+      promotion_request:
+        values.want_promotion && values.promo_plan_id && values.promo_title?.trim() && values.promo_start_date
+          ? {
+              plan_id: Number(values.promo_plan_id),
+              title: values.promo_title.trim(),
+              banner_image_url: values.promo_banner_url?.trim() || undefined,
+              start_date: values.promo_start_date,
+            }
+          : null,
     };
     return payload;
   };
@@ -2044,6 +2195,18 @@ export default function EventForm({
       toast.error(msg);
       return;
     }
+    if (values.want_promotion) {
+      if (!values.promo_plan_id?.trim() || !values.promo_title?.trim() || !values.promo_start_date?.trim()) {
+        toast.error("Complete the promotion fields in Media, or turn off Add promotion.");
+        goToStep("media");
+        return;
+      }
+      if (values.promo_landing_slider && !values.promo_banner_url?.trim()) {
+        toast.error("Banner image is required for the selected promotion plan.");
+        goToStep("media");
+        return;
+      }
+    }
     const masterErr = validateMasters(true);
     if (masterErr) {
       toast.error(masterErr);
@@ -2071,18 +2234,30 @@ export default function EventForm({
   const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => {
     if (!e.target.files?.length || readOnly) return;
     const file = e.target.files[0];
+    const name = file.name.toLowerCase();
+    const okType =
+      file.type.startsWith("image/") ||
+      file.type === "application/pdf" ||
+      /\.(jpe?g|png|webp|gif|pdf)$/i.test(name);
+    if (!okType) {
+      toast.error("Only JPG, PNG, or PDF files are allowed.");
+      e.target.value = "";
+      return;
+    }
     const formData = new FormData();
     formData.append("image", file);
     try {
       const res = await uploadImage(formData).unwrap();
-      if (res.url) {
+      const url = extractUploadUrl(res) || res.url;
+      if (url) {
         setDocuments((prev) => [
           ...prev.filter((d) => d.document_type_id !== documentTypeId),
-          { document_type_id: documentTypeId, url: res.url },
+          { document_type_id: documentTypeId, url },
         ]);
+        toast.success("Document uploaded");
       }
-    } catch {
-      toast.error(`Failed to upload ${file.name}`);
+    } catch (err) {
+      toast.error(extractApiError(err, `Failed to upload ${file.name}`));
     }
     e.target.value = "";
   };
@@ -2126,7 +2301,10 @@ export default function EventForm({
     if (event.status === "APPROVED" || event.status === "LIVE") {
       return (
         <div className="portal-banner-success rounded-xl border p-4 text-sm font-medium">
-          This event is {event.status === "LIVE" ? "live" : "approved"}. Details are read-only here.
+          This event is {event.status === "LIVE" ? "live" : "approved"}.
+          {event.status === "APPROVED"
+            ? " It stays hidden until Super Admin publishes it after the contract is fully signed."
+            : " Details are read-only here."}
         </div>
       );
     }
@@ -2156,6 +2334,68 @@ export default function EventForm({
         toast.error("Choose Single Event or Tour to continue.");
         return false;
       }
+
+      // Snapshot schedule before trigger — yup cast can clear nested showtimes fields
+      const show0 = (getValues("showtimes") || [])[0];
+      const eventDateBefore = String(show0?.event_date || getValues("showtimes.0.event_date") || "").trim();
+      const startTimeNorm = normalizeTimeToHm(
+        show0?.start_time || getValues("showtimes.0.start_time") || ""
+      );
+
+      if (hostingType === "single") {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDateBefore)) {
+          toast.error("Set the event date.");
+          return false;
+        }
+        if (!startTimeNorm) {
+          toast.error("Set the start time (hours and minutes).");
+          return false;
+        }
+        // Persist normalized HH:mm (no seconds) onto showtimes[0]
+        const rows = [...(getValues("showtimes") || [])];
+        if (!rows[0]) rows[0] = defaultVenue();
+        rows[0] = {
+          ...rows[0],
+          event_date: eventDateBefore,
+          start_time: startTimeNorm,
+          // Single events derive end from duration — drop stale end_time leftovers.
+          end_time: "",
+          ends_at: "",
+          duration_type: "ONE_DAY",
+        };
+        setValue("showtimes", rows, { shouldDirty: true });
+
+        const durationMins = Number(getValues("duration_minutes") || 0);
+        if (!durationMins || durationMins < 1) {
+          toast.error("Set event duration in minutes.");
+          return false;
+        }
+      }
+
+      const ticketsBefore = getValues("showtimes.0.ticket_types") || [];
+      if (!ticketsBefore.length) {
+        toast.error("Add at least one ticket type.");
+        return false;
+      }
+      for (const t of ticketsBefore) {
+        if (!String(t.ticket_type || "").trim()) {
+          toast.error("Each ticket type needs a name.");
+          return false;
+        }
+        if (!Number(t.total_count) || Number(t.total_count) < 1) {
+          toast.error("Each ticket type needs total seats of at least 1.");
+          return false;
+        }
+        if (!Number.isFinite(Number(t.price)) || Number(t.price) < 0) {
+          toast.error("Each ticket type needs a valid price.");
+          return false;
+        }
+        if (!Number(t.max_per_order) || Number(t.max_per_order) < 1) {
+          toast.error("Each ticket type needs a max per order of at least 1.");
+          return false;
+        }
+      }
+
       const ok = await trigger([
         "name",
         "category_type_id",
@@ -2165,6 +2405,22 @@ export default function EventForm({
         "about_event",
         "allowed_ticket_modes",
       ]);
+
+      // Restore schedule if resolver cast cleared it
+      if (hostingType === "single" && eventDateBefore && startTimeNorm) {
+        const rows = [...(getValues("showtimes") || [])];
+        if (!rows[0]) rows[0] = defaultVenue();
+        rows[0] = {
+          ...rows[0],
+          event_date: eventDateBefore,
+          start_time: startTimeNorm,
+          end_time: "",
+          ends_at: "",
+          duration_type: "ONE_DAY",
+        };
+        setValue("showtimes", rows, { shouldDirty: true });
+      }
+
       if (!ok) {
         toast.error("Please complete the required event details.");
         return false;
@@ -2190,40 +2446,6 @@ export default function EventForm({
         toast.error("Select at least one ticket delivery mode for customers.");
         return false;
       }
-      if (hostingType === "single") {
-        const show = values.showtimes?.[0];
-        if (!show?.event_date || !show?.start_time) {
-          toast.error("Set event date and start time.");
-          return false;
-        }
-        if (!Number(values.duration_minutes) || Number(values.duration_minutes) < 1) {
-          toast.error("Set event duration in minutes.");
-          return false;
-        }
-      }
-      const tickets = values.showtimes?.[0]?.ticket_types || [];
-      if (!tickets.length) {
-        toast.error("Add at least one ticket type.");
-        return false;
-      }
-      for (const t of tickets) {
-        if (!String(t.ticket_type || "").trim()) {
-          toast.error("Each ticket type needs a name.");
-          return false;
-        }
-        if (!Number(t.total_count) || Number(t.total_count) < 1) {
-          toast.error("Each ticket type needs total seats of at least 1.");
-          return false;
-        }
-        if (!Number.isFinite(Number(t.price)) || Number(t.price) < 0) {
-          toast.error("Each ticket type needs a valid price.");
-          return false;
-        }
-        if (!Number(t.max_per_order) || Number(t.max_per_order) < 1) {
-          toast.error("Each ticket type needs a max per order of at least 1.");
-          return false;
-        }
-      }
       return true;
     }
     if (stepId === "sport") {
@@ -2244,9 +2466,55 @@ export default function EventForm({
         toast.error("Horizontal poster is required.");
         return false;
       }
+      if (getValues("want_promotion")) {
+        const planId = getValues("promo_plan_id")?.trim();
+        const title = getValues("promo_title")?.trim();
+        const start = getValues("promo_start_date")?.trim();
+        const landing = Boolean(getValues("promo_landing_slider"));
+        const banner = getValues("promo_banner_url")?.trim();
+        if (!planId) {
+          toast.error("Select a promotion plan, or turn off Add promotion.");
+          return false;
+        }
+        if (!title) {
+          toast.error("Enter a promotion title.");
+          return false;
+        }
+        if (!start) {
+          toast.error("Choose when the promotion should start.");
+          return false;
+        }
+        const today = new Date();
+        const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+          today.getDate()
+        ).padStart(2, "0")}`;
+        if (start < ymd) {
+          toast.error("Promotion start date cannot be in the past.");
+          return false;
+        }
+        if (landing && !banner) {
+          toast.error("Banner image is required for this promotion plan.");
+          return false;
+        }
+      }
       return true;
     }
     if (stepId === "venue") {
+      if (hostingType === "single") {
+        const rows = [...(getValues("showtimes") || [])];
+        const durationMins = Number(getValues("duration_minutes") || 0);
+        const next = rows.map((s) => ({
+          ...s,
+          duration_type: "ONE_DAY" as const,
+          end_time: "",
+          ends_at: "",
+        }));
+        setValue("showtimes", next, { shouldDirty: true });
+        if (!durationMins || durationMins < 1) {
+          toast.error("Set event duration in Event details first.");
+          return false;
+        }
+      }
       const ok = await trigger(["showtimes"]);
       if (!ok) {
         toast.error("Please complete venue, city, schedule, and ticket details.");
@@ -2457,7 +2725,19 @@ export default function EventForm({
                     disabled={readOnly}
                     type="date"
                     className={inputClass}
-                    {...register("showtimes.0.event_date")}
+                    value={watch("showtimes.0.event_date") || ""}
+                    onChange={(e) => {
+                      const rows = [...(getValues("showtimes") || [])];
+                      if (!rows[0]) rows[0] = defaultVenue();
+                      rows[0] = {
+                        ...rows[0],
+                        event_date: e.target.value,
+                        end_time: "",
+                        ends_at: "",
+                        duration_type: "ONE_DAY",
+                      };
+                      setValue("showtimes", rows, { shouldDirty: true });
+                    }}
                   />
                   {watch("showtimes.0.event_date") && (
                     <p className="text-xs text-slate-600 mt-1">{formatDate(watch("showtimes.0.event_date"))}</p>
@@ -2465,12 +2745,24 @@ export default function EventForm({
                 </div>
                 <div>
                   <label className={labelClass}>Start time <span className="text-rose-500">*</span></label>
-                  <input
+                  <TimeHmFields
                     disabled={readOnly}
-                    type="time"
-                    className={inputClass}
-                    {...register("showtimes.0.start_time")}
+                    inputClass={inputClass}
+                    value={watch("showtimes.0.start_time")}
+                    onChange={(hm) => {
+                      const rows = [...(getValues("showtimes") || [])];
+                      if (!rows[0]) rows[0] = defaultVenue();
+                      rows[0] = {
+                        ...rows[0],
+                        start_time: hm,
+                        end_time: "",
+                        ends_at: "",
+                        duration_type: "ONE_DAY",
+                      };
+                      setValue("showtimes", rows, { shouldDirty: true });
+                    }}
                   />
+                  <p className="text-[11px] text-slate-500 mt-1">Hours and minutes only (no seconds).</p>
                 </div>
               </div>
             </div>
@@ -2869,6 +3161,305 @@ export default function EventForm({
             {...register("youtube_url")}
           />
           {errors.youtube_url && <p className={errorClass}>{errors.youtube_url.message}</p>}
+        </section>
+
+        <section className="org-card p-6 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="portal-heading text-lg font-semibold flex items-center gap-2">
+                <Megaphone size={18} className="text-primary shrink-0" />
+                Promotion (optional)
+              </h3>
+              <p className="portal-muted text-sm mt-1">
+                Request a visibility plan in a popup. Super Admin still reviews the banner before it goes live.
+              </p>
+            </div>
+            {!readOnly ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!getValues("promo_title")?.trim() && getValues("name")?.trim()) {
+                    setValue("promo_title", getValues("name").trim(), { shouldDirty: true });
+                  }
+                  setPromoModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#e11d48] text-white text-sm font-semibold hover:bg-[#be123c] shrink-0"
+              >
+                <Megaphone size={15} />
+                {wantPromotion ? "Edit promotion" : "Request Promotion"}
+              </button>
+            ) : null}
+          </div>
+
+          {wantPromotion && promoPlanId ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0 space-y-0.5">
+                <p className="font-semibold text-slate-900 truncate">
+                  {getValues("promo_title") ||
+                    promoPlans.find((p) => String(p.id) === promoPlanId)?.name ||
+                    "Promotion"}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {promoPlans.find((p) => String(p.id) === promoPlanId)?.name}
+                  {getValues("promo_start_date")
+                    ? ` · starts ${getValues("promo_start_date")}`
+                    : ""}
+                </p>
+              </div>
+              {!readOnly ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValue("want_promotion", false, { shouldDirty: true });
+                    setValue("promo_plan_id", "", { shouldDirty: true });
+                    setValue("promo_title", "", { shouldDirty: true });
+                    setValue("promo_banner_url", "", { shouldDirty: true });
+                    setValue("promo_start_date", "", { shouldDirty: true });
+                    setValue("promo_landing_slider", false, { shouldDirty: true });
+                  }}
+                  className="text-xs font-semibold text-rose-600 hover:underline"
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No promotion added yet.</p>
+          )}
+
+          {promoModalOpen && typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="event-request-promotion-title"
+                  onMouseDown={(e) => {
+                    if (e.target === e.currentTarget) setPromoModalOpen(false);
+                  }}
+                >
+                  <div
+                    className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-4"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h3
+                        id="event-request-promotion-title"
+                        className="text-lg font-bold text-slate-900"
+                      >
+                        Request Promotion
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setPromoModalOpen(false)}
+                        className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+                        aria-label="Close"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    {!promoPlans.length ? (
+                      <p className="text-sm text-amber-700">
+                        No event promotion plans are available yet. Ask Super Admin to publish a plan.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-semibold text-slate-600 mb-0">
+                              Plan <span className="text-rose-500">*</span>
+                            </label>
+                            <PlanInfoButton
+                              title={selectedPromoPlan?.name || "Plan"}
+                              description={selectedPromoPlan?.description}
+                              details={
+                                selectedPromoPlan
+                                  ? {
+                                      duration_days: selectedPromoPlan.duration_days,
+                                      price: selectedPromoPlan.price,
+                                      listing_boost: selectedPromoPlan.listing_boost,
+                                      landing_slider: selectedPromoPlan.landing_slider,
+                                      category_rail: selectedPromoPlan.category_rail,
+                                    }
+                                  : null
+                              }
+                              autoOpenKey={promoPlanId || null}
+                            />
+                          </div>
+                          <select
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20"
+                            value={promoPlanId || ""}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              setValue("promo_plan_id", id, { shouldDirty: true });
+                              const plan = promoPlans.find((p) => String(p.id) === id);
+                              setValue("promo_landing_slider", Boolean(plan?.landing_slider), {
+                                shouldDirty: true,
+                              });
+                            }}
+                          >
+                            <option value="">Select plan</option>
+                            {promoPlans.map((p) => (
+                              <option key={p.id} value={String(p.id)}>
+                                {p.name} — {formatMoneyDisplay(p.price)} / {p.duration_days} days
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-slate-600">
+                            Promotion title <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20"
+                            placeholder="Shown with your banner"
+                            {...register("promo_title")}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-slate-600">
+                            Promotion start date <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20"
+                            min={(() => {
+                              const t = new Date();
+                              return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(
+                                t.getDate()
+                              ).padStart(2, "0")}`;
+                            })()}
+                            {...register("promo_start_date")}
+                          />
+                          <p className="text-[11px] text-slate-500 leading-relaxed">
+                            After Super Admin approval, the promotion becomes visible from this date for
+                            the plan duration.
+                          </p>
+                        </div>
+
+                        {watch("promo_landing_slider") ? (
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-600">
+                              Banner image <span className="text-rose-500">*</span>
+                            </label>
+                            <CroppedImageField
+                              value={promoBannerUrl || ""}
+                              aspect={16 / 9}
+                              disabled={uploading}
+                              previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                              onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
+                              onCroppedFile={(file) =>
+                                uploadCropped(file, (url) =>
+                                  setValue("promo_banner_url", url, { shouldDirty: true })
+                                )
+                              }
+                              emptyContent={
+                                <>
+                                  <ImagePlus className="text-slate-400 mb-2" size={28} />
+                                  <span className="text-xs portal-muted">Add 16:9 promo banner</span>
+                                </>
+                              }
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-600">
+                              Banner image (optional)
+                            </label>
+                            <CroppedImageField
+                              value={promoBannerUrl || ""}
+                              aspect={16 / 9}
+                              disabled={uploading}
+                              previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                              onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
+                              onCroppedFile={(file) =>
+                                uploadCropped(file, (url) =>
+                                  setValue("promo_banner_url", url, { shouldDirty: true })
+                                )
+                              }
+                              emptyContent={
+                                <>
+                                  <ImagePlus className="text-slate-400 mb-2" size={28} />
+                                  <span className="text-xs portal-muted">Optional promo banner</span>
+                                </>
+                              }
+                            />
+                          </div>
+                        )}
+
+                        {selectedPromoPlan ? (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                            <p className="font-semibold text-sm text-[#e11d48]">Order summary</p>
+                            <div className="flex justify-between text-sm text-slate-700">
+                              <span>{selectedPromoPlan.name}</span>
+                              <span className="font-bold">
+                                {formatMoneyDisplay(selectedPromoPlan.price)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs text-slate-500">
+                              <span>Duration</span>
+                              <span>{selectedPromoPlan.duration_days} days from start date</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">
+                              Demo payment on event submit. After pay, Super Admin reviews the banner.
+                            </p>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setPromoModalOpen(false)}
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!promoPlans.length}
+                        onClick={() => {
+                          const planId = getValues("promo_plan_id")?.trim();
+                          const title = getValues("promo_title")?.trim();
+                          const start = getValues("promo_start_date")?.trim();
+                          const landing = Boolean(getValues("promo_landing_slider"));
+                          const banner = getValues("promo_banner_url")?.trim();
+                          if (!planId) {
+                            toast.error("Select a promotion plan.");
+                            return;
+                          }
+                          if (!title) {
+                            toast.error("Enter a promotion title.");
+                            return;
+                          }
+                          if (!start) {
+                            toast.error("Choose when the promotion should start.");
+                            return;
+                          }
+                          if (landing && !banner) {
+                            toast.error("Banner image is required for this promotion plan.");
+                            return;
+                          }
+                          setValue("want_promotion", true, { shouldDirty: true });
+                          setPromoModalOpen(false);
+                          toast.success("Promotion added. It will be saved when you save or submit the event.");
+                        }}
+                        className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#e11d48] text-white hover:bg-[#be123c] disabled:opacity-60"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )
+            : null}
         </section>
         </>
         )}
@@ -3295,6 +3886,99 @@ export default function EventForm({
                 </button>
               </div>
 
+              {wantPromotion && promoPlanId ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 space-y-3 sm:col-span-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Promotion</p>
+                      <p className="font-semibold text-slate-900 mt-1">
+                        {watch("promo_title")?.trim() || "Promotion request"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-sm text-rose-700 font-medium"
+                      onClick={() => goToStep("media")}
+                    >
+                      Edit promotion
+                    </button>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-700">
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Plan</p>
+                      <p className="font-medium text-slate-900">
+                        {selectedPromoPlan?.name || `Plan #${promoPlanId}`}
+                      </p>
+                      {selectedPromoPlan?.description?.trim() ? (
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                          {selectedPromoPlan.description.trim()}
+                        </p>
+                      ) : null}
+                      {selectedPromoPlan ? (
+                        <p className="text-xs text-slate-600">
+                          {selectedPromoPlan.duration_days} days ·{" "}
+                          {formatMoneyDisplay(selectedPromoPlan.price)}
+                          {selectedPromoPlan.listing_boost ? " · Listing boost" : ""}
+                          {selectedPromoPlan.landing_slider ? " · Landing slider" : ""}
+                          {selectedPromoPlan.category_rail ? " · Category rail" : ""}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
+                        Schedule
+                      </p>
+                      <p>
+                        Start date:{" "}
+                        <span className="font-medium text-slate-900">
+                          {watch("promo_start_date")
+                            ? formatDate(watch("promo_start_date"))
+                            : "—"}
+                        </span>
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Visible from this date for the plan duration after Super Admin approval.
+                        Demo payment runs when you submit the event.
+                      </p>
+                    </div>
+                  </div>
+
+                  {promoBannerUrl?.trim() ? (
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-1.5">
+                        Banner
+                      </p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={resolveMediaUrl(promoBannerUrl)}
+                        alt="Promotion banner"
+                        className="w-full max-w-xl aspect-[16/9] object-cover rounded-lg border border-slate-200 bg-white"
+                      />
+                    </div>
+                  ) : watch("promo_landing_slider") ? (
+                    <p className="text-sm text-amber-700">Banner required for this plan — add it in Media.</p>
+                  ) : (
+                    <p className="text-sm text-slate-500">No banner uploaded (optional for this plan).</p>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Promotion</p>
+                  <p className="text-sm text-slate-600">Not requested for this event.</p>
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      className="text-sm text-rose-700 font-medium"
+                      onClick={() => goToStep("media")}
+                    >
+                      Add promotion
+                    </button>
+                  ) : null}
+                </div>
+              )}
+
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {hostingType === "tour" ? "Tour stops" : "Venues & tickets"}
@@ -3388,13 +4072,13 @@ export default function EventForm({
                             {isImageUrl(doc.url) ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
-                                src={doc.url}
+                                src={resolveMediaUrl(doc.url)}
                                 alt={label}
                                 className="h-28 w-full rounded-md object-cover border border-slate-100"
                               />
                             ) : (
                               <a
-                                href={doc.url}
+                                href={resolveMediaUrl(doc.url)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-200 bg-slate-50 text-slate-500 hover:border-rose-300 hover:text-rose-700"

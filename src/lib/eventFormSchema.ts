@@ -171,7 +171,7 @@ export function addMinutesToIso(iso: string, minutes: number): string {
 
 /**
  * Resolve showtime start/end ISO.
- * When end is blank, derive it from start + durationMinutes (single-event flow).
+ * When end is blank OR invalid (before/equal start), derive it from start + durationMinutes.
  */
 export function showtimeToIso(
   s: {
@@ -185,12 +185,22 @@ export function showtimeToIso(
   durationMinutes?: number | null
 ): { starts_at: string; ends_at: string } {
   const { start, end } = showtimeRangeIso(s);
-  if (end) return { starts_at: start, ends_at: end };
   const mins = Number(durationMinutes) || 0;
+
+  if (end && start) {
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs > startMs) {
+      return { starts_at: start, ends_at: end };
+    }
+  }
+
   if (start && mins > 0) {
     return { starts_at: start, ends_at: addMinutesToIso(start, mins) };
   }
-  return { starts_at: start, ends_at: end };
+
+  if (end) return { starts_at: start, ends_at: end };
+  return { starts_at: start, ends_at: '' };
 }
 
 export const eventDraftSchema = yup.object({
@@ -207,6 +217,12 @@ export const eventDraftSchema = yup.object({
       if (!value?.trim()) return true;
       return Boolean(parseYouTubeId(value));
     }),
+  want_promotion: yup.boolean().default(false),
+  promo_plan_id: yup.string().trim().default(''),
+  promo_title: yup.string().trim().default(''),
+  promo_banner_url: yup.string().trim().default(''),
+  promo_start_date: yup.string().trim().default(''),
+  promo_landing_slider: yup.boolean().default(false),
   languages: yup.array().of(yup.string().required()).default([]),
   about_event: yup
     .string()
@@ -404,6 +420,12 @@ export function defaultEventFormValues(): EventFormValues {
     poster_vertical_url: '',
     gallery_images: [],
     youtube_url: '',
+    want_promotion: false,
+    promo_plan_id: '',
+    promo_title: '',
+    promo_banner_url: '',
+    promo_start_date: '',
+    promo_landing_slider: false,
     languages: [],
     about_event: '',
     age_group: '',

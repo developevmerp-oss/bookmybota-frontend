@@ -9,6 +9,7 @@ import {
   type PartnerDocumentUpload,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 type Variant = "light" | "dark";
 
@@ -133,7 +134,7 @@ export default function PartnerDocumentsFields({
                   <div className={fileRowClass}>
                     <FileText size={16} className="text-rose-500 shrink-0" />
                     <a
-                      href={uploadedUrl}
+                      href={resolveMediaUrl(uploadedUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={linkClass}

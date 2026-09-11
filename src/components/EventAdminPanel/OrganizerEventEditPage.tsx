@@ -31,13 +31,17 @@ export default function EditOrganizerEventPage({
 
   const editable = event?.status === "DRAFT" || event?.status === "PENDING_APPROVAL";
   const canSubmit = event?.status === "DRAFT";
-  const canToggleVisibility = event?.status === "APPROVED" || event?.status === "LIVE";
+  const canToggleVisibility = event?.status === "LIVE";
   const canSellTickets = event?.status === "LIVE";
 
   const handleSaveDraft = async (payload: EventFormPayload) => {
     try {
       await updateEvent({ id, body: payload }).unwrap();
-      toast.success("Draft saved. You can continue editing anytime from My Events.");
+      toast.success(
+        payload.promotion_request
+          ? "Draft saved with promotion request. You can continue editing anytime from My Events."
+          : "Draft saved. You can continue editing anytime from My Events."
+      );
       router.push("/organizer/events");
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save event"));
@@ -48,7 +52,11 @@ export default function EditOrganizerEventPage({
   const handleSubmit = async (payload: EventFormPayload) => {
     try {
       await submitEvent({ id, body: payload }).unwrap();
-      toast.success("Event submitted for Super Admin approval");
+      toast.success(
+        payload.promotion_request
+          ? "Event and promotion submitted for Super Admin approval"
+          : "Event submitted for Super Admin approval"
+      );
       router.push("/organizer/events");
     } catch (e) {
       toast.error(extractApiError(e, "Failed to submit event"));
@@ -73,14 +81,19 @@ export default function EditOrganizerEventPage({
     return (
       <div className="text-center py-16">
         <p className="portal-muted mb-4">Event not found.</p>
-        <Link href="/organizer/events" className="text-rose-600 hover:text-rose-800">Back to events</Link>
+        <Link href="/organizer/events" className="text-rose-600 hover:text-rose-800">
+          Back to events
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <Link href="/organizer/events" className="inline-flex items-center gap-2 text-sm portal-muted hover:text-slate-900">
+      <Link
+        href="/organizer/events"
+        className="inline-flex items-center gap-2 text-sm portal-muted hover:text-slate-900"
+      >
         <ArrowLeft size={16} /> Back to events
       </Link>
 

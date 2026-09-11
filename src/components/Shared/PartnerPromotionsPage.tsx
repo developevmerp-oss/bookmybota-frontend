@@ -34,8 +34,8 @@ import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import Pagination from "@/components/Shared/Pagination";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { PAGE_SIZE } from "@/lib/pagination";
-import { defaultPartnerCtaUrl } from "@/lib/promotionCta";
 import { promotionTargetLabel } from "@/lib/promotionTargetLabel";
+import PlanInfoButton from "@/components/Shared/PlanInfoButton";
 import {
   emptyPartnerPromotionsFormValues,
   partnerPromotionsFormSchema,
@@ -51,7 +51,7 @@ type PartnerPromotionsPageProps = {
 };
 
 const fieldErrorClass = "mt-1.5 text-xs text-rose-500 font-medium";
-const diningInputClass =
+const promoInputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20 transition-all";
 
 function RequiredMark() {
@@ -105,7 +105,7 @@ function paymentBadge(status?: string, dining = false) {
 export default function PartnerPromotionsPage({
   module,
   title = "Marketing Promotions",
-  description = "Pay for a visibility plan, then Super Admin reviews your banner. Once approved, your promotion runs until the plan duration ends.",
+  description = "Pay for a visibility plan, then Super Admin reviews your banner. Once approved, your promotion runs from the start date you choose for the plan duration.",
 }: PartnerPromotionsPageProps) {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
@@ -114,7 +114,6 @@ export default function PartnerPromotionsPage({
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<MarketingCampaign | null>(null);
-  const [ctaTouched, setCtaTouched] = useState(false);
 
   const {
     register,
@@ -132,19 +131,12 @@ export default function PartnerPromotionsPage({
 
   const planId = watch("plan_id");
   const bannerUrl = watch("banner_image_url");
-  const targetId = watch("target_id");
   const landingSlider = watch("landing_slider");
   const allowsItemTarget = watch("allows_item_target");
 
   useEffect(() => {
     dispatch(loadFromStorage());
   }, [dispatch]);
-
-  useEffect(() => {
-    if (!modalOpen || ctaTouched || !bizId) return;
-    const next = defaultPartnerCtaUrl(module, bizId, targetId);
-    if (next) setValue("cta_url", next);
-  }, [modalOpen, module, bizId, targetId, ctaTouched, setValue]);
 
   const { data: campaignsData, isLoading } = useGetBusinessCampaignsQuery(
     { bizId, page, limit: PAGE_SIZE },
@@ -236,7 +228,6 @@ export default function PartnerPromotionsPage({
 
   const resetForm = () => {
     setEditingCampaign(null);
-    setCtaTouched(false);
     reset(emptyPartnerPromotionsFormValues(module));
   };
 
@@ -249,15 +240,17 @@ export default function PartnerPromotionsPage({
     const nextTarget =
       camp.target_type ||
       (module === "DINING" ? "RESTAURANT" : module === "EVENTS" ? "EVENT" : "MOVIE");
+    const startRaw = camp.start_date ? String(camp.start_date).slice(0, 10) : "";
     setEditingCampaign(camp);
-    setCtaTouched(Boolean(camp.cta_url?.trim()));
     reset({
       plan_id: String(camp.plan_id),
       title: camp.title || camp.plan_name || "",
       banner_image_url: camp.banner_image_url || "",
-      cta_url: camp.cta_url || defaultPartnerCtaUrl(module, bizId, camp.target_id || "") || "",
       target_type: nextTarget as PartnerPromotionsFormValues["target_type"],
       target_id: camp.target_id || "",
+      start_date: /^\d{4}-\d{2}-\d{2}$/.test(startRaw)
+        ? startRaw
+        : emptyPartnerPromotionsFormValues(module).start_date,
       landing_slider: Boolean(camp.landing_slider),
       allows_item_target: Boolean(camp.allows_item_target),
     });
@@ -283,10 +276,7 @@ export default function PartnerPromotionsPage({
     const payload = {
       title: values.title.trim(),
       banner_image_url: values.banner_image_url || undefined,
-      cta_url:
-        values.cta_url.trim() ||
-        defaultPartnerCtaUrl(module, bizId, values.target_id) ||
-        undefined,
+      start_date: values.start_date,
       target_type:
         module === "DINING" && values.target_type === "BUSINESS" ? "RESTAURANT" : values.target_type,
       target_id: values.target_id || (module === "DINING" ? bizId : undefined),
@@ -329,7 +319,7 @@ export default function PartnerPromotionsPage({
   }
 
   const isDining = module === "DINING";
-  const inputClass = isDining ? diningInputClass : "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm";
+  const inputClass = promoInputClass;
 
   const closeModal = () => {
     setModalOpen(false);
@@ -346,9 +336,38 @@ export default function PartnerPromotionsPage({
       ) : null}
 
       <div className="space-y-1.5">
-        <label className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
-          Plan <RequiredMark />
-        </label>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-semibold text-slate-600 mb-0">
+            Plan <RequiredMark />
+          </label>
+          <PlanInfoButton
+            title={selectedPlan?.name || editingCampaign?.plan_name || "Plan"}
+            description={
+              selectedPlan?.description ||
+              plans.find((p) => String(p.id) === String(editingCampaign?.plan_id))?.description
+            }
+            details={
+              selectedPlan
+                ? {
+                    duration_days: selectedPlan.duration_days,
+                    price: selectedPlan.price,
+                    listing_boost: selectedPlan.listing_boost,
+                    landing_slider: selectedPlan.landing_slider,
+                    category_rail: selectedPlan.category_rail,
+                  }
+                : editingCampaign
+                  ? {
+                      duration_days: editingCampaign.duration_days,
+                      price: Number(editingCampaign.amount ?? editingCampaign.price ?? 0),
+                      listing_boost: editingCampaign.listing_boost,
+                      landing_slider: editingCampaign.landing_slider,
+                      category_rail: editingCampaign.category_rail,
+                    }
+                  : null
+            }
+            autoOpenKey={planId || null}
+          />
+        </div>
         {editingCampaign ? (
           <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
             {editingCampaign.plan_name || selectedPlan?.name} — already paid, plan cannot be changed
@@ -366,16 +385,8 @@ export default function PartnerPromotionsPage({
         {errors.plan_id && <p className={fieldErrorClass}>{errors.plan_id.message}</p>}
       </div>
 
-      {selectedPlan && !isDining ? (
-        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600 space-y-1">
-          <p>Listing boost: {selectedPlan.listing_boost ? "Yes" : "No"}</p>
-          <p>Landing slider: {selectedPlan.landing_slider ? "Yes" : "No"}</p>
-          <p>Category rail: {selectedPlan.category_rail ? "Yes" : "No"}</p>
-        </div>
-      ) : null}
-
       <div className="space-y-1.5">
-        <label className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+        <label className="text-sm font-semibold text-slate-600">
           Promotion title <RequiredMark />
         </label>
         <input
@@ -433,40 +444,24 @@ export default function PartnerPromotionsPage({
       ) : null}
 
       <div className="space-y-1.5">
-        <label className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>CTA URL</label>
+        <label className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+          Promotion start date <RequiredMark />
+        </label>
         <input
-          {...register("cta_url", {
-            onChange: () => setCtaTouched(true),
-          })}
-          placeholder={
-            defaultPartnerCtaUrl(module, bizId, targetId) ||
-            (module === "EVENTS"
-              ? "/events/..."
-              : module === "MOVIES"
-                ? "/movies/..."
-                : `/restaurant/${bizId}`)
-          }
+          type="date"
+          min={emptyPartnerPromotionsFormValues(module).start_date}
+          {...register("start_date")}
           className={inputClass}
         />
+        {errors.start_date && <p className={fieldErrorClass}>{errors.start_date.message}</p>}
         <p className="text-[11px] text-slate-500 leading-relaxed">
-          This is where customers go when they tap your banner on the home slider.
-          Leave it as the details page (restaurant / event / movie) so the banner opens your listing.
+          After Super Admin approval, the promotion becomes visible from this date for the plan duration.
         </p>
       </div>
 
       {selectedPlan ? (
-        <div
-          className={`rounded-xl border p-4 space-y-3 ${
-            isDining
-              ? "border-rose-100 bg-rose-50/50"
-              : "border-[#6900AA]/20 bg-[#F7E9FF]/60"
-          }`}
-        >
-          <div
-            className={`flex items-center gap-2 font-semibold text-sm ${
-              isDining ? "text-[#e11d48]" : "text-[#6900AA]"
-            }`}
-          >
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <div className="flex items-center gap-2 font-semibold text-sm text-[#e11d48]">
             <CreditCard size={16} />
             {editingCampaign ? "Already paid" : "Order summary"}
           </div>
@@ -476,20 +471,16 @@ export default function PartnerPromotionsPage({
           </div>
           <div className="flex justify-between text-xs text-slate-500">
             <span>Duration</span>
-            <span>{selectedPlan.duration_days} days after approval</span>
+            <span>{selectedPlan.duration_days} days from start date</span>
           </div>
           {editingCampaign ? (
             <p className="text-[11px] text-slate-500 leading-relaxed">
               No extra charge. Your updated banner goes back to Super Admin for review.
-              The promotion starts only after approval.
+              Visibility follows your start date after approval.
             </p>
           ) : (
             <>
-              <div
-                className={`border-t pt-2 flex justify-between text-sm font-bold text-slate-900 ${
-                  isDining ? "border-rose-100" : "border-[#6900AA]/10"
-                }`}
-              >
+              <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-bold text-slate-900">
                 <span>Total</span>
                 <span>{formatMoneyDisplay(selectedPlan.price)}</span>
               </div>
@@ -505,24 +496,18 @@ export default function PartnerPromotionsPage({
   );
 
   const formActions = (
-    <div className={`flex justify-end gap-2 ${isDining ? "pt-1" : "pt-2"}`}>
+    <div className="flex justify-end gap-2 pt-1">
       <button
         type="button"
         onClick={closeModal}
-        className={`px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 ${
-          isDining ? "shadow-sm" : ""
-        }`}
+        className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50"
       >
         Cancel
       </button>
       <button
         type="submit"
         disabled={saving || uploading || !selectedPlan}
-        className={`px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60 ${
-          isDining
-            ? "bg-[#e11d48] text-white-keep hover:bg-[#be123c] shadow-md shadow-rose-200/60"
-            : "btn-primary"
-        }`}
+        className="px-4 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60 bg-[#e11d48] text-white hover:bg-[#be123c] shadow-md shadow-rose-200/60"
       >
         {(saving || uploading) && <Loader2 size={14} className="animate-spin" />}
         {editingCampaign ? (
@@ -540,48 +525,40 @@ export default function PartnerPromotionsPage({
     </div>
   );
 
-  const diningModal =
-    modalOpen && isDining
+  const requestModal =
+    modalOpen && typeof document !== "undefined"
       ? createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px]">
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="request-promotion-title"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeModal();
+            }}
+          >
             <form
               onSubmit={handleSubmit(onValid)}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col sm:flex-row"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-4"
               noValidate
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              <aside className="sm:w-[240px] shrink-0 bg-gradient-to-b from-sky-50 via-blue-50/80 to-white p-6 flex flex-col items-center justify-center text-center border-b sm:border-b-0 sm:border-r border-sky-100 min-h-[220px] sm:min-h-0">
-                <div className="h-24 w-24 rounded-full bg-white shadow-lg shadow-sky-200/50 ring-4 ring-sky-100 flex items-center justify-center mb-5">
-                  <Megaphone size={40} className="text-sky-600" />
-                </div>
-                <h4 className="text-lg font-extrabold text-slate-900">Get more visibility</h4>
-                <p className="mt-2 text-sm text-slate-500 leading-relaxed max-w-[11rem]">
-                  Your restaurant will appear on the landing slider and dining listings.
-                </p>
-              </aside>
-
-              <div className="flex-1 min-w-0 p-5 sm:p-6 overflow-y-auto space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-xl font-extrabold text-slate-900">
-                      {editingCampaign ? "Fix & resubmit promotion" : "Request Promotion"}
-                    </h3>
-                    <p className="text-sm text-slate-500 mt-1">
-                      Fill in the details below to request a promotion.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
-                    aria-label="Close"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                {formFields}
-                {formActions}
+              <div className="flex items-center justify-between gap-3">
+                <h3 id="request-promotion-title" className="text-lg font-bold text-slate-900">
+                  {editingCampaign ? "Fix & resubmit promotion" : "Request Promotion"}
+                </h3>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
               </div>
+
+              {formFields}
+              {formActions}
             </form>
           </div>,
           document.body
@@ -642,12 +619,12 @@ export default function PartnerPromotionsPage({
               const headerLabel = showTargetName || "Listing boost only";
               const cardTitle = camp.title || camp.plan_name || "Promotion";
               const dateLine =
-                camp.status === "ACTIVE" && camp.start_date
+                camp.start_date && camp.end_date
                   ? `${formatDate(camp.start_date)} → ${formatDate(camp.end_date)}`
                   : camp.status === "EXPIRED"
                     ? `Ended ${formatDate(camp.end_date)}`
                     : camp.end_date
-                      ? `Runs ${camp.duration_days ?? "—"} days after approval`
+                      ? `Ends ${formatDate(camp.end_date)}`
                       : null;
 
               if (isDining) {
@@ -780,7 +757,7 @@ export default function PartnerPromotionsPage({
                     </div>
                     <h4 className="font-bold text-slate-800">{camp.title || camp.plan_name}</h4>
                     {showTargetName ? (
-                      <p className="text-xs font-medium text-[#6900AA]">{showTargetName}</p>
+                      <p className="text-xs font-medium text-[#e11d48]">{showTargetName}</p>
                     ) : null}
                     <p className="text-xs text-slate-500">{camp.plan_name}</p>
                     {(camp.amount != null || camp.payment_reference) && (
@@ -808,12 +785,12 @@ export default function PartnerPromotionsPage({
                       <p className="text-[11px] text-rose-600">Rejected — fix the creative and resubmit. Payment is kept.</p>
                     ) : (
                       <p className="text-[11px] text-slate-400">
-                        {camp.status === "ACTIVE" && camp.start_date
+                        {camp.start_date && camp.end_date
                           ? `${formatDate(camp.start_date)} → ${formatDate(camp.end_date)}`
                           : camp.status === "EXPIRED"
                             ? `Ended ${formatDate(camp.end_date)}`
                             : camp.end_date
-                              ? `Runs ${camp.duration_days ?? "—"} days after approval`
+                              ? `Ends ${formatDate(camp.end_date)}`
                               : "—"}
                       </p>
                     )}
@@ -821,7 +798,7 @@ export default function PartnerPromotionsPage({
                       <button
                         type="button"
                         onClick={() => openEdit(camp)}
-                        className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[#6900AA] text-white px-3 py-1.5 text-xs font-semibold hover:bg-[#5a0092]"
+                        className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[#e11d48] text-white px-3 py-1.5 text-xs font-semibold hover:bg-[#be123c]"
                       >
                         <Pencil size={12} /> Fix & resubmit
                       </button>
@@ -835,28 +812,7 @@ export default function PartnerPromotionsPage({
 
         {campaignsData?.meta && <Pagination meta={campaignsData.meta} onPageChange={setPage} />}
 
-        {diningModal}
-
-        {modalOpen && !isDining && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-            <form
-              onSubmit={handleSubmit(onValid)}
-              className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-4"
-              noValidate
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">
-                  {editingCampaign ? "Fix & resubmit promotion" : "Request Promotion"}
-                </h3>
-                <button type="button" onClick={closeModal} className="text-slate-400 hover:text-slate-700">
-                  <X size={18} />
-                </button>
-              </div>
-              {formFields}
-              {formActions}
-            </form>
-          </div>
-        )}
+        {requestModal}
       </div>
     </div>
   );

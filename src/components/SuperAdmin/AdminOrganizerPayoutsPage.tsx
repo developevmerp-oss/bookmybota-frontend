@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Banknote,
   CheckCircle2,
+  Film,
   Loader2,
   Plus,
   Store,
@@ -18,12 +19,17 @@ import * as yup from "yup";
 import {
   useCreateOrganizerPayoutMutation,
   useGenerateOrganizerSettlementMutation,
+  useGenerateAdminCinemaSettlementMutation,
   useGetAdminBusinessesQuery,
+  useGetAdminCinemaSettlementQuery,
+  useGetAdminCinemaSettlementsPendingQuery,
+  useGetAdminCinemaSettlementsQuery,
   useGetAdminDiningGiftCardRedemptionsQuery,
   useGetOrganizerPayoutsQuery,
   useGetOrganizerSettlementQuery,
   useGetOrganizerSettlementsQuery,
   useGetPendingOrganizerSettlementsQuery,
+  usePatchAdminCinemaSettlementMutation,
   usePatchAdminDiningGiftCardSettlementMutation,
   usePatchOrganizerSettlementMutation,
   type DiningGiftCardRedemptionRow,
@@ -54,9 +60,50 @@ import {
 
 const money = formatMoney;
 
-type PageTab = "events" | "dining" | "history";
+type PageTab = "events" | "movies" | "dining" | "history";
 type EventsWorkspace = "queue" | "runs";
+type MoviesWorkspace = "queue" | "runs";
 type DiningStatusTab = "ALL" | "PENDING" | "APPROVED" | "PAID" | "CANCELLED";
+
+type CinemaPendingRow = {
+  business_id: string;
+  cinema_name?: string;
+  booking_count?: number;
+  gross_ticket?: number;
+  commission_total?: number;
+  cinema_payable?: number;
+  gift_card_amount?: number;
+};
+
+type CinemaSettlementLine = {
+  id: string;
+  movie_title?: string | null;
+  guest_name?: string | null;
+  booking_code?: string | null;
+  ticket_amount?: number;
+  commission_total?: number;
+  gift_card_amount?: number;
+  cash_amount?: number;
+  cinema_payable?: number;
+};
+
+type CinemaSettlementRun = {
+  id: string;
+  business_id: string;
+  cinema_name?: string;
+  status?: string;
+  booking_count?: number;
+  gross_ticket?: number;
+  commission_total?: number;
+  cinema_payable?: number;
+  gift_card_amount?: number;
+  cash_amount?: number;
+  notes?: string | null;
+  created_at?: string;
+  approved_at?: string | null;
+  paid_at?: string | null;
+  lines?: CinemaSettlementLine[];
+};
 
 const EMPTY_MANUAL: AdminPayoutValues = {
   business_id: "",
@@ -437,8 +484,215 @@ function SettlementDetailPanel({
   );
 }
 
+function CinemaSettlementDetailPanel({
+  runId,
+  onClose,
+}: {
+  runId: string;
+  onClose: () => void;
+}) {
+  const { data: run, isLoading } = useGetAdminCinemaSettlementQuery(runId);
+  const [patchSettlement, { isLoading: patching }] =
+    usePatchAdminCinemaSettlementMutation();
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    setNotes(run?.notes || "");
+  }, [run?.notes, runId]);
+
+  const act = async (status: "APPROVED" | "PAID" | "CANCELLED") => {
+    if (status === "CANCELLED") {
+      const ok = window.confirm(
+        "Cancel this cinema settlement? Bookings will become unsettled and can enter a new run."
+      );
+      if (!ok) return;
+    }
+    try {
+      const res = await patchSettlement({
+        id: runId,
+        status,
+        notes: notes.trim() || undefined,
+      }).unwrap();
+      toast.success(res.message || "Settlement updated");
+      if (status === "CANCELLED" || status === "PAID") onClose();
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to update cinema settlement"));
+    }
+  };
+
+  const status = (run?.status || "").toUpperCase();
+  const canAct = status === "PENDING" || status === "APPROVED";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-[2px]">
+      <div className="glass-panel rounded-t-2xl sm:rounded-2xl border border-white/10 w-full max-w-4xl max-h-[92vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Cinema settlement detail</h3>
+            <p className="text-xs text-zinc-400 mt-1">
+              Gift-card bookings are included at full cinema share (ticket − commission).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-semibold text-zinc-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5"
+          >
+            Close
+          </button>
+        </div>
+
+        {isLoading || !run ? (
+          <div className="flex items-center gap-2 py-10 text-zinc-400 justify-center">
+            <Loader2 className="animate-spin" size={18} /> Loading…
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {statusBadge(run.status)}
+              <span className="text-sm text-white font-semibold">{run.cinema_name}</span>
+              <span className="text-xs text-zinc-500">
+                {run.created_at ? formatDate(run.created_at) : "—"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <StatCard
+                label="Gross tickets"
+                value={money(run.gross_ticket)}
+                accent="text-emerald-600"
+              />
+              <StatCard
+                label="Commission"
+                value={money(run.commission_total)}
+                accent="text-emerald-600"
+              />
+              <StatCard
+                label="Cinema payable"
+                value={money(run.cinema_payable)}
+                accent="text-emerald-600"
+              />
+              <StatCard
+                label="GC funded"
+                value={money(run.gift_card_amount)}
+                hint="Does not reduce payable"
+                accent="text-emerald-600"
+              />
+              <StatCard
+                label="Cash funded"
+                value={money(run.cash_amount)}
+                accent="text-emerald-600"
+              />
+            </div>
+
+            {canAct && (
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                <div className="flex-1">
+                  <label className="block text-xs text-zinc-500 mb-1">Notes (optional)</label>
+                  <input
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Payment note or transfer id"
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {status === "PENDING" && (
+                    <button
+                      type="button"
+                      disabled={patching}
+                      onClick={() => void act("APPROVED")}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold bg-sky-600/80 hover:bg-sky-500 text-white disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={patching}
+                    onClick={() => void act("PAID")}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-rose-600/80 hover:bg-rose-500 text-white disabled:opacity-50"
+                  >
+                    {patching ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={12} />
+                    )}
+                    Mark paid
+                  </button>
+                  <button
+                    type="button"
+                    disabled={patching}
+                    onClick={() => void act("CANCELLED")}
+                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {run.notes && !canAct ? (
+              <p className="text-xs text-zinc-400">
+                Notes: <span className="text-zinc-200">{run.notes}</span>
+              </p>
+            ) : null}
+
+            <div className="overflow-x-auto rounded-xl border border-white/5">
+              <table className="w-full text-left text-sm min-w-[720px]">
+                <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                  <tr>
+                    <th className="px-3 py-2.5 font-semibold">Movie / Guest</th>
+                    <th className="px-3 py-2.5 font-semibold">Ticket</th>
+                    <th className="px-3 py-2.5 font-semibold">Commission</th>
+                    <th className="px-3 py-2.5 font-semibold">GC / Cash</th>
+                    <th className="px-3 py-2.5 font-semibold">Cinema</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {(run.lines || []).map((line: CinemaSettlementLine) => (
+                    <tr key={line.id}>
+                      <td className="px-3 py-2.5">
+                        <p className="text-white font-medium">{line.movie_title || "—"}</p>
+                        <p className="text-xs text-zinc-500">
+                          {line.guest_name || "—"}
+                          {line.booking_code ? ` · ${line.booking_code}` : ""}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2.5 text-emerald-600">
+                        {money(line.ticket_amount)}
+                      </td>
+                      <td className="px-3 py-2.5 text-emerald-600">
+                        −{money(line.commission_total)}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs space-y-0.5">
+                        <p className="text-emerald-600">GC {money(line.gift_card_amount)}</p>
+                        <p className="text-emerald-600/80">Cash {money(line.cash_amount)}</p>
+                      </td>
+                      <td className="px-3 py-2.5 font-semibold text-emerald-600">
+                        {money(line.cinema_payable)}
+                      </td>
+                    </tr>
+                  ))}
+                  {(run.lines || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-8 text-center text-zinc-500 text-sm">
+                        No booking lines on this run.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function parseTab(raw: string | null): PageTab {
-  if (raw === "dining" || raw === "history" || raw === "events") return raw;
+  if (raw === "dining" || raw === "history" || raw === "events" || raw === "movies") return raw;
   if (raw === "settlements") return "events";
   if (raw === "payouts") return "history";
   return "events";
@@ -462,6 +716,11 @@ export default function AdminOrganizerPayoutsPage() {
   const [showManual, setShowManual] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [eventsWorkspace, setEventsWorkspace] = useState<EventsWorkspace>("queue");
+  const [moviesWorkspace, setMoviesWorkspace] = useState<MoviesWorkspace>("queue");
+  const [moviesCinemaFilter, setMoviesCinemaFilter] = useState("");
+  const [moviesStatusFilter, setMoviesStatusFilter] = useState("ALL");
+  const [selectedCinemaRunId, setSelectedCinemaRunId] = useState<string | null>(null);
+  const [settlingCinemaId, setSettlingCinemaId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit] = useState(PAGE_SIZE);
@@ -480,6 +739,10 @@ export default function AdminOrganizerPayoutsPage() {
     { module: "dining", tab: "active" },
     { skip: pageTab !== "dining" && pageTab !== "history" }
   );
+  const { data: cinemasData } = useGetAdminBusinessesQuery(
+    { module: "cinema", tab: "active" },
+    { skip: pageTab !== "movies" }
+  );
 
   const organizers = useMemo(() => {
     const items = organizersData?.items ?? [];
@@ -490,6 +753,11 @@ export default function AdminOrganizerPayoutsPage() {
     const items = restaurantsData?.items ?? [];
     return [...items].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [restaurantsData?.items]);
+
+  const cinemaOptions = useMemo(() => {
+    const items = cinemasData?.items ?? [];
+    return [...items].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [cinemasData?.items]);
 
   const { data: settlementsData, isLoading: settlementsLoading, isFetching: settlementsFetching } =
     useGetOrganizerSettlementsQuery(
@@ -511,6 +779,29 @@ export default function AdminOrganizerPayoutsPage() {
       },
       { skip: pageTab !== "events" }
     );
+
+  const {
+    data: cinemaPendingData = [],
+    isLoading: cinemaPendingLoading,
+    isError: cinemaPendingError,
+    refetch: refetchCinemaPending,
+  } = useGetAdminCinemaSettlementsPendingQuery(
+    moviesCinemaFilter ? { business_id: moviesCinemaFilter } : undefined,
+    { skip: pageTab !== "movies" }
+  );
+
+  const {
+    data: cinemaSettlementsData = [],
+    isLoading: cinemaSettlementsLoading,
+    isFetching: cinemaSettlementsFetching,
+    refetch: refetchCinemaSettlements,
+  } = useGetAdminCinemaSettlementsQuery(
+    {
+      ...(moviesCinemaFilter ? { business_id: moviesCinemaFilter } : {}),
+      ...(moviesStatusFilter !== "ALL" ? { status: moviesStatusFilter } : {}),
+    },
+    { skip: pageTab !== "movies" }
+  );
 
   const { data: payoutsData, isLoading: payoutsLoading, isFetching: payoutsFetching } =
     useGetOrganizerPayoutsQuery(
@@ -553,9 +844,13 @@ export default function AdminOrganizerPayoutsPage() {
   const diningMeta = diningData?.meta;
   const diningSummary = diningData?.summary;
   const diningPaidRows = diningPaidHistory?.items ?? [];
+  const cinemaPending = cinemaPendingData as CinemaPendingRow[];
+  const cinemaSettlements = cinemaSettlementsData as CinemaSettlementRun[];
 
   const [generateSettlement, { isLoading: generating }] =
     useGenerateOrganizerSettlementMutation();
+  const [generateCinemaSettlement, { isLoading: generatingCinema }] =
+    useGenerateAdminCinemaSettlementMutation();
   const [createPayout, { isLoading: savingManual }] = useCreateOrganizerPayoutMutation();
   const [patchDiningSettlement] = usePatchAdminDiningGiftCardSettlementMutation();
   const [settlingBizId, setSettlingBizId] = useState<string | null>(null);
@@ -593,6 +888,38 @@ export default function AdminOrganizerPayoutsPage() {
       .reduce((sum, s) => sum + Number(s.organizer_payable || 0), 0);
     return { draft, approved, paidAmt, openPayable, total: settlements.length };
   }, [settlements]);
+
+  const cinemaStats = useMemo(() => {
+    const pendingPayable = cinemaPending.reduce(
+      (sum, row) => sum + Number(row.cinema_payable || 0),
+      0
+    );
+    const pendingBookings = cinemaPending.reduce(
+      (sum, row) => sum + Number(row.booking_count || 0),
+      0
+    );
+    const pendingRuns = cinemaSettlements.filter(
+      (s) => (s.status || "").toUpperCase() === "PENDING"
+    ).length;
+    const approvedRuns = cinemaSettlements.filter(
+      (s) => (s.status || "").toUpperCase() === "APPROVED"
+    ).length;
+    const openPayable = cinemaSettlements
+      .filter((s) => {
+        const st = (s.status || "").toUpperCase();
+        return st === "PENDING" || st === "APPROVED";
+      })
+      .reduce((sum, s) => sum + Number(s.cinema_payable || 0), 0);
+    return {
+      pendingPayable,
+      pendingBookings,
+      cinemasCount: cinemaPending.length,
+      pendingRuns,
+      approvedRuns,
+      openPayable,
+      totalRuns: cinemaSettlements.length,
+    };
+  }, [cinemaPending, cinemaSettlements]);
 
   const onGenerate = async (values: GenerateValues) => {
     try {
@@ -690,10 +1017,25 @@ export default function AdminOrganizerPayoutsPage() {
     }
   };
 
+  const settleCinemaNow = async (row: CinemaPendingRow) => {
+    setSettlingCinemaId(row.business_id);
+    try {
+      const res = await generateCinemaSettlement({ business_id: row.business_id }).unwrap();
+      toast.success(res.message || "Cinema settlement created");
+      setMoviesWorkspace("runs");
+      await Promise.all([refetchCinemaPending(), refetchCinemaSettlements()]);
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to generate cinema settlement"));
+    } finally {
+      setSettlingCinemaId(null);
+    }
+  };
+
   const switchTab = (tab: PageTab) => {
     setPageTab(tab);
     setPage(1);
     setSelectedRunId(null);
+    setSelectedCinemaRunId(null);
     router.replace(`/admin/organizer-payouts?tab=${tab}`, { scroll: false });
   };
 
@@ -703,6 +1045,7 @@ export default function AdminOrganizerPayoutsPage() {
         <AdminSegmentedTabs
           tabs={[
             { key: "events", label: "Events", icon: Ticket },
+            { key: "movies", label: "Movies", icon: Film },
             { key: "dining", label: "Dining", icon: Store },
             { key: "history", label: "History", icon: Banknote },
           ]}
@@ -1168,6 +1511,229 @@ export default function AdminOrganizerPayoutsPage() {
               onClose={() => setSelectedRunId(null)}
             />
           ) : null}
+        </>
+      )}
+
+      {pageTab === "movies" && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              label="Pending bookings"
+              value={String(cinemaStats.pendingBookings)}
+              hint={`${cinemaStats.cinemasCount} cinemas`}
+              accent="text-amber-300"
+            />
+            <StatCard
+              label="Pending payable"
+              value={money(cinemaStats.pendingPayable)}
+              hint="Not yet in a settlement run"
+              accent="text-emerald-600"
+            />
+            <StatCard
+              label="Open runs"
+              value={money(cinemaStats.openPayable)}
+              hint={`${cinemaStats.pendingRuns} pending · ${cinemaStats.approvedRuns} approved`}
+              accent="text-emerald-600"
+            />
+            <FlowSteps />
+          </div>
+
+          <AdminSegmentedTabs
+            size="sm"
+            tabs={[
+              {
+                key: "queue",
+                label: "To settle",
+                count: cinemaStats.cinemasCount,
+              },
+              {
+                key: "runs",
+                label: "Settlement runs",
+                count: cinemaStats.totalRuns,
+              },
+            ]}
+            active={moviesWorkspace}
+            onChange={(key) => setMoviesWorkspace(key)}
+          />
+
+          <AdminFilterBar>
+            <div className="min-w-[12rem]">
+              <label className="block text-[11px] text-zinc-500 mb-1 font-medium">Cinema</label>
+              <select
+                value={moviesCinemaFilter}
+                onChange={(e) => setMoviesCinemaFilter(e.target.value)}
+                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm"
+              >
+                <option value="">All cinemas</option>
+                {cinemaOptions.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {moviesWorkspace === "runs" ? (
+              <div className="min-w-[10rem]">
+                <label className="block text-[11px] text-zinc-500 mb-1 font-medium">Status</label>
+                <select
+                  value={moviesStatusFilter}
+                  onChange={(e) => setMoviesStatusFilter(e.target.value)}
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm"
+                >
+                  <option value="ALL">All</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="PAID">Paid</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+            ) : null}
+          </AdminFilterBar>
+
+          {moviesWorkspace === "queue" && (
+            <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/5">
+                <h3 className="text-sm font-bold text-white">Pending by cinema</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Confirmed movie bookings that still need a settlement run.
+                </p>
+              </div>
+              {cinemaPendingLoading ? (
+                <div className="flex items-center justify-center gap-2 py-10 text-zinc-400">
+                  <Loader2 className="animate-spin" size={16} /> Loading pending…
+                </div>
+              ) : cinemaPendingError ? (
+                <p className="px-4 py-8 text-center text-rose-400 text-sm">
+                  Could not load pending cinema settlements.
+                </p>
+              ) : cinemaPending.length === 0 ? (
+                <p className="px-4 py-8 text-center text-zinc-500 text-sm">
+                  No unsettled confirmed movie bookings.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm min-w-[720px]">
+                    <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Cinema</th>
+                        <th className="px-4 py-3 font-semibold">Bookings</th>
+                        <th className="px-4 py-3 font-semibold">Gross / Commission</th>
+                        <th className="px-4 py-3 font-semibold">Payable</th>
+                        <th className="px-4 py-3 font-semibold" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {cinemaPending.map((row) => (
+                        <tr key={row.business_id} className="hover:bg-white/[0.02]">
+                          <td className="px-4 py-3 font-semibold text-white">
+                            {row.cinema_name || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-300">{row.booking_count || 0}</td>
+                          <td className="px-4 py-3 text-xs space-y-0.5">
+                            <p className="text-emerald-600">Gross {money(row.gross_ticket)}</p>
+                            <p className="text-emerald-600/80">
+                              Commission {money(row.commission_total)}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-emerald-600 tabular-nums">
+                            {money(row.cinema_payable)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              disabled={
+                                settlingCinemaId === row.business_id || generatingCinema
+                              }
+                              onClick={() => void settleCinemaNow(row)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50"
+                            >
+                              {settlingCinemaId === row.business_id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Plus size={12} />
+                              )}
+                              Generate settlement
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {moviesWorkspace === "runs" && (
+            <>
+              {cinemaSettlementsLoading || cinemaSettlementsFetching ? (
+                <AdminListShimmer rows={6} columns={5} showTabs={false} showToolbar={false} />
+              ) : cinemaSettlements.length === 0 ? (
+                <AdminEmptyState
+                  icon={Film}
+                  title="No cinema settlement runs yet"
+                  description="Generate a settlement from the pending queue for a cinema partner."
+                />
+              ) : (
+                <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[860px]">
+                      <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Cinema</th>
+                          <th className="px-4 py-3 font-semibold">Bookings</th>
+                          <th className="px-4 py-3 font-semibold">Amounts</th>
+                          <th className="px-4 py-3 font-semibold">Payable</th>
+                          <th className="px-4 py-3 font-semibold">Status</th>
+                          <th className="px-4 py-3 font-semibold" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {cinemaSettlements.map((run) => (
+                          <tr key={run.id} className="hover:bg-white/[0.02]">
+                            <td className="px-4 py-3">
+                              <p className="font-semibold text-white">{run.cinema_name || "—"}</p>
+                              <p className="text-xs text-zinc-500 mt-0.5">
+                                {run.created_at ? formatDate(run.created_at) : "—"}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-300">{run.booking_count || 0}</td>
+                            <td className="px-4 py-3 text-xs space-y-0.5">
+                              <p className="text-emerald-600">Gross {money(run.gross_ticket)}</p>
+                              <p className="text-emerald-600/80">
+                                Commission {money(run.commission_total)}
+                              </p>
+                              <p className="text-emerald-600/80">GC {money(run.gift_card_amount)}</p>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-emerald-600">
+                              {money(run.cinema_payable)}
+                            </td>
+                            <td className="px-4 py-3">{statusBadge(run.status)}</td>
+                            <td className="px-4 py-3">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCinemaRunId(run.id)}
+                                className="text-xs font-semibold text-rose-400 hover:underline"
+                              >
+                                Review →
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {selectedCinemaRunId ? (
+                <CinemaSettlementDetailPanel
+                  runId={selectedCinemaRunId}
+                  onClose={() => setSelectedCinemaRunId(null)}
+                />
+              ) : null}
+            </>
+          )}
         </>
       )}
 

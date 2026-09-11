@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CalendarDays,
   CreditCard,
+  Film,
   RotateCcw,
   Store,
   Ticket,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   useGetAdminEventGiftCardRedemptionsQuery,
+  useGetAdminMovieGiftCardRedemptionsQuery,
   useGetAdminGiftCardSettlementOverviewQuery,
 } from "@/services/api";
 import { formatDate, formatTime12h } from "@/lib/dateFormat";
@@ -31,7 +33,7 @@ import {
   adminFinancePageClass,
 } from "@/components/SuperAdmin/AdminFinanceChrome";
 
-type VerticalTab = "overview" | "dining" | "events";
+type VerticalTab = "overview" | "dining" | "events" | "movies";
 
 /**
  * Gift Card Ledger — liability + usage visibility.
@@ -61,9 +63,25 @@ export default function AdminGiftCardSettlementsPage() {
       { skip: vertical !== "events" }
     );
 
+  const { data: movieData, isLoading: movieLoading, isError: movieError } =
+    useGetAdminMovieGiftCardRedemptionsQuery(
+      {
+        page,
+        limit: PAGE_SIZE,
+        ...(q.trim() ? { q: q.trim() } : {}),
+        ...(fromDate ? { from: fromDate } : {}),
+        ...(toDate ? { to: toDate } : {}),
+      },
+      { skip: vertical !== "movies" }
+    );
+
   const eventRows = eventData?.items ?? [];
   const eventMeta = eventData?.meta;
   const eventSummary = eventData?.summary;
+
+  const movieRows = movieData?.items ?? [];
+  const movieMeta = movieData?.meta;
+  const movieSummary = movieData?.summary;
 
   const switchVertical = (next: VerticalTab) => {
     setVertical(next);
@@ -80,6 +98,7 @@ export default function AdminGiftCardSettlementsPage() {
           { key: "overview", label: "Overview", icon: Wallet },
           { key: "dining", label: "Dining", icon: Store },
           { key: "events", label: "Events", icon: Ticket },
+          { key: "movies", label: "Movies", icon: Film },
         ]}
         active={vertical}
         onChange={switchVertical}
@@ -91,7 +110,7 @@ export default function AdminGiftCardSettlementsPage() {
             <AdminListShimmer rows={4} columns={4} showTabs={false} showToolbar={false} />
           ) : (
             <>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
                   <div className="h-1 bg-gradient-to-r from-amber-500 to-amber-400/30" />
                   <div className="p-5 space-y-4">
@@ -171,13 +190,61 @@ export default function AdminGiftCardSettlementsPage() {
                     </div>
                   </div>
                 </div>
+
+                <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-violet-500 to-violet-400/30" />
+                  <div className="p-5 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-xl bg-violet-500/15 border border-violet-500/25 p-2.5 text-violet-300">
+                        <Film size={18} />
+                      </span>
+                      <div>
+                        <p className="text-base font-bold text-white">Movies</p>
+                        <p className="text-xs text-zinc-500">GC vs cash · cinema payable unchanged</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                          GC used
+                        </p>
+                        <p className="text-xl font-extrabold text-emerald-600 tabular-nums mt-1">
+                          {formatMoney(overview?.movies?.gift_card_redeemed || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+                          Cinema share
+                        </p>
+                        <p className="text-xl font-extrabold text-emerald-600 tabular-nums mt-1">
+                          {formatMoney(overview?.movies?.cinema_payable_total || 0)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href="/admin/organizer-payouts?tab=movies"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors"
+                      >
+                        Settle movies <ArrowRight size={14} />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => switchVertical("movies")}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-white/10 text-zinc-300 hover:bg-white/5 transition-colors"
+                      >
+                        View GC usage
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
                   Platform gift-card float
                 </p>
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                   <AdminStatCard
                     icon={Wallet}
                     label="Liability outstanding"
@@ -204,6 +271,12 @@ export default function AdminGiftCardSettlementsPage() {
                     icon={Ticket}
                     label="Event redeemed"
                     value={formatMoney(overview?.ledger?.event_redeemed || 0)}
+                    accent="text-emerald-600"
+                  />
+                  <AdminStatCard
+                    icon={Film}
+                    label="Movie redeemed"
+                    value={formatMoney(overview?.ledger?.movie_redeemed || 0)}
                     accent="text-emerald-600"
                   />
                   <AdminStatCard
@@ -422,6 +495,162 @@ export default function AdminGiftCardSettlementsPage() {
           </div>
 
           {eventMeta && <Pagination meta={eventMeta} onPageChange={setPage} />}
+        </div>
+      )}
+
+      {vertical === "movies" && (
+        <div className="space-y-5">
+          <AdminCallout
+            tone="sky"
+            action={
+              <Link
+                href="/admin/organizer-payouts?tab=movies"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white"
+              >
+                Open Partner Payouts <ArrowRight size={14} />
+              </Link>
+            }
+          >
+            Usage visibility only — cinema money is paid via{" "}
+            <span className="font-semibold">Partner Payouts → Movies</span>.
+          </AdminCallout>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <AdminStatCard
+              label="GC redeemed"
+              value={formatMoney(movieSummary?.gift_card_redeemed || 0)}
+              hint={`${movieSummary?.bookings_count || 0} bookings`}
+              accent="text-emerald-600"
+            />
+            <AdminStatCard
+              label="Customer cash"
+              value={formatMoney(movieSummary?.customer_cash_total || 0)}
+              hint="After gift card"
+              accent="text-emerald-600"
+            />
+            <AdminStatCard
+              label="Cinema entitlement"
+              value={formatMoney(movieSummary?.cinema_payable_total || 0)}
+              hint="Full ticket net"
+              accent="text-emerald-600"
+            />
+            <AdminStatCard
+              label="Bookings"
+              value={String(movieSummary?.bookings_count || 0)}
+              accent="text-zinc-200"
+            />
+          </div>
+
+          <AdminFilterBar>
+            <div className="flex-1 min-w-0">
+              <SearchInput
+                value={q}
+                onChange={(v) => {
+                  setQ(v);
+                  setPage(1);
+                }}
+                placeholder="Search movie, cinema, guest, last4…"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <label className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
+                <CalendarDays size={14} />
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
+                  aria-label="From date"
+                />
+              </label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setPage(1);
+                }}
+                className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
+                aria-label="To date"
+              />
+            </div>
+          </AdminFilterBar>
+
+          <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+            {movieLoading ? (
+              <AdminListShimmer rows={6} columns={6} showTabs={false} showToolbar={false} />
+            ) : movieError ? (
+              <p className="text-center text-rose-400 py-16">Could not load movie gift card usage.</p>
+            ) : movieRows.length === 0 ? (
+              <AdminEmptyState
+                icon={Film}
+                title="No movie gift card redemptions yet"
+                description="When guests apply a MOVIES gift card at checkout, usage appears here."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[760px]">
+                  <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                    <tr>
+                      <th className="px-4 py-3.5 font-semibold">Movie / Cinema</th>
+                      <th className="px-4 py-3.5 font-semibold">Guest / Card</th>
+                      <th className="px-4 py-3.5 font-semibold">Ticket / Fee</th>
+                      <th className="px-4 py-3.5 font-semibold">Paid with</th>
+                      <th className="px-4 py-3.5 font-semibold">Cinema</th>
+                      <th className="px-4 py-3.5 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {movieRows.map((row) => (
+                      <tr key={row.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="font-semibold text-white">{row.movie_title || "—"}</p>
+                          <p className="text-xs text-zinc-400 mt-0.5">{row.cinema_name || "—"}</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            {row.redeemed_at
+                              ? `${formatDate(row.redeemed_at)} ${formatTime12h(row.redeemed_at)}`
+                              : "—"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="text-sm text-zinc-200">{row.guest_name || "—"}</p>
+                          <p className="text-xs text-zinc-500">{row.guest_email || ""}</p>
+                          <p className="text-xs font-mono text-zinc-400 mt-1">
+                            ****{row.code_last4 || "————"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top text-xs text-emerald-600 space-y-0.5">
+                          <p>Ticket {formatMoney(row.ticket_amount || 0)}</p>
+                          <p>
+                            Commission −{formatMoney(row.commission_total || 0)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top text-xs space-y-0.5 text-emerald-600">
+                          <p className="font-semibold">
+                            GC {formatMoney(row.gift_card_amount)}
+                          </p>
+                          <p className="text-emerald-600/80">Cash {formatMoney(row.grand_total || 0)}</p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="font-bold text-emerald-600 tabular-nums">
+                            {formatMoney(row.cinema_payable || 0)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <AdminStatusBadge status={row.booking_status} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {movieMeta && <Pagination meta={movieMeta} onPageChange={setPage} />}
         </div>
       )}
     </div>

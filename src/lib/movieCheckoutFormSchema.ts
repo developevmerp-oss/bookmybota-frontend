@@ -25,12 +25,8 @@ export const movieCheckoutFormSchema = yup.object({
   guest_email: yup
     .string()
     .trim()
-    .default("")
-    .test("email-or-empty", "Enter a valid email address.", (value) => {
-      const v = String(value ?? "").trim();
-      if (!v) return true;
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-    }),
+    .required("Email is required so we can send your movie tickets.")
+    .email("Enter a valid email address."),
 });
 
 export type MovieCheckoutFormValues = yup.InferType<typeof movieCheckoutFormSchema>;

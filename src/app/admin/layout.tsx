@@ -146,7 +146,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Movie Contracts", href: "/admin/movie-contracts", icon: FileSignature },
     { name: "Event Masters", href: "/admin/event-masters", icon: ListChecks },
     { name: "Partner Documents", href: "/admin/partner-documents", icon: FileText },
-    { name: "Fees & Commission", href: "/admin/commission", icon: Percent },
+    { name: "BookMyBota Revenue", href: "/admin/revenue", icon: Percent },
     { name: "Partner Payouts", href: "/admin/organizer-payouts", icon: Wallet },
     { name: "Subscription & Billing", href: "/admin/billing", icon: CreditCard },
     { name: "Marketing Plans", href: "/admin/marketing", icon: Megaphone },

@@ -73,6 +73,18 @@ type CinemaPendingRow = {
   commission_total?: number;
   cinema_payable?: number;
   gift_card_amount?: number;
+  cash_amount?: number;
+  period_from?: string | null;
+  period_to?: string | null;
+  bookings?: Array<{
+    id?: string;
+    movie_title?: string;
+    guest_name?: string;
+    booking_code?: string;
+    cinema_payable?: number;
+    gift_card_amount?: number;
+    created_at?: string;
+  }>;
 };
 
 type CinemaSettlementLine = {
@@ -99,11 +111,23 @@ type CinemaSettlementRun = {
   gift_card_amount?: number;
   cash_amount?: number;
   notes?: string | null;
+  payment_reference?: string | null;
+  period_from?: string | null;
+  period_to?: string | null;
   created_at?: string;
   approved_at?: string | null;
   paid_at?: string | null;
   lines?: CinemaSettlementLine[];
 };
+
+const cinemaGenerateSchema = yup.object({
+  business_id: yup.string().required("Select a cinema"),
+  period_from: yup.string().optional(),
+  period_to: yup.string().optional(),
+  notes: yup.string().max(500).optional(),
+});
+
+type CinemaGenerateValues = yup.InferType<typeof cinemaGenerateSchema>;
 
 const EMPTY_MANUAL: AdminPayoutValues = {
   business_id: "",
@@ -494,13 +518,19 @@ function CinemaSettlementDetailPanel({
   const { data: run, isLoading } = useGetAdminCinemaSettlementQuery(runId);
   const [patchSettlement, { isLoading: patching }] =
     usePatchAdminCinemaSettlementMutation();
+  const [paymentRef, setPaymentRef] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
     setNotes(run?.notes || "");
-  }, [run?.notes, runId]);
+    setPaymentRef(run?.payment_reference || "");
+  }, [run?.notes, run?.payment_reference, runId]);
 
   const act = async (status: "APPROVED" | "PAID" | "CANCELLED") => {
+    if (status === "PAID" && !paymentRef.trim()) {
+      toast.error("Add a payment reference before marking paid");
+      return;
+    }
     if (status === "CANCELLED") {
       const ok = window.confirm(
         "Cancel this cinema settlement? Bookings will become unsettled and can enter a new run."
@@ -512,6 +542,7 @@ function CinemaSettlementDetailPanel({
         id: runId,
         status,
         notes: notes.trim() || undefined,
+        payment_reference: paymentRef.trim() || undefined,
       }).unwrap();
       toast.success(res.message || "Settlement updated");
       if (status === "CANCELLED" || status === "PAID") onClose();
@@ -552,7 +583,7 @@ function CinemaSettlementDetailPanel({
               {statusBadge(run.status)}
               <span className="text-sm text-white font-semibold">{run.cinema_name}</span>
               <span className="text-xs text-zinc-500">
-                {run.created_at ? formatDate(run.created_at) : "—"}
+                {formatDate(run.period_from)} – {formatDate(run.period_to)}
               </span>
             </div>
 
@@ -586,15 +617,28 @@ function CinemaSettlementDetailPanel({
             </div>
 
             {canAct && (
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-                <div className="flex-1">
-                  <label className="block text-xs text-zinc-500 mb-1">Notes (optional)</label>
-                  <input
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Payment note or transfer id"
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-                  />
+              <div className="flex flex-col gap-2">
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">
+                      Payment reference (required for Mark paid)
+                    </label>
+                    <input
+                      value={paymentRef}
+                      onChange={(e) => setPaymentRef(e.target.value)}
+                      placeholder="MOCK-BANK-REF or transfer id"
+                      className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Notes (optional)</label>
+                    <input
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Optional note"
+                      className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {status === "PENDING" && (
@@ -631,6 +675,13 @@ function CinemaSettlementDetailPanel({
                 </div>
               </div>
             )}
+
+            {status === "PAID" && run.payment_reference ? (
+              <p className="text-xs text-zinc-400">
+                Paid ref:{" "}
+                <span className="font-mono text-zinc-200">{run.payment_reference}</span>
+              </p>
+            ) : null}
 
             {run.notes && !canAct ? (
               <p className="text-xs text-zinc-400">
@@ -721,6 +772,7 @@ export default function AdminOrganizerPayoutsPage() {
   const [moviesStatusFilter, setMoviesStatusFilter] = useState("ALL");
   const [selectedCinemaRunId, setSelectedCinemaRunId] = useState<string | null>(null);
   const [settlingCinemaId, setSettlingCinemaId] = useState<string | null>(null);
+  const [showCinemaGenerate, setShowCinemaGenerate] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit] = useState(PAGE_SIZE);
@@ -741,7 +793,7 @@ export default function AdminOrganizerPayoutsPage() {
   );
   const { data: cinemasData } = useGetAdminBusinessesQuery(
     { module: "cinema", tab: "active" },
-    { skip: pageTab !== "movies" }
+    { skip: pageTab !== "movies" && pageTab !== "history" }
   );
 
   const organizers = useMemo(() => {
@@ -803,6 +855,11 @@ export default function AdminOrganizerPayoutsPage() {
     { skip: pageTab !== "movies" }
   );
 
+  const { data: cinemaPaidHistoryData = [] } = useGetAdminCinemaSettlementsQuery(
+    { status: "PAID" },
+    { skip: pageTab !== "history" }
+  );
+
   const { data: payoutsData, isLoading: payoutsLoading, isFetching: payoutsFetching } =
     useGetOrganizerPayoutsQuery(
       {
@@ -846,6 +903,7 @@ export default function AdminOrganizerPayoutsPage() {
   const diningPaidRows = diningPaidHistory?.items ?? [];
   const cinemaPending = cinemaPendingData as CinemaPendingRow[];
   const cinemaSettlements = cinemaSettlementsData as CinemaSettlementRun[];
+  const cinemaPaidHistory = cinemaPaidHistoryData as CinemaSettlementRun[];
 
   const [generateSettlement, { isLoading: generating }] =
     useGenerateOrganizerSettlementMutation();
@@ -864,6 +922,18 @@ export default function AdminOrganizerPayoutsPage() {
   } = useForm<GenerateValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: yupResolver(generateSchema) as any,
+    defaultValues: { business_id: "", period_from: "", period_to: "", notes: "" },
+  });
+
+  const {
+    register: registerCinemaGen,
+    handleSubmit: handleCinemaGenerate,
+    reset: resetCinemaGen,
+    setValue: setCinemaGenValue,
+    formState: { errors: cinemaGenErrors },
+  } = useForm<CinemaGenerateValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(cinemaGenerateSchema) as any,
     defaultValues: { business_id: "", period_from: "", period_to: "", notes: "" },
   });
 
@@ -1020,9 +1090,15 @@ export default function AdminOrganizerPayoutsPage() {
   const settleCinemaNow = async (row: CinemaPendingRow) => {
     setSettlingCinemaId(row.business_id);
     try {
-      const res = await generateCinemaSettlement({ business_id: row.business_id }).unwrap();
+      const res = await generateCinemaSettlement({
+        business_id: row.business_id,
+        ...(row.period_from ? { period_from: toDateOnlyParam(row.period_from) || undefined } : {}),
+        ...(row.period_to ? { period_to: toDateOnlyParam(row.period_to) || undefined } : {}),
+      }).unwrap();
       toast.success(res.message || "Cinema settlement created");
       setMoviesWorkspace("runs");
+      setSelectedCinemaRunId(res.data?.id || null);
+      setShowCinemaGenerate(false);
       await Promise.all([refetchCinemaPending(), refetchCinemaSettlements()]);
     } catch (err) {
       toast.error(extractApiError(err, "Failed to generate cinema settlement"));
@@ -1031,11 +1107,40 @@ export default function AdminOrganizerPayoutsPage() {
     }
   };
 
+  const prefillCinemaGenerate = (row: CinemaPendingRow) => {
+    setMoviesWorkspace("runs");
+    setShowCinemaGenerate(true);
+    setCinemaGenValue("business_id", row.business_id);
+    setCinemaGenValue("period_from", toDateOnlyParam(row.period_from) || "");
+    setCinemaGenValue("period_to", toDateOnlyParam(row.period_to) || "");
+    setCinemaGenValue("notes", "");
+  };
+
+  const onCinemaGenerate = async (values: CinemaGenerateValues) => {
+    try {
+      const res = await generateCinemaSettlement({
+        business_id: values.business_id,
+        ...(values.period_from?.trim() ? { period_from: values.period_from.trim() } : {}),
+        ...(values.period_to?.trim() ? { period_to: values.period_to.trim() } : {}),
+        notes: values.notes?.trim() || undefined,
+      }).unwrap();
+      toast.success(res.message || "Cinema settlement created");
+      setSelectedCinemaRunId(res.data?.id || null);
+      setShowCinemaGenerate(false);
+      resetCinemaGen({ business_id: values.business_id, period_from: "", period_to: "", notes: "" });
+      setMoviesWorkspace("runs");
+      await Promise.all([refetchCinemaPending(), refetchCinemaSettlements()]);
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to generate cinema settlement"));
+    }
+  };
+
   const switchTab = (tab: PageTab) => {
     setPageTab(tab);
     setPage(1);
     setSelectedRunId(null);
     setSelectedCinemaRunId(null);
+    setShowCinemaGenerate(false);
     router.replace(`/admin/organizer-payouts?tab=${tab}`, { scroll: false });
   };
 
@@ -1076,6 +1181,20 @@ export default function AdminOrganizerPayoutsPage() {
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-zinc-300 hover:text-white hover:bg-white/5 text-sm font-semibold transition-colors"
             >
               Manual
+            </button>
+          </div>
+        ) : pageTab === "movies" ? (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setMoviesWorkspace("runs");
+                setShowCinemaGenerate((v) => !v);
+              }}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors"
+            >
+              <Plus size={16} />
+              {showCinemaGenerate ? "Hide generate" : "Generate"}
             </button>
           </div>
         ) : null}
@@ -1553,7 +1672,10 @@ export default function AdminOrganizerPayoutsPage() {
               },
             ]}
             active={moviesWorkspace}
-            onChange={(key) => setMoviesWorkspace(key)}
+            onChange={(key) => {
+              setMoviesWorkspace(key);
+              if (key === "queue") setShowCinemaGenerate(false);
+            }}
           />
 
           <AdminFilterBar>
@@ -1604,7 +1726,7 @@ export default function AdminOrganizerPayoutsPage() {
                 </div>
               ) : cinemaPendingError ? (
                 <p className="px-4 py-8 text-center text-rose-400 text-sm">
-                  Could not load pending cinema settlements.
+                  Could not load pending cinema settlements. Restart the backend so settlement tables migrate.
                 </p>
               ) : cinemaPending.length === 0 ? (
                 <p className="px-4 py-8 text-center text-zinc-500 text-sm">
@@ -1612,13 +1734,14 @@ export default function AdminOrganizerPayoutsPage() {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm min-w-[720px]">
+                  <table className="w-full text-left text-sm min-w-[820px]">
                     <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
                       <tr>
                         <th className="px-4 py-3 font-semibold">Cinema</th>
                         <th className="px-4 py-3 font-semibold">Bookings</th>
-                        <th className="px-4 py-3 font-semibold">Gross / Commission</th>
+                        <th className="px-4 py-3 font-semibold">GC / Cash</th>
                         <th className="px-4 py-3 font-semibold">Payable</th>
+                        <th className="px-4 py-3 font-semibold">Period</th>
                         <th className="px-4 py-3 font-semibold" />
                       </tr>
                     </thead>
@@ -1630,30 +1753,40 @@ export default function AdminOrganizerPayoutsPage() {
                           </td>
                           <td className="px-4 py-3 text-zinc-300">{row.booking_count || 0}</td>
                           <td className="px-4 py-3 text-xs space-y-0.5">
-                            <p className="text-emerald-600">Gross {money(row.gross_ticket)}</p>
-                            <p className="text-emerald-600/80">
-                              Commission {money(row.commission_total)}
-                            </p>
+                            <p className="text-emerald-600">GC {money(row.gift_card_amount)}</p>
+                            <p className="text-emerald-600/80">Cash {money(row.cash_amount)}</p>
                           </td>
                           <td className="px-4 py-3 font-bold text-emerald-600 tabular-nums">
                             {money(row.cinema_payable)}
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              type="button"
-                              disabled={
-                                settlingCinemaId === row.business_id || generatingCinema
-                              }
-                              onClick={() => void settleCinemaNow(row)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50"
-                            >
-                              {settlingCinemaId === row.business_id ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <Plus size={12} />
-                              )}
-                              Generate settlement
-                            </button>
+                          <td className="px-4 py-3 text-xs text-zinc-500">
+                            {formatDate(row.period_from)} – {formatDate(row.period_to)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => prefillCinemaGenerate(row)}
+                                className="text-xs font-semibold text-zinc-300 hover:text-white"
+                              >
+                                Edit dates
+                              </button>
+                              <button
+                                type="button"
+                                disabled={
+                                  settlingCinemaId === row.business_id || generatingCinema
+                                }
+                                onClick={() => void settleCinemaNow(row)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50"
+                              >
+                                {settlingCinemaId === row.business_id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <Plus size={12} />
+                                )}
+                                Create draft
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1666,6 +1799,71 @@ export default function AdminOrganizerPayoutsPage() {
 
           {moviesWorkspace === "runs" && (
             <>
+              {showCinemaGenerate && (
+                <form
+                  onSubmit={handleCinemaGenerate(onCinemaGenerate)}
+                  className="glass-panel rounded-2xl border border-white/10 p-4 space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Generate cinema settlement</h3>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Leave dates empty to include all unsettled bookings for the cinema.
+                    </p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Cinema</label>
+                      <select
+                        {...registerCinemaGen("business_id")}
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      >
+                        <option value="">Select cinema</option>
+                        {cinemaOptions.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                      {cinemaGenErrors.business_id && (
+                        <p className={fieldErrorClass}>{cinemaGenErrors.business_id.message}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Period from</label>
+                      <input
+                        type="date"
+                        {...registerCinemaGen("period_from")}
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Period to</label>
+                      <input
+                        type="date"
+                        {...registerCinemaGen("period_to")}
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Notes</label>
+                      <input
+                        {...registerCinemaGen("notes")}
+                        placeholder="Optional"
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={generatingCinema}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    {generatingCinema ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    Generate draft
+                  </button>
+                </form>
+              )}
+
               {cinemaSettlementsLoading || cinemaSettlementsFetching ? (
                 <AdminListShimmer rows={6} columns={5} showTabs={false} showToolbar={false} />
               ) : cinemaSettlements.length === 0 ? (
@@ -1677,10 +1875,10 @@ export default function AdminOrganizerPayoutsPage() {
               ) : (
                 <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[860px]">
+                    <table className="w-full text-left text-sm min-w-[900px]">
                       <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
                         <tr>
-                          <th className="px-4 py-3 font-semibold">Cinema</th>
+                          <th className="px-4 py-3 font-semibold">Cinema / Period</th>
                           <th className="px-4 py-3 font-semibold">Bookings</th>
                           <th className="px-4 py-3 font-semibold">Amounts</th>
                           <th className="px-4 py-3 font-semibold">Payable</th>
@@ -1694,7 +1892,7 @@ export default function AdminOrganizerPayoutsPage() {
                             <td className="px-4 py-3">
                               <p className="font-semibold text-white">{run.cinema_name || "—"}</p>
                               <p className="text-xs text-zinc-500 mt-0.5">
-                                {run.created_at ? formatDate(run.created_at) : "—"}
+                                {formatDate(run.period_from)} – {formatDate(run.period_to)}
                               </p>
                             </td>
                             <td className="px-4 py-3 text-zinc-300">{run.booking_count || 0}</td>
@@ -2046,6 +2244,50 @@ export default function AdminOrganizerPayoutsPage() {
                         </td>
                         <td className="px-4 py-3 font-mono text-xs text-zinc-400">
                           {row.payment_reference || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <h3 className="text-sm font-semibold text-zinc-300 pt-2">
+            Cinema / movie settlement payouts (paid)
+          </h3>
+          {cinemaPaidHistory.length === 0 ? (
+            <div className="glass-panel rounded-2xl border border-white/5 px-6 py-8 text-center text-zinc-500">
+              No paid cinema settlements yet.
+            </div>
+          ) : (
+            <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-[800px]">
+                  <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Date</th>
+                      <th className="px-4 py-3 font-medium">Cinema</th>
+                      <th className="px-4 py-3 font-medium">Period</th>
+                      <th className="px-4 py-3 font-medium">Payable</th>
+                      <th className="px-4 py-3 font-medium">Reference</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {cinemaPaidHistory.map((run) => (
+                      <tr key={run.id}>
+                        <td className="px-4 py-3 text-zinc-300">
+                          {formatDate(run.paid_at || run.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-white">{run.cinema_name || "—"}</td>
+                        <td className="px-4 py-3 text-xs text-zinc-400">
+                          {formatDate(run.period_from)} – {formatDate(run.period_to)}
+                        </td>
+                        <td className="px-4 py-3 text-emerald-600 font-semibold">
+                          {money(run.cinema_payable)}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-zinc-400">
+                          {run.payment_reference || "—"}
                         </td>
                       </tr>
                     ))}

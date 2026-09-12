@@ -307,6 +307,11 @@ export default function CinemaSettlementsPage() {
                   accent="text-emerald-600"
                 />
                 <StatCard
+                  label="Discounts"
+                  value={money(summary?.discount_total)}
+                  accent="text-emerald-600"
+                />
+                <StatCard
                   label="Commission deducted"
                   value={money(summary?.commission_total)}
                   accent="text-emerald-600"
@@ -334,6 +339,10 @@ export default function CinemaSettlementsPage() {
                   accent="text-emerald-600"
                 />
               </div>
+              <p className="text-xs portal-muted">
+                Your earnings are ticket share after commission. BookMyBota platform offers and gift
+                cards do not reduce your cinema payout.
+              </p>
 
               <div className="org-card overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
@@ -349,12 +358,14 @@ export default function CinemaSettlementsPage() {
                         <th className="portal-table-head text-right px-4 py-3">Sales</th>
                         <th className="portal-table-head text-right px-4 py-3">Commission</th>
                         <th className="portal-table-head text-right px-4 py-3">Earned</th>
+                        <th className="portal-table-head text-right px-4 py-3">Paid</th>
+                        <th className="portal-table-head text-right px-4 py-3">Pending</th>
                       </tr>
                     </thead>
                     <tbody>
                       {movieRows.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center portal-muted">
+                          <td colSpan={8} className="px-4 py-8 text-center portal-muted">
                             No ticket sales recorded yet.
                           </td>
                         </tr>
@@ -381,6 +392,12 @@ export default function CinemaSettlementsPage() {
                             </td>
                             <td className="portal-table-cell px-4 py-3 text-right font-semibold text-emerald-600">
                               {money(row.cinema_earned)}
+                            </td>
+                            <td className="portal-table-cell px-4 py-3 text-right text-emerald-600">
+                              {money(row.paid_amount)}
+                            </td>
+                            <td className="portal-table-cell px-4 py-3 text-right text-amber-600">
+                              {money(row.pending_amount)}
                             </td>
                           </tr>
                         ))
@@ -414,6 +431,7 @@ export default function CinemaSettlementsPage() {
                             <th className="portal-table-head text-left px-4 py-3">Movie</th>
                             <th className="portal-table-head text-right px-4 py-3">Tickets</th>
                             <th className="portal-table-head text-right px-4 py-3">Sales</th>
+                            <th className="portal-table-head text-right px-4 py-3">Discount</th>
                             <th className="portal-table-head text-right px-4 py-3">Your share</th>
                             <th className="portal-table-head text-left px-4 py-3">Booked</th>
                           </tr>
@@ -421,7 +439,7 @@ export default function CinemaSettlementsPage() {
                         <tbody>
                           {customerEntries.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-4 py-8 text-center portal-muted">
+                              <td colSpan={7} className="px-4 py-8 text-center portal-muted">
                                 No bookings match these filters.
                               </td>
                             </tr>
@@ -440,6 +458,9 @@ export default function CinemaSettlementsPage() {
                                 </td>
                                 <td className="portal-table-cell px-4 py-3 text-right text-emerald-600">
                                   {money(row.ticket_amount)}
+                                </td>
+                                <td className="portal-table-cell px-4 py-3 text-right text-emerald-600">
+                                  {money(row.discount_amount)}
                                 </td>
                                 <td className="portal-table-cell px-4 py-3 text-right font-semibold text-emerald-700">
                                   {money(row.cinema_earned)}
@@ -496,7 +517,7 @@ export default function CinemaSettlementsPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-slate-100">
-                          <th className="portal-table-head text-left px-4 py-3">Created</th>
+                          <th className="portal-table-head text-left px-4 py-3">Period</th>
                           <th className="portal-table-head text-left px-4 py-3">Status</th>
                           <th className="portal-table-head text-right px-4 py-3">Bookings</th>
                           <th className="portal-table-head text-right px-4 py-3">You receive</th>
@@ -507,7 +528,14 @@ export default function CinemaSettlementsPage() {
                         {recentSettlements.map((run) => (
                           <tr key={run.id} className="border-b border-slate-50">
                             <td className="portal-table-cell px-4 py-3">
-                              {run.created_at ? formatDate(run.created_at) : "—"}
+                              <p>
+                                {formatDate(run.period_from)} – {formatDate(run.period_to)}
+                              </p>
+                              {run.payment_reference ? (
+                                <p className="text-[10px] portal-muted font-mono mt-0.5">
+                                  Ref {run.payment_reference}
+                                </p>
+                              ) : null}
                             </td>
                             <td className="portal-table-cell px-4 py-3">
                               {statusBadge(run.status)}
@@ -739,7 +767,7 @@ function SettlementsTab({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="portal-table-head text-left px-4 py-3">Created</th>
+                  <th className="portal-table-head text-left px-4 py-3">Period</th>
                   <th className="portal-table-head text-left px-4 py-3">Status</th>
                   <th className="portal-table-head text-right px-4 py-3">Bookings</th>
                   <th className="portal-table-head text-right px-4 py-3">You receive</th>
@@ -752,8 +780,12 @@ function SettlementsTab({
                 {settlements.map((run) => (
                   <tr key={run.id} className="border-b border-slate-50">
                     <td className="portal-table-strong px-4 py-3">
-                      {run.created_at ? formatDate(run.created_at) : "—"}
-                      {run.notes ? (
+                      {formatDate(run.period_from)} – {formatDate(run.period_to)}
+                      {run.payment_reference ? (
+                        <span className="block text-[10px] font-normal portal-muted font-mono">
+                          Ref {run.payment_reference}
+                        </span>
+                      ) : run.notes ? (
                         <span className="block text-[10px] font-normal portal-muted line-clamp-1">
                           {run.notes}
                         </span>
@@ -815,7 +847,7 @@ function SettlementDetailModal({
             <h3 className="portal-heading font-semibold text-lg">Settlement detail</h3>
             {run && (
               <p className="portal-muted text-xs mt-1 flex flex-wrap items-center gap-2">
-                {run.created_at ? formatDate(run.created_at) : "—"} · {statusBadge(run.status)}
+                {formatDate(run.period_from)} – {formatDate(run.period_to)} · {statusBadge(run.status)}
               </p>
             )}
           </div>
@@ -841,6 +873,12 @@ function SettlementDetailModal({
                 <StatCard label="Gift card" value={money(run.gift_card_amount)} accent="text-emerald-600" />
                 <StatCard label="Cash" value={money(run.cash_amount)} accent="text-emerald-600" />
               </div>
+              {run.payment_reference ? (
+                <p className="text-sm">
+                  <span className="portal-muted">Payment ref:</span>{" "}
+                  <span className="font-mono text-slate-800">{run.payment_reference}</span>
+                </p>
+              ) : null}
               {run.notes ? (
                 <p className="text-sm">
                   <span className="portal-muted">Notes:</span> {run.notes}

@@ -1869,32 +1869,46 @@ export interface OfferRedemption {
 export interface CommissionLedgerRow {
   event_id?: string;
   event_name?: string;
+  movie_id?: string;
+  movie_title?: string;
   business_id?: string;
   organizer_name?: string;
+  cinema_name?: string;
   booking_date?: string;
+  customer_key?: string;
+  customer_name?: string;
+  guest_phone?: string | null;
+  guest_email?: string | null;
   convenience_fee_percent?: number | string;
   commission_percent?: number | string;
   bookings_count: number;
   tickets_sold: number;
   ticket_amount: number | string;
+  discount_total?: number | string;
+  gift_card_total?: number | string;
   convenience_fee_total: number | string;
   commission_total: number | string;
   platform_earned: number | string;
   organizer_payout: number | string;
+  cinema_payable?: number | string;
   grand_total: number | string;
 }
 
 export interface CommissionLedger {
+  module?: 'events' | 'movies' | string;
   group_by: string;
   rows: CommissionLedgerRow[];
   totals: {
     bookings_count: number;
     tickets_sold: number;
     ticket_amount: number | string;
+    discount_total?: number | string;
+    gift_card_total?: number | string;
     convenience_fee_total: number | string;
     commission_total: number | string;
     platform_earned: number | string;
     organizer_payout: number | string;
+    cinema_payable?: number | string;
     grand_total: number | string;
   };
 }
@@ -4710,13 +4724,19 @@ export const api = createApi({
 
     getCommissionLedger: builder.query<
       CommissionLedger,
-      { from?: string; to?: string; group_by?: 'event' | 'business' | 'date' } | void
+      {
+        from?: string;
+        to?: string;
+        group_by?: 'event' | 'movie' | 'business' | 'date' | 'customer';
+        module?: 'events' | 'movies';
+      } | void
     >({
       query: (params) => {
         const searchParams = new URLSearchParams();
         if (params?.from) searchParams.append('from', params.from);
         if (params?.to) searchParams.append('to', params.to);
         if (params?.group_by) searchParams.append('group_by', params.group_by);
+        if (params?.module) searchParams.append('module', params.module);
         const qs = searchParams.toString();
         return `/admin/commission${qs ? `?${qs}` : ''}`;
       },
@@ -6926,6 +6946,7 @@ export const api = createApi({
           bookings_count: number;
           tickets_sold: number;
           ticket_amount: number;
+          discount_total?: number;
           commission_total: number;
           cinema_earned: number;
           total_paid: number;
@@ -6976,6 +6997,7 @@ export const api = createApi({
           booking_code?: string | null;
           ticket_qty: number;
           ticket_amount: number;
+          discount_amount?: number | string;
           commission_total: number;
           cinema_earned: number;
           grand_total: number;
@@ -7054,7 +7076,15 @@ export const api = createApi({
       providesTags: (_result, _error, id) => [{ type: 'CinemaSettlements', id }],
     }),
 
-    generateAdminCinemaSettlement: builder.mutation<{ message: string; data: any }, { business_id: string }>({
+    generateAdminCinemaSettlement: builder.mutation<
+      { message: string; data: any },
+      {
+        business_id: string;
+        period_from?: string;
+        period_to?: string;
+        notes?: string;
+      }
+    >({
       query: (body) => ({
         url: '/admin/cinema-settlements',
         method: 'POST',
@@ -7065,7 +7095,7 @@ export const api = createApi({
 
     patchAdminCinemaSettlement: builder.mutation<
       { message: string; data: any },
-      { id: string; status: string; notes?: string }
+      { id: string; status: string; notes?: string; payment_reference?: string }
     >({
       query: ({ id, ...body }) => ({
         url: `/admin/cinema-settlements/${id}`,

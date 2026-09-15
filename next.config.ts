@@ -21,6 +21,15 @@ function uploadsProxyDestination(): string | null {
 const uploadOrigin = uploadsProxyDestination();
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
+    ],
+  },
   async rewrites() {
     if (!uploadOrigin) return [];
     return [

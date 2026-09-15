@@ -1,5 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import AdminCommissionPage from "@/components/SuperAdmin/AdminCommissionPage";
-
-export default AdminCommissionPage;
+export default function AdminCommissionRedirectPage() {
+  redirect("/admin/revenue");
+}

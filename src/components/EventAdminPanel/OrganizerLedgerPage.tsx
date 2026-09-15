@@ -269,6 +269,11 @@ export default function OrganizerLedgerPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="Ticket sales" value={money(summary?.ticket_amount)} accent="text-emerald-600" />
                 <StatCard
+                  label="Discounts"
+                  value={money(summary?.discount_total)}
+                  accent="text-emerald-600"
+                />
+                <StatCard
                   label="Commission deducted"
                   value={money(summary?.commission_total)}
                   accent="text-emerald-600"
@@ -296,6 +301,10 @@ export default function OrganizerLedgerPage() {
                   accent="text-emerald-600"
                 />
               </div>
+              <p className="text-xs portal-muted">
+                Your earnings are ticket share after commission. Your own promos reduce earnings;
+                BookMyBota platform offers and gift cards do not.
+              </p>
 
               <div className="org-card overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
@@ -376,6 +385,7 @@ export default function OrganizerLedgerPage() {
                             <th className="portal-table-head text-left px-4 py-3">Event</th>
                             <th className="portal-table-head text-right px-4 py-3">Tickets</th>
                             <th className="portal-table-head text-right px-4 py-3">Sales</th>
+                            <th className="portal-table-head text-right px-4 py-3">Discount</th>
                             <th className="portal-table-head text-right px-4 py-3">Your share</th>
                             <th className="portal-table-head text-left px-4 py-3">When</th>
                           </tr>
@@ -383,7 +393,7 @@ export default function OrganizerLedgerPage() {
                         <tbody>
                           {customerEntries.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-4 py-8 text-center portal-muted">
+                              <td colSpan={7} className="px-4 py-8 text-center portal-muted">
                                 No bookings match these filters.
                               </td>
                             </tr>
@@ -399,6 +409,9 @@ export default function OrganizerLedgerPage() {
                                 <td className="portal-table-cell px-4 py-3">{row.event_name}</td>
                                 <td className="portal-table-cell px-4 py-3 text-right">{row.ticket_qty}</td>
                                 <td className="portal-table-cell px-4 py-3 text-right text-emerald-600">{money(row.ticket_amount)}</td>
+                                <td className="portal-table-cell px-4 py-3 text-right text-emerald-600">
+                                  {money(row.discount_amount)}
+                                </td>
                                 <td className="portal-table-cell px-4 py-3 text-right font-semibold text-emerald-700">
                                   {money(row.organizer_earned)}
                                 </td>

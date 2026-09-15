@@ -1,6 +1,6 @@
 "use client";
 import { Manrope } from "next/font/google";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import "./globals.css";
 import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/providers/StoreProvider";
@@ -205,7 +205,13 @@ export default function RootLayout({
     <html lang="en" className={isAdminOrBusiness ? "admin-theme" : "customer-theme"}>
       <body className={`${manrope.className} ${manrope.variable}`}>
         <StoreProvider>
-          {showPartnerAuthHeader ? <PartnerAuthHeader /> : showPublicHeader ? <HomeHeader /> : null}
+          {showPartnerAuthHeader ? (
+            <Suspense fallback={<div className="h-[64px] sm:h-[72px] border-b border-[#EBEBEB] bg-white" />}>
+              <PartnerAuthHeader />
+            </Suspense>
+          ) : showPublicHeader ? (
+            <HomeHeader />
+          ) : null}
           <main className={isImmersiveBookingFlow ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : undefined}>
             {children}
             {showLayoutFooter && <Footer />}

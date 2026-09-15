@@ -10,7 +10,7 @@ import { Lock, Mail } from "lucide-react";
 import { useLoginMutation } from "@/services/api";
 import { useAppDispatch } from "@/lib/hooks";
 import { setCredentials } from "@/features/auth/authSlice";
-import { homePathForRole, type UserRole } from "@/lib/authStorage";
+import { homePathForRole, loginPathForRole, type UserRole } from "@/lib/authStorage";
 import { extractApiError, extractApiSuccessMessage } from "@/lib/apiErrors";
 import PasswordInput from "@/components/Shared/PasswordInput";
 import { businessLoginSchema, type BusinessLoginValues } from "@/lib/loginFormSchema";
@@ -68,6 +68,7 @@ function LoginFields({
   hint,
   compact,
   footerBar,
+  forgotPasswordHref,
 }: {
   form: ReturnType<typeof useForm<BusinessLoginValues>>;
   onSubmit: (e?: React.BaseSyntheticEvent) => Promise<void>;
@@ -80,6 +81,7 @@ function LoginFields({
   compact?: boolean;
   /** Soft footer strip for register / customer links (page variant) */
   footerBar?: boolean;
+  forgotPasswordHref: string;
 }) {
   const pill =
     "w-full bg-[#EEF2F7] border border-transparent rounded-full py-3.5 text-sm focus:outline-none focus:bg-white focus:border-primary/30 focus:ring-2 focus:ring-primary/15 text-slate-800 font-medium transition-all placeholder:text-slate-400";
@@ -103,7 +105,7 @@ function LoginFields({
 
   return (
     <>
-      <form onSubmit={onSubmit} className={compact ? "space-y-4" : "space-y-5"} noValidate>
+      <form onSubmit={onSubmit} className={compact ? "space-y-3.5" : "space-y-4"} noValidate>
         <div>
           <label htmlFor="partner-login-email" className="sr-only">
             Email Address
@@ -156,9 +158,9 @@ function LoginFields({
           {form.formState.errors.password && (
             <p className={fieldErrorClass}>{form.formState.errors.password.message}</p>
           )}
-          <div className="mt-2.5 flex justify-end">
+          <div className="mt-2 flex justify-end">
             <Link
-              href="/forgot-password"
+              href={forgotPasswordHref}
               className="text-[12px] font-semibold text-primary hover:opacity-80"
             >
               Forgot Password?
@@ -169,7 +171,7 @@ function LoginFields({
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-primary hover:opacity-95 text-primary-foreground rounded-full py-3.5 text-sm font-bold uppercase tracking-wide transition-all shadow-[0_10px_24px_-8px_var(--primary-glow)] cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
+          className="w-full bg-primary hover:opacity-95 text-primary-foreground rounded-full py-3 sm:py-3.5 text-sm font-bold uppercase tracking-wide transition-all shadow-[0_10px_24px_-8px_var(--primary-glow)] cursor-pointer flex justify-center items-center gap-2 disabled:opacity-60"
         >
           {isLoading ? "Signing in..." : "Sign In"}
         </button>
@@ -182,7 +184,7 @@ function LoginFields({
       ) : null}
 
       {footerBar && footer ? (
-        <div className="mt-8 -mx-6 sm:-mx-10 lg:-mx-12 xl:-mx-14 px-6 sm:px-10 lg:px-12 xl:px-14 py-4 bg-[#F4F6F9] border-t border-slate-100">
+        <div className="mt-5 sm:mt-6 -mx-6 sm:-mx-10 lg:-mx-12 xl:-mx-14 px-6 sm:px-10 lg:px-12 xl:px-14 py-3 sm:py-3.5 bg-[#F4F6F9] border-t border-slate-100">
           {footer}
         </div>
       ) : (
@@ -255,6 +257,7 @@ export default function PartnerLoginForm({
       hint={hint}
       compact={variant === "embedded"}
       footerBar={variant === "page"}
+      forgotPasswordHref={`/forgot-password?from=${encodeURIComponent(loginPathForRole(expectedRole))}`}
     />
   );
 
@@ -273,11 +276,11 @@ export default function PartnerLoginForm({
   }
 
   return (
-    <div className="min-h-[calc(100vh-4.5rem)] bg-[linear-gradient(165deg,#e8f0f8_0%,#f7fafc_45%,#f3eef8_100%)]">
-      <div className="min-h-[calc(100vh-4.5rem)] flex items-center justify-center px-4 py-8 sm:py-10">
-        <div className="w-full max-w-5xl rounded-[1.75rem] bg-white shadow-[0_28px_90px_-30px_rgba(15,23,42,0.35)] overflow-hidden border border-white/80">
-          <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[min(640px,calc(100vh-7rem))]">
-            <div className="relative hidden lg:block bg-[#0b0618] min-h-[560px]">
+    <div className="h-[calc(100dvh-4rem)] sm:h-[calc(100dvh-4.5rem)] overflow-hidden bg-[linear-gradient(165deg,#e8f0f8_0%,#f7fafc_45%,#f3eef8_100%)]">
+      <div className="h-full flex items-center justify-center px-3 sm:px-4 py-3 sm:py-4">
+        <div className="w-full max-w-5xl h-full max-h-[min(580px,calc(100dvh-5.25rem))] sm:max-h-[min(600px,calc(100dvh-5.75rem))] rounded-[1.5rem] sm:rounded-[1.75rem] bg-white shadow-[0_28px_90px_-30px_rgba(15,23,42,0.35)] overflow-hidden border border-white/80">
+          <div className="grid grid-cols-1 lg:grid-cols-2 h-full min-h-0">
+            <div className="relative hidden lg:block bg-[#0b0618] h-full min-h-0">
               <Image
                 src={imageSrc}
                 alt=""
@@ -287,7 +290,7 @@ export default function PartnerLoginForm({
                 sizes="(max-width: 1024px) 0px, 50vw"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-black/25" />
-              <div className="absolute inset-x-0 bottom-0 p-8 xl:p-10">
+              <div className="absolute inset-x-0 bottom-0 p-7 xl:p-9">
                 <p className="font-display text-2xl font-bold text-white tracking-tight drop-shadow-sm">
                   {brandName}
                 </p>
@@ -304,22 +307,22 @@ export default function PartnerLoginForm({
               </div>
             </div>
 
-            <div className="flex flex-col justify-center px-6 pt-10 pb-0 sm:px-10 lg:px-12 xl:px-14 sm:pt-12">
-              <div className="lg:hidden mb-7 rounded-2xl overflow-hidden border border-slate-100 bg-[#0b0618]">
-                <div className="relative w-full aspect-[16/9]">
+            <div className="flex flex-col justify-center px-5 pt-5 pb-0 sm:px-10 lg:px-12 xl:px-14 sm:pt-8 min-h-0 overflow-hidden">
+              <div className="lg:hidden mb-4 rounded-2xl overflow-hidden border border-slate-100 bg-[#0b0618] shrink-0">
+                <div className="relative w-full aspect-[21/9] max-h-[7.5rem]">
                   <Image
                     src={imageSrc}
                     alt=""
                     fill
                     priority
-                    className={isPhoto ? "object-cover" : "object-contain p-4"}
+                    className={isPhoto ? "object-cover" : "object-contain p-3"}
                     sizes="(max-width: 1024px) 90vw, 0px"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <div className="absolute bottom-3 left-4 right-4">
-                    <p className="font-display text-base font-bold text-white">{brandName}</p>
+                  <div className="absolute bottom-2.5 left-3 right-3">
+                    <p className="font-display text-sm font-bold text-white">{brandName}</p>
                     {sideImageLabel ? (
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75 mt-0.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-white/75 mt-0.5">
                         {sideImageLabel}
                       </p>
                     ) : null}
@@ -327,14 +330,14 @@ export default function PartnerLoginForm({
                 </div>
               </div>
 
-              <div className="mb-8">
+              <div className="mb-5 sm:mb-6 shrink-0">
                 <h1
                   id={titleId}
-                  className="text-2xl sm:text-[1.65rem] font-black text-slate-800 tracking-tight"
+                  className="text-xl sm:text-[1.65rem] font-black text-slate-800 tracking-tight"
                 >
                   {title}
                 </h1>
-                <p className="mt-1.5 text-sm text-slate-400 font-medium">{subtitle}</p>
+                <p className="mt-1 text-sm text-slate-400 font-medium">{subtitle}</p>
               </div>
 
               {fields}

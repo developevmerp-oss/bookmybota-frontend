@@ -66,6 +66,20 @@
   }
 }
 
+/* Filter bar: transparent until stuck; light translucent fill when stuck */
+.dining-filters-sticky {
+  background-color: transparent;
+  border-bottom: 1px solid transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+.dining-filters-sticky.is-stuck {
+  background-color: rgba(255, 255, 255, 0.90);
+  border-bottom-color: rgba(226, 232, 240, 0.9);
+}
+
 .dining-sticky-cuisine-names {
   top: 7.75rem;
 }

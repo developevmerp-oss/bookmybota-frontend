@@ -967,9 +967,11 @@ export default function Home() {
   const cuisinesRef = useRef<HTMLDivElement>(null);
   const stickyCuisinesRef = useRef<HTMLDivElement>(null);
   const cuisineStickySentinelRef = useRef<HTMLDivElement>(null);
+  const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
   const offersRef = useRef<HTMLDivElement>(null);
   const [collectionsScroll, setCollectionsScroll] = useState({ left: false, right: false });
   const [showStickyCuisineNames, setShowStickyCuisineNames] = useState(false);
+  const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
 
   const bindBannerNav = useCallback((swiper: SwiperType) => {
@@ -1490,6 +1492,29 @@ export default function Home() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [exploreCardId, cuisineCards.length, siteHeaderHeight]);
+
+  useEffect(() => {
+    const sentinel = filtersStickySentinelRef.current;
+    if (!sentinel) {
+      setIsFiltersStuck(false);
+      return;
+    }
+
+    const topOffset = siteHeaderHeight + (showStickyCuisineNames ? 52 : 0);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsFiltersStuck(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0,
+        rootMargin: `-${Math.max(topOffset, 1)}px 0px 0px 0px`,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [siteHeaderHeight, showStickyCuisineNames]);
 
   useEffect(() => {
     if (!showHomeExtras) {
@@ -2133,18 +2158,23 @@ className={`text-sm font-bold mt-2 transition-colors ${
       )}
 
       <div className="w-full bg-white">
-      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
-        <div >
-          {/* ── 4. Filter Section ───────────────────────────────────────────── */}
-          <section
-            className="sticky z-30  -mx-5 px-5 sm:mx-0 sm:px-0"
-            style={{
-              top:
-                siteHeaderHeight +
-                (showStickyCuisineNames ? 52 : 0),
-            }}
+        {/* Sentinel: when it leaves the sticky offset, filter bar is "stuck" */}
+        <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
+        {/* ── 4. Filter Section (full-bleed sticky bar; chips stay content-width) ─ */}
+        <section
+          className="sticky z-30 w-full"
+          style={{
+            top:
+              siteHeaderHeight +
+              (showStickyCuisineNames ? 52 : 0),
+          }}
+        >
+          <div
+            className={`dining-filters-sticky w-full transition-[background-color,border-color] duration-200 ${
+              isFiltersStuck ? "is-stuck" : ""
+            }`}
           >
-            <div className="border-b border-slate-100/90  bg-white py-2 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+            <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-4">
               <DiningFiltersBar
                 cuisines={cuisineOptions}
                 filters={diningFilters}
@@ -2159,8 +2189,11 @@ className={`text-sm font-bold mt-2 transition-colors ${
                 }}
               />
             </div>
-          </section>
+          </div>
+        </section>
 
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
+        <div >
           {/* ── 5. Offer Section ────────────────────────────────────────────── */}
           {showHomeExtras && homeOfferCards.length > 0 && (
             <section id="dining-offers" className="pt-3 pb-5 sm:pt-2 scroll-mt-24">

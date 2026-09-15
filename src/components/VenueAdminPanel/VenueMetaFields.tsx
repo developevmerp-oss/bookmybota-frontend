@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { FileText, ImagePlus } from "lucide-react";
+import { Eye, FileText, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { extractApiError } from "@/lib/apiErrors";
@@ -151,9 +151,11 @@ export default function VenueMetaFields({
                 href={resolveMediaUrl(url)}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-violet-700 hover:underline"
+                className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                title="View document"
+                aria-label="View document"
               >
-                <FileText size={16} /> View uploaded file
+                <Eye size={18} />
               </a>
               {!disabled && (
                 <button

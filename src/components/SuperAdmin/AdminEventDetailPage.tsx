@@ -11,11 +11,13 @@ import {
   FileSignature,
   FileText,
   MapPin,
+  Pencil,
   Radio,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  useGetAdminEventContractQuery,
   useGetAdminEventDetailQuery,
   useUpdateAdminEventMutation,
   type EventDocumentUpload,
@@ -103,6 +105,7 @@ export default function AdminEventDetailPage({
 }) {
   const { id } = use(params);
   const { data: event, isLoading } = useGetAdminEventDetailQuery(id);
+  const { data: contract } = useGetAdminEventContractQuery(id, { skip: !id });
   const [updateEvent, { isLoading: isUpdating }] = useUpdateAdminEventMutation();
 
   const {
@@ -201,7 +204,10 @@ export default function AdminEventDetailPage({
   const posterH = resolveMediaUrl(event.poster_horizontal_url);
   const posterV = resolveMediaUrl(event.poster_vertical_url);
   const showCreateContract =
-    event.status === "PENDING_APPROVAL" || event.status === "APPROVED";
+    (event.status === "PENDING_APPROVAL" || event.status === "APPROVED") &&
+    (!contract || contract.status === "REJECTED");
+  const showEditContract = contract?.status === "ACTIVE";
+  const showViewContract = Boolean(contract && contract.status !== "REJECTED");
 
   return (
     <div className="w-full space-y-6">
@@ -276,20 +282,38 @@ export default function AdminEventDetailPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            disabled={isUpdating}
-            onClick={toggleVisibility}
-            className="px-4 py-2 rounded-xl border border-white/10 text-sm font-medium inline-flex items-center gap-2 hover:bg-white/5 disabled:opacity-50"
-          >
-            {event.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
-            {event.is_visible ? "Visible" : "Hidden"}
-          </button>
+          {event.status === "LIVE" && (
+            <button
+              disabled={isUpdating}
+              onClick={toggleVisibility}
+              className="px-4 py-2 rounded-xl border border-white/10 text-sm font-medium inline-flex items-center gap-2 hover:bg-white/5 disabled:opacity-50"
+            >
+              {event.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
+              {event.is_visible ? "Visible" : "Hidden"}
+            </button>
+          )}
           {showCreateContract && (
             <Link
               href={`/admin/event-contracts/create?eventId=${event.id}`}
               className="px-4 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 text-sm font-medium inline-flex items-center gap-2"
             >
               <FileSignature size={16} /> Create contract
+            </Link>
+          )}
+          {showEditContract && (
+            <Link
+              href={`/admin/event-contracts/create?eventId=${event.id}&mode=revise`}
+              className="px-4 py-2 rounded-xl border border-amber-500/30 text-amber-700 hover:bg-amber-50 text-sm font-medium inline-flex items-center gap-2"
+            >
+              <Pencil size={16} /> Edit contract
+            </Link>
+          )}
+          {showViewContract && (
+            <Link
+              href={`/admin/event-contracts/${event.id}`}
+              className="px-4 py-2 rounded-xl border border-white/10 text-sm font-medium inline-flex items-center gap-2 hover:bg-white/5"
+            >
+              <FileSignature size={16} /> View contract
             </Link>
           )}
           {event.status === "PENDING_APPROVAL" && (
@@ -561,6 +585,12 @@ export default function AdminEventDetailPage({
                     <p className="text-xs portal-muted mt-0.5 capitalize">
                       {a.artist_source?.replaceAll("_", " ") || "artist"}
                       {a.artist_business_name ? ` · ${a.artist_business_name}` : ""}
+                      {a.approval_status ? ` · ${a.approval_status}` : ""}
+                      {a.artist_is_authorized === false
+                        ? " · pending claim / not authorized"
+                        : a.artist_is_authorized
+                          ? " · authorized partner"
+                          : ""}
                     </p>
                     {a.description && (
                       <p className="text-sm text-slate-600 mt-1 line-clamp-3">{a.description}</p>
@@ -593,9 +623,11 @@ export default function AdminEventDetailPage({
                     href={resolveMediaUrl(doc.url)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-rose-600 hover:text-rose-700 font-medium shrink-0"
+                    className="inline-flex items-center justify-center p-2 rounded-lg text-rose-600 hover:bg-rose-50 shrink-0"
+                    title="View document"
+                    aria-label={`View ${doc.document_name || "document"}`}
                   >
-                    Open
+                    <Eye size={18} />
                   </a>
                 ) : (
                   <span className="portal-muted">No file</span>
@@ -699,6 +731,28 @@ export default function AdminEventDetailPage({
                         <dt className="portal-muted">Venue source</dt>
                         <dd className="text-slate-800 capitalize">
                           {String(s.venue_source).replaceAll("_", " ")}
+                        </dd>
+                      </div>
+                    )}
+                    {s.venue_claim_status && (
+                      <div className="flex justify-between gap-2">
+                        <dt className="portal-muted">Claim status</dt>
+                        <dd className="text-slate-800 uppercase tracking-wide text-xs font-semibold">
+                          {s.venue_claim_status}
+                        </dd>
+                      </div>
+                    )}
+                    {s.venue_is_authorized != null && (
+                      <div className="flex justify-between gap-2">
+                        <dt className="portal-muted">Partner authorized</dt>
+                        <dd className="text-slate-800">{s.venue_is_authorized ? "Yes" : "No"}</dd>
+                      </div>
+                    )}
+                    {s.venue_partner_source && (
+                      <div className="flex justify-between gap-2">
+                        <dt className="portal-muted">Partner source</dt>
+                        <dd className="text-slate-800 capitalize">
+                          {String(s.venue_partner_source).replaceAll("_", " ")}
                         </dd>
                       </div>
                     )}

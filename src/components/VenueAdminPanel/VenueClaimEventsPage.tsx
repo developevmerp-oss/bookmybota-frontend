@@ -65,7 +65,7 @@ export default function VenueClaimEventsPage() {
                 onClick={() => onClaim(s.showtime_id)}
                 className="btn-primary text-sm disabled:opacity-50 shrink-0 w-full"
               >
-                Claim event
+                Claim & confirm
               </button>
             </li>
           ))}

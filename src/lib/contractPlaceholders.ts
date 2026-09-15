@@ -23,7 +23,9 @@ export interface EventContractRecord {
   contract_number: string;
   body_html: string;
   terms_and_conditions?: string | null;
-  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
+  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED' | 'SUPERSEDED';
+  version?: number;
+  is_current?: boolean;
   convenience_fee_percent: number | string;
   commission_percent: number | string;
   dynamic_data?: Record<string, string | number> | null;
@@ -87,6 +89,8 @@ export function contractStatusLabel(
         : 'Signed — awaiting Super Admin publish';
     case 'REJECTED':
       return 'Rejected';
+    case 'SUPERSEDED':
+      return 'Old contract (superseded)';
     default:
       return status;
   }

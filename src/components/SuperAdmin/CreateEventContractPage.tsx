@@ -13,6 +13,7 @@ import {
   useCreateEventContractMutation,
   useGetContractPrefillQuery,
   useGetEligibleContractEventsQuery,
+  useReviseEventContractMutation,
   type EventContract,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -31,8 +32,11 @@ export default function CreateEventContractPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialEventId = searchParams.get("eventId") ?? "";
+  const isRevise = searchParams.get("mode") === "revise";
 
-  const { data: eligible = [], isLoading: loadingEligible } = useGetEligibleContractEventsQuery();
+  const { data: eligible = [], isLoading: loadingEligible } = useGetEligibleContractEventsQuery(undefined, {
+    skip: isRevise,
+  });
   const {
     register,
     handleSubmit,
@@ -65,6 +69,8 @@ export default function CreateEventContractPage() {
   const [previewContract, setPreviewContract] = useState<EventContract | null>(null);
 
   const [createContract, { isLoading: creating }] = useCreateEventContractMutation();
+  const [reviseContract, { isLoading: revising }] = useReviseEventContractMutation();
+  const saving = creating || revising;
 
   useEffect(() => {
     if (initialEventId) setValue("event_id", initialEventId);
@@ -127,20 +133,32 @@ export default function CreateEventContractPage() {
     }
 
     try {
-      const res = await createContract({
-        event_id: values.event_id,
-        body_html: values.body_html,
-        terms_and_conditions: values.terms ?? "",
-        convenience_fee_percent: conv,
-        commission_percent: comm,
-      }).unwrap();
-      toast.success(
-        (res as { message?: string }).message ||
+      if (isRevise) {
+        await reviseContract({
+          eventId: values.event_id,
+          body_html: values.body_html,
+          terms_and_conditions: values.terms ?? "",
+          convenience_fee_percent: conv,
+          commission_percent: comm,
+        }).unwrap();
+        toast.success(
+          "Contract revised. Previous version is under Old Contracts. Both parties must re-sign."
+        );
+      } else {
+        await createContract({
+          event_id: values.event_id,
+          body_html: values.body_html,
+          terms_and_conditions: values.terms ?? "",
+          convenience_fee_percent: conv,
+          commission_percent: comm,
+        }).unwrap();
+        toast.success(
           "Contract created. Sign with signature + OTP, then ask the organizer to sign."
-      );
+        );
+      }
       router.push(`/admin/event-contracts/${values.event_id}`);
     } catch (err) {
-      toast.error(extractApiError(err, "Failed to create contract"));
+      toast.error(extractApiError(err, isRevise ? "Failed to revise contract" : "Failed to create contract"));
     }
   };
 
@@ -173,11 +191,13 @@ export default function CreateEventContractPage() {
         >
           <ArrowLeft size={16} /> Back to contracts
         </Link>
-        <h2 className="text-2xl font-bold text-white">Create Event Contract</h2>
+        <h2 className="text-2xl font-bold text-white">
+          {isRevise ? "Edit Event Contract" : "Create Event Contract"}
+        </h2>
         <p className="text-zinc-400 mt-1">
-          Select a pending event, review auto-filled details, compose the contract with dynamic fields,
-          then open the contract and sign with your signature + email OTP. After both parties sign, use
-          Publish on the event to make it live for customers.
+          {isRevise
+            ? "Editing creates a new current contract version. The previous signed contract moves to Old Contracts. Super Admin and the event organizer must both sign again."
+            : "Select a pending event, review auto-filled details, compose the contract with dynamic fields, then open the contract and sign with your signature + email OTP. After both parties sign, use Publish on the event to make it live for customers."}
         </p>
       </div>
 
@@ -190,18 +210,31 @@ export default function CreateEventContractPage() {
               <label className="block text-sm font-medium text-zinc-400 mb-1">
                 Select event <span className="text-rose-500">*</span>
               </label>
-              <select
-                className="input-field w-full"
-                {...register("event_id")}
-                disabled={loadingEligible}
-              >
-                <option value="">Select pending event…</option>
-                {eligible.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.name} — {ev.organizer_name} ({ev.status.replace("_", " ")})
-                  </option>
-                ))}
-              </select>
+              {isRevise ? (
+                <input
+                  className="input-field w-full"
+                  value={
+                    prefill?.event?.name
+                      ? `${prefill.event.name} — ${prefill.event.organizer_name ?? ""}`
+                      : eventId || "Loading…"
+                  }
+                  disabled
+                  readOnly
+                />
+              ) : (
+                <select
+                  className="input-field w-full"
+                  {...register("event_id")}
+                  disabled={loadingEligible}
+                >
+                  <option value="">Select pending event…</option>
+                  {eligible.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.name} — {ev.organizer_name} ({ev.status.replace("_", " ")})
+                    </option>
+                  ))}
+                </select>
+              )}
               {errors.event_id && (
                 <p className="text-xs text-rose-400 font-medium mt-1">{errors.event_id.message}</p>
               )}
@@ -338,11 +371,11 @@ export default function CreateEventContractPage() {
           </Link>
           <button
             type="submit"
-            disabled={creating || !eventId || !feesValid}
+            disabled={saving || !eventId || !feesValid}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
           >
-            {creating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-            Create contract
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+            {isRevise ? "Save revised contract" : "Create contract"}
           </button>
         </div>
       </form>

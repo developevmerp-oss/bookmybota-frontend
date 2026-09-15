@@ -674,6 +674,7 @@ export interface AdminEvent {
     venue_layout_template_id?: string | null;
     venue_source?: 'manual' | 'registered' | 'auto_registered';
     venue_is_authorized?: boolean;
+    venue_partner_source?: string | null;
     venue_claim_status?: 'UNCLAIMED' | 'CLAIMED' | string;
     layout_mode?: 'none' | 'standard' | 'custom';
     custom_layout_name?: string | null;
@@ -879,7 +880,11 @@ export interface EventContract {
   contract_number: string;
   body_html: string;
   terms_and_conditions?: string | null;
-  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
+  status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED' | 'SUPERSEDED';
+  version?: number;
+  is_current?: boolean;
+  supersedes_contract_id?: string | null;
+  superseded_at?: string | null;
   convenience_fee_percent: number | string;
   commission_percent: number | string;
   dynamic_data?: Record<string, string | number> | null;
@@ -1158,6 +1163,7 @@ export interface EventArtistItem {
   image_url?: string | null;
   documents?: any[];
   sort_order?: number;
+  approval_status?: string;
 }
 
 export interface PublicEvent {
@@ -4770,8 +4776,17 @@ export const api = createApi({
       providesTags: (_r, _e, id) => [{ type: 'EventContracts', id: `prefill-${id}` }],
     }),
 
-    getEventContracts: builder.query<PaginatedList<EventContract>, PagedQuery | void>({
-      query: (params) => `/admin/event-contracts${toListQuery({ q: params?.q, page: params?.page, limit: params?.limit })}`,
+    getEventContracts: builder.query<
+      PaginatedList<EventContract>,
+      (PagedQuery & { scope?: 'current' | 'old' }) | void
+    >({
+      query: (params) =>
+        `/admin/event-contracts${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+          scope: params?.scope,
+        })}`,
       transformResponse: (res: { data: EventContract[] }) => unwrapPaginated(res),
       providesTags: ['EventContracts'],
     }),
@@ -4780,6 +4795,28 @@ export const api = createApi({
       query: (eventId) => `/admin/event-contracts/event/${eventId}`,
       transformResponse: (res: { data: EventContract }) => res.data,
       providesTags: (_r, _e, id) => [{ type: 'EventContracts', id }],
+    }),
+
+    getAdminEventContractById: builder.query<EventContract, string>({
+      query: (contractId) => `/admin/event-contracts/by-id/${contractId}`,
+      transformResponse: (res: { data: EventContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventContracts', id: `by-${id}` }],
+    }),
+
+    getAdminEventContractHistory: builder.query<
+      { event_id: string; event_name: string; organizer_name?: string; contracts: EventContract[] },
+      string
+    >({
+      query: (eventId) => `/admin/event-contracts/event/${eventId}/history`,
+      transformResponse: (res: {
+        data: {
+          event_id: string;
+          event_name: string;
+          organizer_name?: string;
+          contracts: EventContract[];
+        };
+      }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventContracts', id: `history-${id}` }],
     }),
 
     createEventContract: builder.mutation<
@@ -4794,6 +4831,25 @@ export const api = createApi({
       }
     >({
       query: (body) => ({ url: '/admin/event-contracts', method: 'POST', body }),
+      transformResponse: (res: { data: EventContract }) => res.data,
+      invalidatesTags: ['EventContracts', 'AdminEvents', 'OrganizerEvents', 'PublicEvents'],
+    }),
+
+    reviseEventContract: builder.mutation<
+      EventContract,
+      {
+        eventId: string;
+        body_html: string;
+        terms_and_conditions?: string;
+        convenience_fee_percent?: number;
+        commission_percent?: number;
+      }
+    >({
+      query: ({ eventId, ...body }) => ({
+        url: `/admin/event-contracts/event/${eventId}/revise`,
+        method: 'POST',
+        body,
+      }),
       transformResponse: (res: { data: EventContract }) => res.data,
       invalidatesTags: ['EventContracts', 'AdminEvents', 'OrganizerEvents', 'PublicEvents'],
     }),
@@ -4826,6 +4882,27 @@ export const api = createApi({
       query: (eventId) => `/events/organizer/${eventId}/contract`,
       transformResponse: (res: { data: EventContract }) => res.data,
       providesTags: (_r, _e, id) => [{ type: 'OrganizerEvents', id: `${id}-contract` }],
+    }),
+
+    getOrganizerEventContracts: builder.query<
+      PaginatedList<EventContract>,
+      (PagedQuery & { scope?: 'current' | 'old' }) | void
+    >({
+      query: (params) =>
+        `/events/organizer/contracts${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+          scope: params?.scope,
+        })}`,
+      transformResponse: (res: { data: EventContract[] }) => unwrapPaginated(res),
+      providesTags: ['EventContracts', 'OrganizerEvents'],
+    }),
+
+    getOrganizerEventContractById: builder.query<EventContract, string>({
+      query: (contractId) => `/events/organizer/contracts/${contractId}`,
+      transformResponse: (res: { data: EventContract }) => res.data,
+      providesTags: (_r, _e, id) => [{ type: 'EventContracts', id: `org-${id}` }],
     }),
 
     requestOrganizerContractOtp: builder.mutation<
@@ -7597,10 +7674,15 @@ export const {
   useGetContractPrefillQuery,
   useGetEventContractsQuery,
   useGetAdminEventContractQuery,
+  useGetAdminEventContractByIdQuery,
+  useGetAdminEventContractHistoryQuery,
   useCreateEventContractMutation,
+  useReviseEventContractMutation,
   useRequestAdminContractOtpMutation,
   useSignAdminEventContractMutation,
   useGetOrganizerEventContractQuery,
+  useGetOrganizerEventContractsQuery,
+  useGetOrganizerEventContractByIdQuery,
   useRequestOrganizerContractOtpMutation,
   useSignOrganizerEventContractMutation,
   useRejectOrganizerEventContractMutation,

@@ -1,13 +1,32 @@
 "use client";
 
-import ChangePasswordForm from "@/components/Shared/ChangePasswordForm";
+import { Suspense, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+function RedirectToProfilePassword() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/organizer/profile?tab=password");
+  }, [router]);
+
+  return (
+    <div className="w-full flex items-center justify-center min-h-[8rem] text-slate-500 text-sm">
+      Opening change password...
+    </div>
+  );
+}
 
 export default function OrganizerChangePasswordPage() {
   return (
-    <div className="w-full max-w-[1600px] mx-auto">
-      <div className="org-card p-4 sm:p-6 max-w-xl">
-        <ChangePasswordForm variant="portal" />
-      </div>
-    </div>
+    <Suspense
+      fallback={
+        <div className="w-full flex items-center justify-center min-h-[8rem] text-slate-500 text-sm">
+          Opening change password...
+        </div>
+      }
+    >
+      <RedirectToProfilePassword />
+    </Suspense>
   );
 }

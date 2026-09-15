@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { KeyRound, LogOut, User } from "lucide-react";
+import { FileSignature, FileStack, KeyRound, LogOut, User, type LucideIcon } from "lucide-react";
+
+export type PartnerProfileExtraLink = {
+  href: string;
+  label: string;
+  icon?: LucideIcon;
+};
 
 type Props = {
   displayName: string;
@@ -11,6 +17,7 @@ type Props = {
   profileHref: string;
   changePasswordHref: string;
   onLogout: () => void;
+  extraLinks?: PartnerProfileExtraLink[];
 };
 
 /**
@@ -25,7 +32,9 @@ export default function PartnerProfileHoverMenu({
   profileHref,
   changePasswordHref,
   onLogout,
+  extraLinks = [],
 }: Props) {
+  void email;
   return (
     <div className="relative group">
       <button
@@ -58,6 +67,20 @@ export default function PartnerProfileHoverMenu({
             <User size={16} className="text-muted-foreground" />
             My Profile
           </Link>
+          {extraLinks.map((link) => {
+            const Icon = link.icon ?? FileSignature;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                role="menuitem"
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                <Icon size={16} className="text-muted-foreground" />
+                {link.label}
+              </Link>
+            );
+          })}
           <Link
             href={changePasswordHref}
             role="menuitem"
@@ -80,3 +103,8 @@ export default function PartnerProfileHoverMenu({
     </div>
   );
 }
+
+export const ORGANIZER_CONTRACT_PROFILE_LINKS: PartnerProfileExtraLink[] = [
+  { href: "/organizer/contracts", label: "Current Contract", icon: FileSignature },
+  { href: "/organizer/contracts/history", label: "Old Contracts", icon: FileStack },
+];

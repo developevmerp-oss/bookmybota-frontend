@@ -7,7 +7,9 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
-import PartnerProfileHoverMenu from "@/components/Shared/PartnerProfileHoverMenu";
+import PartnerProfileHoverMenu, {
+  ORGANIZER_CONTRACT_PROFILE_LINKS,
+} from "@/components/Shared/PartnerProfileHoverMenu";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
   LayoutDashboard,
@@ -20,9 +22,11 @@ import {
   Wallet,
   QrCode,
   Megaphone,
+  User,
 } from "lucide-react";
 
 const navigation = [
+  { name: "Profile", href: "/organizer/profile", icon: User },
   { name: "Dashboard", href: "/organizer", icon: LayoutDashboard },
   { name: "My Events", href: "/organizer/events", icon: CalendarDays },
   { name: "Bookings", href: "/organizer/bookings", icon: CalendarCheck },
@@ -74,6 +78,14 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
     title: "Change password",
     subtitle: "Update the password for your organizer login.",
   },
+  "/organizer/contracts": {
+    title: "Current Contract",
+    subtitle: "Active and pending platform contracts for your events.",
+  },
+  "/organizer/contracts/history": {
+    title: "Old Contracts",
+    subtitle: "Previous contract versions after Super Admin edits.",
+  },
 };
 
 function OrganizerShell({ children }: { children: React.ReactNode }) {
@@ -97,6 +109,8 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
 
   const { title: pageTitle, subtitle: pageSubtitle } = useMemo(() => {
     if (pathname.startsWith("/organizer/change-password")) return pageMeta["/organizer/change-password"];
+    if (pathname.startsWith("/organizer/contracts/history")) return pageMeta["/organizer/contracts/history"];
+    if (pathname.startsWith("/organizer/contracts")) return pageMeta["/organizer/contracts"];
     if (pathname.startsWith("/organizer/profile")) return pageMeta["/organizer/profile"];
     if (pathname === "/organizer") return pageMeta["/organizer"];
     const key = Object.keys(pageMeta)
@@ -223,8 +237,9 @@ function OrganizerShell({ children }: { children: React.ReactNode }) {
               initials={initials}
               roleLabel="Organizer"
               profileHref="/organizer/profile"
-              changePasswordHref="/organizer/change-password"
+              changePasswordHref="/organizer/profile?tab=password"
               onLogout={handleLogout}
+              extraLinks={ORGANIZER_CONTRACT_PROFILE_LINKS}
             />
           </div>
         </header>

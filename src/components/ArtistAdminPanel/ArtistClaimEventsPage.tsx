@@ -67,7 +67,7 @@ export default function ArtistClaimEventsPage() {
                 onClick={() => onClaim(e.event_artist_id)}
                 className="btn-primary text-sm disabled:opacity-50 shrink-0 w-full"
               >
-                Claim event
+                Claim & confirm
               </button>
             </li>
           ))}

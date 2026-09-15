@@ -47,6 +47,10 @@ export default function AdminEventsPage() {
   const [updateEvent] = useUpdateAdminEventMutation();
 
   const toggleVisibility = async (event: (typeof events)[number]) => {
+    if (event.status !== "LIVE") {
+      toast.error("Visibility can only be changed after the event is published.");
+      return;
+    }
     try {
       await updateEvent({
         id: event.id,
@@ -148,13 +152,15 @@ export default function AdminEventsPage() {
                   </div>
                 </div>
                 <div className="admin-data-card-actions">
-                  <button
-                    onClick={() => toggleVisibility(event)}
-                    className="p-2 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
-                    title="Toggle visibility"
-                  >
-                    {event.is_visible ? <Eye size={17} /> : <EyeOff size={17} />}
-                  </button>
+                  {event.status === "LIVE" && (
+                    <button
+                      onClick={() => toggleVisibility(event)}
+                      className="p-2 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
+                      title="Toggle visibility"
+                    >
+                      {event.is_visible ? <Eye size={17} /> : <EyeOff size={17} />}
+                    </button>
+                  )}
                   <Link
                     href={`/admin/events/${event.id}`}
                     className="text-sm font-medium text-zinc-600 hover:text-rose-600 px-2 py-1"
@@ -220,13 +226,19 @@ export default function AdminEventsPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <button
-                          onClick={() => toggleVisibility(event)}
-                          className="text-zinc-400 hover:text-white"
-                          title="Toggle visibility"
-                        >
-                          {event.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                        </button>
+                        {event.status === "LIVE" ? (
+                          <button
+                            onClick={() => toggleVisibility(event)}
+                            className="text-zinc-400 hover:text-white"
+                            title="Toggle visibility"
+                          >
+                            {event.is_visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-zinc-500">
+                            {event.is_visible ? "Yes" : "No"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-4 text-right space-x-2">
                         <Link

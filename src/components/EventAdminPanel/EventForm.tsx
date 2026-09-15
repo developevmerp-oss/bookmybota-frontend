@@ -264,10 +264,143 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
   };
 }
 
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const HOUR_12_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
 
-/** Hours + minutes only (no seconds) — avoids native time-picker second segment bugs. */
+function parseYmdParts(ymd?: string | null): { y: string; m: string; d: string } {
+  const s = String(ymd || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return { y: s.slice(0, 4), m: s.slice(5, 7), d: s.slice(8, 10) };
+  }
+  return { y: "", m: "", d: "" };
+}
+
+function buildYmd(y: string, m: string, d: string): string {
+  if (!/^\d{4}$/.test(y) || !m || !d) return "";
+  const year = Number(y);
+  const month = Number(m);
+  const day = Number(d);
+  if (!Number.isFinite(year) || year < 2000 || year > 2100) return "";
+  if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+  const dt = new Date(year, month - 1, day);
+  if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) return "";
+  return `${y}-${m}-${d}`;
+}
+
+/** Calendar date as Day / Month / 4-digit Year (avoids native date year bugs). */
+function DateYmdFields({
+  value,
+  onChange,
+  disabled,
+  inputClass,
+}: {
+  value?: string | null;
+  onChange: (ymd: string) => void;
+  disabled?: boolean;
+  inputClass: string;
+}) {
+  const parsed = parseYmdParts(value);
+  const [y, setY] = useState(parsed.y);
+  const [m, setM] = useState(parsed.m);
+  const [d, setD] = useState(parsed.d);
+
+  useEffect(() => {
+    const next = parseYmdParts(value);
+    setY(next.y);
+    setM(next.m);
+    setD(next.d);
+  }, [value]);
+
+  const emit = (yy: string, mm: string, dd: string) => {
+    if (/^\d{4}$/.test(yy) && mm && dd) {
+      const built = buildYmd(yy, mm, dd);
+      onChange(built);
+      return;
+    }
+    if (!yy && !mm && !dd) onChange("");
+  };
+
+  return (
+    <div className="flex flex-col gap-2 min-w-0">
+      <select
+        disabled={disabled}
+        aria-label="Day"
+        className={`${inputClass} w-full`}
+        value={d}
+        onChange={(e) => {
+          const dd = e.target.value;
+          setD(dd);
+          emit(y, m, dd);
+        }}
+      >
+        <option value="">DD</option>
+        {DAY_OPTIONS.map((day) => (
+          <option key={day} value={day}>
+            {day}
+          </option>
+        ))}
+      </select>
+      <select
+        disabled={disabled}
+        aria-label="Month"
+        className={`${inputClass} w-full`}
+        value={m}
+        onChange={(e) => {
+          const mm = e.target.value;
+          setM(mm);
+          emit(y, mm, d);
+        }}
+      >
+        <option value="">MM</option>
+        {MONTH_OPTIONS.map((month) => (
+          <option key={month} value={month}>
+            {month}
+          </option>
+        ))}
+      </select>
+      <input
+        disabled={disabled}
+        type="text"
+        inputMode="numeric"
+        aria-label="Year (4 digits)"
+        placeholder="YYYY"
+        maxLength={4}
+        className={`${inputClass} w-full`}
+        value={y}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+          setY(digits);
+          emit(digits, m, d);
+        }}
+      />
+    </div>
+  );
+}
+
+function splitHm12(hm?: string | null): { hour12: string; minute: string; ampm: "AM" | "PM" } {
+  const normalized = normalizeTimeToHm(hm);
+  if (!normalized) return { hour12: "", minute: "", ampm: "AM" };
+  const [hStr, mStr] = normalized.split(":");
+  const h24 = Number(hStr);
+  const ampm: "AM" | "PM" = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 % 12 || 12;
+  return {
+    hour12: String(h12).padStart(2, "0"),
+    minute: mStr || "",
+    ampm,
+  };
+}
+
+function combineHm12(hour12: string, minute: string, ampm: "AM" | "PM"): string {
+  if (!hour12 || !minute) return "";
+  let h = Number(hour12) % 12;
+  if (ampm === "PM") h += 12;
+  return `${String(h).padStart(2, "0")}:${minute}`;
+}
+
+/** 12-hour clock with AM/PM (stored as HH:mm 24h). */
 function TimeHmFields({
   value,
   onChange,
@@ -279,37 +412,38 @@ function TimeHmFields({
   disabled?: boolean;
   inputClass: string;
 }) {
-  const hm = normalizeTimeToHm(value);
-  const [hour, minute] = hm ? hm.split(":") : ["", ""];
+  const { hour12, minute, ampm } = splitHm12(value);
 
   return (
-    <div className="flex items-center gap-2 min-w-0">
+    <div className="flex flex-col gap-2 min-w-0">
       <select
         disabled={disabled}
         aria-label="Hour"
-        className={inputClass}
-        value={hour}
+        className={`${inputClass} w-full`}
+        value={hour12}
         onChange={(e) => {
           const h = e.target.value;
           if (!h) {
             onChange("");
             return;
           }
-          onChange(`${h}:${minute || "00"}`);
+          onChange(combineHm12(h, minute || "00", ampm));
         }}
       >
         <option value="">HH</option>
-        {HOUR_OPTIONS.map((h) => (
+        {HOUR_12_OPTIONS.map((h) => (
           <option key={h} value={h}>
-            {h}
+            {Number(h)}
           </option>
         ))}
       </select>
-      <span className="text-slate-400 font-semibold shrink-0">:</span>
+      <span className="text-slate-500 font-semibold text-center leading-none select-none" aria-hidden>
+        :
+      </span>
       <select
         disabled={disabled}
         aria-label="Minute"
-        className={inputClass}
+        className={`${inputClass} w-full`}
         value={minute}
         onChange={(e) => {
           const m = e.target.value;
@@ -317,7 +451,7 @@ function TimeHmFields({
             onChange("");
             return;
           }
-          onChange(`${hour || "00"}:${m}`);
+          onChange(combineHm12(hour12 || "12", m, ampm));
         }}
       >
         <option value="">MM</option>
@@ -326,6 +460,24 @@ function TimeHmFields({
             {m}
           </option>
         ))}
+      </select>
+      <select
+        disabled={disabled}
+        aria-label="AM or PM"
+        className={`${inputClass} w-full`}
+        value={hour12 ? ampm : ""}
+        onChange={(e) => {
+          const next = e.target.value as "AM" | "PM" | "";
+          if (!next) {
+            onChange("");
+            return;
+          }
+          onChange(combineHm12(hour12 || "12", minute || "00", next));
+        }}
+      >
+        <option value="">AM/PM</option>
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
       </select>
     </div>
   );
@@ -558,7 +710,7 @@ function VenueNameSearchField({
     <div>
       <label className={labelClass}>Venue name <span className="text-rose-500">*</span></label>
       <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
         <input
           disabled={readOnly}
           className={`${inputClass} pl-9`}
@@ -574,6 +726,41 @@ function VenueNameSearchField({
             window.setTimeout(() => setShowResults(false), 150);
           }}
         />
+        {showResults && !readOnly && debouncedQ.length >= 2 && !venueBusinessId && venues.length > 0 && (
+          <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-lg">
+            {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
+            {venues.map((v) => {
+              const selected = venueBusinessId === v.id;
+              const verified =
+                v.is_partner_authorized !== false &&
+                v.partner_source !== "event_auto" &&
+                v.approval_status === "APPROVED";
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyVenue(v)}
+                  className={`w-full text-left px-3 py-2 hover:bg-rose-50 transition-colors ${
+                    selected ? "bg-rose-50" : ""
+                  }`}
+                >
+                  <p className="text-sm font-medium text-slate-800">{v.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {[v.address, v.city_name, v.city_state].filter(Boolean).join(" · ") || "Address not set"}
+                    {typeof v.published_layout_count === "number" && verified
+                      ? ` · ${v.published_layout_count} live layout${v.published_layout_count === 1 ? "" : "s"}`
+                      : ""}
+                  </p>
+                  <p className={`text-[11px] mt-0.5 ${verified ? "text-emerald-700" : "text-amber-700"}`}>
+                    {verified ? "Verified partner" : "In system — not platform-authorized"}
+                    {verified && v.default_layout_name ? ` · Live: ${v.default_layout_name}` : ""}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
       <p className="text-xs text-slate-500 mt-1">
         Search and select a registered venue. If the venue is not in the system, enter its details below.
@@ -593,42 +780,6 @@ function VenueNameSearchField({
         >
           Change venue
         </button>
-      )}
-
-      {showResults && !readOnly && debouncedQ.length >= 2 && !venueBusinessId && venues.length > 0 && (
-        <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 shadow-sm">
-          {isFetching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
-          {venues.map((v) => {
-            const selected = venueBusinessId === v.id;
-            const verified =
-              v.is_partner_authorized !== false &&
-              v.partner_source !== "event_auto" &&
-              v.approval_status === "APPROVED";
-            return (
-              <button
-                key={v.id}
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => applyVenue(v)}
-                className={`w-full text-left px-3 py-2 hover:bg-rose-50 transition-colors ${
-                  selected ? "bg-rose-50" : ""
-                }`}
-              >
-                <p className="text-sm font-medium text-slate-800">{v.name}</p>
-                <p className="text-xs text-slate-500">
-                  {[v.address, v.city_name, v.city_state].filter(Boolean).join(" · ") || "Address not set"}
-                  {typeof v.published_layout_count === "number" && verified
-                    ? ` · ${v.published_layout_count} live layout${v.published_layout_count === 1 ? "" : "s"}`
-                    : ""}
-                </p>
-                <p className={`text-[11px] mt-0.5 ${verified ? "text-emerald-700" : "text-amber-700"}`}>
-                  {verified ? "Verified partner" : "In system — not platform-authorized"}
-                  {verified && v.default_layout_name ? ` · Live: ${v.default_layout_name}` : ""}
-                </p>
-              </button>
-            );
-          })}
-        </div>
       )}
     </div>
   );
@@ -661,7 +812,7 @@ function SeatingLayoutFields({
   const { data: layoutData, isFetching: layoutsFetching } = useGetOrganizerVenueLayoutsQuery(
     venueBusinessId!,
     {
-      skip: readOnly || !venueBusinessId || !isRegisteredPartner,
+      skip: !venueBusinessId || !isRegisteredPartner,
     }
   );
 
@@ -684,7 +835,6 @@ function SeatingLayoutFields({
     { businessId: venueBusinessId!, templateId: layoutId! },
     {
       skip:
-        readOnly ||
         !venueBusinessId ||
         !layoutId ||
         !isRegisteredPartner ||
@@ -753,8 +903,22 @@ function SeatingLayoutFields({
     setValue,
   ]);
 
-  if (!isRegisteredPartner || (!layoutsFetching && liveLayouts.length === 0)) {
-    return null;
+  if (!isRegisteredPartner) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600">
+        Seating layout selection is available after you choose a <strong>verified partner venue</strong>.
+        Auto-registered or new venues use ticket types only (no seat map).
+      </div>
+    );
+  }
+
+  if (!layoutsFetching && liveLayouts.length === 0) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+        This verified venue has no live seating layout published yet. Ticket booking will use capacity from
+        ticket types until a layout goes live.
+      </div>
+    );
   }
 
   return (
@@ -828,7 +992,7 @@ function SeatingLayoutFields({
             <p className="text-sm font-semibold text-emerald-900">{selectedLayout.name}</p>
             <p className="text-xs text-emerald-800">
               {selectedLayout.capacity ? `${selectedLayout.capacity} seats · ` : ""}
-              Layout preview (read-only).
+              Zoom and pan the seating map, or open the full view.
             </p>
           </div>
           {showTemplateLoading ? (
@@ -843,7 +1007,8 @@ function SeatingLayoutFields({
               seatingConfig={
                 (templateDetail?.seating_config as Record<string, unknown> | null | undefined) ?? null
               }
-              height={260}
+              height={320}
+              title={selectedLayout.name}
             />
           )}
         </div>
@@ -1324,7 +1489,17 @@ function VenueBlock({
             <div className="grid sm:grid-cols-3 gap-3">
               <div>
                 <label className={labelClass}>Date <span className="text-rose-500">*</span></label>
-                <input disabled={readOnly} type="date" className={inputClass} {...register(`showtimes.${index}.event_date`)} />
+                <DateYmdFields
+                  disabled={readOnly}
+                  inputClass={inputClass}
+                  value={eventDate}
+                  onChange={(ymd) => {
+                    const rows = [...(getValues("showtimes") || [])];
+                    if (!rows[index]) return;
+                    rows[index] = { ...rows[index], event_date: ymd };
+                    setValue("showtimes", rows, { shouldDirty: true });
+                  }}
+                />
                 {eventDate && <p className="text-xs text-slate-600 mt-1">{formatDate(eventDate)}</p>}
               </div>
               <div>
@@ -1439,7 +1614,7 @@ function VenueBlock({
         )}
       </div>
 
-      {index === 0 && venueDocuments.length > 0 && onDocumentUpload && onDocumentRemove && (
+      {index === 0 && onDocumentUpload && onDocumentRemove && (
         <div className="space-y-3 pt-2 border-t border-slate-200">
           <div>
             <p className="text-sm font-semibold text-slate-800">Venue documents</p>
@@ -1447,14 +1622,20 @@ function VenueBlock({
               Upload venue-related documents here. They are not listed on the Documents step.
             </p>
           </div>
-          <EventDocUploadsList
-            docs={venueDocuments}
-            documents={documents}
-            readOnly={readOnly}
-            uploading={uploading}
-            onUpload={onDocumentUpload}
-            onRemove={onDocumentRemove}
-          />
+          {venueDocuments.length > 0 ? (
+            <EventDocUploadsList
+              docs={venueDocuments}
+              documents={documents}
+              readOnly={readOnly}
+              uploading={uploading}
+              onUpload={onDocumentUpload}
+              onRemove={onDocumentRemove}
+            />
+          ) : (
+            <p className="text-xs text-slate-500 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-2">
+              No venue document types configured for this category yet.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -2093,7 +2274,8 @@ export default function EventForm({
           description: a.description?.trim() || null,
           image_url: a.image_url?.trim() || null,
           documents: Array.isArray(a.documents) ? a.documents : [],
-          auto_register_artist: isArtist && source === "external",
+          auto_register_artist:
+            isArtist && (source === "external" || (source === "auto_registered" && !a.artist_business_id)),
           sort_order: i,
         };
       }),
@@ -2198,6 +2380,13 @@ export default function EventForm({
     if (values.want_promotion) {
       if (!values.promo_plan_id?.trim() || !values.promo_title?.trim() || !values.promo_start_date?.trim()) {
         toast.error("Complete the promotion fields in Media, or turn off Add promotion.");
+        goToStep("media");
+        return;
+      }
+      const eventDate = String(values.showtimes?.[0]?.event_date || "").trim();
+      const promoStart = values.promo_start_date.trim();
+      if (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate) && promoStart > eventDate) {
+        toast.error("Promotion start date cannot be after the event date.");
         goToStep("media");
         return;
       }
@@ -2492,6 +2681,11 @@ export default function EventForm({
           toast.error("Promotion start date cannot be in the past.");
           return false;
         }
+        const eventDate = String(getValues("showtimes.0.event_date") || "").trim();
+        if (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate) && start > eventDate) {
+          toast.error("Promotion start date cannot be after the event date.");
+          return false;
+        }
         if (landing && !banner) {
           toast.error("Banner image is required for this promotion plan.");
           return false;
@@ -2721,17 +2915,16 @@ export default function EventForm({
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Event date <span className="text-rose-500">*</span></label>
-                  <input
+                  <DateYmdFields
                     disabled={readOnly}
-                    type="date"
-                    className={inputClass}
+                    inputClass={inputClass}
                     value={watch("showtimes.0.event_date") || ""}
-                    onChange={(e) => {
+                    onChange={(ymd) => {
                       const rows = [...(getValues("showtimes") || [])];
                       if (!rows[0]) rows[0] = defaultVenue();
                       rows[0] = {
                         ...rows[0],
-                        event_date: e.target.value,
+                        event_date: ymd,
                         end_time: "",
                         ends_at: "",
                         duration_type: "ONE_DAY",
@@ -2739,9 +2932,7 @@ export default function EventForm({
                       setValue("showtimes", rows, { shouldDirty: true });
                     }}
                   />
-                  {watch("showtimes.0.event_date") && (
-                    <p className="text-xs text-slate-600 mt-1">{formatDate(watch("showtimes.0.event_date"))}</p>
-                  )}
+                  <p className="text-[11px] text-slate-500 mt-1">Day / month / 4-digit year.</p>
                 </div>
                 <div>
                   <label className={labelClass}>Start time <span className="text-rose-500">*</span></label>
@@ -2762,7 +2953,7 @@ export default function EventForm({
                       setValue("showtimes", rows, { shouldDirty: true });
                     }}
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">Hours and minutes only (no seconds).</p>
+                  <p className="text-[11px] text-slate-500 mt-1">12-hour clock with AM/PM.</p>
                 </div>
               </div>
             </div>
@@ -3323,20 +3514,21 @@ export default function EventForm({
                           <label className="text-sm font-semibold text-slate-600">
                             Promotion start date <span className="text-rose-500">*</span>
                           </label>
-                          <input
-                            type="date"
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20"
-                            min={(() => {
-                              const t = new Date();
-                              return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(
-                                t.getDate()
-                              ).padStart(2, "0")}`;
-                            })()}
-                            {...register("promo_start_date")}
+                          <DateYmdFields
+                            disabled={false}
+                            inputClass="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20"
+                            value={watch("promo_start_date") || ""}
+                            onChange={(ymd) =>
+                              setValue("promo_start_date", ymd, { shouldDirty: true, shouldValidate: true })
+                            }
                           />
                           <p className="text-[11px] text-slate-500 leading-relaxed">
                             After Super Admin approval, the promotion becomes visible from this date for
-                            the plan duration.
+                            the plan duration. Cannot be after the event date
+                            {watch("showtimes.0.event_date")
+                              ? ` (${formatDate(watch("showtimes.0.event_date"))})`
+                              : ""}
+                            .
                           </p>
                         </div>
 
@@ -3440,6 +3632,19 @@ export default function EventForm({
                           }
                           if (!start) {
                             toast.error("Choose when the promotion should start.");
+                            return;
+                          }
+                          const today = new Date();
+                          const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+                            today.getDate()
+                          ).padStart(2, "0")}`;
+                          if (start < ymd) {
+                            toast.error("Promotion start date cannot be in the past.");
+                            return;
+                          }
+                          const eventDate = String(getValues("showtimes.0.event_date") || "").trim();
+                          if (eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate) && start > eventDate) {
+                            toast.error("Promotion start date cannot be after the event date.");
                             return;
                           }
                           if (landing && !banner) {

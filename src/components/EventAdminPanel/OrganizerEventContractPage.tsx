@@ -99,7 +99,19 @@ export default function OrganizerContractPage() {
           <ArrowLeft size={16} /> Back to My Events
         </Link>
         <h2 className="portal-heading text-2xl font-bold">Platform contract</h2>
-        <p className="portal-muted">{contractStatusLabel(contract.status)}</p>
+        <p className="portal-muted">
+          {contractStatusLabel(contract.status)}
+          {typeof contract.version === "number" ? ` · v${contract.version}` : ""}
+          {contract.is_current === false ? " · Old" : " · Current"}
+        </p>
+        <div className="flex flex-wrap gap-3 mt-2 text-sm">
+          <Link href="/organizer/contracts" className="text-rose-600 hover:underline">
+            All current contracts
+          </Link>
+          <Link href="/organizer/contracts/history" className="text-rose-600 hover:underline">
+            Old contracts
+          </Link>
+        </div>
       </div>
 
       <EventContractDocument contract={contract} />

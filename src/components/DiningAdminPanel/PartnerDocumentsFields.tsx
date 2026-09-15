@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Trash2, Upload } from "lucide-react";
+import { Eye, FileText, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetPartnerDocumentMastersQuery,
@@ -137,9 +137,11 @@ export default function PartnerDocumentsFields({
                       href={resolveMediaUrl(uploadedUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={linkClass}
+                      className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                      title="View document"
+                      aria-label={`View ${doc.name}`}
                     >
-                      View uploaded file
+                      <Eye size={18} />
                     </a>
                     {editable && (
                       <button

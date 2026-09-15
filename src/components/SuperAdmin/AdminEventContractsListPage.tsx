@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { FileSignature, Plus } from "lucide-react";
 import { useGetEventContractsQuery } from "@/services/api";
 import { contractStatusLabel } from "@/lib/contractPlaceholders";
@@ -10,13 +11,19 @@ import Pagination from "@/components/Shared/Pagination";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 
-export default function AdminEventContractsPage() {
+type Scope = "current" | "old";
+
+export default function AdminEventContractsPage({ scope = "current" }: { scope?: Scope }) {
+  const pathname = usePathname();
+  const activeScope: Scope =
+    scope === "old" || pathname?.includes("/event-contracts/history") ? "old" : "current";
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const { data, isLoading, isFetching } = useGetEventContractsQuery({
     page,
     limit,
+    scope: activeScope,
     ...(q.trim() ? { q: q.trim() } : {}),
   });
   const contracts = data?.items ?? [];
@@ -27,6 +34,29 @@ export default function AdminEventContractsPage() {
 
   return (
     <div className="w-full space-y-6">
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/event-contracts"
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            activeScope === "current"
+              ? "bg-rose-600 text-white"
+              : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+          }`}
+        >
+          Current Contracts
+        </Link>
+        <Link
+          href="/admin/event-contracts/history"
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            activeScope === "old"
+              ? "bg-rose-600 text-white"
+              : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+          }`}
+        >
+          Old Contracts
+        </Link>
+      </div>
+
       <div className="admin-list-toolbar">
         <SearchInput
           value={q}
@@ -36,19 +66,21 @@ export default function AdminEventContractsPage() {
           }}
           placeholder="Search contract, event, organizer"
         />
-        <Link
-          href="/admin/event-contracts/create"
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700"
-        >
-          <Plus size={18} /> Create contract
-        </Link>
+        {activeScope === "current" ? (
+          <Link
+            href="/admin/event-contracts/create"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700"
+          >
+            <Plus size={18} /> Create contract
+          </Link>
+        ) : null}
       </div>
 
       {isFetching && !isLoading ? (
         <AdminListShimmer rows={limit > 10 ? 8 : 5} columns={5} showTabs={false} showToolbar={false} />
       ) : contracts.length === 0 ? (
         <div className="glass-panel rounded-2xl border border-white/5 p-10 text-center text-zinc-500">
-          No contracts yet.
+          {activeScope === "old" ? "No old contracts yet." : "No current contracts yet."}
         </div>
       ) : (
         <>
@@ -68,13 +100,21 @@ export default function AdminEventContractsPage() {
                     <div className="admin-data-card-value">{c.organizer_name}</div>
                   </div>
                   <div className="admin-data-card-row">
+                    <span className="admin-data-card-label">Version</span>
+                    <div className="admin-data-card-value">v{c.version ?? 1}</div>
+                  </div>
+                  <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Status</span>
                     <div className="admin-data-card-value">{contractStatusLabel(c.status)}</div>
                   </div>
                 </div>
                 <div className="admin-data-card-actions">
                   <Link
-                    href={`/admin/event-contracts/${c.event_id}`}
+                    href={
+                      activeScope === "old"
+                        ? `/admin/event-contracts/view/${c.id}`
+                        : `/admin/event-contracts/${c.event_id}`
+                    }
                     className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1"
                   >
                     <FileSignature size={14} /> View
@@ -92,6 +132,7 @@ export default function AdminEventContractsPage() {
                     <th className="px-6 py-4">Contract</th>
                     <th className="px-6 py-4">Event</th>
                     <th className="px-6 py-4">Organizer</th>
+                    <th className="px-6 py-4">Version</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-right">Action</th>
                   </tr>
@@ -102,10 +143,15 @@ export default function AdminEventContractsPage() {
                       <td className="px-6 py-4 text-white font-medium">{c.contract_number}</td>
                       <td className="px-6 py-4 text-zinc-300">{c.event_name}</td>
                       <td className="px-6 py-4 text-zinc-400">{c.organizer_name}</td>
+                      <td className="px-6 py-4 text-zinc-400">v{c.version ?? 1}</td>
                       <td className="px-6 py-4 text-zinc-300">{contractStatusLabel(c.status)}</td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href={`/admin/event-contracts/${c.event_id}`}
+                          href={
+                            activeScope === "old"
+                              ? `/admin/event-contracts/view/${c.id}`
+                              : `/admin/event-contracts/${c.event_id}`
+                          }
                           className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1"
                         >
                           <FileSignature size={14} /> View

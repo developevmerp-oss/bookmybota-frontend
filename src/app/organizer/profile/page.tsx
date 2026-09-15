@@ -1,26 +1,115 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Building2, Mail, MapPin, Phone, Save, User, ImagePlus } from "lucide-react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  Building2,
+  Check,
+  ImagePlus,
+  Loader2,
+  Lock,
+  Mail,
+  MapPin,
+  Pencil,
+  Save,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 import ChangePasswordForm from "@/components/Shared/ChangePasswordForm";
 import PhoneInput from "@/components/Shared/PhoneInput";
+import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { useAppSelector } from "@/lib/hooks";
 import { extractApiError } from "@/lib/apiErrors";
-import { isValidPhone } from "@/lib/validation";
+import { isValidPhone, PHONE_MAX_DIGITS, PHONE_MIN_DIGITS } from "@/lib/validation";
 import {
   useGetBusinessSettingsQuery,
   useUpdateBusinessSettingsMutation,
   useUploadImageMutation,
   useGetCitiesQuery,
 } from "@/services/api";
-import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 
-export default function OrganizerProfilePage() {
+type FieldKey = "name" | "phone" | "city" | "address" | "description" | "cover";
+type ProfileTab = "profile" | "password";
+
+const inputClass =
+  "w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-500";
+
+const selectClass =
+  "w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-500";
+
+const textareaClass =
+  "w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 disabled:bg-slate-50 disabled:text-slate-500 min-h-[110px] resize-y";
+
+function FieldHeader({
+  label,
+  required,
+  editing,
+  onEdit,
+  htmlFor,
+}: {
+  label: string;
+  required?: boolean;
+  editing: boolean;
+  onEdit: () => void;
+  htmlFor?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 mb-1.5">
+      <label htmlFor={htmlFor} className="text-sm font-medium text-slate-700">
+        {label}
+        {required && <span className="text-rose-600 ml-0.5">*</span>}
+      </label>
+      {!editing && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="inline-flex items-center gap-1 text-[13px] font-medium text-rose-600 hover:text-rose-700 cursor-pointer"
+        >
+          <Pencil size={12} strokeWidth={2.25} />
+          Edit
+        </button>
+      )}
+    </div>
+  );
+}
+
+function IconField({
+  icon,
+  children,
+  showCheck,
+  alignTop,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  showCheck?: boolean;
+  alignTop?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <span
+        className={`absolute left-3 text-slate-400 pointer-events-none ${
+          alignTop ? "top-3" : "top-1/2 -translate-y-1/2"
+        }`}
+      >
+        {icon}
+      </span>
+      {children}
+      {showCheck && (
+        <Check
+          size={16}
+          strokeWidth={2.5}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none"
+        />
+      )}
+    </div>
+  );
+}
+
+function ProfileDetailsForm() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
   const { data: settings, isLoading } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
-  const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
+  const [updateSettings, { isLoading: isSaving }] = useUpdateBusinessSettingsMutation();
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const { data: cities = [] } = useGetCitiesQuery();
 
@@ -31,6 +120,14 @@ export default function OrganizerProfilePage() {
   const [description, setDescription] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [editing, setEditing] = useState<Record<FieldKey, boolean>>({
+    name: false,
+    phone: false,
+    city: false,
+    address: false,
+    description: false,
+    cover: false,
+  });
 
   useEffect(() => {
     if (!settings || initialized) return;
@@ -43,7 +140,30 @@ export default function OrganizerProfilePage() {
     setInitialized(true);
   }, [settings, initialized]);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const enableEdit = (key: FieldKey) => {
+    setEditing((prev) => ({ ...prev, [key]: true }));
+  };
+
+  const resetFromSettings = () => {
+    setName(settings?.name || "");
+    setAddress(settings?.address || "");
+    setCityId(settings?.city_id ?? "");
+    setPhone(settings?.phone || "");
+    setDescription(settings?.description || "");
+    setCoverImageUrl(settings?.cover_image_url || "");
+    setEditing({
+      name: false,
+      phone: false,
+      city: false,
+      address: false,
+      description: false,
+      cover: false,
+    });
+  };
+
+  const anyEditing = Object.values(editing).some(Boolean);
+
+  const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bizId) return;
     if (!name.trim()) {
@@ -51,7 +171,7 @@ export default function OrganizerProfilePage() {
       return;
     }
     if (phone.trim() && !isValidPhone(phone)) {
-      toast.error("Phone must be 9–12 digits (numbers only)");
+      toast.error(`Phone must be ${PHONE_MIN_DIGITS}–${PHONE_MAX_DIGITS} digits (numbers only)`);
       return;
     }
     try {
@@ -66,164 +186,323 @@ export default function OrganizerProfilePage() {
           cover_image_url: coverImageUrl || "",
         },
       }).unwrap();
-      toast.success("Profile updated");
+      setEditing({
+        name: false,
+        phone: false,
+        city: false,
+        address: false,
+        description: false,
+        cover: false,
+      });
+      toast.success("Profile updated successfully");
     } catch (err) {
       toast.error(extractApiError(err, "Failed to update profile"));
     }
   };
 
-  if (isLoading || !initialized) {
-    return <div className="text-zinc-400 py-10 text-center">Loading profile...</div>;
+  if (isLoading || !initialized || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-[12rem] text-slate-500 text-sm">
+        Loading profile...
+      </div>
+    );
   }
 
+  const email = user.email || "";
+  const displayName = name || email.split("@")[0] || "Organizer";
+  const selectedCity = cityId === "" ? undefined : cities.find((c) => c.id === cityId);
+  const cityLabel = selectedCity
+    ? `${selectedCity.name}${selectedCity.state ? `, ${selectedCity.state}` : ""}`
+    : "—";
+
   return (
-    <div className="w-full max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
-      <div>
-        <h2 className="portal-heading text-2xl font-bold">Organizer profile</h2>
-        <p className="portal-muted mt-1">
-          Details from registration. Update contact info here; login email cannot be changed.
-        </p>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 lg:p-8">
+      <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8 pb-5 sm:pb-6 border-b border-slate-200">
+        {coverImageUrl ? (
+          <img
+            src={coverImageUrl}
+            alt=""
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover shrink-0 border border-slate-200"
+          />
+        ) : (
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-xl sm:text-2xl font-bold shrink-0">
+            {displayName.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-base sm:text-lg font-semibold text-slate-800 truncate">{displayName}</p>
+          <p className="text-sm text-slate-500 truncate">{email}</p>
+          <p className="text-xs text-slate-400 mt-0.5">Event Organizer</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSave} className="glass-panel rounded-2xl p-6 space-y-5">
-        <div className="flex items-center gap-3 pb-4 border-b border-white/5">
-          {coverImageUrl ? (
-            <img src={coverImageUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
+      <form onSubmit={onSave} className="space-y-5" noValidate>
+        <div>
+          <FieldHeader
+            label="Profile image"
+            editing={editing.cover}
+            onEdit={() => enableEdit("cover")}
+          />
+          {editing.cover ? (
+            <CroppedImageField
+              value={coverImageUrl}
+              aspect={1}
+              disabled={uploading}
+              previewClassName="w-32 h-32 rounded-2xl border border-slate-200"
+              emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+              onRemove={() => setCoverImageUrl("")}
+              onCroppedFile={async (file) => {
+                const fd = new FormData();
+                fd.append("image", file);
+                try {
+                  const res = await uploadImage(fd).unwrap();
+                  if (res.url) setCoverImageUrl(res.url);
+                } catch {
+                  toast.error("Failed to upload image");
+                }
+              }}
+              emptyContent={
+                <>
+                  <ImagePlus className="text-slate-400 mb-1" size={20} />
+                  <span className="text-[10px] text-slate-500">Add photo</span>
+                </>
+              }
+            />
           ) : (
-            <span className="w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-lg">
-              {(name || user?.email || "O").charAt(0).toUpperCase()}
-            </span>
+            <div className="flex items-center gap-3">
+              {coverImageUrl ? (
+                <img
+                  src={coverImageUrl}
+                  alt=""
+                  className="w-20 h-20 rounded-2xl object-cover border border-slate-200"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-slate-400">
+                  <ImagePlus size={20} />
+                </div>
+              )}
+              <p className="text-xs text-slate-400">Shown with your public events.</p>
+            </div>
           )}
-          <div className="min-w-0">
-            <p className="font-semibold text-white truncate">{name || "Event Organizer"}</p>
-            <p className="text-xs text-zinc-500 truncate">{user?.email}</p>
+        </div>
+
+        <div>
+          <FieldHeader
+            label="Organizer name"
+            required
+            htmlFor="org-profile-name"
+            editing={editing.name}
+            onEdit={() => enableEdit("name")}
+          />
+          <IconField icon={<Building2 size={16} />}>
+            <input
+              id="org-profile-name"
+              type="text"
+              disabled={!editing.name}
+              className={inputClass}
+              placeholder="Your organization name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </IconField>
+        </div>
+
+        <div>
+          <FieldHeader
+            label="Mobile Number"
+            editing={editing.phone}
+            onEdit={() => enableEdit("phone")}
+          />
+          <PhoneInput
+            value={phone || ""}
+            onChange={setPhone}
+            disabled={!editing.phone}
+            variant="light"
+            showIcon
+            helperText={`${PHONE_MIN_DIGITS}–${PHONE_MAX_DIGITS} digits, numbers only`}
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+          <IconField icon={<Mail size={16} />} showCheck>
+            <input type="email" value={email} disabled className={inputClass} readOnly />
+          </IconField>
+          <p className="mt-1.5 text-xs text-slate-400">Email cannot be changed from profile.</p>
+        </div>
+
+        <div>
+          <FieldHeader
+            label="City"
+            htmlFor="org-profile-city"
+            editing={editing.city}
+            onEdit={() => enableEdit("city")}
+          />
+          {editing.city ? (
+            <IconField icon={<MapPin size={16} />}>
+              <select
+                id="org-profile-city"
+                className={selectClass}
+                value={cityId === "" ? "" : String(cityId)}
+                onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : "")}
+              >
+                <option value="">Select city</option>
+                {cities.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.state ? `, ${c.state}` : ""}
+                  </option>
+                ))}
+              </select>
+            </IconField>
+          ) : (
+            <IconField icon={<MapPin size={16} />}>
+              <input type="text" value={cityLabel} disabled className={inputClass} readOnly />
+            </IconField>
+          )}
+        </div>
+
+        <div>
+          <FieldHeader
+            label="Address"
+            htmlFor="org-profile-address"
+            editing={editing.address}
+            onEdit={() => enableEdit("address")}
+          />
+          <IconField icon={<MapPin size={16} />}>
+            <input
+              id="org-profile-address"
+              type="text"
+              disabled={!editing.address}
+              className={inputClass}
+              placeholder="Office / street address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </IconField>
+        </div>
+
+        <div>
+          <FieldHeader
+            label="About"
+            htmlFor="org-profile-about"
+            editing={editing.description}
+            onEdit={() => enableEdit("description")}
+          />
+          <IconField icon={<User size={16} />} alignTop>
+            <textarea
+              id="org-profile-about"
+              disabled={!editing.description}
+              className={textareaClass}
+              placeholder="Short description of your organization"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+            />
+          </IconField>
+        </div>
+
+        {anyEditing && (
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={resetFromSettings}
+              className="inline-flex items-center justify-center h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving || uploading}
+              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-60 cursor-pointer"
+            >
+              {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              Save changes
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function OrganizerProfileContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab: ProfileTab = tabParam === "password" ? "password" : "profile";
+
+  const setTab = (tab: ProfileTab) => {
+    const next = tab === "password" ? `${pathname}?tab=password` : pathname;
+    router.replace(next);
+  };
+
+  const tabs = [
+    { id: "profile" as const, label: "My Profile", icon: User },
+    { id: "password" as const, label: "Change Password", icon: Lock },
+  ];
+
+  return (
+    <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8">
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
+          <aside className="w-full lg:w-[240px] shrink-0">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
+              <h2 className="px-3 pt-2 pb-3 text-xl sm:text-2xl border-b border-slate-200 mb-3 font-extrabold text-slate-900">
+                My Account
+              </h2>
+              <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
+                {tabs.map((item) => {
+                  const active = activeTab === item.id;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTab(item.id)}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                        active
+                          ? "bg-rose-50 text-rose-700"
+                          : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Icon size={18} className={active ? "text-rose-600" : "text-slate-500"} />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </aside>
+
+          <div className="flex-1 min-w-0 w-full">
+            {activeTab === "profile" ? (
+              <ProfileDetailsForm />
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 max-w-lg">
+                <ChangePasswordForm variant="light" />
+              </div>
+            )}
           </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1.5">Profile image</label>
-          <CroppedImageField
-            value={coverImageUrl}
-            aspect={1}
-            disabled={uploading}
-            previewClassName="w-32 h-32 rounded-2xl border border-white/10"
-            emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-white/20 hover:border-violet-400"
-            onRemove={() => setCoverImageUrl("")}
-            onCroppedFile={async (file) => {
-              const fd = new FormData();
-              fd.append("image", file);
-              try {
-                const res = await uploadImage(fd).unwrap();
-                if (res.url) setCoverImageUrl(res.url);
-              } catch {
-                toast.error("Failed to upload image");
-              }
-            }}
-            emptyContent={
-              <>
-                <ImagePlus className="text-zinc-400 mb-1" size={20} />
-                <span className="text-[10px] text-zinc-500">Add photo</span>
-              </>
-            }
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-            <span className="inline-flex items-center gap-1.5">
-              <Building2 size={14} /> Organizer name
-            </span>
-          </label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="input-field w-full"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-            <span className="inline-flex items-center gap-1.5">
-              <Mail size={14} /> Login email
-            </span>
-          </label>
-          <input
-            value={user?.email || ""}
-            disabled
-            className="input-field w-full opacity-70 cursor-not-allowed"
-          />
-          <p className="text-xs text-zinc-500 mt-1">Used to sign in. Set at registration and cannot be edited here.</p>
-        </div>
-
-        <div>
-          <PhoneInput
-            value={phone}
-            onChange={setPhone}
-            variant="input-field"
-            label="Phone"
-            helperText="Contact number shown on your public events."
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin size={14} /> City
-            </span>
-          </label>
-          <select
-            value={cityId === "" ? "" : String(cityId)}
-            onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : "")}
-            className="input-field w-full"
-          >
-            <option value="">Select city</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}{c.state ? `, ${c.state}` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin size={14} /> Address
-            </span>
-          </label>
-          <input
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="input-field w-full"
-            placeholder="Office / street address"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-            <span className="inline-flex items-center gap-1.5">
-              <User size={14} /> About
-            </span>
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            className="input-field w-full"
-            placeholder="Short description of your organization"
-          />
-        </div>
-
-        <button type="submit" disabled={saving} className="btn-primary inline-flex items-center gap-2 disabled:opacity-50">
-          <Save size={16} />
-          {saving ? "Saving..." : "Save profile"}
-        </button>
-      </form>
-
-      <div className="glass-panel rounded-2xl p-6" id="password">
-        <ChangePasswordForm variant="portal" />
       </div>
     </div>
   );
 }
+
+export default function OrganizerProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full flex items-center justify-center min-h-[12rem] text-slate-500 text-sm">
+          Loading profile...
+        </div>
+      }
+    >
+      <OrganizerProfileContent />
+    </Suspense>
+  );
+}
+

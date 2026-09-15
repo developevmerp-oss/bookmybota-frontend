@@ -132,7 +132,10 @@ export default function PartnerPromotionsPage({
   const planId = watch("plan_id");
   const bannerUrl = watch("banner_image_url");
   const landingSlider = watch("landing_slider");
+  const categoryRail = watch("category_rail");
   const allowsItemTarget = watch("allows_item_target");
+  const bannerRequired = Boolean(landingSlider || categoryRail);
+  const targetId = watch("target_id");
 
   useEffect(() => {
     dispatch(loadFromStorage());
@@ -151,6 +154,19 @@ export default function PartnerPromotionsPage({
     { page: 1, limit: 100 },
     { skip: !bizId || module !== "MOVIES" }
   );
+
+  const promoMaxEventDate = useMemo(() => {
+    if (module !== "EVENTS" || !targetId) return "";
+    const ev = (organizerEventsData?.items || []).find((e) => String(e.id) === String(targetId));
+    const raw = ev?.event_starts_at || "";
+    if (!raw) return "";
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }, [module, targetId, organizerEventsData?.items]);
 
   const [requestCampaign, { isLoading: submitting }] = useRequestMarketingCampaignMutation();
   const [resubmitCampaign, { isLoading: resubmitting }] = useResubmitMarketingCampaignMutation();
@@ -179,10 +195,12 @@ export default function PartnerPromotionsPage({
   useEffect(() => {
     if (!selectedPlan) {
       setValue("landing_slider", false);
+      setValue("category_rail", false);
       setValue("allows_item_target", false);
       return;
     }
     setValue("landing_slider", Boolean(selectedPlan.landing_slider));
+    setValue("category_rail", Boolean(selectedPlan.category_rail));
     setValue("allows_item_target", Boolean(selectedPlan.allows_item_target));
   }, [selectedPlan, setValue]);
 
@@ -252,6 +270,7 @@ export default function PartnerPromotionsPage({
         ? startRaw
         : emptyPartnerPromotionsFormValues(module).start_date,
       landing_slider: Boolean(camp.landing_slider),
+      category_rail: Boolean(camp.category_rail),
       allows_item_target: Boolean(camp.allows_item_target),
     });
     setModalOpen(true);
@@ -273,6 +292,10 @@ export default function PartnerPromotionsPage({
   };
 
   const onValid = async (values: PartnerPromotionsFormValues) => {
+    if (module === "EVENTS" && promoMaxEventDate && values.start_date > promoMaxEventDate) {
+      toast.error("Promotion start date cannot be after the event date.");
+      return;
+    }
     const payload = {
       title: values.title.trim(),
       banner_image_url: values.banner_image_url || undefined,
@@ -397,10 +420,10 @@ export default function PartnerPromotionsPage({
         {errors.title && <p className={fieldErrorClass}>{errors.title.message}</p>}
       </div>
 
-      {landingSlider ? (
+      {planId ? (
         <div className="space-y-2">
           <span className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
-            Banner image <RequiredMark />
+            Banner image {bannerRequired ? <RequiredMark /> : <span className="text-slate-400 font-normal">(optional)</span>}
           </span>
           <CroppedImageField
             value={bannerUrl || ""}
@@ -450,12 +473,18 @@ export default function PartnerPromotionsPage({
         <input
           type="date"
           min={emptyPartnerPromotionsFormValues(module).start_date}
+          max={promoMaxEventDate || undefined}
           {...register("start_date")}
           className={inputClass}
         />
         {errors.start_date && <p className={fieldErrorClass}>{errors.start_date.message}</p>}
         <p className="text-[11px] text-slate-500 leading-relaxed">
           After Super Admin approval, the promotion becomes visible from this date for the plan duration.
+          {promoMaxEventDate
+            ? ` Cannot be after the event date (${promoMaxEventDate}).`
+            : module === "EVENTS" && allowsItemTarget
+              ? " Select an event first to limit the start date."
+              : ""}
         </p>
       </div>
 

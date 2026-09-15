@@ -349,6 +349,7 @@ export default function VenueLayoutViewer({
     if (name.includes("category 2") || name.includes("cat 2") || name.includes("east stand")) return "#2563eb"; // Blue
     if (name.includes("category 3") || name.includes("cat 3") || name.includes("west stand")) return "#22c55e"; // Green
     if (name.includes("away")) return "#9333ea"; // Purple
+    if (name.includes("south")) return "#f97316"; // Orange
     return "#3b82f6";                                // Blue default
   };
 

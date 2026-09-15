@@ -1962,6 +1962,306 @@ export default function VenueLayoutBuilder({
     toast.success("Loaded Ethiopia Football Stadium Layout!");
   };
 
+  const generateEthiopiaFullSeatingStadium = () => {
+    let newShapes: Shape[] = [];
+    let newLabels: Label[] = [];
+    let newSeats: Seat[] = [];
+
+    // 1. Title, Specifications & Ticketing Legend (Left Side)
+    newLabels.push(
+      { id: Math.random().toString(36).substr(2, 9), text: "ETHIOPIA NATIONAL STADIUM\nFULL SEATING & GROUND LAYOUT", x: 60, y: 80, fontSize: 24 },
+      {
+        id: Math.random().toString(36).substr(2, 9),
+        text: "STADIUM SPECIFICATIONS\n\nStadium : Addis Ababa National Stadium\nStandard: FIFA & CAF Category 4 Ground\nCapacity: ~62,000 Spectator Bowl\nPitch   : 105m x 68m Natural Hybrid Grass\nTrack   : 400m Olympic Tartan Athletics Ring",
+        x: 60,
+        y: 200,
+        fontSize: 12,
+      },
+      {
+        id: Math.random().toString(36).substr(2, 9),
+        text: "TICKETING SECTORS\n\n🟨 VIP Presidential Box (Center West)\n🟥 Category 1 (North Stand & West Lower)\n🟦 Category 2 (East Grandstand Upper & Lower)\n🟩 Category 3 (West Stand Upper Tier)\n🟧 South Stand (General Supporters)\n🟪 Away Supporters Section (South-East)",
+        x: 60,
+        y: 400,
+        fontSize: 12,
+      },
+      {
+        id: Math.random().toString(36).substr(2, 9),
+        text: "FACILITIES & GATES\n\n🚪 Gate 1: VIP & Presidential Protocol\n🚪 Gate 2: North Stand Entrance\n🚪 Gate 3: East Grandstand Entrance\n🚪 Gate 4: South General Turnstiles\n🚪 Gate 5: Away Supporters Turnstiles\n💡 4x High-Mast LED Floodlight Towers\n📺 2x Ultra HD Stadium Scoreboards",
+        x: 60,
+        y: 600,
+        fontSize: 12,
+      },
+      {
+        id: Math.random().toString(36).substr(2, 9),
+        text: "     N\n  W 🧭 E\n     S",
+        x: 2980,
+        y: 1950,
+        fontSize: 22,
+      }
+    );
+
+    // 2. Outer Stadium Grounds, Concourse & Olympic Running Track
+    newShapes.push(
+      // Outer landscaped green grounds
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 260, y: 40, width: 2680, height: 2320, fill: "#15803d", text: "" },
+      // Stadium Outer Concourse / Concrete Ring
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 340, y: 90, width: 2520, height: 2220, fill: "#334155", text: "" },
+      // Inner Stadium Bowl Floor
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 370, y: 120, width: 2460, height: 2160, fill: "#0f172a", text: "" },
+      // Red Tartan Athletics Running Track (Surrounding Pitch)
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 960, y: 740, width: 1280, height: 920, fill: "#991b1b", text: "" },
+      // Track inner red lane
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1040, y: 800, width: 1120, height: 800, fill: "#b91c1c", text: "" },
+      // Inner Field Grass Apron
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1160, y: 890, width: 880, height: 620, fill: "#14532d", text: "" }
+    );
+
+    // 3. Football Pitch - 10 Alternating Lawn Mow Stripes (105m x 68m)
+    for (let s = 0; s < 10; s++) {
+      newShapes.push({
+        id: Math.random().toString(36).substr(2, 9),
+        type: 'rect',
+        x: 1240 + s * 72,
+        y: 970,
+        width: 72,
+        height: 460,
+        fill: s % 2 === 0 ? "#16a34a" : "#15803d",
+        text: ""
+      });
+    }
+
+    // 4. Football Pitch - White Markings, Spots, Arcs & Goal Nets
+    newShapes.push(
+      // Outer Boundary Line
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1240, y: 970, width: 720, height: 460, fill: "transparent", text: "" },
+      // Halfway Line
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1599, y: 970, width: 2, height: 460, fill: "#ffffff", text: "" },
+      // Center Kickoff Circle
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1530, y: 1130, width: 140, height: 140, fill: "transparent", text: "" },
+      // Center Kickoff Spot
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1597, y: 1197, width: 6, height: 6, fill: "#ffffff", text: "" },
+      // Left Penalty Box (18-yard box)
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1240, y: 1070, width: 130, height: 260, fill: "transparent", text: "" },
+      // Left Goal Box (6-yard box)
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1240, y: 1135, width: 50, height: 130, fill: "transparent", text: "" },
+      // Left Penalty Spot
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1330, y: 1197, width: 6, height: 6, fill: "#ffffff", text: "" },
+      // Right Penalty Box (18-yard box)
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1830, y: 1070, width: 130, height: 260, fill: "transparent", text: "" },
+      // Right Goal Box (6-yard box)
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1910, y: 1135, width: 50, height: 130, fill: "transparent", text: "" },
+      // Right Penalty Spot
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1864, y: 1197, width: 6, height: 6, fill: "#ffffff", text: "" },
+      // Left Goalpost Net
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1215, y: 1160, width: 25, height: 80, fill: "rgba(255,255,255,0.3)", text: "" },
+      // Right Goalpost Net
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1960, y: 1160, width: 25, height: 80, fill: "rgba(255,255,255,0.3)", text: "" },
+      // Pitch Dimension Badge
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1510, y: 985, width: 180, height: 32, fill: "rgba(0,0,0,0.45)", text: "PITCH: 105m x 68m" }
+    );
+
+    // 5. Dugouts, Technical Area & Player Tunnel
+    newShapes.push(
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1350, y: 1445, width: 150, height: 38, fill: "#1e3a8a", text: "HOME TEAM BENCH" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1550, y: 1448, width: 100, height: 32, fill: "#475569", text: "4TH OFFICIAL / VAR" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1700, y: 1445, width: 150, height: 38, fill: "#7f1d1d", text: "AWAY TEAM BENCH" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1565, y: 1485, width: 70, height: 65, fill: "#7c3aed", text: "TUNNEL" }
+    );
+
+    // 6. Stand Headers & Architectural Backdrops
+    newShapes.push(
+      // North Stand Backdrop
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 940, y: 200, width: 1320, height: 500, fill: "#1e293b", text: "" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1460, y: 210, width: 280, height: 40, fill: "#b91c1c", text: "NORTH STAND (HOME END)" },
+
+      // South Stand Backdrops
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 940, y: 1700, width: 880, height: 500, fill: "#1e293b", text: "" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1220, y: 1710, width: 320, height: 40, fill: "#ea580c", text: "SOUTH STAND - GENERAL SUPPORTERS" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1830, y: 1700, width: 430, height: 500, fill: "#2e1065", text: "" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1875, y: 1710, width: 240, height: 40, fill: "#7e22ce", text: "AWAY SUPPORTERS" },
+
+      // West Stand Backdrops
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 420, y: 680, width: 500, height: 1040, fill: "#1e293b", text: "" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 530, y: 690, width: 280, height: 40, fill: "#14532d", text: "WEST MAIN GRANDSTAND" },
+      // VIP Box Plaque
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 440, y: 1040, width: 460, height: 260, fill: "#78350f", text: "" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 550, y: 1045, width: 240, height: 35, fill: "#d97706", text: "👑 VIP PRESIDENTIAL BOX" },
+
+      // East Stand Backdrops
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 2280, y: 680, width: 500, height: 1040, fill: "#1e293b", text: "" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 2390, y: 690, width: 280, height: 40, fill: "#1d4ed8", text: "EAST GRANDSTAND" }
+    );
+
+    // 7. REAL INTERACTIVE SEATS ACROSS ALL 4 STANDS
+    // A) NORTH STAND (HOME END) - Red Category 1 (12 rows x 42 seats = 504 seats)
+    const northGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 12; r++) {
+      for (let c = 0; c < 42; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "North Stand - Home End",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 965 + c * 30,
+          coordinate_y: 270 + r * 34,
+          status: "AVAILABLE",
+          grid_id: northGridId,
+        });
+      }
+    }
+
+    // B) SOUTH STAND - GENERAL SUPPORTERS (Orange, 10 rows x 26 seats = 260 seats)
+    const southGenGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 26; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "South Stand - General",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 965 + c * 32,
+          coordinate_y: 1775 + r * 40,
+          status: "AVAILABLE",
+          grid_id: southGenGridId,
+        });
+      }
+    }
+
+    // C) SOUTH STAND - AWAY SUPPORTERS (Purple, 10 rows x 13 seats = 130 seats)
+    const southAwayGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 13; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "Away Supporters Section",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 1850 + c * 31,
+          coordinate_y: 1775 + r * 40,
+          status: "AVAILABLE",
+          grid_id: southAwayGridId,
+        });
+      }
+    }
+
+    // D) WEST STAND - VIP PRESIDENTIAL BOX (Gold Amber, 5 rows x 12 seats = 60 seats)
+    const westVipGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 12; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "VIP Presidential Box",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 470 + c * 34,
+          coordinate_y: 1095 + r * 38,
+          status: "AVAILABLE",
+          grid_id: westVipGridId,
+        });
+      }
+    }
+
+    // E) WEST STAND - LOWER TIER (Red Cat 1, 8 rows x 12 seats = 96 seats)
+    const westLowerGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 12; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "Category 1 - West Stand Lower",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 470 + c * 34,
+          coordinate_y: 745 + r * 35,
+          status: "AVAILABLE",
+          grid_id: westLowerGridId,
+        });
+      }
+    }
+
+    // F) WEST STAND - UPPER TIER (Green Cat 3, 9 rows x 12 seats = 108 seats)
+    const westUpperGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 12; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "Category 3 - West Stand Upper",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 470 + c * 34,
+          coordinate_y: 1335 + r * 35,
+          status: "AVAILABLE",
+          grid_id: westUpperGridId,
+        });
+      }
+    }
+
+    // G) EAST STAND - LOWER TIER (Royal Blue Cat 2, 12 rows x 12 seats = 144 seats)
+    const eastLowerGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 12; r++) {
+      for (let c = 0; c < 12; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "Category 2 - East Stand Lower",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 2340 + c * 34,
+          coordinate_y: 745 + r * 38,
+          status: "AVAILABLE",
+          grid_id: eastLowerGridId,
+        });
+      }
+    }
+
+    // H) EAST STAND - UPPER TIER (Royal Blue Cat 2, 12 rows x 12 seats = 144 seats)
+    const eastUpperGridId = Math.random().toString(36).substr(2, 9);
+    for (let r = 0; r < 12; r++) {
+      for (let c = 0; c < 12; c++) {
+        newSeats.push({
+          internalId: Math.random().toString(36).substr(2, 9),
+          ticket_type_id: null,
+          section_name: "Category 2 - East Stand Upper",
+          row_label: String.fromCharCode(65 + r),
+          seat_label: `${c + 1}`,
+          coordinate_x: 2340 + c * 34,
+          coordinate_y: 1245 + r * 38,
+          status: "AVAILABLE",
+          grid_id: eastUpperGridId,
+        });
+      }
+    }
+
+    // 8. Stadium Atmosphere: Scoreboards, Floodlights, Gates
+    newShapes.push(
+      // Ultra HD LED Stadium Scoreboards
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1350, y: 100, width: 500, height: 75, fill: "#020617", text: "⚽ ETHIOPIA NATIONAL STADIUM ⚽\n[ HOME  0 - 0  AWAY ]  |  45:00" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1350, y: 2225, width: 500, height: 60, fill: "#020617", text: "ADDIS ABABA STADIUM  •  CAF / FIFA CERTIFIED" },
+
+      // High-Mast Floodlight Towers at 4 corners
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 440, y: 150, width: 110, height: 110, fill: "#475569", text: "💡 TOWER 1\n(NW LIGHTS)" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 2650, y: 150, width: 110, height: 110, fill: "#475569", text: "💡 TOWER 2\n(NE LIGHTS)" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 440, y: 2130, width: 110, height: 110, fill: "#475569", text: "💡 TOWER 3\n(SW LIGHTS)" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 2650, y: 2130, width: 110, height: 110, fill: "#475569", text: "💡 TOWER 4\n(SE LIGHTS)" },
+
+      // Stadium Entry Gates
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 340, y: 1165, width: 70, height: 90, fill: "#15803d", text: "GATE 1\n(VIP)" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1540, y: 110, width: 120, height: 65, fill: "#15803d", text: "GATE 2 (NORTH)" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 2790, y: 1165, width: 70, height: 90, fill: "#15803d", text: "GATE 3\n(EAST)" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 1320, y: 2215, width: 120, height: 65, fill: "#15803d", text: "GATE 4 (SOUTH)" },
+      { id: Math.random().toString(36).substr(2, 9), type: 'rect', x: 2000, y: 2215, width: 120, height: 65, fill: "#7c3aed", text: "GATE 5 (AWAY)" }
+    );
+
+    pushSnapshot(newSeats, newLabels, newShapes, null);
+    setZoomScale(0.38);
+    toast.success("Loaded Ethiopia Football Ground & Seating Layout!");
+  };
+
   const generateGrandAmphitheatre = () => {
     // 1. Stage at bottom
     const stageShape: Shape = {
@@ -2292,6 +2592,7 @@ export default function VenueLayoutBuilder({
             onChange={(e) => {
               if (e.target.value === "classic_football") generateClassicFootballLayout();
               else if (e.target.value === "ethiopia_stadium") generateEthiopiaFootballStadium();
+              else if (e.target.value === "ethiopia_football_seats") generateEthiopiaFullSeatingStadium();
               else if (e.target.value === "amphitheatre") generateGrandAmphitheatre();
               else if (e.target.value === "cinema") generateCinemaMultiplex();
               else if (e.target.value === "theater") generateTheater();
@@ -2308,6 +2609,7 @@ export default function VenueLayoutBuilder({
             <optgroup label="🏟️ Stadiums & Sports">
               <option value="classic_football">⚽ Classic Football Stadium (4 Straight Stands)</option>
               <option value="ethiopia_stadium">🇪🇹 Ethiopia Football Stadium (Addis Ababa Stadium)</option>
+              <option value="ethiopia_football_seats">🇪🇹⚽ Ethiopia Football Ground & Seating Stadium (Full Bowl)</option>
               <option value="arena">🥊 Arena (In-The-Round)</option>
             </optgroup>
             <optgroup label="🎭 Theatres & Auditoriums">

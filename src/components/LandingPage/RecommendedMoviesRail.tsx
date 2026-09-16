@@ -161,7 +161,7 @@ export default function RecommendedMoviesRail() {
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <h2 className="type-section font-semibold tracking-tight text-[#111111]">
-            Recommended Movies
+            Most Loved on Screen
           </h2>
           <Link
             href={seeAllHref}

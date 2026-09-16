@@ -1040,6 +1040,15 @@ export default function Home() {
   //   router.push(`/search?${params.toString()}`);
   // };
 
+  const scrollToDiningBrowseViewport = useCallback(() => {
+    requestAnimationFrame(() => {
+      document.getElementById("explore-dining")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, []);
+
   const handleCuisineSelect = (cuisine: string) => {
     setDiningFilters((prev) => {
       const exists = prev.cuisines.some((c) => c.toLowerCase() === cuisine.toLowerCase());
@@ -1050,18 +1059,12 @@ export default function Home() {
           : [...prev.cuisines, cuisine],
       };
     });
-    document.getElementById("restaurant-listings")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    scrollToDiningBrowseViewport();
   };
 
   const handleExploreRestaurants = () => {
     setDiningFilters(DEFAULT_DINING_FILTERS);
-    document.getElementById("restaurant-listings")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    scrollToDiningBrowseViewport();
   };
 
   // ── Location state ──
@@ -1294,13 +1297,8 @@ export default function Home() {
       offerBucket: bucket,
     }));
     setCurrentPage(1);
-    requestAnimationFrame(() => {
-      document.getElementById("restaurant-listings")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  }, []);
+    scrollToDiningBrowseViewport();
+  }, [scrollToDiningBrowseViewport]);
 
   const cuisineCards = useMemo(() => {
     const used = new Set<string>();
@@ -1817,7 +1815,11 @@ export default function Home() {
       </section> */}
 
       {/* ── Explore Dining categories ─────────────────────────────────────── */}
-      <section className="w-full bg-white border-b border-slate-100">
+      <section
+        id="explore-dining"
+        className="w-full bg-white border-b border-slate-100"
+        style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
+      >
         <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-6 sm:py-3">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-5 tracking-tight">
             Explore Dining
@@ -1841,14 +1843,8 @@ export default function Home() {
                     // Re-clicking the active card must keep selection + results.
                     // Resetting categories with a new array would clear the list
                     // while RTK Query returns the same cached page and never rehydrates.
-                    const scrollTargetId =
-                      card.id === "restaurant"
-                        ? "explore-cuisines"
-                        : "restaurant-listings";
                     if (exploreCardId === card.id) {
-                      document
-                        .getElementById(scrollTargetId)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      scrollToDiningBrowseViewport();
                       return;
                     }
                     setExploreCardId(card.id);
@@ -1863,12 +1859,7 @@ export default function Home() {
                       setActiveCategories([]);
                     }
                     setCurrentPage(1);
-                    // Restaurant shows cuisines under Explore Dining — scroll there, not past it.
-                    requestAnimationFrame(() => {
-                      document
-                        .getElementById(scrollTargetId)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    });
+                    scrollToDiningBrowseViewport();
                   }}
                   className="text-center cursor-pointer w-[120px] h-[140px] sm:w-[132px] sm:h-[160px] rounded-2xl transition-all hover:-translate-y-0.5"
                   aria-pressed={isActive}
@@ -2178,7 +2169,10 @@ className={`text-sm font-bold mt-2 transition-colors ${
               <DiningFiltersBar
                 cuisines={cuisineOptions}
                 filters={diningFilters}
-                onChange={setDiningFilters}
+                onChange={(next) => {
+                  setDiningFilters(next);
+                  scrollToDiningBrowseViewport();
+                }}
                 onReset={() => setDiningFilters(DEFAULT_DINING_FILTERS)}
                 categories={exploreDiningFilterCategories}
                 categoriesSelected={activeCategories}
@@ -2186,6 +2180,34 @@ className={`text-sm font-bold mt-2 transition-colors ${
                   setActiveCategories(next);
                   setExploreCardId(exploreCardIdForCategories(next, businessTypes));
                   setCurrentPage(1);
+                  scrollToDiningBrowseViewport();
+                }}
+                extraChips={[
+                  ...(searchQuery
+                    ? [
+                        {
+                          label: `Search: "${searchQuery}"`,
+                          onClear: () => {
+                            setSearchInput("");
+                            setSearchQuery("");
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(mealOccasion
+                    ? [
+                        {
+                          label:
+                            MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label || mealOccasion,
+                          onClear: () => setMealOccasion(""),
+                        },
+                      ]
+                    : []),
+                ]}
+                onClearExtras={() => {
+                  setSearchInput("");
+                  setSearchQuery("");
+                  setMealOccasion("");
                 }}
               />
             </div>
@@ -2253,116 +2275,23 @@ className={`text-sm font-bold mt-2 transition-colors ${
 
           {/* ── 6. Restaurant section ───────────────────────────────────────── */}
           <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-2"}`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
-                {getFilteredSectionTitle()}
-              </h2>
-              <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
-                {locationLoading ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader2 size={12} className="animate-spin" /> Locating restaurants…
-                  </span>
-                ) : (
-                  <>
-                    <span className="font-semibold text-slate-700">{cityDisplay}</span>
-                    {" · "}
-                    {restaurantCountLabel} to explore
-                  </>
-                )}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {searchQuery && (
-                <div className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                  <span>Search: "{searchQuery}"</span>
-                  <button
-                    onClick={() => { setSearchInput(""); setSearchQuery(""); }}
-                    className="hover:bg-[#efd7ff] p-0.5 rounded-full transition-colors flex items-center justify-center"
-                    aria-label="Clear search"
-                  >
-                    <X size={12} className="text-[#6900AA]" />
-                  </button>
-                </div>
+          <div className="mb-3">
+            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+              {getFilteredSectionTitle()}
+            </h2>
+            <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
+              {locationLoading ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" /> Locating restaurants…
+                </span>
+              ) : (
+                <>
+                  <span className="font-semibold text-slate-700">{cityDisplay}</span>
+                  {" · "}
+                  {restaurantCountLabel} to explore
+                </>
               )}
-
-              {diningFilters.cuisines.map((selectedCuisine) => (
-                <div
-                  key={`cuisine-${selectedCuisine}`}
-                  className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm"
-                >
-                  <span>Cuisine: {selectedCuisine}</span>
-                  <button
-                    onClick={() =>
-                      setDiningFilters({
-                        ...diningFilters,
-                        cuisines: diningFilters.cuisines.filter(
-                          (c) => c.toLowerCase() !== selectedCuisine.toLowerCase()
-                        ),
-                      })
-                    }
-                    className="hover:bg-[#efd7ff] p-0.5 rounded-full transition-colors flex items-center justify-center"
-                    aria-label="Clear cuisine filter"
-                  >
-                    <X size={12} className="text-[#6900AA]" />
-                  </button>
-                </div>
-              ))}
-
-              {activeCategories.map((selectedCategory) => (
-                <div
-                  key={`category-${selectedCategory}`}
-                  className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-650 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm"
-                >
-                  <span>Category: {selectedCategory}</span>
-                  <button
-                    onClick={() => {
-                      const next = activeCategories.filter(
-                        (c) => c.toLowerCase() !== selectedCategory.toLowerCase()
-                      );
-                      setActiveCategories(next);
-                      setExploreCardId(exploreCardIdForCategories(next, businessTypes));
-                      setCurrentPage(1);
-                    }}
-                    className="hover:bg-slate-200 p-0.5 rounded-full transition-colors flex items-center justify-center"
-                    aria-label="Clear category filter"
-                  >
-                    <X size={12} className="text-slate-650" />
-                  </button>
-                </div>
-              ))}
-
-              {mealOccasion && (
-                <div className="flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                  <span>{MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label}</span>
-                  <button
-                    onClick={() => setMealOccasion("")}
-                    className="hover:bg-[#efd7ff] p-0.5 rounded-full transition-colors flex items-center justify-center"
-                    aria-label="Clear meal filter"
-                  >
-                    <X size={12} className="text-[#6900AA]" />
-                  </button>
-                </div>
-              )}
-
-              {hasActiveFilters && (
-                <button
-                  onClick={() => {
-                    setSearchInput("");
-                    setSearchQuery("");
-                    setActiveCategories([]);
-                    setExploreCardId("all-dining");
-                    setDiningFilters(DEFAULT_DINING_FILTERS);
-                    setMealOccasion("");
-                    setCurrentPage(1);
-                  }}
-                  className="text-xs text-[#6900AA] hover:text-[#57008E] font-bold px-2 py-1.5 transition-colors cursor-pointer"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
+            </p>
           </div>
 
           {businessesLoading && loadedRestaurants.length === 0 ? (

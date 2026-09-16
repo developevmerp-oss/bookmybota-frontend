@@ -37,9 +37,12 @@ export function formatMovieCardMeta(
   return [certification?.trim() || "", lang].filter(Boolean).join(" | ");
 }
 
-/** "Mirzapur: The Movie (2026)" — skips a duplicate year if the title already has one. */
+/** "Mirzapur: The Movie (2026)" — skips appending a year if the title already has one. */
 export function formatMovieCardTitle(title: string, yearOrDate?: string | null): string {
   const raw = title.trim();
+  if (!raw) return raw;
+  // Title already includes a year anywhere — don't append another.
+  if (/\((?:19|20)\d{2}\)/.test(raw)) return raw;
   if (!yearOrDate) return raw;
   const year = /^\d{4}$/.test(yearOrDate)
     ? yearOrDate
@@ -48,6 +51,5 @@ export function formatMovieCardTitle(title: string, yearOrDate?: string | null):
         return Number.isNaN(d.getTime()) ? "" : String(d.getFullYear());
       })();
   if (!year) return raw;
-  if (/\(\d{4}\)\s*$/.test(raw)) return raw;
   return `${raw} (${year})`;
 }

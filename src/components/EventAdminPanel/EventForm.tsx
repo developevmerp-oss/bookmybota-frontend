@@ -186,6 +186,9 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
     promo_plan_id: (promo as any)?.plan_id != null ? String((promo as any).plan_id) : "",
     promo_title: promo?.title ? String(promo.title) : "",
     promo_banner_url: (promo as any)?.banner_image_url ? String((promo as any).banner_image_url) : "",
+    promo_slider_accent_text: (promo as any)?.slider_accent_text
+      ? String((promo as any).slider_accent_text)
+      : "",
     promo_start_date: promoStartDate,
     promo_landing_slider: Boolean((promo as any)?.landing_slider),
     languages: parseEventLanguages(event.language),
@@ -2286,6 +2289,7 @@ export default function EventForm({
               plan_id: Number(values.promo_plan_id),
               title: values.promo_title.trim(),
               banner_image_url: values.promo_banner_url?.trim() || undefined,
+              slider_accent_text: values.promo_slider_accent_text?.trim() || null,
               start_date: values.promo_start_date,
             }
           : null,
@@ -3405,6 +3409,7 @@ export default function EventForm({
                     setValue("promo_plan_id", "", { shouldDirty: true });
                     setValue("promo_title", "", { shouldDirty: true });
                     setValue("promo_banner_url", "", { shouldDirty: true });
+                    setValue("promo_slider_accent_text", "", { shouldDirty: true });
                     setValue("promo_start_date", "", { shouldDirty: true });
                     setValue("promo_landing_slider", false, { shouldDirty: true });
                   }}
@@ -3556,6 +3561,23 @@ export default function EventForm({
                                 </>
                               }
                             />
+
+                            <div className="space-y-1.5 pt-1">
+                              <label className="text-sm font-semibold text-slate-600">
+                                Slider accent text{" "}
+                                <span className="font-medium text-slate-400">(optional)</span>
+                              </label>
+                              <input
+                                maxLength={40}
+                                placeholder='e.g. "Feel The Beat"'
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20"
+                                {...register("promo_slider_accent_text")}
+                              />
+                              <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Optional. If filled, shown on the right side of the home hero slider.
+                                Leave blank to hide it (max 40 characters).
+                              </p>
+                            </div>
                           </div>
                         ) : (
                           <div className="space-y-2">

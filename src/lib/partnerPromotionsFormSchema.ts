@@ -20,7 +20,12 @@ export const partnerPromotionsFormSchema = yup
       .min(2, "Title must be at least 2 characters.")
       .max(120, "Title must be at most 120 characters."),
     banner_image_url: yup.string().trim().default(""),
-    target_type: yup
+    slider_accent_text: yup
+    .string()
+    .trim()
+    .max(40, "Accent text must be at most 40 characters.")
+    .default(""),
+  target_type: yup
       .mixed<PartnerPromoTargetType>()
       .oneOf(["BUSINESS", "RESTAURANT", "EVENT", "MOVIE"])
       .required("Target type is required."),
@@ -67,6 +72,7 @@ export const emptyPartnerPromotionsFormValues = (
   plan_id: "",
   title: "",
   banner_image_url: "",
+  slider_accent_text: "",
   target_type: module === "DINING" ? "RESTAURANT" : module === "EVENTS" ? "EVENT" : "MOVIE",
   target_id: "",
   start_date: todayYmd(),

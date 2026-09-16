@@ -1509,6 +1509,8 @@ export interface MarketingCampaign {
   plan_id: number;
   title?: string | null;
   banner_image_url?: string | null;
+  /** Right-side script text on the landing hero slider */
+  slider_accent_text?: string | null;
   cta_url?: string | null;
   category?: string;
   target_type?: 'BUSINESS' | 'RESTAURANT' | 'EVENT' | 'MOVIE';
@@ -1905,6 +1907,8 @@ export interface OfferRedemption {
 }
 
 export interface CommissionLedgerRow {
+  revenue_source?: 'events' | 'movies' | string;
+  item_name?: string;
   event_id?: string;
   event_name?: string;
   movie_id?: string;
@@ -1933,7 +1937,7 @@ export interface CommissionLedgerRow {
 }
 
 export interface CommissionLedger {
-  module?: 'events' | 'movies' | string;
+  module?: 'all' | 'events' | 'movies' | string;
   group_by: string;
   rows: CommissionLedgerRow[];
   totals: {
@@ -1948,6 +1952,10 @@ export interface CommissionLedger {
     organizer_payout: number | string;
     cinema_payable?: number | string;
     grand_total: number | string;
+  };
+  breakdown?: {
+    events?: CommissionLedger['totals'];
+    movies?: CommissionLedger['totals'];
   };
 }
 
@@ -4629,6 +4637,7 @@ export const api = createApi({
         end_date?: string;
         title?: string;
         banner_image_url?: string;
+        slider_accent_text?: string;
         cta_url?: string;
         category?: string;
         target_type?: string;
@@ -4678,6 +4687,7 @@ export const api = createApi({
         plan_id: number;
         title: string;
         banner_image_url?: string;
+        slider_accent_text?: string;
         cta_url?: string;
         category?: string;
         target_type?: string;
@@ -4701,6 +4711,7 @@ export const api = createApi({
         campaignId: number;
         title: string;
         banner_image_url?: string;
+        slider_accent_text?: string;
         cta_url?: string;
         target_type?: string;
         target_id?: string;
@@ -4765,8 +4776,8 @@ export const api = createApi({
       {
         from?: string;
         to?: string;
-        group_by?: 'event' | 'movie' | 'business' | 'date' | 'customer';
-        module?: 'events' | 'movies';
+        group_by?: 'event' | 'movie' | 'item' | 'business' | 'date' | 'customer';
+        module?: 'all' | 'events' | 'movies';
       } | void
     >({
       query: (params) => {

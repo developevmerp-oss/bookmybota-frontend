@@ -12,11 +12,11 @@ import {
 import "./AdaptiveCardRow.css";
 
 type AdaptiveCardContextValue = {
-  /** True when item count is below desktop minVisible — stretch width, cap media height. */
+  /** @deprecated Kept for callers; cards no longer stretch when sparse. */
   fluid: boolean;
-  /** 1–2 cards: landscape poster. 3+ cards: portrait. */
+  /** @deprecated Kept for callers; posters stay portrait at all counts. */
   horizontal: boolean;
-  /** Columns used for layout (1–minVisible). */
+  /** Desktop target columns (minVisible). */
   columns: number;
   minVisible: number;
   /** True when more items than desktop minVisible — extra cards scroll. */
@@ -40,10 +40,10 @@ type AdaptiveCardRowProps = {
 
 /**
  * Landing-page card row (responsive):
- * - Phone: 2 cards in view (1 card = full width).
+ * - Phone: 2 cards in view.
  * - Tablet: 3 cards in view.
- * - Desktop: 5 cards in view.
- * - Fewer items than the current breakpoint fill the row equally.
+ * - Desktop: minVisible cards in view (default 5).
+ * - Fewer items keep the same card width (empty space on the right).
  */
 export default function AdaptiveCardRow({
   children,
@@ -59,11 +59,10 @@ export default function AdaptiveCardRow({
 
   const ctx = useMemo<AdaptiveCardContextValue>(() => {
     const scrollable = count > minVisible;
-    const columns = Math.min(Math.max(count, 1), minVisible);
     return {
-      fluid: count > 0 && count < minVisible,
-      horizontal: count === 1 || count === 2,
-      columns,
+      fluid: false,
+      horizontal: false,
+      columns: minVisible,
       minVisible,
       scrollable,
     };

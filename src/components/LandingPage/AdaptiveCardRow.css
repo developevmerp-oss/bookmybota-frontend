@@ -31,12 +31,14 @@
   }
 }
 
+/* Always use the breakpoint card width — fewer items leave empty space on the right
+   instead of stretching 1–2 cards across the full row. */
 .adaptive-card-slot {
   min-width: 0;
   scroll-snap-align: start;
   flex: 0 0
     calc(
-      (100% - (min(var(--adaptive-count), var(--adaptive-visible)) - 1) * var(--adaptive-gap)) /
-        min(var(--adaptive-count), var(--adaptive-visible))
+      (100% - (var(--adaptive-visible) - 1) * var(--adaptive-gap)) /
+        var(--adaptive-visible)
     );
 }

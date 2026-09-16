@@ -221,6 +221,11 @@ export const eventDraftSchema = yup.object({
   promo_plan_id: yup.string().trim().default(''),
   promo_title: yup.string().trim().default(''),
   promo_banner_url: yup.string().trim().default(''),
+  promo_slider_accent_text: yup
+    .string()
+    .trim()
+    .max(40, 'Accent text must be at most 40 characters.')
+    .default(''),
   promo_start_date: yup.string().trim().default(''),
   promo_landing_slider: yup.boolean().default(false),
   languages: yup.array().of(yup.string().required()).default([]),
@@ -424,6 +429,7 @@ export function defaultEventFormValues(): EventFormValues {
     promo_plan_id: '',
     promo_title: '',
     promo_banner_url: '',
+    promo_slider_accent_text: '',
     promo_start_date: '',
     promo_landing_slider: false,
     languages: [],

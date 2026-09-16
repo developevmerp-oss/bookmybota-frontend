@@ -64,10 +64,31 @@ export function formatMoneyDisplay(
 /** Dining budget tier labels (low → high) */
 export const PRICE_TIERS = ['Br', 'Br Br', 'Br Br Br', 'Br Br Br Br'] as const;
 
-/** Convert legacy ₹ tier strings stored in DB to Br tiers */
+/**
+ * Convert legacy ₹ / compacted Br tier strings to spaced Br labels.
+ * e.g. "₹₹₹" | "BrBrBr" → "Br Br Br"
+ */
 export function normalizePriceRange(range?: string | null): string {
   if (!range) return '';
-  return range.replace(/₹/g, 'Br');
+  const spaced = range.replace(/\s+/g, ' ').trim();
+  if (!spaced) return '';
+  if ((PRICE_TIERS as readonly string[]).includes(spaced)) return spaced;
+
+  const compact = spaced.replace(/\s+/g, '');
+  let count = 0;
+  if (/^[₹$€£¥]+$/.test(compact)) count = compact.length;
+  else if (/^(Br)+$/i.test(compact)) count = compact.length / 2;
+  else if (/^Br(\s+Br)+$/i.test(spaced)) {
+    return spaced.replace(/\s+/g, ' ');
+  }
+
+  if (count >= 1 && count <= 4) return PRICE_TIERS[count - 1];
+
+  return spaced
+    .replace(/₹/g, 'Br')
+    .replace(/(Br)(?=Br)/gi, '$1 ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function getCostForTwoFromRange(priceRange?: string | null): string {

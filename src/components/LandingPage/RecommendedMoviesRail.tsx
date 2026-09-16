@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clapperboard } from "lucide-react";
 import { useGetPublicMoviesQuery, type Movie } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
@@ -13,7 +13,7 @@ import {
   isMoviePromoted,
   parseLanguageList,
 } from "@/lib/movieDisplay";
-import AdaptiveCardRow, { useAdaptiveCard } from "./AdaptiveCardRow";
+import AdaptiveCardRow from "./AdaptiveCardRow";
 import "./RecommendedMoviesRail.css";
 
 const MIN_VISIBLE = 5;
@@ -59,40 +59,29 @@ function mapShowcaseMovie(movie: ShowcaseMovieCard): RailMovieCard {
   };
 }
 
-/** Match EventPosterCard media sizing on landing sports/event rails. */
-function moviePosterMediaClass(fluid: boolean, horizontal: boolean, columns: number) {
-  if (horizontal && columns === 1) {
-    return "h-[130px] sm:h-[150px] md:h-[170px] lg:h-[300px] w-full";
-  }
-  if (horizontal) return "aspect-[16/9] w-full";
-  if (fluid) return "aspect-[3/4] w-full max-h-[280px]";
-  return "aspect-[3/4] w-full";
-}
-
 function MovieCard({ movie }: { movie: RailMovieCard }) {
-  const adaptive = useAdaptiveCard();
-  const fluid = adaptive?.fluid ?? false;
-  const horizontal = adaptive?.horizontal ?? false;
-  const columns = adaptive?.columns ?? MIN_VISIBLE;
+  const [imgFailed, setImgFailed] = useState(false);
   const meta = formatMovieCardMeta(movie.certification, movie.languages);
+  const showPoster = Boolean(movie.poster) && !imgFailed;
 
   return (
     <Link href={movie.href} className={`group block h-full w-full ${cardShell}`}>
       <article className="flex h-full flex-col">
-        <div
-          className={`relative ${moviePosterMediaClass(fluid, horizontal, columns)} overflow-hidden bg-[#F3F4F6]`}
-        >
-          {movie.poster ? (
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#F3F4F6]">
+          {showPoster ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={movie.poster}
-              alt={movie.title}
+              alt=""
               className="w-full h-full object-cover object-top group-hover:scale-[1.04] transition-transform duration-500 ease-out"
               loading="lazy"
               draggable={false}
+              onError={() => setImgFailed(true)}
             />
           ) : (
-            <div className="w-full h-full bg-slate-200" />
+            <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+              <Clapperboard size={32} strokeWidth={1.4} />
+            </div>
           )}
           {movie.promoted ? (
             <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
@@ -101,13 +90,13 @@ function MovieCard({ movie }: { movie: RailMovieCard }) {
             <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
           ) : null}
         </div>
-        <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">
+        <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
           <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
             {movie.title}
           </h3>
-          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">
-            {meta || "\u00A0"}
-          </p>
+          {meta ? (
+            <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">{meta}</p>
+          ) : null}
         </div>
       </article>
     </Link>
@@ -144,7 +133,12 @@ export default function RecommendedMoviesRail() {
   const apiMovies = (data?.items ?? []).map(mapApiMovie);
   const useStatic = !isLoading && apiMovies.length === 0;
   const items = useStatic ? SHOWCASE_MOVIE_CARDS.map(mapShowcaseMovie) : apiMovies;
-  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [items.length, useStatic, isLoading, city]);
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [
+    items.length,
+    useStatic,
+    isLoading,
+    city,
+  ]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -186,9 +180,12 @@ export default function RecommendedMoviesRail() {
           {isLoading ? (
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
-                <div key={i} className="w-full overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white">
+                <div
+                  key={i}
+                  className="w-full overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white"
+                >
                   <div className="aspect-[3/4] w-full bg-[#F7F7F7]" />
-                  <div className="px-3.5 pt-3.5 pb-4 space-y-2">
+                  <div className="px-3 pt-3 pb-3.5 space-y-2">
                     <div className="h-4 w-4/5 rounded bg-[#F7F7F7]" />
                     <div className="h-3.5 w-3/5 rounded bg-[#F7F7F7]" />
                   </div>

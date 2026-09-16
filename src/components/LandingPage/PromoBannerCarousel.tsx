@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Navigation, Pagination } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import "swiper/css/pagination";
-import { useGetActiveMarketingPromotionsQuery } from "@/services/api";
+import type { Business, MarketingCampaign, Movie, PublicEvent } from "@/services/api";
+import {
+  useGetActiveMarketingPromotionsQuery,
+  useGetPublicMoviesQuery,
+} from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { promotionClickHref } from "@/lib/promotionCta";
 import { useHomeCatalog } from "./useHomeCatalog";
-import { eventLandscape } from "./homeUtils";
+import { eventLandscape, eventPortrait, hasCityFilter } from "./homeUtils";
 import "./PromoBannerCarousel.css";
 
 type PromoBannerCarouselProps = {
@@ -22,47 +26,399 @@ type PromoBannerCarouselProps = {
 type Slide = {
   id: string;
   title: string;
+  year?: string;
+  tagline?: string;
   image: string;
   href: string;
-  badge?: string;
+  badge: string;
+  dateLabel?: string;
+  weekdayLabel?: string;
+  cityLabel?: string;
+  placeLabel?: string;
+  /** Right-side script — always from promotion / linked entity data */
+  accent?: string;
+  /** True when slide uses a designed promo banner creative */
+  designed?: boolean;
+  cta: string;
 };
 
+function categoryBadge(category?: string, fallback = "EVENT") {
+  const key = (category || "").toUpperCase();
+  if (!key || key === "ALL" || key === "EVENTS") return fallback;
+  if (key === "MOVIES") return "MOVIE";
+  return key;
+}
+
+function ctaFor(category?: string, targetType?: string) {
+  const key = (category || targetType || "").toUpperCase();
+  if (key === "DINING" || key === "RESTAURANT" || key === "BUSINESS") return "Reserve Now";
+  if (key === "MOVIES" || key === "MOVIE") return "Book Now";
+  return "Book Tickets";
+}
+
+function splitTitleYear(name: string, iso?: string) {
+  const match = name.match(/^(.*?)[\s,:-]*((?:19|20)\d{2})\s*$/);
+  if (match) return { title: match[1].trim() || name, year: match[2] };
+  if (iso) {
+    const y = new Date(iso).getFullYear();
+    if (!Number.isNaN(y)) return { title: name, year: String(y) };
+  }
+  return { title: name, year: undefined };
+}
+
+function formatSlideDate(iso?: string) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return {
+    dateLabel: d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+    weekdayLabel: d.toLocaleDateString("en-US", { weekday: "long" }),
+  };
+}
+
+function normalizePhrase(value?: string | null) {
+  return (value || "").replace(/\s+/g, " ").trim();
+}
+
+function shortAbout(about?: string | null, excludeName?: string) {
+  const raw = normalizePhrase(about);
+  if (!raw) return undefined;
+  const name = normalizePhrase(excludeName).toLowerCase();
+  if (name && raw.toLowerCase() === name) return undefined;
+  if (name && raw.toLowerCase().startsWith(name) && raw.length - name.length < 8) return undefined;
+  return raw.length > 56 ? `${raw.slice(0, 53).trim()}…` : raw;
+}
+
+/**
+ * Right-side script text — only from partner-entered slider_accent_text.
+ * Never invents fallback copy when the field is empty.
+ */
+function accentFromPromo(raw?: string | null) {
+  const text = (raw || "").replace(/\s+/g, " ").trim();
+  return text || undefined;
+}
+
+function taglineVisible(slide: Slide) {
+  if (!slide.tagline?.trim()) return false;
+  const t = slide.tagline.trim().toLowerCase().replace(/\s+/g, " ");
+  const title = slide.title.trim().toLowerCase();
+  const withYear = `${title} ${slide.year || ""}`.trim().toLowerCase();
+  if (t === title || t === withYear) return false;
+  if (withYear.includes(t) && t.length <= withYear.length) return false;
+  if (t.includes(title) && Math.abs(t.length - withYear.length) < 8) return false;
+  return true;
+}
+
+function eventToSlide(event: PublicEvent, city: string): Slide {
+  const when = formatSlideDate(event.next_showtime);
+  const { title, year } = splitTitleYear(event.name, event.next_showtime);
+  const cityLabel = event.city_name?.trim() || (city && city !== "All Cities" ? city : "");
+  const placeLabel = event.venue_name?.trim() || "";
+
+  return {
+    id: `event-${event.id}`,
+    title,
+    year,
+    tagline: shortAbout(event.about_event, event.name) ||
+      (event.category_name ? `${event.category_name} • Live near you` : undefined),
+    image: eventLandscape(event) || eventPortrait(event),
+    href: `/events/${event.id}`,
+    badge: categoryBadge(event.category_slug || event.category_name, "EVENT"),
+    dateLabel: when?.dateLabel,
+    weekdayLabel: when?.weekdayLabel,
+    cityLabel: cityLabel || placeLabel || undefined,
+    placeLabel: cityLabel ? placeLabel || undefined : undefined,
+    accent: undefined,
+    designed: false,
+    cta: "Book Tickets",
+  };
+}
+
+function movieToSlide(movie: Movie): Slide {
+  const when = formatSlideDate(movie.release_date || undefined);
+  const { title, year } = splitTitleYear(movie.title, movie.release_date || undefined);
+  const genre = movie.genres?.[0];
+
+  return {
+    id: `movie-${movie.id}`,
+    title,
+    year,
+    tagline: shortAbout(movie.description, movie.title) ||
+      (genre ? `${genre} • Now on screen` : undefined),
+    image: resolveMediaUrl(movie.banner_url || movie.poster_url || ""),
+    href: `/movies/${movie.id}`,
+    badge: "MOVIE",
+    dateLabel: when?.dateLabel,
+    weekdayLabel: when?.weekdayLabel,
+    accent: undefined,
+    designed: false,
+    cta: "Book Now",
+  };
+}
+
+function diningToSlide(place: Business, city: string): Slide {
+  const cityLabel =
+    place.city_name?.trim() || (city && city !== "All Cities" ? city : "");
+  const title = place.name;
+
+  return {
+    id: `dining-${place.id}`,
+    title,
+    tagline: shortAbout(place.description, place.name) || "Reserve your table",
+    image: resolveMediaUrl(place.cover_image_url || ""),
+    href: `/restaurant/${place.id}`,
+    badge: "DINING",
+    cityLabel: cityLabel || undefined,
+    placeLabel: place.address?.split(",")[0]?.trim() || undefined,
+    accent: undefined,
+    designed: false,
+    cta: "Reserve Now",
+  };
+}
+
+function promoToSlide(
+  promo: MarketingCampaign,
+  ctx: {
+    city: string;
+    eventsById: Map<string, PublicEvent>;
+    moviesById: Map<string, Movie>;
+    diningById: Map<string, Business>;
+  }
+): Slide {
+  const banner = resolveMediaUrl(promo.banner_image_url || "");
+  const designed = Boolean(banner);
+  const href = promotionClickHref(promo) || categoryFallbackHref(promo.category);
+  const targetType = String(promo.target_type || "").toUpperCase();
+  const targetId = promo.target_id ? String(promo.target_id) : "";
+
+  const linkedEvent =
+    targetType === "EVENT" && targetId ? ctx.eventsById.get(targetId) : undefined;
+  const linkedMovie =
+    targetType === "MOVIE" && targetId ? ctx.moviesById.get(targetId) : undefined;
+  const linkedDining =
+    (targetType === "RESTAURANT" || targetType === "BUSINESS") && targetId
+      ? ctx.diningById.get(targetId) || ctx.diningById.get(String(promo.business_id || ""))
+      : targetType === "" && promo.category?.toUpperCase() === "DINING"
+        ? ctx.diningById.get(String(promo.business_id || ""))
+        : undefined;
+
+  // Base from linked entity when available
+  let base: Slide | null = null;
+  if (linkedEvent) base = eventToSlide(linkedEvent, ctx.city);
+  else if (linkedMovie) base = movieToSlide(linkedMovie);
+  else if (linkedDining) base = diningToSlide(linkedDining, ctx.city);
+
+  const promoTitle = normalizePhrase(promo.title) || normalizePhrase(promo.plan_name) || "Featured";
+  const { title: splitTitle, year: splitYear } = splitTitleYear(
+    promoTitle,
+    linkedEvent?.next_showtime
+  );
+
+  // Prefer promotion title when organizer set one; keep linked meta (date/place)
+  const title = base && !promo.title ? base.title : splitTitle;
+  const year = base?.year || splitYear;
+
+  const accent = accentFromPromo(promo.slider_accent_text);
+
+  return {
+    id: `promo-${promo.id}`,
+    title,
+    year,
+    tagline:
+      shortAbout(base?.tagline, title) ||
+      (promo.plan_name && promo.title && promo.plan_name !== promo.title
+        ? normalizePhrase(promo.plan_name)
+        : undefined) ||
+      base?.tagline,
+    // Slider API requires banner — always prefer the promotion creative
+    image: banner || base?.image || "",
+    href,
+    badge: categoryBadge(promo.category || base?.badge, base?.badge || "EVENT"),
+    dateLabel: base?.dateLabel,
+    weekdayLabel: base?.weekdayLabel,
+    cityLabel: base?.cityLabel,
+    placeLabel: base?.placeLabel,
+    // Partner-entered accent text from promotion purchase
+    accent,
+    designed,
+    cta: ctaFor(promo.category, promo.target_type),
+  };
+}
+
+function SlideCard({ slide }: { slide: Slide }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(slide.image) && !failed;
+  const hasMeta = Boolean(slide.dateLabel || slide.cityLabel);
+  const showTagline = taglineVisible(slide);
+  const showAccent = Boolean(slide.accent?.trim());
+  const isDesignedPoster = Boolean(slide.designed && showImage);
+
+  return (
+    <>
+      <div className="absolute inset-0">
+        {showImage ? (
+          <img
+            src={slide.image}
+            alt=""
+            aria-hidden
+            className={`promo-slide-photo h-full w-full object-cover ${
+              isDesignedPoster ? "promo-slide-photo--designed" : ""
+            }`}
+            draggable={false}
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <div className="h-full w-full promo-slide-fallback" aria-hidden />
+        )}
+        <div
+          className={`pointer-events-none absolute inset-0 ${
+            isDesignedPoster
+              ? "promo-slide-scrim-designed"
+              : showImage
+                ? "promo-slide-scrim-poster"
+                : "promo-slide-scrim"
+          }`}
+        />
+      </div>
+
+      {showAccent ? (
+        <div className="promo-accent-wrap pointer-events-none absolute z-[3] hidden sm:block" aria-hidden>
+          <span className="promo-accent-glow" />
+          <span className="promo-accent-script">{slide.accent}</span>
+        </div>
+      ) : null}
+
+      <div
+        className={`relative z-[2] flex h-full flex-col justify-center pl-5 pr-2 sm:pl-7 sm:pr-4 md:pl-9 md:pr-6 pb-6 sm:pb-8 ${
+          isDesignedPoster
+            ? "max-w-[52%] sm:max-w-[46%] md:max-w-[42%]"
+            : "max-w-[58%] sm:max-w-[52%] md:max-w-[48%] lg:max-w-[46%]"
+        }`}
+      >
+        <span className="w-fit mb-2 sm:mb-2.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full bg-[#6900AA] text-white shadow-sm">
+          {slide.badge}
+        </span>
+
+        <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-[2rem] font-extrabold leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] line-clamp-2">
+          {slide.title}
+          {slide.year ? (
+            <>
+              {" "}
+              <span className="promo-year-gradient">{slide.year}</span>
+            </>
+          ) : null}
+        </h2>
+
+        {showTagline ? (
+          <p className="mt-1 sm:mt-1.5 text-white/75 text-[11px] sm:text-sm font-medium line-clamp-1">
+            {slide.tagline}
+          </p>
+        ) : null}
+
+        {hasMeta ? (
+          <div className="mt-3 sm:mt-4 flex items-center gap-3 sm:gap-4 text-white">
+            {slide.dateLabel ? (
+              <div className="flex items-start gap-2 min-w-0">
+                <CalendarDays className="mt-0.5 shrink-0 text-white/80" size={16} strokeWidth={2} />
+                <div className="min-w-0 leading-tight">
+                  <p className="text-[12px] sm:text-sm font-semibold truncate">{slide.dateLabel}</p>
+                  {slide.weekdayLabel ? (
+                    <p className="text-[10px] sm:text-xs text-white/65">{slide.weekdayLabel}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {slide.dateLabel && slide.cityLabel ? (
+              <span className="hidden sm:block w-px h-8 bg-white/30 shrink-0" aria-hidden />
+            ) : null}
+
+            {slide.cityLabel ? (
+              <div className="hidden sm:flex items-start gap-2 min-w-0">
+                <MapPin className="mt-0.5 shrink-0 text-white/80" size={16} strokeWidth={2} />
+                <div className="min-w-0 leading-tight">
+                  <p className="text-[12px] sm:text-sm font-semibold truncate">{slide.cityLabel}</p>
+                  {slide.placeLabel ? (
+                    <p className="text-[10px] sm:text-xs text-white/65 truncate">{slide.placeLabel}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        <span className="promo-cta-btn mt-3.5 sm:mt-5 inline-flex w-fit items-center gap-1.5 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 text-[12px] sm:text-sm font-bold text-white shadow-[0_8px_20px_rgba(236,72,153,0.35)] transition-transform duration-200 group-hover:scale-[1.03]">
+          {slide.cta}
+          <ArrowRight size={15} strokeWidth={2.5} />
+        </span>
+      </div>
+    </>
+  );
+}
+
 export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) {
-  const { bannerEvents, isLoadingEvents, isLoadingFallback } = useHomeCatalog(city);
+  const { bannerEvents, events, fallbackEvents, dining, isLoadingEvents, isLoadingFallback } =
+    useHomeCatalog(city);
+  const hasCity = hasCityFilter(city);
+  const { data: moviesData, isLoading: loadingMovies } = useGetPublicMoviesQuery({
+    limit: 50,
+    ...(hasCity ? { city } : {}),
+  });
   const { data: promotions = [], isLoading: loadingPromos } = useGetActiveMarketingPromotionsQuery({
     surface: "slider",
   });
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
 
+  const eventsById = useMemo(() => {
+    const map = new Map<string, PublicEvent>();
+    for (const list of [bannerEvents, events, fallbackEvents]) {
+      for (const e of list) map.set(String(e.id), e);
+    }
+    return map;
+  }, [bannerEvents, events, fallbackEvents]);
+
+  const moviesById = useMemo(() => {
+    const map = new Map<string, Movie>();
+    for (const m of moviesData?.items || []) map.set(String(m.id), m);
+    return map;
+  }, [moviesData?.items]);
+
+  const diningById = useMemo(() => {
+    const map = new Map<string, Business>();
+    for (const d of dining) map.set(String(d.id), d);
+    return map;
+  }, [dining]);
+
   const slides = useMemo<Slide[]>(() => {
+    // Priority 1: live landing-slider promotions (dynamic)
     if (promotions.length > 0) {
-      return promotions.slice(0, 10).map((p) => ({
-        id: String(p.id),
-        title: p.title || p.plan_name || "Promotion",
-        image: resolveMediaUrl(p.banner_image_url || ""),
-        href: promotionClickHref(p) || categoryFallbackHref(p.category),
-        badge: p.category && p.category !== "ALL" ? p.category : undefined,
-      }));
+      return promotions
+        .slice(0, 10)
+        .map((p) =>
+          promoToSlide(p, { city, eventsById, moviesById, diningById })
+        )
+        .filter((s) => s.image || s.title);
     }
 
-    return bannerEvents.slice(0, 5).map((event) => ({
-      id: event.id,
-      title: event.name,
-      image: eventLandscape(event),
-      href: `/events/${event.id}`,
-      badge: "EVENTS",
-    }));
-  }, [promotions, bannerEvents]);
+    // Priority 2: fallback events when no promotions are active
+    return bannerEvents.slice(0, 8).map((event) => eventToSlide(event, city));
+  }, [promotions, bannerEvents, city, eventsById, moviesById, diningById]);
 
   const loading =
-    loadingPromos || (promotions.length === 0 && (isLoadingEvents || (slides.length === 0 && isLoadingFallback)));
+    loadingPromos ||
+    (promotions.length === 0 &&
+      (isLoadingEvents || loadingMovies || (slides.length === 0 && isLoadingFallback)));
 
   if (loading) {
     return (
-      <section className="bg-white w-full">
-        <div className="relative h-[200px] sm:h-[270px] md:h-[320px] lg:h-[380px] xl:h-[420px] w-full">
-          <div className="h-full w-full bg-[#F7F7F7]" />
+      <section className="promo-banner-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4">
+        <div className="mx-auto w-[92%] sm:w-[88%] md:w-[86%] lg:w-[82%] max-w-[1180px]">
+          <div className="promo-banner-frame rounded-2xl sm:rounded-3xl overflow-hidden promo-slide-skeleton" />
         </div>
       </section>
     );
@@ -71,24 +427,36 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
   if (slides.length === 0) return null;
 
   const multi = slides.length > 1;
+  // Peek + slidesPerView:"auto" needs enough slides for loop clones;
+  // otherwise Swiper warns and disables loop. Use rewind when short.
+  const canLoop = slides.length >= 4;
 
   return (
-    <section className="promo-banner-swiper bg-white w-full overflow-hidden">
-      <div className="relative h-[200px] sm:h-[270px] md:h-[320px] lg:h-[380px] xl:h-[420px] w-full">
+    <section className="promo-banner-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4">
+      <div className="relative w-full">
         <Swiper
-          key={`promo-auto-${slides.map((s) => s.id).join("-")}`}
+          key={`promo-dyn-${slides.map((s) => s.id).join("-")}`}
           modules={[Autoplay, Navigation, Pagination]}
-          className="h-full w-full"
-          loop={multi}
-          speed={700}
+          className="promo-banner-peek w-full"
+          loop={canLoop}
+          rewind={multi && !canLoop}
+          loopAdditionalSlides={canLoop ? 2 : 0}
+          speed={600}
+          centeredSlides
           grabCursor
           allowTouchMove
-          slidesPerView={1}
-          spaceBetween={0}
+          slidesPerView="auto"
+          spaceBetween={14}
+          watchSlidesProgress
+          breakpoints={{
+            640: { spaceBetween: 16 },
+            768: { spaceBetween: 18 },
+            1024: { spaceBetween: 20 },
+          }}
           autoplay={
             multi
               ? {
-                  delay: 4000,
+                  delay: 5000,
                   disableOnInteraction: false,
                   pauseOnMouseEnter: true,
                   stopOnLastSlide: false,
@@ -127,22 +495,14 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
           }}
         >
           {slides.map((slide) => (
-            <SwiperSlide key={slide.id} className="h-full">
-              <div className="h-full w-full relative">
-                <Link href={slide.href} className="block h-full w-full overflow-hidden bg-[#111111]">
-                  <img
-                    src={slide.image}
-                    alt={slide.title}
-                    className="h-full w-full object-cover"
-                    draggable={false}
-                  />
-                </Link>
-                {slide.badge ? (
-                  <span className="pointer-events-none absolute top-3 left-3 z-[1] text-[10px] sm:text-xs font-bold uppercase tracking-wide px-2.5 py-1 rounded-md bg-white/95 text-[#6900AA] shadow-sm">
-                    {slide.badge}
-                  </span>
-                ) : null}
-              </div>
+            <SwiperSlide key={slide.id} className="promo-banner-slide">
+              <Link
+                href={slide.href}
+                aria-label={`${slide.title}${slide.year ? ` ${slide.year}` : ""}`}
+                className="promo-banner-card group relative flex h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
+              >
+                <SlideCard slide={slide} />
+              </Link>
             </SwiperSlide>
           ))}
         </Swiper>
@@ -153,17 +513,17 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
               ref={prevRef}
               type="button"
               aria-label="Previous banner"
-              className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/90 text-[#333] shadow flex items-center justify-center cursor-pointer hover:bg-white"
+              className="promo-nav-btn promo-nav-prev"
             >
-              <ChevronLeft size={20} />
+              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.25} />
             </button>
             <button
               ref={nextRef}
               type="button"
               aria-label="Next banner"
-              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/90 text-[#333] shadow flex items-center justify-center cursor-pointer hover:bg-white"
+              className="promo-nav-btn promo-nav-next"
             >
-              <ChevronRight size={20} />
+              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.25} />
             </button>
           </>
         )}

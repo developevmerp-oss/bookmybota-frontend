@@ -264,6 +264,7 @@ export default function PartnerPromotionsPage({
       plan_id: String(camp.plan_id),
       title: camp.title || camp.plan_name || "",
       banner_image_url: camp.banner_image_url || "",
+      slider_accent_text: camp.slider_accent_text || "",
       target_type: nextTarget as PartnerPromotionsFormValues["target_type"],
       target_id: camp.target_id || "",
       start_date: /^\d{4}-\d{2}-\d{2}$/.test(startRaw)
@@ -299,6 +300,7 @@ export default function PartnerPromotionsPage({
     const payload = {
       title: values.title.trim(),
       banner_image_url: values.banner_image_url || undefined,
+      slider_accent_text: values.slider_accent_text?.trim() || "",
       start_date: values.start_date,
       target_type:
         module === "DINING" && values.target_type === "BUSINESS" ? "RESTAURANT" : values.target_type,
@@ -446,6 +448,26 @@ export default function PartnerPromotionsPage({
           {errors.banner_image_url && (
             <p className={fieldErrorClass}>{errors.banner_image_url.message}</p>
           )}
+
+          <div className="space-y-1.5 pt-1">
+            <label className={`font-semibold text-slate-600 ${isDining ? "text-sm" : "text-xs"}`}>
+              Slider accent text{" "}
+              <span className="font-medium text-slate-400">(optional)</span>
+            </label>
+            <input
+              {...register("slider_accent_text")}
+              maxLength={40}
+              placeholder='e.g. "Feel The Beat"'
+              className={inputClass}
+            />
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Optional. If filled, this phrase appears on the right side of the home hero slider.
+              Leave blank to hide that text.
+            </p>
+            {errors.slider_accent_text && (
+              <p className={fieldErrorClass}>{errors.slider_accent_text.message}</p>
+            )}
+          </div>
         </div>
       ) : null}
 

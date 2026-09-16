@@ -1,14 +1,14 @@
 "use client";
 
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Building2, Calendar, Star } from "lucide-react";
+import { Building2, Calendar, Star, Utensils } from "lucide-react";
 import type { Business, PublicEvent, PublicRegisteredPartner } from "@/services/api";
 import { useGetPublicEventQuery } from "@/services/api";
 import { normalizePriceRange } from "@/lib/currencyFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
   eventPortrait,
-  eventLandscape,
   eventPlaceLine,
   eventDateParts,
   localityFromAddress,
@@ -16,24 +16,47 @@ import {
 } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 
-/** 1 card: full-width landscape, shorter than before. 2 cards: 16/9. 3+: portrait. */
-function posterMediaClass(fluid: boolean, horizontal: boolean, columns: number) {
-  if (horizontal && columns === 1) {
-    return "h-[130px] sm:h-[150px] md:h-[170px] lg:h-[300px] w-full";
-  }
-  if (horizontal) return "aspect-[16/9] w-full";
-  // Match event vertical poster crop (2:3)
-  if (fluid) return "aspect-[2/3] w-full max-h-[280px]";
-  return "aspect-[2/3] w-full";
-}
-
-function diningMediaClass(columns = 0) {
-  if (columns === 1) return "h-[130px] sm:h-[150px] md:h-[170px] lg:h-[300px] w-full";
-  return "aspect-[4/3] w-full";
-}
+const POSTER_MEDIA = "aspect-[2/3] w-full";
+const DINING_MEDIA = "aspect-[4/3] w-full";
 
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
+
+function MediaFallback({ icon }: { icon: ReactNode }) {
+  return (
+    <div className="flex h-full w-full min-h-full items-center justify-center bg-[#F3F4F6] text-slate-300">
+      {icon}
+    </div>
+  );
+}
+
+/** Cover image that swaps to a placeholder if the URL 404s / is broken. */
+function CoverImage({
+  src,
+  alt,
+  fallback,
+  objectClass = "object-cover",
+}: {
+  src?: string;
+  alt: string;
+  fallback: ReactNode;
+  objectClass?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const url = (src || "").trim();
+  if (!url || failed) return <MediaFallback icon={fallback} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt}
+      className={`w-full h-full ${objectClass} group-hover:scale-[1.04] transition-transform duration-500 ease-out`}
+      loading="lazy"
+      draggable={false}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 function DateBadge({ iso }: { iso?: string }) {
   const parts = eventDateParts(iso);
@@ -53,6 +76,27 @@ function DateBadge({ iso }: { iso?: string }) {
   );
 }
 
+function diningMetaLine(place: Business): string {
+  const cuisineParts = (place.cuisine || "")
+    .split(/[·|,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((p) => !/^(Br)+$/i.test(p.replace(/\s+/g, "")) && !/^₹+$/.test(p));
+
+  const type = place.type_name?.trim() || "";
+  const price = normalizePriceRange(place.price_range);
+
+  const parts: string[] = [];
+  for (const part of cuisineParts) {
+    if (!parts.some((p) => p.toLowerCase() === part.toLowerCase())) parts.push(part);
+  }
+  if (type && !parts.some((p) => p.toLowerCase() === type.toLowerCase())) parts.push(type);
+  if (price && !parts.some((p) => p.replace(/\s+/g, "").toLowerCase() === price.replace(/\s+/g, "").toLowerCase())) {
+    parts.push(price);
+  }
+  return parts.slice(0, 3).join(" · ");
+}
+
 export function EventPosterCard({
   event,
   city,
@@ -65,17 +109,13 @@ export function EventPosterCard({
   fullWidth?: boolean;
 }) {
   const adaptive = useAdaptiveCard();
-  const horizontal = Boolean(adaptive?.horizontal);
-  const image = horizontal ? eventLandscape(event) : eventPortrait(event);
+  const image = eventPortrait(event);
   const eventType = event.category_name?.trim();
   const fillSlot = Boolean(adaptive) || fullWidth;
-  const fluid = Boolean(adaptive?.fluid);
-  const columns = adaptive?.columns ?? 0;
   const widthClass = fillSlot
     ? "w-full"
     : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px]";
 
-  // List API may omit venue — resolve from next showtime on public detail.
   const needsVenueLookup = !event.venue_name?.trim();
   const { data: detail } = useGetPublicEventQuery(event.id, { skip: !needsVenueLookup });
   const fromDetail = venueFromEventDetail(needsVenueLookup ? detail : null);
@@ -93,18 +133,12 @@ export function EventPosterCard({
       href={`/events/${event.id}`}
       className={`${widthClass} group block h-full ${cardShell} ${className}`}
     >
-      <div className={`relative ${posterMediaClass(fluid, horizontal, columns)} overflow-hidden bg-[#F3F4F6]`}>
-        {image ? (
-          <img
-            src={image}
-            alt={event.name}
-            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 ease-out"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300">
-            <Calendar size={28} strokeWidth={1.5} />
-          </div>
-        )}
+      <div className={`relative ${POSTER_MEDIA} overflow-hidden bg-[#F3F4F6]`}>
+        <CoverImage
+          src={image}
+          alt={event.name}
+          fallback={<Calendar size={28} strokeWidth={1.5} />}
+        />
         <DateBadge iso={event.next_showtime} />
         {event.is_promoted ? (
           <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#6900AA] shadow-sm">
@@ -113,14 +147,12 @@ export function EventPosterCard({
         ) : null}
       </div>
 
-      <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">
+      <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
         <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
           {event.name}
         </h3>
         {placeLine ? (
-          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">
-            {placeLine}
-          </p>
+          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">{placeLine}</p>
         ) : null}
         {eventType ? (
           <p className="mt-0.5 type-card-caption text-[#6900AA]/80 font-medium line-clamp-1">
@@ -154,9 +186,6 @@ export function ShowcaseEventPosterCard({
 }) {
   const adaptive = useAdaptiveCard();
   const fillSlot = Boolean(adaptive) || fullWidth;
-  const fluid = Boolean(adaptive?.fluid);
-  const horizontal = Boolean(adaptive?.horizontal);
-  const columns = adaptive?.columns ?? 0;
   const widthClass = fillSlot
     ? "w-full"
     : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[210px]";
@@ -166,25 +195,21 @@ export function ShowcaseEventPosterCard({
       href={href}
       className={`${widthClass} group block h-full ${cardShell} ${className}`}
     >
-      <div className={`relative ${posterMediaClass(fluid, horizontal, columns)} overflow-hidden bg-[#F3F4F6]`}>
-        <img
+      <div className={`relative ${POSTER_MEDIA} overflow-hidden bg-[#F3F4F6]`}>
+        <CoverImage
           src={image}
           alt={title}
-          className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 ease-out"
-          loading="lazy"
-          draggable={false}
+          fallback={<Calendar size={28} strokeWidth={1.5} />}
         />
         <DateBadge iso={showDate} />
       </div>
 
-      <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">
+      <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
         <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
           {title}
         </h3>
         {place && (
-          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">
-            {place}
-          </p>
+          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">{place}</p>
         )}
         {eventType && (
           <p className="mt-0.5 type-card-caption text-[#6900AA]/80 font-medium line-clamp-1">
@@ -218,9 +243,6 @@ export function VenuePosterCard({
 }) {
   const adaptive = useAdaptiveCard();
   const fillSlot = Boolean(adaptive);
-  const fluid = Boolean(adaptive?.fluid);
-  const horizontal = Boolean(adaptive?.horizontal);
-  const columns = adaptive?.columns ?? 0;
   const widthClass = fillSlot
     ? "w-full"
     : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px]";
@@ -236,25 +258,15 @@ export function VenuePosterCard({
       className={`${widthClass} group block h-full ${cardShell} ${className}`}
       title={`View ${venue.name} availability and send an inquiry`}
     >
-      <div
-        className={`relative ${posterMediaClass(fluid, horizontal, columns)} overflow-hidden bg-[#F3F4F6]`}
-      >
-        {image ? (
-          <img
-            src={image}
-            alt={venue.name}
-            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 ease-out"
-            loading="lazy"
-            draggable={false}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300">
-            <Building2 size={32} strokeWidth={1.5} />
-          </div>
-        )}
+      <div className={`relative ${POSTER_MEDIA} overflow-hidden bg-[#F3F4F6]`}>
+        <CoverImage
+          src={image}
+          alt={venue.name}
+          fallback={<Building2 size={32} strokeWidth={1.5} />}
+        />
       </div>
 
-      <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">
+      <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
         <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
           {venue.name}
         </h3>
@@ -280,45 +292,36 @@ export function DiningPosterCard({ place }: { place: Business }) {
   const rating = Number(place.rating);
   const showRating = Number.isFinite(rating) && rating > 0;
   const locality = localityFromAddress(place.address);
-  const tags = [place.cuisine, place.type_name, normalizePriceRange(place.price_range)]
-    .filter(Boolean)
-    .filter((v, i, arr) => arr.indexOf(v) === i);
+  const meta = diningMetaLine(place);
   const fillSlot = Boolean(adaptive);
-  const columns = adaptive?.columns ?? 0;
   const widthClass = fillSlot
     ? "w-full"
-    : "snap-start shrink-0 w-[240px] sm:w-[340px] md:w-[355px]";
+    : "snap-start shrink-0 w-[240px] sm:w-[280px] md:w-[300px]";
 
   return (
     <Link href={`/restaurant/${place.id}`} className={`${widthClass} group block h-full ${cardShell}`}>
-      <div className={`${diningMediaClass(columns)} overflow-hidden bg-[#F7F7F7] relative`}>
-        {image ? (
-          <img
-            src={image}
-            alt={place.name}
-            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 ease-out"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center type-card-caption text-[#9A9A9A] px-2 text-center">
-            {place.name}
-          </div>
-        )}
+      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7]`}>
+        <CoverImage
+          src={image}
+          alt={place.name}
+          fallback={<Utensils size={28} strokeWidth={1.5} />}
+        />
         {showRating && (
-          <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1 bg-[#267E3E] text-white type-card-caption font-semibold px-2 py-1 rounded-md shadow-sm">
+          <span className="absolute bottom-2.5 left-2.5 z-[2] inline-flex items-center gap-1 bg-[#267E3E] text-white type-card-caption font-semibold px-2 py-1 rounded-md shadow-sm">
             {rating.toFixed(1)} <Star size={11} fill="currentColor" />
           </span>
         )}
       </div>
-      <div className="px-3.5 pt-3.5 pb-4 flex flex-col gap-1">
+      <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
         <h3 className="type-card-title font-bold text-[#111827] line-clamp-1 group-hover:text-[#6900AA] transition-colors">
           {place.name}
         </h3>
         {locality && (
           <p className="type-card-body text-[#6B6B6B] line-clamp-1">{locality}</p>
         )}
-        {tags.length > 0 && (
-          <p className="type-card-caption text-[#9A9A9A] line-clamp-1">{tags.join(" · ")}</p>
-        )}
+        {meta ? (
+          <p className="type-card-caption text-[#9A9A9A] line-clamp-1">{meta}</p>
+        ) : null}
       </div>
     </Link>
   );

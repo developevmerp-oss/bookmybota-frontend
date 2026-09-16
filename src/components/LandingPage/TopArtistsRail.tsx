@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Mic2 } from "lucide-react";
 import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
@@ -44,6 +44,31 @@ function mapShowcaseArtist(artist: ShowcaseArtistCard): RailArtistCard {
   };
 }
 
+function ArtistAvatar({ image }: { image: string }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(image) && !failed;
+
+  if (!showImage) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-[#F7E9FF] text-[#6900AA]">
+        <Mic2 size={32} strokeWidth={1.4} />
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={image}
+      alt=""
+      className="w-full h-full object-cover"
+      loading="lazy"
+      draggable={false}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function ArtistCard({ artist }: { artist: RailArtistCard }) {
   return (
     <Link
@@ -53,20 +78,7 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
     >
       <div className="top-artists-avatar">
         <div className="top-artists-avatar-inner">
-          {artist.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={artist.image}
-              alt={artist.name}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              draggable={false}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-[#F7E9FF] text-[#6900AA]">
-              <Mic2 size={32} strokeWidth={1.4} />
-            </div>
-          )}
+          <ArtistAvatar image={artist.image} />
         </div>
       </div>
       <p className="top-artists-name">{artist.name}</p>
@@ -106,7 +118,10 @@ export default function TopArtistsRail() {
         {isLoading ? (
           <div className="flex gap-4 overflow-hidden py-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex flex-col items-center w-[6.75rem] sm:w-[7.75rem] shrink-0">
+              <div
+                key={i}
+                className="flex flex-col items-center w-[6.75rem] sm:w-[7.75rem] shrink-0"
+              >
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#F7E9FF] animate-pulse" />
                 <div className="mt-3 h-3 w-16 bg-slate-100 rounded animate-pulse" />
                 <div className="mt-2 h-2.5 w-12 bg-slate-50 rounded animate-pulse" />

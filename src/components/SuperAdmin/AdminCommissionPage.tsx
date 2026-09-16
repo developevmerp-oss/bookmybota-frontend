@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Film, Ticket } from "lucide-react";
+import { Film, LayoutGrid, Ticket } from "lucide-react";
 import { useGetCommissionLedgerQuery } from "@/services/api";
 import { formatDate } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
@@ -10,23 +10,34 @@ import { AdminSegmentedTabs } from "@/components/SuperAdmin/AdminFinanceChrome";
 
 const money = formatMoney;
 
-type RevenueModule = "events" | "movies";
-type GroupBy = "event" | "movie" | "business" | "date" | "customer";
+type RevenueModule = "all" | "events" | "movies";
+type GroupBy = "item" | "event" | "movie" | "business" | "date" | "customer";
 
 export default function AdminCommissionPage() {
-  const [moduleTab, setModuleTab] = useState<RevenueModule>("events");
-  const [groupBy, setGroupBy] = useState<GroupBy>("event");
+  const [moduleTab, setModuleTab] = useState<RevenueModule>("all");
+  const [groupBy, setGroupBy] = useState<GroupBy>("item");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  const activeGroupBy: GroupBy =
-    moduleTab === "movies"
-      ? groupBy === "event"
-        ? "movie"
-        : groupBy
-      : groupBy === "movie"
-        ? "event"
-        : groupBy;
+  const isOverview = moduleTab === "all";
+  const isMovies = moduleTab === "movies";
+
+  const activeGroupBy: GroupBy = useMemo(() => {
+    if (isOverview) {
+      if (groupBy === "business" || groupBy === "date" || groupBy === "customer") return groupBy;
+      return "item";
+    }
+    if (isMovies) {
+      if (groupBy === "event" || groupBy === "item") return "movie";
+      return groupBy === "movie" || groupBy === "business" || groupBy === "date" || groupBy === "customer"
+        ? groupBy
+        : "movie";
+    }
+    if (groupBy === "movie" || groupBy === "item") return "event";
+    return groupBy === "event" || groupBy === "business" || groupBy === "date" || groupBy === "customer"
+      ? groupBy
+      : "event";
+  }, [groupBy, isMovies, isOverview]);
 
   const { data, isLoading, isFetching } = useGetCommissionLedgerQuery({
     module: moduleTab,
@@ -36,7 +47,15 @@ export default function AdminCommissionPage() {
   });
 
   const groupOptions = useMemo(() => {
-    if (moduleTab === "movies") {
+    if (isOverview) {
+      return [
+        { key: "item" as const, label: "By item" },
+        { key: "business" as const, label: "By partner" },
+        { key: "customer" as const, label: "By customer" },
+        { key: "date" as const, label: "By date" },
+      ];
+    }
+    if (isMovies) {
       return [
         { key: "movie" as const, label: "By movie" },
         { key: "business" as const, label: "By cinema" },
@@ -50,11 +69,11 @@ export default function AdminCommissionPage() {
       { key: "customer" as const, label: "By customer" },
       { key: "date" as const, label: "By date" },
     ];
-  }, [moduleTab]);
+  }, [isMovies, isOverview]);
 
   const switchModule = (next: RevenueModule) => {
     setModuleTab(next);
-    setGroupBy(next === "movies" ? "movie" : "event");
+    setGroupBy(next === "all" ? "item" : next === "movies" ? "movie" : "event");
   };
 
   if (isLoading) {
@@ -63,13 +82,34 @@ export default function AdminCommissionPage() {
 
   const rows = data?.rows || [];
   const totals = data?.totals;
-  const isMovies = moduleTab === "movies";
-  const partnerLabel = isMovies ? "Cinema payout" : "Organizer payout";
-  const commissionFromLabel = isMovies ? "From cinemas" : "From organizers";
-  const primaryGroup = isMovies ? "movie" : "event";
+  const breakdown = data?.breakdown;
+  const partnerLabel = isOverview
+    ? "Partner payout"
+    : isMovies
+      ? "Cinema payout"
+      : "Organizer payout";
+  const commissionFromLabel = isOverview
+    ? "From all partners"
+    : isMovies
+      ? "From cinemas"
+      : "From organizers";
+  const primaryGroup = isOverview ? "item" : isMovies ? "movie" : "event";
+  const isPrimaryGroup = activeGroupBy === primaryGroup;
 
   const customerContact = (row: (typeof rows)[number]) =>
     [row.guest_phone, row.guest_email].filter(Boolean).join(" · ") || "—";
+
+  const itemTitle = (row: (typeof rows)[number]) =>
+    row.item_name || row.movie_title || row.event_name || "—";
+
+  const sourceLabel = (row: (typeof rows)[number]) =>
+    row.revenue_source === "movies" ? "Movie" : row.revenue_source === "events" ? "Event" : "—";
+
+  const emptyMessage = isOverview
+    ? "No ticket revenue yet. Confirmed event and movie bookings will appear here."
+    : isMovies
+      ? "No movie fee data yet. Bookings will appear once customers purchase movie tickets."
+      : "No fee data yet. Bookings will appear once customers purchase tickets.";
 
   return (
     <div className="w-full space-y-6">
@@ -77,6 +117,7 @@ export default function AdminCommissionPage() {
         <div className="flex flex-wrap items-end justify-between gap-3 w-full">
           <AdminSegmentedTabs
             tabs={[
+              { key: "all", label: "Overview", icon: LayoutGrid },
               { key: "events", label: "Events", icon: Ticket },
               { key: "movies", label: "Movies", icon: Film },
             ]}
@@ -175,30 +216,56 @@ export default function AdminCommissionPage() {
         </div>
       </div>
 
+      {isOverview && breakdown ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 -mt-2">
+          <div className="glass-panel rounded-xl border border-white/5 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs text-zinc-500 uppercase tracking-wider">Events share</p>
+              <p className="text-sm text-zinc-300 mt-0.5">
+                Platform {money(breakdown.events?.platform_earned)} · Payout{" "}
+                {money(breakdown.events?.organizer_payout)}
+              </p>
+            </div>
+            <p className="text-lg font-bold text-emerald-600 tabular-nums">
+              {money(breakdown.events?.ticket_amount)}
+            </p>
+          </div>
+          <div className="glass-panel rounded-xl border border-white/5 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs text-zinc-500 uppercase tracking-wider">Movies share</p>
+              <p className="text-sm text-zinc-300 mt-0.5">
+                Platform {money(breakdown.movies?.platform_earned)} · Payout{" "}
+                {money(breakdown.movies?.organizer_payout)}
+              </p>
+            </div>
+            <p className="text-lg font-bold text-emerald-600 tabular-nums">
+              {money(breakdown.movies?.ticket_amount)}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <p className="text-xs text-zinc-500 -mt-2">
-        Partner promos reduce {isMovies ? "cinema" : "organizer"} payout. Platform (BookMyBota)
-        promos are absorbed by BookMyBota and do not reduce partner payout. Gift cards reduce
-        customer cash only.
+        {isOverview
+          ? "Full BookMyBota ticket revenue across events and movies. Partner promos reduce payout; platform promos are absorbed by BookMyBota; gift cards reduce customer cash only."
+          : `Partner promos reduce ${isMovies ? "cinema" : "organizer"} payout. Platform (BookMyBota) promos are absorbed by BookMyBota and do not reduce partner payout. Gift cards reduce customer cash only.`}
       </p>
 
       {rows.length === 0 ? (
         <div className="glass-panel rounded-2xl border border-white/5 text-center py-10 text-zinc-500">
-          {isMovies
-            ? "No movie fee data yet. Bookings will appear once customers purchase movie tickets."
-            : "No fee data yet. Bookings will appear once customers purchase tickets."}
+          {emptyMessage}
         </div>
       ) : (
         <>
           <div className="admin-card-grid">
             {rows.map((row, idx) => (
-              <article key={row.customer_key || idx} className="admin-data-card">
+              <article
+                key={`${row.revenue_source || ""}-${row.event_id || row.movie_id || row.customer_key || row.business_id || idx}`}
+                className="admin-data-card"
+              >
                 <div className="admin-data-card-header">
-                  {activeGroupBy === primaryGroup && (
-                    <p className="admin-data-card-title">
-                      {isMovies
-                        ? row.movie_title || row.event_name || "—"
-                        : row.event_name || "—"}
-                    </p>
+                  {isPrimaryGroup && (
+                    <p className="admin-data-card-title">{itemTitle(row)}</p>
                   )}
                   {activeGroupBy === "business" && (
                     <p className="admin-data-card-title">
@@ -215,11 +282,17 @@ export default function AdminCommissionPage() {
                   )}
                 </div>
                 <div className="admin-data-card-body">
-                  {activeGroupBy === primaryGroup && (
+                  {isPrimaryGroup && (
                     <>
+                      {isOverview ? (
+                        <div className="admin-data-card-row">
+                          <span className="admin-data-card-label">Source</span>
+                          <div className="admin-data-card-value">{sourceLabel(row)}</div>
+                        </div>
+                      ) : null}
                       <div className="admin-data-card-row">
                         <span className="admin-data-card-label">
-                          {isMovies ? "Cinema" : "Organizer"}
+                          {isOverview ? "Partner" : isMovies ? "Cinema" : "Organizer"}
                         </span>
                         <div className="admin-data-card-value">
                           {row.cinema_name || row.organizer_name || "—"}
@@ -304,20 +377,23 @@ export default function AdminCommissionPage() {
               <table className="w-full text-left min-w-[900px]">
                 <thead className="bg-zinc-900/50 border-b border-white/5 text-zinc-400 text-sm">
                   <tr>
-                    {activeGroupBy === primaryGroup && (
+                    {isPrimaryGroup && (
                       <>
+                        {isOverview ? (
+                          <th className="px-6 py-4 font-medium">Source</th>
+                        ) : null}
                         <th className="px-6 py-4 font-medium">
-                          {isMovies ? "Movie" : "Event"}
+                          {isOverview ? "Item" : isMovies ? "Movie" : "Event"}
                         </th>
                         <th className="px-6 py-4 font-medium">
-                          {isMovies ? "Cinema" : "Organizer"}
+                          {isOverview ? "Partner" : isMovies ? "Cinema" : "Organizer"}
                         </th>
                         <th className="px-6 py-4 font-medium">Rates</th>
                       </>
                     )}
                     {activeGroupBy === "business" && (
                       <th className="px-6 py-4 font-medium">
-                        {isMovies ? "Cinema" : "Organizer"}
+                        {isOverview ? "Partner" : isMovies ? "Cinema" : "Organizer"}
                       </th>
                     )}
                     {activeGroupBy === "customer" && (
@@ -343,16 +419,15 @@ export default function AdminCommissionPage() {
                 <tbody className="divide-y divide-white/5">
                   {rows.map((row, idx) => (
                     <tr
-                      key={row.customer_key || idx}
+                      key={`${row.revenue_source || ""}-${row.event_id || row.movie_id || row.customer_key || row.business_id || idx}`}
                       className="hover:bg-white/5 transition-colors"
                     >
-                      {activeGroupBy === primaryGroup && (
+                      {isPrimaryGroup && (
                         <>
-                          <td className="px-6 py-4 font-medium text-white">
-                            {isMovies
-                              ? row.movie_title || row.event_name || "—"
-                              : row.event_name || "—"}
-                          </td>
+                          {isOverview ? (
+                            <td className="px-6 py-4 text-zinc-400">{sourceLabel(row)}</td>
+                          ) : null}
+                          <td className="px-6 py-4 font-medium text-white">{itemTitle(row)}</td>
                           <td className="px-6 py-4 text-zinc-400">
                             {row.cinema_name || row.organizer_name || "—"}
                           </td>

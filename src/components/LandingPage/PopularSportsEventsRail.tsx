@@ -60,7 +60,7 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
                 <div key={i} className="adaptive-card-slot">
-                  <div className="aspect-[3/4] w-full rounded-xl bg-[#F7F7F7]" />
+                  <div className="aspect-[2/3] w-full rounded-xl bg-[#F7F7F7]" />
                   <div className="mt-3 h-4 w-4/5 rounded bg-[#F7F7F7]" />
                   <div className="mt-2 h-3 w-3/5 rounded bg-[#F7F7F7]" />
                 </div>

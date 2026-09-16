@@ -1,27 +1,332 @@
-.promo-banner-swiper .swiper {
-  height: 100%;
-  width: 100%;
+/* Event hero carousel — mockup-style cards with side peek */
+.promo-banner-swiper {
+  --promo-slide-w: 92%;
+  overflow-x: clip;
 }
 
-.promo-banner-swiper .swiper-slide {
-  height: 100%;
+@media (min-width: 640px) {
+  .promo-banner-swiper {
+    --promo-slide-w: 88%;
+  }
+}
+
+@media (min-width: 768px) {
+  .promo-banner-swiper {
+    --promo-slide-w: 86%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .promo-banner-swiper {
+    --promo-slide-w: 82%;
+  }
+}
+
+@media (min-width: 1280px) {
+  .promo-banner-swiper {
+    --promo-slide-w: 78%;
+  }
+}
+
+.promo-banner-frame,
+.promo-banner-peek.swiper,
+.promo-banner-slide.swiper-slide,
+.promo-banner-card {
+  height: 220px;
+}
+
+@media (min-width: 640px) {
+  .promo-banner-frame,
+  .promo-banner-peek.swiper,
+  .promo-banner-slide.swiper-slide,
+  .promo-banner-card {
+    height: 280px;
+  }
+}
+
+@media (min-width: 768px) {
+  .promo-banner-frame,
+  .promo-banner-peek.swiper,
+  .promo-banner-slide.swiper-slide,
+  .promo-banner-card {
+    height: 320px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .promo-banner-frame,
+  .promo-banner-peek.swiper,
+  .promo-banner-slide.swiper-slide,
+  .promo-banner-card {
+    height: 360px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .promo-banner-frame,
+  .promo-banner-peek.swiper,
+  .promo-banner-slide.swiper-slide,
+  .promo-banner-card {
+    height: 380px;
+  }
+}
+
+.promo-banner-peek.swiper {
+  width: 100%;
+  overflow: visible;
+}
+
+.promo-banner-swiper .swiper-wrapper {
+  align-items: stretch;
+}
+
+.promo-banner-slide.swiper-slide {
+  width: var(--promo-slide-w) !important;
   box-sizing: border-box;
 }
 
+.promo-banner-card {
+  background: #111;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18);
+}
+
+/* Fallback card — full-width scrim */
+.promo-slide-scrim {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(8, 0, 18, 0.92) 0%,
+      rgba(12, 0, 28, 0.78) 28%,
+      rgba(20, 0, 40, 0.35) 55%,
+      rgba(0, 0, 0, 0.12) 78%,
+      rgba(0, 0, 0, 0.28) 100%
+    ),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0%, transparent 42%);
+}
+
+/* Poster artwork — left panel for UI; soft right vignette for floating accent */
+.promo-slide-scrim-poster {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(8, 0, 18, 0.88) 0%,
+      rgba(12, 0, 28, 0.72) 22%,
+      rgba(18, 0, 36, 0.38) 38%,
+      transparent 52%
+    ),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0%, transparent 38%);
+}
+
+/* Designed marketing creatives — light left fade only; keep right art fully visible */
+.promo-slide-scrim-designed {
+  background: linear-gradient(
+    90deg,
+    rgba(8, 0, 18, 0.82) 0%,
+    rgba(12, 0, 28, 0.55) 18%,
+    rgba(12, 0, 28, 0.22) 32%,
+    transparent 48%
+  );
+}
+
+.promo-slide-photo {
+  object-position: 50% 42%;
+}
+
+.promo-slide-photo--designed {
+  object-position: center center;
+}
+
+@media (min-width: 768px) {
+  .promo-slide-photo {
+    object-position: 52% 40%;
+  }
+
+  .promo-slide-photo--designed {
+    object-position: center center;
+  }
+}
+
+.promo-slide-fallback {
+  background:
+    radial-gradient(ellipse 70% 80% at 75% 40%, rgba(157, 0, 255, 0.35), transparent),
+    linear-gradient(120deg, #1a0029 0%, #460071 42%, #6900aa 100%);
+}
+
+.promo-slide-skeleton {
+  background: linear-gradient(110deg, #e8e8e8 8%, #f3f3f3 18%, #e8e8e8 33%);
+  background-size: 200% 100%;
+  animation: promo-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes promo-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.promo-year-gradient {
+  background: linear-gradient(90deg, #ff8a3d 0%, #ff4d8d 55%, #e11d8f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.promo-cta-btn {
+  background: linear-gradient(90deg, #ec4899 0%, #f97316 100%);
+}
+
+/*
+ * Right accent — floating script like the mockup
+ * Soft radial glow only (no hard glass card)
+ */
+.promo-accent-wrap {
+  right: 6%;
+  top: 42%;
+  width: min(36%, 260px);
+  height: 7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-12deg);
+}
+
+@media (min-width: 768px) {
+  .promo-accent-wrap {
+    right: 7%;
+    top: 40%;
+    width: min(34%, 280px);
+    height: 7.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .promo-accent-wrap {
+    right: 8%;
+    top: 38%;
+  }
+}
+
+.promo-accent-glow {
+  position: absolute;
+  inset: 8% 4%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.28) 45%,
+    transparent 72%
+  );
+  filter: blur(2px);
+}
+
+.promo-accent-script {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  font-family: "Segoe Script", "Brush Script MT", "Apple Chancery", "Bradley Hand", cursive;
+  font-size: clamp(1.35rem, 2.6vw, 2.15rem);
+  font-weight: 600;
+  line-height: 1.05;
+  text-align: center;
+  letter-spacing: 0.01em;
+  color: #ffb347;
+  background: linear-gradient(180deg, #ffe0a8 0%, #ffb347 45%, #ff7a2f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(60, 20, 0, 0.55)) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55));
+  white-space: nowrap;
+}
+
+/* Circular glass nav buttons on peek edges */
+.promo-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  cursor: pointer;
+  color: #ffffff;
+  background: rgba(20, 20, 20, 0.45);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .promo-nav-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
+
+.promo-nav-btn:hover {
+  background: rgba(20, 20, 20, 0.65);
+}
+
+.promo-nav-btn.swiper-button-disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Arrows sit on side peek strips — not on poster artwork */
+.promo-nav-prev {
+  left: max(0.5rem, calc((100% - var(--promo-slide-w)) / 4));
+  transform: translate(-40%, -50%);
+}
+
+.promo-nav-next {
+  right: max(0.5rem, calc((100% - var(--promo-slide-w)) / 4));
+  transform: translate(40%, -50%);
+}
+
+@media (min-width: 640px) {
+  .promo-nav-prev {
+    transform: translate(-50%, -50%);
+  }
+
+  .promo-nav-next {
+    transform: translate(50%, -50%);
+  }
+}
+
+/* Dots on the active banner */
 .promo-banner-swiper .swiper-pagination {
   bottom: 12px !important;
+  left: 50% !important;
+  transform: translateX(-50%);
+  width: auto !important;
+  line-height: 0;
+  z-index: 5;
 }
 
 .promo-banner-swiper .swiper-pagination-bullet {
-  width: 6px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.5);
+  width: 7px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.4);
   opacity: 1;
   margin: 0 3px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .promo-banner-swiper .swiper-pagination-bullet-active {
-  width: 20px;
-  border-radius: 9999px;
   background: #ffffff;
+  transform: scale(1.2);
 }

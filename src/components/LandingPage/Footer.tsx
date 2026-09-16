@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { FaFacebookF, FaInstagram } from "react-icons/fa";
-import { useGetPublicEventFiltersQuery } from "@/services/api";
 
 const COLUMNS = [
   {
@@ -49,9 +48,6 @@ const COLUMNS = [
 ];
 
 export default function Footer() {
-  const { data: filters } = useGetPublicEventFiltersQuery();
-  const cities = filters?.cities || [];
-
   return (
     <footer id="contact" className="bg-[#111111] text-white">
       <div className="border-b border-white/10">
@@ -165,25 +161,6 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-
-        {cities.length > 0 && (
-          <div className="mt-10 pt-8 border-t border-white/10">
-            <h4 className="type-label font-semibold text-white mb-3">Cities</h4>
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {cities.map((city) => (
-                <span key={city} className="type-body text-[#B0B0B0]">
-                  <Link href={`/events?city=${encodeURIComponent(city)}`} className="hover:text-white">
-                    {city} events
-                  </Link>
-                  <span className="mx-1.5 text-white/20">·</span>
-                  <Link href={`/dining?city=${encodeURIComponent(city)}`} className="hover:text-white">
-                    dining
-                  </Link>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="border-t border-white/10">

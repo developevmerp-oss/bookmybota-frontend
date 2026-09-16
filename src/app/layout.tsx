@@ -106,7 +106,7 @@ export default function RootLayout({
   const isBusinessLogin = pathname === "/business/login";
   const isOrganizerLogin = pathname === "/organizer/login";
   const isAdminLogin = pathname === "/admin/login";
-  /** Partner login/register are auth pages (footer hidden; no customer chrome). */
+  /** Partner public auth pages (login/register) — used to hide footer, etc. */
   const isPartnerPublicAuth =
     isOrganizerRegister ||
     isVenueRegister ||

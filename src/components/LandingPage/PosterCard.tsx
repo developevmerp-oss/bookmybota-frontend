@@ -159,7 +159,7 @@ export function ShowcaseEventPosterCard({
   const columns = adaptive?.columns ?? 0;
   const widthClass = fillSlot
     ? "w-full"
-    : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px]";
+    : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[210px]";
 
   return (
     <Link

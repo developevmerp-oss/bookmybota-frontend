@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Building2,
+  CalendarDays,
   Clapperboard,
   Laugh,
   Mic2,
@@ -33,6 +34,7 @@ type SubNavTab = {
 
 const TABS: SubNavTab[] = [
   { label: "Dining", href: "/dining", match: "dining", Icon: UtensilsCrossed },
+  { label: "Events", href: "/events", match: "events", Icon: CalendarDays },
   { label: "Concert", key: "concert", Icon: Mic2 },
   { label: "Comedy", key: "comedy", Icon: Laugh },
   { label: "Music", key: "music", Icon: Music },
@@ -119,6 +121,16 @@ export default function SubNavBar() {
     if (item.match === "movie") return onMovies;
     if (item.match === "venues") return onVenues;
     if (item.match === "artists") return onArtists;
+    if (item.match === "events") {
+      if (!onEvents) return false;
+      if (!activeSlug && !q) return true;
+      // Highlight Events when category isn't one of the dedicated Concert/Comedy/Music/Sports tabs
+      const known = ["concert", "comedy", "music", "sports"] as const;
+      const matchesKnown = known.some((key) =>
+        categorySlugsMatch(activeSlug, resolveCategorySlug(key, categories), categories)
+      );
+      return !matchesKnown;
+    }
     if (item.match === "list-your-show") {
       return pathname === "/list-your-show" || pathname.startsWith("/list-your-show/");
     }

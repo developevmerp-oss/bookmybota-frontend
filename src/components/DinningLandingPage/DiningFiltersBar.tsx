@@ -16,6 +16,8 @@ interface DiningFiltersBarProps {
   onCategoriesChange?: (categories: string[]) => void;
   category?: string;
   onCategoryChange?: (category: string) => void;
+  extraChips?: Array<{ label: string; onClear: () => void }>;
+  onClearExtras?: () => void;
 }
 
 const ACCENT = "#6900AA";
@@ -326,6 +328,8 @@ export default function DiningFiltersBar({
   onCategoriesChange,
   category = "All",
   onCategoryChange,
+  extraChips = [],
+  onClearExtras,
 }: DiningFiltersBarProps) {
   const effectiveCategoriesSelected = useMemo(() => {
     if (categoriesSelected.length > 0) return categoriesSelected;
@@ -485,6 +489,8 @@ export default function DiningFiltersBar({
     });
   }
 
+  const rowChips = [...extraChips, ...activeChips];
+
   const tabs: { id: FilterTab; label: string }[] = [
     { id: "sort", label: "Sort" },
     ...(categories.length > 0 ? [{ id: "category" as const, label: "Category" }] : []),
@@ -618,47 +624,39 @@ export default function DiningFiltersBar({
         >
           Offers
         </button>
-      </div>
 
-      <div
-        className={`grid transition-[grid-template-rows,margin] duration-300 ease-out ${
-          activeChips.length > 0 ? "grid-rows-[1fr] mt-3" : "grid-rows-[0fr] mt-0"
-        }`}
-      >
-        <div className="overflow-hidden min-h-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            {activeChips.map((chip) => (
-              <span
-                key={chip.label}
-                className="inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-full px-3 py-1.5 text-xs font-semibold"
-              >
-                {chip.label}
-                <button
-                  type="button"
-                  onClick={chip.onClear}
-                  className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors"
-                  aria-label={`Remove ${chip.label}`}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-            {activeChips.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  onReset?.();
-                  onCategoriesChange?.([]);
-                  if (!onCategoriesChange) onCategoryChange?.("All");
-                }}
-                className="text-xs font-bold px-2 py-1.5 transition-colors cursor-pointer hover:underline"
-                style={{ color: ACCENT }}
-              >
-                Clear All
-              </button>
-            )}
-          </div>
-        </div>
+        {rowChips.map((chip) => (
+          <span
+            key={chip.label}
+            className="shrink-0 inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap"
+          >
+            {chip.label}
+            <button
+              type="button"
+              onClick={chip.onClear}
+              className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors cursor-pointer"
+              aria-label={`Remove ${chip.label}`}
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+
+        {rowChips.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              onReset?.();
+              onCategoriesChange?.([]);
+              if (!onCategoriesChange) onCategoryChange?.("All");
+              onClearExtras?.();
+            }}
+            className="shrink-0 text-xs font-bold px-2 py-1.5 transition-colors cursor-pointer hover:underline whitespace-nowrap"
+            style={{ color: ACCENT }}
+          >
+            Clear All
+          </button>
+        ) : null}
       </div>
 
       {showFilter &&

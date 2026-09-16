@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Armchair,
   User,
+  UtensilsCrossed,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useGetMovieBookingQuery } from "@/services/api";
@@ -265,6 +266,33 @@ export default function MovieBookingConfirmationPage({
               ) : null}
             </div>
           </div>
+
+          {/* Beverages / snacks */}
+          {booking.beverages && booking.beverages.length > 0 && (
+            <div className="px-4 sm:px-6 py-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
+                  <UtensilsCrossed size={11} /> Snacks &amp; Beverages
+                </p>
+                <p className="text-sm font-extrabold text-emerald-600 tabular-nums">
+                  {formatMoney(Number(booking.beverage_total) || 0)}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {booking.beverages.map((bev, i) => (
+                  <span
+                    key={bev.id || i}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-slate-800"
+                  >
+                    <UtensilsCrossed size={11} className="text-amber-500" />
+                    {bev.name}
+                    {bev.quantity > 1 && <span className="font-normal text-slate-500">×{bev.quantity}</span>}
+                    <span className="font-normal text-amber-700">({formatMoney(bev.subtotal)})</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Perforation */}
           <div className="relative h-5 flex items-center" aria-hidden>

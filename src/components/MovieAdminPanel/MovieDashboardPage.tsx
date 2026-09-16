@@ -8,6 +8,8 @@ import {
   useGetPartnerMovieShowtimesQuery,
   useGetPartnerMovieCatalogQuery,
   useGetActivePlatformOffersQuery,
+  useGetPartnerMovieBookingsQuery,
+  useGetCinemaBeveragesQuery,
 } from "@/services/api";
 import {
   Clapperboard,
@@ -21,6 +23,7 @@ import {
   Clock,
   ArrowRight,
   Sparkles,
+  UtensilsCrossed,
 } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
@@ -32,6 +35,16 @@ export default function MovieDashboardPage() {
   const { data: showtimes = [] } = useGetPartnerMovieShowtimesQuery({ bizId }, { skip: !bizId });
   const { data: catalogData } = useGetPartnerMovieCatalogQuery();
   const { data: offers = [] } = useGetActivePlatformOffersQuery();
+  const { data: bookingsData } = useGetPartnerMovieBookingsQuery({ bizId }, { skip: !bizId });
+  const { data: beverages = [] } = useGetCinemaBeveragesQuery(bizId, { skip: !bizId });
+
+  const bookingStats = bookingsData?.stats ?? {
+    total_bookings: 0,
+    total_tickets_sold: 0,
+    total_revenue: 0,
+    total_beverage_revenue: 0,
+    total_beverage_items: 0,
+  };
 
   const totalCatalogMovies = catalogData?.meta?.total ?? catalogData?.items?.length ?? 0;
   const movieOffers = offers.filter(
@@ -80,7 +93,7 @@ export default function MovieDashboardPage() {
       </div>
 
       {/* KPI Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Screens */}
         <Link
           href="/movie/screens"
@@ -117,9 +130,45 @@ export default function MovieDashboardPage() {
           </p>
         </Link>
 
-        {/* Movie Catalog */}
+        {/* Bookings / Tickets */}
         <Link
-          href="/movie/movies"
+          href="/movie/bookings"
+          className="glass-panel rounded-2xl border border-white/10 p-5 hover:border-emerald-500/40 transition-colors group"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="size-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <Ticket size={18} />
+            </div>
+            <ArrowRight size={14} className="text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+          </div>
+          <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Ticket Bookings</p>
+          <p className="text-3xl font-extrabold text-white mt-1">{bookingStats.total_bookings}</p>
+          <p className="text-xs text-zinc-500 mt-1">
+            {bookingStats.total_tickets_sold} tickets sold
+          </p>
+        </Link>
+
+        {/* Concessions / Snack Revenue */}
+        <Link
+          href="/movie/bookings"
+          className="glass-panel rounded-2xl border border-white/10 p-5 hover:border-amber-500/40 transition-colors group"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="size-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <UtensilsCrossed size={18} />
+            </div>
+            <ArrowRight size={14} className="text-zinc-600 group-hover:text-amber-400 transition-colors" />
+          </div>
+          <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Snack Revenue</p>
+          <p className="text-3xl font-extrabold text-amber-300 mt-1">{bookingStats.total_beverage_revenue || 0} <span className="text-sm font-normal text-amber-400/80">ETB</span></p>
+          <p className="text-xs text-zinc-500 mt-1">
+            {bookingStats.total_beverage_items || 0} items ordered
+          </p>
+        </Link>
+
+        {/* Snack Catalog */}
+        <Link
+          href="/movie/beverages"
           className="glass-panel rounded-2xl border border-white/10 p-5 hover:border-purple-500/40 transition-colors group"
         >
           <div className="flex items-center justify-between mb-3">
@@ -128,25 +177,11 @@ export default function MovieDashboardPage() {
             </div>
             <ArrowRight size={14} className="text-zinc-600 group-hover:text-purple-400 transition-colors" />
           </div>
-          <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Catalog Movies</p>
-          <p className="text-3xl font-extrabold text-white mt-1">{totalCatalogMovies}</p>
-          <p className="text-xs text-zinc-500 mt-1">Available for scheduling</p>
-        </Link>
-
-        {/* Offers */}
-        <Link
-          href="/movie/offers"
-          className="glass-panel rounded-2xl border border-white/10 p-5 hover:border-amber-500/40 transition-colors group"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="size-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-              <Tag size={18} />
-            </div>
-            <ArrowRight size={14} className="text-zinc-600 group-hover:text-amber-400 transition-colors" />
-          </div>
-          <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Active Offers</p>
-          <p className="text-3xl font-extrabold text-white mt-1">{movieOffers.length}</p>
-          <p className="text-xs text-zinc-500 mt-1">Platform promo discounts</p>
+          <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Snack Menu</p>
+          <p className="text-3xl font-extrabold text-white mt-1">{beverages.length}</p>
+          <p className="text-xs text-zinc-500 mt-1">
+            {beverages.filter((b) => b.is_available).length} items active
+          </p>
         </Link>
       </div>
 
@@ -234,17 +269,30 @@ export default function MovieDashboardPage() {
       </div>
 
       {/* Quick Navigation Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link
           href="/movie/screens"
           className="glass-panel rounded-2xl border border-white/10 p-5 hover:border-white/25 transition-colors space-y-2 group"
         >
           <div className="flex items-center gap-2 text-white font-bold text-sm">
             <Tv size={16} className="text-fuchsia-400" />
-            Screens &amp; Layout Requests
+            Screens &amp; Layouts
           </div>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Create screens, configure layout templates, and submit seat layout requests to Super Admin.
+            Create screens, configure layout templates, and submit seat layout requests.
+          </p>
+        </Link>
+
+        <Link
+          href="/movie/beverages"
+          className="glass-panel rounded-2xl border border-white/10 p-5 hover:border-white/25 transition-colors space-y-2 group"
+        >
+          <div className="flex items-center gap-2 text-white font-bold text-sm">
+            <UtensilsCrossed size={16} className="text-amber-400" />
+            Beverages &amp; Snacks
+          </div>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Manage popcorn, drinks, combos, prices, and stock availability for counter sales.
           </p>
         </Link>
 
@@ -262,15 +310,15 @@ export default function MovieDashboardPage() {
         </Link>
 
         <Link
-          href="/movie/profile"
+          href="/movie/bookings"
           className="glass-panel rounded-2xl border border-white/10 p-5 hover:border-white/25 transition-colors space-y-2 group"
         >
           <div className="flex items-center gap-2 text-white font-bold text-sm">
-            <User size={16} className="text-rose-400" />
-            Cinema Partner Profile
+            <Ticket size={16} className="text-rose-400" />
+            Bookings &amp; Prep
           </div>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Update cinema address, contact details, cover branding photos, and operating information.
+            View customer bookings, verify QR tickets, and check showtime snack prep lists.
           </p>
         </Link>
       </div>

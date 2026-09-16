@@ -27,10 +27,18 @@ export type MovieTicketPdfBooking = {
   guest_email?: string;
   ticket_qty?: number;
   grand_total?: number | string;
+  beverage_total?: number | string;
   seats?: Array<{
     seat_identifier?: string;
     tier_name?: string | null;
     unit_price?: number | string;
+  }>;
+  beverages?: Array<{
+    id?: string;
+    name: string;
+    quantity: number;
+    unit_price?: number | string;
+    subtotal?: number | string;
   }>;
 };
 
@@ -152,7 +160,46 @@ export async function buildMovieTicketPdf(booking: MovieTicketPdfBooking): Promi
   y += 16;
   drawField("Amount paid", formatMoney(Number(booking.grand_total) || 0), leftX, y);
 
-  y += 20;
+  // ── Snacks & Beverages section ──────────────────────────────────────────
+  const beverages = booking.beverages?.filter((b) => b.quantity > 0) ?? [];
+  if (beverages.length > 0) {
+    y += 14;
+    doc.setDrawColor(...BORDER);
+    doc.line(margin + 8, y, margin + cardW - 8, y);
+    y += 7;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...SLATE_400);
+    doc.text("SNACKS & BEVERAGES", leftX, y);
+    y += 5;
+
+    for (const bev of beverages) {
+      const label = `${bev.name}${bev.quantity > 1 ? ` ×${bev.quantity}` : ""}`;
+      const price = formatMoney(Number(bev.subtotal ?? (Number(bev.unit_price || 0) * bev.quantity)));
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...SLATE_900);
+      doc.text(label, leftX, y, { maxWidth: cardW - 60 });
+      doc.setFont("helvetica", "bold");
+      doc.text(price, margin + cardW - 8, y, { align: "right" });
+      y += 6;
+    }
+
+    if (booking.beverage_total) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...SLATE_400);
+      doc.text("Snacks subtotal", leftX, y);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...SLATE_900);
+      doc.text(formatMoney(Number(booking.beverage_total)), margin + cardW - 8, y, { align: "right" });
+      y += 8;
+    }
+  }
+
+  y += 6;
   if (qrDataUrl) {
     const qrSize = 48;
     const qrX = margin + (cardW - qrSize) / 2;

@@ -24,6 +24,12 @@ import {
   CheckCircle2,
   Banknote,
   Timer,
+  UtensilsCrossed,
+  Plus,
+  Minus,
+  ShoppingBag,
+  Sparkles,
+  ChevronRight,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -34,8 +40,10 @@ import {
   useReleaseMovieSeatHoldMutation,
   useGetMyGiftCardsQuery,
   usePreviewGiftCardRedeemMutation,
+  useGetShowtimeBeveragesQuery,
   type MovieBookingSeatPayload,
   type GiftCardRedeemPreview,
+  type CinemaBeverage,
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -107,7 +115,16 @@ function writeHoldSessionToken(token: string) {
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-600";
 const reqStar = <span className="text-rose-500">*</span>;
 
-type BookingStep = "seats" | "review";
+type BookingStep = "seats" | "beverages" | "review";
+
+interface SelectedBeverage {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image_url?: string | null;
+  category?: string;
+}
 
 interface MovieSeatLayoutPageProps {
   showtimeId: string;
@@ -161,6 +178,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [selectedGiftCardId, setSelectedGiftCardId] = useState("");
   const [appliedGiftCard, setAppliedGiftCard] = useState<GiftCardRedeemPreview | null>(null);
 
+  const [selectedBeverages, setSelectedBeverages] = useState<Record<string, SelectedBeverage>>({});
+  const [bevCategoryFilter, setBevCategoryFilter] = useState<string>("ALL");
+
   const [viewMode, setViewMode] = useState<"canvas" | "grid">("canvas");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
@@ -195,6 +215,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const { data: myGiftCards = [] } = useGetMyGiftCardsQuery(undefined, {
     skip: !customerId,
   });
+
+  const { data: showtimeBeverages = [] } = useGetShowtimeBeveragesQuery(showtimeId);
 
   const {
     register,
@@ -600,9 +622,14 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     return money(Math.max(10, ticketSubtotal * 0.03));
   }, [selectedSeats.length, ticketSubtotal]);
 
+  const beverageSubtotal = useMemo(
+    () => money(Object.values(selectedBeverages).reduce((sum, b) => sum + b.price * b.quantity, 0)),
+    [selectedBeverages]
+  );
+
   const orderTotal = useMemo(
-    () => money(Math.max(0, ticketSubtotal + convenienceFee - discountAmount)),
-    [ticketSubtotal, convenienceFee, discountAmount]
+    () => money(Math.max(0, ticketSubtotal + beverageSubtotal + convenienceFee - discountAmount)),
+    [ticketSubtotal, beverageSubtotal, convenienceFee, discountAmount]
   );
 
   const giftCardAmount = appliedGiftCard ? Number(appliedGiftCard.amount_applicable) || 0 : 0;
@@ -610,6 +637,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const grandTotal = useMemo(
     () => money(Math.max(0, orderTotal - giftCardAmount)),
     [orderTotal, giftCardAmount]
+  );
+
+  const totalBeverageQty = useMemo(
+    () => Object.values(selectedBeverages).reduce((s, b) => s + b.quantity, 0),
+    [selectedBeverages]
   );
 
   const redeemableGiftCards = useMemo(
@@ -704,6 +736,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     setSecondsLeft(null);
     setTimeOutOpen(false);
     setSelectedSeats([]);
+    setSelectedBeverages({});
     setPromoApplied(false);
     setDiscountAmount(0);
     setPromoCode("");
@@ -739,7 +772,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         })
       );
       setTimeOutOpen(false);
-      setStep("review");
+      // Route to beverages step if any are available, otherwise skip to review
+      setStep(showtimeBeverages.length > 0 ? "beverages" : "review");
       toast.success(res.message || "Seats held. Complete your booking.");
     } catch (err) {
       toast.error(extractApiError(err, "Could not hold seats. Please try again."));
@@ -747,7 +781,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     } finally {
       setHolding(false);
     }
-  }, [selectedSeats, qty, sessionToken, createHold, showtimeId, refetch]);
+  }, [selectedSeats, qty, sessionToken, createHold, showtimeId, refetch, showtimeBeverages.length]);
 
   proceedRef.current = proceedCreateHold;
 
@@ -771,7 +805,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [pendingAfterAuth, isCustomerLoggedIn, authModalOpen]);
 
   useEffect(() => {
-    if (step !== "review" || !expiresAt) {
+    if ((step !== "review" && step !== "beverages") || !expiresAt) {
       setSecondsLeft(null);
       return;
     }
@@ -808,6 +842,12 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       const res = await createBooking({
         showtime_id: showtimeId,
         seats: selectedSeats,
+        beverages: Object.values(selectedBeverages).map((b) => ({
+          beverage_id: b.id,
+          quantity: b.quantity,
+          name: b.name,
+          unit_price: b.price,
+        })),
         guest_name: values.guest_name.trim(),
         guest_phone: sanitizePhoneInput(values.guest_phone),
         guest_email: values.guest_email.trim(),
@@ -1083,13 +1123,17 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               type="button"
               onClick={() => {
                 if (step === "review") {
+                  setStep(showtimeBeverages.length > 0 ? "beverages" : "seats");
+                  return;
+                }
+                if (step === "beverages") {
                   setStep("seats");
                   return;
                 }
                 router.back();
               }}
               className="p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 transition-colors cursor-pointer shrink-0"
-              title={step === "review" ? "Back to seats" : "Go Back"}
+              title={step === "review" ? "Back to snacks" : step === "beverages" ? "Back to seats" : "Go Back"}
             >
               <ArrowLeft className="size-5" />
             </button>
@@ -1133,6 +1177,19 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             >
               1. Seats
             </span>
+            {showtimeBeverages.length > 0 && (
+              <>
+                <span className="text-slate-300">→</span>
+                <span
+                  className={`px-2.5 py-1 rounded-lg border font-bold ${step === "beverages"
+                      ? "bg-amber-50 border-amber-200 text-amber-700"
+                      : "bg-slate-100 border-slate-200 text-slate-500"
+                    }`}
+                >
+                  2. Snacks
+                </span>
+              </>
+            )}
             <span className="text-slate-300">→</span>
             <span
               className={`px-2.5 py-1 rounded-lg border font-bold ${step === "review"
@@ -1140,7 +1197,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   : "bg-slate-100 border-slate-200 text-slate-500"
                 }`}
             >
-              2. Review
+              {showtimeBeverages.length > 0 ? "3" : "2"}. Review
             </span>
           </div>
         </div>
@@ -1166,6 +1223,199 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       <main className="flex-1 min-h-0 overflow-y-auto">
         {step === "seats" ? (
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 pb-36">{seatMapSection}</div>
+        ) : step === "beverages" ? (
+          <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 py-6 pb-36">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Beverages catalogue */}
+              <div className="lg:col-span-7 space-y-5">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <UtensilsCrossed className="size-4 text-amber-500" /> Add Snacks &amp; Beverages
+                    </h2>
+                    <p className="text-[11px] text-slate-500">Optional — skip if you prefer</p>
+                  </div>
+
+                  {/* Dynamic category filter */}
+                  {(() => {
+                    const cats = ["ALL", ...Array.from(new Set(showtimeBeverages.map((b) => b.category?.toUpperCase() || "OTHER")))];
+                    return (
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                        {cats.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setBevCategoryFilter(cat)}
+                            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              bevCategoryFilter === cat
+                                ? "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow"
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                          >
+                            {cat === "ALL" ? "All" : cat.charAt(0) + cat.slice(1).toLowerCase()}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Beverage grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {showtimeBeverages
+                      .filter((b) => bevCategoryFilter === "ALL" || b.category?.toUpperCase() === bevCategoryFilter)
+                      .map((bev) => {
+                        const sel = selectedBeverages[bev.id];
+                        const qty = sel?.quantity || 0;
+                        return (
+                          <div
+                            key={bev.id}
+                            className={`rounded-2xl border flex flex-col overflow-hidden transition-all ${
+                              qty > 0
+                                ? "border-amber-300 shadow-md shadow-amber-100"
+                                : "border-slate-200 hover:border-slate-300"
+                            } ${!bev.is_available ? "opacity-50 pointer-events-none" : ""}`}
+                          >
+                            {/* Image */}
+                            <div className="relative w-full aspect-[4/3] bg-slate-100 overflow-hidden">
+                              {bev.image_url ? (
+                                <img src={bev.image_url} alt={bev.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                  <UtensilsCrossed className="size-8" />
+                                </div>
+                              )}
+                              {!bev.is_available && (
+                                <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">Sold Out</span>
+                                </div>
+                              )}
+                              {qty > 0 && (
+                                <span className="absolute top-2 right-2 size-5 rounded-full bg-amber-500 text-white text-[10px] font-extrabold flex items-center justify-center shadow">{qty}</span>
+                              )}
+                            </div>
+
+                            {/* Info */}
+                            <div className="p-2.5 flex-1 flex flex-col gap-2">
+                              <p className="text-xs font-bold text-slate-900 leading-tight line-clamp-2">{bev.name}</p>
+                              {bev.description && <p className="text-[10px] text-slate-500 line-clamp-1">{bev.description}</p>}
+                              <p className="text-xs font-extrabold text-[#F84464] mt-auto">{formatMoney(Number(bev.price))}</p>
+
+                              {/* Qty controls */}
+                              {qty === 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedBeverages((prev) => ({
+                                    ...prev,
+                                    [bev.id]: { id: bev.id, name: bev.name, price: Number(bev.price), quantity: 1, image_url: bev.image_url, category: bev.category },
+                                  }))}
+                                  className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition-all cursor-pointer"
+                                >
+                                  <Plus className="size-3" /> Add
+                                </button>
+                              ) : (
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedBeverages((prev) => {
+                                      const next = { ...prev };
+                                      if (next[bev.id].quantity <= 1) { delete next[bev.id]; } else { next[bev.id] = { ...next[bev.id], quantity: next[bev.id].quantity - 1 }; }
+                                      return next;
+                                    })}
+                                    className="size-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 cursor-pointer"
+                                  >
+                                    <Minus className="size-3" />
+                                  </button>
+                                  <span className="text-sm font-extrabold text-slate-900 w-6 text-center">{qty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedBeverages((prev) => ({ ...prev, [bev.id]: { ...prev[bev.id], quantity: prev[bev.id].quantity + 1 } }))}
+                                    className="size-7 rounded-lg bg-amber-500 hover:bg-amber-400 flex items-center justify-center text-white cursor-pointer"
+                                  >
+                                    <Plus className="size-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Beverage summary sidebar */}
+              <aside className="lg:col-span-5 space-y-4 lg:sticky lg:top-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+                  <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <ShoppingBag className="size-4 text-amber-500" /> Your order
+                  </h2>
+
+                  {/* Selected seats summary */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Seats</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedSeats.map((s) => (
+                        <span key={s.seat_identifier} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] font-bold text-slate-900">
+                          <Armchair className="size-3 text-rose-500" />{s.seat_identifier}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Snacks list */}
+                  {Object.values(selectedBeverages).length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Snacks &amp; Drinks</span>
+                      {Object.values(selectedBeverages).map((b) => (
+                        <div key={b.id} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-700">{b.name} × {b.quantity}</span>
+                          <span className="font-bold text-slate-900">{formatMoney(b.price * b.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pricing breakdown */}
+                  <div className="space-y-1.5 pt-3 border-t border-slate-200 text-xs">
+                    <div className="flex justify-between text-slate-500">
+                      <span>Tickets ({selectedSeats.length})</span>
+                      <span className="text-slate-900 font-semibold">{formatMoney(ticketSubtotal)}</span>
+                    </div>
+                    {beverageSubtotal > 0 && (
+                      <div className="flex justify-between text-slate-500">
+                        <span>Snacks &amp; drinks</span>
+                        <span className="text-slate-900 font-semibold">{formatMoney(beverageSubtotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-slate-500">
+                      <span>Convenience fee</span>
+                      <span className="text-slate-900 font-semibold">+{formatMoney(convenienceFee)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm font-extrabold">
+                      <span className="text-slate-900">Subtotal</span>
+                      <span className="text-lg text-transparent bg-clip-text bg-gradient-to-r from-[#F84464] to-[#6900AA]">{formatMoney(orderTotal)}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setStep("review")}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-extrabold shadow-lg shadow-[#F84464]/20 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    Continue to Review <ChevronRight className="size-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedBeverages({}); setStep("review"); }}
+                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer transition-colors"
+                  >
+                    Skip — no snacks
+                  </button>
+                </div>
+              </aside>
+            </div>
+          </div>
         ) : (
           <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 py-6 pb-10">
             <form
@@ -1397,15 +1647,17 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   <div className="space-y-2 pt-2 border-t border-slate-200 text-xs">
                     <div className="flex justify-between text-slate-500">
                       <span>Tickets ({selectedSeats.length})</span>
-                      <span className="text-slate-900 font-semibold">
-                        {formatMoney(ticketSubtotal)}
-                      </span>
+                      <span className="text-slate-900 font-semibold">{formatMoney(ticketSubtotal)}</span>
                     </div>
+                    {beverageSubtotal > 0 && (
+                      <div className="flex justify-between text-slate-500">
+                        <span>Snacks &amp; drinks ({totalBeverageQty})</span>
+                        <span className="text-slate-900 font-semibold">{formatMoney(beverageSubtotal)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-slate-500">
                       <span>Convenience fee</span>
-                      <span className="text-slate-900 font-semibold">
-                        +{formatMoney(convenienceFee)}
-                      </span>
+                      <span className="text-slate-900 font-semibold">+{formatMoney(convenienceFee)}</span>
                     </div>
                     {discountAmount > 0 && (
                       <div className="flex justify-between text-emerald-600">
@@ -1448,6 +1700,41 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           </div>
         )}
       </main>
+
+      {step === "beverages" && (
+        <footer className="shrink-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 space-y-0.5">
+              {totalBeverageQty > 0 ? (
+                <>
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    {totalBeverageQty} snack item{totalBeverageQty === 1 ? "" : "s"} added
+                  </p>
+                  <p className="text-xs font-bold text-slate-900">{formatMoney(beverageSubtotal)}</p>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400 italic">No snacks selected — you can skip</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => { setSelectedBeverages({}); setStep("review"); }}
+                className="px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Skip
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep("review")}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-extrabold shadow-lg shadow-[#F84464]/20 cursor-pointer min-w-[8.5rem] flex items-center justify-center gap-2"
+              >
+                Continue <ChevronRight className="size-4" />
+              </button>
+            </div>
+          </div>
+        </footer>
+      )}
 
       {step === "seats" && (
         <footer className="shrink-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

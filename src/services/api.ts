@@ -521,9 +521,35 @@ export interface MovieBookingSeatPayload {
   unit_price: number;
 }
 
+export interface CinemaBeverage {
+  id: string;
+  business_id: string;
+  name: string;
+  category: 'POPCORN' | 'BEVERAGE' | 'COMBO' | 'SNACKS' | string;
+  description?: string | null;
+  price: number;
+  image_url?: string | null;
+  is_available: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MovieBookingBeverageItem {
+  id?: string;
+  beverage_id?: string | null;
+  name: string;
+  unit_price: number;
+  quantity: number;
+  subtotal: number;
+  image_url?: string | null;
+  category?: string | null;
+}
+
 export interface CreateMovieBookingPayload {
   showtime_id: string;
   seats: MovieBookingSeatPayload[];
+  beverages?: Array<{ beverage_id: string; quantity: number; name?: string; unit_price?: number }>;
   guest_name: string;
   guest_phone: string;
   guest_email?: string;
@@ -543,8 +569,11 @@ export interface MovieBookingResult {
   movie_title: string;
   cinema_name: string;
   ticket_qty: number;
+  beverage_total?: number;
+  beverage_qty?: number;
   grand_total: number;
   seats: MovieBookingSeatPayload[];
+  beverages?: MovieBookingBeverageItem[];
 }
 
 export interface MovieBookingDetail {
@@ -558,6 +587,8 @@ export interface MovieBookingDetail {
   guest_email?: string;
   status: string;
   ticket_amount: number;
+  beverage_total?: number;
+  beverage_qty?: number;
   convenience_fee_total: number;
   discount_amount: number;
   grand_total: number;
@@ -589,6 +620,7 @@ export interface MovieBookingDetail {
     seat_number?: string;
     unit_price: number;
   }>;
+  beverages?: MovieBookingBeverageItem[];
 }
 
 export interface BusinessType {
@@ -6873,7 +6905,13 @@ export const api = createApi({
     getPartnerMovieBookings: builder.query<
       {
         data: MovieBookingDetail[];
-        stats: { total_bookings: number; total_tickets_sold: number; total_revenue: number };
+        stats: {
+          total_bookings: number;
+          total_tickets_sold: number;
+          total_revenue: number;
+          total_beverage_revenue?: number;
+          total_beverage_items?: number;
+        };
       },
       { bizId: string; q?: string; date?: string; status?: string; movie_id?: string; screen_id?: string }
     >({
@@ -6971,6 +7009,105 @@ export const api = createApi({
       invalidatesTags: (_r, _e, arg) => [
         { type: 'MovieShowtimes', id: `layout-${arg.showtime_id}` },
         'MovieShowtimes',
+      ],
+    }),
+
+    // ── Cinema Beverages & Food ──────────────────────────────────────────
+
+    getCinemaBeverages: builder.query<CinemaBeverage[], string>({
+      query: (bizId) => `/businesses/${bizId}/cinema-beverages`,
+      transformResponse: (res: { data: CinemaBeverage[] }) => res.data ?? [],
+      providesTags: (_res, _err, bizId) => [{ type: 'CinemaScreens' as any, id: `beverages-${bizId}` }],
+    }),
+
+    getCinemaBeverageCategories: builder.query<string[], string>({
+      query: (bizId) => `/businesses/${bizId}/cinema-beverages/categories`,
+      transformResponse: (res: { data: string[] }) => res.data ?? [],
+      providesTags: (_res, _err, bizId) => [{ type: 'CinemaScreens' as any, id: `beverage-categories-${bizId}` }],
+    }),
+
+    createCinemaBeverage: builder.mutation<
+      { message: string; data: CinemaBeverage },
+      {
+        bizId: string;
+        name: string;
+        category: string;
+        description?: string;
+        price: number;
+        image_url?: string;
+        is_available?: boolean;
+        sort_order?: number;
+      }
+    >({
+      query: ({ bizId, ...body }) => ({
+        url: `/businesses/${bizId}/cinema-beverages`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_res, _err, { bizId }) => [
+        { type: 'CinemaScreens' as any, id: `beverages-${bizId}` },
+        { type: 'CinemaScreens' as any, id: `beverage-categories-${bizId}` },
+      ],
+    }),
+
+    updateCinemaBeverage: builder.mutation<
+      { message: string; data: CinemaBeverage },
+      {
+        bizId: string;
+        beverageId: string;
+        name: string;
+        category: string;
+        description?: string;
+        price: number;
+        image_url?: string;
+        is_available?: boolean;
+        sort_order?: number;
+      }
+    >({
+      query: ({ bizId, beverageId, ...body }) => ({
+        url: `/businesses/${bizId}/cinema-beverages/${beverageId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_res, _err, { bizId }) => [
+        { type: 'CinemaScreens' as any, id: `beverages-${bizId}` },
+        { type: 'CinemaScreens' as any, id: `beverage-categories-${bizId}` },
+      ],
+    }),
+
+    toggleCinemaBeverageAvailability: builder.mutation<
+      { message: string; data: CinemaBeverage },
+      { bizId: string; beverageId: string; is_available: boolean }
+    >({
+      query: ({ bizId, beverageId, is_available }) => ({
+        url: `/businesses/${bizId}/cinema-beverages/${beverageId}/availability`,
+        method: 'PATCH',
+        body: { is_available },
+      }),
+      invalidatesTags: (_res, _err, { bizId }) => [
+        { type: 'CinemaScreens' as any, id: `beverages-${bizId}` },
+      ],
+    }),
+
+    deleteCinemaBeverage: builder.mutation<
+      { message: string },
+      { bizId: string; beverageId: string }
+    >({
+      query: ({ bizId, beverageId }) => ({
+        url: `/businesses/${bizId}/cinema-beverages/${beverageId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_res, _err, { bizId }) => [
+        { type: 'CinemaScreens' as any, id: `beverages-${bizId}` },
+        { type: 'CinemaScreens' as any, id: `beverage-categories-${bizId}` },
+      ],
+    }),
+
+    getShowtimeBeverages: builder.query<CinemaBeverage[], string>({
+      query: (showtimeId) => `/movies/showtimes/${showtimeId}/beverages`,
+      transformResponse: (res: { data: CinemaBeverage[] }) => res.data ?? [],
+      providesTags: (_res, _err, showtimeId) => [
+        { type: 'MovieShowtimes' as any, id: `beverages-${showtimeId}` },
       ],
     }),
 
@@ -7827,6 +7964,13 @@ export const {
   useCreateMovieSeatHoldMutation,
   useReleaseMovieSeatHoldMutation,
   useCreateMovieBookingMutation,
+  useGetCinemaBeveragesQuery,
+  useGetCinemaBeverageCategoriesQuery,
+  useCreateCinemaBeverageMutation,
+  useUpdateCinemaBeverageMutation,
+  useToggleCinemaBeverageAvailabilityMutation,
+  useDeleteCinemaBeverageMutation,
+  useGetShowtimeBeveragesQuery,
   useScanCinemaMovieBookingMutation,
   useCheckInCinemaMovieBookingMutation,
   useGetCinemaSettlementsQuery,

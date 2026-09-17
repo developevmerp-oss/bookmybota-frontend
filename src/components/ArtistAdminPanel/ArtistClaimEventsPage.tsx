@@ -38,10 +38,21 @@ export default function ArtistClaimEventsPage() {
 
   return (
     <div className="w-full max-w-[1600px] mx-auto space-y-4">
+      <div className="org-card p-4 sm:p-5">
+        <h1 className="text-lg font-semibold text-foreground">Claim events</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Confirm lineup slots organizers assigned to you. Claims appear after the organizer submits the event
+          for Super Admin approval.
+        </p>
+      </div>
+
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : events.length === 0 ? (
-        <div className="org-card p-6 text-sm text-muted-foreground">No claimable events right now.</div>
+        <div className="org-card p-6 text-sm text-muted-foreground">
+          No claimable events right now. When an organizer adds you and submits for approval, it will show
+          here.
+        </div>
       ) : (
         <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           {events.map((e) => (

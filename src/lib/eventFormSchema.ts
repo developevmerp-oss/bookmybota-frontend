@@ -8,6 +8,8 @@ import {
 import { parseYouTubeId } from './youtube';
 import { countChars } from './eventDocumentScope';
 import { validateShowtimeTickets } from './eventTicketLayoutValidation';
+import { adminPhoneSchema } from './adminFormSchemas';
+import { sanitizePhoneInput } from './validation';
 
 /** About event limit — characters so the counter rises as the user types. */
 export const MAX_ABOUT_EVENT_CHARS = 2500;
@@ -83,7 +85,10 @@ const showtimeSchema = yup.object({
   venue_proposal: yup
     .object({
       contact_name: yup.string().default(''),
-      contact_phone: yup.string().default(''),
+      contact_phone: yup
+        .string()
+        .default('')
+        .transform((value) => sanitizePhoneInput(String(value ?? ''))),
       contact_email: yup.string().default(''),
       capacity: yup.number().nullable().default(null),
       facilities: yup.array().of(yup.string().required()).default([]),
@@ -291,38 +296,52 @@ export const eventSubmitSchema = eventDraftSchema.shape({
             then: (schema) => schema.required('Select a registered venue partner'),
             otherwise: (schema) => schema.nullable(),
           }),
-        venue_layout_template_id: yup
-          .string()
-          .nullable()
-          .default(null)
-          .when('layout_mode', {
-            is: 'standard',
-            then: (schema) => schema.required('Select a published layout for Standard mode'),
-            otherwise: (schema) => schema.nullable(),
-          }),
-        custom_layout_name: yup
-          .string()
-          .trim()
-          .default('')
-          .when('layout_mode', {
-            is: 'custom',
-            then: (schema) => schema.required('Custom layout name is required'),
-            otherwise: (schema) => schema,
-          }),
+        venue_layout_template_id: yup.string().nullable().default(null),
+        custom_layout_name: yup.string().trim().default(''),
         custom_layout_capacity: yup
           .number()
           .nullable()
           .transform((value, original) =>
             original === '' || original === null || original === undefined ? null : value
           )
-          .when('layout_mode', {
-            is: 'custom',
-            then: (schema) =>
-              schema
-                .typeError('Expected capacity must be a number')
-                .required('Expected capacity is required for custom layout')
-                .min(1, 'Expected capacity must be at least 1'),
-            otherwise: (schema) => schema.nullable(),
+          .nullable(),
+        custom_layout_notes: yup.string().trim().default(''),
+        venue_address: yup.string().trim().default('').when('venue_business_id', {
+          is: (id: string | null | undefined) => !id,
+          then: (schema) => schema.required('Venue address is required'),
+          otherwise: (schema) => schema.default(''),
+        }),
+        venue_proposal: yup
+          .object({
+            contact_name: yup.string().trim().default(''),
+            contact_phone: yup.string().trim().default(''),
+            contact_email: yup.string().trim().default(''),
+            capacity: yup.number().nullable().default(null),
+            facilities: yup.array().of(yup.string().required()).default([]),
+            image_urls: yup.array().of(yup.string().required()).default([]),
+            notes: yup.string().default(''),
+          })
+          .nullable()
+          .default(null)
+          .when('venue_business_id', {
+            is: (id: string | null | undefined) => !id,
+            then: () =>
+              yup
+                .object({
+                  contact_name: yup.string().trim().required('Contact person name is required'),
+                  contact_phone: adminPhoneSchema,
+                  contact_email: yup
+                    .string()
+                    .trim()
+                    .email('Enter a valid email')
+                    .required('Email is required'),
+                  capacity: yup.number().nullable().default(null),
+                  facilities: yup.array().of(yup.string().required()).default([]),
+                  image_urls: yup.array().of(yup.string().required()).default([]),
+                  notes: yup.string().default(''),
+                })
+                .required('Venue contact details are required'),
+            otherwise: (schema) => schema.nullable().default(null),
           }),
       })
     )
@@ -518,18 +537,29 @@ export function getCompletedEventStepIds(opts: {
   const aboutOk = Boolean(values.about_event?.trim()) && countChars(values.about_event) <= MAX_ABOUT_CHARS;
   const modesOk = (values.allowed_ticket_modes || []).length > 0;
   const genresOk = !genresConfigured || (values.genres || []).length > 0;
-  const tickets = values.showtimes?.[0]?.ticket_types || [];
-  const ticketsOk =
-    tickets.length > 0 &&
-    tickets.every(
-      (t) =>
-        Boolean(t.ticket_type?.trim()) &&
-        Number(t.total_count) >= 1 &&
-        Number(t.price) >= 0 &&
-        Number.isFinite(Number(t.price)) &&
-        Number(t.max_per_order) >= 1
-    );
-  if (hostingOk && nameOk && categoryOk && languagesOk && ageOk && aboutOk && modesOk && genresOk && ticketsOk) {
+  const durationMinutes = Number(values.duration_minutes) || 0;
+  const durationOk = durationMinutes >= 1;
+  const show0 = values.showtimes?.[0];
+  const scheduleOk =
+    hostingType === 'tour'
+      ? true
+      : Boolean(
+          show0 &&
+            /^\d{4}-\d{2}-\d{2}$/.test(String(show0.event_date || '').trim()) &&
+            Boolean(String(show0.start_time || '').trim())
+        );
+  if (
+    hostingOk &&
+    nameOk &&
+    categoryOk &&
+    languagesOk &&
+    ageOk &&
+    aboutOk &&
+    modesOk &&
+    genresOk &&
+    durationOk &&
+    scheduleOk
+  ) {
     done.push('details');
   }
 
@@ -541,17 +571,37 @@ export function getCompletedEventStepIds(opts: {
     }
   }
 
-  if (values.poster_horizontal_url?.trim()) {
-    done.push('media');
+  const posterOk = Boolean(values.poster_horizontal_url?.trim());
+  if (posterOk) {
+    if (requiredDocumentIds.length > 0) {
+      const docsErr = validateRequiredDocuments(
+        documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
+        requiredDocumentIds,
+        Object.fromEntries(requiredDocumentIds.map((id) => [id, 'document']))
+      );
+      if (!docsErr) done.push('media');
+    } else {
+      done.push('media');
+    }
   }
 
   const showtimes = values.showtimes || [];
-  const durationMinutes = Number(values.duration_minutes) || 0;
   const venueOk =
     showtimes.length > 0 &&
     showtimes.every((s) => {
       if (!s.venue_name?.trim()) return false;
       if (s.city_id == null || !Number.isFinite(Number(s.city_id))) return false;
+      if (!s.venue_business_id) {
+        if (!s.venue_address?.trim()) return false;
+        const contact = s.venue_proposal;
+        if (
+          !contact?.contact_name?.trim() ||
+          !contact?.contact_phone?.trim() ||
+          !contact?.contact_email?.trim()
+        ) {
+          return false;
+        }
+      }
       if (!isShowtimePersistable(s, durationMinutes)) return false;
       const { starts_at, ends_at } = showtimeToIso(s, durationMinutes);
       if (ends_at) {
@@ -566,7 +616,8 @@ export function getCompletedEventStepIds(opts: {
           Boolean(t.ticket_type?.trim()) &&
           Number(t.total_count) >= 1 &&
           Number(t.price) >= 0 &&
-          Number.isFinite(Number(t.price))
+          Number.isFinite(Number(t.price)) &&
+          Number(t.max_per_order) >= 1
       );
     });
   if (venueOk) done.push('venue');
@@ -576,16 +627,7 @@ export function getCompletedEventStepIds(opts: {
     done.push('artists');
   }
 
-  if (requiredDocumentIds.length > 0) {
-    const docsErr = validateRequiredDocuments(
-      documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
-      requiredDocumentIds,
-      Object.fromEntries(requiredDocumentIds.map((id) => [id, 'document']))
-    );
-    if (!docsErr) done.push('documents');
-  }
-
-  const requiredCore: EventStepCompletionId[] = ['details', 'media', 'venue'];
+  const requiredCore: EventStepCompletionId[] = ['details', 'venue', 'media'];
   if (requiredCore.every((id) => done.includes(id))) {
     done.push('review');
   }

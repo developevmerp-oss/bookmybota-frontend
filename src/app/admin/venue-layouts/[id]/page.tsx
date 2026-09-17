@@ -75,6 +75,7 @@ function mapSeatsFromJson(sourceSeats: unknown[]) {
       coordinate_y: Number(row.coordinate_y) || 0,
       status: String(row.status || "AVAILABLE"),
       grid_id: row.grid_id ? String(row.grid_id) : undefined,
+      color: typeof row.color === "string" && row.color.trim() ? String(row.color) : null,
     };
   });
 }
@@ -176,10 +177,17 @@ export default function AdminVenueLayoutBuilderPage() {
     ? []
     : ((activeTemplate?.seats_json || request?.template_seats || []) as Array<Record<string, unknown>>);
   const sourceConfig = creatingNew
-    ? {}
+    ? ({} as {
+        labels?: unknown[];
+        shapes?: unknown[];
+        bgImageUrl?: string | null;
+        sectionColors?: Record<string, string>;
+      })
     : ((activeTemplate?.seating_config || request?.template_seating_config || {}) as {
         labels?: unknown[];
         shapes?: unknown[];
+        bgImageUrl?: string | null;
+        sectionColors?: Record<string, string>;
       });
 
   const initialSeats = Array.isArray(sourceSeats) ? mapSeatsFromJson(sourceSeats) : [];
@@ -566,6 +574,8 @@ export default function AdminVenueLayoutBuilderPage() {
                   initialConfig: {
                     labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
                     shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
+                    bgImageUrl: sourceConfig.bgImageUrl || null,
+                    sectionColors: sourceConfig.sectionColors,
                   },
                   saving,
                   hideSubmitToVenue: true,
@@ -712,6 +722,8 @@ export default function AdminVenueLayoutBuilderPage() {
                 initialConfig: {
                   labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
                   shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
+                  bgImageUrl: sourceConfig.bgImageUrl || null,
+                  sectionColors: sourceConfig.sectionColors,
                 },
                 saving,
                 hideSubmitToVenue: true,

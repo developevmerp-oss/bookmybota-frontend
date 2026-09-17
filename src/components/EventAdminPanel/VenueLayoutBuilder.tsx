@@ -21,6 +21,8 @@ type Seat = {
   coordinate_y: number;
   status: string;
   grid_id?: string;
+  /** Per-seat display color (row/seat selection). Falls back to sectionColors / defaults. */
+  color?: string | null;
 };
 
 type Label = {
@@ -47,14 +49,29 @@ type Shape = {
 };
 
 type VenueAdapter = {
-  sections?: Array<{ id: string; name: string; capacity?: number }>;
+  sections?: Array<{ id: string; name: string; capacity?: number; price?: number }>;
   initialSeats?: Seat[];
-  initialConfig?: { labels?: Label[]; shapes?: Shape[]; bgImageUrl?: string | null };
+  initialConfig?: {
+    labels?: Label[];
+    shapes?: Shape[];
+    bgImageUrl?: string | null;
+    sectionColors?: Record<string, string>;
+  };
   maxCapacity?: number;
   saving?: boolean;
   onSave: (
-    payload: { seating_config: { canvasWidth: number; canvasHeight: number; labels: Label[]; shapes: Shape[]; bgImageUrl?: string | null }; seats: Seat[] },
-    options?: { publish?: boolean }
+    payload: {
+      seating_config: {
+        canvasWidth: number;
+        canvasHeight: number;
+        labels: Label[];
+        shapes: Shape[];
+        bgImageUrl?: string | null;
+        sectionColors?: Record<string, string>;
+      };
+      seats: Seat[];
+    },
+    options?: { publish?: boolean; saveAsNew?: boolean }
   ) => Promise<void>;
   onBlankPage?: () => void;
   hideSubmitToVenue?: boolean;
@@ -65,7 +82,41 @@ type HistorySnapshot = {
   labels: Label[];
   shapes: Shape[];
   bgImageUrl?: string | null;
+  sectionColors?: Record<string, string>;
 };
+
+const SECTION_COLOR_PRESETS = [
+  "#3b82f6",
+  "#16a34a",
+  "#dc2626",
+  "#f59e0b",
+  "#9333ea",
+  "#06b6d4",
+  "#ec4899",
+  "#f97316",
+  "#6366f1",
+  "#0284c7",
+  "#a855f7",
+  "#64748b",
+];
+
+function defaultSectionColor(sectionName: string): string {
+  const name = (sectionName || "").toLowerCase();
+  if (name.includes("vip") || name.includes("premium")) return "#f59e0b";
+  if (name.includes("category 1") || name.includes("cat 1")) return "#dc2626";
+  if (name.includes("category 2") || name.includes("cat 2") || name.includes("east stand")) return "#2563eb";
+  if (name.includes("category 3") || name.includes("cat 3") || name.includes("west stand")) return "#16a34a";
+  if (name.includes("away")) return "#9333ea";
+  if (name.includes("south")) return "#f97316";
+  if (name.includes("platinum")) return "#06b6d4";
+  if (name.includes("gold")) return "#a855f7";
+  if (name.includes("dress")) return "#ec4899";
+  if (name.includes("upper balcony")) return "#8b5cf6";
+  if (name.includes("recliner")) return "#0284c7";
+  if (name.includes("prime")) return "#3b82f6";
+  if (name.includes("classic")) return "#6366f1";
+  return "#3b82f6";
+}
 
 export default function VenueLayoutBuilder({
   eventId,
@@ -98,9 +149,11 @@ export default function VenueLayoutBuilder({
   const [bgImage] = useImage(bgImageUrl || "");
   const [mode, setMode] = useState<"select" | "pan" | "add_seat" | "add_label" | "add_shape" | "bulk_seats" | "eraser">("select");
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
+  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [moveEntireSection, setMoveEntireSection] = useState(false);
+  const [sectionColors, setSectionColors] = useState<Record<string, string>>({});
 
   // Undo / Redo History Stack
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
@@ -109,6 +162,7 @@ export default function VenueLayoutBuilder({
   const [bulkRows, setBulkRows] = useState(5);
   const [bulkCols, setBulkCols] = useState(10);
   const [bulkSection, setBulkSection] = useState("General");
+  const [bulkColor, setBulkColor] = useState("#3b82f6");
   const [bulkTicketType, setBulkTicketType] = useState("");
   const [bulkShape, setBulkShape] = useState<"grid" | "curve" | "circle">("grid");
   const [bulkRotation, setBulkRotation] = useState(0);
@@ -478,9 +532,22 @@ export default function VenueLayoutBuilder({
     }
   }, [selectedShapeId, selectedLabelId, mode, shapes, labels]);
 
-  const pushSnapshot = (newSeats: Seat[], newLabels: Label[], newShapes: Shape[], newBg?: string | null) => {
+  const pushSnapshot = (
+    newSeats: Seat[],
+    newLabels: Label[],
+    newShapes: Shape[],
+    newBg?: string | null,
+    newSectionColors?: Record<string, string>
+  ) => {
     const finalBg = newBg !== undefined ? newBg : bgImageUrl;
-    const snap: HistorySnapshot = { seats: newSeats, labels: newLabels, shapes: newShapes, bgImageUrl: finalBg };
+    const finalColors = newSectionColors !== undefined ? newSectionColors : sectionColors;
+    const snap: HistorySnapshot = {
+      seats: newSeats,
+      labels: newLabels,
+      shapes: newShapes,
+      bgImageUrl: finalBg,
+      sectionColors: finalColors,
+    };
     setHistory((prev) => {
       const sliced = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : [];
       const nextHistory = [...sliced, snap].slice(-30);
@@ -491,6 +558,7 @@ export default function VenueLayoutBuilder({
     setLabels(newLabels);
     setShapes(newShapes);
     if (newBg !== undefined) setBgImageUrl(newBg);
+    if (newSectionColors !== undefined) setSectionColors(newSectionColors);
   };
 
   const handleUndo = () => {
@@ -502,7 +570,9 @@ export default function VenueLayoutBuilder({
       setLabels(snap.labels);
       setShapes(snap.shapes);
       setBgImageUrl(snap.bgImageUrl || null);
+      setSectionColors(snap.sectionColors || {});
       setSelectedSeatId(null);
+      setSelectedSeatIds([]);
       setSelectedLabelId(null);
       setSelectedShapeId(null);
       toast.info("Undo");
@@ -518,7 +588,9 @@ export default function VenueLayoutBuilder({
       setLabels(snap.labels);
       setShapes(snap.shapes);
       setBgImageUrl(snap.bgImageUrl || null);
+      setSectionColors(snap.sectionColors || {});
       setSelectedSeatId(null);
+      setSelectedSeatIds([]);
       setSelectedLabelId(null);
       setSelectedShapeId(null);
       toast.info("Redo");
@@ -532,7 +604,8 @@ export default function VenueLayoutBuilder({
       return;
     }
     if (seats.length === 0 && labels.length === 0 && shapes.length === 0 && !bgImageUrl) return;
-    pushSnapshot([], [], [], null);
+    pushSnapshot([], [], [], null, {});
+    setSelectedSeatIds([]);
     setSelectedSeatId(null);
     setSelectedLabelId(null);
     setSelectedShapeId(null);
@@ -568,6 +641,7 @@ export default function VenueLayoutBuilder({
     let initLabels: Label[] = [];
     let initShapes: Shape[] = [];
     let initBg: string | null = null;
+    let initColors: Record<string, string> = {};
 
     if (venueAdapter) {
       if (venueHydratedRef.current) return;
@@ -584,6 +658,7 @@ export default function VenueLayoutBuilder({
       if (venueAdapter.initialConfig?.labels) initLabels = venueAdapter.initialConfig.labels;
       if (venueAdapter.initialConfig?.shapes) initShapes = venueAdapter.initialConfig.shapes;
       if (venueAdapter.initialConfig?.bgImageUrl) initBg = venueAdapter.initialConfig.bgImageUrl;
+      if (venueAdapter.initialConfig?.sectionColors) initColors = { ...venueAdapter.initialConfig.sectionColors };
     } else if (layoutData?.data) {
       if (layoutData.data.seats) {
         initSeats = layoutData.data.seats.map((s: any) => ({
@@ -597,6 +672,9 @@ export default function VenueLayoutBuilder({
       if (layoutData.data.seating_config?.labels) initLabels = layoutData.data.seating_config.labels;
       if (layoutData.data.seating_config?.shapes) initShapes = layoutData.data.seating_config.shapes;
       if (layoutData.data.seating_config?.bgImageUrl) initBg = layoutData.data.seating_config.bgImageUrl;
+      if (layoutData.data.seating_config?.sectionColors) {
+        initColors = { ...layoutData.data.seating_config.sectionColors };
+      }
     } else {
       return;
     }
@@ -605,7 +683,16 @@ export default function VenueLayoutBuilder({
     setLabels(initLabels);
     setShapes(initShapes);
     setBgImageUrl(initBg);
-    setHistory([{ seats: initSeats, labels: initLabels, shapes: initShapes, bgImageUrl: initBg }]);
+    setSectionColors(initColors);
+    setHistory([
+      {
+        seats: initSeats,
+        labels: initLabels,
+        shapes: initShapes,
+        bgImageUrl: initBg,
+        sectionColors: initColors,
+      },
+    ]);
     setHistoryIndex(0);
   }, [layoutData, venueAdapter]);
 
@@ -617,7 +704,7 @@ export default function VenueLayoutBuilder({
         id: section.id,
         ticket_type: section.name,
         total_count: section.capacity || 99999,
-        price: 0,
+        price: Number(section.price) || 0,
       }))
     : eventDetails?.ticket_types || [];
 
@@ -709,6 +796,7 @@ export default function VenueLayoutBuilder({
       setShapes([...shapes, newShape]);
     } else if (clickedOnEmpty) {
       setSelectedSeatId(null);
+      setSelectedSeatIds([]);
       setSelectedLabelId(null);
       setSelectedShapeId(null);
     }
@@ -807,54 +895,176 @@ export default function VenueLayoutBuilder({
     }
   };
 
-  const updateSelectedSeat = (field: keyof Seat, value: string) => {
-    const selectedSeat = seats.find(s => s.internalId === selectedSeatId);
-    if (selectedSeat && selectedSeat.status && selectedSeat.status !== "AVAILABLE") {
-      if (field === "row_label" || field === "seat_label" || field === "section_name" || field === "ticket_type_id") {
-        toast.error(`Cannot edit ${field.replace('_', ' ')}: Seat ${selectedSeat.row_label}-${selectedSeat.seat_label} already has customer bookings!`);
-        return;
-      }
+  const resolveSeatColor = (seat: Seat | string) => {
+    if (typeof seat === "string") {
+      const key = String(seat || "General").trim() || "General";
+      return sectionColors[key] || defaultSectionColor(key);
     }
-
-    if (moveEntireSection && selectedSeatId) {
-      if (selectedSeat && selectedSeat.section_name) {
-        // Bulk update the field for the entire section
-        setSeats(seats.map(s => s.section_name === selectedSeat.section_name ? { ...s, [field]: value } : s));
-        return;
-      }
+    if (seat.color && /^#?[0-9a-fA-F]{3,8}$/.test(seat.color.trim())) {
+      return seat.color.startsWith("#") ? seat.color : `#${seat.color}`;
     }
-    setSeats(seats.map(s => s.internalId === selectedSeatId ? { ...s, [field]: value } : s));
+    const key = String(seat.section_name || "General").trim() || "General";
+    return sectionColors[key] || defaultSectionColor(key);
   };
 
-  const deleteSelectedSeat = () => {
-    if (!selectedSeatId) return;
+  const getActiveSelectionIds = () => {
+    if (selectedSeatIds.length > 0) return selectedSeatIds;
+    if (selectedSeatId) return [selectedSeatId];
+    return [] as string[];
+  };
 
-    const seatToDelete = seats.find(s => s.internalId === selectedSeatId);
-    if (seatToDelete && seatToDelete.status && seatToDelete.status !== "AVAILABLE") {
-      toast.error(`Cannot delete seat ${seatToDelete.row_label}-${seatToDelete.seat_label}: It is already ${seatToDelete.status.toLowerCase()}!`);
+  const selectSeat = (seatId: string, multi: boolean) => {
+    setSelectedLabelId(null);
+    setSelectedShapeId(null);
+    if (multi) {
+      setSelectedSeatIds((prev) => {
+        const exists = prev.includes(seatId);
+        const next = exists ? prev.filter((id) => id !== seatId) : [...prev, seatId];
+        setSelectedSeatId(next[next.length - 1] || null);
+        return next;
+      });
+      return;
+    }
+    setSelectedSeatId(seatId);
+    setSelectedSeatIds([seatId]);
+  };
+
+  const selectEntireRow = () => {
+    const primary = seats.find((s) => s.internalId === selectedSeatId);
+    if (!primary) return;
+    const ids = seats
+      .filter(
+        (s) =>
+          (s.section_name || "") === (primary.section_name || "") &&
+          (s.row_label || "") === (primary.row_label || "")
+      )
+      .map((s) => s.internalId);
+    setSelectedSeatIds(ids);
+    setSelectedSeatId(primary.internalId);
+    toast.success(`Selected row ${primary.row_label} (${ids.length} seats)`);
+  };
+
+  const selectEntireSectionSeats = () => {
+    const primary = seats.find((s) => s.internalId === selectedSeatId);
+    if (!primary) return;
+    const ids = seats
+      .filter((s) => (s.section_name || "") === (primary.section_name || ""))
+      .map((s) => s.internalId);
+    setSelectedSeatIds(ids);
+    setSelectedSeatId(primary.internalId);
+    toast.success(`Selected section ${primary.section_name} (${ids.length} seats)`);
+  };
+
+  const setColorForSelection = (color: string) => {
+    const ids = getActiveSelectionIds();
+    if (ids.length === 0) return;
+
+    // "Apply to entire section" → color every seat in that section (+ keep section default map)
+    if (moveEntireSection && selectedSeatId) {
+      const primary = seats.find((s) => s.internalId === selectedSeatId);
+      if (primary?.section_name) {
+        const sectionName = primary.section_name;
+        setSeats((prev) =>
+          prev.map((s) => (s.section_name === sectionName ? { ...s, color } : s))
+        );
+        setSectionColors((prev) => ({ ...prev, [sectionName]: color }));
+        toast.success(`Applied color to entire section "${sectionName}"`);
+        return;
+      }
+    }
+
+    // Otherwise only the selected seats / row
+    setSeats((prev) =>
+      prev.map((s) => (ids.includes(s.internalId) ? { ...s, color } : s))
+    );
+    toast.success(
+      ids.length === 1
+        ? "Applied color to selected seat"
+        : `Applied color to ${ids.length} selected seats`
+    );
+  };
+
+  const updateSelectedSeat = (field: keyof Seat, value: string) => {
+    const ids = getActiveSelectionIds();
+    if (ids.length === 0) return;
+
+    const locked = seats.find(
+      (s) =>
+        ids.includes(s.internalId) &&
+        s.status &&
+        s.status !== "AVAILABLE" &&
+        (field === "row_label" || field === "seat_label" || field === "section_name" || field === "ticket_type_id")
+    );
+    if (locked) {
+      toast.error(
+        `Cannot edit ${field.replace("_", " ")}: Seat ${locked.row_label}-${locked.seat_label} already has customer bookings!`
+      );
       return;
     }
 
-    if (moveEntireSection) {
-      const selectedSeat = seats.find(s => s.internalId === selectedSeatId);
+    if (moveEntireSection && selectedSeatId && ids.length <= 1) {
+      const selectedSeat = seats.find((s) => s.internalId === selectedSeatId);
+      if (selectedSeat && selectedSeat.section_name) {
+        const oldName = selectedSeat.section_name;
+        setSeats(
+          seats.map((s) => (s.section_name === oldName ? { ...s, [field]: value } : s))
+        );
+        if (field === "section_name" && value && value !== oldName) {
+          setSectionColors((prev) => {
+            const next = { ...prev };
+            if (prev[oldName]) {
+              next[value] = prev[oldName];
+              delete next[oldName];
+            }
+            return next;
+          });
+        }
+        return;
+      }
+    }
+
+    setSeats(seats.map((s) => (ids.includes(s.internalId) ? { ...s, [field]: value } : s)));
+  };
+
+  const deleteSelectedSeat = () => {
+    const ids = getActiveSelectionIds();
+    if (ids.length === 0) return;
+
+    const booked = seats.filter(
+      (s) => ids.includes(s.internalId) && s.status && s.status !== "AVAILABLE"
+    );
+    if (booked.length > 0) {
+      toast.error(`Cannot delete: ${booked.length} selected seat(s) are already booked/reserved.`);
+      return;
+    }
+
+    if (moveEntireSection && ids.length <= 1 && selectedSeatId) {
+      const selectedSeat = seats.find((s) => s.internalId === selectedSeatId);
       if (selectedSeat) {
         const groupId = selectedSeat.grid_id || selectedSeat.section_name;
         if (groupId) {
-          const bookedInGroup = seats.filter(s => (s.grid_id || s.section_name) === groupId && s.status && s.status !== "AVAILABLE");
+          const bookedInGroup = seats.filter(
+            (s) => (s.grid_id || s.section_name) === groupId && s.status && s.status !== "AVAILABLE"
+          );
           if (bookedInGroup.length > 0) {
-            toast.error(`Cannot delete entire section: ${bookedInGroup.length} seat(s) are already booked/reserved!`);
+            toast.error(
+              `Cannot delete entire section: ${bookedInGroup.length} seat(s) are already booked/reserved!`
+            );
             return;
           }
-          setSeats(seats.filter(s => (s.grid_id || s.section_name) !== groupId));
+          setSeats(seats.filter((s) => (s.grid_id || s.section_name) !== groupId));
           setSelectedSeatId(null);
+          setSelectedSeatIds([]);
           toast.success("Deleted entire grid!");
           return;
         }
       }
     }
 
-    setSeats(seats.filter(s => s.internalId !== selectedSeatId));
+    setSeats(seats.filter((s) => !ids.includes(s.internalId)));
     setSelectedSeatId(null);
+    setSelectedSeatIds([]);
+    toast.success(ids.length > 1 ? `Removed ${ids.length} seats` : "Seat removed");
   };
 
   const deleteSelectedLabel = () => {
@@ -959,13 +1169,18 @@ export default function VenueLayoutBuilder({
           coordinate_y: cy,
           status: "AVAILABLE",
           grid_id: gridId,
+          color: bulkColor || defaultSectionColor(bulkSection),
         });
         seatCounter++;
       }
     }
     setSeats([...seats, ...newSeats]);
+    setSectionColors((prev) => ({
+      ...prev,
+      [bulkSection.trim() || "General"]: bulkColor || defaultSectionColor(bulkSection),
+    }));
     setMode("select");
-    toast.success(`Added ${bulkRows * bulkCols} seats!`);
+    toast.success(`Added ${bulkRows * bulkCols} seats in "${bulkSection}"!`);
   };
 
   const generateTheater = () => {
@@ -2448,7 +2663,7 @@ export default function VenueLayoutBuilder({
     toast.success("Loaded Grand Theatre Template!");
   };
 
-  const handleSave = async (publish = false) => {
+  const handleSave = async (publish = false, saveAsNew = false) => {
     if (maxCapacity > 0 && seats.length > maxCapacity) {
       toast.error(
         `Validation Failed: Total seats placed (${seats.length}) exceeds the maximum room/screen capacity (${maxCapacity}). Please remove ${seats.length - maxCapacity} seat(s).`
@@ -2468,7 +2683,14 @@ export default function VenueLayoutBuilder({
 
     try {
       const payload = {
-        seating_config: { canvasWidth: 3200, canvasHeight: 2400, labels, shapes, bgImageUrl: bgImageUrl || undefined },
+        seating_config: {
+          canvasWidth: 3200,
+          canvasHeight: 2400,
+          labels,
+          shapes,
+          bgImageUrl: bgImageUrl || undefined,
+          sectionColors,
+        },
         seats: seats.map((s) => ({
           id: typeof s.id === "string" && !s.id.startsWith("0.") ? s.id : undefined,
           internalId: s.internalId,
@@ -2480,11 +2702,11 @@ export default function VenueLayoutBuilder({
           coordinate_y: Number(s.coordinate_y) || 0,
           status: s.status || "AVAILABLE",
           grid_id: s.grid_id || s.section_name,
+          color: s.color || null,
         })),
       };
       if (venueAdapter) {
-        await venueAdapter.onSave(payload, { publish });
-        toast.success(publish ? "Layout sent to the venue as an option." : "Layout option saved.");
+        await venueAdapter.onSave(payload, { publish, saveAsNew });
         return;
       }
       if (!eventId) return;
@@ -2635,6 +2857,9 @@ export default function VenueLayoutBuilder({
               : "bg-white text-slate-700 border-slate-200 shadow-sm"
           }`}>
             <span>🪑 Seats: <strong>{seats.length}</strong></span>
+            {selectedSeatIds.length > 1 && (
+              <span className="text-rose-600 font-semibold">· {selectedSeatIds.length} selected</span>
+            )}
             {maxCapacity > 0 && (
               <>
                 <span className="text-slate-400">/</span>
@@ -2685,10 +2910,32 @@ export default function VenueLayoutBuilder({
           <button onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
             <Save size={16} /> {isSaving ? "Saving..." : venueAdapter ? "Save layout" : "Save Layout"}
           </button>
+          {venueAdapter?.hideSubmitToVenue ? (
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => void handleSave(false, true)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors flex items-center gap-2"
+              title="Keep the current option and also save this canvas as another option"
+            >
+              <PlusSquare size={16} /> Save as new option
+            </button>
+          ) : null}
           {venueAdapter?.onBlankPage ? (
             <button
               type="button"
-              onClick={() => venueAdapter.onBlankPage?.()}
+              onClick={() => {
+                setSeats([]);
+                setLabels([]);
+                setShapes([]);
+                setSectionColors({});
+                setSelectedSeatId(null);
+                setSelectedSeatIds([]);
+                setHistory([{ seats: [], labels: [], shapes: [], bgImageUrl: null, sectionColors: {} }]);
+                setHistoryIndex(0);
+                venueAdapter.onBlankPage?.();
+                toast.info("Blank page ready — build another option, then Save as new option.");
+              }}
               className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors"
             >
               Add blank page
@@ -2866,28 +3113,10 @@ export default function VenueLayoutBuilder({
                   );
                 })}
                 {(() => {
-                  const getSectionColor = (sectionName: string): string => {
-                    const name = (sectionName || "").toLowerCase();
-                    if (name.includes("vip") || name.includes("premium")) return "#f59e0b"; // Golden Amber
-                    if (name.includes("category 1") || name.includes("cat 1")) return "#dc2626"; // Vibrant Red
-                    if (name.includes("category 2") || name.includes("cat 2") || name.includes("east stand")) return "#2563eb"; // Royal Blue
-                    if (name.includes("category 3") || name.includes("cat 3") || name.includes("west stand")) return "#16a34a"; // Stadium Green
-                    if (name.includes("away")) return "#9333ea"; // Purple
-                    if (name.includes("south")) return "#f97316"; // Orange
-                    if (name.includes("platinum")) return "#06b6d4"; // Cyan
-                    if (name.includes("gold")) return "#a855f7";     // Purple
-                    if (name.includes("dress")) return "#ec4899";    // Pink
-                    if (name.includes("upper balcony")) return "#8b5cf6";    // Violet
-                    if (name.includes("recliner")) return "#0284c7"; // Sky Blue
-                    if (name.includes("prime")) return "#3b82f6";    // Blue
-                    if (name.includes("classic")) return "#6366f1";  // Indigo
-                    return "#3b82f6";
-                  };
-
                   const renderSeat = (seat: Seat, isDraggable: boolean, dx: number = 0, dy: number = 0) => {
-                    const isSelected = seat.internalId === selectedSeatId;
-                    const tt = ticketTypes.find((t: any) => t.id === seat.ticket_type_id);
-                    const color = tt ? "#3b82f6" : getSectionColor(seat.section_name);
+                    const isSelected =
+                      seat.internalId === selectedSeatId || selectedSeatIds.includes(seat.internalId);
+                    const color = resolveSeatColor(seat);
       
       return (
         <Group
@@ -2895,13 +3124,13 @@ export default function VenueLayoutBuilder({
           id={seat.internalId}
           x={seat.coordinate_x + dx}
           y={seat.coordinate_y + dy}
-          draggable={isDraggable && mode === "select"}
+          draggable={isDraggable && mode === "select" && selectedSeatIds.length <= 1}
           onDragEnd={isDraggable ? ((e) => handleDragEnd(e, seat.internalId)) : undefined}
           onMouseEnter={() => setHoveredSeat(seat)}
           onMouseLeave={() => setHoveredSeat((prev) => (prev?.internalId === seat.internalId ? null : prev))}
           onDblClick={() => handleToggleZoomOnSection(seat)}
           onDblTap={() => handleToggleZoomOnSection(seat)}
-          onClick={() => {
+          onClick={(e) => {
             if (mode === "eraser") {
               if (seat.status && seat.status !== "AVAILABLE") {
                 toast.error(`Cannot erase seat ${seat.row_label}-${seat.seat_label}: already booked/reserved.`);
@@ -2909,15 +3138,15 @@ export default function VenueLayoutBuilder({
               }
               setSeats(prev => prev.filter(s => s.internalId !== seat.internalId));
               if (selectedSeatId === seat.internalId) setSelectedSeatId(null);
+              setSelectedSeatIds((prev) => prev.filter((id) => id !== seat.internalId));
               return;
             }
             if (mode === "select") {
-              setSelectedSeatId(seat.internalId);
-              setSelectedLabelId(null);
-              setSelectedShapeId(null);
+              const multi = Boolean(e.evt?.ctrlKey || e.evt?.metaKey || e.evt?.shiftKey);
+              selectSeat(seat.internalId, multi);
             }
           }}
-          onTap={() => {
+          onTap={(e) => {
             if (mode === "eraser") {
               if (seat.status && seat.status !== "AVAILABLE") {
                 toast.error(`Cannot erase seat ${seat.row_label}-${seat.seat_label}: already booked/reserved.`);
@@ -2925,12 +3154,12 @@ export default function VenueLayoutBuilder({
               }
               setSeats(prev => prev.filter(s => s.internalId !== seat.internalId));
               if (selectedSeatId === seat.internalId) setSelectedSeatId(null);
+              setSelectedSeatIds((prev) => prev.filter((id) => id !== seat.internalId));
               return;
             }
             if (mode === "select") {
-              setSelectedSeatId(seat.internalId);
-              setSelectedLabelId(null);
-              setSelectedShapeId(null);
+              const multi = Boolean(e.evt?.ctrlKey || e.evt?.metaKey || e.evt?.shiftKey);
+              selectSeat(seat.internalId, multi);
             }
           }}
         >
@@ -3257,6 +3486,43 @@ export default function VenueLayoutBuilder({
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Section Name</label>
                 <input type="text" value={bulkSection} onChange={(e) => setBulkSection(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Section Color</label>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="color"
+                    value={bulkColor}
+                    onChange={(e) => setBulkColor(e.target.value)}
+                    className="h-10 w-12 rounded border border-slate-300 cursor-pointer bg-white"
+                    title="Pick section color"
+                  />
+                  <input
+                    type="text"
+                    value={bulkColor}
+                    onChange={(e) => setBulkColor(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SECTION_COLOR_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      onClick={() => setBulkColor(c)}
+                      className={`h-6 w-6 rounded-full border-2 ${
+                        bulkColor.toLowerCase() === c.toLowerCase()
+                          ? "border-slate-900 scale-110"
+                          : "border-white shadow"
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">
+                  Each section can use a different color so VIP / stalls / balcony stay easy to spot.
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Layout Shape</label>
@@ -3455,6 +3721,12 @@ export default function VenueLayoutBuilder({
             </div>
           ) : selectedSeat ? (
             <div className="space-y-4">
+              {selectedSeatIds.length > 1 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                  <strong>{selectedSeatIds.length} seats</strong> selected · edits apply to all selected
+                  seats. Tip: Ctrl/Cmd+click to add seats.
+                </div>
+              )}
               {selectedSeat.status && selectedSeat.status !== "AVAILABLE" && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
                   <div className="font-bold flex items-center gap-1.5">
@@ -3465,6 +3737,22 @@ export default function VenueLayoutBuilder({
                   </p>
                 </div>
               )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={selectEntireRow}
+                  className="px-2 py-2 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Select row {selectedSeat.row_label}
+                </button>
+                <button
+                  type="button"
+                  onClick={selectEntireSectionSeats}
+                  className="px-2 py-2 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Select section
+                </button>
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Ticket Type (Pricing Zone)</label>
                 <select 
@@ -3478,6 +3766,44 @@ export default function VenueLayoutBuilder({
                     <option key={t.id} value={t.id}>{t.ticket_type} (Birr {t.price})</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">
+                  {moveEntireSection ? "Section color" : "Color (selected seats only)"}
+                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="color"
+                    value={resolveSeatColor(selectedSeat)}
+                    onChange={(e) => setColorForSelection(e.target.value)}
+                    className="h-10 w-12 rounded border border-slate-300 cursor-pointer bg-white"
+                  />
+                  <span
+                    className="h-8 flex-1 rounded-lg border border-slate-200"
+                    style={{ backgroundColor: resolveSeatColor(selectedSeat) }}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SECTION_COLOR_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      onClick={() => setColorForSelection(c)}
+                      className={`h-6 w-6 rounded-full border-2 ${
+                        resolveSeatColor(selectedSeat).toLowerCase() === c.toLowerCase()
+                          ? "border-slate-900 scale-110"
+                          : "border-white shadow"
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">
+                  {moveEntireSection
+                    ? "Applies to the whole section."
+                    : "Only selected seats/row change. Check “Apply changes to entire section” for the full section."}
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Section / Row</label>
@@ -3528,13 +3854,19 @@ export default function VenueLayoutBuilder({
                 <input
                   type="text"
                   value={selectedSeat.seat_label}
-                  disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                  disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE") || selectedSeatIds.length > 1}
                   onChange={(e) => updateSelectedSeat("seat_label", e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
+                {selectedSeatIds.length > 1 && (
+                  <p className="text-[11px] text-slate-500 mt-1">Seat labels stay unique — edit one seat at a time for labels.</p>
+                )}
               </div>
               <div className="pt-4 border-t border-slate-100">
-                <p className="text-xs font-medium text-slate-500 mb-3">Status: <span className="text-slate-800 font-semibold">{selectedSeat.status}</span></p>
+                <p className="text-xs font-medium text-slate-500 mb-3">
+                  Status: <span className="text-slate-800 font-semibold">{selectedSeat.status}</span>
+                  {selectedSeatIds.length > 1 ? ` · ${selectedSeatIds.length} selected` : ""}
+                </p>
                 <button
                   onClick={deleteSelectedSeat}
                   disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
@@ -3545,12 +3877,22 @@ export default function VenueLayoutBuilder({
                   }`}
                   title={selectedSeat.status && selectedSeat.status !== "AVAILABLE" ? "Booked seats cannot be deleted" : "Remove seat"}
                 >
-                  <Trash2 size={16} /> {selectedSeat.status && selectedSeat.status !== "AVAILABLE" ? "Seat Locked (Booked)" : "Remove Seat"}
+                  <Trash2 size={16} />{" "}
+                  {selectedSeat.status && selectedSeat.status !== "AVAILABLE"
+                    ? "Seat Locked (Booked)"
+                    : selectedSeatIds.length > 1
+                      ? `Remove ${selectedSeatIds.length} Seats`
+                      : "Remove Seat"}
                 </button>
               </div>
             </div>
           ) : (
-            <p className="text-slate-500 text-sm">Select a seat or label on the canvas, or click a toolbar action.</p>
+            <p className="text-slate-500 text-sm">
+              Select a seat or label on the canvas, or click a toolbar action.
+              <span className="block mt-2 text-xs text-slate-400">
+                Multi-select: Ctrl/Cmd+click seats, or use Select row / Select section after picking one seat.
+              </span>
+            </p>
           )}
         </div>
       )}

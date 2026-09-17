@@ -50,13 +50,6 @@ function formatEventDate(startsAt?: string | null, endsAt?: string | null): stri
   return `${startLabel} – ${endLabel}`;
 }
 
-function formatEventTime(startsAt?: string | null): string {
-  if (!startsAt) return "";
-  const d = new Date(startsAt);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
 export default function OrganizerEventsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -70,7 +63,10 @@ export default function OrganizerEventsPage() {
     }),
     [search, statusFilter, page]
   );
-  const { data, isLoading } = useGetOrganizerEventsQuery(queryArg);
+  const { data, isLoading } = useGetOrganizerEventsQuery(queryArg, {
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+  });
   const events = data?.items ?? [];
 
   return (
@@ -153,11 +149,6 @@ export default function OrganizerEventsPage() {
                       <p className="text-sm font-semibold text-foreground">
                         {formatEventDate(event.event_starts_at, event.event_ends_at)}
                       </p>
-                      {formatEventTime(event.event_starts_at) && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {formatEventTime(event.event_starts_at)}
-                        </p>
-                      )}
                     </td>
                     <td className="px-3 py-4 align-top">
                       <Link
@@ -183,11 +174,25 @@ export default function OrganizerEventsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-4 text-sm text-muted-foreground align-top">
-                      {event.contract
-                        ? contractStatusLabel(event.contract.status, {
+                      {(() => {
+                        const layoutStatus = String(event.layout_request_status || "").toUpperCase();
+                        if (
+                          layoutStatus === "SUBMITTED" ||
+                          layoutStatus === "UNDER_REVIEW" ||
+                          layoutStatus === "ORGANIZER_CHANGE_REQUESTED"
+                        ) {
+                          return "Waiting for Super Admin layout";
+                        }
+                        if (layoutStatus === "PENDING_ORGANIZER_APPROVAL") {
+                          return "Approve layout on Preview";
+                        }
+                        if (event.contract) {
+                          return contractStatusLabel(event.contract.status, {
                             eventStatus: event.status,
-                          })
-                        : "Waiting for Super Admin"}
+                          });
+                        }
+                        return "Waiting for Super Admin";
+                      })()}
                     </td>
                     <td className="px-3 py-4 text-sm text-muted-foreground align-top">
                       {event.is_visible ? "Yes" : "No"}

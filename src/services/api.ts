@@ -263,6 +263,7 @@ export interface VenueLayoutTemplate {
   id: string;
   business_id?: string;
   request_id?: string | null;
+  event_request_id?: string | null;
   hall_id?: string | null;
   name: string;
   layout_type: string;
@@ -683,6 +684,9 @@ export interface AdminEvent {
   event_starts_at?: string | null;
   /** Latest showtime end (organizer list). */
   event_ends_at?: string | null;
+  /** Latest open custom layout request status (organizer list). */
+  layout_request_status?: string | null;
+  layout_request_name?: string | null;
   ticket_types?: Array<{
     id: string;
     ticket_type: string;
@@ -713,6 +717,15 @@ export interface AdminEvent {
     custom_layout_type?: string | null;
     custom_layout_capacity?: number | null;
     custom_layout_notes?: string | null;
+    venue_proposal?: {
+      contact_name?: string;
+      contact_phone?: string;
+      contact_email?: string;
+      capacity?: number | null;
+      facilities?: string[];
+      image_urls?: string[];
+      notes?: string;
+    } | null;
     starts_at: string;
     ends_at?: string;
     duration_type?: 'ONE_DAY' | 'MULTI_DAY';
@@ -747,6 +760,23 @@ export interface AdminEvent {
     venue_name?: string | null;
     organizer_change_notes?: string | null;
     reference_images?: string[];
+    fulfilled_template_id?: string | null;
+    fulfilled_template_name?: string | null;
+    fulfilled_template_capacity?: number | null;
+    proposed_template_ids?: string[];
+    proposed_templates?: Array<{
+      id: string;
+      name: string;
+      capacity?: number | null;
+      status?: string;
+      is_default?: boolean;
+      venue_approved_at?: string | null;
+      venue_live_requested_at?: string | null;
+      rejection_reason?: string | null;
+      seating_config?: Record<string, unknown> | null;
+      seats_json?: unknown[];
+      seat_count?: number | null;
+    }>;
     status_history?: Array<{ status?: string; at?: string; by?: string; note?: string | null }>;
   }>;
   hosting_type?: 'single' | 'tour';
@@ -789,6 +819,18 @@ export interface EventDocumentUpload {
   document_type_id: number;
   url: string;
   document_name?: string;
+}
+
+export interface EventCategoryMaster {
+  id: number;
+  /** Same as business_types.id — value stored on events.category_type_id */
+  business_type_id: number;
+  category_type_id: number;
+  name: string;
+  slug?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
 }
 
 export interface EventGenreMaster {
@@ -927,6 +969,8 @@ export interface EventContract {
   rejection_reason?: string | null;
   event_name?: string;
   organizer_name?: string;
+  event_status?: string;
+  event_ends_at?: string | null;
   created_at?: string;
 }
 
@@ -1161,9 +1205,17 @@ export interface AdminEventLayoutRequest {
   layout_type?: string;
   capacity?: number;
   notes?: string | null;
+  organizer_change_notes?: string | null;
   status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'FULFILLED' | 'REJECTED' | 'CANCELLED' | string;
   rejection_reason?: string | null;
   fulfilled_template_id?: string | null;
+  proposed_template_ids?: string[];
+  proposed_templates?: Array<{
+    id: string;
+    name: string;
+    capacity?: number | null;
+    status?: string;
+  }>;
   submitted_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -1179,7 +1231,36 @@ export interface AdminEventLayoutRequest {
   fulfilled_template_capacity?: number | null;
   fulfilled_template_status?: string | null;
   workflow_tab?: string;
+  draft_count?: number;
+  built_count?: number;
+  published_option_count?: number;
+  showtime_venue_address?: string | null;
+  city_name?: string | null;
+  city_state?: string | null;
+  city_country?: string | null;
   published_layouts?: OrganizerVenueLayoutOption[];
+  templates?: VenueLayoutTemplate[];
+  ticket_types?: Array<{
+    id: string;
+    ticket_type: string;
+    total_count: number;
+    available_count?: number;
+    price?: number | string;
+    max_per_order?: number | null;
+  }>;
+  ticket_seat_total?: number;
+  target_capacity?: number;
+  source_venue_layout?: {
+    id: string;
+    name: string;
+    layout_type?: string;
+    capacity?: number | null;
+    status?: string;
+    is_default?: boolean;
+    seating_config?: Record<string, unknown> | null;
+    seats_json?: unknown[];
+    seat_count?: number;
+  } | null;
 }
 
 export interface EventArtistItem {
@@ -3123,11 +3204,32 @@ export const api = createApi({
       invalidatesTags: ['EventLayoutRequests', 'OrganizerEvents', 'AdminEvents'],
     }),
 
+    saveAdminEventLayoutTemplate: builder.mutation<
+      VenueLayoutTemplate,
+      {
+        id: string;
+        seating_config: Record<string, unknown>;
+        seats: unknown[];
+        name?: string;
+        template_id?: string;
+        save_as_new?: boolean;
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/event-layout-requests/${id}/template`,
+        method: 'PUT',
+        body,
+      }),
+      transformResponse: (res: { data: VenueLayoutTemplate }) => res.data,
+      invalidatesTags: ['EventLayoutRequests', 'EventLayouts'],
+    }),
+
     fulfillAdminEventLayoutRequest: builder.mutation<
       { data: AdminEventLayoutRequest; message?: string },
       {
         id: string;
         fulfilled_template_id?: string | null;
+        fulfilled_template_ids?: string[];
         apply_to_event?: boolean;
         notes?: string;
       }
@@ -3141,8 +3243,14 @@ export const api = createApi({
     }),
 
     reviewOrganizerEventLayoutRequest: builder.mutation<
-      { data?: unknown },
-      { id: string; action: 'approve' | 'request_changes'; notes?: string }
+      { data?: unknown; message?: string },
+      {
+        id: string;
+        action: 'approve' | 'go_live' | 'approve_option' | 'reject_option' | 'request_changes';
+        notes?: string;
+        selected_template_id?: string;
+        template_id?: string;
+      }
     >({
       query: ({ id, ...body }) => ({
         url: `/events/organizer/layout-requests/${id}/review`,
@@ -4821,7 +4929,7 @@ export const api = createApi({
 
     getEventContracts: builder.query<
       PaginatedList<EventContract>,
-      (PagedQuery & { scope?: 'current' | 'old' }) | void
+      (PagedQuery & { scope?: 'current' | 'old' | 'pending' }) | void
     >({
       query: (params) =>
         `/admin/event-contracts${toListQuery({
@@ -4939,7 +5047,7 @@ export const api = createApi({
           scope: params?.scope,
         })}`,
       transformResponse: (res: { data: EventContract[] }) => unwrapPaginated(res),
-      providesTags: ['EventContracts', 'OrganizerEvents'],
+      providesTags: ['EventContracts'],
     }),
 
     getOrganizerEventContractById: builder.query<EventContract, string>({
@@ -5718,23 +5826,36 @@ export const api = createApi({
         showtime_id: string;
         event_id: string;
         event_name: string;
+        event_status?: string;
+        category_name?: string | null;
         venue_name: string;
+        venue_address?: string | null;
         starts_at: string;
+        ends_at?: string | null;
         city_name?: string;
         organizer_name?: string;
+        venue_source?: string;
+        linked_venue_name?: string | null;
       }>,
       string
     >({
       query: (businessId) => `/businesses/${businessId}/venue/claimable-showtimes`,
-      transformResponse: (res: { data?: unknown[] }) => (res?.data ?? []) as Array<{
-        showtime_id: string;
-        event_id: string;
-        event_name: string;
-        venue_name: string;
-        starts_at: string;
-        city_name?: string;
-        organizer_name?: string;
-      }>,
+      transformResponse: (res: { data?: unknown[] }) =>
+        (res?.data ?? []) as Array<{
+          showtime_id: string;
+          event_id: string;
+          event_name: string;
+          event_status?: string;
+          category_name?: string | null;
+          venue_name: string;
+          venue_address?: string | null;
+          starts_at: string;
+          ends_at?: string | null;
+          city_name?: string;
+          organizer_name?: string;
+          venue_source?: string;
+          linked_venue_name?: string | null;
+        }>,
     }),
 
     claimVenueShowtime: builder.mutation<
@@ -6224,7 +6345,81 @@ export const api = createApi({
       providesTags: ['EventMasters'],
     }),
 
+    getEventCategories: builder.query<EventCategoryMaster[], void>({
+      query: () => '/events/categories',
+      transformResponse: (res: { data?: EventCategoryMaster[] }) => res.data ?? [],
+      providesTags: [{ type: 'EventMasters', id: 'CATEGORY_LIST' }],
+    }),
+
     // ── Admin Event Masters ───────────────────────────────────────────────────
+
+    getAdminEventCategories: builder.query<
+      PaginatedList<EventCategoryMaster>,
+      { q?: string; page?: number; limit?: number; active_only?: boolean } | void
+    >({
+      query: (params) =>
+        `/admin/event-categories${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+          active_only: params?.active_only ? 'true' : undefined,
+        })}`,
+      transformResponse: (res: { data?: EventCategoryMaster[] }) => unwrapPaginated(res),
+      providesTags: (result) =>
+        result?.items
+          ? [
+              ...result.items.map((c) => ({
+                type: 'EventMasters' as const,
+                id: `category-${c.id}`,
+              })),
+              { type: 'EventMasters', id: 'CATEGORY_LIST' },
+            ]
+          : [{ type: 'EventMasters', id: 'CATEGORY_LIST' }],
+    }),
+
+    createAdminEventCategory: builder.mutation<
+      EventCategoryMaster,
+      { name: string; slug?: string; is_active?: boolean; sort_order?: number }
+    >({
+      query: (body) => ({
+        url: '/admin/event-categories',
+        method: 'POST',
+        body: { is_active: true, ...body },
+      }),
+      transformResponse: (res: { data?: EventCategoryMaster }) =>
+        res?.data ?? ({} as EventCategoryMaster),
+      invalidatesTags: [
+        { type: 'EventMasters', id: 'CATEGORY_LIST' },
+        'EventMasters',
+        'Businesses',
+      ],
+    }),
+
+    updateAdminEventCategory: builder.mutation<
+      EventCategoryMaster,
+      { id: number; body: Partial<Pick<EventCategoryMaster, 'name' | 'slug' | 'is_active' | 'sort_order'>> }
+    >({
+      query: ({ id, body }) => ({ url: `/admin/event-categories/${id}`, method: 'PUT', body }),
+      transformResponse: (res: { data?: EventCategoryMaster }) => {
+        if (!res?.data) throw new Error('Update failed — empty response.');
+        return res.data;
+      },
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: 'EventMasters', id: `category-${id}` },
+        { type: 'EventMasters', id: 'CATEGORY_LIST' },
+        'EventMasters',
+        'Businesses',
+      ],
+    }),
+
+    deleteAdminEventCategory: builder.mutation<void, number>({
+      query: (id) => ({ url: `/admin/event-categories/${id}`, method: 'DELETE' }),
+      invalidatesTags: [
+        { type: 'EventMasters', id: 'CATEGORY_LIST' },
+        'EventMasters',
+        'Businesses',
+      ],
+    }),
 
     getAdminEventGenres: builder.query<
       PaginatedList<EventGenreMaster>,
@@ -7683,6 +7878,7 @@ export const {
   useGetAdminEventLayoutRequestsQuery,
   useGetAdminEventLayoutRequestQuery,
   useReviewAdminEventLayoutRequestMutation,
+  useSaveAdminEventLayoutTemplateMutation,
   useFulfillAdminEventLayoutRequestMutation,
   useReviewOrganizerEventLayoutRequestMutation,
   useGetGeoCountriesQuery,
@@ -7919,6 +8115,11 @@ export const {
   useGetEventBookingByIdQuery,
   useCancelEventBookingMutation,
   useGetEventMastersQuery,
+  useGetEventCategoriesQuery,
+  useGetAdminEventCategoriesQuery,
+  useCreateAdminEventCategoryMutation,
+  useUpdateAdminEventCategoryMutation,
+  useDeleteAdminEventCategoryMutation,
   useGetAdminEventGenresQuery,
   useCreateAdminEventGenreMutation,
   useUpdateAdminEventGenreMutation,

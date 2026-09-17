@@ -734,6 +734,39 @@ export default function AdminEventDetailPage({
                         </dd>
                       </div>
                     )}
+                    {(() => {
+                      const proposal =
+                        s.venue_proposal && typeof s.venue_proposal === "object"
+                          ? s.venue_proposal
+                          : null;
+                      if (!proposal) return null;
+                      const name = String(proposal.contact_name || "").trim();
+                      const email = String(proposal.contact_email || "").trim();
+                      const phone = String(proposal.contact_phone || "").trim();
+                      if (!name && !email && !phone) return null;
+                      return (
+                        <>
+                          {name ? (
+                            <div className="flex justify-between gap-2 sm:col-span-2">
+                              <dt className="portal-muted">Contact person</dt>
+                              <dd className="text-slate-800">{name}</dd>
+                            </div>
+                          ) : null}
+                          {email ? (
+                            <div className="flex justify-between gap-2 sm:col-span-2">
+                              <dt className="portal-muted">Contact email</dt>
+                              <dd className="text-slate-800">{email}</dd>
+                            </div>
+                          ) : null}
+                          {phone ? (
+                            <div className="flex justify-between gap-2 sm:col-span-2">
+                              <dt className="portal-muted">Contact phone</dt>
+                              <dd className="text-slate-800">{phone}</dd>
+                            </div>
+                          ) : null}
+                        </>
+                      );
+                    })()}
                     {s.venue_claim_status && (
                       <div className="flex justify-between gap-2">
                         <dt className="portal-muted">Claim status</dt>

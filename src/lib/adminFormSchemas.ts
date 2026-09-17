@@ -181,6 +181,11 @@ export const adminPartnerTermCreateSchema = yup.object({
     .required(),
 });
 
+export const adminEventCategoryCreateSchema = yup.object({
+  name: yup.string().trim().required('Category name is required.'),
+});
+export type AdminEventCategoryCreateValues = yup.InferType<typeof adminEventCategoryCreateSchema>;
+
 export const adminEventGenreCreateSchema = yup.object({
   category_type_id: yup.string().required('Please select a category.'),
   name: yup.string().trim().required('Genre name is required.'),

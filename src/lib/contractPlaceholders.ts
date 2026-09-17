@@ -99,6 +99,7 @@ export function contractStatusLabel(
 export function organizerWorkflowLabel(event: {
   status: string;
   is_visible?: boolean;
+  layout_request_status?: string | null;
   contract?: {
     status: string;
     admin_signed_at?: string | null;
@@ -109,6 +110,19 @@ export function organizerWorkflowLabel(event: {
   if (event.status === 'LIVE' && event.is_visible) return 'Public';
   if (event.status === 'LIVE') return 'Live (hidden)';
   if (event.status === 'DRAFT') return 'Draft';
+
+  const layoutStatus = String(event.layout_request_status || '').toUpperCase();
+  if (layoutStatus === 'PENDING_ORGANIZER_APPROVAL') {
+    return 'Review custom layout on Preview';
+  }
+  if (
+    layoutStatus === 'SUBMITTED' ||
+    layoutStatus === 'UNDER_REVIEW' ||
+    layoutStatus === 'ORGANIZER_CHANGE_REQUESTED'
+  ) {
+    return 'Awaiting custom layout from Super Admin';
+  }
+
   if (event.status === 'PENDING_APPROVAL') return 'Awaiting Super Admin review';
   if (!event.contract || event.contract.status === 'REJECTED') {
     return event.contract?.status === 'REJECTED'

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
@@ -16,7 +16,10 @@ import {
   Crown,
   Gift,
   Languages,
+  LayoutGrid,
   Loader2,
+  Map as MapIcon,
+  Maximize2,
   Mic2,
   Minus,
   Plus,
@@ -55,6 +58,7 @@ import { parseEventLanguages } from "@/lib/eventValidation";
 import { sanitizePhoneInput } from "@/lib/validation";
 import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
+import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
 import {
   emptyEventCheckoutContactValues,
   emptyEventCheckoutDeliveryValues,
@@ -206,6 +210,8 @@ export default function EventCheckout({
   const [submitting, setSubmitting] = useState(false);
   const [holding, setHolding] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
+  const [desiredSeatQty, setDesiredSeatQty] = useState<number | null>(null);
+  const [seatViewMode, setSeatViewMode] = useState<"canvas" | "grid">("canvas");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [expandedCity, setExpandedCity] = useState<string>("");
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -306,6 +312,15 @@ export default function EventCheckout({
     setSessionToken(readHoldSessionToken());
   }, []);
 
+  useEffect(() => {
+    if (!isMapFullscreen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMapFullscreen]);
+
   const showtimes = event.showtimes || [];
   const allTicketTypes = event.ticket_types || [];
   const ticketTypes = useMemo(() => {
@@ -326,6 +341,66 @@ export default function EventCheckout({
     }
     return allTicketTypes.filter((t) => !t.showtime_id);
   }, [allTicketTypes, showtimes, showtimeId]);
+
+  const pricingTicketPool = useMemo(() => {
+    const layoutTypes = Array.isArray(activeLayoutData?.data?.ticket_types)
+      ? activeLayoutData.data.ticket_types
+      : [];
+    const byId = new Map<string, { id: string; ticket_type: string; price: number; max_per_order?: number }>();
+    for (const t of [...ticketTypes, ...allTicketTypes, ...layoutTypes]) {
+      const id = String(t?.id || "").trim();
+      if (!id || byId.has(id)) continue;
+      byId.set(id, {
+        id,
+        ticket_type: String(t.ticket_type || "Ticket"),
+        price: Number(t.price) || 0,
+        max_per_order: Number((t as { max_per_order?: number }).max_per_order) || 10,
+      });
+    }
+    return Array.from(byId.values());
+  }, [ticketTypes, allTicketTypes, activeLayoutData]);
+
+  const resolveSeatTicket = useCallback(
+    (seat: {
+      ticket_type_id?: string | null;
+      section_name?: string | null;
+      price?: number | string | null;
+      unit_price?: number | string | null;
+    }) => {
+      const typeId = String(seat.ticket_type_id || "").trim();
+      if (typeId) {
+        const exact = pricingTicketPool.find((t) => t.id === typeId);
+        if (exact) return exact;
+      }
+
+      const section = String(seat.section_name || "").trim().toLowerCase();
+      if (section) {
+        const byName = pricingTicketPool.find((t) => {
+          const name = String(t.ticket_type || "").trim().toLowerCase();
+          return (
+            name === section ||
+            name.includes(section) ||
+            section.includes(name) ||
+            name.replace(/\s+/g, "") === section.replace(/\s+/g, "")
+          );
+        });
+        if (byName) return byName;
+      }
+
+      const seatPrice = Number(seat.price ?? seat.unit_price);
+      if (Number.isFinite(seatPrice) && seatPrice > 0) {
+        return {
+          id: typeId || `price-${seatPrice}`,
+          ticket_type: String(seat.section_name || "Seat"),
+          price: seatPrice,
+          max_per_order: 10,
+        };
+      }
+
+      return pricingTicketPool[0] || null;
+    },
+    [pricingTicketPool]
+  );
 
   const availableTicketModes = useMemo(
     () => ticketModeOptionsForEvent(event.allowed_ticket_modes),
@@ -443,23 +518,41 @@ export default function EventCheckout({
     const lines = [];
 
     if (selectedSeats.length > 0) {
-      const seatGrouped: Record<string, number> = {};
+      const seatGrouped: Record<
+        string,
+        { qty: number; unit: number; ticket_type: string; ids: string[] }
+      > = {};
+
       selectedSeats.forEach((s) => {
-        seatGrouped[s.ticket_type_id] = (seatGrouped[s.ticket_type_id] || 0) + 1;
+        const resolved = resolveSeatTicket(s);
+        const ttId = String(resolved?.id || s.ticket_type_id || "seat");
+        const unit =
+          Number(resolved?.price) ||
+          Number(s.price) ||
+          Number(s.unit_price) ||
+          0;
+        if (!seatGrouped[ttId]) {
+          seatGrouped[ttId] = {
+            qty: 0,
+            unit,
+            ticket_type: String(resolved?.ticket_type || s.section_name || "Seat"),
+            ids: [],
+          };
+        }
+        seatGrouped[ttId].qty += 1;
+        seatGrouped[ttId].ids.push(String(s.id));
+        if (!seatGrouped[ttId].unit && unit) seatGrouped[ttId].unit = unit;
       });
 
-      for (const [ttId, qty] of Object.entries(seatGrouped)) {
-        const t = ticketTypes.find((type) => type.id === ttId);
-        if (t) {
-          lines.push({
-            id: t.id,
-            ticket_type: t.ticket_type,
-            qty,
-            unit: Number(t.price) || 0,
-            available: Number(t.available_count) || 0,
-            event_seat_ids: selectedSeats.filter((s) => s.ticket_type_id === ttId).map((s) => s.id),
-          });
-        }
+      for (const [ttId, group] of Object.entries(seatGrouped)) {
+        lines.push({
+          id: ttId,
+          ticket_type: group.ticket_type,
+          qty: group.qty,
+          unit: group.unit,
+          available: group.qty,
+          event_seat_ids: group.ids,
+        });
       }
     } else {
       ticketTypes.forEach((t) => {
@@ -476,7 +569,7 @@ export default function EventCheckout({
       });
     }
     return lines;
-  }, [ticketTypes, qtyByType, selectedSeats]);
+  }, [ticketTypes, qtyByType, selectedSeats, resolveSeatTicket]);
 
   const ticketAmount = moneySum(selectedLines.map((l) => l.unit * l.qty));
   const discountAmount = !isOrganizer && appliedPromo ? appliedPromo.discount_amount : 0;
@@ -768,6 +861,228 @@ export default function EventCheckout({
     return () => window.clearInterval(id);
   }, [step, expiresAt, holdId]);
 
+  const hasReservedSeats = Boolean(activeLayoutData?.data?.seats?.length);
+  const maxSeatQtyPick = useMemo(() => {
+    if (!hasReservedSeats) return 10;
+    const fromTickets = ticketTypes.map((t) =>
+      Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10)
+    );
+    const available = (activeLayoutData?.data?.seats || []).filter(
+      (s: { status?: string }) => String(s.status || "").toUpperCase() === "AVAILABLE"
+    ).length;
+    const cap = fromTickets.length ? Math.max(...fromTickets) : 10;
+    return Math.min(10, Math.max(1, available || cap), cap);
+  }, [hasReservedSeats, ticketTypes, activeLayoutData]);
+
+  const eventGridLayout = useMemo(() => {
+    type GridSeat = {
+      id: string;
+      row: string;
+      number: string;
+      sectionName: string;
+      ticket_type_id: string;
+      price: number;
+      isBooked: boolean;
+      gapAfter: number;
+      x: number;
+      y: number;
+      raw: any;
+    };
+    type GridSection = {
+      sectionName: string;
+      price: number;
+      avgX: number;
+      avgY: number;
+      rows: Array<{ rowLabel: string; seats: GridSeat[] }>;
+    };
+    type GridBand = { avgY: number; sections: GridSection[] };
+
+    const rawSeats = Array.isArray(activeLayoutData?.data?.seats)
+      ? activeLayoutData.data.seats
+      : [];
+    const config =
+      activeLayoutData?.data?.seating_config ||
+      activeLayoutData?.seating_config ||
+      {};
+    const shapes: any[] = Array.isArray(config?.shapes) ? config.shapes : [];
+    const stageShape = shapes.find((s) =>
+      String(s.text || s.label || "")
+        .toLowerCase()
+        .match(/stage|screen|performance/)
+    );
+    const seatYs = rawSeats.map((s: any) => Number(s.coordinate_y ?? 0));
+    const seatMinY = seatYs.length ? Math.min(...seatYs) : 0;
+    const stageY = stageShape ? Number(stageShape.y ?? 0) : null;
+    const stageAtTop = stageY == null ? true : stageY <= seatMinY + 80;
+
+    if (!rawSeats.length) {
+      return { bands: [] as GridBand[], stageAtTop, hasStage: Boolean(stageShape) };
+    }
+
+    const sectionMap = new Map<string, any[]>();
+    for (const s of rawSeats) {
+      const sec = String(s.section_name || "General").trim() || "General";
+      if (!sectionMap.has(sec)) sectionMap.set(sec, []);
+      sectionMap.get(sec)!.push(s);
+    }
+
+    const sections: GridSection[] = Array.from(sectionMap.entries()).map(
+      ([sectionName, seats]) => {
+        const xs = seats.map((s: any) => Number(s.coordinate_x ?? 0));
+        const ys = seats.map((s: any) => Number(s.coordinate_y ?? 0));
+        const avgX = xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
+        const avgY = ys.reduce((a, b) => a + b, 0) / (ys.length || 1);
+
+        const rowMap = new Map<string, any[]>();
+        for (const s of seats) {
+          const r = String(s.row_label || "A").trim() || "A";
+          if (!rowMap.has(r)) rowMap.set(r, []);
+          rowMap.get(r)!.push(s);
+        }
+
+        const rows = Array.from(rowMap.entries())
+          .map(([rowLabel, rowSeats]) => {
+            const sorted = [...rowSeats].sort(
+              (a: any, b: any) => Number(a.coordinate_x ?? 0) - Number(b.coordinate_x ?? 0)
+            );
+            const steps: number[] = [];
+            for (let i = 0; i < sorted.length - 1; i++) {
+              const diff =
+                Number(sorted[i + 1].coordinate_x ?? 0) - Number(sorted[i].coordinate_x ?? 0);
+              if (diff > 5) steps.push(diff);
+            }
+            const normalStep = steps.length > 0 ? Math.min(...steps) : 40;
+            const sampleTypeId = String(sorted[0]?.ticket_type_id || "");
+            const ticket = ticketTypes.find((t) => t.id === sampleTypeId);
+            const price = Number(ticket?.price) || 0;
+            const avgRowY =
+              sorted.reduce((sum: number, s: any) => sum + Number(s.coordinate_y ?? 0), 0) /
+              (sorted.length || 1);
+
+            return {
+              rowLabel,
+              avgY: avgRowY,
+              seats: sorted.map((seat: any, seatIdx: number) => {
+                const seatNum =
+                  seat.seat_label != null && String(seat.seat_label).trim() !== ""
+                    ? String(seat.seat_label).trim()
+                    : String(seatIdx + 1);
+                const nextSeat = sorted[seatIdx + 1];
+                const gapRatio = nextSeat
+                  ? (Number(nextSeat.coordinate_x ?? 0) - Number(seat.coordinate_x ?? 0)) /
+                    normalStep
+                  : 1;
+                const gapAfter =
+                  gapRatio > 2.4 ? 3 : gapRatio > 1.7 ? 2 : gapRatio > 1.35 ? 1 : 0;
+                const status = String(seat.status || "").toUpperCase();
+                return {
+                  id: String(seat.id),
+                  row: rowLabel,
+                  number: seatNum,
+                  sectionName,
+                  ticket_type_id: String(seat.ticket_type_id || ""),
+                  price:
+                    Number(
+                      ticketTypes.find((t) => t.id === String(seat.ticket_type_id || ""))?.price
+                    ) || price,
+                  isBooked: status !== "AVAILABLE",
+                  gapAfter,
+                  x: Number(seat.coordinate_x ?? 0),
+                  y: Number(seat.coordinate_y ?? 0),
+                  raw: seat,
+                } as GridSeat;
+              }),
+            };
+          })
+          .sort((a, b) => a.avgY - b.avgY);
+
+        const price =
+          rows[0]?.seats[0]?.price ||
+          Number(
+            ticketTypes.find((t) => t.id === String(seats[0]?.ticket_type_id || ""))?.price
+          ) ||
+          0;
+
+        return {
+          sectionName,
+          price,
+          avgX,
+          avgY,
+          rows: rows.map(({ rowLabel, seats: rowSeats }) => ({
+            rowLabel,
+            seats: rowSeats,
+          })),
+        };
+      }
+    );
+
+    sections.sort((a, b) => a.avgY - b.avgY || a.avgX - b.avgX);
+
+    const ySpan =
+      Math.max(...sections.map((s) => s.avgY)) - Math.min(...sections.map((s) => s.avgY)) || 1;
+    const bandThreshold = Math.max(120, ySpan * 0.28);
+
+    const bands: GridBand[] = [];
+    for (const sec of sections) {
+      const last = bands[bands.length - 1];
+      if (last && Math.abs(sec.avgY - last.avgY) <= bandThreshold) {
+        last.sections.push(sec);
+        last.avgY =
+          last.sections.reduce((sum, s) => sum + s.avgY, 0) / last.sections.length;
+      } else {
+        bands.push({ avgY: sec.avgY, sections: [sec] });
+      }
+    }
+
+    for (const band of bands) {
+      band.sections.sort((a, b) => a.avgX - b.avgX);
+    }
+
+    return { bands, stageAtTop, hasStage: Boolean(stageShape) || sections.length > 0 };
+  }, [activeLayoutData, ticketTypes]);
+
+  const findGridSeatContext = useCallback(
+    (seatId: string) => {
+      for (const band of eventGridLayout.bands) {
+        for (const section of band.sections) {
+          for (const row of section.rows) {
+            const idx = row.seats.findIndex((s) => String(s.id) === String(seatId));
+            if (idx >= 0) {
+              return { section, row, index: idx, seat: row.seats[idx] };
+            }
+          }
+        }
+      }
+      return null;
+    },
+    [eventGridLayout]
+  );
+
+  /**
+   * BookMyShow-style: pick contiguous available seats on the same row.
+   * `need` may be the full ticket count or only the remaining seats to fill.
+   */
+  const autoSelectNeighborSeats = useCallback(
+    (anchorSeatId: string, need: number) => {
+      const ctx = findGridSeatContext(anchorSeatId);
+      if (!ctx || need < 1) return null;
+      const block = pickContiguousBlock(ctx.row.seats, ctx.index, need);
+      if (!block.length) return null;
+      return block.map((s) => ({
+        ...s.raw,
+        id: s.id,
+        ticket_type_id: s.ticket_type_id,
+        section_name: s.sectionName,
+        row_label: s.row,
+        seat_label: s.number,
+        price: s.price,
+        unit_price: s.price,
+        status: "AVAILABLE",
+      }));
+    },
+    [findGridSeatContext]
+  );
+
   if (!open) return null;
 
   const accentBtn = "bg-[#6900AA] hover:bg-[#57008E]";
@@ -788,7 +1103,9 @@ export default function EventCheckout({
     step === 1
       ? "Choose a city and venue for your event."
       : step === 2
-        ? "You can add tickets based on availability."
+        ? hasReservedSeats
+          ? "Choose how many seats, then pick them on the map or grid."
+          : "You can add tickets based on availability."
         : step === 3
           ? availableTicketModes.length === 1
             ? "Confirm ticket delivery and sign in to continue."
@@ -815,10 +1132,137 @@ export default function EventCheckout({
     Boolean(ticketMode) &&
     deliveryDetailsReady &&
     (isOrganizer ? contactDetailsReady : isCustomerLoggedIn && contactDetailsReady);
-  const hasReservedSeats = Boolean(activeLayoutData?.data?.seats?.length);
+
+  const toggleGridSeat = (
+    seat: (typeof eventGridLayout.bands)[number]["sections"][number]["rows"][number]["seats"][number]
+  ) => {
+    if (seat.isBooked || !desiredSeatQty) return;
+
+    // Tap a selected seat → deselect only that seat (adjust like BMS)
+    const exists = selectedSeats.some((s) => String(s.id) === seat.id);
+    if (exists) {
+      applySelectedSeats(selectedSeats.filter((s) => String(s.id) !== seat.id));
+      return;
+    }
+
+    // Full qty already picked → start a fresh auto-select of the full count
+    const startFresh = selectedSeats.length === 0 || selectedSeats.length >= desiredSeatQty;
+    const need = startFresh ? desiredSeatQty : desiredSeatQty - selectedSeats.length;
+
+    const autoBlock = autoSelectNeighborSeats(seat.id, need);
+    if (!autoBlock || autoBlock.length === 0) {
+      toast.message("No available seats in this row for your selection.");
+      return;
+    }
+
+    if (!startFresh) {
+      const currentType = String(selectedSeats[0]?.ticket_type_id || "");
+      const incoming = resolveSeatTicket(autoBlock[0]);
+      if (currentType && incoming?.id && String(incoming.id) !== currentType) {
+        toast.message("Please select seats from the same ticket type / block.");
+        return;
+      }
+      const existingIds = new Set(selectedSeats.map((s) => String(s.id)));
+      const toAdd = autoBlock.filter((s) => !existingIds.has(String(s.id)));
+      if (!toAdd.length) return;
+      const merged = [...selectedSeats, ...toAdd].slice(0, desiredSeatQty);
+      applySelectedSeats(merged);
+      if (merged.length < desiredSeatQty) {
+        toast.message(
+          `${merged.length}/${desiredSeatQty} selected — tap another row for the rest.`
+        );
+      }
+      return;
+    }
+
+    applySelectedSeats(autoBlock);
+    if (autoBlock.length < desiredSeatQty) {
+      toast.message(
+        `${autoBlock.length}/${desiredSeatQty} selected — tap another row for the rest.`
+      );
+    }
+  };
+
+  const handleMapSeatsSelected = (seats: any[]) => {
+    if (!desiredSeatQty) {
+      applySelectedSeats(seats);
+      return;
+    }
+
+    const prevIds = new Set(selectedSeats.map((s) => String(s.id)));
+    const nextIds = new Set(seats.map((s) => String(s.id)));
+
+    // Deselect path from map viewer — or BMS "start fresh" when qty was full
+    if (seats.length < selectedSeats.length) {
+      if (seats.length === 1 && !prevIds.has(String(seats[0].id))) {
+        const autoBlock = autoSelectNeighborSeats(String(seats[0].id), desiredSeatQty);
+        if (autoBlock && autoBlock.length > 0) {
+          applySelectedSeats(autoBlock);
+          if (autoBlock.length < desiredSeatQty) {
+            toast.message(
+              `${autoBlock.length}/${desiredSeatQty} selected — tap another row for the rest.`
+            );
+          }
+          return;
+        }
+      }
+      applySelectedSeats(seats);
+      return;
+    }
+
+    const newlyAdded = seats.filter((s) => !prevIds.has(String(s.id)));
+    if (newlyAdded.length === 1 && seats.length === selectedSeats.length + 1) {
+      const startFresh = selectedSeats.length === 0 || selectedSeats.length >= desiredSeatQty;
+      const need = startFresh ? desiredSeatQty : desiredSeatQty - selectedSeats.length;
+      const autoBlock = autoSelectNeighborSeats(String(newlyAdded[0].id), need);
+      if (autoBlock && autoBlock.length > 0) {
+        if (startFresh) {
+          applySelectedSeats(autoBlock);
+        } else {
+          const existing = new Set(selectedSeats.map((s) => String(s.id)));
+          const toAdd = autoBlock.filter((s) => !existing.has(String(s.id)));
+          applySelectedSeats([...selectedSeats, ...toAdd].slice(0, desiredSeatQty));
+        }
+        return;
+      }
+    }
+
+    // Ignore map over-select beyond qty
+    if (seats.length > desiredSeatQty) {
+      applySelectedSeats(seats.slice(0, desiredSeatQty));
+      return;
+    }
+
+    // Keep selection if map re-emits same set
+    if (
+      seats.length === selectedSeats.length &&
+      seats.every((s) => prevIds.has(String(s.id))) &&
+      selectedSeats.every((s) => nextIds.has(String(s.id)))
+    ) {
+      return;
+    }
+
+    applySelectedSeats(seats);
+  };
+
+  const seatsReady = hasReservedSeats
+    ? desiredSeatQty != null && selectedSeats.length === desiredSeatQty
+    : ticketQty >= 1;
 
   const proceedFromTickets = () => {
-    if (ticketQty < 1) return;
+    if (hasReservedSeats) {
+      if (!desiredSeatQty) {
+        toast.error("Choose how many seats you need first.");
+        return;
+      }
+      if (selectedSeats.length !== desiredSeatQty) {
+        toast.error(`Please select exactly ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"} on the map.`);
+        return;
+      }
+    } else if (ticketQty < 1) {
+      return;
+    }
+    setIsMapFullscreen(false);
     setStep(3);
   };
 
@@ -880,7 +1324,7 @@ export default function EventCheckout({
     if (targetStep === step) return false;
     if (targetStep < step) return true;
     if (targetStep >= 2 && !showtimeId) return false;
-    if (targetStep >= 3 && ticketQty < 1) return false;
+    if (targetStep >= 3 && !(hasReservedSeats ? seatsReady : ticketQty >= 1)) return false;
     if (targetStep >= 4 && !canProceedFromTicketMode) return false;
     return targetStep <= CHECKOUT_STEPS.length;
   };
@@ -1001,6 +1445,9 @@ export default function EventCheckout({
     setSelectedDateKey(dateKey(s.starts_at));
     setQtyByType({});
     setSelectedSeats([]);
+    setDesiredSeatQty(null);
+    setSeatViewMode("canvas");
+    setIsMapFullscreen(false);
     setAppliedPromo(null);
   };
 
@@ -1009,17 +1456,56 @@ export default function EventCheckout({
       setSelectedSeats([]);
       return;
     }
-    const typeIds = [...new Set(seats.map((s) => String(s.ticket_type_id || "")).filter(Boolean))];
-    let next = seats;
+
+    const normalized = seats.map((s) => {
+      const resolved = resolveSeatTicket({
+        ...s,
+        section_name: s.section_name || s.sectionName,
+      });
+      return {
+        ...s,
+        id: String(s.id),
+        ticket_type_id: String(resolved?.id || s.ticket_type_id || ""),
+        section_name: s.section_name || s.sectionName || resolved?.ticket_type || "",
+        price: Number(resolved?.price) || Number(s.price) || Number(s.unit_price) || 0,
+        unit_price: Number(resolved?.price) || Number(s.unit_price) || Number(s.price) || 0,
+      };
+    });
+
+    const typeIds = [
+      ...new Set(normalized.map((s) => String(s.ticket_type_id || "")).filter(Boolean)),
+    ];
+    let next = normalized;
     if (typeIds.length > 1) {
-      const keepType = String(seats[seats.length - 1]?.ticket_type_id || typeIds[0]);
-      next = seats.filter((s) => String(s.ticket_type_id) === keepType);
+      // Keep the first seat's ticket type so existing picks are not wiped when
+      // the user clicks a seat from another block/type.
+      const keepType = String(normalized[0]?.ticket_type_id || typeIds[0]);
+      next = normalized.filter((s) => String(s.ticket_type_id) === keepType);
+      if (next.length < normalized.length) {
+        toast.message("Please select seats from the same ticket type / block.");
+      }
     }
-    const typeId = String(next[0]?.ticket_type_id || "");
-    const ticket = ticketTypes.find((t) => t.id === typeId);
-    const maxPerOrder = Math.max(1, Number((ticket as { max_per_order?: number } | undefined)?.max_per_order) || 10);
-    if (next.length > maxPerOrder) {
-      next = next.slice(0, maxPerOrder);
+
+    // In the reserved-seat flow the user already chose a seat count — allow that
+    // many selections. Do not silently clamp to ticket max_per_order mid-map.
+    const hardCap =
+      desiredSeatQty != null
+        ? Math.max(1, desiredSeatQty)
+        : Math.max(
+            1,
+            Number(
+              (
+                pricingTicketPool.find((t) => t.id === String(next[0]?.ticket_type_id || "")) ||
+                ticketTypes.find((t) => t.id === String(next[0]?.ticket_type_id || ""))
+              )?.max_per_order
+            ) || 10
+          );
+
+    if (next.length > hardCap) {
+      next = next.slice(0, hardCap);
+      toast.message(
+        `You can select up to ${hardCap} seat${hardCap === 1 ? "" : "s"}.`
+      );
     }
     setSelectedSeats(next);
     setQtyByType({});
@@ -1286,70 +1772,72 @@ export default function EventCheckout({
               )}
 
               {hasReservedSeats ? (
-                <div className="bg-white border border-slate-200 rounded-xl p-5 text-center space-y-4">
-                  <div>
-                    <h4 className="text-[1.1875rem] font-extrabold text-slate-900">Select seats</h4>
-                    <p className="mt-1 text-[0.9375rem] text-slate-500">
-                      Reserved seating â€” pick your seats on the map
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsMapFullscreen(true)}
-                    className={`w-full py-3 ${accentBtn} text-white text-[1.0625rem] font-bold rounded-xl cursor-pointer`}
-                  >
-                    {selectedSeats.length > 0 ? "Edit Seating Map" : "Open Seating Map"}
-                  </button>
-                  {selectedSeats.length > 0 && (
-                    <p className={`text-[1rem] font-bold ${accentIcon}`}>
-                      {selectedSeats.length} seat{selectedSeats.length === 1 ? "" : "s"} selected Â·{" "}
-                      {formatMoney(ticketAmount, { compact: true })}
-                    </p>
-                  )}
-                  {isMapFullscreen && (
-                    <div className="fixed inset-0 z-[100] bg-[#F5F5F5] flex flex-col overflow-hidden">
-                      <div className="shrink-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setIsMapFullscreen(false)}
-                          className="h-9 w-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 cursor-pointer hover:bg-slate-50"
-                          aria-label="Close seating map"
-                        >
-                          <X size={18} />
-                        </button>
-                        <div className="min-w-0 flex-1 text-left">
-                          <h3 className="font-bold text-[1.125rem] text-slate-900 truncate">{event.name}</h3>
-                          <p className="text-[0.875rem] text-slate-500 truncate">
-                            {[selectedShowtime?.venue_name, selectedShowtime?.starts_at ? formatTime12h(selectedShowtime.starts_at) : ""]
-                              .filter(Boolean)
-                              .join(" Â· ")}
-                          </p>
+                <div className="space-y-4">
+                  {desiredSeatQty == null ? (
+                    <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-5">
+                      <div className="text-center">
+                        <h4 className="text-[1.1875rem] font-extrabold text-slate-900">
+                          How many seats?
+                        </h4>
+                        <p className="mt-1 text-[0.9375rem] text-slate-500">
+                          Pick a count, then choose your seats on the full seating map
+                        </p>
                       </div>
+                      <div className="grid grid-cols-5 gap-2.5 max-w-sm mx-auto">
+                        {Array.from({ length: maxSeatQtyPick }, (_, i) => i + 1).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => {
+                              setDesiredSeatQty(n);
+                              setSelectedSeats([]);
+                              setSeatViewMode("canvas");
+                              setIsMapFullscreen(true);
+                            }}
+                            className="h-12 rounded-xl text-sm font-bold cursor-pointer transition bg-[#F5F5F5] text-[#333] hover:bg-[#6900AA] hover:text-white"
+                          >
+                            {n}
+                          </button>
+                        ))}
                       </div>
-                      <div className="flex-1 overflow-hidden relative flex flex-col p-2 sm:p-4">
-                        <VenueLayoutViewer
-                          layoutData={activeLayoutData}
-                          ticketTypes={ticketTypes}
-                          onSeatsSelected={applySelectedSeats}
-                          initialSelectedSeats={selectedSeats}
-                        />
-                      </div>
-                      <div className="shrink-0 p-4 border-t border-slate-200 bg-white flex items-center gap-3">
-                        <div className="min-w-0 flex-1 text-left">
-                          <p className="text-[0.9375rem] text-slate-500">
-                            {selectedSeats.length} seat{selectedSeats.length === 1 ? "" : "s"} selected
-                          </p>
-                          <p className="text-[1.1875rem] font-extrabold text-slate-900">
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-slate-200 rounded-xl p-5 text-center space-y-4">
+                      <div>
+                        <h4 className="text-[1.125rem] font-extrabold text-slate-900">
+                          {selectedSeats.length}/{desiredSeatQty} seat
+                          {desiredSeatQty === 1 ? "" : "s"} selected
+                        </h4>
+                        <p className="mt-1 text-[0.875rem] text-slate-500">
+                          {seatsReady
+                            ? "Seats locked in — continue when you are ready"
+                            : "Open the map to finish selecting your seats"}
+                        </p>
+                        {ticketAmount > 0 && (
+                          <p className={`mt-2 text-[1.0625rem] font-bold ${accentIcon}`}>
                             {formatMoney(ticketAmount, { compact: true })}
                           </p>
-                        </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2.5">
                         <button
                           type="button"
-                          disabled={selectedSeats.length < 1}
-                          onClick={() => setIsMapFullscreen(false)}
-                          className={`px-5 py-2.5 ${accentBtn} text-white font-bold text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-[#E3BCFF] disabled:cursor-not-allowed`}
+                          onClick={() => {
+                            setDesiredSeatQty(null);
+                            setSelectedSeats([]);
+                            setIsMapFullscreen(false);
+                          }}
+                          className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-[0.9375rem] font-semibold cursor-pointer hover:bg-slate-50"
                         >
-                          Continue
+                          Change count
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsMapFullscreen(true)}
+                          className={`flex-1 py-3 rounded-xl ${accentBtn} text-white text-[0.9375rem] font-bold cursor-pointer inline-flex items-center justify-center gap-2`}
+                        >
+                          <Maximize2 className="size-4" />
+                          {selectedSeats.length > 0 ? "Edit seats on map" : "Open seating map"}
                         </button>
                       </div>
                     </div>
@@ -1926,7 +2414,7 @@ export default function EventCheckout({
                 disabled={!showtimeId}
                 onClick={() => {
                   setStep(2);
-                  if (hasReservedSeats) setIsMapFullscreen(true);
+                  setIsMapFullscreen(false);
                 }}
                 className={`w-full py-3.5 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed`}
               >
@@ -1937,7 +2425,7 @@ export default function EventCheckout({
           )}
           {step === 2 && (
             <>
-              {isPage && ticketQty > 0 ? (
+              {isPage && (hasReservedSeats ? seatsReady : ticketQty > 0) ? (
                 <div className="flex items-end gap-3">
                   <button
                     type="button"
@@ -1950,6 +2438,9 @@ export default function EventCheckout({
                     <div className="mb-2 text-right">
                       <p className="text-[0.9375rem] text-slate-500">
                         {ticketQty} Ticket{ticketQty === 1 ? "" : "s"}
+                        {hasReservedSeats && desiredSeatQty != null
+                          ? ` · ${selectedSeats.length}/${desiredSeatQty} seats`
+                          : ""}
                       </p>
                       <p className="text-[1.25rem] font-extrabold text-slate-900 leading-tight">
                         {formatMoney(ticketAmount, { compact: true })}
@@ -1957,7 +2448,7 @@ export default function EventCheckout({
                     </div>
                     <button
                       type="button"
-                      disabled={ticketQty < 1}
+                      disabled={!seatsReady}
                       onClick={proceedFromTickets}
                       className={`w-full py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
                     >
@@ -1976,11 +2467,15 @@ export default function EventCheckout({
                   </button>
                   <button
                     type="button"
-                    disabled={ticketQty < 1}
+                    disabled={!seatsReady}
                     onClick={proceedFromTickets}
                     className={`flex-1 py-3 rounded-[0.5rem] ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] cursor-pointer disabled:cursor-not-allowed`}
                   >
-                    Continue
+                    {hasReservedSeats && desiredSeatQty == null
+                      ? "Choose seat count"
+                      : hasReservedSeats
+                        ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
+                        : "Continue"}
                   </button>
                 </div>
               ) : (
@@ -2007,7 +2502,7 @@ export default function EventCheckout({
                 </button>
                 <button
                   type="button"
-                  disabled={ticketQty < 1}
+                  disabled={!seatsReady}
                   onClick={proceedFromTickets}
                   className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-[#E3BCFF] disabled:text-white disabled:hover:bg-[#E3BCFF] text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
                 >
@@ -2101,6 +2596,270 @@ export default function EventCheckout({
 
   const checkoutModals = (
     <>
+      {isMapFullscreen && desiredSeatQty != null && (
+        <div className="fixed inset-0 z-[100] bg-[#F5F5F5] flex flex-col overflow-hidden">
+          <header className="shrink-0 bg-white border-b border-slate-200 shadow-sm">
+            <div className="px-3 sm:px-5 py-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsMapFullscreen(false)}
+                className="h-10 w-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-700 cursor-pointer hover:bg-slate-50 shrink-0"
+                aria-label="Back from seating map"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-[1.0625rem] sm:text-[1.1875rem] text-slate-900 truncate">
+                  {event.name}
+                </h3>
+                <p className="text-[0.8125rem] sm:text-[0.875rem] text-slate-500 truncate">
+                  {[
+                    selectedShowtime?.venue_name,
+                    selectedShowtime?.starts_at
+                      ? formatTime12h(selectedShowtime.starts_at)
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDesiredSeatQty(null);
+                  setSelectedSeats([]);
+                  setIsMapFullscreen(false);
+                }}
+                className="hidden sm:inline-flex text-[0.8125rem] font-semibold text-[#6900AA] hover:underline cursor-pointer shrink-0"
+              >
+                Change count
+              </button>
+            </div>
+            <div className="px-3 sm:px-5 pb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSeatViewMode("canvas")}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    seatViewMode === "canvas"
+                      ? "bg-[#6900AA] text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-white"
+                  }`}
+                >
+                  <MapIcon className="size-3.5" />
+                  <span>Map</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSeatViewMode("grid")}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    seatViewMode === "grid"
+                      ? "bg-[#6900AA] text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-white"
+                  }`}
+                >
+                  <LayoutGrid className="size-3.5" />
+                  <span>Grid View</span>
+                </button>
+              </div>
+              <p className="text-[0.8125rem] sm:text-[0.875rem] text-slate-600 font-medium">
+                Select exactly{" "}
+                <span className="text-slate-900 font-extrabold">{desiredSeatQty}</span> seat
+                {desiredSeatQty === 1 ? "" : "s"}
+                <span className="text-[#6900AA] font-bold">
+                  {" "}
+                  · {selectedSeats.length}/{desiredSeatQty}
+                </span>
+              </p>
+            </div>
+          </header>
+
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {seatViewMode === "canvas" ? (
+              <div className="flex-1 min-h-0 p-2 sm:p-4">
+                <div className="h-full w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
+                  <VenueLayoutViewer
+                    layoutData={activeLayoutData}
+                    ticketTypes={ticketTypes}
+                    onSeatsSelected={handleMapSeatsSelected}
+                    initialSelectedSeats={selectedSeats}
+                    maxSelectable={desiredSeatQty}
+                    cinemaMode
+                    customLegend={ticketTypes.map((t) => ({
+                      name: t.ticket_type,
+                      color: "#6900AA",
+                      price: Number(t.price) || 0,
+                    }))}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-5 py-4">
+                <div className="flex flex-wrap items-center justify-center gap-5 py-2.5 px-4 mb-4 rounded-2xl bg-white border border-slate-200 text-xs shadow-sm sticky top-0 z-[1]">
+                  <div className="flex items-center gap-2">
+                    <div className="size-4 rounded-md bg-white border border-slate-300" />
+                    <span className="text-slate-600">Available</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="size-4 rounded-md bg-[#6900AA]" />
+                    <span className="text-slate-900 font-bold">Selected</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="size-4 rounded-md bg-slate-200 border border-slate-300 relative">
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500">
+                        ✕
+                      </span>
+                    </div>
+                    <span className="text-slate-500">Sold / Held</span>
+                  </div>
+                </div>
+
+                {eventGridLayout.bands.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+                    No seats available in grid view.
+                  </div>
+                ) : (
+                  <div className="w-full max-w-[1400px] mx-auto space-y-5">
+                    {eventGridLayout.hasStage && eventGridLayout.stageAtTop && (
+                      <div className="text-center space-y-2 px-4">
+                        <p className="text-[0.6875rem] uppercase tracking-[0.2em] font-extrabold text-slate-500">
+                          Stage
+                        </p>
+                        <div className="relative mx-auto w-[min(92%,42rem)] h-2.5">
+                          <div className="absolute inset-0 rounded-[50%] border-b-4 border-[#6900AA] shadow-[0_8px_18px_rgba(105,0,170,0.2)]" />
+                        </div>
+                      </div>
+                    )}
+
+                    {eventGridLayout.bands.map((band, bandIdx) => (
+                      <div
+                        key={`band-${bandIdx}`}
+                        className={`grid gap-4 ${
+                          band.sections.length === 1
+                            ? "grid-cols-1"
+                            : band.sections.length === 2
+                              ? "grid-cols-1 md:grid-cols-2"
+                              : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                        }`}
+                      >
+                        {band.sections.map((section) => (
+                          <section
+                            key={section.sectionName}
+                            className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm overflow-x-auto"
+                          >
+                            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 mb-3">
+                              <h4 className="text-[0.75rem] sm:text-[0.8125rem] font-extrabold uppercase tracking-wider text-[#6900AA]">
+                                {section.sectionName}
+                              </h4>
+                              {section.price > 0 && (
+                                <span className="shrink-0 text-[0.75rem] font-extrabold text-slate-900 bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                                  {formatMoney(section.price, { compact: true })}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="space-y-1.5 min-w-max mx-auto">
+                              {section.rows.map((row) => (
+                                <div
+                                  key={`${section.sectionName}-${row.rowLabel}`}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span className="w-5 text-center text-[0.6875rem] font-bold text-slate-500 shrink-0">
+                                    {row.rowLabel}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    {row.seats.map((seat) => {
+                                      const isSelected = selectedSeats.some(
+                                        (s) => String(s.id) === seat.id
+                                      );
+                                      return (
+                                        <div
+                                          key={seat.id}
+                                          className="flex items-center"
+                                          style={
+                                            seat.gapAfter
+                                              ? { marginRight: `${seat.gapAfter * 0.55}rem` }
+                                              : undefined
+                                          }
+                                        >
+                                          <button
+                                            type="button"
+                                            disabled={seat.isBooked}
+                                            onClick={() => toggleGridSeat(seat)}
+                                            className={`size-7 sm:size-8 rounded-md text-[10px] sm:text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${
+                                              seat.isBooked
+                                                ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed"
+                                                : isSelected
+                                                  ? "bg-[#6900AA] text-white border border-[#6900AA]/40 shadow-md scale-105 z-10"
+                                                  : "bg-white border border-slate-300 text-slate-700 hover:bg-[#F7E9FF] hover:border-[#6900AA]/40 cursor-pointer"
+                                            }`}
+                                            title={`${section.sectionName} · ${seat.row}${seat.number}`}
+                                          >
+                                            {seat.number}
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <span className="w-5 text-center text-[0.6875rem] font-bold text-slate-500 shrink-0">
+                                    {row.rowLabel}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    ))}
+
+                    {eventGridLayout.hasStage && !eventGridLayout.stageAtTop && (
+                      <div className="text-center space-y-2 px-4 pt-2">
+                        <div className="relative mx-auto w-[min(92%,42rem)] h-2.5">
+                          <div className="absolute inset-0 rounded-[50%] border-t-4 border-[#6900AA] shadow-[0_-8px_18px_rgba(105,0,170,0.2)]" />
+                        </div>
+                        <p className="text-[0.6875rem] uppercase tracking-[0.2em] font-extrabold text-slate-500">
+                          Stage
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <footer className="shrink-0 bg-white border-t border-slate-200 px-4 sm:px-6 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(15,23,42,0.08)]">
+            <div className="max-w-5xl mx-auto flex items-center gap-3 sm:gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.875rem] text-slate-500">
+                  {selectedSeats.length}/{desiredSeatQty} seat
+                  {desiredSeatQty === 1 ? "" : "s"} selected
+                </p>
+                <p className="text-[1.25rem] sm:text-[1.375rem] font-extrabold text-slate-900 leading-tight">
+                  {formatMoney(ticketAmount, { compact: true })}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={selectedSeats.length !== desiredSeatQty}
+                onClick={() => {
+                  if (selectedSeats.length !== desiredSeatQty) {
+                    toast.error(
+                      `Please select exactly ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}.`
+                    );
+                    return;
+                  }
+                  setIsMapFullscreen(false);
+                  proceedFromTickets();
+                }}
+                className={`min-w-[9.5rem] sm:min-w-[12rem] px-5 py-3.5 ${accentBtn} text-white font-bold text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-[#E3BCFF] disabled:cursor-not-allowed`}
+              >
+                Continue
+              </button>
+            </div>
+          </footer>
+        </div>
+      )}
       {ticketModeDetailsOpen && (
         <div
           className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50"

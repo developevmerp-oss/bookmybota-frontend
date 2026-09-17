@@ -59,6 +59,7 @@ import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import { formatMoney } from "@/lib/currencyFormat";
 import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
+import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
 
 const HOLD_SESSION_KEY = "bmb_movie_hold_session";
 
@@ -345,29 +346,6 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     };
   }, [layoutData, hasCanvasLayout, bookedSet]);
 
-  const handleCanvasSeatsSelected = useCallback(
-    (chosenSeats: any[]) => {
-      if (chosenSeats.length > qty) {
-        toast.warning(`Please select exactly ${qty} seat${qty === 1 ? "" : "s"}.`);
-        return;
-      }
-      const newSelected = chosenSeats.map((cs) => {
-        const secName = cs.section_name || "Standard";
-        const price = getTierPrice(secName, 0);
-        return {
-          seat_identifier: cs.friendlyId || cs.id,
-          tier_name: secName,
-          unit_price: price,
-        };
-      });
-      setSelectedSeats(newSelected);
-      setPromoApplied(false);
-      setDiscountAmount(0);
-      setAppliedGiftCard(null);
-    },
-    [getTierPrice, qty]
-  );
-
   const screenPosition = useMemo<"top" | "bottom">(() => {
     const shapes = layoutData?.layout_template?.seating_config?.shapes;
     if (Array.isArray(shapes) && shapes.length > 0) {
@@ -582,35 +560,175 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     return rows;
   }, [layoutData, showtime, bookedSet, getTierPrice]);
 
-  const handleSeatClick = (seat: GridSeat) => {
-    if (seat.isBooked) return;
-
-    const exists = selectedSeats.some((s) => s.seat_identifier === seat.id);
-    if (exists) {
-      setSelectedSeats((prev) => prev.filter((s) => s.seat_identifier !== seat.id));
-      setPromoApplied(false);
-      setDiscountAmount(0);
-      setAppliedGiftCard(null);
-      return;
-    }
-
-    if (selectedSeats.length >= qty) {
-      toast.warning(`Please select exactly ${qty} seat${qty === 1 ? "" : "s"}.`);
-      return;
-    }
-
-    setSelectedSeats((prev) => [
-      ...prev,
-      {
-        seat_identifier: seat.id,
-        tier_name: seat.tierName,
-        unit_price: seat.price,
-      },
-    ]);
+  const resetSeatPromos = () => {
     setPromoApplied(false);
     setDiscountAmount(0);
     setAppliedGiftCard(null);
   };
+
+  const findGridSeatContext = useCallback(
+    (seatId: string) => {
+      for (const row of gridRows) {
+        const idx = row.seats.findIndex((s) => s.id === seatId);
+        if (idx >= 0) {
+          return { row, index: idx, seat: row.seats[idx] };
+        }
+      }
+      return null;
+    },
+    [gridRows]
+  );
+
+  /** BMS-style: contiguous available seats on the same row (aisle-aware). */
+  const autoSelectNeighborSeats = useCallback(
+    (anchorSeatId: string, need: number) => {
+      const ctx = findGridSeatContext(anchorSeatId);
+      if (!ctx || need < 1) return null;
+      const block = pickContiguousBlock(ctx.row.seats, ctx.index, need);
+      if (!block.length) return null;
+      return block.map((s) => ({
+        seat_identifier: s.id,
+        tier_name: s.tierName,
+        unit_price: s.price,
+      }));
+    },
+    [findGridSeatContext]
+  );
+
+  const applyMovieSeats = (next: MovieBookingSeatPayload[]) => {
+    setSelectedSeats(next.slice(0, qty));
+    resetSeatPromos();
+  };
+
+  const handleSeatClick = (seat: GridSeat) => {
+    if (seat.isBooked) return;
+
+    // Tap a selected seat → deselect only that seat (adjust like BMS)
+    const exists = selectedSeats.some((s) => s.seat_identifier === seat.id);
+    if (exists) {
+      applyMovieSeats(selectedSeats.filter((s) => s.seat_identifier !== seat.id));
+      return;
+    }
+
+    // Full qty already picked → start a fresh auto-select of the full count
+    const startFresh = selectedSeats.length === 0 || selectedSeats.length >= qty;
+    const need = startFresh ? qty : qty - selectedSeats.length;
+
+    const autoBlock = autoSelectNeighborSeats(seat.id, need);
+    if (!autoBlock || autoBlock.length === 0) {
+      toast.message("No available seats in this row for your selection.");
+      return;
+    }
+
+    if (!startFresh) {
+      const currentTier = String(selectedSeats[0]?.tier_name || "");
+      const incomingTier = String(autoBlock[0]?.tier_name || "");
+      if (currentTier && incomingTier && currentTier !== incomingTier) {
+        toast.message("Please select seats from the same price category.");
+        return;
+      }
+      const existingIds = new Set(selectedSeats.map((s) => s.seat_identifier));
+      const toAdd = autoBlock.filter((s) => !existingIds.has(s.seat_identifier));
+      if (!toAdd.length) return;
+      const merged = [...selectedSeats, ...toAdd].slice(0, qty);
+      applyMovieSeats(merged);
+      if (merged.length < qty) {
+        toast.message(`${merged.length}/${qty} selected — tap another row for the rest.`);
+      }
+      return;
+    }
+
+    applyMovieSeats(autoBlock);
+    if (autoBlock.length < qty) {
+      toast.message(`${autoBlock.length}/${qty} selected — tap another row for the rest.`);
+    }
+  };
+
+  const handleCanvasSeatsSelected = useCallback(
+    (chosenSeats: any[]) => {
+      const mapped = chosenSeats.map((cs) => {
+        const secName = cs.section_name || "Standard";
+        const seatId = String(cs.friendlyId || cs.id);
+        const fromGrid = findGridSeatContext(seatId)?.seat;
+        const price = fromGrid?.price ?? getTierPrice(secName, 0);
+        return {
+          seat_identifier: seatId,
+          tier_name: fromGrid?.tierName || secName,
+          unit_price: price,
+        };
+      });
+
+      const prevIds = new Set(selectedSeats.map((s) => s.seat_identifier));
+      const nextIds = new Set(mapped.map((s) => s.seat_identifier));
+
+      // Deselect path from map viewer — or BMS "start fresh" when qty was full
+      if (mapped.length < selectedSeats.length) {
+        if (
+          mapped.length === 1 &&
+          !prevIds.has(mapped[0].seat_identifier)
+        ) {
+          const autoBlock = autoSelectNeighborSeats(mapped[0].seat_identifier, qty);
+          if (autoBlock && autoBlock.length > 0) {
+            applyMovieSeats(autoBlock);
+            if (autoBlock.length < qty) {
+              toast.message(`${autoBlock.length}/${qty} selected — tap another row for the rest.`);
+            }
+            return;
+          }
+        }
+        applyMovieSeats(mapped);
+        return;
+      }
+
+      const newlyAdded = mapped.filter((s) => !prevIds.has(s.seat_identifier));
+      if (newlyAdded.length === 1 && mapped.length === selectedSeats.length + 1) {
+        const startFresh = selectedSeats.length === 0 || selectedSeats.length >= qty;
+        const need = startFresh ? qty : qty - selectedSeats.length;
+        const autoBlock = autoSelectNeighborSeats(newlyAdded[0].seat_identifier, need);
+        if (autoBlock && autoBlock.length > 0) {
+          if (startFresh) {
+            applyMovieSeats(autoBlock);
+            if (autoBlock.length < qty) {
+              toast.message(`${autoBlock.length}/${qty} selected — tap another row for the rest.`);
+            }
+          } else {
+            const currentTier = String(selectedSeats[0]?.tier_name || "");
+            const incomingTier = String(autoBlock[0]?.tier_name || "");
+            if (currentTier && incomingTier && currentTier !== incomingTier) {
+              toast.message("Please select seats from the same price category.");
+              return;
+            }
+            const existing = new Set(selectedSeats.map((s) => s.seat_identifier));
+            const toAdd = autoBlock.filter((s) => !existing.has(s.seat_identifier));
+            const merged = [...selectedSeats, ...toAdd].slice(0, qty);
+            applyMovieSeats(merged);
+            if (merged.length < qty) {
+              toast.message(`${merged.length}/${qty} selected — tap another row for the rest.`);
+            }
+          }
+          return;
+        }
+      }
+
+      if (mapped.length > qty) {
+        applyMovieSeats(mapped.slice(0, qty));
+        return;
+      }
+
+      if (
+        mapped.length === selectedSeats.length &&
+        mapped.every((s) => prevIds.has(s.seat_identifier)) &&
+        selectedSeats.every((s) => nextIds.has(s.seat_identifier))
+      ) {
+        return;
+      }
+
+      applyMovieSeats(mapped);
+    },
+    // applyMovieSeats / reset are stable enough via closure; deps below cover selection logic
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [autoSelectNeighborSeats, findGridSeatContext, getTierPrice, qty, selectedSeats]
+  );
 
   const ticketSubtotal = useMemo(
     () => money(selectedSeats.reduce((sum, s) => sum + (Number(s.unit_price) || 0), 0)),

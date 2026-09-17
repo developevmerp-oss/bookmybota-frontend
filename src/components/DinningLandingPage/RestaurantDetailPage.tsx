@@ -7,7 +7,7 @@ import {
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
   ChevronLeft, X, Navigation, User,
   Send, ShieldCheck, ArrowRight, Check, ChevronDown, Tag, CheckCheck,
-  Sun, Moon, Sunrise, FileText, BadgeCheck
+  Sun, Moon, Sunrise, FileText, BadgeCheck, Utensils
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -15,6 +15,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
 import { resolveMediaUrl } from '@/lib/mediaUrl';
+import SafeCoverImage, { DiningImageFallback } from '@/components/Shared/SafeCoverImage';
 import {
   bookingWidgetOfferLabel,
   businessHasCustomerVisibleOffer,
@@ -482,27 +483,19 @@ const StarRatingInput = ({ value, onChange }: { value: number, onChange: (val: n
   return (
     <div className="flex items-center gap-1">
       {[1, 2, 3, 4, 5].map((star) => (
-        <div
+        <button
           key={star}
-          className="relative cursor-pointer"
-          onMouseMove={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const isHalf = x < rect.width / 2;
-            onChange(isHalf ? star - 0.5 : star);
-          }}
+          type="button"
+          className="relative cursor-pointer p-0 border-0 bg-transparent"
+          onClick={() => onChange(star)}
+          aria-label={`${star} star${star === 1 ? "" : "s"}`}
         >
           <Star
             size={24}
             strokeWidth={1.5}
             className={`${value >= star ? "fill-emerald-500 text-emerald-500" : "text-slate-300 fill-slate-100"} transition-colors`}
           />
-          {value === star - 0.5 && (
-            <div className="absolute top-0 left-0 overflow-hidden w-[50%] h-full pointer-events-none">
-              <Star size={24} strokeWidth={1.5} className="fill-emerald-500 text-emerald-500" />
-            </div>
-          )}
-        </div>
+        </button>
       ))}
       <span className="ml-2 text-xs font-bold text-slate-500 w-12">{value}</span>
     </div>
@@ -1046,11 +1039,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     uploadedPhotos.push(...uniqueGallery);
   }
 
-  const photos = profile
-    ? (uploadedPhotos.length > 0
-        ? resolveValidMediaUrls(uploadedPhotos)
-        : getPhotosForVenue(profile.type_name, profile.cover_image_url))
-    : [];
+  const photos = profile ? resolveValidMediaUrls(uploadedPhotos) : [];
   const venueGalleryPhotos = resolveValidMediaUrls(uploadedPhotos);
 
   const openLightbox = (index: number, items?: string[]) => {
@@ -1540,8 +1529,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* ── Image Collage ── */}
-        <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[260px] md:h-[380px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 mb-0 bg-slate-100">
-          {photos.slice(0, 5).map((photoUrl, idx) => {
+        <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[260px] md:h-[380px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 mb-0 bg-[#F3F4F6]">
+          {photos.length === 0 ? (
+            <div className="col-span-4 row-span-2 flex items-center justify-center text-slate-300">
+              <Utensils size={40} strokeWidth={1.5} />
+            </div>
+          ) : (
+          photos.slice(0, 5).map((photoUrl, idx) => {
             const total = Math.min(photos.length, 5);
             const isLastVisible = idx === total - 1;
 
@@ -1570,10 +1564,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 onClick={() => openLightbox(isLastVisible ? 0 : idx)}
                 className={itemClass}
               >
-                <img
+                <SafeCoverImage
                   src={photoUrl}
                   alt={`gallery item ${idx}`}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                  fallback={<DiningImageFallback size={28} />}
                 />
 
                 {idx === 0 && (
@@ -1600,7 +1596,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 )}
               </div>
             );
-          })}
+          })
+          )}
         </div>
 
 
@@ -2172,9 +2169,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {similarRestaurants.map((restaurant) => {
                   const rating = Number(restaurant.rating || 4.2).toFixed(1);
                   const cuisine = restaurant.cuisine || "Italian, Chinese, Continental";
-                  const coverImg =
-                    resolveMediaUrl(restaurant.cover_image_url) ||
-                    "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
+                  const coverImg = resolveMediaUrl(restaurant.cover_image_url) || "";
                   const locality = restaurant.address ? restaurant.address.split(",")[0].trim() : "";
                   const priceForTwo = restaurant.average_cost
                     ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
@@ -2186,17 +2181,17 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       href={`/restaurant/${restaurant.id}`}
                       className="group block bg-white hover:shadow-lg rounded-2xl p-3 border border-slate-100 hover:border-slate-200 transition-all duration-300 w-[280px] shrink-0 snap-start"
                     >
-                      <div className="relative h-44 rounded-xl overflow-hidden bg-slate-100 mb-3">
-                        <img
+                      <div className="relative h-44 rounded-xl overflow-hidden bg-[#F3F4F6] mb-3">
+                        <SafeCoverImage
                           src={coverImg}
                           alt={restaurant.name}
                           className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
-                          }}
+                          fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                          fallback={<DiningImageFallback size={28} />}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                        {coverImg ? (
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                        ) : null}
                       </div>
 
                       <div className="px-1 pb-1">
@@ -3192,18 +3187,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         className="relative shrink-0 rounded-2xl overflow-hidden bg-zinc-100 mx-auto lg:mx-0"
                         style={{ width: 200, height: 200 }}
                       >
-                        <img
+                        <SafeCoverImage
                           src={
                             photos[0] ||
                             resolveMediaUrl(profile.cover_image_url) ||
-                            'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80'
+                            ''
                           }
                           alt={profile.name}
                           className="absolute inset-0 w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80';
-                          }}
+                          fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
+                          fallback={<DiningImageFallback size={32} />}
                         />
                         <span className="absolute bottom-2.5 left-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-full bg-black/80 text-white text-[10px] font-semibold px-2.5 py-1">
                           {profile.name}

@@ -2,9 +2,36 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import type { DiningFilterState, SortOption } from "@/lib/diningFilters";
 import { useGetDiningCuisinesQuery } from "@/services/api";
+import "./DiningSearchPopup.css";
+
+const RECENT_SEARCHES_KEY = "dining_recent_searches";
+const MAX_RECENT_SEARCHES = 6;
+
+function readRecentSearches(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentSearches(items: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items.slice(0, MAX_RECENT_SEARCHES)));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 interface DiningFiltersBarProps {
   cuisines: string[];
@@ -18,6 +45,11 @@ interface DiningFiltersBarProps {
   onCategoryChange?: (category: string) => void;
   extraChips?: Array<{ label: string; onClear: () => void }>;
   onClearExtras?: () => void;
+  /** Show search icon on the right of the filter row (Dining Home). */
+  showSearch?: boolean;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  onSearchSubmit?: (value: string) => void;
 }
 
 const ACCENT = "#6900AA";
@@ -330,6 +362,10 @@ export default function DiningFiltersBar({
   onCategoryChange,
   extraChips = [],
   onClearExtras,
+  showSearch = false,
+  searchValue = "",
+  onSearchChange,
+  onSearchSubmit,
 }: DiningFiltersBarProps) {
   const effectiveCategoriesSelected = useMemo(() => {
     if (categoriesSelected.length > 0) return categoriesSelected;
@@ -339,6 +375,10 @@ export default function DiningFiltersBar({
 
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
+  const [showSearchPopup, setShowSearchPopup] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(searchValue);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<DiningFilterState>(filters);
   const [draftCategories, setDraftCategories] = useState<string[]>(effectiveCategoriesSelected);
   const [tab, setTab] = useState<FilterTab>("sort");
@@ -385,11 +425,55 @@ export default function DiningFiltersBar({
       if (e.key === "Escape") {
         setShowFilter(false);
         setShowSort(false);
+        setShowSearchPopup(false);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!showSearchPopup) return;
+    setSearchDraft(searchValue);
+    setRecentSearches(readRecentSearches());
+    const focusTimer = window.setTimeout(() => searchInputRef.current?.focus(), 50);
+    const scrollbarGap = window.innerWidth - document.documentElement.clientWidth;
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = "hidden";
+    if (scrollbarGap > 0) {
+      document.body.style.paddingRight = `${scrollbarGap}px`;
+    }
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
+    };
+    // Intentionally only re-run when the popup opens — not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSearchPopup]);
+
+  const closeSearchPopup = () => {
+    setShowSearchPopup(false);
+  };
+
+  const commitSearch = (raw: string) => {
+    const next = raw.trim();
+    onSearchChange?.(next);
+    onSearchSubmit?.(next);
+    if (next) {
+      const updated = [next, ...readRecentSearches().filter((item) => item.toLowerCase() !== next.toLowerCase())];
+      writeRecentSearches(updated);
+      setRecentSearches(updated.slice(0, MAX_RECENT_SEARCHES));
+    }
+    closeSearchPopup();
+  };
+
+  const removeRecentSearch = (term: string) => {
+    const updated = readRecentSearches().filter((item) => item.toLowerCase() !== term.toLowerCase());
+    writeRecentSearches(updated);
+    setRecentSearches(updated);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -518,11 +602,13 @@ export default function DiningFiltersBar({
 
   return (
     <div className="mb-2">
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
+      <div className="flex items-center gap-2 pb-1 -mx-1 px-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
         <button
           type="button"
           onClick={() => {
             setShowSort(false);
+            setShowSearchPopup(false);
             setShowFilter(true);
           }}
           className={chipClass(activeCount > 0)}
@@ -544,6 +630,7 @@ export default function DiningFiltersBar({
             type="button"
             onClick={() => {
               setShowFilter(false);
+              setShowSearchPopup(false);
               setShowSort((v) => !v);
             }}
             className={chipClass(filters.sort !== "relevance")}
@@ -657,7 +744,119 @@ export default function DiningFiltersBar({
             Clear All
           </button>
         ) : null}
+        </div>
+
+        {showSearch ? (
+          <button
+            type="button"
+            onClick={() => {
+              setShowFilter(false);
+              setShowSort(false);
+              setShowSearchPopup(true);
+            }}
+            className="dining-search-trigger shrink-0 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer"
+            aria-label="Search restaurants"
+          >
+            <Search size={18} strokeWidth={1.75} />
+          </button>
+        ) : null}
       </div>
+
+      {showSearch &&
+        showSearchPopup &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="dining-search-popup fixed inset-0 z-[220] flex items-start justify-center px-4 pt-[min(18vh,140px)]">
+            <button
+              type="button"
+              aria-label="Close search"
+              className="dining-search-popup__backdrop absolute inset-0 bg-slate-900/35 backdrop-blur-[2px]"
+              onClick={closeSearchPopup}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Search restaurants"
+              className="dining-search-popup__panel relative w-full max-w-[560px] bg-white rounded-2xl shadow-[0_18px_50px_rgba(15,23,42,0.18)] overflow-hidden"
+            >
+              <div className="flex items-center gap-3 px-5 sm:px-6 py-4 sm:py-[1.15rem]">
+                <Search size={20} strokeWidth={1.75} className="text-slate-500 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchDraft}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSearchDraft(next);
+                    onSearchChange?.(next);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitSearch(searchDraft);
+                    }
+                  }}
+                  placeholder="What are you looking for?"
+                  className="flex-1 min-w-0 bg-transparent text-[15px] sm:text-base text-slate-800 placeholder:text-slate-400 outline-none"
+                  aria-label="Search restaurants"
+                />
+                {searchDraft ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchDraft("");
+                      onSearchChange?.("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="shrink-0 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    aria-label="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="dining-search-popup__results border-t border-slate-100">
+                <div className="px-5 sm:px-6 pt-4 pb-5">
+                  <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
+                  {recentSearches.length === 0 ? (
+                    <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-50">
+                      {recentSearches.map((term) => (
+                        <li key={term} className="flex items-center gap-3 py-3">
+                          <button
+                            type="button"
+                            onClick={() => commitSearch(term)}
+                            className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer group"
+                          >
+                            <Search
+                              size={16}
+                              strokeWidth={1.75}
+                              className="text-slate-400 shrink-0 group-hover:text-slate-500"
+                            />
+                            <span className="truncate text-[15px] text-slate-500 group-hover:text-slate-700">
+                              {term}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeRecentSearch(term)}
+                            className="shrink-0 p-1 rounded-full text-slate-300 hover:text-slate-500 hover:bg-slate-100 cursor-pointer"
+                            aria-label={`Remove ${term}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {showFilter &&
         typeof document !== "undefined" &&

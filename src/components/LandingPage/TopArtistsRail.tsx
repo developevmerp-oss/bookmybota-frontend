@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Mic2 } from "lucide-react";
+import { Mic2 } from "lucide-react";
 import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
@@ -10,6 +10,7 @@ import {
   SHOWCASE_ARTIST_CARDS,
   type ShowcaseArtistCard,
 } from "@/data/showcaseArtistCards";
+import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import "./TopArtistsRail.css";
 
 const VISIBLE = 6;
@@ -107,12 +108,7 @@ export default function TopArtistsRail() {
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <h2 className="type-section font-semibold tracking-tight text-[#111111]">Top Artists</h2>
-          <Link
-            href="/artists"
-            className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
-          >
-            See All ›
-          </Link>
+          <RailSeeAllLink href="/artists" />
         </div>
 
         {isLoading ? (
@@ -129,17 +125,16 @@ export default function TopArtistsRail() {
             ))}
           </div>
         ) : (
-          <div className="relative">
-            {scrollEdges.left && (
-              <button
-                type="button"
-                aria-label="Previous artists"
+          <div className="relative overflow-visible">
+            {scrollEdges.left ? (
+              <RailOverlayNavButton
+                direction="prev"
+                side="left"
+                label="Previous artists"
                 onClick={() => scrollBy(-1)}
-                className="flex absolute left-1 sm:-left-2 top-[76px] sm:top-[86px] md:top-[94px] lg:top-[105px] -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full items-center justify-center cursor-pointer bg-white/95 border border-[#EDEDED] text-[#111111] shadow-md hover:bg-[#F7E9FF]"
-              >
-                <ChevronLeft size={20} />
-              </button>
-            )}
+                className="!flex !-left-3 sm:!-left-4 lg:!-left-5 !top-[76px] sm:!top-[86px] md:!top-[94px] lg:!top-[105px]"
+              />
+            ) : null}
 
             <div
               ref={scrollerRef}
@@ -151,16 +146,15 @@ export default function TopArtistsRail() {
               ))}
             </div>
 
-            {scrollEdges.right && (
-              <button
-                type="button"
-                aria-label="Next artists"
+            {scrollEdges.right ? (
+              <RailOverlayNavButton
+                direction="next"
+                side="right"
+                label="Next artists"
                 onClick={() => scrollBy(1)}
-                className="flex absolute right-1 sm:-right-2 top-[76px] sm:top-[86px] md:top-[94px] lg:top-[105px] -translate-y-1/2 z-10 w-9 h-9 md:w-10 md:h-10 rounded-full items-center justify-center cursor-pointer bg-white/95 border border-[#EDEDED] text-[#111111] shadow-md hover:bg-[#F7E9FF]"
-              >
-                <ChevronRight size={20} />
-              </button>
-            )}
+                className="!flex !-right-3 sm:!-right-4 lg:!-right-5 !top-[76px] sm:!top-[86px] md:!top-[94px] lg:!top-[105px]"
+              />
+            ) : null}
           </div>
         )}
       </div>

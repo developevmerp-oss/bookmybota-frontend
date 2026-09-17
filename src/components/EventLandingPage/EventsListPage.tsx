@@ -20,6 +20,7 @@ import {
   FaSlidersH,
 } from "react-icons/fa";
 import { MapPin } from "lucide-react";
+import SafeCoverImage, { EventImageFallback } from "@/components/Shared/SafeCoverImage";
 import {
   api,
   useGetBusinessTypesQuery,
@@ -44,6 +45,7 @@ import {
   type EventCategoryKey,
 } from "@/lib/eventCategories";
 import { SHOWCASE_EVENT_CARDS, showcaseCardsForCategories } from "@/data/showcaseEventCards";
+import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import {
   eventLandscape,
   eventPlaceLine,
@@ -179,19 +181,15 @@ function PromoFeatureCard({
         active ? "scale-100" : "scale-[0.92]"
       }`}
     >
-      {image ? (
-        <img
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100">
+        <SafeCoverImage
           src={image}
           alt={event.name}
-          className="block h-auto w-full bg-slate-100 object-contain"
-          loading="lazy"
-          draggable={false}
+          className="absolute inset-0 h-full w-full object-cover"
+          fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+          fallback={<EventImageFallback size={32} />}
         />
-      ) : (
-        <div className="flex aspect-[3/4] w-full items-center justify-center bg-slate-200 px-3 text-center text-sm font-medium text-slate-500">
-          {event.name}
-        </div>
-      )}
+      </div>
       <div className="space-y-0.5 px-3.5 py-3 sm:px-4 sm:py-3.5">
         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[#1A1A1A] sm:text-base">
           {event.name}
@@ -408,19 +406,14 @@ function DistrictEventCard({
       href={`/events/${event.id}`}
       className="group block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white"
     >
-      <div className="relative w-full overflow-hidden bg-slate-100">
-        {portrait ? (
-          <img
-            src={portrait}
-            alt={event.name}
-            className="block h-auto w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex aspect-[3/4] w-full items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300 text-sm font-medium text-slate-500">
-            No poster
-          </div>
-        )}
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100">
+        <SafeCoverImage
+          src={portrait}
+          alt={event.name}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+          fallback={<EventImageFallback size={32} />}
+        />
       </div>
       <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
         {dateLine ? (
@@ -450,25 +443,24 @@ function RecommendCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: s
       href={`/events/${event.id}`}
       className="group shrink-0 w-[48vw] sm:w-[200px] md:w-[220px] lg:w-[240px] 2xl:w-[240px] snap-start"
     >
-      {portrait ? (
-        <img
+      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-100">
+        <SafeCoverImage
           src={portrait}
           alt={event.name}
-          className="block w-full h-auto rounded-2xl object-contain bg-slate-100 transition-transform duration-300 group-hover:scale-[1.02]"
-          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+          fallback={<EventImageFallback size={32} />}
         />
-      ) : (
-        <div className="aspect-[3/4] w-full rounded-2xl bg-slate-200" />
-      )}
+      </div>
       <div className="mt-2 space-y-0.5">
         {place ? (
-          <p className="flex items-center gap-1 text-[11px] text-slate-600 line-clamp-1">
+          <p className="flex items-center gap-1 text-sm font-semibold text-slate-600 line-clamp-1">
             <MapPin className="shrink-0 text-[#6900AA]" size={13} strokeWidth={2} />
             <span className="truncate">{place}</span>
           </p>
         ) : null}
-        <h3 className="text-sm font-bold text-slate-900 line-clamp-1">{event.name}</h3>
-        {dateLine ? <p className="text-xs text-slate-500 line-clamp-1">{dateLine}</p> : null}
+        <h3 className="text-sm sm:text-lg font-bold text-slate-900 line-clamp-1">{event.name}</h3>
+        {dateLine ? <p className="text-sm font-semibold text-slate-500 line-clamp-1">{dateLine}</p> : null}
       </div>
     </Link>
   );
@@ -530,6 +522,15 @@ export default function PublicEventsPage() {
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [selectedPriceBands, setSelectedPriceBands] = useState<string[]>([]);
   const [selectedMore, setSelectedMore] = useState<string[]>([]);
+  /** Draft selections inside the filter popup — committed only on Apply / Clear. */
+  const [draftSlugs, setDraftSlugs] = useState<string[]>([]);
+  const [draftEventGenres, setDraftEventGenres] = useState<string[]>([]);
+  const [draftDatePreset, setDraftDatePreset] = useState("");
+  const [draftDateFrom, setDraftDateFrom] = useState("");
+  const [draftDateTo, setDraftDateTo] = useState("");
+  const [draftUseDateRange, setDraftUseDateRange] = useState(false);
+  const [draftLanguages, setDraftLanguages] = useState<string[]>([]);
+  const [draftPriceBands, setDraftPriceBands] = useState<string[]>([]);
   const [openFilters, setOpenFilters] = useState({
     categories: true,
     date: false,
@@ -576,19 +577,108 @@ export default function PublicEventsPage() {
     }, 50);
   }, []);
 
+  const syncDraftFromApplied = useCallback(() => {
+    setDraftSlugs(selectedSlugs);
+    setDraftEventGenres(selectedEventGenres);
+    setDraftDatePreset(datePreset);
+    setDraftDateFrom(dateFrom);
+    setDraftDateTo(dateTo);
+    setDraftUseDateRange(useDateRange);
+    setDraftLanguages(selectedLanguages);
+    setDraftPriceBands(selectedPriceBands);
+  }, [
+    selectedSlugs,
+    selectedEventGenres,
+    datePreset,
+    dateFrom,
+    dateTo,
+    useDateRange,
+    selectedLanguages,
+    selectedPriceBands,
+  ]);
+
+  const openFiltersModal = useCallback(
+    (tab: FilterModalTab = "date") => {
+      syncDraftFromApplied();
+      setFilterModalTab(tab);
+      setFiltersOpen(true);
+    },
+    [syncDraftFromApplied]
+  );
+
+  const closeFiltersModal = useCallback(() => {
+    setFiltersOpen(false);
+  }, []);
+
+  const syncCategoryToUrl = useCallback(
+    (slugs: string[] | string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      const list = Array.isArray(slugs) ? slugs : slugs ? [slugs] : [];
+      if (list.length) params.set("category", list.join(","));
+      else params.delete("category");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [searchParams, pathname, router]
+  );
+
   const applyFiltersAndClose = useCallback(() => {
+    if (dedicatedCategoryPage) {
+      setSelectedEventGenres(draftEventGenres);
+    } else {
+      categoryFromFilterRef.current = true;
+      setDedicatedCategoryPage(false);
+      setSelectedSlugs(draftSlugs);
+      syncCategoryToUrl(draftSlugs);
+    }
+    setDatePreset(draftDatePreset);
+    setDateFrom(draftDateFrom);
+    setDateTo(draftDateTo);
+    setUseDateRange(draftUseDateRange);
+    setSelectedLanguages(draftLanguages);
+    setSelectedPriceBands(draftPriceBands);
     setFiltersOpen(false);
     scrollToEventsViewport();
-  }, [scrollToEventsViewport]);
+  }, [
+    dedicatedCategoryPage,
+    draftEventGenres,
+    draftSlugs,
+    draftDatePreset,
+    draftDateFrom,
+    draftDateTo,
+    draftUseDateRange,
+    draftLanguages,
+    draftPriceBands,
+    scrollToEventsViewport,
+    syncCategoryToUrl,
+  ]);
 
-  const syncCategoryToUrl = (slugs: string[] | string | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    const list = Array.isArray(slugs) ? slugs : slugs ? [slugs] : [];
-    if (list.length) params.set("category", list.join(","));
-    else params.delete("category");
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  };
+  const clearModalFiltersAndApply = useCallback(() => {
+    setDraftDatePreset("");
+    setDraftDateFrom("");
+    setDraftDateTo("");
+    setDraftUseDateRange(false);
+    setDraftLanguages([]);
+    setDraftPriceBands([]);
+    setDraftEventGenres([]);
+    setDatePreset("");
+    setDateFrom("");
+    setDateTo("");
+    setUseDateRange(false);
+    setSelectedLanguages([]);
+    setSelectedPriceBands([]);
+    setSelectedMore([]);
+    setSelectedEventGenres([]);
+    if (!dedicatedCategoryPage) {
+      categoryFromFilterRef.current = true;
+      setDedicatedCategoryPage(false);
+      setDraftSlugs([]);
+      setSelectedSlugs([]);
+      syncCategoryToUrl([]);
+    }
+    setFiltersOpen(false);
+    scrollToEventsViewport();
+  }, [dedicatedCategoryPage, scrollToEventsViewport, syncCategoryToUrl]);
 
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
   const apiCategories = filterOptions?.categories ?? [];
@@ -665,8 +755,6 @@ export default function PublicEventsPage() {
 
   useEffect(() => {
     const applyCity = () => {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("city")) return;
       const stored = localStorage.getItem("selected_city");
       if (stored && stored !== "All Cities") setCity(stored);
       else setCity("");
@@ -967,16 +1055,16 @@ export default function PublicEventsPage() {
   }, [calMonth]);
 
   const headingCity = city || "Ethiopia";
-  const hasActiveFilters =
+  const hasNonCityFilters =
     (!isCategoryBrowse && selectedSlugs.length > 0) ||
     (isCategoryBrowse && selectedEventGenres.length > 0) ||
     Boolean(datePreset) ||
     Boolean(dateFrom) ||
     Boolean(dateTo) ||
-    Boolean(city) ||
     selectedLanguages.length > 0 ||
     selectedPriceBands.length > 0 ||
     selectedMore.length > 0;
+  const hasActiveFilters = hasNonCityFilters || Boolean(city);
 
   const listingWithPosters = useMemo(
     () =>
@@ -1357,13 +1445,28 @@ export default function PublicEventsPage() {
   );
 
   const tabHasSelection = (tab: FilterModalTab) => {
-    if (tab === "date") return Boolean(datePreset || dateFrom || dateTo);
+    if (tab === "date") return Boolean(draftDatePreset || draftDateFrom || draftDateTo);
     if (tab === "genre") {
-      return isCategoryBrowse ? selectedEventGenres.length > 0 : selectedSlugs.length > 0;
+      return isCategoryBrowse ? draftEventGenres.length > 0 : draftSlugs.length > 0;
     }
-    if (tab === "language") return selectedLanguages.length > 0;
-    if (tab === "pricing") return selectedPriceBands.length > 0;
+    if (tab === "language") return draftLanguages.length > 0;
+    if (tab === "pricing") return draftPriceBands.length > 0;
     return false;
+  };
+
+  const toggleDraftSlug = (slug: string) => {
+    setDraftSlugs((prev) => {
+      const isActive = prev.some((s) => categorySlugsMatch(s, slug, categoryPool));
+      return isActive
+        ? prev.filter((s) => !categorySlugsMatch(s, slug, categoryPool))
+        : [...prev, slug];
+    });
+  };
+
+  const toggleDraftEventGenre = (name: string) => {
+    setDraftEventGenres((prev) =>
+      prev.includes(name) ? prev.filter((g) => g !== name) : [...prev, name]
+    );
   };
 
   const districtFilterModalBody = (
@@ -1396,16 +1499,16 @@ export default function PublicEventsPage() {
         {filterModalTab === "date" ? (
           <div className="space-y-1">
             {datePresets.map((d) => {
-              const selected = datePreset === d.id;
+              const selected = draftDatePreset === d.id;
               return (
                 <button
                   key={d.id}
                   type="button"
                   onClick={() => {
-                    setDatePreset((p) => (p === d.id ? "" : d.id));
-                    setDateFrom("");
-                    setDateTo("");
-                    setUseDateRange(false);
+                    setDraftDatePreset((p) => (p === d.id ? "" : d.id));
+                    setDraftDateFrom("");
+                    setDraftDateTo("");
+                    setDraftUseDateRange(false);
                   }}
                   className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-slate-800 cursor-pointer hover:bg-white/70"
                 >
@@ -1424,12 +1527,12 @@ export default function PublicEventsPage() {
                 <p className="px-2 py-2 text-sm text-slate-500">Loading genres…</p>
               ) : categoryGenreOptions.length ? (
                 categoryGenreOptions.map((g) => {
-                  const selected = selectedEventGenres.includes(g.name);
+                  const selected = draftEventGenres.includes(g.name);
                   return (
                     <button
                       key={g.id}
                       type="button"
-                      onClick={() => toggleEventGenre(g.name)}
+                      onClick={() => toggleDraftEventGenre(g.name)}
                       className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm sm:text-base text-slate-800 cursor-pointer hover:bg-white/70"
                     >
                       <SelectionMark selected={selected} multi />
@@ -1442,14 +1545,14 @@ export default function PublicEventsPage() {
               )
             ) : (
               categoryFilters.map((cat) => {
-                const selected = selectedSlugs.some((s) =>
+                const selected = draftSlugs.some((s) =>
                   categorySlugsMatch(s, cat.slug, categoryPool)
                 );
                 return (
                   <button
                     key={cat.slug}
                     type="button"
-                    onClick={() => selectSlug(cat.slug)}
+                    onClick={() => toggleDraftSlug(cat.slug)}
                     className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm sm:text-base text-slate-800 cursor-pointer hover:bg-white/70"
                   >
                     <SelectionMark selected={selected} multi />
@@ -1464,12 +1567,12 @@ export default function PublicEventsPage() {
         {filterModalTab === "language" ? (
           <div className="space-y-1">
             {languageOptions.map((lang) => {
-              const selected = selectedLanguages.includes(lang);
+              const selected = draftLanguages.includes(lang);
               return (
                 <button
                   key={lang}
                   type="button"
-                  onClick={() => toggleIn(selectedLanguages, lang, setSelectedLanguages)}
+                  onClick={() => toggleIn(draftLanguages, lang, setDraftLanguages)}
                   className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-slate-800 cursor-pointer hover:bg-white/70"
                 >
                   <SelectionMark selected={selected} multi />
@@ -1483,12 +1586,12 @@ export default function PublicEventsPage() {
         {filterModalTab === "pricing" ? (
           <div className="space-y-1">
             {priceBands.map((band) => {
-              const selected = selectedPriceBands.includes(band.id);
+              const selected = draftPriceBands.includes(band.id);
               return (
                 <button
                   key={band.id}
                   type="button"
-                  onClick={() => toggleIn(selectedPriceBands, band.id, setSelectedPriceBands)}
+                  onClick={() => toggleIn(draftPriceBands, band.id, setDraftPriceBands)}
                   className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-slate-800 cursor-pointer hover:bg-white/70"
                 >
                   <SelectionMark selected={selected} multi />
@@ -1558,10 +1661,7 @@ export default function PublicEventsPage() {
           <ChipButton
             label={hasActiveFilters ? "Filters · On" : "Filters"}
             active={filtersOpen || hasActiveFilters}
-            onClick={() => {
-              setFilterModalTab("date");
-              setFiltersOpen(true);
-            }}
+            onClick={() => openFiltersModal("date")}
             icon={<FaSlidersH size={12} />}
             trailing={<FaChevronDown size={10} className="opacity-60" />}
           />
@@ -1638,7 +1738,7 @@ export default function PublicEventsPage() {
         {isLoading || (isFetching && paged.length === 0) ? (
           <EventListShimmer />
         ) : paged.length === 0 ? (
-          hasActiveFilters ? (
+          hasNonCityFilters ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
               <p className="text-sm font-semibold text-slate-800">No events match your filters</p>
               <p className="mt-1 text-sm text-slate-500">Try another date, genre, language, or price.</p>
@@ -1650,8 +1750,10 @@ export default function PublicEventsPage() {
                 Clear filters
               </button>
             </div>
+          ) : city ? (
+            <CityLocationEmptyState categoryLabel="events" city={city} />
           ) : (
-            <div className="mx-auto grid w-full max-w-[420px] grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
+            <div className="mx-auto grid w-full  grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
               {emptyShowcaseCards.map((event) => (
                 <div
                   key={event.id}
@@ -1671,7 +1773,7 @@ export default function PublicEventsPage() {
             </div>
           )
         ) : (
-          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 grid w-full  grid-cols-1 gap-5  md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
+          <div className="  grid w-full  grid-cols-1 gap-5  md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
             {paged.map((event) => (
               <DistrictEventCard
                 key={event.id}
@@ -1744,7 +1846,7 @@ export default function PublicEventsPage() {
             </div>
           </section>
 
-          {/* Desktop — existing District blur banner (unchanged) */}
+          {/* Desktop — District blur banner */}
           <section className="relative hidden w-full overflow-hidden bg-white lg:block">
             {promoEvents.length > 1 ? (
               <>
@@ -1752,7 +1854,7 @@ export default function PublicEventsPage() {
                   type="button"
                   aria-label="Previous promo"
                   onClick={goPrevPromo}
-                  className="absolute left-2 top-1/2 z-20 flex size-9 -translate-y-1/2 cursor-pointer items-center justify-center text-slate-800 hover:opacity-70 xl:left-6 2xl:left-12 sm:size-10"
+                  className="absolute left-3 top-1/2 z-20 flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center text-slate-800 hover:opacity-70 xl:left-5 2xl:left-8"
                 >
                   <FaChevronLeft size={16} />
                 </button>
@@ -1760,7 +1862,7 @@ export default function PublicEventsPage() {
                   type="button"
                   aria-label="Next promo"
                   onClick={goNextPromo}
-                  className="absolute right-2 top-1/2 z-20 flex size-9 -translate-y-1/2 cursor-pointer items-center justify-center text-slate-800 hover:opacity-70 xl:right-6 2xl:right-12 sm:size-10"
+                  className="absolute right-3 top-1/2 z-20 flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center text-slate-800 hover:opacity-70 xl:right-5 2xl:right-8"
                 >
                   <FaChevronRight size={16} />
                 </button>
@@ -1788,15 +1890,14 @@ export default function PublicEventsPage() {
                     className="relative w-full shrink-0 grow-0 basis-full"
                   >
                     <div className="absolute inset-0 overflow-hidden" aria-hidden>
-                      {image ? (
-                        <img
-                          src={image}
-                          alt=""
-                          className="absolute inset-0 h-full w-full scale-150 object-cover blur-[15px] opacity-80"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-slate-200" />
-                      )}
+                      <SafeCoverImage
+                        src={image}
+                        alt=""
+                        className="absolute inset-0 h-full w-full scale-150 object-cover blur-[15px] opacity-80"
+                        fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
+                        fallback={<EventImageFallback size={48} />}
+                        loading="eager"
+                      />
                       <div className="absolute inset-0 bg-white/55" />
                       <div
                         className="absolute inset-0"
@@ -1808,52 +1909,53 @@ export default function PublicEventsPage() {
                     </div>
 
                     <div
-                      className={`relative ${CONTAINER} py-8 sm:py-10 lg:py-12 lg:px-16 xl:px-14 2xl:px-12 ${
-                        promoEvents.length > 1 ? "pb-14 sm:pb-16" : ""
+                      className={`relative mx-auto w-full container px-5 sm:px-10  lg:px-10  2xl:px-0 py-10 xl:py-12 ${
+                        promoEvents.length > 1
+                          ? "px-14 xl:px-16 2xl:px-20 pb-14"
+                          : "px-10 xl:px-12 2xl:px-16"
                       }`}
                     >
-                      <div className="flex flex-col-reverse md:flex-row md:items-center gap-6 md:gap-10 lg:gap-14">
-                        <div className="flex-1 min-w-0 text-slate-900">
+                      <div className="flex items-center gap-8 lg:gap-8 2xl:gap-5">
+                        <div className="min-w-0 flex-1 text-slate-900">
                           {formatPromoDateTime(event.next_showtime) ? (
-                            <p className="text-xs sm:text-sm md:text-base font-medium text-slate-600">
+                            <p className="text-sm md:text-base font-medium text-slate-600">
                               {formatPromoDateTime(event.next_showtime)}
                             </p>
                           ) : null}
-                          <h1 className="mt-2 text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold leading-tight line-clamp-3">
+                          <h1 className="mt-2 text-2xl md:text-3xl xl:text-4xl font-extrabold leading-tight line-clamp-3">
                             {event.name}
                           </h1>
                           {eventPlaceLine(event, city || undefined) ? (
-                            <p className="mt-2 text-sm sm:text-base md:text-lg font-medium text-slate-700 line-clamp-2">
+                            <p className="mt-2 text-base md:text-lg font-medium text-slate-700 line-clamp-2">
                               {eventPlaceLine(event, city || undefined)}
                             </p>
                           ) : null}
                           {priceOnwards(event) ? (
-                            <p className="mt-3 text-sm sm:text-base md:text-lg font-bold text-slate-900">
+                            <p className="mt-3 text-base md:text-lg font-bold text-slate-900">
                               {priceOnwards(event)}
                             </p>
                           ) : null}
                           <div className="mt-4 sm:mt-5">
                             <Link
                               href={`/events/${event.id}`}
-                              className="inline-flex items-center justify-center rounded-2xl bg-[#131316] px-5 py-2 sm:px-8 sm:py-4 md:px-10 md:py-5 text-sm sm:text-base font-bold text-[#fff8da] hover:bg-zinc-900 transition-colors"
+                              className="inline-flex items-center justify-center rounded-2xl bg-[#131316] px-8 py-3.5 xl:px-10 xl:py-4 text-sm xl:text-base font-bold text-[#fff8da] hover:bg-zinc-900 transition-colors"
                             >
                               Book tickets
                             </Link>
                           </div>
                         </div>
 
-                        <div className="mx-auto md:mx-0 shrink-0 flex h-[280px] sm:h-[340px] md:h-[380px] lg:h-[420px] items-center justify-center">
-                          {image ? (
-                            <img
+                        <div className="shrink-0 h-[280px] sm:h-[340px] md:h-[380px] lg:h-[490px]">
+                          <div className="aspect-[3/4] h-full overflow-hidden rounded-2xl bg-[#F3F4F6] shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
+                            <SafeCoverImage
                               src={portrait || landscape}
                               alt={event.name}
-                              className="max-h-full w-auto max-w-[190px] sm:max-w-[235px] md:max-w-[270px] lg:max-w-[300px] rounded-2xl object-contain drop-shadow-[0_18px_40px_rgba(15,23,42,0.35)]"
+                              className="h-full w-full object-cover"
+                              fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                              fallback={<EventImageFallback size={40} />}
+                              loading="eager"
                             />
-                          ) : (
-                            <div className="h-full aspect-[3/4] rounded-2xl bg-slate-200 flex items-center justify-center text-slate-500 text-sm font-medium px-4 text-center">
-                              {event.name}
-                            </div>
-                          )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2040,7 +2142,7 @@ export default function PublicEventsPage() {
             type="button"
             aria-label="Close filters"
             className="absolute inset-0 bg-black/40 cursor-pointer"
-            onClick={() => setFiltersOpen(false)}
+            onClick={closeFiltersModal}
           />
           <div className="relative z-10 flex w-full sm:max-w-lg flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-xl max-h-[88vh]">
             <div className="px-4 pt-4 pb-3">
@@ -2050,7 +2152,7 @@ export default function PublicEventsPage() {
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
               <button
                 type="button"
-                onClick={clearAllFilters}
+                onClick={clearModalFiltersAndApply}
                 className="text-sm font-medium text-slate-800 underline underline-offset-2 cursor-pointer"
               >
                 Clear filters

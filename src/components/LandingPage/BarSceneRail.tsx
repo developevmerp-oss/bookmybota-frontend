@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery } from "@/services/api";
 import ContentRail from "./ContentRail";
-import { DiningPosterCard } from "./PosterCard";
+import { DiningPosterCard, ShowcaseDiningPosterCard } from "./PosterCard";
+import CityLocationEmptyState from "./CityLocationEmptyState";
+import { SHOWCASE_BAR_CARDS } from "@/data/showcaseDiningCards";
 import { hasCityFilter } from "./homeUtils";
 
 function resolveBarCategoryName(types: { name: string }[]): string {
@@ -31,10 +33,8 @@ export default function BarSceneRail({ city }: { city: string }) {
 
   const items = barsData?.items ?? [];
   const isLoading = typesLoading || barsLoading;
-  const empty =
-    !isLoading && items.length === 0
-      ? `No bars in ${hasCity ? city : "your city"} yet`
-      : undefined;
+  const isEmpty = !isLoading && items.length === 0;
+  const useStatic = isEmpty && !hasCity;
 
   const seeAllParams = new URLSearchParams();
   if (hasCity) seeAllParams.set("city", city);
@@ -44,15 +44,32 @@ export default function BarSceneRail({ city }: { city: string }) {
   return (
     <ContentRail
       title="Raise a Glass"
+      subtitle="Bars and lounges people are loving right now."
       seeAllHref={seeAllHref}
       label="bars"
       cardStyle="dining"
+      minVisible={4}
       isLoading={isLoading}
-      empty={empty}
+      empty={
+        isEmpty && hasCity ? (
+          <CityLocationEmptyState categoryLabel="bars" city={city} />
+        ) : undefined
+      }
     >
-      {items.map((place) => (
-        <DiningPosterCard key={place.id} place={place} />
-      ))}
+      {useStatic
+        ? SHOWCASE_BAR_CARDS.map((place) => (
+            <ShowcaseDiningPosterCard
+              key={place.id}
+              name={place.name}
+              image={place.image}
+              rating={place.rating}
+              locality={place.locality}
+              cuisine={place.cuisine}
+            />
+          ))
+        : items.map((place) => (
+            <DiningPosterCard key={place.id} place={place} />
+          ))}
     </ContentRail>
   );
 }

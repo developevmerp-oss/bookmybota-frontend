@@ -8,6 +8,7 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { parseYouTubeId, youtubeEmbedSrc, youtubeThumb } from "@/lib/youtube";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import SafeCoverImage, { EventImageFallback } from "@/components/Shared/SafeCoverImage";
 import "./EventMediaSlider.css";
 
 type Props = {
@@ -34,7 +35,9 @@ export default function EventMediaSlider({
 
   if (slides.length === 0) {
     return (
-      <div className="rounded-lg sm:rounded-xl bg-slate-100 aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9]" />
+      <div className="rounded-lg sm:rounded-xl bg-[#F3F4F6] aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9] flex items-center justify-center text-slate-300">
+        <EventImageFallback size={40} />
+      </div>
     );
   }
 
@@ -52,7 +55,13 @@ export default function EventMediaSlider({
         {slides.map((slide, index) => (
           <SwiperSlide key={`${slide.type}-${index}`}>
             {slide.type === "image" ? (
-              <img src={slide.src} alt={eventName} className="h-full w-full object-cover" />
+              <SafeCoverImage
+                src={slide.src}
+                alt={eventName}
+                className="h-full w-full object-cover"
+                fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                fallback={<EventImageFallback size={40} />}
+              />
             ) : (
               <div className="relative h-full w-full bg-black">
                 {active === index ? (

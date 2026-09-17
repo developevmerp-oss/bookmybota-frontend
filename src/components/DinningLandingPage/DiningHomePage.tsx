@@ -9,6 +9,7 @@ import {
   Navigation,
   Loader2,
   X,
+  Utensils,
   UtensilsCrossed,
   Users,
   Tag,
@@ -22,6 +23,8 @@ import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import "swiper/css/pagination";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
+import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -645,15 +648,9 @@ async function searchLocations(query: string): Promise<NominatimResult[]> {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function RestaurantCard({ restaurant }: { restaurant: Business }) {
-  const getFallbackImageForType = (type?: string) => {
-    const lower = type?.toLowerCase() || "";
-    if (lower.includes("cafe")) return "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=500&q=80";
-    if (lower.includes("bar") || lower.includes("pub")) return "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=500&q=80";
-    return "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
-  };
-
-  const imageSrc =
-    resolveMediaUrl(restaurant.cover_image_url) || getFallbackImageForType(restaurant.type_name);
+  const [imgFailed, setImgFailed] = useState(false);
+  const imageSrc = resolveMediaUrl(restaurant.cover_image_url) || "";
+  const showImage = Boolean(imageSrc) && !imgFailed;
   const rating = Number(restaurant.rating || 4.2).toFixed(1);
   const cuisine =
     restaurant.cuisine ||
@@ -699,18 +696,24 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
   return (
     <div className="group flex h-full flex-col bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-shadow duration-300 p-3">
-      <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+      <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-[#F3F4F6]">
         <Link href={`/restaurant/${restaurant.id}`} className="absolute inset-0 block">
-          <img
-            src={imageSrc}
-            alt={restaurant.name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+          {showImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageSrc}
+              alt={restaurant.name}
+              className="w-full h-full object-cover"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-300">
+              <Utensils size={28} strokeWidth={1.5} />
+            </div>
+          )}
+          {showImage ? (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+          ) : null}
         </Link>
 
         {isPromoted && (
@@ -779,6 +782,89 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
           </span>
         </div>
       </Link>
+    </div>
+  );
+}
+
+/** Static showcase listing card — same look as RestaurantCard, not clickable (no detail page). */
+function ShowcaseRestaurantCard({ place }: { place: ShowcaseDiningCard }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const cuisineLine = place.cuisine
+    .split(/[·|,]/)
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" • ");
+  const rating = Number(place.rating || 0).toFixed(1);
+  const idHash = place.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const priceForTwo = (() => {
+    const bases = [1200, 1500, 2000, 2400, 1800];
+    return `${formatMoney(bases[idHash % bases.length], { compact: true })} for two`;
+  })();
+  const distance = (() => {
+    const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
+    return `${dists[idHash % dists.length]} km away`;
+  })();
+  const showImage = Boolean(place.image) && !imgFailed;
+
+  return (
+    <div className="group flex h-full flex-col bg-white rounded-2xl border border-[#E8E8E8] shadow-sm p-3 select-none">
+      <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-[#F3F4F6]">
+        {showImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={place.image}
+            alt={place.name}
+            className="w-full h-full object-cover"
+            draggable={false}
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-slate-300">
+            <Utensils size={28} strokeWidth={1.5} />
+          </div>
+        )}
+        {showImage ? (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
+        ) : null}
+      </div>
+
+      <div className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-white">
+        <div className="flex justify-between items-start gap-2 mb-2">
+          <h3 className="font-bold text-[#292929] text-lg sm:text-xl leading-tight truncate flex-1">
+            {place.name}
+          </h3>
+          <div className="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-1.5 py-0.5 rounded-md">
+            <span className="text-[10px]">★</span>
+            <span>{rating}+</span>
+          </div>
+        </div>
+
+        <div className="space-y-1.5 text-sm text-[#292929]">
+          <p className="flex items-center gap-1.5 min-w-0">
+            <UtensilsCrossed size={14} className="shrink-0 text-[#6900AA]" />
+            <span className="truncate font-medium">{cuisineLine || place.cuisine}</span>
+          </p>
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <p className="flex items-center gap-1.5 min-w-0 flex-1">
+              <MapPin size={14} className="shrink-0 text-[#6900AA]" />
+              <span className="truncate font-medium">{place.locality}</span>
+            </p>
+            <span className="shrink-0 font-medium whitespace-nowrap text-[#292929]">{distance}</span>
+          </div>
+          <p className="flex items-center gap-1.5 min-w-0">
+            <Users size={14} className="shrink-0 text-[#6900AA]" />
+            <span className="truncate font-medium">{priceForTwo}</span>
+          </p>
+        </div>
+
+        <div className="mt-auto pt-3 w-full">
+          <span className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-[#6900AA] bg-white px-3.5 py-2.5 text-sm font-semibold text-[#6900AA] opacity-70">
+            <span>View Booking</span>
+            <ArrowRight size={16} className="shrink-0" />
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1444,6 +1530,31 @@ export default function Home() {
     diningFilters.sort !== "relevance" ||
     diningFilters.bookTable;
   const showHomeExtras = !hasActiveFilters;
+  const diningFiltersAreDefault =
+    diningFilters.cuisines.length === 0 &&
+    diningFilters.minRating === 0 &&
+    !diningFilters.offersOnly &&
+    !diningFilters.offerBucket &&
+    !diningFilters.pureVeg &&
+    !diningFilters.servesAlcohol &&
+    diningFilters.maxCost === 0 &&
+    diningFilters.sort === "relevance" &&
+    !diningFilters.bookTable;
+  const isBarCategoryOnly =
+    activeCategories.length === 1 &&
+    activeCategories[0].trim().toLowerCase() === "bar";
+  const hasSelectedCity =
+    Boolean(locationCity) && locationCity !== "All Cities";
+  const canShowCatalogFallback =
+    !businessesLoading &&
+    displayRestaurants.length === 0 &&
+    !searchQuery &&
+    !mealOccasion &&
+    diningFiltersAreDefault &&
+    (activeCategories.length === 0 || isBarCategoryOnly);
+  const useStaticDining = canShowCatalogFallback && !hasSelectedCity;
+  const showCityEmptyDining = canShowCatalogFallback && hasSelectedCity;
+  const staticDiningCards = isBarCategoryOnly ? SHOWCASE_BAR_CARDS : SHOWCASE_DINING_CARDS;
 
   const cuisinesScroll = useHorizontalScrollEdges(cuisinesRef, [
     cuisineCards.length,
@@ -1537,9 +1648,11 @@ export default function Home() {
 
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
-  const totalRestaurants = diningFilters.offerBucket
-    ? displayRestaurants.length
-    : businessesData?.meta?.total ?? filteredRestaurants.length;
+  const totalRestaurants = useStaticDining
+    ? staticDiningCards.length
+    : diningFilters.offerBucket
+      ? displayRestaurants.length
+      : businessesData?.meta?.total ?? filteredRestaurants.length;
   const restaurantCountLabel = `${totalRestaurants} restaurant${totalRestaurants !== 1 ? "s" : ""}`;
 
   const getFilteredSectionTitle = () => {
@@ -2153,11 +2266,13 @@ className={`text-sm font-bold mt-2 transition-colors ${
         <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
         {/* ── 4. Filter Section (full-bleed sticky bar; chips stay content-width) ─ */}
         <section
+          id="dining-filters-bar"
           className="sticky z-30 w-full"
           style={{
             top:
               siteHeaderHeight +
               (showStickyCuisineNames ? 52 : 0),
+            scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8,
           }}
         >
           <div
@@ -2179,6 +2294,15 @@ className={`text-sm font-bold mt-2 transition-colors ${
                 onCategoriesChange={(next) => {
                   setActiveCategories(next);
                   setExploreCardId(exploreCardIdForCategories(next, businessTypes));
+                  setCurrentPage(1);
+                  scrollToDiningBrowseViewport();
+                }}
+                showSearch
+                searchValue={searchInput}
+                onSearchChange={setSearchInput}
+                onSearchSubmit={(value) => {
+                  setSearchInput(value);
+                  setSearchQuery(value);
                   setCurrentPage(1);
                   scrollToDiningBrowseViewport();
                 }}
@@ -2299,6 +2423,17 @@ className={`text-sm font-bold mt-2 transition-colors ${
               <Loader2 size={36} className="animate-spin text-[#6900AA]" />
               <p className="text-sm font-medium">Loading top restaurants...</p>
             </div>
+          ) : useStaticDining ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {staticDiningCards.map((place) => (
+                <ShowcaseRestaurantCard key={place.id} place={place} />
+              ))}
+            </div>
+          ) : showCityEmptyDining ? (
+            <CityLocationEmptyState
+              categoryLabel={isBarCategoryOnly ? "bars" : "restaurants"}
+              city={locationCity}
+            />
           ) : displayRestaurants.length === 0 ? (
             <div className="text-center py-24">
               <div className="text-5xl mb-4">🍽️</div>

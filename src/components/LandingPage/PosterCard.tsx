@@ -2,10 +2,9 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Building2, Calendar, Star, Utensils } from "lucide-react";
+import { Building2, Calendar, MapPin, Star, Utensils } from "lucide-react";
 import type { Business, PublicEvent, PublicRegisteredPartner } from "@/services/api";
 import { useGetPublicEventQuery } from "@/services/api";
-import { normalizePriceRange } from "@/lib/currencyFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
   eventPortrait,
@@ -15,6 +14,7 @@ import {
   venueFromEventDetail,
 } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
+import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 
 const POSTER_MEDIA = "aspect-[2/3] w-full";
 const DINING_MEDIA = "aspect-[4/3] w-full";
@@ -84,16 +84,12 @@ function diningMetaLine(place: Business): string {
     .filter((p) => !/^(Br)+$/i.test(p.replace(/\s+/g, "")) && !/^₹+$/.test(p));
 
   const type = place.type_name?.trim() || "";
-  const price = normalizePriceRange(place.price_range);
 
   const parts: string[] = [];
   for (const part of cuisineParts) {
     if (!parts.some((p) => p.toLowerCase() === part.toLowerCase())) parts.push(part);
   }
   if (type && !parts.some((p) => p.toLowerCase() === type.toLowerCase())) parts.push(type);
-  if (price && !parts.some((p) => p.replace(/\s+/g, "").toLowerCase() === price.replace(/\s+/g, "").toLowerCase())) {
-    parts.push(price);
-  }
   return parts.slice(0, 3).join(" · ");
 }
 
@@ -291,12 +287,12 @@ export function DiningPosterCard({ place }: { place: Business }) {
   const image = resolveMediaUrl(place.cover_image_url) || "";
   const rating = Number(place.rating);
   const showRating = Number.isFinite(rating) && rating > 0;
-  const locality = localityFromAddress(place.address);
+  const locality = localityFromAddress(place.address) || place.city_name?.trim() || "";
   const meta = diningMetaLine(place);
   const fillSlot = Boolean(adaptive);
   const widthClass = fillSlot
     ? "w-full"
-    : "snap-start shrink-0 w-[240px] sm:w-[280px] md:w-[300px]";
+    : "snap-start shrink-0 w-[260px] sm:w-[300px] lg:w-[350px]";
 
   return (
     <Link href={`/restaurant/${place.id}`} className={`${widthClass} group block h-full ${cardShell}`}>
@@ -306,23 +302,103 @@ export function DiningPosterCard({ place }: { place: Business }) {
           alt={place.name}
           fallback={<Utensils size={28} strokeWidth={1.5} />}
         />
+        <DiningWishlistButton
+          businessId={place.id}
+          className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
+        />
         {showRating && (
-          <span className="absolute bottom-2.5 left-2.5 z-[2] inline-flex items-center gap-1 bg-[#267E3E] text-white type-card-caption font-semibold px-2 py-1 rounded-md shadow-sm">
-            {rating.toFixed(1)} <Star size={11} fill="currentColor" />
+          <span className="absolute bottom-2.5 left-2.5 z-[2] inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 shadow-md">
+            <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
+            <span className="text-xs font-bold text-[#111827]">{rating.toFixed(1)}</span>
           </span>
         )}
       </div>
-      <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
+      <div className="px-3.5 pt-3 pb-3.5 flex flex-col gap-1 min-h-0">
         <h3 className="type-card-title font-bold text-[#111827] line-clamp-1 group-hover:text-[#6900AA] transition-colors">
           {place.name}
         </h3>
-        {locality && (
-          <p className="type-card-body text-[#6B6B6B] line-clamp-1">{locality}</p>
-        )}
+        {locality ? (
+          <p className="type-card-body text-[#6B6B6B] line-clamp-1 flex items-center gap-1">
+            <MapPin size={13} className="shrink-0 text-slate-400" />
+            <span className="truncate">{locality}</span>
+          </p>
+        ) : null}
         {meta ? (
           <p className="type-card-caption text-[#9A9A9A] line-clamp-1">{meta}</p>
         ) : null}
       </div>
+    </Link>
+  );
+}
+
+/** Static showcase card — same layout as DiningPosterCard (no wishlist, no detail page). */
+export function ShowcaseDiningPosterCard({
+  name,
+  image,
+  rating,
+  locality,
+  cuisine,
+  href,
+  className = "",
+}: {
+  name: string;
+  image: string;
+  rating?: number;
+  locality?: string;
+  cuisine?: string;
+  href?: string;
+  className?: string;
+}) {
+  const adaptive = useAdaptiveCard();
+  const showRating = typeof rating === "number" && Number.isFinite(rating) && rating > 0;
+  const fillSlot = Boolean(adaptive);
+  const widthClass = fillSlot
+    ? "w-full"
+    : "snap-start shrink-0 w-[260px] sm:w-[300px] lg:w-[350px]";
+
+  const body = (
+    <>
+      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7]`}>
+        <CoverImage
+          src={image}
+          alt={name}
+          fallback={<Utensils size={28} strokeWidth={1.5} />}
+        />
+        {showRating && (
+          <span className="absolute bottom-2.5 left-2.5 z-[2] inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 shadow-md">
+            <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
+            <span className="text-xs font-bold text-[#111827]">{rating!.toFixed(1)}</span>
+          </span>
+        )}
+      </div>
+      <div className="px-3.5 pt-3 pb-3.5 flex flex-col gap-1 min-h-0">
+        <h3 className="type-card-title font-bold text-[#111827] line-clamp-1 group-hover:text-[#6900AA] transition-colors">
+          {name}
+        </h3>
+        {locality ? (
+          <p className="type-card-body text-[#6B6B6B] line-clamp-1 flex items-center gap-1">
+            <MapPin size={13} className="shrink-0 text-slate-400" />
+            <span className="truncate">{locality}</span>
+          </p>
+        ) : null}
+        {cuisine ? (
+          <p className="type-card-caption text-[#9A9A9A] line-clamp-1">{cuisine}</p>
+        ) : null}
+      </div>
+    </>
+  );
+
+  if (!href) {
+    return (
+      <div className={`${widthClass} group block h-full ${cardShell} ${className} select-none`}>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} className={`${widthClass} group block h-full ${cardShell} ${className}`}>
+      {body}
     </Link>
   );
 }

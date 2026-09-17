@@ -49,19 +49,26 @@ export function isProtectedPath(pathname: string): boolean {
 }
 
 /**
- * Customer logout: clear session and go to the system landing page.
+ * Customer logout: clear session.
+ * Redirect to landing only when logging out from My Account (`/customer/*`).
+ * On other pages, stay put after logout.
  */
 export function logoutCustomer(
   dispatch: AppDispatch,
-  _options?: { pathname?: string }
+  options?: { pathname?: string }
 ): void {
   if (typeof window === 'undefined') return;
+
+  const pathname = options?.pathname ?? window.location.pathname;
 
   clearSessionForRole('customer');
   dispatch(clearCredentials());
   window.dispatchEvent(new Event('auth_changed'));
   window.dispatchEvent(new Event('storage'));
-  window.location.replace('/');
+
+  if (pathname.startsWith('/customer')) {
+    window.location.replace('/');
+  }
 }
 
 export function isLoginAuthRequest(url: string): boolean {

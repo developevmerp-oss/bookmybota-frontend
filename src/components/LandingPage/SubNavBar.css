@@ -1,0 +1,48 @@
+/* Circle fill only while hovered — expands from entry, shrinks to exit */
+.list-your-show-cta {
+  --cta-scale: 28;
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+  isolation: isolate;
+  color: #6900aa;
+  background-color: transparent;
+  transition: color 0.35s ease, border-color 0.35s ease;
+}
+
+.list-your-show-cta__circle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  border-radius: 50%;
+  background: #6900aa;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+
+.list-your-show-cta.is-filled {
+  color: #ffffff;
+}
+
+.list-your-show-cta.is-filled .list-your-show-cta__circle {
+  transform: translate(-50%, -50%) scale(var(--cta-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-your-show-cta__circle {
+    transition: none;
+  }
+
+  .list-your-show-cta.is-filled {
+    color: #ffffff;
+    background-color: #6900aa;
+  }
+
+  .list-your-show-cta.is-filled .list-your-show-cta__circle {
+    display: none;
+  }
+}

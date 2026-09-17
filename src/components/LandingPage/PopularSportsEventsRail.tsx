@@ -1,33 +1,38 @@
 "use client";
 
 import { useRef } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { SHOWCASE_SPORTS_EVENT_CARDS } from "@/data/showcaseEventCards";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import CityLocationEmptyState from "./CityLocationEmptyState";
+import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import { EventPosterCard, ShowcaseEventPosterCard } from "./PosterCard";
-import { isSportsEvent } from "./homeUtils";
+import { hasCityFilter, isSportsEvent } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 
 const MIN_VISIBLE = 5;
 
 export default function PopularSportsEventsRail({ city }: { city: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { events, fallbackEvents, isLoadingEvents, isLoadingFallback } = useHomeCatalog(city);
-  const pool = events.length > 0 ? events : fallbackEvents;
-  const sportsEvents = pool.filter(isSportsEvent).slice(0, 12);
-  const useStatic = !isLoadingEvents && !isLoadingFallback && sportsEvents.length === 0;
+  const { events, isLoadingEvents } = useHomeCatalog(city);
+  const sportsEvents = events.filter(isSportsEvent).slice(0, 12);
+  const hasCity = hasCityFilter(city);
+  const isLoading = isLoadingEvents;
+  const isEmpty = !isLoading && sportsEvents.length === 0;
+  const useStatic = isEmpty && !hasCity;
   const cardCount = useStatic ? SHOWCASE_SPORTS_EVENT_CARDS.length : sportsEvents.length;
-  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [cardCount, useStatic, isLoadingEvents]);
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [
+    cardCount,
+    useStatic,
+    isLoading,
+    isEmpty,
+  ]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
   };
-
-  const isLoading = isLoadingEvents || isLoadingFallback;
 
   return (
     <section className="bg-white py-6 sm:py-8 lg:py-10">
@@ -36,25 +41,18 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
           <h2 className="type-section font-semibold tracking-tight text-[#111111]">
             Popular Sports Events
           </h2>
-          <Link
-            href="/events?category=sports"
-            className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
-          >
-            See All ›
-          </Link>
+          <RailSeeAllLink href="/events?category=sports" />
         </div>
 
-        <div className="relative">
-          {scrollEdges.left && (
-            <button
-              type="button"
-              aria-label="Previous sports events"
+        <div className="relative overflow-visible">
+          {!isEmpty && scrollEdges.left ? (
+            <RailOverlayNavButton
+              direction="prev"
+              side="left"
+              label="Previous sports events"
               onClick={() => scrollBy(-1)}
-              className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-            >
-              <ChevronLeft size={18} />
-            </button>
-          )}
+            />
+          ) : null}
 
           {isLoading ? (
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
@@ -66,6 +64,8 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
                 </div>
               ))}
             </AdaptiveCardRow>
+          ) : isEmpty && hasCity ? (
+            <CityLocationEmptyState categoryLabel="sports events" city={city} />
           ) : (
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {useStatic
@@ -86,16 +86,14 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
             </AdaptiveCardRow>
           )}
 
-          {scrollEdges.right && (
-            <button
-              type="button"
-              aria-label="Next sports events"
+          {!isEmpty && scrollEdges.right ? (
+            <RailOverlayNavButton
+              direction="next"
+              side="right"
+              label="Next sports events"
               onClick={() => scrollBy(1)}
-              className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-            >
-              <ChevronRight size={18} />
-            </button>
-          )}
+            />
+          ) : null}
         </div>
       </div>
     </section>

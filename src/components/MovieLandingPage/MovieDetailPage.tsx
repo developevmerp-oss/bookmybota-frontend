@@ -9,6 +9,7 @@ import { useParams } from "next/navigation";
 import { ArrowRight, ChevronRight, Loader2, Play, Share2, Star, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import MovieTrailerModal from "@/components/MovieLandingPage/MovieTrailerModal";
+import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
 import {
   useGetMovieEligiblePlatformOffersQuery,
   useGetPublicMovieQuery,
@@ -136,7 +137,14 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 
       <div className="absolute inset-0 pointer-events-none" aria-hidden>
 
-        <img src={bg} alt="" className="h-full w-full object-cover object-center" />
+        <SafeCoverImage
+          src={bg}
+          alt=""
+          className="h-full w-full object-cover object-center"
+          fallbackClassName="flex h-full w-full items-center justify-center bg-[#1f1f23] text-white/25"
+          fallback={<MovieImageFallback size={64} />}
+          loading="eager"
+        />
 
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/25" />
 
@@ -184,9 +192,16 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 lg:gap-10 items-start">
 
-          <div className="hidden lg:block rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 aspect-[2/3] max-w-[220px]">
+          <div className="hidden lg:block rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 aspect-[2/3] max-w-[220px] bg-[#F3F4F6]">
 
-            <img src={movie.poster} alt={movie.title} className="h-full w-full object-cover" />
+            <SafeCoverImage
+              src={movie.poster}
+              alt={movie.title}
+              className="h-full w-full object-cover"
+              fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+              fallback={<MovieImageFallback size={40} />}
+              loading="eager"
+            />
 
           </div>
 

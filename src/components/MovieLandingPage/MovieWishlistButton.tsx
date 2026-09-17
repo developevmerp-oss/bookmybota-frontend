@@ -105,11 +105,11 @@ export default function MovieWishlistButton({ movieId, className }: Props) {
         setOptimistic(wishlisted);
         toast.success(
           result.message ||
-            (wishlisted ? "Successfully added to wishlist" : "Removed from wishlist")
+            (wishlisted ? "Successfully added to favourites" : "Removed from favourites")
         );
       } catch (err) {
         setOptimistic(prev);
-        toast.error(extractApiError(err, "Could not update wishlist"));
+        toast.error(extractApiError(err, "Could not update favourites"));
       }
     },
     [isCustomer, movieId, saved, toggleWishlist, syncWishlist]

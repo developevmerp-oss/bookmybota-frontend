@@ -43,6 +43,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
   const [verifiedPhone, setVerifiedPhone] = useState("");
   const [verificationToken, setVerificationToken] = useState("");
   const [resendIn, setResendIn] = useState(0);
+  const [dynamicOtp, setDynamicOtp] = useState<string>("");
 
   const [sendOtp, { isLoading: isSendingOtp }] = useSendCustomerOtpMutation();
   const [verifyOtp, { isLoading: isVerifyingOtp }] = useVerifyCustomerOtpMutation();
@@ -81,6 +82,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
     setVerifiedPhone("");
     setVerificationToken("");
     setResendIn(0);
+    setDynamicOtp("");
     phoneForm.reset({ phone: "" });
     otpForm.reset({ otp: "" });
     registerForm.reset({ name: "", email: "", phone: "" });
@@ -125,12 +127,14 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
   const requestOtp = async (phone: string) => {
     const data = await sendOtp({ phone }).unwrap();
     setVerifiedPhone(phone);
-    otpForm.reset({ otp: "" });
+    const receivedOtp = data.demo_otp || "";
+    setDynamicOtp(receivedOtp);
+    otpForm.reset({ otp: receivedOtp });
     setStep("otp");
     setResendIn(RESEND_SECONDS);
     toast.success(data.message || `OTP sent to ${DIAL_CODE} ${phone}.`);
-    if (data.demo_otp) {
-      toast.message(`Demo OTP: ${data.demo_otp}`, { duration: 8000 });
+    if (receivedOtp) {
+      toast.message(`Your OTP is: ${receivedOtp}`, { duration: 8000 });
     }
   };
 
@@ -332,7 +336,10 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 </span>
               </p>
               <p className="text-center text-xs text-amber-700 font-semibold mb-5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-                Demo OTP: <span className="tracking-widest font-black">123456</span>
+                One-Time Password:{" "}
+                <span className="tracking-widest font-black text-amber-900 text-sm">
+                  {dynamicOtp || "123456"}
+                </span>
               </p>
               <form onSubmit={onVerifyOtp} className="space-y-4" noValidate>
                 <input

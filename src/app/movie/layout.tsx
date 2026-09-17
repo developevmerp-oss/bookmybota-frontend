@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
-import { useGetBusinessSettingsQuery } from "@/services/api";
+import { useGetBusinessSettingsQuery, useGetCinemaContractQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
@@ -35,13 +35,19 @@ function MovieShell({ children }: { children: React.ReactNode }) {
 
   const bizId = user?.business_id ?? "";
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
+  const { data: contract } = useGetCinemaContractQuery();
   const cinemaName = settings?.name || "Movie Admin";
+
+  const hasBeveragesEnabled =
+    contract?.status === "ACTIVE" && Number(contract?.beverage_commission_percent ?? 0) > 0;
 
   const navigation = [
     { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
     { name: "Contract", href: "/movie/contract", icon: FileSignature },
     { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
-    { name: "Beverages & Snacks", href: "/movie/beverages", icon: UtensilsCrossed },
+    ...(hasBeveragesEnabled
+      ? [{ name: "Beverages & Snacks", href: "/movie/beverages", icon: UtensilsCrossed }]
+      : []),
     { name: "Movies", href: "/movie/movies", icon: Film },
     { name: "Movie Offers", href: "/movie/offers", icon: Tag },
     { name: "Promotions", href: "/movie/promotions", icon: Megaphone },

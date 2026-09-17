@@ -49,6 +49,7 @@ export default function CreateMovieContractPage() {
       terms: "",
       convenience_fee: "0",
       commission: "0",
+      beverage_commission: "0",
     },
     mode: "onSubmit",
   });
@@ -56,6 +57,7 @@ export default function CreateMovieContractPage() {
   const businessId = watch("business_id");
   const convenienceFee = watch("convenience_fee") ?? "";
   const commission = watch("commission") ?? "";
+  const beverageCommission = watch("beverage_commission") ?? "";
   const terms = watch("terms") ?? "";
   const bodyHtml = watch("body_html") ?? "";
 
@@ -80,6 +82,10 @@ export default function CreateMovieContractPage() {
       "commission",
       sanitizePercentInput(String(prefill.suggested.commission_percent ?? 0))
     );
+    setValue(
+      "beverage_commission",
+      sanitizePercentInput(String(prefill.suggested.beverage_commission_percent ?? 0))
+    );
     setValue("terms", prefill.suggested.terms_and_conditions ?? "");
     setValue("body_html", prefill.suggested.body_html ?? "");
   }, [prefill?.suggested?.contract_number, prefill?.business?.id, setValue]);
@@ -90,27 +96,34 @@ export default function CreateMovieContractPage() {
       ...prefill.suggested.dynamic_data,
       convenienceFeePercent: parsePercent(convenienceFee) ?? 0,
       commissionPercent: parsePercent(commission) ?? 0,
+      beverageCommissionPercent: parsePercent(beverageCommission) ?? 0,
     };
-  }, [prefill, convenienceFee, commission]);
+  }, [prefill, convenienceFee, commission, beverageCommission]);
 
   const convenienceLiveError = getPercentValidationError(convenienceFee, "Convenience fee (%)");
   const commissionLiveError = getPercentValidationError(commission, "Commission (%)");
-  const feesValid = !convenienceLiveError && !commissionLiveError;
+  const beverageLiveError = getPercentValidationError(beverageCommission, "Snacks & beverages commission (%)");
+  const feesValid = !convenienceLiveError && !commissionLiveError && !beverageLiveError;
 
   const onValid = async (values: AdminMovieContractCreateValues) => {
     const convErr = getPercentValidationError(values.convenience_fee, "Convenience fee (%)");
     const commErr = getPercentValidationError(values.commission, "Commission (%)");
+    const bevErr = getPercentValidationError(values.beverage_commission, "Snacks & beverages commission (%)");
     if (convErr) {
       setError("convenience_fee", { type: "manual", message: convErr });
     }
     if (commErr) {
       setError("commission", { type: "manual", message: commErr });
     }
-    if (convErr || commErr) return;
+    if (bevErr) {
+      setError("beverage_commission", { type: "manual", message: bevErr });
+    }
+    if (convErr || commErr || bevErr) return;
 
     const conv = parsePercent(values.convenience_fee);
     const comm = parsePercent(values.commission);
-    if (conv === null || comm === null) {
+    const bevComm = parsePercent(values.beverage_commission);
+    if (conv === null || comm === null || bevComm === null) {
       if (conv === null) {
         setError("convenience_fee", {
           type: "manual",
@@ -119,6 +132,12 @@ export default function CreateMovieContractPage() {
       }
       if (comm === null) {
         setError("commission", {
+          type: "manual",
+          message: "Enter valid fee percentages between 0 and 100.",
+        });
+      }
+      if (bevComm === null) {
+        setError("beverage_commission", {
           type: "manual",
           message: "Enter valid fee percentages between 0 and 100.",
         });
@@ -133,6 +152,7 @@ export default function CreateMovieContractPage() {
         terms_and_conditions: values.terms ?? "",
         convenience_fee_percent: conv,
         commission_percent: comm,
+        beverage_commission_percent: bevComm,
       }).unwrap();
       toast.success(
         (res as { message?: string }).message ||
@@ -155,6 +175,7 @@ export default function CreateMovieContractPage() {
       status: "PENDING_SIGNATURES",
       convenience_fee_percent: parsePercent(convenienceFee) ?? 0,
       commission_percent: parsePercent(commission) ?? 0,
+      beverage_commission_percent: parsePercent(beverageCommission) ?? 0,
       dynamic_data: dynamicPreview,
       cinema_name: prefill.business.name,
       cinema_phone: prefill.business.phone,
@@ -163,6 +184,7 @@ export default function CreateMovieContractPage() {
 
   const convenienceError = errors.convenience_fee?.message || convenienceLiveError;
   const commissionError = errors.commission?.message || commissionLiveError;
+  const beverageError = errors.beverage_commission?.message || beverageLiveError;
 
   return (
     <div className="w-full space-y-6">
@@ -202,21 +224,22 @@ export default function CreateMovieContractPage() {
                 ))}
               </select>
               {errors.business_id && (
-                <p className="text-xs text-rose-400 font-medium mt-1">{errors.business_id.message}</p>
+                <p className="text-xs text-rose-400 font-medium mt-1">
+                  {errors.business_id.message}
+                </p>
               )}
             </div>
 
-            {loadingPrefill && businessId && (
-              <p className="text-sm text-zinc-500 flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" /> Loading cinema details…
-              </p>
+            {loadingPrefill && (
+              <div className="flex items-center gap-2 text-zinc-400 text-sm py-2">
+                <Loader2 size={16} className="animate-spin text-rose-500" />
+                <span>Loading cinema profile and suggested contract terms…</span>
+              </div>
             )}
 
             {prefill && (
-              <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm pt-1">
                 {[
-                  ["Cinema Name", prefill.business.name],
-                  ["Representative", prefill.cinema_admin?.name],
                   ["Email", prefill.cinema_admin?.email],
                   ["Phone", prefill.business.phone],
                   ["Total Screens", prefill.business.total_screens ? `${prefill.business.total_screens} screens` : "0 screens"],
@@ -246,14 +269,14 @@ export default function CreateMovieContractPage() {
                   })}
                   placeholder="0–100"
                 />
-                <p className="text-xs text-zinc-500 mt-1">Charged to the customer on ticket amount.</p>
+                <p className="text-xs text-zinc-500 mt-1">Charged to customer on ticket amount.</p>
                 {convenienceError && (
                   <p className="text-xs text-rose-400 font-medium mt-1">{convenienceError}</p>
                 )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-1">
-                  Commission (%) <span className="text-rose-500">*</span>
+                  Ticket Commission (%) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -266,11 +289,34 @@ export default function CreateMovieContractPage() {
                   })}
                   placeholder="0–100"
                 />
-                <p className="text-xs text-zinc-500 mt-1">Taken from the cinema on ticket amount.</p>
+                <p className="text-xs text-zinc-500 mt-1">Taken from cinema on box-office tickets.</p>
                 {commissionError && (
                   <p className="text-xs text-rose-400 font-medium mt-1">{commissionError}</p>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-400 mb-1">
+                Snacks &amp; Beverages Commission (%) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                className={`input-field w-full ${beverageError ? "border-rose-500" : ""}`}
+                {...register("beverage_commission", {
+                  onChange: (e) => {
+                    e.target.value = sanitizePercentInput(e.target.value);
+                  },
+                })}
+                placeholder="0–100"
+              />
+              <p className="text-xs text-zinc-500 mt-1">
+                Deducted from cinema food &amp; beverage sales. If &gt; 0%, cinema can add snacks in Movie Admin Panel. If 0%, snacks module is hidden for cinema.
+              </p>
+              {beverageError && (
+                <p className="text-xs text-rose-400 font-medium mt-1">{beverageError}</p>
+              )}
             </div>
 
             <div>

@@ -6,6 +6,7 @@ export const MOVIE_CONTRACT_DYNAMIC_FIELDS = [
   { label: 'Contract Number', token: 'contractNumber' },
   { label: 'Convenience Fee %', token: 'convenienceFeePercent' },
   { label: 'Commission %', token: 'commissionPercent' },
+  { label: 'Snacks & Beverages Commission %', token: 'beverageCommissionPercent' },
   { label: 'Total Screens', token: 'totalScreens' },
   { label: 'Platform Name', token: 'platformName' },
   { label: 'Contract Date', token: 'contractDate' },
@@ -13,7 +14,7 @@ export const MOVIE_CONTRACT_DYNAMIC_FIELDS = [
 
 export const DEFAULT_MOVIE_CONTRACT_BODY = `<p><strong>This Agreement.</strong> This Cinema Platform Agreement ("Agreement") is entered into between {{platformName}} ("Platform") and {{cinemaName}} ("Cinema Partner") as of {{contractDate}}.</p>
 <p><strong>Cinema Details.</strong> Cinema Name: {{cinemaName}}. Authorized Representative: {{cinemaAdminName}}. Address: {{cinemaAddress}}. Contact: {{cinemaPhone}}. Total Screens registered on the Platform: {{totalScreens}}.</p>
-<p><strong>Commercial Terms.</strong> The Platform shall charge a customer convenience fee of {{convenienceFeePercent}}% per ticket and deduct an operator commission of {{commissionPercent}}% from box-office proceeds. Payouts will be processed on a weekly basis for all completed showtimes.</p>
+<p><strong>Commercial Terms.</strong> The Platform shall charge a customer convenience fee of {{convenienceFeePercent}}% per ticket, deduct an operator commission of {{commissionPercent}}% from box-office ticket proceeds, and deduct a snacks & beverages commission of {{beverageCommissionPercent}}% from cinema food and beverage sales. Payouts will be processed on a weekly basis for all completed showtimes.</p>
 <p><strong>Obligations of the Cinema Partner.</strong> The Cinema Partner agrees to (a) maintain accurate and up-to-date showtime schedules, (b) honour all tickets sold through the Platform, (c) not discriminate between Platform-sold and walk-in tickets, and (d) promptly notify the Platform of any showtime cancellations or changes.</p>
 <p><strong>Obligations of the Platform.</strong> The Platform agrees to (a) process bookings securely and issue digital M-Tickets, (b) remit net proceeds to the Cinema Partner after deducting the agreed commission, and (c) provide customer support for Platform-related issues.</p>
 <p><strong>Term.</strong> This Agreement shall remain in effect for twelve (12) months from the date of activation and shall automatically renew unless terminated by either party with thirty (30) days written notice.</p>
@@ -29,6 +30,7 @@ export interface MovieContractRecord {
   status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
   convenience_fee_percent: number | string;
   commission_percent: number | string;
+  beverage_commission_percent?: number | string;
   dynamic_data?: Record<string, string | number> | null;
   admin_signed_at?: string | null;
   cinema_signed_at?: string | null;
@@ -58,6 +60,7 @@ export function mergeMovieContractHtml(contract: MovieContractRecord): string {
   const data: Record<string, string | number> = {
     ...dynamic,
     commissionPercent: dynamic.commissionPercent ?? contract.commission_percent,
+    beverageCommissionPercent: dynamic.beverageCommissionPercent ?? contract.beverage_commission_percent ?? 0,
     convenienceFeePercent: dynamic.convenienceFeePercent ?? contract.convenience_fee_percent,
     contractNumber: dynamic.contractNumber ?? contract.contract_number,
     cinemaName: dynamic.cinemaName ?? contract.cinema_name ?? 'Cinema Partner',

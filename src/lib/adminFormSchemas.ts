@@ -256,6 +256,7 @@ export const adminMovieContractCreateSchema = yup.object({
   terms: yup.string().trim().default(''),
   convenience_fee: yup.string().trim().required('Convenience fee is required.'),
   commission: yup.string().trim().required('Commission is required.'),
+  beverage_commission: yup.string().trim().required('Snacks & beverages commission is required.'),
 });
 export type AdminMovieContractCreateValues = yup.InferType<typeof adminMovieContractCreateSchema>;
 

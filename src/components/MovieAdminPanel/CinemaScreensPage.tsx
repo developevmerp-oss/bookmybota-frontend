@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
-import { CheckCircle, CheckCircle2, Clapperboard, Clock, Edit3, Eye, Layers, Plus, RefreshCw, X } from "lucide-react";
+import { CheckCircle, CheckCircle2, Clapperboard, Clock, Ban, Eye, Layers, Plus, RefreshCw, X } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
 import {
   useApproveVenueLayoutTemplateMutation,
@@ -18,17 +17,17 @@ import {
   useRejectVenueLayoutTemplateMutation,
   useRejectAllVenueLayoutTemplatesMutation,
   useUpdateCinemaScreenMutation,
-  useUpdateCinemaScreenLayoutMutation,
+  useUpdateCinemaScreenSeatStatusesMutation,
   type CinemaScreen,
   type VenueLayoutTemplate,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
-
-const VenueLayoutBuilder = dynamic(
-  () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
-  { ssr: false, loading: () => <p className="p-8 text-center text-zinc-400">Loading layout editor…</p> }
-);
+import {
+  buildCinemaSeatTypeZones,
+  CINEMA_SEAT_TYPE_FIELDS,
+  seatTypesTotal,
+} from "@/lib/cinemaSeatTypes";
 import {
   cinemaScreenFormSchema,
   emptyCinemaScreenFormValues,
@@ -145,7 +144,8 @@ export default function CinemaScreensPage() {
   const [publishLayout, { isLoading: publishing }] = usePublishVenueLayoutTemplateMutation();
   const [rejectLayout, { isLoading: rejecting }] = useRejectVenueLayoutTemplateMutation();
   const [rejectAllLayouts, { isLoading: rejectingAll }] = useRejectAllVenueLayoutTemplatesMutation();
-  const [updateScreenLayout, { isLoading: isUpdatingScreenLayout }] = useUpdateCinemaScreenLayoutMutation();
+  const [updateSeatStatuses, { isLoading: isUpdatingSeatStatuses }] =
+    useUpdateCinemaScreenSeatStatusesMutation();
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectAllScreenId, setRejectAllScreenId] = useState<string | null>(null);
   const [viewingTemplateId, setViewingTemplateId] = useState<string | null>(null);
@@ -165,6 +165,7 @@ export default function CinemaScreensPage() {
     handleSubmit: handleScreenSubmit,
     reset: resetScreenForm,
     getValues: getScreenValues,
+    watch: watchScreen,
     formState: { errors: screenErrors },
   } = useForm<CinemaScreenFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,6 +173,15 @@ export default function CinemaScreensPage() {
     defaultValues: emptyCinemaScreenFormValues(),
     mode: "onSubmit",
   });
+
+  const watchedCapacity = watchScreen("capacity");
+  const watchedRegular = watchScreen("regular_seats");
+  const watchedRecliner = watchScreen("recliner_seats");
+  const watchedCouple = watchScreen("couple_seats");
+  const assignedSeats =
+    (Number(watchedRegular) || 0) + (Number(watchedRecliner) || 0) + (Number(watchedCouple) || 0);
+  const totalCapacity = Number(watchedCapacity) || 0;
+  const remainingSeats = totalCapacity - assignedSeats;
 
   const {
     register: registerReject,
@@ -289,12 +299,18 @@ export default function CinemaScreensPage() {
   const onCreate = async (values: CinemaScreenFormValues) => {
     if (!bizId) return;
     try {
+      const seatTypes = {
+        regular: Number(values.regular_seats) || 0,
+        recliner: Number(values.recliner_seats) || 0,
+        couple: Number(values.couple_seats) || 0,
+      };
       const res = await createScreen({
         bizId,
         name: values.name.trim(),
         screen_type: values.screen_type,
-        capacity: Number(values.capacity) || 0,
+        capacity: Number(values.capacity) || seatTypesTotal(seatTypes),
         description: values.description?.trim() || undefined,
+        seat_types_json: seatTypes,
       }).unwrap();
       toast.success((res as { message?: string })?.message || "Screen created");
       resetScreenForm(emptyCinemaScreenFormValues());
@@ -378,6 +394,20 @@ export default function CinemaScreensPage() {
     }
     const formCapacity = Number(getScreenValues("capacity")) || 0;
     const cap = Number(selectedScreen.capacity) || formCapacity || 100;
+    const rawTypes = (selectedScreen.seat_types_json || {}) as Record<string, unknown>;
+    const seatTypes = {
+      regular: Number(rawTypes.regular) || 0,
+      recliner: Number(rawTypes.recliner) || 0,
+      couple: Number(rawTypes.couple) || 0,
+    };
+    const zones =
+      seatTypesTotal(seatTypes) > 0
+        ? buildCinemaSeatTypeZones(seatTypes)
+        : [
+            { name: "Regular", capacity: Math.max(1, Math.round(cap * 0.7)), seat_type: "regular" as const },
+            { name: "Recliner", capacity: Math.max(1, Math.round(cap * 0.2)), seat_type: "recliner" as const },
+            { name: "Couple", capacity: Math.max(1, Math.round(cap * 0.1)), seat_type: "couple" as const },
+          ];
     const phase = resolveLayoutPhase(selectedScreen);
     try {
       const res = await createLayoutRequest({
@@ -395,10 +425,8 @@ export default function CinemaScreensPage() {
         spec_json: {
           hall_name: selectedScreen.name,
           hall_capacity: cap,
-          zones: [
-            { name: "Premium", capacity: Math.max(1, Math.round(cap * 0.3)) },
-            { name: "Regular", capacity: Math.max(1, Math.round(cap * 0.7)) },
-          ],
+          zones,
+          seat_types: seatTypes,
           notes: `Cinema screen layout for ${selectedScreen.name}`,
           intake_mode: "structured_request",
         },
@@ -426,8 +454,9 @@ export default function CinemaScreensPage() {
           <Clapperboard size={20} className="text-fuchsia-400" /> Screens & layouts
         </h2>
         <p className="text-sm text-zinc-400 mt-1">
-          Create screens, request a seat layout once, then track progress. When Super Admin publishes
-          a map, review it here and approve.
+          Create screens with Regular / Recliner / Couple seat counts, request a seat layout once, then
+          track progress. After Super Admin publishes a map, you can approve it, set movie seat prices,
+          and block seats — layout geometry stays locked.
         </p>
       </div>
 
@@ -464,7 +493,7 @@ export default function CinemaScreensPage() {
           </div>
           <div>
             <label className="portal-label">
-              Expected capacity <RequiredMark />
+              Expected capacity (total seats) <RequiredMark />
             </label>
             <input
               className="input-field"
@@ -481,6 +510,63 @@ export default function CinemaScreensPage() {
             <input className="input-field" {...registerScreen("description")} />
           </div>
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {CINEMA_SEAT_TYPE_FIELDS.map((field) => (
+            <div key={field.key}>
+              <label className="portal-label">{field.label}</label>
+              <input
+                className="input-field"
+                type="number"
+                min={0}
+                placeholder="0"
+                {...registerScreen(
+                  field.key === "regular"
+                    ? "regular_seats"
+                    : field.key === "recliner"
+                      ? "recliner_seats"
+                      : "couple_seats"
+                )}
+              />
+              {screenErrors[
+                field.key === "regular"
+                  ? "regular_seats"
+                  : field.key === "recliner"
+                    ? "recliner_seats"
+                    : "couple_seats"
+              ] && (
+                <p className={fieldErrorClass}>
+                  {
+                    screenErrors[
+                      field.key === "regular"
+                        ? "regular_seats"
+                        : field.key === "recliner"
+                          ? "recliner_seats"
+                          : "couple_seats"
+                    ]?.message
+                  }
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        <p
+          className={`text-xs ${
+            remainingSeats === 0 && assignedSeats > 0
+              ? "text-emerald-400"
+              : remainingSeats < 0
+                ? "text-rose-400"
+                : "text-zinc-500"
+          }`}
+        >
+          Total capacity {totalCapacity || 0}. Assigned {assignedSeats}
+          {totalCapacity > 0
+            ? remainingSeats === 0
+              ? " — all seats assigned."
+              : remainingSeats > 0
+                ? ` — ${remainingSeats} still to assign across Regular / Recliner / Couple.`
+                : ` — over by ${Math.abs(remainingSeats)}. Reduce seat type counts.`
+            : ". Enter total capacity first, then split into Regular, Recliner, and Couple."}
+        </p>
         <button
           type="submit"
           disabled={creating}
@@ -697,6 +783,16 @@ export default function CinemaScreensPage() {
                     </div>
                     <p className="text-sm text-zinc-400">
                       {(screen.screen_type || "standard").toUpperCase()} · capacity {screen.capacity}
+                      {screen.seat_types_json &&
+                      (Number(screen.seat_types_json.regular) > 0 ||
+                        Number(screen.seat_types_json.recliner) > 0 ||
+                        Number(screen.seat_types_json.couple) > 0) ? (
+                        <span className="block text-xs text-zinc-500 mt-0.5">
+                          Regular {Number(screen.seat_types_json.regular) || 0} · Recliner{" "}
+                          {Number(screen.seat_types_json.recliner) || 0} · Couple{" "}
+                          {Number(screen.seat_types_json.couple) || 0}
+                        </span>
+                      ) : null}
                       {seatCount > 0 ? ` · ${seatCount} seats mapped` : ""}
                       {screen.layout_name ? ` · ${screen.layout_name}` : ""}
                     </p>
@@ -785,9 +881,9 @@ export default function CinemaScreensPage() {
                           type="button"
                           onClick={() => setEditingScreenId(screen.id)}
                           className="btn-secondary text-sm inline-flex items-center gap-1.5"
-                          title="Move or adjust seats, rows, or customize layout for this screen"
+                          title="Block or unblock seats for customers (layout geometry is locked)"
                         >
-                          <Edit3 size={14} /> Edit layout
+                          <Ban size={14} /> Block seats
                         </button>
                         <button
                           type="button"
@@ -1242,58 +1338,142 @@ export default function CinemaScreensPage() {
       )}
 
       {editingScreen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-2 sm:p-4">
-          <div className="w-full h-full max-w-7xl bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between px-6 py-3 bg-zinc-900 text-white border-b border-zinc-800">
-              <div>
-                <h3 className="font-bold text-base flex items-center gap-2">
-                  <span>🎬 Customizing Layout: {editingScreen.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
-                    Max Capacity: {editingScreen.capacity}
-                  </span>
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Move, add or adjust seats. Seat count cannot exceed screen capacity ({editingScreen.capacity}) and booked seats are locked.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingScreenId(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
-              >
-                Close Editor
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden relative">
-              <VenueLayoutBuilder
-                key={`screen-builder-${editingScreen.id}`}
-                venueAdapter={{
-                  initialSeats: editingInitialSeats,
-                  initialConfig: editingInitialConfig,
-                  maxCapacity: Number(editingScreen.capacity) || 0,
-                  saving: isUpdatingScreenLayout,
-                  hideSubmitToVenue: true,
-                  onSave: async (payload) => {
-                    try {
-                      await updateScreenLayout({
-                        bizId,
-                        screenId: editingScreen.id,
-                        seating_config: payload.seating_config,
-                        seats: payload.seats,
-                      }).unwrap();
-                      toast.success("Screen layout customized and saved successfully!");
-                      setEditingScreenId(null);
-                      refetch();
-                    } catch (err) {
-                      toast.error(extractApiError(err, "Failed to save screen layout."));
-                    }
-                  },
-                }}
-              />
-            </div>
-          </div>
-        </div>
+        <CinemaSeatBlockModal
+          screen={editingScreen}
+          seats={editingInitialSeats as Array<Record<string, unknown>>}
+          saving={isUpdatingSeatStatuses}
+          onClose={() => setEditingScreenId(null)}
+          onSave={async (updates) => {
+            try {
+              const res = await updateSeatStatuses({
+                bizId,
+                screenId: editingScreen.id,
+                seats: updates,
+              }).unwrap();
+              toast.success(res.message || "Seat statuses updated");
+              setEditingScreenId(null);
+              refetch();
+            } catch (err) {
+              toast.error(extractApiError(err, "Failed to update seat statuses"));
+            }
+          }}
+        />
       )}
+    </div>
+  );
+}
+
+function CinemaSeatBlockModal({
+  screen,
+  seats,
+  saving,
+  onClose,
+  onSave,
+}: {
+  screen: CinemaScreen;
+  seats: Array<Record<string, unknown>>;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (updates: Array<{ seat_key: string; status: "BLOCKED" | "AVAILABLE" }>) => Promise<void>;
+}) {
+  const [localSeats, setLocalSeats] = useState(() =>
+    seats.map((s) => ({
+      ...s,
+      status: String(s.status || "AVAILABLE").toUpperCase(),
+    }))
+  );
+
+  const toggle = (idx: number) => {
+    setLocalSeats((prev) =>
+      prev.map((seat, i) => {
+        if (i !== idx) return seat;
+        const cur = String(seat.status || "AVAILABLE").toUpperCase();
+        if (cur === "BOOKED" || cur === "RESERVED") return seat;
+        return { ...seat, status: cur === "BLOCKED" ? "AVAILABLE" : "BLOCKED" };
+      })
+    );
+  };
+
+  const handleSave = async () => {
+    const updates = localSeats
+      .map((seat) => {
+        const status = String(seat.status || "AVAILABLE").toUpperCase();
+        if (status !== "BLOCKED" && status !== "AVAILABLE") return null;
+        const key = String(seat.id || seat.internalId || "").trim();
+        const row = String(seat.row_label || "").trim();
+        const num = String(seat.seat_label || "").trim();
+        return {
+          seat_key: key || `${row}-${num}`,
+          status: status as "BLOCKED" | "AVAILABLE",
+        };
+      })
+      .filter(Boolean) as Array<{ seat_key: string; status: "BLOCKED" | "AVAILABLE" }>;
+    await onSave(updates);
+  };
+
+  const blockedCount = localSeats.filter((s) => String(s.status).toUpperCase() === "BLOCKED").length;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-2 sm:p-4">
+      <div className="w-full max-w-4xl max-h-[90vh] bg-zinc-950 rounded-2xl overflow-hidden border border-white/10 flex flex-col">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+          <div>
+            <h3 className="font-bold text-white text-base">Block seats — {screen.name}</h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Layout geometry is locked. Click seats to block/unblock. Customers cannot book blocked seats.
+              {blockedCount > 0 ? ` · ${blockedCount} blocked` : ""}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-zinc-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {localSeats.map((seat, idx) => {
+              const status = String(seat.status || "AVAILABLE").toUpperCase();
+              const locked = status === "BOOKED" || status === "RESERVED";
+              const blocked = status === "BLOCKED";
+              const label = `${seat.row_label || ""}${seat.seat_label || ""}`;
+              return (
+                <button
+                  key={String(seat.id || seat.internalId || idx)}
+                  type="button"
+                  disabled={locked || saving}
+                  onClick={() => toggle(idx)}
+                  title={
+                    locked
+                      ? "Booked seats cannot be changed"
+                      : blocked
+                        ? "Click to unblock"
+                        : "Click to block"
+                  }
+                  className={`min-w-[2.5rem] px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                    locked
+                      ? "bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed"
+                      : blocked
+                        ? "bg-rose-600/80 text-white border-rose-400"
+                        : "bg-emerald-600/20 text-emerald-200 border-emerald-500/40 hover:bg-emerald-600/40"
+                  }`}
+                >
+                  {label || idx + 1}
+                </button>
+              );
+            })}
+          </div>
+          {localSeats.length === 0 && (
+            <p className="text-sm text-zinc-500">No seats on this layout yet.</p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save blocked seats"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -42,6 +42,7 @@ import {
   movieShowtimeFormSchema,
   type MovieShowtimeFormValues,
 } from "@/lib/moviePartnerFormSchemas";
+import { PRICE_DURATION_OPTIONS } from "@/lib/cinemaSeatTypes";
 
 const FORMAT_OPTIONS = ["2D", "3D", "IMAX 2D", "IMAX 3D", "4DX", "Dolby Cinema", "ScreenX"];
 
@@ -209,9 +210,11 @@ export default function MovieShowtimesPage() {
         language: "English",
         format: "2D",
         tier_pricing: [
-          { tier_name: "VIP", price: 350 },
-          { tier_name: "Standard", price: 200 },
+          { tier_name: "Regular", price: 200 },
+          { tier_name: "Recliner", price: 350 },
+          { tier_name: "Couple", price: 500 },
         ],
+        price_duration: "showtime",
       })
     );
     setModalOpen(true);
@@ -261,6 +264,7 @@ export default function MovieShowtimesPage() {
       tier_pricing: (values.tier_pricing || [])
         .filter((t) => t.tier_name && Number(t.price) >= 0)
         .map((t) => ({ tier_name: t.tier_name, price: Number(t.price) })),
+      price_duration: values.price_duration || "showtime",
     };
 
     try {
@@ -743,17 +747,38 @@ export default function MovieShowtimesPage() {
                       Seat Tier Ticket Pricing (ETB) <RequiredMark />
                     </label>
                     <p className="text-[11px] text-zinc-400">
-                      Set prices for seat categories configured in the layout.
+                      Price Regular / Recliner / Couple seats for this movie. Layout seats stay fixed — only prices change.
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => append({ tier_name: "Premium", price: 250 })}
+                    onClick={() => append({ tier_name: "Regular", price: 250 })}
                     className="text-xs text-rose-400 hover:text-rose-300 font-semibold inline-flex items-center gap-1"
                   >
                     <Plus size={14} /> Add Tier
                   </button>
                 </div>
+
+                {!editingShowtime && (
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                      Price valid for
+                    </label>
+                    <select
+                      {...register("price_duration")}
+                      className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
+                    >
+                      {PRICE_DURATION_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-zinc-500 mt-1">
+                      Choosing 1 day / 1 week / etc. applies these tier prices across that window for this movie &amp; screen.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2.5">
                   {fields.map((field, idx) => (
@@ -761,7 +786,7 @@ export default function MovieShowtimesPage() {
                       <div className="flex items-center gap-2.5">
                         <input
                           {...register(`tier_pricing.${idx}.tier_name`)}
-                          placeholder="Tier name (e.g. VIP, Standard)"
+                          placeholder="Tier name (e.g. Regular, Recliner, Couple)"
                           className="flex-1 bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
                         />
                         <div className="w-32 flex items-center gap-1 bg-zinc-800 border border-white/10 rounded-lg px-2.5 py-1.5">

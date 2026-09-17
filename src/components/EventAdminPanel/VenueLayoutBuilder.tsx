@@ -164,9 +164,11 @@ export default function VenueLayoutBuilder({
   const [bulkSection, setBulkSection] = useState("General");
   const [bulkColor, setBulkColor] = useState("#3b82f6");
   const [bulkTicketType, setBulkTicketType] = useState("");
+  const [bulkStartRow, setBulkStartRow] = useState("A");
   const [bulkShape, setBulkShape] = useState<"grid" | "curve" | "circle">("grid");
   const [bulkRotation, setBulkRotation] = useState(0);
   const [bulkCurveAngle, setBulkCurveAngle] = useState(180);
+  const [applyEntireRow, setApplyEntireRow] = useState(true);
 
   // Zoom & Pan Interactive State
   const [zoomScale, setZoomScale] = useState(0.48);
@@ -696,17 +698,59 @@ export default function VenueLayoutBuilder({
     setHistoryIndex(0);
   }, [layoutData, venueAdapter]);
 
-  if (!skipEvent && (eventLoading || layoutLoading)) return <div className="p-8 text-center text-zinc-400">Loading editor...</div>;
-  if (!skipEvent && !eventDetails) return <div className="p-8 text-center text-rose-500">Event not found.</div>;
-
-  const ticketTypes = venueAdapter?.sections?.length
-    ? venueAdapter.sections.map((section) => ({
+  const ticketTypes = useMemo(() => {
+    if (venueAdapter?.sections?.length) {
+      return venueAdapter.sections.map((section) => ({
         id: section.id,
         ticket_type: section.name,
         total_count: section.capacity || 99999,
-        price: Number(section.price) || 0,
+        price: Number(section.price) || Number((section as { price?: number }).price) || 0,
+      }));
+    }
+    return eventDetails?.ticket_types || [];
+  }, [venueAdapter?.sections, eventDetails?.ticket_types]);
+
+  const zoneProgress = useMemo(() => {
+    const normalizeZoneKey = (value: unknown) =>
+      String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ");
+
+    const zones = ticketTypes
+      .map((t: { id: string; ticket_type: string; total_count?: number }) => ({
+        id: String(t.id),
+        name: String(t.ticket_type || ""),
+        capacity: Number(t.total_count) || 0,
       }))
-    : eventDetails?.ticket_types || [];
+      .filter((z: { name: string; capacity: number }) => z.name && z.capacity > 0 && z.capacity < 99999);
+    if (zones.length === 0) return [] as Array<{ id: string; name: string; capacity: number; mapped: number }>;
+
+    return zones.map((zone: { id: string; name: string; capacity: number }) => {
+      const keys = new Set([normalizeZoneKey(zone.name), normalizeZoneKey(zone.id)]);
+      const mapped = seats.filter((s) => {
+        const section = normalizeZoneKey(s.section_name);
+        const typeId = String(s.ticket_type_id || "");
+        if (typeId && (typeId === zone.id || normalizeZoneKey(typeId) === normalizeZoneKey(zone.name))) {
+          return true;
+        }
+        return [...keys].some((k) => k && (section === k || section.includes(k) || k.includes(section)));
+      }).length;
+      return { ...zone, mapped };
+    });
+  }, [ticketTypes, seats]);
+
+  const assignTicketType = (typeId: string) => {
+    setBulkTicketType(typeId);
+    const match = ticketTypes.find((t: { id: string }) => String(t.id) === String(typeId));
+    if (match?.ticket_type) {
+      setBulkSection(String(match.ticket_type));
+    }
+  };
+
+  if (!skipEvent && (eventLoading || layoutLoading)) return <div className="p-8 text-center text-zinc-400">Loading editor...</div>;
+  if (!skipEvent && !eventDetails) return <div className="p-8 text-center text-rose-500">Event not found.</div>;
 
   const handleStageMouseDown = (e: any) => {
     const isBg = e.target === e.target.getStage();
@@ -895,6 +939,81 @@ export default function VenueLayoutBuilder({
     }
   };
 
+  const nextRowLabel = (start: string, index: number): string => {
+    const s = String(start || "A").trim() || "A";
+    if (/^[A-Za-z]$/.test(s)) {
+      let n = s.toUpperCase().charCodeAt(0) - 65 + index;
+      let result = "";
+      while (n >= 0) {
+        result = String.fromCharCode(65 + (n % 26)) + result;
+        n = Math.floor(n / 26) - 1;
+      }
+      return result;
+    }
+    if (/^\d+$/.test(s)) {
+      return String(Number(s) + index);
+    }
+    const m = s.match(/^(.*?)(\d+)$/);
+    if (m) {
+      return `${m[1]}${Number(m[2]) + index}`;
+    }
+    return index === 0 ? s : `${s}${index + 1}`;
+  };
+
+  const rowRenameFromRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedSeatId) {
+      rowRenameFromRef.current = null;
+      return;
+    }
+    const seat = seats.find((s) => s.internalId === selectedSeatId);
+    rowRenameFromRef.current = seat?.row_label ?? null;
+  }, [selectedSeatId]);
+
+  const renameSelectedRow = (newRowName: string, opts?: { silent?: boolean }) => {
+    const selectedSeat = seats.find((s) => s.internalId === selectedSeatId);
+    if (!selectedSeat) return;
+    const next = String(newRowName || "").trim();
+    if (!next) {
+      if (!opts?.silent) toast.error("Enter a row name (e.g. A, B, 1, VIP-1).");
+      return;
+    }
+    if (selectedSeat.status && selectedSeat.status !== "AVAILABLE") {
+      if (!opts?.silent) toast.error("Cannot rename a booked seat's row.");
+      return;
+    }
+    const oldRow = rowRenameFromRef.current ?? selectedSeat.row_label;
+    const section = selectedSeat.section_name;
+    if (applyEntireRow) {
+      const locked = seats.some(
+        (s) =>
+          s.section_name === section &&
+          s.row_label === oldRow &&
+          s.status &&
+          s.status !== "AVAILABLE"
+      );
+      if (locked) {
+        if (!opts?.silent) toast.error("This row has booked seats — row name is locked.");
+        return;
+      }
+      setSeats((prev) =>
+        prev.map((s) => {
+          if (s.internalId === selectedSeatId) return { ...s, row_label: next };
+          if (s.section_name === section && s.row_label === oldRow) {
+            return { ...s, row_label: next };
+          }
+          return s;
+        })
+      );
+      rowRenameFromRef.current = next;
+      if (!opts?.silent) toast.success(`Row renamed to "${next}" for the whole row.`);
+    } else {
+      setSeats((prev) => prev.map((s) => (s.internalId === selectedSeatId ? { ...s, row_label: next } : s)));
+      rowRenameFromRef.current = next;
+    }
+  };
+
   const resolveSeatColor = (seat: Seat | string) => {
     if (typeof seat === "string") {
       const key = String(seat || "General").trim() || "General";
@@ -960,6 +1079,12 @@ export default function VenueLayoutBuilder({
     if (ids.length === 0) return;
 
     // "Apply to entire section" → color every seat in that section (+ keep section default map)
+    // While typing a row name, only update the selected seat; full-row apply happens on blur / quick-pick
+    if (field === "row_label") {
+      setSeats(seats.map((s) => (s.internalId === selectedSeatId ? { ...s, row_label: value } : s)));
+      return;
+    }
+
     if (moveEntireSection && selectedSeatId) {
       const primary = seats.find((s) => s.internalId === selectedSeatId);
       if (primary?.section_name) {
@@ -1126,7 +1251,7 @@ export default function VenueLayoutBuilder({
     let seatCounter = seats.length + 1;
 
     for (let r = 0; r < bulkRows; r++) {
-      const rowChar = String.fromCharCode(65 + (r % 26)); // A, B, C...
+      const rowChar = nextRowLabel(bulkStartRow, r);
       for (let c = 0; c < bulkCols; c++) {
         let cx = 0;
         let cy = 0;
@@ -2871,6 +2996,30 @@ export default function VenueLayoutBuilder({
             )}
           </div>
 
+          {zoneProgress.length > 0 && (
+            <div className="hidden lg:flex items-center gap-1.5 max-w-[42vw] overflow-x-auto">
+              {zoneProgress.map((zone) => {
+                const ok = zone.mapped === zone.capacity;
+                const over = zone.mapped > zone.capacity;
+                return (
+                  <span
+                    key={zone.id}
+                    className={`shrink-0 px-2 py-1 rounded-md border text-[11px] font-semibold ${
+                      over
+                        ? "bg-rose-50 text-rose-700 border-rose-300"
+                        : ok
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                          : "bg-amber-50 text-amber-800 border-amber-300"
+                    }`}
+                    title={`Requested by partner: ${zone.capacity} ${zone.name} seats`}
+                  >
+                    {zone.name} {zone.mapped}/{zone.capacity}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
           <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
             <button onClick={() => setZoomScale(s => Math.max(0.15, Number((s - 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
             <span className="text-xs font-semibold text-slate-600 min-w-[44px] text-center">{Math.round(zoomScale * 100)}%</span>
@@ -3484,7 +3633,45 @@ export default function VenueLayoutBuilder({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Section Name</label>
-                <input type="text" value={bulkSection} onChange={(e) => setBulkSection(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                {ticketTypes.length > 0 ? (
+                  <select
+                    value={bulkSection}
+                    onChange={(e) => {
+                      setBulkSection(e.target.value);
+                      const match = ticketTypes.find(
+                        (t: { ticket_type: string; id: string }) =>
+                          String(t.ticket_type) === e.target.value || String(t.id) === e.target.value
+                      );
+                      if (match) setBulkTicketType(String(match.id));
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                  >
+                    <option value="General">General</option>
+                    {ticketTypes.map((t: { id: string; ticket_type: string; total_count?: number }) => (
+                      <option key={t.id} value={t.ticket_type}>
+                        {t.ticket_type}
+                        {Number(t.total_count) > 0 && Number(t.total_count) < 99999
+                          ? ` (need ${t.total_count})`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input type="text" value={bulkSection} onChange={(e) => setBulkSection(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Starting row name</label>
+                <input
+                  type="text"
+                  value={bulkStartRow}
+                  onChange={(e) => setBulkStartRow(e.target.value)}
+                  placeholder="A  or  1  or  VIP-1"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Rows auto-name from this: A→B→C, or 1→2→3, or VIP-1→VIP-2.
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Section Color</label>
@@ -3545,10 +3732,29 @@ export default function VenueLayoutBuilder({
               )}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Ticket Type (Pricing Zone)</label>
-                <select value={bulkTicketType} onChange={(e) => setBulkTicketType(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none">
+                <select
+                  value={bulkTicketType}
+                  onChange={(e) => assignTicketType(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                >
                   <option value="">-- None --</option>
-                  {ticketTypes.map((t: any) => <option key={t.id} value={t.id}>{t.ticket_type} (Birr {t.price})</option>)}
+                  {ticketTypes.map((t: any) => {
+                    const prog = zoneProgress.find((z) => z.id === String(t.id) || z.name === t.ticket_type);
+                    const need = Number(t.total_count) > 0 && Number(t.total_count) < 99999 ? Number(t.total_count) : 0;
+                    return (
+                      <option key={t.id} value={t.id}>
+                        {t.ticket_type}
+                        {need ? ` · ${prog?.mapped ?? 0}/${need}` : ""}
+                        {t.price ? ` (Birr ${t.price})` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
+                {zoneProgress.length > 0 && (
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Counts above are requested by the partner. Match section name + ticket type when generating seats.
+                  </p>
+                )}
               </div>
               <button onClick={generateBulkGrid} className="btn-primary w-full mt-4">Generate Layout</button>
             </div>
@@ -3758,13 +3964,36 @@ export default function VenueLayoutBuilder({
                 <select 
                   value={selectedSeat.ticket_type_id || ""}
                   disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
-                  onChange={(e) => updateSelectedSeat("ticket_type_id", e.target.value)}
+                  onChange={(e) => {
+                    const typeId = e.target.value;
+                    const match = ticketTypes.find((t: { id: string }) => String(t.id) === String(typeId));
+                    const sectionName = match?.ticket_type ? String(match.ticket_type) : undefined;
+                    setSeats((prev) =>
+                      prev.map((s) =>
+                        s.internalId === selectedSeatId
+                          ? {
+                              ...s,
+                              ticket_type_id: typeId || null,
+                              ...(sectionName ? { section_name: sectionName } : {}),
+                            }
+                          : s
+                      )
+                    );
+                  }}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 >
                   <option value="">-- Select Type --</option>
-                  {ticketTypes.map((t: any) => (
-                    <option key={t.id} value={t.id}>{t.ticket_type} (Birr {t.price})</option>
-                  ))}
+                  {ticketTypes.map((t: any) => {
+                    const prog = zoneProgress.find((z) => z.id === String(t.id) || z.name === t.ticket_type);
+                    const need = Number(t.total_count) > 0 && Number(t.total_count) < 99999 ? Number(t.total_count) : 0;
+                    return (
+                      <option key={t.id} value={t.id}>
+                        {t.ticket_type}
+                        {need ? ` · ${prog?.mapped ?? 0}/${need}` : ""}
+                        {t.price ? ` (Birr ${t.price})` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -3806,24 +4035,59 @@ export default function VenueLayoutBuilder({
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-600 mb-1">Section / Row</label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Section name</label>
+                <input
+                  type="text"
+                  value={selectedSeat.section_name}
+                  disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                  onChange={(e) => updateSelectedSeat("section_name", e.target.value)}
+                  placeholder="e.g. Couple"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Row name</label>
+                <input
+                  type="text"
+                  value={selectedSeat.row_label}
+                  disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                  onChange={(e) => updateSelectedSeat("row_label", e.target.value)}
+                  onBlur={(e) => {
+                    if (applyEntireRow) renameSelectedRow(e.target.value.trim());
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      renameSelectedRow((e.target as HTMLInputElement).value.trim());
+                    }
+                  }}
+                  placeholder="e.g. A, B, 1"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                />
+                <div className="flex items-center gap-2 mt-2 bg-slate-50 p-2 rounded border border-slate-200">
                   <input
-                    type="text"
-                    value={selectedSeat.section_name}
-                    disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
-                    onChange={(e) => updateSelectedSeat("section_name", e.target.value)}
-                    placeholder="Sec"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    type="checkbox"
+                    id="applyEntireRow"
+                    checked={applyEntireRow}
+                    onChange={(e) => setApplyEntireRow(e.target.checked)}
+                    className="rounded text-rose-500 focus:ring-rose-500"
                   />
-                  <input
-                    type="text"
-                    value={selectedSeat.row_label}
-                    disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
-                    onChange={(e) => updateSelectedSeat("row_label", e.target.value)}
-                    placeholder="Row"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                  />
+                  <label htmlFor="applyEntireRow" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                    Apply row name to entire row (same section)
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {["A", "B", "C", "D", "E", "F", "1", "2", "3"].map((hint) => (
+                    <button
+                      key={hint}
+                      type="button"
+                      disabled={Boolean(selectedSeat.status && selectedSeat.status !== "AVAILABLE")}
+                      onClick={() => renameSelectedRow(hint)}
+                      className="px-2 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:border-rose-200 disabled:opacity-40"
+                    >
+                      {hint}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-2 bg-slate-50 p-2 rounded border border-slate-200">
@@ -3835,7 +4099,7 @@ export default function VenueLayoutBuilder({
                   className="rounded text-rose-500 focus:ring-rose-500"
                 />
                 <label htmlFor="moveEntireSection" className="text-xs font-semibold text-slate-700 cursor-pointer">
-                  Apply changes/moves to entire section
+                  Apply section moves / ticket type to entire section
                 </label>
               </div>
               {moveEntireSection && (

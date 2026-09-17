@@ -1079,12 +1079,6 @@ export default function VenueLayoutBuilder({
     if (ids.length === 0) return;
 
     // "Apply to entire section" → color every seat in that section (+ keep section default map)
-    // While typing a row name, only update the selected seat; full-row apply happens on blur / quick-pick
-    if (field === "row_label") {
-      setSeats(seats.map((s) => (s.internalId === selectedSeatId ? { ...s, row_label: value } : s)));
-      return;
-    }
-
     if (moveEntireSection && selectedSeatId) {
       const primary = seats.find((s) => s.internalId === selectedSeatId);
       if (primary?.section_name) {

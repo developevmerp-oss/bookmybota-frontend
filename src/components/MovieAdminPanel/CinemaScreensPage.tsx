@@ -1371,12 +1371,12 @@ function CinemaSeatBlockModal({
   onSave,
 }: {
   screen: CinemaScreen;
-  seats: Array<Record<string, unknown>>;
+  seats: Array<Record<string, any>>;
   saving: boolean;
   onClose: () => void;
   onSave: (updates: Array<{ seat_key: string; status: "BLOCKED" | "AVAILABLE" }>) => Promise<void>;
 }) {
-  const [localSeats, setLocalSeats] = useState(() =>
+  const [localSeats, setLocalSeats] = useState<Array<Record<string, any>>>(() =>
     seats.map((s) => ({
       ...s,
       status: String(s.status || "AVAILABLE").toUpperCase(),
@@ -1396,7 +1396,7 @@ function CinemaSeatBlockModal({
 
   const handleSave = async () => {
     const updates = localSeats
-      .map((seat) => {
+      .map((seat: Record<string, any>) => {
         const status = String(seat.status || "AVAILABLE").toUpperCase();
         if (status !== "BLOCKED" && status !== "AVAILABLE") return null;
         const key = String(seat.id || seat.internalId || "").trim();

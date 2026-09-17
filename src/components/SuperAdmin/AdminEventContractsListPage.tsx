@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileSignature, Plus } from "lucide-react";
@@ -11,20 +11,40 @@ import Pagination from "@/components/Shared/Pagination";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 
-type Scope = "current" | "old";
+type Scope = "current" | "pending" | "old";
 
-export default function AdminEventContractsPage({ scope = "current" }: { scope?: Scope }) {
+function resolveScope(pathname: string | null, scope?: Scope): Scope {
+  if (scope === "pending" || pathname?.includes("/event-contracts/pending")) return "pending";
+  if (scope === "old" || pathname?.includes("/event-contracts/history")) return "old";
+  return "current";
+}
+
+function emptyMessage(scope: Scope) {
+  if (scope === "pending") return "No pending contracts.";
+  if (scope === "old") return "No old contracts yet.";
+  return "No current contracts yet.";
+}
+
+export default function AdminEventContractsPage({ scope }: { scope?: Scope }) {
   const pathname = usePathname();
-  const activeScope: Scope =
-    scope === "old" || pathname?.includes("/event-contracts/history") ? "old" : "current";
+  const activeScope = resolveScope(pathname, scope);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
-  const { data, isLoading, isFetching } = useGetEventContractsQuery({
-    page,
-    limit,
-    scope: activeScope,
-    ...(q.trim() ? { q: q.trim() } : {}),
+
+  const queryArg = useMemo(
+    () => ({
+      page,
+      limit,
+      scope: activeScope,
+      ...(q.trim() ? { q: q.trim() } : {}),
+    }),
+    [page, limit, activeScope, q]
+  );
+
+  const { data, isLoading, isFetching, isError, error } = useGetEventContractsQuery(queryArg, {
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
   });
   const contracts = data?.items ?? [];
 
@@ -44,6 +64,16 @@ export default function AdminEventContractsPage({ scope = "current" }: { scope?:
           }`}
         >
           Current Contracts
+        </Link>
+        <Link
+          href="/admin/event-contracts/pending"
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            activeScope === "pending"
+              ? "bg-rose-600 text-white"
+              : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+          }`}
+        >
+          Pending Contract
         </Link>
         <Link
           href="/admin/event-contracts/history"
@@ -66,7 +96,7 @@ export default function AdminEventContractsPage({ scope = "current" }: { scope?:
           }}
           placeholder="Search contract, event, organizer"
         />
-        {activeScope === "current" ? (
+        {activeScope === "current" || activeScope === "pending" ? (
           <Link
             href="/admin/event-contracts/create"
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700"
@@ -76,14 +106,20 @@ export default function AdminEventContractsPage({ scope = "current" }: { scope?:
         ) : null}
       </div>
 
-      {isFetching && !isLoading ? (
-        <AdminListShimmer rows={limit > 10 ? 8 : 5} columns={5} showTabs={false} showToolbar={false} />
+      {isError ? (
+        <div className="glass-panel rounded-2xl border border-rose-500/30 p-6 text-center text-rose-300 text-sm">
+          {(error as { data?: { error?: string } })?.data?.error ||
+            "Could not load contracts. Restart the backend and try again."}
+        </div>
       ) : contracts.length === 0 ? (
         <div className="glass-panel rounded-2xl border border-white/5 p-10 text-center text-zinc-500">
-          {activeScope === "old" ? "No old contracts yet." : "No current contracts yet."}
+          {emptyMessage(activeScope)}
         </div>
       ) : (
         <>
+          {isFetching ? (
+            <p className="text-xs text-zinc-500">Refreshing…</p>
+          ) : null}
           <div className="admin-card-grid">
             {contracts.map((c) => (
               <article key={c.id} className="admin-data-card">
@@ -101,17 +137,22 @@ export default function AdminEventContractsPage({ scope = "current" }: { scope?:
                   </div>
                   <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Version</span>
-                    <div className="admin-data-card-value">v{c.version ?? 1}</div>
+                    <div className="admin-data-card-value">
+                      v{c.version ?? 1}
+                      {c.is_current === false ? " · edited" : ""}
+                    </div>
                   </div>
                   <div className="admin-data-card-row">
                     <span className="admin-data-card-label">Status</span>
-                    <div className="admin-data-card-value">{contractStatusLabel(c.status)}</div>
+                    <div className="admin-data-card-value">
+                      {contractStatusLabel(c.status, { eventStatus: c.event_status })}
+                    </div>
                   </div>
                 </div>
                 <div className="admin-data-card-actions">
                   <Link
                     href={
-                      activeScope === "old"
+                      activeScope === "old" || c.is_current === false
                         ? `/admin/event-contracts/view/${c.id}`
                         : `/admin/event-contracts/${c.event_id}`
                     }
@@ -143,12 +184,19 @@ export default function AdminEventContractsPage({ scope = "current" }: { scope?:
                       <td className="px-6 py-4 text-white font-medium">{c.contract_number}</td>
                       <td className="px-6 py-4 text-zinc-300">{c.event_name}</td>
                       <td className="px-6 py-4 text-zinc-400">{c.organizer_name}</td>
-                      <td className="px-6 py-4 text-zinc-400">v{c.version ?? 1}</td>
-                      <td className="px-6 py-4 text-zinc-300">{contractStatusLabel(c.status)}</td>
+                      <td className="px-6 py-4 text-zinc-400">
+                        v{c.version ?? 1}
+                        {c.is_current === false ? (
+                          <span className="ml-1 text-xs text-amber-400">edited</span>
+                        ) : null}
+                      </td>
+                      <td className="px-6 py-4 text-zinc-300">
+                        {contractStatusLabel(c.status, { eventStatus: c.event_status })}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <Link
                           href={
-                            activeScope === "old"
+                            activeScope === "old" || c.is_current === false
                               ? `/admin/event-contracts/view/${c.id}`
                               : `/admin/event-contracts/${c.event_id}`
                           }

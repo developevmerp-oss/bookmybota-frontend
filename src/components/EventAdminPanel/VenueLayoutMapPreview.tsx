@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 type PreviewSeat = {
   x: number;
   y: number;
+  color: string;
 };
 
 type PreviewLabel = {
@@ -40,7 +41,41 @@ type Props = {
 const MAX_PREVIEW_SEATS_COMPACT = 800;
 const MAX_PREVIEW_SEATS_EXPANDED = 8000;
 
-function asSeats(raw: unknown, maxSeats: number): PreviewSeat[] {
+function normalizeHex(color: unknown): string | null {
+  if (typeof color !== "string") return null;
+  const raw = color.trim();
+  if (!raw) return null;
+  if (/^#[0-9a-fA-F]{3,8}$/.test(raw)) return raw;
+  if (/^[0-9a-fA-F]{3,8}$/.test(raw)) return `#${raw}`;
+  return null;
+}
+
+function defaultSectionColor(sectionName: string): string {
+  const name = (sectionName || "").toLowerCase();
+  if (name.includes("vip") || name.includes("premium")) return "#f59e0b";
+  if (name.includes("recliner")) return "#0284c7";
+  if (name.includes("prime")) return "#3b82f6";
+  if (name.includes("classic")) return "#6366f1";
+  return "#3b82f6";
+}
+
+function resolveSeatColor(
+  row: Record<string, unknown>,
+  sectionColors?: Record<string, string>
+): string {
+  const own = normalizeHex(row.color);
+  if (own) return own;
+  const section = String(row.section_name || "General").trim() || "General";
+  const fromMap = sectionColors ? normalizeHex(sectionColors[section]) : null;
+  if (fromMap) return fromMap;
+  return defaultSectionColor(section);
+}
+
+function asSeats(
+  raw: unknown,
+  maxSeats: number,
+  sectionColors?: Record<string, string>
+): PreviewSeat[] {
   let list: unknown[] = [];
   if (Array.isArray(raw)) {
     list = raw;
@@ -60,7 +95,7 @@ function asSeats(raw: unknown, maxSeats: number): PreviewSeat[] {
     const x = Number(row.coordinate_x);
     const y = Number(row.coordinate_y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    out.push({ x, y });
+    out.push({ x, y, color: resolveSeatColor(row, sectionColors) });
   }
   return out;
 }
@@ -172,9 +207,9 @@ function drawMap(
   for (const seat of seats) {
     ctx.beginPath();
     ctx.arc(seat.x, seat.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#3b82f6";
+    ctx.fillStyle = seat.color || "#3b82f6";
     ctx.fill();
-    ctx.strokeStyle = "#1e40af";
+    ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1 / scale;
     ctx.stroke();
   }
@@ -219,7 +254,17 @@ function MapCanvas({
     offsetRef.current = offset;
   }, [offset]);
 
-  const seats = useMemo(() => asSeats(seatsRaw, maxSeats), [seatsRaw, maxSeats]);
+  const sectionColors = useMemo(() => {
+    const raw = seatingConfig?.sectionColors;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      return raw as Record<string, string>;
+    }
+    return undefined;
+  }, [seatingConfig]);
+  const seats = useMemo(
+    () => asSeats(seatsRaw, maxSeats, sectionColors),
+    [seatsRaw, maxSeats, sectionColors]
+  );
   const labels = useMemo(() => asLabels(seatingConfig), [seatingConfig]);
   const shapes = useMemo(() => asShapes(seatingConfig), [seatingConfig]);
   const canvasW = Number(seatingConfig?.canvasWidth) || 3200;

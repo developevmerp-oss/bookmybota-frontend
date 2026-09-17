@@ -88,11 +88,10 @@ export function validateShowtimeTickets(
 
   const mode = showtime.layout_mode || 'none';
 
+  // Custom layout: capacity is optional (Super Admin builds the map). Only enforce
+  // ticket totals when an expected capacity was explicitly provided.
   if (mode === 'custom') {
     const cap = Number(showtime.custom_layout_capacity);
-    if (forSubmit && (!Number.isFinite(cap) || cap < 1)) {
-      return `Enter expected capacity for the custom layout at "${venueLabel}".`;
-    }
     if (Number.isFinite(cap) && cap > 0 && totalTickets > cap) {
       return `Total ticket seats (${totalTickets}) exceed custom layout capacity (${cap}) for "${venueLabel}".`;
     }

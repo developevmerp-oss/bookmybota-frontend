@@ -42,21 +42,19 @@ export type EventStepperStepDef = {
 
 const DEFAULT_STEPS: EventStepperStepDef[] = [
   { id: "details", label: "Event details", short: "Details" },
+  { id: "venue", label: "Venue", short: "Venue" },
+  { id: "artists", label: "Artist", short: "Artist" },
   { id: "media", label: "Media", short: "Media" },
-  { id: "venue", label: "Venue & layout", short: "Venue" },
-  { id: "artists", label: "Lineup", short: "Lineup" },
-  { id: "documents", label: "Documents", short: "Docs" },
-  { id: "review", label: "Review", short: "Review" },
+  { id: "review", label: "Preview", short: "Preview" },
 ];
 
 const SPORT_STEPS: EventStepperStepDef[] = [
   { id: "details", label: "Event details", short: "Details" },
   { id: "sport", label: "Sport details", short: "Sport" },
+  { id: "venue", label: "Venue", short: "Venue" },
+  { id: "artists", label: "Artist", short: "Artist" },
   { id: "media", label: "Media", short: "Media" },
-  { id: "venue", label: "Venue & layout", short: "Venue" },
-  { id: "artists", label: "Teams / players", short: "Teams" },
-  { id: "documents", label: "Documents", short: "Docs" },
-  { id: "review", label: "Review", short: "Review" },
+  { id: "review", label: "Preview", short: "Preview" },
 ];
 
 export function isSportsCategory(slug?: string | null): boolean {

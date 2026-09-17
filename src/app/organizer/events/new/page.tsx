@@ -56,7 +56,7 @@ export default function NewOrganizerEventPage() {
       <div>
         <h2 className="portal-heading text-2xl font-bold">Create event</h2>
         <p className="portal-muted mt-1">
-          Guided steps: event details, venues & tickets, documents, then review and submit.
+          Guided steps: event details, venue, artist, media, then preview and submit.
         </p>
       </div>
       <EventForm

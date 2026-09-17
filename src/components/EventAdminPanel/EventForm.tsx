@@ -5,10 +5,10 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check, Megaphone, X } from "lucide-react";
+import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check, Megaphone, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import {
-  useGetBusinessTypesQuery,
+  useGetEventCategoriesQuery,
   useGetEventMastersQuery,
   useGetCitiesQuery,
   useUploadImageMutation,
@@ -17,6 +17,7 @@ import {
   useGetOrganizerVenueLayoutQuery,
   useSearchOrganizerArtistsQuery,
   useGetPublicMarketingPlansQuery,
+  useReviewOrganizerEventLayoutRequestMutation,
   type CityMaster,
   type EventDocumentMaster,
   type EventDocumentUpload,
@@ -29,6 +30,7 @@ import { fuzzyFilter } from "@/lib/fuzzySearch";
 import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import PlanInfoButton from "@/components/Shared/PlanInfoButton";
 import { resolveMediaUrl, extractUploadUrl } from "@/lib/mediaUrl";
+import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 
 const VenueLayoutMapPreview = dynamic(
   () => import("@/components/EventAdminPanel/VenueLayoutMapPreview"),
@@ -252,8 +254,30 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
             ? ((s as { custom_layout_images?: string[] }).custom_layout_images || [])
             : [],
           location_id: (s as { location_id?: number | null }).location_id ?? null,
-          venue_proposal: ((s as { venue_proposal?: EventFormValues["showtimes"][number]["venue_proposal"] })
-            .venue_proposal || null) as EventFormValues["showtimes"][number]["venue_proposal"],
+          venue_proposal: (() => {
+            const raw = (s as { venue_proposal?: EventFormValues["showtimes"][number]["venue_proposal"] | string })
+              .venue_proposal;
+            const parsed =
+              typeof raw === "string"
+                ? (() => {
+                    try {
+                      return JSON.parse(raw) as EventFormValues["showtimes"][number]["venue_proposal"];
+                    } catch {
+                      return null;
+                    }
+                  })()
+                : raw || null;
+            if (!parsed || typeof parsed !== "object") return null;
+            return {
+              contact_name: String(parsed.contact_name || ""),
+              contact_phone: String(parsed.contact_phone || ""),
+              contact_email: String(parsed.contact_email || ""),
+              capacity: parsed.capacity ?? null,
+              facilities: Array.isArray(parsed.facilities) ? parsed.facilities : [],
+              image_urls: Array.isArray(parsed.image_urls) ? parsed.image_urls : [],
+              notes: String(parsed.notes || ""),
+            };
+          })(),
           duration_type: durationType,
           event_date: toDateInput(s.starts_at),
           start_time: toTimeInput(s.starts_at),
@@ -290,6 +314,34 @@ function buildYmd(y: string, m: string, d: string): string {
   const dt = new Date(year, month - 1, day);
   if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) return "";
   return `${y}-${m}-${d}`;
+}
+
+/** Event date: type or pick from calendar (stored as YYYY-MM-DD). */
+function EventDateField({
+  value,
+  onChange,
+  disabled,
+  inputClass,
+}: {
+  value?: string | null;
+  onChange: (ymd: string) => void;
+  disabled?: boolean;
+  inputClass: string;
+}) {
+  const ymd = /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim()) ? String(value).trim() : "";
+
+  return (
+    <div className="space-y-1">
+      <input
+        type="date"
+        disabled={disabled}
+        className={`${inputClass} w-full`}
+        value={ymd}
+        onChange={(e) => onChange(e.target.value || "")}
+      />
+      {ymd ? <p className="text-xs text-slate-600">{formatDate(ymd)}</p> : null}
+    </div>
+  );
 }
 
 /** Calendar date as Day / Month / 4-digit Year (avoids native date year bugs). */
@@ -418,70 +470,70 @@ function TimeHmFields({
   const { hour12, minute, ampm } = splitHm12(value);
 
   return (
-    <div className="flex flex-col gap-2 min-w-0">
-      <select
-        disabled={disabled}
-        aria-label="Hour"
-        className={`${inputClass} w-full`}
-        value={hour12}
-        onChange={(e) => {
-          const h = e.target.value;
-          if (!h) {
-            onChange("");
-            return;
-          }
-          onChange(combineHm12(h, minute || "00", ampm));
-        }}
-      >
-        <option value="">HH</option>
-        {HOUR_12_OPTIONS.map((h) => (
-          <option key={h} value={h}>
-            {Number(h)}
-          </option>
-        ))}
-      </select>
-      <span className="text-slate-500 font-semibold text-center leading-none select-none" aria-hidden>
-        :
-      </span>
-      <select
-        disabled={disabled}
-        aria-label="Minute"
-        className={`${inputClass} w-full`}
-        value={minute}
-        onChange={(e) => {
-          const m = e.target.value;
-          if (!m) {
-            onChange("");
-            return;
-          }
-          onChange(combineHm12(hour12 || "12", m, ampm));
-        }}
-      >
-        <option value="">MM</option>
-        {MINUTE_OPTIONS.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
-      <select
-        disabled={disabled}
-        aria-label="AM or PM"
-        className={`${inputClass} w-full`}
-        value={hour12 ? ampm : ""}
-        onChange={(e) => {
-          const next = e.target.value as "AM" | "PM" | "";
-          if (!next) {
-            onChange("");
-            return;
-          }
-          onChange(combineHm12(hour12 || "12", minute || "00", next));
-        }}
-      >
-        <option value="">AM/PM</option>
-        <option value="AM">AM</option>
-        <option value="PM">PM</option>
-      </select>
+    <div className="space-y-2 min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          disabled={disabled}
+          aria-label="Hour"
+          className={`${inputClass} min-w-[4.5rem] flex-1`}
+          value={hour12}
+          onChange={(e) => {
+            const h = e.target.value;
+            if (!h) {
+              onChange("");
+              return;
+            }
+            onChange(combineHm12(h, minute || "00", ampm));
+          }}
+        >
+          <option value="">HH</option>
+          {HOUR_12_OPTIONS.map((h) => (
+            <option key={h} value={h}>
+              {Number(h)}
+            </option>
+          ))}
+        </select>
+        <span className="text-slate-500 font-semibold shrink-0">:</span>
+        <select
+          disabled={disabled}
+          aria-label="Minute"
+          className={`${inputClass} min-w-[4.5rem] flex-1`}
+          value={minute}
+          onChange={(e) => {
+            const m = e.target.value;
+            if (!m) {
+              onChange("");
+              return;
+            }
+            onChange(combineHm12(hour12 || "12", m, ampm));
+          }}
+        >
+          <option value="">MM</option>
+          {MINUTE_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <select
+          disabled={disabled}
+          aria-label="AM or PM"
+          className={`${inputClass} min-w-[5rem]`}
+          value={hour12 ? ampm : ""}
+          onChange={(e) => {
+            const next = e.target.value as "AM" | "PM" | "";
+            if (!next) {
+              onChange("");
+              return;
+            }
+            onChange(combineHm12(hour12 || "12", minute || "00", next));
+          }}
+        >
+          <option value="">AM/PM</option>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
     </div>
   );
 }
@@ -685,20 +737,13 @@ function VenueNameSearchField({
       { shouldDirty: true, shouldValidate: true }
     );
     if (verified) {
-      const hasLive =
-        Boolean(venue.default_layout_id) ||
-        (typeof venue.published_layout_count === "number" && venue.published_layout_count > 0);
-      if (hasLive) {
-        setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
-        setValue(
-          `showtimes.${index}.venue_layout_template_id`,
-          venue.default_layout_id || null,
-          { shouldDirty: true }
-        );
-      } else {
-        setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
-        setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
-      }
+      // Preview-only: keep default layout id for map view; booking preference defaults to none.
+      setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+      setValue(
+        `showtimes.${index}.venue_layout_template_id`,
+        venue.default_layout_id || null,
+        { shouldDirty: false }
+      );
     } else {
       setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
       setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
@@ -793,7 +838,6 @@ function SeatingLayoutFields({
   readOnly,
   labelClass,
   inputClass,
-  errorClass,
 }: {
   index: number;
   readOnly: boolean;
@@ -801,11 +845,7 @@ function SeatingLayoutFields({
   inputClass: string;
   errorClass: string;
 }) {
-  const {
-    watch,
-    setValue,
-    formState: { errors },
-  } = useFormContext<EventFormValues>();
+  const { watch, setValue, register } = useFormContext<EventFormValues>();
   const venueSource = watch(`showtimes.${index}.venue_source`) || "manual";
   const venueBusinessId = watch(`showtimes.${index}.venue_business_id`);
   const isRegisteredPartner = venueSource === "registered" && Boolean(venueBusinessId);
@@ -820,14 +860,11 @@ function SeatingLayoutFields({
   );
 
   const liveLayouts = useMemo(
-    () => (layoutData?.layouts || []).filter((l) => Boolean(l.is_default)),
+    () => (layoutData?.layouts || []).filter((l) => Boolean(l.is_default) || String(l.status) === "PUBLISHED"),
     [layoutData?.layouts]
   );
 
-  const selectedLayout = useMemo(
-    () => liveLayouts.find((l) => l.id === layoutId) || null,
-    [liveLayouts, layoutId]
-  );
+  const previewLayoutId = layoutId || liveLayouts[0]?.id || null;
 
   const {
     data: templateDetail,
@@ -835,185 +872,267 @@ function SeatingLayoutFields({
     isFetching: templateFetching,
     isError: templateError,
   } = useGetOrganizerVenueLayoutQuery(
-    { businessId: venueBusinessId!, templateId: layoutId! },
+    { businessId: venueBusinessId!, templateId: previewLayoutId! },
     {
-      skip:
-        !venueBusinessId ||
-        !layoutId ||
-        !isRegisteredPartner ||
-        layoutMode !== "standard",
+      skip: !venueBusinessId || !previewLayoutId || !isRegisteredPartner,
     }
   );
   const showTemplateLoading = (templateLoading || templateFetching) && !templateDetail;
+  const previewLayout = liveLayouts.find((l) => l.id === previewLayoutId) || liveLayouts[0] || null;
 
-  useEffect(() => {
-    if (layoutMode === "standard" && selectedLayout?.capacity != null) {
-      setValue(`showtimes.${index}.layout_capacity_snapshot`, Number(selectedLayout.capacity) || null, {
-        shouldDirty: false,
-      });
-    } else if (layoutMode !== "standard") {
-      setValue(`showtimes.${index}.layout_capacity_snapshot`, null, { shouldDirty: false });
-      setValue(`showtimes.${index}.layout_seat_count_snapshot`, null, { shouldDirty: false });
-    }
-  }, [layoutMode, selectedLayout, index, setValue]);
-
-  useEffect(() => {
-    if (layoutMode !== "standard" || !templateDetail) return;
-    const seatCount = Number((templateDetail as { seat_count?: number }).seat_count);
-    if (Number.isFinite(seatCount) && seatCount > 0) {
-      setValue(`showtimes.${index}.layout_seat_count_snapshot`, seatCount, { shouldDirty: false });
-    }
-  }, [layoutMode, templateDetail, index, setValue]);
-
-  // Keep selection aligned with live layouts only — no restriction messages / other modes.
+  // Registered venues: layouts are view-only. Booking layout is none or custom request only.
   useEffect(() => {
     if (readOnly) return;
     if (!isRegisteredPartner) {
-      if (layoutMode !== "none") {
+      if (layoutMode !== "none" && layoutMode !== "custom") {
         setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
       }
+      setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: false });
+      return;
+    }
+    if (layoutMode === "standard") {
+      setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
       setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
-      return;
     }
-    if (layoutsFetching) return;
-    if (!liveLayouts.length) {
-      if (layoutMode !== "none") {
-        setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
-      }
-      if (layoutId) {
-        setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
-      }
-      return;
-    }
-    if (layoutMode !== "standard") {
-      setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
-    }
-    const stillValid = Boolean(layoutId && liveLayouts.some((l) => l.id === layoutId));
-    if (!stillValid) {
-      setValue(`showtimes.${index}.venue_layout_template_id`, liveLayouts[0].id, {
-        shouldDirty: true,
-        shouldValidate: true,
+  }, [readOnly, isRegisteredPartner, layoutMode, index, setValue]);
+
+  useEffect(() => {
+    if (layoutMode !== "custom") return;
+    const name = String(watch(`showtimes.${index}.custom_layout_name`) || "").trim();
+    if (!name) {
+      setValue(`showtimes.${index}.custom_layout_name`, "Custom event seating layout", {
+        shouldDirty: false,
       });
     }
-  }, [
-    readOnly,
-    isRegisteredPartner,
-    layoutsFetching,
-    liveLayouts,
-    layoutMode,
-    layoutId,
-    index,
-    setValue,
-  ]);
+  }, [layoutMode, index, setValue, watch]);
 
   if (!isRegisteredPartner) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600">
-        Seating layout selection is available after you choose a <strong>verified partner venue</strong>.
-        Auto-registered or new venues use ticket types only (no seat map).
-      </div>
-    );
-  }
-
-  if (!layoutsFetching && liveLayouts.length === 0) {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-        This verified venue has no live seating layout published yet. Ticket booking will use capacity from
-        ticket types until a layout goes live.
+      <div className="space-y-3">
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600">
+          Venue layouts appear only when you select a <strong>registered venue partner</strong>. New or
+          auto-registered venues use ticket types only (no seat map).
+        </div>
+        <LayoutPreferenceRadios
+          index={index}
+          readOnly={readOnly}
+          labelClass={labelClass}
+          inputClass={inputClass}
+          allowCustom
+        />
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
-      <div>
-        <p className={labelClass}>Live layouts for this venue</p>
-        <p className="text-xs text-slate-500 mb-2">
-          Choose the seating map customers will use when booking.
-        </p>
-        {layoutsFetching && <p className="text-xs text-slate-500 mb-2">Loading venue layouts…</p>}
-        {liveLayouts.length > 0 ? (
-          <div className="grid sm:grid-cols-2 gap-2 mb-2">
-            {liveLayouts.map((l) => {
-              const active = layoutId === l.id;
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() =>
-                    setValue(`showtimes.${index}.venue_layout_template_id`, l.id, {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-                  }
-                  className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
-                    active
-                      ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
-                      : "border-slate-200 bg-white hover:border-rose-300 hover:bg-rose-50/40"
-                  }`}
-                >
-                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
-                    {active ? <Check size={14} className="text-emerald-600 shrink-0" /> : null}
-                    {l.name}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {l.capacity ? `${l.capacity} seats` : "Capacity not set"}
-                  </p>
-                </button>
-              );
-            })}
+    <div className="space-y-4">
+      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div>
+          <p className={labelClass}>Venue layouts (view only)</p>
+          <p className="text-xs text-slate-500 mb-2">
+            These are the venue partner&apos;s published layouts. You can preview them here but cannot edit
+            them. Choose below whether you need a custom layout for this event.
+          </p>
+          {layoutsFetching && <p className="text-xs text-slate-500 mb-2">Loading venue layouts…</p>}
+          {!layoutsFetching && liveLayouts.length === 0 ? (
+            <p className="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              This venue has no published seating layout yet.
+            </p>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-2 mb-2">
+              {liveLayouts.map((l) => {
+                const active = previewLayoutId === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() =>
+                      setValue(`showtimes.${index}.venue_layout_template_id`, l.id, {
+                        shouldDirty: false,
+                      })
+                    }
+                    className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
+                      active
+                        ? "border-slate-400 bg-slate-50 ring-1 ring-slate-200"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold text-slate-800">{l.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {l.capacity ? `${l.capacity} seats` : "Capacity not set"} · preview only
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {previewLayout && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{previewLayout.name}</p>
+              <p className="text-xs text-slate-600">
+                Read-only preview — zoom and pan to inspect the map.
+              </p>
+            </div>
+            {showTemplateLoading ? (
+              <p className="text-xs text-slate-600">Loading seating map…</p>
+            ) : templateError ? (
+              <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                Could not load this seating map.
+              </p>
+            ) : (
+              <VenueLayoutMapPreview
+                seats={templateDetail?.seats_json}
+                seatingConfig={
+                  (templateDetail?.seating_config as Record<string, unknown> | null | undefined) ?? null
+                }
+                height={280}
+                title={previewLayout.name}
+              />
+            )}
           </div>
-        ) : null}
-        <select
-          disabled={readOnly || !liveLayouts.length}
-          className={inputClass}
-          value={layoutId || ""}
-          onChange={(e) =>
-            setValue(`showtimes.${index}.venue_layout_template_id`, e.target.value || null, {
-              shouldDirty: true,
-              shouldValidate: true,
-            })
-          }
-        >
-          <option value="">Select layout</option>
-          {liveLayouts.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-              {l.capacity ? ` · ${l.capacity} seats` : ""}
-            </option>
-          ))}
-        </select>
-        {errors.showtimes?.[index]?.venue_layout_template_id && (
-          <p className={errorClass}>{errors.showtimes[index]?.venue_layout_template_id?.message}</p>
         )}
       </div>
 
-      {selectedLayout && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2.5 space-y-3">
-          <div>
-            <p className="text-sm font-semibold text-emerald-900">{selectedLayout.name}</p>
-            <p className="text-xs text-emerald-800">
-              {selectedLayout.capacity ? `${selectedLayout.capacity} seats · ` : ""}
-              Zoom and pan the seating map, or open the full view.
+      <LayoutPreferenceRadios
+        index={index}
+        readOnly={readOnly}
+        labelClass={labelClass}
+        inputClass={inputClass}
+        allowCustom
+      />
+    </div>
+  );
+}
+
+function LayoutPreferenceRadios({
+  index,
+  readOnly,
+  labelClass,
+  inputClass,
+  allowCustom,
+}: {
+  index: number;
+  readOnly: boolean;
+  labelClass: string;
+  inputClass: string;
+  allowCustom: boolean;
+}) {
+  const { watch, setValue, register, getValues } = useFormContext<EventFormValues>();
+  const layoutMode = watch(`showtimes.${index}.layout_mode`) || "none";
+  const preference = layoutMode === "custom" ? "custom" : "none";
+  const ticketTypes = watch(`showtimes.0.ticket_types`) || watch(`showtimes.${index}.ticket_types`) || [];
+  const ticketSeatTotal = useMemo(
+    () =>
+      (ticketTypes || []).reduce((sum, t) => sum + (Number(t?.total_count) || 0), 0),
+    [ticketTypes]
+  );
+
+  useEffect(() => {
+    if (readOnly || preference !== "custom") return;
+    if (ticketSeatTotal > 0) {
+      setValue(`showtimes.${index}.custom_layout_capacity`, ticketSeatTotal, {
+        shouldDirty: true,
+      });
+    }
+  }, [preference, ticketSeatTotal, index, readOnly, setValue]);
+
+  const applyCustomMode = () => {
+    setValue(`showtimes.${index}.layout_mode`, "custom", { shouldDirty: true });
+    setValue(`showtimes.${index}.custom_layout_name`, "Custom event seating layout", {
+      shouldDirty: true,
+    });
+    setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+    const tickets =
+      getValues(`showtimes.0.ticket_types`) || getValues(`showtimes.${index}.ticket_types`) || [];
+    const total = tickets.reduce((sum, t) => sum + (Number(t?.total_count) || 0), 0);
+    if (total > 0) {
+      setValue(`showtimes.${index}.custom_layout_capacity`, total, { shouldDirty: true });
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+      <div>
+        <p className={labelClass}>Event seating layout</p>
+        <p className="text-xs text-slate-500 mb-2">
+          Optional. Request a custom layout for this event, or continue without a seat map.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <label
+          className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${
+            preference === "none" ? "border-rose-300 bg-rose-50/50" : "border-slate-200 bg-slate-50"
+          } ${readOnly ? "cursor-default" : ""}`}
+        >
+          <input
+            type="radio"
+            className="mt-1"
+            disabled={readOnly}
+            checked={preference === "none"}
+            onChange={() => {
+              setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+              setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+              setValue(`showtimes.${index}.custom_layout_notes`, "", { shouldDirty: true });
+              setValue(`showtimes.${index}.custom_layout_capacity`, null, { shouldDirty: true });
+            }}
+          />
+          <span>
+            <span className="text-sm font-semibold text-slate-800">No need add layout</span>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Customers book by ticket type only (no seat map for this event).
             </p>
-          </div>
-          {showTemplateLoading ? (
-            <p className="text-xs text-emerald-800">Loading seating map…</p>
-          ) : templateError ? (
-            <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-              Could not load this seating map. Try selecting the layout again.
-            </p>
-          ) : (
-            <VenueLayoutMapPreview
-              seats={templateDetail?.seats_json}
-              seatingConfig={
-                (templateDetail?.seating_config as Record<string, unknown> | null | undefined) ?? null
-              }
-              height={320}
-              title={selectedLayout.name}
+          </span>
+        </label>
+
+        {allowCustom ? (
+          <label
+            className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${
+              preference === "custom" ? "border-rose-300 bg-rose-50/50" : "border-slate-200 bg-slate-50"
+            } ${readOnly ? "cursor-default" : ""}`}
+          >
+            <input
+              type="radio"
+              className="mt-1"
+              disabled={readOnly}
+              checked={preference === "custom"}
+              onChange={applyCustomMode}
             />
+            <span>
+              <span className="text-sm font-semibold text-slate-800">Add customise event layout</span>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Super Admin will build a seating layout for this event
+                {ticketSeatTotal > 0 ? ` (up to ${ticketSeatTotal} seats from your ticket types)` : ""}.
+                Review and approve it on Preview before the contract is created.
+              </p>
+            </span>
+          </label>
+        ) : null}
+      </div>
+
+      {preference === "custom" && (
+        <div className="space-y-3">
+          {ticketSeatTotal > 0 && (
+            <p className="text-xs text-slate-600 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              Seating capacity for Super Admin: <strong>{ticketSeatTotal}</strong> seats (from ticket
+              types).
+            </p>
           )}
+          <div>
+            <label className={labelClass}>
+              Notes for Super Admin <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              disabled={readOnly}
+              rows={3}
+              className={`${inputClass} resize-y min-h-[72px]`}
+              placeholder="e.g. VIP section near stage, standing GA at the back…"
+              {...register(`showtimes.${index}.custom_layout_notes`)}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -1371,11 +1490,24 @@ function VenueBlock({
               setValue(`showtimes.${index}.venue_name`, name, { shouldDirty: true, shouldValidate: true });
               setValue(`showtimes.${index}.venue_source`, "manual", { shouldDirty: true });
               setValue(`showtimes.${index}.venue_business_id`, null, { shouldDirty: true });
-              setValue(`showtimes.${index}.venue_address`, "", { shouldDirty: true, shouldValidate: true });
-              setValue(`showtimes.${index}.city_id`, null, { shouldDirty: true, shouldValidate: true });
-              setValue(`showtimes.${index}.location_id`, null, { shouldDirty: true });
+              // Keep address/city the user already entered — do not wipe on city filter refetch.
               setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
-              setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
+              const proposal = getValues(`showtimes.${index}.venue_proposal`);
+              if (!proposal) {
+                setValue(
+                  `showtimes.${index}.venue_proposal`,
+                  {
+                    contact_name: "",
+                    contact_phone: "",
+                    contact_email: "",
+                    capacity: null,
+                    facilities: [],
+                    image_urls: [],
+                    notes: "",
+                  },
+                  { shouldDirty: false }
+                );
+              }
               setAddingNewVenue(true);
             }}
             onVenueSelected={() => setAddingNewVenue(false)}
@@ -1431,6 +1563,71 @@ function VenueBlock({
                 {...register(`showtimes.${index}.venue_address`)}
                 placeholder="Full street address"
               />
+              {errors.showtimes?.[index]?.venue_address && (
+                <p className={errorClass}>{errors.showtimes[index]?.venue_address?.message}</p>
+              )}
+            </div>
+            <div>
+              <label className={labelClass}>
+                Contact person name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                disabled={readOnly}
+                className={inputClass}
+                {...register(`showtimes.${index}.venue_proposal.contact_name`)}
+                placeholder="Person to contact at this venue"
+              />
+              {errors.showtimes?.[index]?.venue_proposal?.contact_name && (
+                <p className={errorClass}>
+                  {errors.showtimes[index]?.venue_proposal?.contact_name?.message}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className={labelClass}>
+                Email <span className="text-rose-500">*</span>
+              </label>
+              <input
+                disabled={readOnly}
+                type="email"
+                className={inputClass}
+                {...register(`showtimes.${index}.venue_proposal.contact_email`)}
+                placeholder="venue@example.com"
+              />
+              {errors.showtimes?.[index]?.venue_proposal?.contact_email && (
+                <p className={errorClass}>
+                  {errors.showtimes[index]?.venue_proposal?.contact_email?.message}
+                </p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <label className={labelClass}>
+                Phone number <span className="text-rose-500">*</span>
+              </label>
+              <input
+                disabled={readOnly}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                className={inputClass}
+                placeholder="9–12 digits only"
+                value={watch(`showtimes.${index}.venue_proposal.contact_phone`) || ""}
+                onChange={(e) => {
+                  setValue(
+                    `showtimes.${index}.venue_proposal.contact_phone`,
+                    e.target.value.replace(/\D/g, "").slice(0, 12),
+                    { shouldDirty: true, shouldValidate: true }
+                  );
+                }}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Numbers only — 9 to 12 digits. Letters and special characters are not allowed.
+              </p>
+              {errors.showtimes?.[index]?.venue_proposal?.contact_phone && (
+                <p className={errorClass}>
+                  {errors.showtimes[index]?.venue_proposal?.contact_phone?.message}
+                </p>
+              )}
             </div>
           </>
         )}
@@ -1492,7 +1689,7 @@ function VenueBlock({
             <div className="grid sm:grid-cols-3 gap-3">
               <div>
                 <label className={labelClass}>Date <span className="text-rose-500">*</span></label>
-                <DateYmdFields
+                <EventDateField
                   disabled={readOnly}
                   inputClass={inputClass}
                   value={eventDate}
@@ -1503,7 +1700,6 @@ function VenueBlock({
                     setValue("showtimes", rows, { shouldDirty: true });
                   }}
                 />
-                {eventDate && <p className="text-xs text-slate-600 mt-1">{formatDate(eventDate)}</p>}
               </div>
               <div>
                 <label className={labelClass}>Start time <span className="text-rose-500">*</span></label>
@@ -1565,18 +1761,18 @@ function VenueBlock({
         <div>
           <p className="text-sm font-semibold text-slate-800">Ticket capacity</p>
           <p className="text-xs text-slate-500 mt-0.5">
-            Ticket types are set in the <strong>Event details</strong> step. Total seats must fit within the
-            layout capacity when a layout is selected.
+            Ticket types are set above on this Venue step. Total seats must fit within the layout capacity when a
+            layout is selected.
           </p>
         </div>
 
         {ticketTypes.length === 0 ? (
           <p className="text-xs text-amber-800 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-            No ticket types yet. Add them in Event details.
+            No ticket types yet. Add them in the Ticket types section above.
           </p>
         ) : (
           <p className="text-xs text-slate-600">
-            {(ticketTypes || []).length} ticket type(s) from Event details
+            {(ticketTypes || []).length} ticket type(s)
             {(ticketTypes || [])
               .map((t) => ` · ${t.ticket_type || "Untitled"} (${t.total_count || 0} @ ${t.price ?? "—"})`)
               .join("")}
@@ -1596,7 +1792,10 @@ function VenueBlock({
             {layoutMode === "standard" && ticketCapacitySummary.layoutCapacity == null ? (
               <p>Select a published layout above to see seat capacity limits.</p>
             ) : layoutMode === "custom" && ticketCapacitySummary.layoutCapacity == null ? (
-              <p>Enter expected capacity in the custom layout section above.</p>
+              <p>
+                Custom layout requested — ticket totals are not limited by a seat-map capacity yet.
+                Super Admin will build the layout after you submit.
+              </p>
             ) : (
               <p>
                 Layout capacity: <strong>{ticketCapacitySummary.layoutCapacity}</strong>
@@ -1622,7 +1821,7 @@ function VenueBlock({
           <div>
             <p className="text-sm font-semibold text-slate-800">Venue documents</p>
             <p className="text-xs text-slate-500 mt-1">
-              Upload venue-related documents here. They are not listed on the Documents step.
+              Upload venue-related documents here. General event documents are on the Media step.
             </p>
           </div>
           {venueDocuments.length > 0 ? (
@@ -1972,7 +2171,7 @@ export default function EventForm({
   saving = false,
   submitting = false,
 }: EventFormProps) {
-  const { data: businessTypes = [] } = useGetBusinessTypesQuery();
+  const { data: eventCategoryMasters = [] } = useGetEventCategoriesQuery();
   const { data: cities = [] } = useGetCitiesQuery();
   const { data: promoPlans = [] } = useGetPublicMarketingPlansQuery({ module: "EVENTS" });
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
@@ -1991,10 +2190,41 @@ export default function EventForm({
     event ? getEventStepperSteps(event.category_slug).map((s) => s.id) : ["details"]
   );
   const [promoModalOpen, setPromoModalOpen] = useState(false);
+  const [layoutPickByRequest, setLayoutPickByRequest] = useState<Record<string, string>>({});
+  const [layoutRejectId, setLayoutRejectId] = useState<string | null>(null);
+  const [layoutRejectReason, setLayoutRejectReason] = useState("");
+  const [layoutViewing, setLayoutViewing] = useState<{
+    id: string;
+    name: string;
+    seats_json?: unknown[];
+    seating_config?: Record<string, unknown> | null;
+  } | null>(null);
+  const [reviewLayoutRequest, { isLoading: reviewingLayout }] =
+    useReviewOrganizerEventLayoutRequestMutation();
+
+  const pendingLayoutPicks = useMemo(
+    () =>
+      (event?.layout_requests || []).filter(
+        (r) => String(r.status) === "PENDING_ORGANIZER_APPROVAL"
+      ),
+    [event?.layout_requests]
+  );
+  const waitingForAdminLayout = useMemo(
+    () =>
+      (event?.layout_requests || []).filter((r) =>
+        ["SUBMITTED", "UNDER_REVIEW", "ORGANIZER_CHANGE_REQUESTED"].includes(String(r.status))
+      ),
+    [event?.layout_requests]
+  );
 
   const categories = useMemo(
-    () => businessTypes.filter((t) => t.module_key === "event" && t.parent_type_id),
-    [businessTypes]
+    () =>
+      eventCategoryMasters.map((c) => ({
+        id: c.category_type_id,
+        name: c.name,
+        slug: c.slug ?? undefined,
+      })),
+    [eventCategoryMasters]
   );
 
   const methods = useForm<EventFormValues>({
@@ -2067,6 +2297,10 @@ export default function EventForm({
 
   useEffect(() => {
     const allowed = new Set(steps.map((s) => s.id));
+    if (stepId === "documents" && allowed.has("media")) {
+      setStepId("media");
+      return;
+    }
     if (!allowed.has(stepId)) {
       setStepId("details");
     }
@@ -2172,11 +2406,13 @@ export default function EventForm({
           : s.venue_business_id && s.venue_source === "auto_registered"
             ? "auto_registered"
             : "manual";
-      const canUseLayouts = venueSource === "registered" && Boolean(s.venue_business_id);
+      const canUseStandardLayouts = venueSource === "registered" && Boolean(s.venue_business_id);
       const layoutMode =
-        canUseLayouts && (s.layout_mode === "standard" || s.layout_mode === "custom")
-          ? s.layout_mode
-          : "none";
+        s.layout_mode === "custom"
+          ? "custom"
+          : canUseStandardLayouts && s.layout_mode === "standard"
+            ? "standard"
+            : "none";
       const originalIndex = rawShowtimes.indexOf(s);
       const stopOrderIndex = originalIndex >= 0 ? originalIndex : stopIndex;
       return {
@@ -2187,7 +2423,10 @@ export default function EventForm({
         venue_business_id: s.venue_business_id || null,
         venue_layout_template_id: layoutMode === "standard" ? s.venue_layout_template_id || null : null,
         layout_mode: layoutMode as "none" | "standard" | "custom",
-        custom_layout_name: layoutMode === "custom" ? s.custom_layout_name?.trim() || null : null,
+        custom_layout_name:
+          layoutMode === "custom"
+            ? s.custom_layout_name?.trim() || "Custom event seating layout"
+            : null,
         custom_layout_type: layoutMode === "custom" ? s.custom_layout_type?.trim() || "custom" : null,
         custom_layout_capacity:
           layoutMode === "custom" && s.custom_layout_capacity != null
@@ -2200,7 +2439,22 @@ export default function EventForm({
             : [],
         location_id: null,
         tour_stop_order: hostingType === "tour" ? stopOrderIndex : null,
-        venue_proposal: null,
+        venue_proposal:
+          venueSource === "registered"
+            ? null
+            : {
+                contact_name: String(s.venue_proposal?.contact_name || "").trim(),
+                contact_phone: String(s.venue_proposal?.contact_phone || "").trim(),
+                contact_email: String(s.venue_proposal?.contact_email || "").trim(),
+                capacity: s.venue_proposal?.capacity ?? null,
+                facilities: Array.isArray(s.venue_proposal?.facilities)
+                  ? s.venue_proposal.facilities
+                  : [],
+                image_urls: Array.isArray(s.venue_proposal?.image_urls)
+                  ? s.venue_proposal.image_urls
+                  : [],
+                notes: String(s.venue_proposal?.notes || "").trim(),
+              },
         starts_at: range.starts_at,
         ends_at: range.ends_at,
         duration_type:
@@ -2565,30 +2819,6 @@ export default function EventForm({
         }
       }
 
-      const ticketsBefore = getValues("showtimes.0.ticket_types") || [];
-      if (!ticketsBefore.length) {
-        toast.error("Add at least one ticket type.");
-        return false;
-      }
-      for (const t of ticketsBefore) {
-        if (!String(t.ticket_type || "").trim()) {
-          toast.error("Each ticket type needs a name.");
-          return false;
-        }
-        if (!Number(t.total_count) || Number(t.total_count) < 1) {
-          toast.error("Each ticket type needs total seats of at least 1.");
-          return false;
-        }
-        if (!Number.isFinite(Number(t.price)) || Number(t.price) < 0) {
-          toast.error("Each ticket type needs a valid price.");
-          return false;
-        }
-        if (!Number(t.max_per_order) || Number(t.max_per_order) < 1) {
-          toast.error("Each ticket type needs a max per order of at least 1.");
-          return false;
-        }
-      }
-
       const ok = await trigger([
         "name",
         "category_type_id",
@@ -2695,6 +2925,11 @@ export default function EventForm({
           return false;
         }
       }
+      const masterErr = validateMasters(true);
+      if (masterErr) {
+        toast.error(masterErr);
+        return false;
+      }
       return true;
     }
     if (stepId === "venue") {
@@ -2713,6 +2948,31 @@ export default function EventForm({
           return false;
         }
       }
+
+      const ticketsBefore = getValues("showtimes.0.ticket_types") || [];
+      if (!ticketsBefore.length) {
+        toast.error("Add at least one ticket type.");
+        return false;
+      }
+      for (const t of ticketsBefore) {
+        if (!String(t.ticket_type || "").trim()) {
+          toast.error("Each ticket type needs a name.");
+          return false;
+        }
+        if (!Number(t.total_count) || Number(t.total_count) < 1) {
+          toast.error("Each ticket type needs total seats of at least 1.");
+          return false;
+        }
+        if (!Number.isFinite(Number(t.price)) || Number(t.price) < 0) {
+          toast.error("Each ticket type needs a valid price.");
+          return false;
+        }
+        if (!Number(t.max_per_order) || Number(t.max_per_order) < 1) {
+          toast.error("Each ticket type needs a max per order of at least 1.");
+          return false;
+        }
+      }
+
       const ok = await trigger(["showtimes"]);
       if (!ok) {
         toast.error("Please complete venue, city, schedule, and ticket details.");
@@ -2746,14 +3006,6 @@ export default function EventForm({
             ? String((e as Error).message)
             : "Artist details are incomplete.";
         toast.error(msg);
-        return false;
-      }
-      return true;
-    }
-    if (stepId === "documents") {
-      const masterErr = validateMasters(true);
-      if (masterErr) {
-        toast.error(masterErr);
         return false;
       }
       return true;
@@ -2810,9 +3062,12 @@ export default function EventForm({
                 onClick={() => {
                   setHostingType("single");
                   const rows = getValues("showtimes") || [];
-                  rows.forEach((_, i) => {
-                    setValue(`showtimes.${i}.duration_type`, "ONE_DAY", { shouldDirty: true });
-                  });
+                  // Single events are one venue only — drop extra stops.
+                  for (let i = rows.length - 1; i >= 1; i -= 1) {
+                    removeShowtime(i);
+                  }
+                  setValue(`showtimes.0.duration_type`, "ONE_DAY", { shouldDirty: true });
+                  setValue(`showtimes.0.end_time`, "", { shouldDirty: true });
                 }}
                 className={`text-left rounded-2xl border p-5 transition-all ${
                   hostingType === "single"
@@ -2825,7 +3080,7 @@ export default function EventForm({
                 </div>
                 <p className="font-semibold text-slate-900">Single Event</p>
                 <p className="text-sm text-slate-500 mt-1">
-                  One concert, comedy show, sports match, or other event at one or more venues.
+                  One concert, comedy show, sports match, or other event at a single venue.
                 </p>
               </button>
               <button
@@ -2886,6 +3141,10 @@ export default function EventForm({
               ))}
             </select>
             {errors.category_type_id && <p className={errorClass}>{errors.category_type_id.message}</p>}
+            <p className="text-[11px] text-slate-500 mt-1">
+              Categories are managed in Super Admin → Event Masters → Category Master. Genres and documents load
+              for the category you pick.
+            </p>
           </div>
 
           <p className="text-xs text-slate-500 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
@@ -2919,7 +3178,7 @@ export default function EventForm({
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Event date <span className="text-rose-500">*</span></label>
-                  <DateYmdFields
+                  <EventDateField
                     disabled={readOnly}
                     inputClass={inputClass}
                     value={watch("showtimes.0.event_date") || ""}
@@ -2936,7 +3195,7 @@ export default function EventForm({
                       setValue("showtimes", rows, { shouldDirty: true });
                     }}
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">Day / month / 4-digit year.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Type the date or use the calendar picker.</p>
                 </div>
                 <div>
                   <label className={labelClass}>Start time <span className="text-rose-500">*</span></label>
@@ -2957,13 +3216,13 @@ export default function EventForm({
                       setValue("showtimes", rows, { shouldDirty: true });
                     }}
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">12-hour clock with AM/PM.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Hours and minutes only (no seconds). 12-hour clock with AM/PM.
+                  </p>
                 </div>
               </div>
             </div>
           )}
-
-          <EventTicketTypesFields readOnly={readOnly} />
 
           <div>
             <label className={labelClass}>
@@ -3519,7 +3778,7 @@ export default function EventForm({
                           <label className="text-sm font-semibold text-slate-600">
                             Promotion start date <span className="text-rose-500">*</span>
                           </label>
-                          <DateYmdFields
+                          <EventDateField
                             disabled={false}
                             inputClass="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#e11d48] focus:ring-1 focus:ring-[#e11d48]/20"
                             value={watch("promo_start_date") || ""}
@@ -3688,16 +3947,12 @@ export default function EventForm({
               )
             : null}
         </section>
-        </>
-        )}
 
-        {stepId === "documents" && (
-        <>
         <section className="org-card p-6 space-y-4">
           <div>
             <h3 className="portal-heading text-lg font-semibold">Event-specific documents</h3>
             <p className="portal-muted text-sm mt-1">
-              General event documents only. Venue and artist documents are uploaded in their own steps.
+              General event documents only. Venue and artist documents are uploaded in the Venue and Artist steps.
             </p>
           </div>
           {!categoryTypeId ? (
@@ -3833,10 +4088,10 @@ export default function EventForm({
         <section className="org-card p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="portal-heading text-lg font-semibold">
-              {hostingType === "tour" ? "Tour stops & layouts" : "Venue & layout"}{" "}
+              {hostingType === "tour" ? "Tour stops & layouts" : "Venue"}{" "}
               <span className="text-rose-500 text-sm">*</span>
             </h3>
-            {!readOnly && (
+            {!readOnly && hostingType === "tour" && (
               <button
                 type="button"
                 onClick={() => {
@@ -3851,15 +4106,18 @@ export default function EventForm({
           </div>
           <p className="portal-muted text-xs">
             {hostingType === "tour"
-              ? "Add each tour city stop as a venue. Ticket types are set in Event details and apply to every stop."
-              : "Add venue and layout details. Ticket types are set in Event details."}
+              ? "Add ticket types once, then each tour city stop as a venue. Ticket types apply to every stop."
+              : "Add ticket types, then this event’s single venue and layout details."}
           </p>
+
+          <EventTicketTypesFields readOnly={readOnly} />
+
           {showtimeFields.map((field, i) => (
             <VenueBlock
               key={field.id}
               index={i}
               readOnly={readOnly}
-              canRemove={showtimeFields.length > 1}
+              canRemove={hostingType === "tour" && showtimeFields.length > 1}
               onRemove={() => removeShowtime(i)}
               cities={cities}
               hostingType={hostingType}
@@ -3881,12 +4139,12 @@ export default function EventForm({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="portal-heading text-lg font-semibold">
-                {isSports ? "Teams / players" : "Event lineup"}
+                {isSports ? "Teams / players" : "Artist"}
               </h3>
               <p className="portal-muted text-xs mt-1">
                 {isSports
                   ? "Optional. Add players, coaches, or officials. Search registered partners or add a new name."
-                  : "Optional. Add artists, guests, or chief guests. For artists you can search partners or auto-register a new name."}
+                  : "Optional. Add artists, guests, or chief guests. Search registered partners or auto-register a new name."}
               </p>
             </div>
         {!readOnly && (
@@ -3919,7 +4177,7 @@ export default function EventForm({
               <div>
                 <p className="text-sm font-semibold text-slate-800">Artist documents</p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Upload artist-related documents here. They are not listed on the Documents step.
+                  Upload artist-related documents here. General event documents are on the Media step.
                 </p>
               </div>
               <EventDocUploadsList
@@ -3938,7 +4196,7 @@ export default function EventForm({
         {stepId === "review" && (
           <section className="org-card p-6 space-y-6">
             <div>
-              <h3 className="portal-heading text-lg font-semibold">Review & submit</h3>
+              <h3 className="portal-heading text-lg font-semibold">Preview & submit</h3>
               <p className="portal-muted text-sm mt-1">
                 Confirm everything looks correct. You can go back to edit any step, save a draft, or submit for Super Admin approval.
               </p>
@@ -4241,6 +4499,353 @@ export default function EventForm({
                 </button>
               </div>
 
+              {waitingForAdminLayout.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-2 sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                    Custom layout in progress
+                  </p>
+                  <p className="text-sm text-amber-900">
+                    Super Admin is preparing your custom seating layout
+                    {waitingForAdminLayout.map((r) => r.layout_name).filter(Boolean).length
+                      ? ` (${waitingForAdminLayout.map((r) => r.layout_name).join(", ")})`
+                      : ""}
+                    . After they send it, review and approve it here on Preview. The contract is created
+                    only after you approve.
+                  </p>
+                </div>
+              )}
+
+              {pendingLayoutPicks.length > 0 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 space-y-4 sm:col-span-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+                      Review event layout
+                    </p>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Super Admin sent seating layout option(s). Preview each map, Approve the ones you
+                      like, Reject others, then Go live on one — same flow as venue layout review.
+                    </p>
+                  </div>
+                  {pendingLayoutPicks.map((req) => {
+                    const options = req.proposed_templates || [];
+                    return (
+                      <div
+                        key={req.id}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-3 space-y-3"
+                      >
+                        <p className="text-sm font-semibold text-slate-900">
+                          {req.layout_name}
+                          {req.venue_name ? ` · ${req.venue_name}` : ""}
+                        </p>
+                        {options.length === 0 ? (
+                          <p className="text-sm text-slate-500">No layout options attached yet.</p>
+                        ) : (
+                          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                            {options.map((opt, index) => {
+                              const rejected = String(opt.status) === "REJECTED";
+                              const shortlisted = Boolean(opt.venue_approved_at) && !rejected;
+                              const live =
+                                Boolean(opt.is_default) ||
+                                (Boolean(opt.venue_live_requested_at) &&
+                                  String(req.fulfilled_template_id || "") === opt.id);
+                              return (
+                                <article
+                                  key={opt.id}
+                                  className={`rounded-xl border overflow-hidden flex flex-col ${
+                                    live
+                                      ? "border-sky-300 ring-1 ring-sky-100"
+                                      : shortlisted
+                                        ? "border-emerald-300 ring-1 ring-emerald-100"
+                                        : rejected
+                                          ? "border-rose-200"
+                                          : "border-slate-200"
+                                  }`}
+                                >
+                                  <div className="p-2 bg-slate-50 border-b border-slate-100">
+                                    <LayoutSeatPreview
+                                      seats={opt.seats_json}
+                                      config={opt.seating_config}
+                                      heightClass="h-40"
+                                    />
+                                  </div>
+                                  <div className="p-3 flex-1 flex flex-col gap-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-rose-600">
+                                          Option {index + 1}
+                                        </p>
+                                        <p className="text-sm font-semibold text-slate-900 truncate">
+                                          {opt.name}
+                                        </p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                          {opt.seat_count ?? opt.capacity ?? 0} seats
+                                        </p>
+                                      </div>
+                                      <span
+                                        className={`shrink-0 text-[10px] font-bold uppercase px-2 py-1 rounded-md border ${
+                                          live
+                                            ? "bg-sky-50 text-sky-700 border-sky-200"
+                                            : shortlisted
+                                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                              : rejected
+                                                ? "bg-rose-50 text-rose-700 border-rose-200"
+                                                : "bg-amber-50 text-amber-700 border-amber-200"
+                                        }`}
+                                      >
+                                        {live
+                                          ? "Live"
+                                          : shortlisted
+                                            ? "Approved"
+                                            : rejected
+                                              ? "Rejected"
+                                              : "Pending"}
+                                      </span>
+                                    </div>
+                                    {rejected && opt.rejection_reason ? (
+                                      <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-2 py-1.5">
+                                        {opt.rejection_reason}
+                                      </p>
+                                    ) : null}
+                                    {!readOnly && (
+                                      <div className="flex flex-wrap gap-1.5 mt-auto pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setLayoutViewing({
+                                              id: opt.id,
+                                              name: opt.name,
+                                              seats_json: opt.seats_json,
+                                              seating_config: opt.seating_config || null,
+                                            })
+                                          }
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                        >
+                                          <Eye size={13} /> View
+                                        </button>
+                                        {!rejected && !live ? (
+                                          <>
+                                            {!shortlisted ? (
+                                              <button
+                                                type="button"
+                                                disabled={reviewingLayout}
+                                                className="btn-primary text-xs py-1.5 px-2.5 disabled:opacity-50"
+                                                onClick={async () => {
+                                                  try {
+                                                    if (options.length === 1) {
+                                                      await reviewLayoutRequest({
+                                                        id: req.id,
+                                                        action: "go_live",
+                                                        selected_template_id: opt.id,
+                                                      }).unwrap();
+                                                      toast.success(
+                                                        "Layout is live — Super Admin can create the contract"
+                                                      );
+                                                    } else {
+                                                      await reviewLayoutRequest({
+                                                        id: req.id,
+                                                        action: "approve_option",
+                                                        selected_template_id: opt.id,
+                                                      }).unwrap();
+                                                      toast.success(
+                                                        "Option approved. Approve more if you like, then Go live on one."
+                                                      );
+                                                    }
+                                                  } catch (e) {
+                                                    toast.error(extractApiError(e, "Approve failed"));
+                                                  }
+                                                }}
+                                              >
+                                                {options.length === 1 ? "Approve & go live" : "Approve"}
+                                              </button>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                disabled={reviewingLayout}
+                                                className="px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold disabled:opacity-50"
+                                                onClick={async () => {
+                                                  try {
+                                                    await reviewLayoutRequest({
+                                                      id: req.id,
+                                                      action: "go_live",
+                                                      selected_template_id: opt.id,
+                                                    }).unwrap();
+                                                    toast.success(
+                                                      "Layout is live — Super Admin can create the contract"
+                                                    );
+                                                  } catch (e) {
+                                                    toast.error(extractApiError(e, "Go live failed"));
+                                                  }
+                                                }}
+                                              >
+                                                Go live
+                                              </button>
+                                            )}
+                                            <button
+                                              type="button"
+                                              disabled={reviewingLayout}
+                                              className="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-600 text-xs font-medium hover:bg-rose-50 disabled:opacity-50"
+                                              onClick={() => {
+                                                setLayoutRejectId(opt.id);
+                                                setLayoutPickByRequest((prev) => ({
+                                                  ...prev,
+                                                  [req.id]: opt.id,
+                                                }));
+                                                setLayoutRejectReason("");
+                                              }}
+                                            >
+                                              Reject
+                                            </button>
+                                          </>
+                                        ) : null}
+                                      </div>
+                                    )}
+                                  </div>
+                                </article>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!readOnly && (
+                          <div className="pt-2 border-t border-slate-100 space-y-2">
+                            <label className="block text-xs font-semibold text-slate-600">
+                              Request changes from Super Admin (optional notes required)
+                            </label>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                type="text"
+                                value={layoutPickByRequest[`notes-${req.id}`] || ""}
+                                onChange={(e) =>
+                                  setLayoutPickByRequest((prev) => ({
+                                    ...prev,
+                                    [`notes-${req.id}`]: e.target.value,
+                                  }))
+                                }
+                                placeholder="What should Super Admin change?"
+                                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                              />
+                              <button
+                                type="button"
+                                disabled={reviewingLayout}
+                                className="px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-sm font-semibold hover:bg-amber-100 disabled:opacity-50"
+                                onClick={async () => {
+                                  const notes = String(
+                                    layoutPickByRequest[`notes-${req.id}`] || ""
+                                  ).trim();
+                                  if (!notes) {
+                                    toast.error("Add notes explaining the changes you need.");
+                                    return;
+                                  }
+                                  try {
+                                    await reviewLayoutRequest({
+                                      id: req.id,
+                                      action: "request_changes",
+                                      notes,
+                                    }).unwrap();
+                                    toast.success("Change request sent to Super Admin");
+                                  } catch (e) {
+                                    toast.error(extractApiError(e, "Could not send change request"));
+                                  }
+                                }}
+                              >
+                                Request changes
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {layoutViewing && (
+                <div
+                  className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4"
+                  onClick={() => setLayoutViewing(null)}
+                >
+                  <div
+                    className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-auto p-4 space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-semibold text-slate-900">{layoutViewing.name}</h3>
+                      <button
+                        type="button"
+                        onClick={() => setLayoutViewing(null)}
+                        className="p-2 rounded-lg hover:bg-slate-100"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <LayoutSeatPreview
+                      seats={layoutViewing.seats_json}
+                      config={layoutViewing.seating_config}
+                      heightClass="h-80"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {layoutRejectId && (
+                <div
+                  className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4"
+                  onClick={() => setLayoutRejectId(null)}
+                >
+                  <div
+                    className="bg-white rounded-2xl max-w-md w-full p-4 space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 className="font-semibold text-slate-900">Reject layout option</h3>
+                    <textarea
+                      rows={3}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      placeholder="Reason for rejection"
+                      value={layoutRejectReason}
+                      onChange={(e) => setLayoutRejectReason(e.target.value)}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        className="btn-secondary text-sm"
+                        onClick={() => setLayoutRejectId(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={reviewingLayout}
+                        className="px-3 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold disabled:opacity-50"
+                        onClick={async () => {
+                          if (!layoutRejectReason.trim()) {
+                            toast.error("Rejection reason is required");
+                            return;
+                          }
+                          const req = pendingLayoutPicks.find((r) =>
+                            (r.proposed_templates || []).some((t) => t.id === layoutRejectId)
+                          );
+                          if (!req) return;
+                          try {
+                            await reviewLayoutRequest({
+                              id: req.id,
+                              action: "reject_option",
+                              selected_template_id: layoutRejectId,
+                              notes: layoutRejectReason.trim(),
+                            }).unwrap();
+                            toast.success("Layout option rejected");
+                            setLayoutRejectId(null);
+                            setLayoutRejectReason("");
+                          } catch (e) {
+                            toast.error(extractApiError(e, "Reject failed"));
+                          }
+                        }}
+                      >
+                        Reject with reason
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {isSports ? "Teams / players" : "Lineup"}
@@ -4327,8 +4932,8 @@ export default function EventForm({
                 <p className="text-sm text-slate-600">
                   T&amp;C points: {selectedTerms.length} master + {customTerms.length} custom
                 </p>
-                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("documents")}>
-                  Edit documents
+                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("media")}>
+                  Edit documents &amp; media
                 </button>
               </div>
             </div>

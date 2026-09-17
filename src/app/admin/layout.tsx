@@ -31,7 +31,6 @@ import {
   KeyRound,
   Clapperboard,
   Film,
-  FileStack,
 } from "lucide-react";
 import AuthGate from "@/components/Shared/AuthGate";
 import SessionGuard from "@/components/Shared/SessionGuard";
@@ -72,20 +71,6 @@ function AdminProfileMenu({
           >
             <UserRound size={16} className="text-slate-500" />
             My Profile
-          </Link>
-          <Link
-            href="/admin/event-contracts"
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-rose-50 transition-colors"
-          >
-            <FileSignature size={16} className="text-slate-500" />
-            Current Contract
-          </Link>
-          <Link
-            href="/admin/event-contracts/history"
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-rose-50 transition-colors"
-          >
-            <FileStack size={16} className="text-slate-500" />
-            Old Contracts
           </Link>
           <Link
             href="/admin/profile?tab=password"

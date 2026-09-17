@@ -1104,6 +1104,7 @@ export interface EventFormPayload {
     plan_id: number;
     title: string;
     banner_image_url?: string;
+    slider_accent_text?: string | null;
     start_date: string;
   } | null;
   ticket_types: Array<{ ticket_type: string; total_count: number; price: number; max_per_order?: number }>;

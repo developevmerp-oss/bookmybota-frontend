@@ -1274,16 +1274,6 @@ export interface AdminEventLayoutRequest {
     seats_json?: unknown[];
     seat_count?: number;
   } | null;
-  ticket_types?: Array<{
-    id: string;
-    ticket_type: string;
-    total_count: number;
-    available_count?: number;
-    price?: number | string;
-  }>;
-  ticket_seat_total?: number;
-  target_capacity?: number;
-  templates?: VenueLayoutTemplate[];
   event_seating_config?: Record<string, unknown>;
 }
 

@@ -238,15 +238,18 @@ export default function VenueLayoutViewer({
 
     setSelectedSeatIds((prev) => {
       const isSelected = prev.includes(seat.id);
-      let newSelection = [];
+      let newSelection: string[] = [];
       if (isSelected) {
         newSelection = prev.filter((id) => id !== seat.id);
+      } else if (prev.length >= maxSelectable) {
+        // BMS: qty already filled — start a fresh pick from the tapped seat
+        // (parent auto-expands contiguous neighbors via onSeatsSelected).
+        newSelection = [seat.id];
       } else {
-        if (prev.length >= maxSelectable) return prev;
         newSelection = [...prev, seat.id];
       }
-      
-      const selectedSeats = seats.filter(s => newSelection.includes(s.id));
+
+      const selectedSeats = seats.filter((s) => newSelection.includes(s.id));
       onSeatsSelected(selectedSeats);
       return newSelection;
     });

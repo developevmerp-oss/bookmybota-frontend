@@ -594,6 +594,11 @@ export interface MovieBookingDetail {
   discount_amount: number;
   grand_total: number;
   ticket_qty: number;
+  commission_percent?: number | string;
+  commission_total?: number | string;
+  beverage_commission_percent?: number | string;
+  beverage_commission_total?: number | string;
+  cinema_payable?: number | string;
   promo_code?: string;
   booking_code: string;
   qr_code_token: string;
@@ -1016,6 +1021,7 @@ export interface MovieContract {
   status: 'PENDING_SIGNATURES' | 'ACTIVE' | 'REJECTED';
   convenience_fee_percent: number | string;
   commission_percent: number | string;
+  beverage_commission_percent?: number | string;
   dynamic_data?: Record<string, string | number> | null;
   admin_signed_at?: string | null;
   cinema_signed_at?: string | null;
@@ -1045,6 +1051,7 @@ export interface MovieContractPrefill {
     contract_number: string;
     convenience_fee_percent: number;
     commission_percent: number;
+    beverage_commission_percent?: number;
     terms_and_conditions: string;
     body_html: string;
     dynamic_data: Record<string, string | number>;
@@ -5127,6 +5134,7 @@ export const api = createApi({
         terms_and_conditions?: string;
         convenience_fee_percent?: number;
         commission_percent?: number;
+        beverage_commission_percent?: number;
       }
     >({
       query: (body) => ({ url: '/admin/movie-contracts', method: 'POST', body }),

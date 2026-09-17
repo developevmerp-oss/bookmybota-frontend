@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   Plus,
@@ -24,6 +25,7 @@ import {
 import { useAppSelector } from "@/lib/hooks";
 import {
   useGetCinemaBeveragesQuery,
+  useGetCinemaContractQuery,
   useCreateCinemaBeverageMutation,
   useUpdateCinemaBeverageMutation,
   useToggleCinemaBeverageAvailabilityMutation,
@@ -67,9 +69,13 @@ export default function CinemaBeveragesPage() {
   const user = useAppSelector((state) => state.auth.user);
   const bizId = user?.business_id ?? "";
 
+  const { data: contract, isLoading: loadingContract } = useGetCinemaContractQuery();
   const { data: beverages = [], isLoading, refetch } = useGetCinemaBeveragesQuery(bizId, {
     skip: !bizId,
   });
+
+  const isBeverageCommissionActive =
+    contract?.status === "ACTIVE" && Number(contract?.beverage_commission_percent ?? 0) > 0;
 
   const [createBeverage, { isLoading: isCreating }] = useCreateCinemaBeverageMutation();
   const [updateBeverage, { isLoading: isUpdating }] = useUpdateCinemaBeverageMutation();
@@ -209,11 +215,46 @@ export default function CinemaBeveragesPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || loadingContract) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-zinc-400">
         <Loader2 className="w-8 h-8 animate-spin text-fuchsia-500 mb-3" />
         <p className="text-sm">Loading cinema snack catalog...</p>
+      </div>
+    );
+  }
+
+  if (!isBeverageCommissionActive) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
+        <div className="glass-panel rounded-2xl border border-white/10 p-8 sm:p-10 space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 flex items-center justify-center mx-auto">
+            <UtensilsCrossed size={32} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white">Beverages &amp; Snacks Not Activated</h2>
+            <p className="text-zinc-400 text-sm max-w-md mx-auto leading-relaxed">
+              Snacks and beverages are not enabled under your cinema contract (snacks &amp; beverages commission is currently 0% or your contract is not yet active).
+            </p>
+            <p className="text-zinc-500 text-xs max-w-md mx-auto">
+              To add and sell food, beverages, and combos, please contact Super Admin to activate a contract with snacks &amp; beverages commission.
+            </p>
+          </div>
+          <div className="pt-2 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/movie/dashboard"
+              className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium hover:bg-white/10 transition-colors"
+            >
+              Back to Dashboard
+            </Link>
+            <Link
+              href="/movie/contract"
+              className="px-5 py-2.5 rounded-xl bg-fuchsia-600 text-white text-sm font-medium hover:bg-fuchsia-500 transition-colors"
+            >
+              View Contract
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

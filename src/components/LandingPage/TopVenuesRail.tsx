@@ -1,11 +1,10 @@
 "use client";
 
 import { useRef } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import { VenuePosterCard } from "./PosterCard";
 
 const MIN_VISIBLE = 5;
@@ -26,12 +25,7 @@ export default function TopVenuesRail() {
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <h2 className="type-section font-semibold tracking-tight text-[#111111]">Top Venues</h2>
-          <Link
-            href="/venues"
-            className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
-          >
-            See All ›
-          </Link>
+          <RailSeeAllLink href="/venues" />
         </div>
 
         {isLoading ? (
@@ -56,17 +50,15 @@ export default function TopVenuesRail() {
             dates you can inquire about.
           </p>
         ) : (
-          <div className="relative">
-            {scrollEdges.left && (
-              <button
-                type="button"
-                aria-label="Previous venues"
+          <div className="relative overflow-visible">
+            {scrollEdges.left ? (
+              <RailOverlayNavButton
+                direction="prev"
+                side="left"
+                label="Previous venues"
                 onClick={() => scrollBy(-1)}
-                className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-              >
-                <ChevronLeft size={18} />
-              </button>
-            )}
+              />
+            ) : null}
 
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {venues.map((venue) => (
@@ -74,16 +66,14 @@ export default function TopVenuesRail() {
               ))}
             </AdaptiveCardRow>
 
-            {scrollEdges.right && (
-              <button
-                type="button"
-                aria-label="Next venues"
+            {scrollEdges.right ? (
+              <RailOverlayNavButton
+                direction="next"
+                side="right"
+                label="Next venues"
                 onClick={() => scrollBy(1)}
-                className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-              >
-                <ChevronRight size={18} />
-              </button>
-            )}
+              />
+            ) : null}
           </div>
         )}
       </div>

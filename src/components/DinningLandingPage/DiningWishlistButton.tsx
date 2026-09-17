@@ -82,7 +82,7 @@ export default function DiningWishlistButton({ businessId, className }: Props) {
       e.stopPropagation();
 
       if (!isCustomer) {
-        toast.message("Sign in to save restaurants to My Wishlist");
+        toast.message("Sign in to save restaurants to My Favourite");
         setAuthOpen(true);
         return;
       }
@@ -95,11 +95,11 @@ export default function DiningWishlistButton({ businessId, className }: Props) {
         setOptimistic(wishlisted);
         toast.success(
           result.message ||
-            (wishlisted ? "Successfully added to wishlist" : "Removed from wishlist")
+            (wishlisted ? "Successfully added to favourites" : "Removed from favourites")
         );
       } catch (err) {
         setOptimistic(prev);
-        toast.error(extractApiError(err, "Could not update wishlist"));
+        toast.error(extractApiError(err, "Could not update favourites"));
       }
     },
     [businessId, isCustomer, saved, toggleWishlist]
@@ -111,7 +111,7 @@ export default function DiningWishlistButton({ businessId, className }: Props) {
         type="button"
         onClick={(e) => void handleClick(e)}
         disabled={toggling}
-        aria-label={saved ? "Remove from wishlist" : "Add to wishlist"}
+        aria-label={saved ? "Remove from favourites" : "Add to favourites"}
         aria-pressed={saved}
         className={
           className ||

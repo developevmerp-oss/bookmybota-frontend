@@ -38,6 +38,7 @@ import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
+import SafeCoverImage, { EventImageFallback } from "@/components/Shared/SafeCoverImage";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { toast } from "sonner";
 import { EventDetailShimmer } from "@/components/Shared/Shimmer";
@@ -124,16 +125,14 @@ function RelatedCard({ event }: { event: PublicEvent }) {
       href={`/events/${event.id}`}
       className="snap-start shrink-0 w-[148px] sm:w-[176px] lg:w-[196px] 2xl:w-[210px] group"
     >
-      <div className="relative h-[208px] sm:h-[248px] lg:h-[264px] 2xl:h-[280px] rounded-xl overflow-hidden bg-slate-200">
-        {image ? (
-          <img
-            src={image}
-            alt={event.name}
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-slate-700" />
-        )}
+      <div className="relative h-[208px] sm:h-[248px] lg:h-[264px] 2xl:h-[280px] rounded-xl overflow-hidden bg-[#F3F4F6]">
+        <SafeCoverImage
+          src={image}
+          alt={event.name}
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
+          fallback={<EventImageFallback size={32} />}
+        />
       </div>
       <p className="mt-2 sm:mt-2.5 font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] leading-snug line-clamp-2">
         {event.name}

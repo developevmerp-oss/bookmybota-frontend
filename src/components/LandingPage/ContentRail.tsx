@@ -2,20 +2,20 @@
 
 import { useRef, Children, type CSSProperties, type ReactNode } from "react";
 import "./AdaptiveCardRow.css";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 
 type ContentRailProps = {
   title: string;
   subtitle?: string;
+  eyebrow?: string;
   seeAllHref?: string;
   seeAllLabel?: string;
   dark?: boolean;
   alt?: boolean;
   isLoading?: boolean;
-  empty?: string;
+  empty?: ReactNode;
   children: ReactNode;
   label: string;
   cardStyle?: "poster" | "dining";
@@ -28,6 +28,7 @@ type ContentRailProps = {
 export default function ContentRail({
   title,
   subtitle,
+  eyebrow,
   seeAllHref,
   seeAllLabel = "See All",
   dark = false,
@@ -43,6 +44,7 @@ export default function ContentRail({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const childCount = Children.toArray(children).filter(Boolean).length;
   const scrollEdges = useHorizontalScrollEdges(scrollerRef, [childCount, isLoading, empty]);
+  const showOverlayNav = !isLoading && !empty && childCount > 0;
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -63,6 +65,20 @@ export default function ContentRail({
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
+            {eyebrow ? (
+              <p
+                className={`type-card-caption font-semibold uppercase tracking-[0.14em] mb-1.5 flex items-center gap-2 ${
+                  dark ? "text-white/55" : "text-slate-400"
+                }`}
+              >
+                {eyebrow}
+                <span
+                  className="inline-block h-px w-6 sm:w-8"
+                  style={{ backgroundColor: "#6900AA" }}
+                  aria-hidden
+                />
+              </p>
+            ) : null}
             <h2
               className={`type-section font-semibold tracking-tight ${
                 dark ? "text-white" : "text-[#111111]"
@@ -76,14 +92,8 @@ export default function ContentRail({
               </p>
             )}
           </div>
-          {seeAllHref && (
-            <Link
-              href={seeAllHref}
-              className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
-            >
-              {seeAllLabel} ›
-            </Link>
-          )}
+
+          {seeAllHref ? <RailSeeAllLink href={seeAllHref} label={seeAllLabel} /> : null}
         </div>
 
         {isLoading ? (
@@ -112,23 +122,23 @@ export default function ContentRail({
             ))}
           </div>
         ) : empty ? (
-          <p className={`type-body py-8 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>{empty}</p>
-        ) : (
-          <div className="relative">
-            {scrollEdges.left && (
-              <button
-                type="button"
-                aria-label={`Previous ${label}`}
-                onClick={() => scrollBy(-1)}
-                className={`hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
-                  dark
-                    ? "bg-white/10 text-white hover:bg-white/20"
-                    : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-                }`}
-              >
-                <ChevronLeft size={18} />
-              </button>
+          <div className={`py-2 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>
+            {typeof empty === "string" ? (
+              <p className="type-body py-6">{empty}</p>
+            ) : (
+              empty
             )}
+          </div>
+        ) : (
+          <div className="relative overflow-visible">
+            {showOverlayNav && scrollEdges.left ? (
+              <RailOverlayNavButton
+                direction="prev"
+                side="left"
+                label={`Previous ${label}`}
+                onClick={() => scrollBy(-1)}
+              />
+            ) : null}
             {adaptive ? (
               <AdaptiveCardRow minVisible={minVisible} scrollerRef={scrollerRef}>
                 {children}
@@ -141,20 +151,14 @@ export default function ContentRail({
                 {children}
               </div>
             )}
-            {scrollEdges.right && (
-              <button
-                type="button"
-                aria-label={`Next ${label}`}
+            {showOverlayNav && scrollEdges.right ? (
+              <RailOverlayNavButton
+                direction="next"
+                side="right"
+                label={`Next ${label}`}
                 onClick={() => scrollBy(1)}
-                className={`hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer ${
-                  dark
-                    ? "bg-white/10 text-white hover:bg-white/20"
-                    : "bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-                }`}
-              >
-                <ChevronRight size={18} />
-              </button>
-            )}
+              />
+            ) : null}
           </div>
         )}
       </div>

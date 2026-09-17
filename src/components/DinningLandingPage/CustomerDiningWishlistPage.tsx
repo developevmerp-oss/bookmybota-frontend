@@ -39,10 +39,10 @@ function WishlistRestaurantCard({
     e.stopPropagation();
     try {
       const result = await toggleWishlist({ business_id: String(restaurant.id) }).unwrap();
-      toast.success(result.message || "Removed from wishlist");
+      toast.success(result.message || "Removed from favourites");
       onRemoved?.();
     } catch (err) {
-      toast.error(extractApiError(err, "Could not remove from wishlist"));
+      toast.error(extractApiError(err, "Could not remove from favourites"));
     }
   };
 
@@ -64,7 +64,7 @@ function WishlistRestaurantCard({
           type="button"
           onClick={(e) => void handleRemove(e)}
           disabled={isLoading}
-          aria-label="Remove from wishlist"
+          aria-label="Remove from favourites"
           className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
         >
           {isLoading ? (
@@ -120,7 +120,7 @@ export default function CustomerDiningWishlistPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
           <div>
-            <h2 className="text-2xl font-extrabold text-[#111111]">My Wishlist</h2>
+            <h2 className="text-2xl font-extrabold text-[#111111]">My Favourite</h2>
             <p className="text-sm text-slate-500 mt-1">
               Dining restaurants you saved for later
             </p>
@@ -137,11 +137,11 @@ export default function CustomerDiningWishlistPage() {
         {isLoading ? (
           <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
             <Loader2 className="animate-spin" size={22} />
-            Loading wishlist…
+            Loading favourites…
           </div>
         ) : isError ? (
           <div className="text-center py-16">
-            <p className="text-slate-600 font-medium">Could not load your wishlist.</p>
+            <p className="text-slate-600 font-medium">Could not load your favourites.</p>
             <button
               type="button"
               onClick={() => void refetch()}

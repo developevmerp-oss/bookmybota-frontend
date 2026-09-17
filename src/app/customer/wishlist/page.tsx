@@ -1,5 +1,5 @@
-import CustomerWishlistPage from "@/components/Customer/CustomerWishlistPage";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <CustomerWishlistPage />;
+  redirect("/customer/favourite");
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Clapperboard } from "lucide-react";
+import { Clapperboard } from "lucide-react";
 import { useGetPublicMoviesQuery, type Movie } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
@@ -14,6 +14,9 @@ import {
   parseLanguageList,
 } from "@/lib/movieDisplay";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import CityLocationEmptyState from "./CityLocationEmptyState";
+import { hasCityFilter } from "./homeUtils";
+import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import "./RecommendedMoviesRail.css";
 
 const MIN_VISIBLE = 5;
@@ -131,13 +134,16 @@ export default function RecommendedMoviesRail() {
 
   const { data, isLoading } = useGetPublicMoviesQuery(moviesQueryArg);
   const apiMovies = (data?.items ?? []).map(mapApiMovie);
-  const useStatic = !isLoading && apiMovies.length === 0;
+  const hasCity = hasCityFilter(city);
+  const isEmpty = !isLoading && apiMovies.length === 0;
+  const useStatic = isEmpty && !hasCity;
   const items = useStatic ? SHOWCASE_MOVIE_CARDS.map(mapShowcaseMovie) : apiMovies;
   const scrollEdges = useHorizontalScrollEdges(scrollerRef, [
     items.length,
     useStatic,
     isLoading,
     city,
+    isEmpty,
   ]);
 
   const scrollBy = (dir: -1 | 1) => {
@@ -155,27 +161,20 @@ export default function RecommendedMoviesRail() {
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <h2 className="type-section font-semibold tracking-tight text-[#111111]">
-            Most Loved on Screen
+            Must-Watch Movies
           </h2>
-          <Link
-            href={seeAllHref}
-            className="shrink-0 type-link font-medium text-[#6900AA] hover:text-[#57008E]"
-          >
-            See All ›
-          </Link>
+          <RailSeeAllLink href={seeAllHref} />
         </div>
 
-        <div className="relative">
-          {scrollEdges.left && (
-            <button
-              type="button"
-              aria-label="Previous movies"
+        <div className="relative overflow-visible">
+          {scrollEdges.left ? (
+            <RailOverlayNavButton
+              direction="prev"
+              side="left"
+              label="Previous movies"
               onClick={() => scrollBy(-1)}
-              className="hidden md:flex absolute -left-2 lg:-left-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-            >
-              <ChevronLeft size={18} />
-            </button>
-          )}
+            />
+          ) : null}
 
           {isLoading ? (
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
@@ -192,6 +191,8 @@ export default function RecommendedMoviesRail() {
                 </div>
               ))}
             </AdaptiveCardRow>
+          ) : isEmpty && hasCity ? (
+            <CityLocationEmptyState categoryLabel="movies" city={city} />
           ) : items.length === 0 ? (
             <p className="text-sm text-[#6B7280] py-6">No movies available yet.</p>
           ) : (
@@ -202,16 +203,14 @@ export default function RecommendedMoviesRail() {
             </AdaptiveCardRow>
           )}
 
-          {scrollEdges.right && (
-            <button
-              type="button"
-              aria-label="Next movies"
+          {scrollEdges.right ? (
+            <RailOverlayNavButton
+              direction="next"
+              side="right"
+              label="Next movies"
               onClick={() => scrollBy(1)}
-              className="hidden md:flex absolute -right-2 lg:-right-3 top-[38%] -translate-y-1/2 z-10 w-9 h-9 rounded-full items-center justify-center cursor-pointer bg-white border border-[#EDEDED] text-[#111111] shadow-sm hover:bg-[#F7E9FF]"
-            >
-              <ChevronRight size={18} />
-            </button>
-          )}
+            />
+          ) : null}
         </div>
       </div>
     </section>

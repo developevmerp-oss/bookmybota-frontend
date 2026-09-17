@@ -84,7 +84,7 @@ function CustomerDropdown({
           <Link href="/customer/profile" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Profile</Link>
           <Link href="/customer/change-password" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
           <Link href="/customer/dashboard" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Orders / Reservations</Link>
-          <Link href="/customer/wishlist" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Wishlist</Link>
+          <Link href="/customer/favourite" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Favourite</Link>
           {showGiftCards && (
             <Link
               href="/customer/gift-cards"
@@ -190,11 +190,14 @@ export default function HomeHeader() {
     window.addEventListener("auth_changed", syncAuth);
     window.addEventListener("storage", syncAuth);
     window.addEventListener("open_customer_login", openLogin);
+    const openCity = () => setCityOpen(true);
+    window.addEventListener("open_city_select", openCity);
     return () => {
       window.removeEventListener("selected_city_changed", syncCity);
       window.removeEventListener("auth_changed", syncAuth);
       window.removeEventListener("storage", syncAuth);
       window.removeEventListener("open_customer_login", openLogin);
+      window.removeEventListener("open_city_select", openCity);
     };
   }, [pathname]);
 
@@ -278,7 +281,7 @@ export default function HomeHeader() {
 
           <NavSearchBar
             onClick={() => setSearchOpen(true)}
-            className="flex-1 min-w-0 max-w-md lg:max-w-xl "
+            className="flex-1 min-w-0 max-w-md lg:max-w-xl 2xl:mx-w-2xl ml-2 lg:ml-8 2xl:ml-12"
           />
 
           <div className="flex items-center gap-3 lg:gap-4 shrink-0 ml-auto">

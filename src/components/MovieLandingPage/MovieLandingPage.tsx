@@ -13,6 +13,7 @@ import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
+  Clapperboard,
   Loader2,
   Star,
   ThumbsUp,
@@ -38,6 +39,8 @@ import {
   SHOWCASE_UPCOMING_MOVIE_CARDS,
   type ShowcaseMovieCard,
 } from "@/data/showcaseMovieCards";
+import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
+import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
 import { getEmbedVideoUrl } from "@/components/MovieLandingPage/MovieTrailerModal";
 import "./MovieLandingPage.css";
 import "@/components/LandingPage/RecommendedMoviesRail.css";
@@ -273,17 +276,19 @@ function MoviePromoFeatureCard({
     >
       {slide.poster ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <SafeCoverImage
           src={slide.poster}
           alt={slide.title}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
             playTrailer && embedUrl ? "opacity-0" : "opacity-100"
           }`}
-          loading="lazy"
-          draggable={false}
+          fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
+          fallback={<MovieImageFallback size={40} />}
         />
       ) : (
-        <div className="absolute inset-0 bg-slate-900" />
+        <div className="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300">
+          <Clapperboard size={40} strokeWidth={1.4} />
+        </div>
       )}
 
       {playTrailer && embedUrl ? (
@@ -344,21 +349,26 @@ function MoviePromoFeatureCard({
 
 function MovieCard({ movie }: { movie: MovieCardData }) {
   const meta = formatMovieCardMeta(movie.certification, movie.languages);
+  const [imgFailed, setImgFailed] = useState(false);
+  const showPoster = Boolean(movie.poster) && !imgFailed;
 
   const inner = (
     <article className="flex h-full flex-col overflow-hidden rounded-[10px] bg-white border border-[#E5E5E5]">
-      <div className="relative shrink-0 overflow-hidden bg-[#111111]">
+      <div className="relative shrink-0 overflow-hidden bg-[#F3F4F6]">
         <div className="movie-listing-poster">
-          {movie.poster ? (
+          {showPoster ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={movie.poster}
               alt={movie.title}
               className="movie-listing-poster-img"
               loading="lazy"
+              onError={() => setImgFailed(true)}
             />
           ) : (
-            <div className="movie-listing-poster-img bg-slate-200" />
+            <div className="movie-listing-poster-img flex items-center justify-center bg-[#F3F4F6] text-slate-300">
+              <Clapperboard size={32} strokeWidth={1.4} />
+            </div>
           )}
         </div>
 
@@ -888,6 +898,14 @@ export default function MovieLandingPage() {
   const useStaticMovies =
     !isLoading &&
     !hasActiveFilters &&
+    !city &&
+    nowShowingSource.length === 0 &&
+    comingSoonSource.length === 0;
+
+  const showCityEmptyMovies =
+    !isLoading &&
+    !hasActiveFilters &&
+    Boolean(city) &&
     nowShowingSource.length === 0 &&
     comingSoonSource.length === 0;
 
@@ -1124,14 +1142,18 @@ export default function MovieLandingPage() {
                 >
                   <div className="absolute inset-0 overflow-hidden" aria-hidden>
                     {slide.blurImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <SafeCoverImage
                         src={slide.blurImage}
                         alt=""
                         className="absolute inset-0 h-full w-full scale-150 object-cover blur-[15px] opacity-80"
+                        fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300"
+                        fallback={<MovieImageFallback size={48} />}
+                        loading="eager"
                       />
                     ) : (
-                      <div className="absolute inset-0 bg-slate-200" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300">
+                        <Clapperboard size={48} strokeWidth={1.4} />
+                      </div>
                     )}
                     <div className="absolute inset-0 bg-white/55" />
                     <div
@@ -1181,15 +1203,17 @@ export default function MovieLandingPage() {
 
                       <div className="mx-auto flex h-[280px] shrink-0 items-center justify-center sm:h-[340px] md:mx-0 md:h-[380px] lg:h-[420px]">
                         {slide.poster ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <SafeCoverImage
                             src={slide.poster}
                             alt={slide.title}
                             className="max-h-full w-auto max-w-[190px] rounded-2xl object-contain drop-shadow-[0_18px_40px_rgba(15,23,42,0.35)] sm:max-w-[235px] md:max-w-[270px] lg:max-w-[300px]"
+                            fallbackClassName="flex aspect-[2/3] h-full items-center justify-center rounded-2xl bg-[#F3F4F6] text-slate-300"
+                            fallback={<MovieImageFallback size={40} />}
+                            loading="eager"
                           />
                         ) : (
-                          <div className="flex aspect-[2/3] h-full items-center justify-center rounded-2xl bg-slate-200 px-4 text-center text-sm font-medium text-slate-500">
-                            {slide.title}
+                          <div className="flex aspect-[2/3] h-full items-center justify-center rounded-2xl bg-[#F3F4F6] text-slate-300">
+                            <Clapperboard size={40} strokeWidth={1.4} />
                           </div>
                         )}
                       </div>
@@ -1363,7 +1387,7 @@ export default function MovieLandingPage() {
                   <Loader2 className="size-8 animate-spin text-[#6900AA]" />
                   <p className="text-sm font-medium sm:text-base">Loading movies...</p>
                 </div>
-              ) : noCinemasInCity && !useStaticMovies ? (
+              ) : noCinemasInCity && !useStaticMovies && !showCityEmptyMovies ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
                   <p className="text-sm font-semibold text-slate-800">No cinemas in {headingCity} yet</p>
                   <p className="mt-1 text-sm text-slate-500">
@@ -1376,6 +1400,8 @@ export default function MovieLandingPage() {
                     Browse by Cinemas
                   </Link>
                 </div>
+              ) : showCityEmptyMovies ? (
+                <CityLocationEmptyState categoryLabel="movies" city={city} />
               ) : movies.length === 0 ? (
                 <div
                   className={`rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center ${

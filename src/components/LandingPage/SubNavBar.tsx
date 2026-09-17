@@ -15,6 +15,7 @@ import {
   UtensilsCrossed,
   type LucideIcon,
 } from "lucide-react";
+import { HiArrowRight } from "react-icons/hi";
 import { useGetPublicEventFiltersQuery } from "@/services/api";
 import {
   categorySlugsMatch,
@@ -22,6 +23,7 @@ import {
   resolveCategorySlug,
   type EventCategoryKey,
 } from "@/lib/eventCategories";
+import "./SubNavBar.css";
 
 type SubNavTab = {
   label: string;
@@ -50,6 +52,62 @@ function tabHref(item: SubNavTab, diningHref: string, categories: Array<{ slug: 
   if (item.href) return item.href;
   if (item.key) return eventCategoryHref(item.key as EventCategoryKey, categories);
   return "/";
+}
+
+function ListYourShowCta({
+  href,
+  label,
+  active,
+  tabIndex,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  tabIndex?: number;
+}) {
+  const btnRef = useRef<HTMLAnchorElement>(null);
+  const circleRef = useRef<HTMLSpanElement>(null);
+  const [filled, setFilled] = useState(false);
+
+  const placeCircle = (clientX: number, clientY: number) => {
+    const btn = btnRef.current;
+    const circle = circleRef.current;
+    if (!btn || !circle) return;
+    const rect = btn.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    circle.style.left = `${x}px`;
+    circle.style.top = `${y}px`;
+    // Grow enough to cover the pill from any entry point
+    const cover = Math.ceil((Math.hypot(rect.width, rect.height) * 2.2) / 12);
+    circle.style.setProperty("--cta-scale", String(cover));
+  };
+
+  return (
+    <Link
+      ref={btnRef}
+      href={href}
+      tabIndex={tabIndex}
+      aria-current={active ? "page" : undefined}
+      className={`list-your-show-cta hidden lg:inline-flex shrink-0 items-center gap-1.5 h-8 px-3.5 sm:px-4 rounded-full text-[12px] sm:text-[13px] font-semibold whitespace-nowrap border border-[#6900AA] ${
+        filled ? "is-filled" : ""
+      }`}
+      onMouseEnter={(e) => {
+        placeCircle(e.clientX, e.clientY);
+        setFilled(true);
+      }}
+      onMouseLeave={(e) => {
+        placeCircle(e.clientX, e.clientY);
+        setFilled(false);
+      }}
+    >
+      <span ref={circleRef} className="list-your-show-cta__circle" aria-hidden />
+      <span className="list-your-show-cta__label relative z-[1] inline-flex items-center gap-1.5">
+        {label}
+        <HiArrowRight size={14} aria-hidden className="shrink-0" />
+      </span>
+    </Link>
+  );
 }
 
 /** Landing scroll: hide after this Y; show only after returning near top (hysteresis). */
@@ -185,17 +243,12 @@ export default function SubNavBar() {
         </div>
 
         {ctaTab ? (
-          <Link
+          <ListYourShowCta
             href={ctaTab.href!}
+            label={ctaTab.label}
+            active={isTabActive(ctaTab)}
             tabIndex={collapsed ? -1 : undefined}
-            className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3.5 sm:px-4 rounded-full text-[12px] sm:text-[13px] font-semibold whitespace-nowrap transition-colors shadow-sm ${
-              isTabActive(ctaTab)
-                ? "bg-[#F5CE00] text-[#111111] ring-2 ring-[#6900AA]/25"
-                : "bg-[#FFD600] text-[#111111] hover:bg-[#F5CE00]"
-            }`}
-          >
-            {ctaTab.label}
-          </Link>
+          />
         ) : null}
       </div>
     </nav>

@@ -363,6 +363,11 @@ export interface CinemaScreen {
   name: string;
   screen_type?: string | null;
   capacity: number;
+  seat_types_json?: {
+    regular?: number;
+    recliner?: number;
+    couple?: number;
+  } | null;
   hall_id?: string | null;
   hall_name?: string | null;
   venue_layout_template_id?: string | null;
@@ -1262,6 +1267,17 @@ export interface AdminEventLayoutRequest {
     seats_json?: unknown[];
     seat_count?: number;
   } | null;
+  ticket_types?: Array<{
+    id: string;
+    ticket_type: string;
+    total_count: number;
+    available_count?: number;
+    price?: number | string;
+  }>;
+  ticket_seat_total?: number;
+  target_capacity?: number;
+  templates?: VenueLayoutTemplate[];
+  event_seating_config?: Record<string, unknown>;
 }
 
 export interface EventArtistItem {
@@ -3238,6 +3254,24 @@ export const api = createApi({
       query: ({ id, ...body }) => ({
         url: `/admin/event-layout-requests/${id}/fulfill`,
         method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['EventLayoutRequests', 'EventLayouts', 'OrganizerEvents', 'AdminEvents'],
+    }),
+
+    saveAdminEventLayoutBuild: builder.mutation<
+      { data: AdminEventLayoutRequest; message?: string },
+      {
+        id: string;
+        name?: string;
+        template_id?: string;
+        seating_config: Record<string, unknown>;
+        seats: unknown[];
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/event-layout-requests/${id}/build-layout`,
+        method: 'PUT',
         body,
       }),
       invalidatesTags: ['EventLayoutRequests', 'EventLayouts', 'OrganizerEvents', 'AdminEvents'],
@@ -6974,6 +7008,7 @@ export const api = createApi({
         screen_type?: string;
         capacity?: number;
         description?: string;
+        seat_types_json?: { regular?: number; recliner?: number; couple?: number };
         is_active?: boolean;
       }
     >({
@@ -7023,6 +7058,25 @@ export const api = createApi({
       ],
     }),
 
+    updateCinemaScreenSeatStatuses: builder.mutation<
+      { message?: string; data?: { seats: unknown[]; changed: number } },
+      {
+        bizId: string;
+        screenId: string;
+        seats: Array<{ seat_key: string; status: 'BLOCKED' | 'AVAILABLE' }>;
+      }
+    >({
+      query: ({ bizId, screenId, seats }) => ({
+        url: `/businesses/${bizId}/cinema-screens/${screenId}/seat-statuses`,
+        method: 'PATCH',
+        body: { seats },
+      }),
+      invalidatesTags: (_r, _e, arg) => [
+        { type: 'CinemaScreens', id: arg.bizId },
+        'CinemaScreens',
+        'VenueLayouts',
+      ],
+    }),
 
     // ── Cinema Partner Movie Showtimes ─────────────────────────────────────────
 
@@ -7049,6 +7103,7 @@ export const api = createApi({
           language?: string;
           format?: string;
           tier_pricing: MovieShowtimeTierPrice[];
+          price_duration?: string;
         };
       }
     >({
@@ -7881,6 +7936,7 @@ export const {
   useReviewAdminEventLayoutRequestMutation,
   useSaveAdminEventLayoutTemplateMutation,
   useFulfillAdminEventLayoutRequestMutation,
+  useSaveAdminEventLayoutBuildMutation,
   useReviewOrganizerEventLayoutRequestMutation,
   useGetGeoCountriesQuery,
   useGetGeoStatesQuery,
@@ -8165,6 +8221,7 @@ export const {
   useCreateCinemaScreenMutation,
   useUpdateCinemaScreenMutation,
   useUpdateCinemaScreenLayoutMutation,
+  useUpdateCinemaScreenSeatStatusesMutation,
   useGetPartnerMovieShowtimesQuery,
   useCreatePartnerMovieShowtimeMutation,
   useUpdatePartnerMovieShowtimeMutation,

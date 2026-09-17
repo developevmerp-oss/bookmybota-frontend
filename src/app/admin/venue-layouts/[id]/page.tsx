@@ -441,19 +441,24 @@ export default function AdminVenueLayoutBuilderPage() {
             </div>
           ) : null}
           <div>
-            <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Requested zones</p>
+            <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Requested seating types</p>
             <div className="space-y-2">
               {sections.length ? (
                 sections.map((section) => (
                   <div key={section.id} className="rounded-lg border border-white/10 px-3 py-2 text-sm">
                     <p className="text-white font-medium">{section.name}</p>
-                    <p className="text-zinc-500 text-xs">Capacity {section.capacity}</p>
+                    <p className="text-zinc-500 text-xs">Map exactly {section.capacity} seat(s) in this section</p>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-zinc-500">No zones provided.</p>
+                <p className="text-sm text-zinc-500">No seating types provided.</p>
               )}
             </div>
+            {isCinemaModule(request.partner_module) && sections.length > 0 ? (
+              <p className="text-[11px] text-amber-400/90 mt-2">
+                Publish is blocked until seat counts per section match these requested types (Regular / Recliner / Couple).
+              </p>
+            ) : null}
           </div>
           {images.length > 0 && (
             <div>
@@ -571,6 +576,7 @@ export default function AdminVenueLayoutBuilderPage() {
                 venueAdapter={{
                   sections,
                   initialSeats,
+                  maxCapacity: Number(request.capacity) || sections.reduce((s, z) => s + (z.capacity || 0), 0) || undefined,
                   initialConfig: {
                     labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
                     shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
@@ -719,6 +725,7 @@ export default function AdminVenueLayoutBuilderPage() {
               venueAdapter={{
                 sections,
                 initialSeats,
+                maxCapacity: Number(request.capacity) || sections.reduce((s, z) => s + (z.capacity || 0), 0) || undefined,
                 initialConfig: {
                   labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
                   shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],

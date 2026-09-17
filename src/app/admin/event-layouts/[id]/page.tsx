@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -8,10 +8,10 @@ import { ArrowLeft, Maximize2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   useFulfillAdminEventLayoutRequestMutation,
+  useFulfillAdminEventLayoutRequestMutation,
   useGetAdminEventLayoutRequestQuery,
   useReviewAdminEventLayoutRequestMutation,
-  useSaveAdminEventLayoutTemplateMutation,
-  type VenueLayoutTemplate,
+  useSaveAdminEventLayoutBuildMutation,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
@@ -50,6 +50,11 @@ function mapSeatsFromJson(sourceSeats: unknown[]) {
   });
 }
 
+const VenueLayoutBuilder = dynamic(
+  () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
+  { ssr: false }
+);
+
 export default function AdminEventLayoutDetailPage() {
   const params = useParams();
   const id = String(params.id || "");
@@ -57,20 +62,16 @@ export default function AdminEventLayoutDetailPage() {
   const [reviewRequest, { isLoading: reviewing }] = useReviewAdminEventLayoutRequestMutation();
   const [saveTemplate, { isLoading: saving }] = useSaveAdminEventLayoutTemplateMutation();
   const [fulfillRequest, { isLoading: fulfilling }] = useFulfillAdminEventLayoutRequestMutation();
+  const [saveBuild, { isLoading: saving }] = useSaveAdminEventLayoutBuildMutation();
 
   const [rejectReason, setRejectReason] = useState("");
   const [fulfillNotes, setFulfillNotes] = useState("");
+  const [templateId, setTemplateId] = useState("");
+  const [applyToEvent, setApplyToEvent] = useState(true);
+  const [isStudioOpen, setIsStudioOpen] = useState(false);
   const [optionName, setOptionName] = useState("");
-  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
-  const [creatingNew, setCreatingNew] = useState(false);
-  const [localTemplates, setLocalTemplates] = useState<VenueLayoutTemplate[]>([]);
-  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
-  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
-  const [showInlineBuilder, setShowInlineBuilder] = useState(false);
-  const [seedFromVenue, setSeedFromVenue] = useState(false);
-  const [studioNonce, setStudioNonce] = useState(0);
 
-  const busy = reviewing || saving || fulfilling;
+  const busy = reviewing || saving || fulfilling || saving;
   const canBuild =
     request &&
     ["SUBMITTED", "UNDER_REVIEW", "ORGANIZER_CHANGE_REQUESTED"].includes(String(request.status));
@@ -227,6 +228,56 @@ export default function AdminEventLayoutDetailPage() {
     );
     void refetch();
   };
+  const layouts = request?.published_layouts || [];
+  const ticketTypes = request?.ticket_types || [];
+  const targetCapacity = Number(request?.target_capacity || request?.capacity) || 0;
+
+  const sections = useMemo(() => {
+    if (ticketTypes.length > 0) {
+      return ticketTypes.map((t) => ({
+        id: t.id,
+        name: t.ticket_type,
+        capacity: Number(t.total_count) || 0,
+        price: Number(t.price) || 0,
+      }));
+    }
+    return [{ id: "General", name: "General", capacity: targetCapacity || 0 }];
+  }, [ticketTypes, targetCapacity]);
+
+  const initialSeats = useMemo(() => {
+    const tpl = (request?.templates || []).find((t) => t.id === request?.fulfilled_template_id) || request?.templates?.[0];
+    const raw = tpl?.seats_json;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((seat, idx) => {
+      const row = seat as Record<string, unknown>;
+      return {
+        id: String(row.id || `seat-${idx}`),
+        internalId: String(row.internalId || row.id || `seat-${idx}`),
+        ticket_type_id: (row.ticket_type_id as string) || null,
+        section_name: String(row.section_name || "General"),
+        row_label: String(row.row_label || "A"),
+        seat_label: String(row.seat_label || `${idx + 1}`),
+        coordinate_x: Number(row.coordinate_x) || 0,
+        coordinate_y: Number(row.coordinate_y) || 0,
+        status: String(row.status || "AVAILABLE"),
+        grid_id: row.grid_id ? String(row.grid_id) : undefined,
+      };
+    });
+  }, [request]);
+
+  const initialConfig = useMemo(() => {
+    const tpl = (request?.templates || []).find((t) => t.id === request?.fulfilled_template_id) || request?.templates?.[0];
+    const cfg = (tpl?.seating_config || request?.event_seating_config || {}) as {
+      labels?: unknown[];
+      shapes?: unknown[];
+      bgImageUrl?: string | null;
+    };
+    return {
+      labels: Array.isArray(cfg.labels) ? (cfg.labels as never[]) : [],
+      shapes: Array.isArray(cfg.shapes) ? (cfg.shapes as never[]) : [],
+      bgImageUrl: cfg.bgImageUrl || null,
+    };
+  }, [request]);
 
   const startReview = async () => {
     try {
@@ -266,8 +317,8 @@ export default function AdminEventLayoutDetailPage() {
     try {
       const res = await fulfillRequest({
         id,
-        fulfilled_template_ids: selectedTemplateIds,
-        fulfilled_template_id: selectedTemplateIds.length === 1 ? selectedTemplateIds[0] : null,
+        fulfilled_template_id: templateId || null,
+        apply_to_event: applyToEvent,
         notes: fulfillNotes.trim() || undefined,
       }).unwrap();
       toast.success(res.message || "Layout options sent");
@@ -277,55 +328,45 @@ export default function AdminEventLayoutDetailPage() {
     }
   };
 
-  if (isLoading) {
-    return <p className="text-zinc-400 p-8">Loading request…</p>;
-  }
+  const handleSaveStudio = async (payload: {
+    seating_config: Record<string, unknown>;
+    seats: unknown[];
+  }) => {
+    await saveBuild({
+      id,
+      name: optionName || request?.layout_name || "Event layout",
+      template_id: request?.fulfilled_template_id || undefined,
+      seating_config: payload.seating_config,
+      seats: payload.seats,
+    }).unwrap();
+    toast.success("Event layout saved with full studio tools");
+    setIsStudioOpen(false);
+    refetch();
+  };
 
+  if (isLoading) {
+    return <p className="text-zinc-400 p-6">Loading event layout request…</p>;
+  }
   if (!request) {
-    return (
-      <div className="w-full p-4 sm:p-6 lg:p-8 space-y-3">
-        <p className="text-zinc-300">Event layout request not found.</p>
-        <Link href="/admin/event-layouts" className="text-rose-500">
-          Back to requests
-        </Link>
-      </div>
-    );
+    return <p className="text-rose-400 p-6">Event layout request not found.</p>;
   }
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="w-full max-w-6xl mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex items-center gap-3">
+        <Link
+          href="/admin/event-layouts"
+          className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5"
+        >
+          <ArrowLeft size={18} />
+        </Link>
         <div>
-          <Link
-            href="/admin/event-layouts"
-            className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white"
-          >
-            <ArrowLeft size={14} /> Back to event layout requests
-          </Link>
-          <h1 className="text-2xl font-bold text-white mt-3">{request.layout_name}</h1>
-          <p className="text-zinc-400 mt-1">
-            Status: <span className="text-white font-medium">{request.status}</span>
-            {" · "}
-            {request.event_name || "Event"} · {request.organizer_name || "Organizer"}
+          <h1 className="text-xl font-bold text-white">{request.layout_name || "Event layout request"}</h1>
+          <p className="text-sm text-zinc-400">
+            Status: {request.status}
+            {targetCapacity > 0 ? ` · target ${targetCapacity} seats` : ""}
           </p>
         </div>
-        {canBuild && (
-          <div className="flex flex-wrap gap-2">
-            {request.status === "SUBMITTED" && (
-              <button type="button" disabled={busy} onClick={startReview} className="btn-secondary text-sm py-2 px-4">
-                Start review
-              </button>
-            )}
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => openStudio({ createNew: true, seed: Boolean(sourceVenueLayout) })}
-              className="btn-primary text-sm py-2 px-4"
-            >
-              {templates.length > 0 ? "Add another layout" : "Create layout"}
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-3">
@@ -342,6 +383,7 @@ export default function AdminEventLayoutDetailPage() {
             Venue: {request.venue_partner_name || request.venue_name || request.showtime_venue_name || "—"}
           </p>
           <p className="text-zinc-300">Type: {request.layout_type || "custom"}</p>
+          <p className="text-zinc-300">Capacity: {request.capacity ?? targetCapacity ?? 0}</p>
           <p className="text-zinc-300">Event status: {request.event_status || "—"}</p>
           <p className="text-zinc-300">
             Target seats:{" "}
@@ -396,241 +438,111 @@ export default function AdminEventLayoutDetailPage() {
             )}
           </div>
         )}
+        {ticketTypes.length > 0 && (
+          <div>
+            <p className="text-xs uppercase tracking-wide text-zinc-500 mb-2">Requested ticket / seating zones</p>
+            <div className="flex flex-wrap gap-2">
+              {ticketTypes.map((t) => (
+                <span
+                  key={t.id}
+                  className="px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs font-semibold"
+                >
+                  {t.ticket_type}: {t.total_count} seats
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {request.notes && (
           <div className="rounded-xl border border-white/10 bg-white/5 p-3">
             <p className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Organizer notes</p>
             <p className="text-sm text-zinc-200 whitespace-pre-wrap">{request.notes}</p>
           </div>
         )}
-        {request.organizer_change_notes && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-            <p className="text-xs uppercase tracking-wide text-amber-300 mb-1">Organizer change request</p>
-            <p className="text-sm text-amber-100 whitespace-pre-wrap">{request.organizer_change_notes}</p>
-          </div>
-        )}
       </div>
 
-      {canBuild && (
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5">
-          <div className="space-y-4">
-            <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-zinc-500">Layout studio</p>
-                  <h2 className="text-xl font-bold text-white mt-1">
-                    {optionName || activeTemplate?.name || request.layout_name}
-                  </h2>
-                  <p className="text-sm text-zinc-400 mt-1">
-                    {initialSeats.length} seats
-                    {targetCapacity > 0 ? ` · target max ${targetCapacity}` : ""}
-                    {" · "}Build options, then send for organizer Preview approval.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => openStudio({ seed: creatingNew && Boolean(sourceVenueLayout) })}
-                  className="btn-primary py-2.5 px-4 text-sm inline-flex items-center gap-2"
-                >
-                  <Maximize2 size={16} /> Open layout studio
-                </button>
-              </div>
-
-              <div>
-                <label className="portal-label block text-sm mb-1.5">Option name</label>
-                <input
-                  className="input-field w-full max-w-md"
-                  value={optionName}
-                  onChange={(e) => setOptionName(e.target.value)}
-                  placeholder="Layout option name"
-                />
-              </div>
-
-              <div
-                onClick={() => openStudio({ seed: creatingNew && Boolean(sourceVenueLayout) })}
-                className="group relative cursor-pointer rounded-2xl border border-white/10 bg-black/40 p-4 hover:border-rose-400/50 transition-all"
-              >
-                <LayoutSeatPreview seats={sourceSeats} config={sourceConfig} heightClass="h-64 sm:h-80" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
-                  <span className="px-4 py-2 rounded-xl bg-white text-slate-900 text-sm font-semibold">
-                    Open full-screen studio
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowInlineBuilder((b) => !b)}
-                className="text-sm text-rose-400 hover:text-rose-300"
-              >
-                {showInlineBuilder ? "Hide inline editor" : "Show inline editor"}
-              </button>
-
-              {showInlineBuilder && (
-                <div className="min-h-[720px] rounded-2xl overflow-hidden border border-white/10">
-                  <VenueLayoutBuilder
-                    key={
-                      creatingNew
-                        ? `new-inline-${studioNonce}-${seedFromVenue ? "seeded" : "blank"}`
-                        : `inline-${activeTemplateId || selectedId || "empty"}-${studioNonce}`
-                    }
-                    venueAdapter={{
-                      sections,
-                      initialSeats,
-                      maxCapacity: targetCapacity > 0 ? targetCapacity : undefined,
-                      initialConfig: {
-                        labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
-                        shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
-                        bgImageUrl: sourceConfig.bgImageUrl || null,
-                        sectionColors: sourceConfig.sectionColors,
-                      },
-                      saving,
-                      hideSubmitToVenue: true,
-                      onSave: handleSaveTemplatePayload,
-                      onBlankPage: () => {
-                        beginNewOption(false);
-                        toast.info("Blank page ready — build, then Save as new option.");
-                      },
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-            {publishedLayouts.length > 0 && (
-              <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-3">
-                <h3 className="text-sm font-semibold text-white">Or attach an existing published venue layout</h3>
-                <div className="space-y-2">
-                  {publishedLayouts.map((l) => {
-                    const checked = selectedTemplateIds.includes(l.id);
-                    return (
-                      <label
-                        key={l.id}
-                        className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer ${
-                          checked ? "border-rose-400/50 bg-rose-500/10" : "border-white/10 bg-white/5"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={checked}
-                          onChange={() => toggleTemplate(l.id)}
-                        />
-                        <span>
-                          <span className="text-sm font-medium text-white">{l.name}</span>
-                          <span className="block text-xs text-zinc-400 mt-0.5">
-                            {l.capacity ? `${l.capacity} seats` : "Capacity not set"} · published venue layout
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <aside className="glass-panel rounded-2xl border border-white/10 p-5 space-y-3 h-fit xl:sticky xl:top-4">
+      {canAct && (
+        <div className="glass-panel rounded-2xl border border-amber-500/20 p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-wide text-zinc-500">
-                Saved options ({templates.length})
-              </p>
-              <p className="text-xs text-zinc-400 mt-1">
-                Select layout(s) to send. Organizer must approve on Preview before a contract can be created.
+              <h2 className="text-white font-semibold">Build layout (same studio as venue & cinema)</h2>
+              <p className="text-sm text-zinc-400 mt-1">
+                Use Select, Pan, Add Seat, Add Grid, Text, Stage, Eraser, templates, colors, and capacity
+                tracking — identical tools to Venue & Cinema Layouts.
               </p>
             </div>
-
             <button
               type="button"
-              disabled={busy}
-              onClick={() => openStudio({ createNew: true })}
-              className="w-full btn-secondary py-2 text-sm"
+              className="btn-primary inline-flex items-center gap-2"
+              onClick={() => {
+                setOptionName(request.layout_name || "Event layout");
+                if (request.status === "SUBMITTED") void startReview();
+                setIsStudioOpen(true);
+              }}
             >
-              + Add another layout option
+              <Maximize2 size={16} /> Open full-screen studio
             </button>
+          </div>
+          <input
+            className="input-field"
+            value={optionName}
+            onChange={(e) => setOptionName(e.target.value)}
+            placeholder="Layout option name"
+          />
+        </div>
+      )}
 
-            {templates.length === 0 ? (
-              <p className="text-sm text-zinc-500">Create and save a layout to add an option here.</p>
-            ) : (
-              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                {templates.map((item) => {
-                  const checked = selectedTemplateIds.includes(item.id);
-                  const isActive = selectedId === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      className={`rounded-xl border p-3 ${
-                        isActive ? "border-rose-400 bg-rose-500/10" : "border-white/10 bg-white/5"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleTemplate(item.id)}
-                          className="mt-1 h-4 w-4 accent-rose-500 shrink-0"
-                          aria-label={`Select ${item.name}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCreatingNew(false);
-                            setSeedFromVenue(false);
-                            setActiveTemplateId(item.id);
-                            setOptionName(item.name);
-                            setStudioNonce((n) => n + 1);
-                          }}
-                          className="flex-1 text-left min-w-0"
-                        >
-                          <LayoutSeatPreview
-                            seats={item.seats_json}
-                            config={item.seating_config}
-                            heightClass="h-24"
-                          />
-                          <p className="text-sm font-medium text-white mt-2 truncate">{item.name}</p>
-                          <p className="text-[0.6875rem] text-zinc-400 mt-0.5">
-                            {optionStatusLabel(item)}
-                            {item.capacity ? ` · ${item.capacity} seats` : ""}
-                          </p>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+      {canAct && (
+        <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Admin actions</h2>
+
+          {request.status === "SUBMITTED" && (
+            <button type="button" disabled={busy} onClick={startReview} className="btn-secondary text-sm py-2 px-4">
+              Start review
+            </button>
+          )}
+
+          <div className="space-y-3 border-t border-white/10 pt-4">
+            <p className="text-sm font-medium text-white">Or fulfill with an existing published venue layout</p>
+            {layouts.length > 0 ? (
+              <div>
+                <label className="portal-label block text-sm mb-1.5">Attach published venue layout</label>
+                <select
+                  className="input-field w-full"
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                >
+                  <option value="">No template (mark for organizer only)</option>
+                  {layouts.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                      {l.is_default ? " (default)" : ""}
+                      {l.capacity ? ` · ${l.capacity}` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
-
-            {selectedTemplateIds.length > 1 && (
-              <p className="text-xs text-amber-300 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-                Multiple options — organizer chooses one on Preview before contract.
-              </p>
-            )}
-            {selectedTemplateIds.length === 1 && (
-              <p className="text-xs text-zinc-400 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                Organizer approves this layout on Preview, then Super Admin can create the contract.
+            ) : (
+              <p className="text-sm text-zinc-400">
+                No published venue layouts yet — use the studio above to build one.
               </p>
             )}
 
-            <div>
-              <label className="portal-label block text-sm mb-1.5">Admin notes (optional)</label>
-              <textarea
-                className="input-field w-full"
-                rows={2}
-                value={fulfillNotes}
-                onChange={(e) => setFulfillNotes(e.target.value)}
-              />
-            </div>
+            {templateId && (
+              <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" checked={applyToEvent} onChange={(e) => setApplyToEvent(e.target.checked)} />
+                Apply seats to event now
+              </label>
+            )}
 
-            <button
-              type="button"
-              disabled={busy || selectedTemplateIds.length === 0}
-              onClick={() => void sendToOrganizer()}
-              className="w-full btn-primary py-2.5 text-sm disabled:opacity-50"
-            >
-              {fulfilling
-                ? "Sending…"
-                : selectedTemplateIds.length > 1
-                  ? `Send ${selectedTemplateIds.length} options to organizer`
-                  : "Send layout to organizer"}
+            <textarea
+              className="input-field min-h-[70px]"
+              placeholder="Optional notes for organizer"
+              value={fulfillNotes}
+              onChange={(e) => setFulfillNotes(e.target.value)}
+            />
+            <button type="button" disabled={busy} onClick={fulfill} className="btn-primary text-sm py-2 px-4">
+              {fulfilling ? "Sending…" : "Send to organizer"}
             </button>
             {sendable.length > 0 && (
               <button
@@ -645,94 +557,55 @@ export default function AdminEventLayoutDetailPage() {
         </div>
       )}
 
-      {canReject && (
-        <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-3">
-          <p className="text-sm font-medium text-white">Reject request</p>
-          <textarea
-            className="input-field w-full"
-            rows={2}
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Reason shown in audit / organizer context"
-          />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={reject}
-            className="btn-secondary text-sm py-2 px-4 text-rose-400 border-rose-500/30"
-          >
-            Reject request
-          </button>
+          <div className="space-y-2 border-t border-white/10 pt-4">
+            <textarea
+              className="input-field min-h-[70px]"
+              placeholder="Rejection reason"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={reject}
+              className="px-4 py-2 rounded-xl border border-rose-400/40 text-rose-300 hover:bg-rose-500/10 text-sm"
+            >
+              Reject request
+            </button>
+          </div>
         </div>
       )}
 
-      {!canBuild && (
-        <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-2">
-          <p className="text-sm text-zinc-400">
-            This request is closed ({request.status}).
-            {request.fulfilled_template_name
-              ? ` Fulfilled with: ${request.fulfilled_template_name}.`
-              : ""}
-          </p>
-          {request.proposed_templates && request.proposed_templates.length > 0 && (
-            <ul className="text-sm text-zinc-300 space-y-1">
-              {request.proposed_templates.map((t) => (
-                <li key={t.id}>
-                  {t.name}
-                  {t.capacity != null ? ` · ${t.capacity} seats` : ""}
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link href={`/admin/events/${request.event_id}`} className="text-rose-400 hover:underline text-sm">
-            Open event detail
-          </Link>
-        </div>
-      )}
-
-      {isLayoutModalOpen && canBuild && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-2 sm:p-4">
-          <div className="flex items-center justify-between pb-3 px-2 text-white border-b border-white/10 mb-2">
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-rose-400">Event layout studio</p>
-              <h2 className="text-lg font-bold truncate">
-                {optionName || activeTemplate?.name || request.layout_name}
-              </h2>
+      {isStudioOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 p-2 sm:p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div>
+              <p className="text-white font-semibold">Full Screen Layout Studio — Event</p>
+              <p className="text-xs text-zinc-400">
+                Same tools as venue & cinema. Ticket zones show requested seat counts from the organizer.
+              </p>
             </div>
             <button
               type="button"
-              onClick={() => setIsLayoutModalOpen(false)}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold inline-flex items-center gap-2"
+              onClick={() => setIsStudioOpen(false)}
+              className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-sm inline-flex items-center gap-1.5"
             >
-              <X size={16} /> Close studio
+              <X size={16} /> Close Studio
             </button>
           </div>
           <div className="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden">
             <VenueLayoutBuilder
-              key={
-                creatingNew
-                  ? `new-modal-${studioNonce}-${seedFromVenue ? "seeded" : "blank"}`
-                  : `modal-${activeTemplateId || selectedId || "empty"}-${studioNonce}`
-              }
+              key={`event-studio-${id}`}
               venueAdapter={{
                 sections,
                 initialSeats,
-                maxCapacity: targetCapacity > 0 ? targetCapacity : undefined,
-                initialConfig: {
-                  labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
-                  shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
-                  bgImageUrl: sourceConfig.bgImageUrl || null,
-                  sectionColors: sourceConfig.sectionColors,
-                },
+                maxCapacity: targetCapacity || undefined,
+                initialConfig,
                 saving,
                 hideSubmitToVenue: true,
-                onSave: async (payload, options) => {
-                  await handleSaveTemplatePayload(payload, options);
-                  setIsLayoutModalOpen(false);
-                },
+                onSave: handleSaveStudio,
                 onBlankPage: () => {
-                  beginNewOption(false);
-                  toast.info("Blank page ready — build, then Save as new option.");
+                  toast.info("Blank canvas — build seats with Add Grid / Add Seat / templates.");
                 },
               }}
             />

@@ -91,6 +91,18 @@ export default function AdminEventLayoutDetailPage() {
     setOptionName(request.layout_name || "Event layout option");
   }, [request?.id, request?.layout_name]);
 
+  // When organizer pointed at a registered venue layout and no event-only options exist yet,
+  // open a seeded draft so Super Admin starts from that map (without mutating the venue).
+  useEffect(() => {
+    if (!request?.id) return;
+    const builtCount = (request.templates || []).length;
+    if (builtCount > 0) return;
+    if (!request.source_venue_layout) return;
+    setCreatingNew(true);
+    setSeedFromVenue(true);
+    setActiveTemplateId(null);
+  }, [request?.id]);
+
   const templates = localTemplates;
   const publishedLayouts = request?.published_layouts || [];
   const sendable = useMemo(() => templates.filter((t) => canSendTemplate(t)), [templates]);
@@ -164,7 +176,14 @@ export default function AdminEventLayoutDetailPage() {
 
   const openStudio = (opts?: { createNew?: boolean; seed?: boolean }) => {
     if (opts?.createNew || templates.length === 0) {
-      beginNewOption(Boolean(opts?.seed));
+      const shouldSeed =
+        opts?.seed !== undefined
+          ? Boolean(opts.seed)
+          : templates.length === 0 && Boolean(sourceVenueLayout);
+      beginNewOption(shouldSeed);
+    } else if (creatingNew) {
+      // Keep current new/seeded draft when reopening the studio
+      if (opts?.seed && sourceVenueLayout) setSeedFromVenue(true);
     } else {
       setCreatingNew(false);
       setSeedFromVenue(false);
@@ -217,6 +236,7 @@ export default function AdminEventLayoutDetailPage() {
       return [merged, ...without];
     });
     setCreatingNew(false);
+    setSeedFromVenue(false);
     setActiveTemplateId(merged.id);
     setOptionName(merged.name);
     setSelectedTemplateIds((prev) => (prev.includes(merged.id) ? prev : [...prev, merged.id]));
@@ -319,7 +339,12 @@ export default function AdminEventLayoutDetailPage() {
             <button
               type="button"
               disabled={busy}
-              onClick={() => openStudio({ createNew: true, seed: Boolean(sourceVenueLayout) })}
+              onClick={() =>
+                openStudio({
+                  createNew: true,
+                  seed: templates.length === 0 && Boolean(sourceVenueLayout),
+                })
+              }
               className="btn-primary text-sm py-2 px-4"
             >
               {templates.length > 0 ? "Add another layout" : "Create layout"}
@@ -381,7 +406,8 @@ export default function AdminEventLayoutDetailPage() {
                     : ""}
               </p>
               <p className="text-xs text-emerald-200/80 mt-1">
-                Start from this venue map, then customize for the event.
+                Start from this venue map, then customize for this event. Saving creates an
+                event-only copy — the registered venue layout stays unchanged.
               </p>
             </div>
             {canBuild && (
@@ -428,7 +454,16 @@ export default function AdminEventLayoutDetailPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => openStudio({ seed: creatingNew && Boolean(sourceVenueLayout) })}
+                  onClick={() =>
+                    openStudio(
+                      creatingNew || templates.length === 0
+                        ? {
+                            createNew: true,
+                            seed: Boolean(seedFromVenue || sourceVenueLayout),
+                          }
+                        : undefined
+                    )
+                  }
                   className="btn-primary py-2.5 px-4 text-sm inline-flex items-center gap-2"
                 >
                   <Maximize2 size={16} /> Open layout studio
@@ -446,7 +481,16 @@ export default function AdminEventLayoutDetailPage() {
               </div>
 
               <div
-                onClick={() => openStudio({ seed: creatingNew && Boolean(sourceVenueLayout) })}
+                onClick={() =>
+                  openStudio(
+                    creatingNew || templates.length === 0
+                      ? {
+                          createNew: true,
+                          seed: Boolean(seedFromVenue || sourceVenueLayout),
+                        }
+                      : undefined
+                  )
+                }
                 className="group relative cursor-pointer rounded-2xl border border-white/10 bg-black/40 p-4 hover:border-rose-400/50 transition-all"
               >
                 <LayoutSeatPreview seats={sourceSeats} config={sourceConfig} heightClass="h-64 sm:h-80" />
@@ -542,7 +586,7 @@ export default function AdminEventLayoutDetailPage() {
             <button
               type="button"
               disabled={busy}
-              onClick={() => openStudio({ createNew: true })}
+              onClick={() => openStudio({ createNew: true, seed: false })}
               className="w-full btn-secondary py-2 text-sm"
             >
               + Add another layout option
@@ -707,7 +751,7 @@ export default function AdminEventLayoutDetailPage() {
               <X size={16} /> Close studio
             </button>
           </div>
-          <div className="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden">
+          <div className="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden flex flex-col">
             <VenueLayoutBuilder
               key={
                 creatingNew

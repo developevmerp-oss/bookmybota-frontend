@@ -10,6 +10,7 @@ import {
   EyeOff,
   FileSignature,
   FileText,
+  LayoutGrid,
   MapPin,
   Pencil,
   Radio,
@@ -209,6 +210,11 @@ export default function AdminEventDetailPage({
   const showEditContract = contract?.status === "ACTIVE";
   const showViewContract = Boolean(contract && contract.status !== "REJECTED");
 
+  const layoutRequests = event.layout_requests || [];
+  const customShowtimes = (event.showtimes || []).filter((s) => s.layout_mode === "custom");
+  const hasCustomLayoutRequest = layoutRequests.length > 0 || customShowtimes.length > 0;
+  const primaryLayoutRequest = layoutRequests[0] || null;
+
   return (
     <div className="w-full space-y-6">
       <Link
@@ -274,6 +280,11 @@ export default function AdminEventDetailPage({
                 Tour event
               </span>
             )}
+            {hasCustomLayoutRequest && (
+              <span className="px-2 py-1 rounded-md text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                Custom seating layout
+              </span>
+            )}
           </div>
           <h2 className="portal-heading text-2xl font-bold">{event.name}</h2>
           <p className="portal-muted mt-1">
@@ -314,6 +325,14 @@ export default function AdminEventDetailPage({
               className="px-4 py-2 rounded-xl border border-white/10 text-sm font-medium inline-flex items-center gap-2 hover:bg-white/5"
             >
               <FileSignature size={16} /> View contract
+            </Link>
+          )}
+          {primaryLayoutRequest && (
+            <Link
+              href={`/admin/event-layouts/${primaryLayoutRequest.id}`}
+              className="px-4 py-2 rounded-xl border border-violet-500/30 text-violet-700 hover:bg-violet-50 text-sm font-medium inline-flex items-center gap-2"
+            >
+              <LayoutGrid size={16} /> Open layout studio
             </Link>
           )}
           {event.status === "PENDING_APPROVAL" && (
@@ -375,6 +394,111 @@ export default function AdminEventDetailPage({
           />
           {errors.rejection_reason && (
             <p className={fieldErrorClass}>{errors.rejection_reason.message}</p>
+          )}
+        </div>
+      )}
+
+      {hasCustomLayoutRequest && (
+        <div className="rounded-2xl border border-violet-200 bg-violet-50/80 p-5 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-violet-600 mb-1">
+                Custom event seating layout
+              </p>
+              <h3 className="text-lg font-semibold text-violet-950">
+                Organizer requested a custom seating map for this event
+              </h3>
+              <p className="text-sm text-violet-800/90 mt-1">
+                Build or edit the event-only layout in Event Layouts. The registered venue map is not
+                changed.
+              </p>
+            </div>
+            {primaryLayoutRequest ? (
+              <Link
+                href={`/admin/event-layouts/${primaryLayoutRequest.id}`}
+                className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-sm font-semibold px-4 py-2.5"
+              >
+                <LayoutGrid size={16} />
+                {["SUBMITTED", "UNDER_REVIEW", "ORGANIZER_CHANGE_REQUESTED"].includes(
+                  String(primaryLayoutRequest.status)
+                )
+                  ? "Build / review layout"
+                  : "View layout request"}
+              </Link>
+            ) : (
+              <Link
+                href="/admin/event-layouts"
+                className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-sm font-semibold px-4 py-2.5"
+              >
+                <LayoutGrid size={16} /> Open Event Layouts
+              </Link>
+            )}
+          </div>
+
+          {layoutRequests.length > 0 ? (
+            <ul className="space-y-3">
+              {layoutRequests.map((lr) => (
+                <li
+                  key={lr.id}
+                  className="rounded-xl border border-violet-200/80 bg-white/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">{lr.layout_name}</p>
+                    <p className="text-sm text-slate-600 mt-0.5">
+                      {[
+                        lr.venue_name,
+                        lr.layout_type,
+                        lr.capacity != null && Number(lr.capacity) > 0
+                          ? `${lr.capacity} seats`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "Custom seating request"}
+                    </p>
+                    {lr.notes ? (
+                      <p className="text-sm text-slate-700 mt-1.5 whitespace-pre-wrap">{lr.notes}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <span className="px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-violet-100 text-violet-800 border border-violet-200">
+                      {String(lr.status).replaceAll("_", " ")}
+                    </span>
+                    <Link
+                      href={`/admin/event-layouts/${lr.id}`}
+                      className="text-sm font-semibold text-violet-700 hover:text-violet-900"
+                    >
+                      Open →
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="space-y-2">
+              {customShowtimes.map((s) => (
+                <li
+                  key={s.id}
+                  className="rounded-xl border border-violet-200/80 bg-white/80 px-4 py-3 text-sm"
+                >
+                  <p className="font-semibold text-slate-900">
+                    {s.custom_layout_name || "Custom event seating layout"}
+                  </p>
+                  <p className="text-slate-600 mt-0.5">
+                    {[
+                      s.venue_name,
+                      s.custom_layout_capacity != null
+                        ? `${s.custom_layout_capacity} seats`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  {s.custom_layout_notes ? (
+                    <p className="text-slate-700 mt-1.5 whitespace-pre-wrap">{s.custom_layout_notes}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
@@ -837,7 +961,12 @@ export default function AdminEventDetailPage({
 
       {event.layout_requests && event.layout_requests.length > 0 && (
         <div className="glass-panel rounded-2xl border border-white/5 p-6">
-          <h3 className="portal-heading text-lg font-semibold mb-4">Layout requests</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="portal-heading text-lg font-semibold">Layout requests</h3>
+            <Link href="/admin/event-layouts" className="text-sm font-medium text-rose-600 hover:text-rose-700">
+              All event layouts →
+            </Link>
+          </div>
           <ul className="space-y-3">
             {event.layout_requests.map((lr) => (
               <li
@@ -863,6 +992,12 @@ export default function AdminEventDetailPage({
                     Change notes: {lr.organizer_change_notes}
                   </p>
                 )}
+                <Link
+                  href={`/admin/event-layouts/${lr.id}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-rose-600 hover:text-rose-700 pt-1"
+                >
+                  <LayoutGrid size={14} /> Open in Event Layouts
+                </Link>
               </li>
             ))}
           </ul>

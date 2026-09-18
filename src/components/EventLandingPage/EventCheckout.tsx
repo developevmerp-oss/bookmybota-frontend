@@ -2685,6 +2685,8 @@ export default function EventCheckout({
                     initialSelectedSeats={selectedSeats}
                     maxSelectable={desiredSeatQty}
                     cinemaMode
+                    mapTitle="Event seating map"
+                    mapDescription={`Live seating layout for this event. Pick up to ${desiredSeatQty} seats directly on the map.`}
                     customLegend={ticketTypes.map((t) => ({
                       name: t.ticket_type,
                       color: "#6900AA",

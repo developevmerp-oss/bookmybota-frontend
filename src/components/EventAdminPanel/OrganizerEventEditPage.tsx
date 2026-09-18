@@ -36,13 +36,16 @@ export default function EditOrganizerEventPage({
 
   const handleSaveDraft = async (payload: EventFormPayload) => {
     try {
-      await updateEvent({ id, body: payload }).unwrap();
+      const result = await updateEvent({ id, body: payload }).unwrap();
+      const pending = event?.status === "PENDING_APPROVAL";
       toast.success(
-        payload.promotion_request
-          ? "Draft saved with promotion request. You can continue editing anytime from My Events."
-          : "Draft saved. You can continue editing anytime from My Events."
+        pending
+          ? result.message ||
+              "Changes saved. Super Admin can see your updates (including custom layout requests)."
+          : payload.promotion_request
+            ? "Draft saved with promotion request."
+            : "Draft saved."
       );
-      router.push("/organizer/events");
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save event"));
       throw e;

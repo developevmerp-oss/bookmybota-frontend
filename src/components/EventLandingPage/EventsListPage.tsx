@@ -29,6 +29,7 @@ import {
   useGetPublicEventsQuery,
   useGetPublicRegisteredArtistsQuery,
   type PublicEvent,
+  type PublicEventsQuery,
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { useAppDispatch } from "@/lib/hooks";
@@ -37,6 +38,7 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
+import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
 import {
   EVENT_CATEGORY_OPTIONS,
   categorySlugsMatch,
@@ -45,7 +47,6 @@ import {
   type EventCategoryKey,
 } from "@/lib/eventCategories";
 import { SHOWCASE_EVENT_CARDS, showcaseCardsForCategories } from "@/data/showcaseEventCards";
-import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import {
   eventLandscape,
   eventPlaceLine,
@@ -142,6 +143,15 @@ function parseCsvParam(raw: string | null): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function sameStringList(a: string[], b: string[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 function formatPromoDateTime(iso?: string) {
@@ -686,6 +696,13 @@ export default function PublicEventsPage() {
       .map((type) => ({ slug: type.slug as string, name: type.name }));
   }, [apiCategories, businessTypes]);
 
+  const categoryPoolKey = useMemo(
+    () => categoryPool.map((c) => `${c.slug}:${c.name}`).join("|"),
+    [categoryPool]
+  );
+
+  const searchParamsKey = searchParams.toString();
+
   useEffect(() => {
     const t = window.setTimeout(() => setSearch(searchInput.trim()), 350);
     return () => window.clearTimeout(t);
@@ -703,50 +720,62 @@ export default function PublicEventsPage() {
     const dateToParam = searchParams.get("date_to");
     const sortParam = searchParams.get("sort");
 
-    setSearchInput(q);
-    setSearch(q.trim());
     const slugsFromUrl = parseCsvParam(cat);
-    setSelectedSlugs(slugsFromUrl);
-    setSelectedLanguages(parseCsvParam(language));
-    setSelectedPriceBands(parseCsvParam(price));
-    setSelectedMore(parseCsvParam(more));
+    const languagesFromUrl = parseCsvParam(language);
+    const priceFromUrl = parseCsvParam(price);
+    const moreFromUrl = parseCsvParam(more);
+    const nextSearch = q.trim();
+
+    setSearchInput((prev) => (prev === q ? prev : q));
+    setSearch((prev) => (prev === nextSearch ? prev : nextSearch));
+    setSelectedSlugs((prev) => (sameStringList(prev, slugsFromUrl) ? prev : slugsFromUrl));
+    setSelectedLanguages((prev) =>
+      sameStringList(prev, languagesFromUrl) ? prev : languagesFromUrl
+    );
+    setSelectedPriceBands((prev) => (sameStringList(prev, priceFromUrl) ? prev : priceFromUrl));
+    setSelectedMore((prev) => (sameStringList(prev, moreFromUrl) ? prev : moreFromUrl));
 
     if (categoryFromFilterRef.current) {
       categoryFromFilterRef.current = false;
       setDedicatedCategoryPage(false);
-    } else if (slugsFromUrl.length === 1 && resolveCategoryKeyFromSlug(slugsFromUrl[0], categoryPool)) {
+    } else if (
+      slugsFromUrl.length === 1 &&
+      resolveCategoryKeyFromSlug(slugsFromUrl[0], categoryPool)
+    ) {
       setDedicatedCategoryPage(true);
-    } else if (slugsFromUrl.length === 0) {
-      setDedicatedCategoryPage(false);
     } else {
       setDedicatedCategoryPage(false);
     }
 
     if (datePresetParam) {
-      setDatePreset(datePresetParam);
-      setDateFrom("");
-      setDateTo("");
+      setDatePreset((prev) => (prev === datePresetParam ? prev : datePresetParam));
+      setDateFrom((prev) => (prev === "" ? prev : ""));
+      setDateTo((prev) => (prev === "" ? prev : ""));
       setUseDateRange(false);
     } else {
-      setDatePreset("");
-      setDateFrom(dateFromParam || "");
-      setDateTo(dateToParam || "");
-      setUseDateRange(Boolean(dateFromParam || dateToParam));
+      const nextFrom = dateFromParam || "";
+      const nextTo = dateToParam || "";
+      setDatePreset((prev) => (prev === "" ? prev : ""));
+      setDateFrom((prev) => (prev === nextFrom ? prev : nextFrom));
+      setDateTo((prev) => (prev === nextTo ? prev : nextTo));
+      setUseDateRange(Boolean(nextFrom || nextTo));
     }
 
     if (sortParam && SORT_OPTIONS.some((o) => o.id === sortParam)) {
-      setSort(sortParam);
+      setSort((prev) => (prev === sortParam ? prev : sortParam));
     }
 
+    let nextCity = "";
     if (cityParam) {
-      if (cityParam === "All Cities") setCity("");
-      else setCity(cityParam);
+      nextCity = cityParam === "All Cities" ? "" : cityParam;
     } else {
       const stored = localStorage.getItem("selected_city");
-      if (stored && stored !== "All Cities") setCity(stored);
-      else setCity("");
+      nextCity = stored && stored !== "All Cities" ? stored : "";
     }
-  }, [searchParams, categoryPool]);
+    setCity((prev) => (prev === nextCity ? prev : nextCity));
+    // categoryPool is read for slug resolution; key keeps identity stable across renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParamsKey / categoryPoolKey intentionally stabilize deps
+  }, [searchParamsKey, categoryPoolKey]);
 
   useEffect(() => {
     const applyCity = () => {
@@ -1077,41 +1106,54 @@ export default function PublicEventsPage() {
     ? CATEGORY_BROWSE_HEADING[activeCategoryKey]
     : "All Events";
 
+  /** District-style hero: prefer marketing promotions (`is_promoted`), then offers, then posters. */
   const promoEvents = useMemo(() => {
     const filterByCategory = (pool: PublicEvent[]) => {
       if (!activeCategoryKey) return pool;
-      return pool.filter((event) => eventMatchesCategoryKey(event, activeCategoryKey, categoryPool));
-    };
-
-    const preferPromoted = (pool: PublicEvent[]) => {
-      const promoted = pool.filter((e) => Boolean(e.is_promoted));
-      return (promoted.length ? promoted : pool).slice(0, 8);
-    };
-
-    if (isCategoryBrowse) {
-      if (listingWithPosters.length) return preferPromoted(listingWithPosters);
-      const fromOffers = filterByCategory(offerHeroEvents);
-      if (fromOffers.length) return fromOffers.slice(0, 8);
-      const fromFallback = filterByCategory(
-        posterFallbackEvents.length ? posterFallbackEvents : allPublicEvents
+      return pool.filter((event) =>
+        eventMatchesCategoryKey(event, activeCategoryKey, categoryPool)
       );
-      return preferPromoted(fromFallback);
+    };
+
+    const dedupe = (pool: PublicEvent[]) => {
+      const seen = new Set<string>();
+      return pool.filter((e) => {
+        if (seen.has(e.id)) return false;
+        seen.add(e.id);
+        return true;
+      });
+    };
+
+    const scopedBase = dedupe(
+      filterByCategory([
+        ...exploreEventPool,
+        ...listingWithPosters,
+        ...offerHeroEvents,
+        ...posterFallbackEvents,
+      ]).filter(
+        (event) =>
+          event.poster_horizontal_url || event.poster_vertical_url || event.name
+      )
+    );
+
+    if (!scopedBase.length) return [];
+
+    const promotedOnly = scopedBase.filter((e) => Boolean(e.is_promoted));
+    if (promotedOnly.length) return promotedOnly.slice(0, 8);
+
+    const offersInScope = filterByCategory(offerHeroEvents);
+    if (offersInScope.length) {
+      const promotedOffers = offersInScope.filter((e) => Boolean(e.is_promoted));
+      return (promotedOffers.length ? promotedOffers : offersInScope).slice(0, 8);
     }
 
-    if (offerHeroEvents.length) return offerHeroEvents.slice(0, 8);
-    const fromFallback = posterFallbackEvents.length
-      ? posterFallbackEvents
-      : listingWithPosters.length
-        ? listingWithPosters
-        : allPublicEvents;
-    return preferPromoted(fromFallback);
+    return scopedBase.slice(0, 8);
   }, [
     activeCategoryKey,
-    isCategoryBrowse,
+    exploreEventPool,
     offerHeroEvents,
     posterFallbackEvents,
     listingWithPosters,
-    allPublicEvents,
     categoryPool,
   ]);
 
@@ -1748,7 +1790,7 @@ export default function PublicEventsPage() {
         {isLoading || (isFetching && paged.length === 0) ? (
           <EventListShimmer />
         ) : paged.length === 0 ? (
-          hasNonCityFilters ? (
+          hasNonCityFilters || Boolean(search.trim()) ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
               <p className="text-sm font-semibold text-slate-800">No events match your filters</p>
               <p className="mt-1 text-sm text-slate-500">Try another date, genre, language, or price.</p>
@@ -1760,8 +1802,6 @@ export default function PublicEventsPage() {
                 Clear filters
               </button>
             </div>
-          ) : city ? (
-            <CityLocationEmptyState categoryLabel="events" city={city} />
           ) : (
             <div className="mx-auto grid w-full  grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
               {emptyShowcaseCards.map((event) => (
@@ -1833,7 +1873,7 @@ export default function PublicEventsPage() {
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
             <div className="mb-3 px-5 sm:px-8 md:mb-4">
               <h2 className="text-lg font-extrabold text-[#111111] sm:text-xl">
-                Featured events
+                {promoEvents.some((e) => e.is_promoted) ? "Promoted events" : "Featured events"}
               </h2>
             </div>
             <div
@@ -1935,6 +1975,11 @@ export default function PublicEventsPage() {
                           <h1 className="mt-2 text-2xl md:text-3xl xl:text-4xl font-extrabold leading-tight line-clamp-3">
                             {event.name}
                           </h1>
+                          {event.is_promoted ? (
+                            <p className="mt-2 inline-flex items-center rounded-md bg-[#6900AA]/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[#6900AA]">
+                              Promoted
+                            </p>
+                          ) : null}
                           {eventPlaceLine(event, city || undefined) ? (
                             <p className="mt-2 text-base md:text-lg font-medium text-slate-700 line-clamp-2">
                               {eventPlaceLine(event, city || undefined)}

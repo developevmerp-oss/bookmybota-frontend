@@ -21,9 +21,11 @@ import {
 import { MdUnarchive } from "react-icons/md";
 import { toast } from "sonner";
 import {
+  useGetBusinessPublicQuery,
   useGetBusinessSettingsQuery,
   useUpdateBusinessSettingsMutation,
 } from "@/services/api";
+import { MapPin } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import {
@@ -138,7 +140,9 @@ export default function DiningOffersPage() {
   }, [dispatch]);
 
   const { data: settings, isLoading } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
+  const { data: business } = useGetBusinessPublicQuery(bizId, { skip: !bizId });
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
+  const showsInLabel = (business?.city_name || "").trim();
 
   useEffect(() => {
     if (settings?.dining_offers) {
@@ -582,6 +586,23 @@ export default function DiningOffersPage() {
               <p className="text-sm text-slate-500 mb-6">
                 Guests can pick this offer when booking. Staff redeem it via Scan QR or walk-in promo.
               </p>
+
+              <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 flex items-start gap-2.5">
+                <MapPin size={16} className="text-[#e11d48] shrink-0 mt-0.5" />
+                <div className="min-w-0 text-sm leading-snug">
+                  <p className="font-semibold text-slate-800">
+                    Shows in:{" "}
+                    <span className="font-bold text-[#e11d48]">
+                      {showsInLabel || "Not set"}
+                    </span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {showsInLabel
+                      ? "This offer appears for customers browsing this restaurant’s city. Location comes from your profile."
+                      : "Set your restaurant city on your profile so location matching works for customers."}
+                  </p>
+                </div>
+              </div>
 
               <form onSubmit={onSubmit} className="space-y-4" noValidate>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

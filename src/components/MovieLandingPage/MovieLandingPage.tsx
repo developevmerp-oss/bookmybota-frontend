@@ -28,6 +28,7 @@ import {
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useAppDispatch } from "@/lib/hooks";
+import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
 import {
   formatMovieCardMeta,
   formatMovieCardTitle,
@@ -39,7 +40,6 @@ import {
   SHOWCASE_UPCOMING_MOVIE_CARDS,
   type ShowcaseMovieCard,
 } from "@/data/showcaseMovieCards";
-import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
 import { getEmbedVideoUrl } from "@/components/MovieLandingPage/MovieTrailerModal";
 import "./MovieLandingPage.css";
@@ -154,6 +154,7 @@ type MovieHeroSlide = {
   ctaLabel: string;
   comingSoon: boolean;
   statusLabel: string;
+  promoted?: boolean;
 };
 
 /** "U | Biography, Devotional +1 more" — same style as movie detail / 2nd reference. */
@@ -207,14 +208,18 @@ function mapShowcaseMovieToCard(movie: ShowcaseMovieCard): MovieCardData {
 
 function buildHeroSlides(movies: Movie[]): MovieHeroSlide[] {
   const withArt = movies.filter((m) => m.poster_url || m.banner_url);
-  const promotedNow = withArt.filter(
-    (m) => m.status === "now_showing" && isMoviePromoted(m.is_promoted)
-  );
+  const promoted = withArt.filter((m) => isMoviePromoted(m.is_promoted));
+  const promotedNow = promoted.filter((m) => m.status === "now_showing");
   const nowShowing = withArt.filter((m) => m.status === "now_showing");
-  const pool = (promotedNow.length ? promotedNow : nowShowing.length ? nowShowing : withArt).slice(
-    0,
-    8
-  );
+  const pool = (
+    promotedNow.length
+      ? promotedNow
+      : promoted.length
+        ? promoted
+        : nowShowing.length
+          ? nowShowing
+          : withArt
+  ).slice(0, 8);
 
   return pool.map((movie) => {
     const poster =
@@ -234,6 +239,7 @@ function buildHeroSlides(movies: Movie[]): MovieHeroSlide[] {
       ctaLabel: movie.status === "coming_soon" ? "Coming Soon" : "Book tickets",
       comingSoon: movie.status === "coming_soon",
       statusLabel: movie.status === "coming_soon" ? "Coming soon" : "Now showing",
+      promoted: isMoviePromoted(movie.is_promoted),
     };
   });
 }
@@ -677,13 +683,43 @@ export default function MovieLandingPage() {
     [city, selectedLanguages, selectedGenres, selectedFormats]
   );
 
+  const unscopedMoviesQueryArg = useMemo(
+    () => ({
+      page: 1,
+      limit: 100,
+      ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
+      ...(selectedGenres.length ? { genre: selectedGenres.join(",") } : {}),
+      ...(selectedFormats.length ? { format: selectedFormats.join(",") } : {}),
+    }),
+    [selectedLanguages, selectedGenres, selectedFormats]
+  );
+
   const filtersQueryArg = useMemo(() => (city ? { city } : undefined), [city]);
 
-  const { data: moviesData, isLoading, isFetching } = useGetPublicMoviesQuery(moviesQueryArg);
+  const {
+    data: cityMoviesData,
+    isLoading: cityMoviesLoading,
+    isFetching: cityMoviesFetching,
+  } = useGetPublicMoviesQuery(moviesQueryArg);
+  const {
+    data: allMoviesData,
+    isLoading: allMoviesLoading,
+    isFetching: allMoviesFetching,
+  } = useGetPublicMoviesQuery(unscopedMoviesQueryArg, { skip: !city });
+
+  const cityMovieItems = cityMoviesData?.items ?? EMPTY_MOVIES;
+  const allMovieItems = allMoviesData?.items ?? EMPTY_MOVIES;
+  const usingMoviesFallback = Boolean(city) && cityMovieItems.length === 0;
+  const moviesData = usingMoviesFallback ? allMoviesData : cityMoviesData;
+  const catalogMovies = preferCityOrAll(cityMovieItems, allMovieItems, Boolean(city));
+  const isLoading =
+    cityMoviesLoading || (Boolean(city) && cityMovieItems.length === 0 && allMoviesLoading);
+  const isFetching =
+    cityMoviesFetching || (usingMoviesFallback && allMoviesFetching);
   const { data: filterOptions } = useGetPublicMovieFiltersQuery(filtersQueryArg);
-  const catalogMovies = moviesData?.items ?? EMPTY_MOVIES;
   const hasCinemasInCity = moviesData?.meta?.has_cinemas_in_city;
-  const noCinemasInCity = Boolean(city && hasCinemasInCity === false);
+  const noCinemasInCity =
+    Boolean(city && hasCinemasInCity === false) && catalogMovies.length === 0;
 
   const heroSlideKey = useMemo(
     () => buildHeroSlides(catalogMovies).map((slide) => slide.id).join("|"),
@@ -902,13 +938,6 @@ export default function MovieLandingPage() {
     nowShowingSource.length === 0 &&
     comingSoonSource.length === 0;
 
-  const showCityEmptyMovies =
-    !isLoading &&
-    !hasActiveFilters &&
-    Boolean(city) &&
-    nowShowingSource.length === 0 &&
-    comingSoonSource.length === 0;
-
   const movies = useStaticMovies
     ? SHOWCASE_NOW_SHOWING_MOVIE_CARDS.map(mapShowcaseMovieToCard)
     : nowShowingSource;
@@ -1075,7 +1104,9 @@ export default function MovieLandingPage() {
           {/* Mobile + tablet — featured cards (centered active + side peeks) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
             <div className="mb-3 px-5 sm:px-8 md:mb-4">
-              <h2 className="text-lg font-extrabold text-[#111111] sm:text-xl">In the Spotlight</h2>
+              <h2 className="text-lg font-extrabold text-[#111111] sm:text-xl">
+                {heroSlides.some((s) => s.promoted) ? "Promoted movies" : "In the Spotlight"}
+              </h2>
             </div>
             <div
               ref={mobilePromoTrackRef}
@@ -1175,6 +1206,11 @@ export default function MovieLandingPage() {
                         <h1 className="line-clamp-3 text-xl font-extrabold leading-tight sm:text-2xl md:text-3xl lg:text-4xl">
                           {slide.title}
                         </h1>
+                        {slide.promoted ? (
+                          <p className="mt-2 inline-flex items-center rounded-md bg-[#6900AA]/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[#6900AA]">
+                            Promoted
+                          </p>
+                        ) : null}
                         {slide.metaLine ? (
                           <p className="mt-2 text-sm font-medium text-slate-600 sm:text-base md:text-lg">
                             {slide.metaLine}
@@ -1387,7 +1423,7 @@ export default function MovieLandingPage() {
                   <Loader2 className="size-8 animate-spin text-[#6900AA]" />
                   <p className="text-sm font-medium sm:text-base">Loading movies...</p>
                 </div>
-              ) : noCinemasInCity && !useStaticMovies && !showCityEmptyMovies ? (
+              ) : noCinemasInCity && !useStaticMovies ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
                   <p className="text-sm font-semibold text-slate-800">No cinemas in {headingCity} yet</p>
                   <p className="mt-1 text-sm text-slate-500">
@@ -1400,8 +1436,6 @@ export default function MovieLandingPage() {
                     Browse by Cinemas
                   </Link>
                 </div>
-              ) : showCityEmptyMovies ? (
-                <CityLocationEmptyState categoryLabel="movies" city={city} />
               ) : movies.length === 0 ? (
                 <div
                   className={`rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center ${

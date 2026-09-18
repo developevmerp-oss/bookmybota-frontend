@@ -18,37 +18,127 @@ function Wrap({ children }: { children: ReactNode }) {
 export function EventDetailShimmer() {
   return (
     <Wrap>
-      <div className="max-w-[80rem] mx-auto px-3 sm:px-6 py-5 sm:py-7">
-        <Skeleton width="60%" height={32} className="mb-5" />
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-5 sm:gap-8">
-          <div>
-            <Skeleton height={280} className="!rounded-[0.75rem] w-full" />
-            <div className="mt-4 flex gap-2 items-center">
-              <Skeleton width={96} height={32} borderRadius={999} />
-              <Skeleton width={140} height={32} borderRadius={999} />
-              <div className="ml-auto">
-                <Skeleton width={120} height={40} borderRadius={8} />
+      <div className="min-h-screen bg-white" aria-busy="true" aria-label="Loading event">
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+          {/* Breadcrumb */}
+          <div className="mb-3 sm:mb-4 flex items-center gap-2">
+            <Skeleton width={40} height={12} />
+            <Skeleton width={8} height={10} />
+            <Skeleton width={48} height={12} />
+            <Skeleton width={8} height={10} />
+            <Skeleton width={64} height={12} />
+            <Skeleton width={8} height={10} />
+            <Skeleton width={120} height={12} />
+          </div>
+
+          {/* Title + share */}
+          <div className="flex items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-5">
+            <Skeleton width="55%" height={36} className="!max-w-[28rem] sm:!h-10 lg:!h-11" />
+            <Skeleton circle width={40} height={40} className="shrink-0" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-5 sm:gap-6 lg:gap-8 2xl:gap-10">
+            <div className="min-w-0">
+              {/* Hero media — matches EventMediaSlider aspect ratios */}
+              <div className="w-full overflow-hidden rounded-lg sm:rounded-xl aspect-[4/3] sm:aspect-[16/9] lg:aspect-[2/1] 2xl:aspect-[21/9]">
+                <Skeleton className="!block !h-full !w-full !rounded-lg sm:!rounded-xl" height="100%" />
+              </div>
+
+              {/* Category badges + interested CTA */}
+              <div className="mt-3 sm:mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <Skeleton width={88} height={32} borderRadius={999} />
+                  <Skeleton width={96} height={32} borderRadius={999} />
+                  <Skeleton width={72} height={32} borderRadius={999} />
+                </div>
+                <div className="sm:ml-auto">
+                  <Skeleton width={132} height={40} borderRadius={8} />
+                </div>
+              </div>
+
+              {/* Mobile booking card */}
+              <div className="lg:hidden mt-4 sm:mt-5 rounded-xl border border-[#E8E8E8] bg-white overflow-hidden">
+                <div className="px-3.5 sm:px-5 pt-3.5 sm:pt-4 pb-2 space-y-3">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <Skeleton width={18} height={18} className="mt-0.5 shrink-0" />
+                      <Skeleton width={i === 4 ? "75%" : "55%"} height={16} />
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3">
+                  <Skeleton width={120} height={22} className="flex-1" />
+                  <Skeleton width={110} height={44} borderRadius={8} />
+                </div>
+              </div>
+
+              {/* About */}
+              <div className="mt-6 sm:mt-8 lg:mt-9 space-y-2.5">
+                <Skeleton width={160} height={26} />
+                <Skeleton count={3} />
+                <Skeleton width="70%" />
+              </div>
+
+              {/* Artists */}
+              <div className="mt-6 sm:mt-8 lg:mt-9">
+                <Skeleton width={90} height={26} className="mb-3" />
+                <div className="flex gap-3 sm:gap-4 overflow-hidden">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="w-[128px] sm:w-[148px] lg:w-[156px] shrink-0">
+                      <div className="h-[160px] sm:h-[188px] lg:h-[196px] rounded-xl overflow-hidden">
+                        <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+                      </div>
+                      <Skeleton width="80%" height={14} className="mt-2" />
+                      <Skeleton width="50%" height={12} className="mt-1" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* You May Also Like */}
+              <div className="mt-6 sm:mt-8 lg:mt-9">
+                <Skeleton width={180} height={26} className="mb-1" />
+                <Skeleton width={200} height={14} className="mb-3" />
+                <div className="flex gap-3 sm:gap-4 overflow-hidden">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className="w-[148px] sm:w-[176px] lg:w-[196px] shrink-0">
+                      <div className="h-[208px] sm:h-[248px] lg:h-[264px] rounded-xl overflow-hidden">
+                        <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+                      </div>
+                      <Skeleton width="90%" height={16} className="mt-2" />
+                      <Skeleton width="55%" height={12} className="mt-1" />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="mt-8 space-y-2">
-              <Skeleton width={160} height={24} />
-              <Skeleton count={3} />
-            </div>
-            <div className="mt-8">
-              <Skeleton width={100} height={24} className="mb-3" />
-              <div className="flex gap-3">
-                {[0, 1, 2, 3].map((i) => (
-                  <Skeleton key={i} width={88} height={120} borderRadius={12} />
-                ))}
+
+            {/* Desktop sticky booking card */}
+            <aside className="hidden lg:block lg:self-start">
+              <div className="rounded-xl border border-[#E8E8E8] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
+                <div className="px-5 pt-4 pb-2 space-y-3">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex items-start gap-3 py-1">
+                      <Skeleton width={18} height={18} className="mt-0.5 shrink-0" />
+                      <Skeleton width={i % 2 === 0 ? "70%" : "55%"} height={18} />
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-[#EEE] px-5 py-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <Skeleton width={140} height={22} />
+                  </div>
+                  <Skeleton width={120} height={48} borderRadius={8} />
+                </div>
               </div>
-            </div>
+            </aside>
           </div>
-          <div className="hidden lg:block">
-            <div className="rounded-[0.75rem] border border-slate-100 bg-white p-4">
-              <Skeleton count={6} className="mb-2" />
-              <Skeleton height={48} className="mt-4" borderRadius={8} />
-            </div>
-          </div>
+        </div>
+
+        {/* Mobile sticky book bar */}
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3">
+          <Skeleton width={120} height={22} className="flex-1" />
+          <Skeleton width={120} height={44} borderRadius={8} />
         </div>
       </div>
     </Wrap>

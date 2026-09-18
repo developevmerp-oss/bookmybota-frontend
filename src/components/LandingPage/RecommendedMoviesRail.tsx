@@ -14,7 +14,6 @@ import {
   parseLanguageList,
 } from "@/lib/movieDisplay";
 import AdaptiveCardRow from "./AdaptiveCardRow";
-import CityLocationEmptyState from "./CityLocationEmptyState";
 import { hasCityFilter } from "./homeUtils";
 import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import "./RecommendedMoviesRail.css";
@@ -132,9 +131,18 @@ export default function RecommendedMoviesRail() {
     [city]
   );
 
-  const { data, isLoading } = useGetPublicMoviesQuery(moviesQueryArg);
-  const apiMovies = (data?.items ?? []).map(mapApiMovie);
+  const { data: cityData, isLoading: cityLoading } = useGetPublicMoviesQuery(moviesQueryArg);
+  const { data: allData, isLoading: allLoading } = useGetPublicMoviesQuery(
+    { limit: 12 },
+    { skip: !hasCityFilter(city) }
+  );
+
   const hasCity = hasCityFilter(city);
+  const cityMovies = (cityData?.items ?? []).map(mapApiMovie);
+  const allMovies = (allData?.items ?? []).map(mapApiMovie);
+  const apiMovies = !hasCity || cityMovies.length > 0 ? cityMovies : allMovies;
+  const isLoading =
+    cityLoading || (hasCity && cityMovies.length === 0 && allLoading);
   const isEmpty = !isLoading && apiMovies.length === 0;
   const useStatic = isEmpty && !hasCity;
   const items = useStatic ? SHOWCASE_MOVIE_CARDS.map(mapShowcaseMovie) : apiMovies;
@@ -152,9 +160,11 @@ export default function RecommendedMoviesRail() {
     el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
   };
 
-  const seeAllHref = city
-    ? `${MOVIES_HOME_HREF}?city=${encodeURIComponent(city)}`
-    : MOVIES_HOME_HREF;
+  // Prefer city movies link when city has results; otherwise browse all movies
+  const seeAllHref =
+    city && cityMovies.length > 0
+      ? `${MOVIES_HOME_HREF}?city=${encodeURIComponent(city)}`
+      : MOVIES_HOME_HREF;
 
   return (
     <section className="bg-white py-6 sm:py-8 lg:py-10">
@@ -191,8 +201,6 @@ export default function RecommendedMoviesRail() {
                 </div>
               ))}
             </AdaptiveCardRow>
-          ) : isEmpty && hasCity ? (
-            <CityLocationEmptyState categoryLabel="movies" city={city} />
           ) : items.length === 0 ? (
             <p className="text-sm text-[#6B7280] py-6">No movies available yet.</p>
           ) : (

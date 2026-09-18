@@ -249,6 +249,14 @@ export const adminPlatformOfferSchema = yup.object({
   event_ids: yup.array().of(yup.string().required()).default([]),
   restaurant_ids: yup.array().of(yup.string().required()).default([]),
   movie_ids: yup.array().of(yup.string().required()).default([]),
+  country_id: yup
+    .mixed<number | ''>()
+    .transform((v) => (v === '' || v == null ? '' : Number(v)))
+    .default(''),
+  city_id: yup
+    .mixed<number | ''>()
+    .transform((v) => (v === '' || v == null ? '' : Number(v)))
+    .default(''),
 });
 export type AdminPlatformOfferValues = yup.InferType<typeof adminPlatformOfferSchema>;
 

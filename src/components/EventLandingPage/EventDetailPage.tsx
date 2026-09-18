@@ -51,7 +51,6 @@ import EventGallerySection from "@/components/EventLandingPage/EventGallerySecti
 import EventVenuesModal from "@/components/EventLandingPage/EventVenuesModal";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import Footer from "@/components/LandingPage/Footer";
-import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 
 const BRAND = "#6900AA";
 type StaticArtist = {
@@ -622,7 +621,33 @@ export default function PublicEventDetailPage({
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[1180px] 2xl:max-w-[1320px] mx-auto px-3 sm:px-6 lg:px-8 2xl:px-10 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-3 sm:mb-4 text-[0.8125rem] sm:text-[0.875rem] text-[#8A8A8A] break-words leading-relaxed"
+        >
+          <Link href="/" className="hover:underline">
+            Home
+          </Link>
+          <span> &gt; </span>
+          <Link href="/events" className="hover:underline">
+            Events
+          </Link>
+          {event.category_name && (
+            <>
+              <span> &gt; </span>
+              <Link
+                href={`/events?category=${encodeURIComponent(event.category_name)}`}
+                className="hover:underline"
+              >
+                {event.category_name}
+              </Link>
+            </>
+          )}
+          <span> &gt; </span>
+          <span className="text-[#555]">{event.name}</span>
+        </nav>
+
         <div className="flex items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-5">
           <h1 className="min-w-0 text-[1.75rem] sm:text-[2rem] lg:text-[2.25rem] 2xl:text-[2.5rem] font-extrabold text-[#1A1A1A] leading-tight tracking-tight break-words">
             {event.name}
@@ -640,7 +665,7 @@ export default function PublicEventDetailPage({
           >
             <Share2 size={18} />
           </button>
-              </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-5 sm:gap-6 lg:gap-8 2xl:gap-10">
           <div className="min-w-0">
@@ -649,8 +674,6 @@ export default function PublicEventDetailPage({
               posterHorizontal={resolveMediaUrl(event.poster_horizontal_url)}
               youtubeUrl={event.youtube_url}
             />
-
-            <CategoryPromoBanners category="EVENTS" targetId={id} className="mt-4" />
 
             <div className="mt-3 sm:mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
@@ -773,7 +796,7 @@ export default function PublicEventDetailPage({
               <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
                 Artists
               </h2>
-              <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {displayArtists.map((artist, i) => (
                   <button
                     key={`${artist.name}-${i}`}
@@ -864,7 +887,7 @@ export default function PublicEventDetailPage({
                 <div className="relative">
                   <div
                     ref={relatedRef}
-                    className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="flex gap-3 sm:gap-4 overflow-x-auto scroll-smooth pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {related.map((e) => (
                       <RelatedCard key={e.id} event={e} />
@@ -884,28 +907,6 @@ export default function PublicEventDetailPage({
               </section>
             )}
 
-            <nav className="mt-8 sm:mt-10 text-[0.875rem] sm:text-[1rem] text-[#8A8A8A] break-words leading-relaxed">
-              <Link href="/" className="hover:underline">
-                Home
-              </Link>
-              <span> &gt; </span>
-              <Link href="/events" className="hover:underline">
-                Events
-              </Link>
-              {event.category_name && (
-                <>
-                  <span> &gt; </span>
-                  <Link
-                    href={`/events?category=${encodeURIComponent(event.category_name)}`}
-                    className="hover:underline"
-                  >
-                    {event.category_name}
-                  </Link>
-                </>
-              )}
-              <span> &gt; </span>
-              <span className="text-[#555]">{event.name}</span>
-            </nav>
           </div>
 
           <aside className="hidden lg:block lg:sticky lg:top-[140px] 2xl:top-[148px] lg:self-start lg:z-30">

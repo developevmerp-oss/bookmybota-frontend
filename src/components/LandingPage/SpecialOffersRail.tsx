@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, Flame, Loader2, Sparkles, Users } from "lucide-react";
 import { useGetActivePlatformOffersQuery, type PlatformOffer } from "@/services/api";
 import { formatDate } from "@/lib/dateFormat";
 import { formatMoney, formatWholeNumber } from "@/lib/currencyFormat";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { readSessionForRole } from "@/lib/authStorage";
 import { RailOverlayNavButton } from "./RailChrome";
 import "./SpecialOffersRail.css";
 
@@ -177,15 +178,46 @@ function OfferCard({ offer }: { offer: DisplayOffer }) {
   );
 }
 
-export default function SpecialOffersRail() {
+export default function SpecialOffersRail({ city = "" }: { city?: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { data: platformOffers = [], isLoading } = useGetActivePlatformOffersQuery();
+  const [customerId, setCustomerId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return readSessionForRole("customer")?.user?.customer_id || null;
+  });
 
-  const offers = platformOffers
-    .filter((o) => o.effective_status === "ACTIVE" || o.effective_status === "SCHEDULED")
-    .map(mapPlatformOffer);
+  useEffect(() => {
+    const syncCustomer = () => {
+      const session = readSessionForRole("customer");
+      setCustomerId(session?.user?.customer_id || null);
+    };
+    syncCustomer();
+    window.addEventListener("storage", syncCustomer);
+    window.addEventListener("auth_changed", syncCustomer);
+    return () => {
+      window.removeEventListener("storage", syncCustomer);
+      window.removeEventListener("auth_changed", syncCustomer);
+    };
+  }, []);
 
-  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [offers.length, isLoading]);
+  const { data: platformOffers = [], isLoading, isFetching } =
+    useGetActivePlatformOffersQuery({
+      customer_id: customerId,
+      ...(city && city !== "All Cities" ? { city } : {}),
+    });
+
+  const offers = useMemo(
+    () =>
+      platformOffers
+        .filter((o) => o.effective_status === "ACTIVE" || o.effective_status === "SCHEDULED")
+        .map(mapPlatformOffer),
+    [platformOffers]
+  );
+
+  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [
+    offers.length,
+    isLoading,
+    isFetching,
+  ]);
 
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
@@ -193,7 +225,8 @@ export default function SpecialOffersRail() {
     el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: "smooth" });
   };
 
-  if (!isLoading && offers.length === 0) {
+  // Hide the whole Special Offers section when nothing is available for this user
+  if (!isLoading && !isFetching && offers.length === 0) {
     return null;
   }
 
@@ -207,7 +240,7 @@ export default function SpecialOffersRail() {
         </div>
 
         <div className="relative overflow-visible">
-          {isLoading ? (
+          {isLoading || (isFetching && offers.length === 0) ? (
             <div className="flex items-center justify-center py-12 type-body text-[#666] gap-2">
               <Loader2 className="animate-spin" size={20} />
               Loading offers…

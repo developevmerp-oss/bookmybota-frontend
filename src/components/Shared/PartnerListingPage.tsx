@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Building2, Mic2, Search, X } from "lucide-react";
 import {
   useGetPublicRegisteredArtistsQuery,
   useGetPublicRegisteredVenuesQuery,
 } from "@/services/api";
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
+import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
 
 const BRAND = "#6900AA";
 
@@ -14,25 +15,59 @@ type PartnerListingKind = "artist" | "venue";
 
 export default function PartnerListingPage({ kind }: { kind: PartnerListingKind }) {
   const [q, setQ] = useState("");
-  /** Start with all partners; city is an optional filter (not auto-locked to header city). */
+  /** Header city when set; empty means show all partners. */
   const [city, setCity] = useState("");
 
-  const queryArgs = useMemo(() => {
-    const trimmed = q.trim();
-    return {
-      ...(trimmed ? { q: trimmed } : {}),
-      ...(city.trim() ? { city: city.trim() } : {}),
+  useEffect(() => {
+    const applyCity = () => {
+      const stored = localStorage.getItem("selected_city") || "";
+      setCity(stored && stored !== "All Cities" ? stored : "");
     };
-  }, [q, city]);
+    applyCity();
+    window.addEventListener("selected_city_changed", applyCity);
+    window.addEventListener("storage", applyCity);
+    return () => {
+      window.removeEventListener("selected_city_changed", applyCity);
+      window.removeEventListener("storage", applyCity);
+    };
+  }, []);
 
-  const artistsQuery = useGetPublicRegisteredArtistsQuery(queryArgs, {
+  const searchArg = useMemo(() => {
+    const trimmed = q.trim();
+    return trimmed ? { q: trimmed } : {};
+  }, [q]);
+
+  const cityQueryArgs = useMemo(
+    () => ({
+      ...searchArg,
+      ...(city.trim() ? { city: city.trim() } : {}),
+    }),
+    [searchArg, city]
+  );
+
+  const artistsCityQuery = useGetPublicRegisteredArtistsQuery(cityQueryArgs, {
     skip: kind !== "artist",
   });
-  const venuesQuery = useGetPublicRegisteredVenuesQuery(queryArgs, {
+  const artistsAllQuery = useGetPublicRegisteredArtistsQuery(searchArg, {
+    skip: kind !== "artist" || !city.trim(),
+  });
+  const venuesCityQuery = useGetPublicRegisteredVenuesQuery(cityQueryArgs, {
     skip: kind !== "venue",
   });
+  const venuesAllQuery = useGetPublicRegisteredVenuesQuery(searchArg, {
+    skip: kind !== "venue" || !city.trim(),
+  });
 
-  const { data: partners = [], isLoading } = kind === "artist" ? artistsQuery : venuesQuery;
+  const cityPartners =
+    kind === "artist" ? artistsCityQuery.data ?? [] : venuesCityQuery.data ?? [];
+  const allPartners =
+    kind === "artist" ? artistsAllQuery.data ?? [] : venuesAllQuery.data ?? [];
+  const partners = preferCityOrAll(cityPartners, allPartners, Boolean(city.trim()));
+
+  const cityLoading = kind === "artist" ? artistsCityQuery.isLoading : venuesCityQuery.isLoading;
+  const allLoading = kind === "artist" ? artistsAllQuery.isLoading : venuesAllQuery.isLoading;
+  const isLoading =
+    cityLoading || (Boolean(city.trim()) && cityPartners.length === 0 && allLoading);
 
   const title = kind === "artist" ? "Artists" : "Venues";
   const subtitle =
@@ -64,6 +99,11 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
                   <p className="mt-2 text-xs font-semibold text-[#6900AA]">
                     {partners.length} registered {kind === "artist" ? "artist" : "venue"}
                     {partners.length === 1 ? "" : "s"}
+                    {city.trim() && cityPartners.length === 0 && partners.length > 0
+                      ? ` · showing all cities`
+                      : city.trim()
+                        ? ` · ${city.trim()}`
+                        : ""}
                   </p>
                 ) : null}
               </div>

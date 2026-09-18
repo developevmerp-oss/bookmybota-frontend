@@ -217,6 +217,23 @@ export interface BusinessSettings {
   admin_email?: string | null;
 }
 
+export type DiningMealPeriod = { open: string; close: string; active: boolean };
+export type DiningMealsConfig = {
+  breakfast: DiningMealPeriod;
+  lunch: DiningMealPeriod;
+  dinner: DiningMealPeriod;
+};
+
+export interface BusinessOperatingDate {
+  id?: string;
+  business_id: string;
+  op_date: string;
+  is_open: boolean;
+  open_time: string | null;
+  close_time: string | null;
+  meals: DiningMealsConfig;
+}
+
 export interface VenueLayoutRequest {
   id: string;
   business_id: string;
@@ -1558,6 +1575,10 @@ export interface PlatformOffer {
   display_theme?: string;
   sort_order?: number;
   redemption_count?: number;
+  country_id?: number | null;
+  city_id?: number | null;
+  country_name?: string | null;
+  city_name?: string | null;
   event_ids?: string[];
   restaurant_ids?: string[];
   movie_ids?: string[];
@@ -2452,7 +2473,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'CinemaSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'BusinessOperatingDates', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'CinemaSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
 
   endpoints: (builder) => ({
 
@@ -3050,6 +3071,49 @@ export const api = createApi({
         { type: 'BusinessSettings', id: bizId },
         'Businesses',
         'DiningMasters',
+      ],
+    }),
+
+    getBusinessOperatingDates: builder.query<
+      BusinessOperatingDate[],
+      { bizId: string; from: string; to: string }
+    >({
+      query: ({ bizId, from, to }) =>
+        `/businesses/${bizId}/operating-dates?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      transformResponse: (res: { data: BusinessOperatingDate[] }) => res.data ?? [],
+      providesTags: (_result, _error, { bizId }) => [
+        { type: 'BusinessOperatingDates', id: bizId },
+      ],
+    }),
+
+    upsertBusinessOperatingDate: builder.mutation<
+      {
+        data: BusinessOperatingDate;
+        cancelled_count: number;
+        emailed_count: number;
+        message?: string;
+      },
+      {
+        bizId: string;
+        body: {
+          date: string;
+          is_open: boolean;
+          open_time?: string | null;
+          close_time?: string | null;
+          meals?: DiningMealsConfig;
+          copy_to_days?: number;
+        };
+      }
+    >({
+      query: ({ bizId, body }) => ({
+        url: `/businesses/${bizId}/operating-dates`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { bizId }) => [
+        { type: 'BusinessOperatingDates', id: bizId },
+        { type: 'Bookings', id: bizId },
+        'Bookings',
       ],
     }),
 
@@ -3905,8 +3969,16 @@ export const api = createApi({
       ) => res.data || [],
     }),
 
-    getActivePlatformOffers: builder.query<PlatformOffer[], void>({
-      query: () => '/platform-offers/active',
+    getActivePlatformOffers: builder.query<
+      PlatformOffer[],
+      { customer_id?: string | null; city?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.city) sp.set('city', params.city);
+        const qs = sp.toString();
+        return `/platform-offers/active${qs ? `?${qs}` : ''}`;
+      },
       transformResponse: (res: { data: PlatformOffer[] }) => res.data || [],
       providesTags: ['PublicPlatformOffers'],
     }),
@@ -3926,11 +3998,12 @@ export const api = createApi({
 
     getMovieEligiblePlatformOffers: builder.query<
       MovieEligiblePlatformOffer[],
-      { movie_id: string; guest_phone?: string }
+      { movie_id: string; guest_phone?: string; city?: string }
     >({
-      query: ({ movie_id, guest_phone }) => {
+      query: ({ movie_id, guest_phone, city }) => {
         const sp = new URLSearchParams({ movie_id });
         if (guest_phone) sp.set('guest_phone', guest_phone);
+        if (city) sp.set('city', city);
         return `/platform-offers/movies-eligible?${sp.toString()}`;
       },
       transformResponse: (res: { data: MovieEligiblePlatformOffer[] }) => res.data || [],
@@ -3941,6 +4014,7 @@ export const api = createApi({
       AppliedPromoOffer & { discount_label?: string; max_discount?: number | null; min_order_amount?: number },
       {
         event_id?: string;
+        movie_id?: string;
         restaurant_id?: string;
         business_id?: string;
         promo_code?: string;
@@ -3950,6 +4024,7 @@ export const api = createApi({
         guest_phone?: string;
         skip_min_order?: boolean;
         booking_id?: string;
+        city?: string;
       }
     >({
       query: (body) => ({
@@ -4818,7 +4893,7 @@ export const api = createApi({
 
     getActiveMarketingPromotions: builder.query<
       MarketingCampaign[],
-      { category?: string; target_type?: string; target_id?: string; surface?: string } | void
+      { category?: string; target_type?: string; target_id?: string; surface?: string; city?: string } | void
     >({
       query: (params) => {
         const sp = new URLSearchParams();
@@ -4826,6 +4901,7 @@ export const api = createApi({
         if (params?.target_type) sp.set('target_type', params.target_type);
         if (params?.target_id) sp.set('target_id', params.target_id);
         if (params?.surface) sp.set('surface', params.surface);
+        if (params?.city) sp.set('city', params.city);
         const qs = sp.toString();
         return `/marketing/promotions/active${qs ? `?${qs}` : ''}`;
       },
@@ -5319,12 +5395,17 @@ export const api = createApi({
 
     validateEventPromoCode: builder.mutation<
       AppliedPromoOffer,
-      { eventId: string; promo_code: string; ticket_amount: number; guest_phone?: string }
+      { eventId: string; promo_code: string; ticket_amount: number; guest_phone?: string; city?: string }
     >({
-      query: ({ eventId, promo_code, ticket_amount, guest_phone }) => ({
+      query: ({ eventId, promo_code, ticket_amount, guest_phone, city }) => ({
         url: `/events/public/${eventId}/validate-promo`,
         method: 'POST',
-        body: { promo_code, ticket_amount, ...(guest_phone ? { guest_phone } : {}) },
+        body: {
+          promo_code,
+          ticket_amount,
+          ...(guest_phone ? { guest_phone } : {}),
+          ...(city ? { city } : {}),
+        },
       }),
       transformResponse: (res: { data: AppliedPromoOffer }) => res.data,
     }),
@@ -7941,6 +8022,8 @@ export const {
   useGetBusinessPublicQuery,
   useGetBusinessSettingsQuery,
   useUpdateBusinessSettingsMutation,
+  useGetBusinessOperatingDatesQuery,
+  useUpsertBusinessOperatingDateMutation,
   useGetVenueLayoutRequestsQuery,
   useCreateVenueLayoutRequestMutation,
   useGetAdminVenueLayoutRequestsQuery,

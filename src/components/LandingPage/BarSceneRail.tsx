@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery } from "@/services/api";
 import ContentRail from "./ContentRail";
 import { DiningPosterCard, ShowcaseDiningPosterCard } from "./PosterCard";
-import CityLocationEmptyState from "./CityLocationEmptyState";
 import { SHOWCASE_BAR_CARDS } from "@/data/showcaseDiningCards";
 import { hasCityFilter } from "./homeUtils";
 
@@ -22,7 +21,7 @@ export default function BarSceneRail({ city }: { city: string }) {
     [businessTypes]
   );
 
-  const { data: barsData, isLoading: barsLoading } = useGetBusinessesPagedQuery({
+  const { data: cityBarsData, isLoading: cityBarsLoading } = useGetBusinessesPagedQuery({
     module: "dining",
     ...(hasCity ? { city } : {}),
     categories: [barCategory],
@@ -31,13 +30,32 @@ export default function BarSceneRail({ city }: { city: string }) {
     limit: 12,
   });
 
-  const items = barsData?.items ?? [];
-  const isLoading = typesLoading || barsLoading;
+  const { data: allBarsData, isLoading: allBarsLoading } = useGetBusinessesPagedQuery(
+    {
+      module: "dining",
+      categories: [barCategory],
+      sort: "rating",
+      page: 1,
+      limit: 12,
+    },
+    { skip: !hasCity }
+  );
+
+  const cityItems = cityBarsData?.items ?? [];
+  const allItems = allBarsData?.items ?? [];
+  const items =
+    !hasCity || cityItems.length > 0 ? cityItems : allItems;
+
+  const isLoading =
+    typesLoading ||
+    cityBarsLoading ||
+    (hasCity && cityItems.length === 0 && allBarsLoading);
   const isEmpty = !isLoading && items.length === 0;
   const useStatic = isEmpty && !hasCity;
 
   const seeAllParams = new URLSearchParams();
-  if (hasCity) seeAllParams.set("city", city);
+  // Link to city dining when city has bars; otherwise browse all bars
+  if (hasCity && cityItems.length > 0) seeAllParams.set("city", city);
   seeAllParams.set("filter", barCategory);
   const seeAllHref = `/dining?${seeAllParams.toString()}`;
 
@@ -50,11 +68,7 @@ export default function BarSceneRail({ city }: { city: string }) {
       cardStyle="dining"
       minVisible={4}
       isLoading={isLoading}
-      empty={
-        isEmpty && hasCity ? (
-          <CityLocationEmptyState categoryLabel="bars" city={city} />
-        ) : undefined
-      }
+      empty={isEmpty && !useStatic ? "No bars available yet." : undefined}
     >
       {useStatic
         ? SHOWCASE_BAR_CARDS.map((place) => (

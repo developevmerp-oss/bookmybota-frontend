@@ -23,6 +23,8 @@ import {
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
+import { useSelectedCity } from "@/lib/useSelectedCity";
+import { hasCityFilter } from "@/components/LandingPage/homeUtils";
 
 
 
@@ -345,8 +347,8 @@ export default function MovieDetailPage() {
   const params = useParams();
 
   const idOrSlug = String(params?.id || "");
-
-
+  const city = useSelectedCity();
+  const hasCity = hasCityFilter(city);
 
   const {
 
@@ -366,7 +368,10 @@ export default function MovieDetailPage() {
 
   const { data: platformOffers = [] } = useGetMovieEligiblePlatformOffersQuery(
 
-    { movie_id: apiMovie?.id || "" },
+    {
+      movie_id: apiMovie?.id || "",
+      ...(hasCity ? { city } : {}),
+    },
 
     { skip: !apiMovie?.id }
 
@@ -437,6 +442,7 @@ export default function MovieDetailPage() {
 
       <CategoryPromoBanners
         category="MOVIES"
+        city={city}
         targetId={movie.id}
         className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-4"
       />

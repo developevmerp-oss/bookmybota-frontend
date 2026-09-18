@@ -7,9 +7,15 @@ import { useHomeCatalog } from "./useHomeCatalog";
 import { isOutdoorEvent } from "./homeUtils";
 
 export default function OutdoorEventsRail({ city }: { city: string }) {
-  const { events, fallbackEvents, categories, isLoadingEvents } = useHomeCatalog(city);
-  const pool = events.length > 0 ? events : fallbackEvents;
-  const items = useMemo(() => pool.filter(isOutdoorEvent).slice(0, 16), [pool]);
+  const { cityEvents, fallbackEvents, categories, isLoadingEvents, hasCity } =
+    useHomeCatalog(city);
+
+  const items = useMemo(() => {
+    const fromCity = cityEvents.filter(isOutdoorEvent);
+    if (fromCity.length > 0 || !hasCity) return fromCity.slice(0, 16);
+    return fallbackEvents.filter(isOutdoorEvent).slice(0, 16);
+  }, [cityEvents, fallbackEvents, hasCity]);
+
   const outdoorCat = categories.find((c) => {
     const s = `${c.slug} ${c.name}`.toLowerCase();
     return s.includes("outdoor") || s.includes("open-air") || s.includes("open air");

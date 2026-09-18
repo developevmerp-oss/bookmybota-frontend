@@ -3289,7 +3289,7 @@ export const api = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['OrganizerEvents', 'EventLayoutRequests'],
+      invalidatesTags: ['OrganizerEvents', 'EventLayoutRequests', 'EventLayouts', 'PublicEvents'],
     }),
 
     getGeoCountries: builder.query<Array<{ id: number; name: string; slug?: string }>, void>({
@@ -5755,6 +5755,15 @@ export const api = createApi({
 
     // ── Organizer Events ──────────────────────────────────────────────────────
 
+    getOrganizerSupportContact: builder.query<
+      { email: string | null; phone: string },
+      void
+    >({
+      query: () => `/events/organizer/support-contact`,
+      transformResponse: (res: { data: { email: string | null; phone: string } }) =>
+        res.data ?? { email: null, phone: '998877456' },
+    }),
+
     getOrganizerEvents: builder.query<
       PaginatedList<OrganizerEvent>,
       { q?: string; status?: string; page?: number; limit?: number } | void
@@ -6020,7 +6029,7 @@ export const api = createApi({
       { id: string; body: EventFormPayload }
     >({
       query: ({ id, body }) => ({ url: `/events/organizer/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['OrganizerEvents'],
+      invalidatesTags: ['OrganizerEvents', 'AdminEvents', 'EventLayoutRequests', 'EventLayouts'],
     }),
 
     submitOrganizerEvent: builder.mutation<
@@ -6028,7 +6037,7 @@ export const api = createApi({
       { id: string; body: EventFormPayload }
     >({
       query: ({ id, body }) => ({ url: `/events/organizer/${id}/submit`, method: 'POST', body }),
-      invalidatesTags: ['OrganizerEvents', 'AdminEvents', 'PublicEvents'],
+      invalidatesTags: ['OrganizerEvents', 'AdminEvents', 'PublicEvents', 'EventLayoutRequests', 'EventLayouts'],
     }),
 
     toggleOrganizerEventVisibility: builder.mutation<
@@ -8119,6 +8128,7 @@ export const {
   useGetOrganizerSettlementQuery,
   useGenerateOrganizerSettlementMutation,
   usePatchOrganizerSettlementMutation,
+  useGetOrganizerSupportContactQuery,
   useGetOrganizerEventsQuery,
   useGetOrganizerEventQuery,
   useSearchOrganizerVenuesQuery,

@@ -2845,63 +2845,71 @@ export default function VenueLayoutBuilder({
   const selectedShape = shapes.find(s => s.id === selectedShapeId);
 
   return (
-    <div className={`flex flex-col bg-white shadow-sm transition-all ${
+    <div className={`flex flex-col min-h-0 bg-white shadow-sm transition-all ${
       isFullscreen 
         ? "fixed inset-0 z-[999] w-screen h-screen rounded-none" 
         : "h-full w-full flex-1 border border-slate-200 rounded-2xl overflow-hidden"
     }`}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
-        <div className="flex gap-3 items-center flex-wrap">
+      {/* Toolbar — shrink-0 so tools stay visible when canvas fills the studio */}
+      <div className="shrink-0 z-30 flex flex-col gap-2 p-3 sm:p-4 border-b border-slate-200 bg-slate-50">
+        <div className="flex flex-wrap items-center gap-2">
           <button 
+            type="button"
             onClick={() => setMode("select")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "select" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "select" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
           >
             <MousePointer2 size={16} /> Select
           </button>
           <button 
+            type="button"
             onClick={() => setMode("pan")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "pan" ? "bg-rose-50 text-rose-600 border-rose-200 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "pan" ? "bg-rose-50 text-rose-600 border-rose-200 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
             title="Pan layout (or hold Spacebar + drag, or middle-click drag)"
           >
             <Hand size={16} /> Pan
           </button>
           <button 
+            type="button"
             onClick={() => setMode("add_seat")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_seat" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_seat" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
           >
             <PlusSquare size={16} /> Add Single Seat
           </button>
           <button 
+            type="button"
             onClick={() => setMode("bulk_seats")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "bulk_seats" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "bulk_seats" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
           >
             <PlusSquare size={16} /> Add Grid
           </button>
           <button 
+            type="button"
             onClick={() => setMode("add_label")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_label" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_label" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
           >
             <PlusSquare size={16} /> Add Text
           </button>
           <button 
+            type="button"
             onClick={() => setMode("add_shape")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_shape" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_shape" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
           >
             <PlusSquare size={16} /> Add Stage Element
           </button>
           <button 
+            type="button"
             onClick={() => setMode("eraser")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "eraser" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "eraser" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
           >
             <Eraser size={16} /> Eraser
           </button>
 
-          <div className="w-px h-8 bg-slate-300 mx-1"></div>
+          <div className="hidden sm:block w-px h-8 bg-slate-300 mx-1" />
 
           {/* Undo / Redo & Clear History Controls */}
           <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
             <button 
+              type="button"
               onClick={handleUndo} 
               disabled={historyIndex <= 0}
               className="p-1.5 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-700 transition-colors"
@@ -2910,6 +2918,7 @@ export default function VenueLayoutBuilder({
               <Undo2 size={16} />
             </button>
             <button 
+              type="button"
               onClick={handleRedo} 
               disabled={historyIndex >= history.length - 1}
               className="p-1.5 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-700 transition-colors"
@@ -2918,6 +2927,7 @@ export default function VenueLayoutBuilder({
               <Redo2 size={16} />
             </button>
             <button 
+              type="button"
               onClick={handleClearCanvas}
               disabled={seats.length === 0 && labels.length === 0 && shapes.length === 0 && !bgImageUrl}
               className="p-1.5 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-500 transition-colors"
@@ -2927,7 +2937,7 @@ export default function VenueLayoutBuilder({
             </button>
           </div>
 
-          <div className="w-px h-8 bg-slate-300 mx-1"></div>
+          <div className="hidden sm:block w-px h-8 bg-slate-300 mx-1" />
 
           <select 
             onChange={(e) => {
@@ -2944,7 +2954,7 @@ export default function VenueLayoutBuilder({
               else if (e.target.value === "fashion") generateFashionShow();
               e.target.value = "";
             }}
-            className="px-4 py-2 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 focus:outline-none cursor-pointer shadow-sm hover:bg-emerald-100 transition-colors"
+            className="px-3 sm:px-4 py-2 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 focus:outline-none cursor-pointer shadow-sm hover:bg-emerald-100 transition-colors"
           >
             <option value="">✨ Add Template...</option>
             <optgroup label="🏟️ Stadiums & Sports">
@@ -2968,7 +2978,7 @@ export default function VenueLayoutBuilder({
             </optgroup>
           </select>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Live Capacity Indicator */}
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${
             maxCapacity > 0 && seats.length > maxCapacity
@@ -2991,7 +3001,7 @@ export default function VenueLayoutBuilder({
           </div>
 
           {zoneProgress.length > 0 && (
-            <div className="hidden lg:flex items-center gap-1.5 max-w-[42vw] overflow-x-auto">
+            <div className="flex items-center gap-1.5 max-w-full overflow-x-auto">
               {zoneProgress.map((zone) => {
                 const ok = zone.mapped === zone.capacity;
                 const over = zone.mapped > zone.capacity;
@@ -3015,9 +3025,9 @@ export default function VenueLayoutBuilder({
           )}
 
           <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
-            <button onClick={() => setZoomScale(s => Math.max(0.15, Number((s - 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
+            <button type="button" onClick={() => setZoomScale(s => Math.max(0.15, Number((s - 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
             <span className="text-xs font-semibold text-slate-600 min-w-[44px] text-center">{Math.round(zoomScale * 100)}%</span>
-            <button onClick={() => setZoomScale(s => Math.min(4.0, Number((s + 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">+</button>
+            <button type="button" onClick={() => setZoomScale(s => Math.min(4.0, Number((s + 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">+</button>
           </div>
 
           {/* Properties Toggle & Fullscreen Toggle */}
@@ -3050,7 +3060,7 @@ export default function VenueLayoutBuilder({
             </button>
           </div>
 
-          <button onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
+          <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
             <Save size={16} /> {isSaving ? "Saving..." : venueAdapter ? "Save layout" : "Save Layout"}
           </button>
           {venueAdapter?.hideSubmitToVenue ? (
@@ -3085,14 +3095,14 @@ export default function VenueLayoutBuilder({
             </button>
           ) : null}
           {venueAdapter && !venueAdapter.hideSubmitToVenue ? (
-            <button onClick={() => void handleSave(true)} disabled={isSaving} className="btn-primary flex items-center gap-2">
+            <button type="button" onClick={() => void handleSave(true)} disabled={isSaving} className="btn-primary flex items-center gap-2">
               {isSaving ? "Submitting..." : "Submit to venue"}
             </button>
           ) : null}
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Canvas Area with Floating Navigation Dock */}
         <div className="flex-1 relative overflow-hidden flex flex-col bg-slate-100">
           {/* Top-Left Shortcut Guide & Seat Hover Details Badge */}

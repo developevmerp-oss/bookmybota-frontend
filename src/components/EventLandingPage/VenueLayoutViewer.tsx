@@ -47,6 +47,8 @@ export default function VenueLayoutViewer({
   cinemaMode = false,
   hideSidePanel = false,
   customLegend,
+  mapTitle,
+  mapDescription,
 }: {
   layoutData: any;
   ticketTypes: any[];
@@ -56,6 +58,8 @@ export default function VenueLayoutViewer({
   cinemaMode?: boolean;
   hideSidePanel?: boolean;
   customLegend?: Array<{ name: string; color: string; price?: number }>;
+  mapTitle?: string;
+  mapDescription?: string;
 }) {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
@@ -601,11 +605,12 @@ export default function VenueLayoutViewer({
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-3 h-3 rounded-full bg-[#F84464] animate-pulse" />
                   <h3 className="text-sm font-bold tracking-wider text-slate-900 uppercase">
-                    Cinema Hall Map
+                    {mapTitle || "Cinema Hall Map"}
                   </h3>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Live layout configured for this screen. Pick up to {maxSelectable} seats directly on the map.
+                  {mapDescription ||
+                    `Live layout configured for this screen. Pick up to ${maxSelectable} seats directly on the map.`}
                 </p>
 
                 <div className="space-y-2 pt-3 border-t border-slate-200 text-xs">

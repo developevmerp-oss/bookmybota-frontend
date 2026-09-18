@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useForm, useFieldArray, useFormContext, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check, Megaphone, X, Eye } from "lucide-react";
+import { ImagePlus, Plus, Trash2, Upload, FileText, AlertCircle, ChevronLeft, ChevronRight, CalendarDays, MapPin, Search, Check, Megaphone, X, Eye, HelpCircle, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetEventCategoriesQuery,
@@ -18,6 +18,7 @@ import {
   useSearchOrganizerArtistsQuery,
   useGetPublicMarketingPlansQuery,
   useReviewOrganizerEventLayoutRequestMutation,
+  useGetOrganizerSupportContactQuery,
   type CityMaster,
   type EventDocumentMaster,
   type EventDocumentUpload,
@@ -78,6 +79,7 @@ import ImageCropPicker, { CroppedImageField } from "@/components/Shared/ImageCro
 import EventStepperNav, {
   type EventStepperStepId,
 } from "@/components/EventAdminPanel/EventStepperNav";
+import EventFormCustomerPreview from "@/components/EventAdminPanel/EventFormCustomerPreview";
 import {
   TICKET_MODE_OPTIONS,
   normalizeAllowedTicketModes,
@@ -949,7 +951,7 @@ function SeatingLayoutFields({
                     disabled={readOnly}
                     onClick={() =>
                       setValue(`showtimes.${index}.venue_layout_template_id`, l.id, {
-                        shouldDirty: false,
+                        shouldDirty: true,
                       })
                     }
                     className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
@@ -1003,6 +1005,7 @@ function SeatingLayoutFields({
         labelClass={labelClass}
         inputClass={inputClass}
         allowCustom
+        seedTemplateId={previewLayoutId}
       />
     </div>
   );
@@ -1014,12 +1017,15 @@ function LayoutPreferenceRadios({
   labelClass,
   inputClass,
   allowCustom,
+  seedTemplateId,
 }: {
   index: number;
   readOnly: boolean;
   labelClass: string;
   inputClass: string;
   allowCustom: boolean;
+  /** Registered venue layout the organizer previewed — kept as seed for Super Admin. */
+  seedTemplateId?: string | null;
 }) {
   const { watch, setValue, register, getValues } = useFormContext<EventFormValues>();
   const layoutMode = watch(`showtimes.${index}.layout_mode`) || "none";
@@ -1041,11 +1047,18 @@ function LayoutPreferenceRadios({
   }, [preference, ticketSeatTotal, index, readOnly, setValue]);
 
   const applyCustomMode = () => {
+    // Keep venue_layout_template_id when set — Super Admin uses it as a seed for an
+    // event-only copy; the registered venue layout itself is never overwritten.
     setValue(`showtimes.${index}.layout_mode`, "custom", { shouldDirty: true });
     setValue(`showtimes.${index}.custom_layout_name`, "Custom event seating layout", {
       shouldDirty: true,
     });
-    setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
+    const existingSeed = getValues(`showtimes.${index}.venue_layout_template_id`);
+    if (!existingSeed && seedTemplateId) {
+      setValue(`showtimes.${index}.venue_layout_template_id`, seedTemplateId, {
+        shouldDirty: true,
+      });
+    }
     const tickets =
       getValues(`showtimes.0.ticket_types`) || getValues(`showtimes.${index}.ticket_types`) || [];
     const total = tickets.reduce((sum, t) => sum + (Number(t?.total_count) || 0), 0);
@@ -1104,9 +1117,10 @@ function LayoutPreferenceRadios({
             <span>
               <span className="text-sm font-semibold text-slate-800">Add customise event layout</span>
               <p className="text-xs text-slate-500 mt-0.5">
-                Super Admin will build a seating layout for this event
+                Super Admin will customize from the registered venue map for this event only
                 {ticketSeatTotal > 0 ? ` (up to ${ticketSeatTotal} seats from your ticket types)` : ""}.
-                Review and approve it on Preview before the contract is created.
+                The venue&apos;s published layout is not changed. Review and approve on Preview before
+                the contract is created.
               </p>
             </span>
           </label>
@@ -2174,6 +2188,11 @@ export default function EventForm({
   const { data: eventCategoryMasters = [] } = useGetEventCategoriesQuery();
   const { data: cities = [] } = useGetCitiesQuery();
   const { data: promoPlans = [] } = useGetPublicMarketingPlansQuery({ module: "EVENTS" });
+  const { data: supportContact } = useGetOrganizerSupportContactQuery(undefined, {
+    skip: readOnly,
+  });
+  const supportEmail = supportContact?.email?.trim() || null;
+  const supportPhone = supportContact?.phone?.trim() || "998877456";
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
   const [documents, setDocuments] = useState<EventDocumentUpload[]>(() =>
     normalizeFormDocuments(event?.documents)
@@ -2201,6 +2220,7 @@ export default function EventForm({
   } | null>(null);
   const [reviewLayoutRequest, { isLoading: reviewingLayout }] =
     useReviewOrganizerEventLayoutRequestMutation();
+  const [pendingChangesSaved, setPendingChangesSaved] = useState(false);
 
   const pendingLayoutPicks = useMemo(
     () =>
@@ -2242,8 +2262,12 @@ export default function EventForm({
     reset,
     getValues,
     trigger,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = methods;
+
+  useEffect(() => {
+    if (isDirty) setPendingChangesSaved(false);
+  }, [isDirty]);
 
   const categoryTypeId = watch("category_type_id");
   const genres = watch("genres") || [];
@@ -2421,7 +2445,7 @@ export default function EventForm({
         city_id: s.city_id ?? null,
         venue_source: venueSource as "manual" | "registered" | "auto_registered",
         venue_business_id: s.venue_business_id || null,
-        venue_layout_template_id: layoutMode === "standard" ? s.venue_layout_template_id || null : null,
+        venue_layout_template_id: s.venue_layout_template_id || null,
         layout_mode: layoutMode as "none" | "standard" | "custom",
         custom_layout_name:
           layoutMode === "custom"
@@ -2606,7 +2630,10 @@ export default function EventForm({
     );
   };
 
+  const saveLockRef = useRef(false);
+
   const runSaveDraft = async () => {
+    if (saveLockRef.current || saving || submitting) return;
     const values = getValues();
     const youtube = values.youtube_url?.trim();
     if (youtube) {
@@ -2620,10 +2647,17 @@ export default function EventForm({
       }
     }
     const payload = buildPayload(values, { forDraft: true });
+    saveLockRef.current = true;
     try {
       await onSaveDraft(payload);
+      if (event?.status === "PENDING_APPROVAL") {
+        reset(getValues());
+        setPendingChangesSaved(true);
+      }
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save draft"));
+    } finally {
+      saveLockRef.current = false;
     }
   };
 
@@ -2727,9 +2761,15 @@ export default function EventForm({
       return (
         <div className="portal-banner-warning rounded-xl border p-4 flex gap-3 text-sm">
           <AlertCircle size={18} className="shrink-0 mt-0.5" />
-          <p className="font-medium">
-            Submitted for Super Admin review. You can still edit details until it is approved.
-          </p>
+          <div>
+            <p className="font-medium">
+              Submitted for Super Admin review. You can still edit details until it is approved.
+            </p>
+            <p className="mt-1 text-xs opacity-90">
+              After editing (for example changing to a custom layout), open Preview and click{" "}
+              <strong>Save changes</strong> so Super Admin can see the update.
+            </p>
+          </div>
         </div>
       );
     }
@@ -4194,311 +4234,53 @@ export default function EventForm({
         )}
 
         {stepId === "review" && (
-          <section className="org-card p-6 space-y-6">
-            <div>
+          <section className="space-y-6">
+            <div className="org-card p-5 sm:p-6 space-y-2">
               <h3 className="portal-heading text-lg font-semibold">Preview & submit</h3>
-              <p className="portal-muted text-sm mt-1">
-                Confirm everything looks correct. You can go back to edit any step, save a draft, or submit for Super Admin approval.
+              <p className="portal-muted text-sm">
+                Check how customers will see your event on the Home page and on your Event page,
+                then save a draft or submit for Super Admin approval.
               </p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Event</p>
-                <p className="font-semibold text-slate-900">{watch("name") || "—"}</p>
-                <p className="text-sm text-slate-600">
-                  {categories.find((c) => c.id === categoryTypeId)?.name || "No category"}
-                  {" · "}
-                  {hostingType === "tour" ? "Tour" : "Single event"}
-                </p>
-                <p className="text-sm text-slate-600">
-                  {(genres || []).join(", ") || "No genres"} · {(languages || []).join(", ") || "No languages"}
-                </p>
-                <p className="text-sm text-slate-600">
-                  Age {watch("age_group") || "—"}
-                  {(() => {
-                    const mins =
-                      Number(watch("duration_minutes") || 0) ||
-                      computeDurationMinutesFromShowtimes(watch("showtimes") || [], watch("duration_minutes"));
-                    return mins ? ` · ${mins} min` : "";
-                  })()}
-                </p>
-                {hostingType === "single" &&
-                watch("showtimes.0.event_date") &&
-                watch("showtimes.0.start_time") ? (
-                  <p className="text-sm text-slate-600">
-                    Schedule: {formatDate(watch("showtimes.0.event_date"))} ·{" "}
-                    {formatTime12h(
-                      `${watch("showtimes.0.event_date")}T${watch("showtimes.0.start_time")}`
-                    )}
-                    {durationMinutesTotal > 0 ? ` · ${durationMinutesTotal} min` : ""}
+              {event?.status === "PENDING_APPROVAL" && !readOnly && !pendingChangesSaved ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-3 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-amber-900">
+                    This event is waiting for Super Admin. If you changed venue, tickets, or switched
+                    to a <strong>custom layout</strong>, save your changes so Super Admin can see them
+                    in Event Layouts.
                   </p>
-                ) : null}
-                <p className="text-sm text-slate-600">
-                  Ticket modes:{" "}
-                  {allowedTicketModes.length
-                    ? TICKET_MODE_OPTIONS.filter((o) => allowedTicketModes.includes(o.id))
-                        .map((o) => o.label)
-                        .join(", ")
-                    : "None selected"}
-                </p>
-                <p className="text-sm text-slate-600">
-                  Ticket types:{" "}
-                  {(watch("showtimes.0.ticket_types") || []).length
-                    ? (watch("showtimes.0.ticket_types") || [])
-                        .map(
-                          (t) =>
-                            `${t.ticket_type || "Untitled"} (${t.total_count || 0} @ ${t.price ?? "—"}, max ${t.max_per_order || 10}/order)`
-                        )
-                        .join(" · ")
-                    : "None added"}
-                </p>
-                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("details")}>
-                  Edit details
-                </button>
-              </div>
-
-              {isSports && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sport</p>
-                  <p className="font-semibold text-slate-900">
-                    {(sportMeta.home_team || "Home").trim()} vs {(sportMeta.away_team || "Away").trim()}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    {(genres || []).join(", ") || "No sport type"}
-                    {sportMeta.tournament_name ? ` · ${sportMeta.tournament_name}` : ""}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    {sportMeta.match_format
-                      ? SPORT_MATCH_FORMATS.find((f) => f.id === sportMeta.match_format)?.label ||
-                        sportMeta.match_format
-                      : "Format not set"}
-                    {" · "}
-                    {sportMeta.gender_category
-                      ? SPORT_GENDER_CATEGORIES.find((g) => g.id === sportMeta.gender_category)
-                          ?.label || sportMeta.gender_category
-                      : "Gender not set"}
-                  </p>
-                  {sportExtraFields.some((f) => sportMeta.extras?.[f.key]?.trim()) && (
-                    <p className="text-sm text-slate-600">
-                      {sportExtraFields
-                        .filter((f) => sportMeta.extras?.[f.key]?.trim())
-                        .map((f) => `${f.label}: ${sportMeta.extras?.[f.key]}`)
-                        .join(" · ")}
-                    </p>
-                  )}
                   <button
                     type="button"
-                    className="text-sm text-rose-700 font-medium"
-                    onClick={() => goToStep("sport")}
+                    disabled={saving || submitting}
+                    onClick={() => void runSaveDraft()}
+                    className="btn-primary shrink-0 text-sm py-2 px-3.5 disabled:opacity-50"
                   >
-                    Edit sport details
+                    {saving ? "Saving..." : "Save changes"}
                   </button>
                 </div>
-              )}
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Media</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1.5">Horizontal poster</p>
-                    {posterHorizontal ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={posterHorizontal}
-                        alt="Horizontal poster"
-                        className="w-full h-28 object-cover rounded-lg border border-slate-200 bg-white"
-                      />
-                    ) : (
-                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-400">
-                        Missing
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1.5">Vertical poster</p>
-                    {posterVertical ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={posterVertical}
-                        alt="Vertical poster"
-                        className="w-full h-28 object-cover rounded-lg border border-slate-200 bg-white"
-                      />
-                    ) : (
-                      <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-400">
-                        Optional
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1.5">
-                    Gallery photos {galleryImages.length ? `(${galleryImages.length})` : ""}
+              ) : null}
+              {event?.status === "PENDING_APPROVAL" && !readOnly && pendingChangesSaved ? (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-3">
+                  <p className="text-sm text-emerald-900 font-medium">
+                    Changes sent to Super Admin. They can now see your custom layout request.
                   </p>
-                  {galleryImages.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {galleryImages.map((url, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={`${url}-${i}`}
-                          src={url}
-                          alt={`Gallery ${i + 1}`}
-                          className="h-16 w-16 rounded-lg object-cover border border-slate-200 bg-white"
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">No gallery photos yet</p>
-                  )}
                 </div>
-                <p className="text-sm text-slate-600">
-                  YouTube:{" "}
-                  {watch("youtube_url")?.trim() ? (
-                    <a
-                      href={watch("youtube_url")}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-rose-700 underline break-all"
-                    >
-                      {watch("youtube_url")}
-                    </a>
-                  ) : (
-                    "Not set"
-                  )}
-                </p>
-                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("media")}>
-                  Edit media
-                </button>
-              </div>
+              ) : null}
+            </div>
 
-              {wantPromotion && promoPlanId ? (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 space-y-3 sm:col-span-2">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Promotion</p>
-                      <p className="font-semibold text-slate-900 mt-1">
-                        {watch("promo_title")?.trim() || "Promotion request"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="text-sm text-rose-700 font-medium"
-                      onClick={() => goToStep("media")}
-                    >
-                      Edit promotion
-                    </button>
-                  </div>
+            <EventFormCustomerPreview
+              values={watch()}
+              event={event}
+              categoryName={categories.find((c) => c.id === categoryTypeId)?.name || null}
+              cityLabel={cityName}
+              termLines={[
+                ...selectedTerms.map((t) => t.text).filter(Boolean),
+                ...customTerms.map((t) => String(t || "").trim()).filter(Boolean),
+              ]}
+              promoPlan={selectedPromoPlan || null}
+              onEditStep={(step) => goToStep(step)}
+            />
 
-                  <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-700">
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 space-y-1">
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">Plan</p>
-                      <p className="font-medium text-slate-900">
-                        {selectedPromoPlan?.name || `Plan #${promoPlanId}`}
-                      </p>
-                      {selectedPromoPlan?.description?.trim() ? (
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                          {selectedPromoPlan.description.trim()}
-                        </p>
-                      ) : null}
-                      {selectedPromoPlan ? (
-                        <p className="text-xs text-slate-600">
-                          {selectedPromoPlan.duration_days} days ·{" "}
-                          {formatMoneyDisplay(selectedPromoPlan.price)}
-                          {selectedPromoPlan.listing_boost ? " · Listing boost" : ""}
-                          {selectedPromoPlan.landing_slider ? " · Landing slider" : ""}
-                          {selectedPromoPlan.category_rail ? " · Category rail" : ""}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 space-y-1">
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
-                        Schedule
-                      </p>
-                      <p>
-                        Start date:{" "}
-                        <span className="font-medium text-slate-900">
-                          {watch("promo_start_date")
-                            ? formatDate(watch("promo_start_date"))
-                            : "—"}
-                        </span>
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Visible from this date for the plan duration after Super Admin approval.
-                        Demo payment runs when you submit the event.
-                      </p>
-                    </div>
-                  </div>
-
-                  {promoBannerUrl?.trim() ? (
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-1.5">
-                        Banner
-                      </p>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={resolveMediaUrl(promoBannerUrl)}
-                        alt="Promotion banner"
-                        className="w-full max-w-xl aspect-[16/9] object-cover rounded-lg border border-slate-200 bg-white"
-                      />
-                    </div>
-                  ) : watch("promo_landing_slider") ? (
-                    <p className="text-sm text-amber-700">Banner required for this plan — add it in Media.</p>
-                  ) : (
-                    <p className="text-sm text-slate-500">No banner uploaded (optional for this plan).</p>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 sm:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Promotion</p>
-                  <p className="text-sm text-slate-600">Not requested for this event.</p>
-                  {!readOnly ? (
-                    <button
-                      type="button"
-                      className="text-sm text-rose-700 font-medium"
-                      onClick={() => goToStep("media")}
-                    >
-                      Add promotion
-                    </button>
-                  ) : null}
-                </div>
-              )}
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {hostingType === "tour" ? "Tour stops" : "Venues & tickets"}
-                </p>
-                {(watch("showtimes") || []).map((show, idx) => (
-                  <div key={idx} className="rounded-lg bg-white border border-slate-200 px-3 py-2">
-                    <p className="font-medium text-slate-900">
-                      {show.venue_name || `Stop ${idx + 1}`} · {cityName(show.city_id)}
-                      {show.venue_source === "registered"
-                        ? " · Verified venue"
-                        : show.venue_source === "auto_registered" || show.venue_business_id
-                          ? " · In system (not authorized)"
-                          : " · New venue (auto-register)"}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Layout:{" "}
-                      {show.layout_mode === "standard"
-                        ? "Standard published"
-                        : show.layout_mode === "custom"
-                          ? `Custom request${show.custom_layout_name ? ` (${show.custom_layout_name})` : ""}`
-                          : "None"}
-                      {" · "}
-                      {(show.ticket_types || []).length} ticket type(s)
-                      {(show.ticket_types || [])
-                        .filter((t) => t.ticket_type)
-                        .map((t) => ` · ${t.ticket_type} (${t.total_count} @ ${t.price}, max ${t.max_per_order || 10}/order)`)
-                        .join("")}
-                    </p>
-                  </div>
-                ))}
-                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("venue")}>
-                  Edit venue & tickets
-                </button>
-              </div>
-
+            <div className="space-y-4">
               {waitingForAdminLayout.length > 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-2 sm:col-span-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
@@ -4846,35 +4628,7 @@ export default function EventForm({
                 </div>
               )}
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {isSports ? "Teams / players" : "Lineup"}
-                </p>
-                {(watch("artists") || []).length === 0 ? (
-                  <p className="text-sm text-slate-600">No one added</p>
-                ) : (
-                  (watch("artists") || []).map((artist, idx) => (
-                    <div key={idx} className="rounded-lg bg-white border border-slate-200 px-3 py-2">
-                      <p className="font-medium text-slate-900">
-                        {artist.name || `Person ${idx + 1}`}
-                        {artist.role_title ? ` · ${artist.role_title}` : ""}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {artist.role_title === "Artist"
-                          ? artist.artist_source === "registered"
-                            ? "Registered artist partner"
-                            : "Artist (auto-register / external)"
-                          : "Event guest listing only"}
-                      </p>
-                    </div>
-                  ))
-                )}
-                <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("artists")}>
-                  {isSports ? "Edit teams / players" : "Edit lineup"}
-                </button>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 sm:col-span-2">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Documents & T&amp;C</p>
                 {(() => {
                   const uploaded = documents.filter((d) => d.url?.trim());
@@ -4958,8 +4712,30 @@ export default function EventForm({
               onClick={runSaveDraft}
                 className="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save draft"}
+              {saving ? "Saving..." : event?.status === "PENDING_APPROVAL" ? "Save changes" : "Save draft"}
             </button>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
+                <HelpCircle size={14} className="shrink-0 text-rose-600" />
+                Need help?
+              </span>
+              {supportEmail && (
+                <a
+                  href={`mailto:${supportEmail}`}
+                  className="inline-flex items-center gap-1.5 text-rose-700 hover:underline"
+                >
+                  <Mail size={13} className="shrink-0" />
+                  {supportEmail}
+                </a>
+              )}
+              <a
+                href={`tel:${supportPhone.replace(/\D/g, "")}`}
+                className="inline-flex items-center gap-1.5 text-rose-700 hover:underline"
+              >
+                <Phone size={13} className="shrink-0" />
+                {supportPhone}
+              </a>
             </div>
             <div className="flex flex-wrap gap-2">
               {!isLastStep ? (
@@ -4970,18 +4746,29 @@ export default function EventForm({
                 >
                   Continue <ChevronRight size={16} />
                 </button>
-              ) : (
-                canSubmit && (
-              <button
-                type="button"
-                disabled={saving || submitting}
-                onClick={handleSubmit(runSubmit)}
-                className="btn-primary disabled:opacity-50"
-              >
-                {submitting ? "Submitting..." : "Submit for approval"}
-              </button>
-                )
-              )}
+              ) : canSubmit ? (
+                <button
+                  type="button"
+                  disabled={saving || submitting}
+                  onClick={handleSubmit(runSubmit)}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {submitting ? "Submitting..." : "Submit for approval"}
+                </button>
+              ) : event?.status === "PENDING_APPROVAL" && !pendingChangesSaved ? (
+                <button
+                  type="button"
+                  disabled={saving || submitting}
+                  onClick={() => void runSaveDraft()}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save changes for Super Admin"}
+                </button>
+              ) : event?.status === "PENDING_APPROVAL" && pendingChangesSaved ? (
+                <span className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800">
+                  Changes sent to Super Admin
+                </span>
+              ) : null}
             </div>
           </div>
         )}

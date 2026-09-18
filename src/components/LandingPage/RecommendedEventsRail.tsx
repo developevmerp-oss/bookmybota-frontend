@@ -8,9 +8,7 @@ export default function RecommendedEventsRail({ city }: { city: string }) {
   const { events, isLoadingEvents } = useHomeCatalog(city);
   const items = events.slice(0, 12);
   const empty =
-    !isLoadingEvents && items.length === 0
-      ? `No events in ${city && city !== "All Cities" ? city : "your city"} yet`
-      : undefined;
+    !isLoadingEvents && items.length === 0 ? "No events available yet." : undefined;
 
   return (
     <ContentRail

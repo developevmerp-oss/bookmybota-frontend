@@ -35,6 +35,7 @@ import {
   Building2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useSelectedCity } from "@/lib/useSelectedCity";
 import {
   useCreateEventBookingMutation,
   useCreateEventSeatHoldMutation,
@@ -197,6 +198,7 @@ export default function EventCheckout({
   const isPage = variant === "page";
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const selectedCity = useSelectedCity();
   const authUser = useAppSelector((state) => state.auth.user);
   const [step, setStep] = useState(1);
   const [showtimeId, setShowtimeId] = useState("");
@@ -674,6 +676,7 @@ export default function EventCheckout({
         promo_code: code,
         ticket_amount: ticketAmount,
         ...(phone.trim() ? { guest_phone: sanitizePhoneInput(phone) } : {}),
+        ...(selectedCity ? { city: selectedCity } : {}),
       }).unwrap();
       setAppliedPromo(result);
       setAppliedGiftCard(null);

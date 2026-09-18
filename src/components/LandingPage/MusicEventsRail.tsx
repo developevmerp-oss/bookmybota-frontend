@@ -7,9 +7,15 @@ import { useHomeCatalog } from "./useHomeCatalog";
 import { isMusicEvent } from "./homeUtils";
 
 export default function MusicEventsRail({ city }: { city: string }) {
-  const { events, fallbackEvents, categories, isLoadingEvents } = useHomeCatalog(city);
-  const pool = events.length > 0 ? events : fallbackEvents;
-  const items = useMemo(() => pool.filter(isMusicEvent).slice(0, 16), [pool]);
+  const { cityEvents, fallbackEvents, categories, isLoadingEvents, hasCity } =
+    useHomeCatalog(city);
+
+  const items = useMemo(() => {
+    const fromCity = cityEvents.filter(isMusicEvent);
+    if (fromCity.length > 0 || !hasCity) return fromCity.slice(0, 16);
+    return fallbackEvents.filter(isMusicEvent).slice(0, 16);
+  }, [cityEvents, fallbackEvents, hasCity]);
+
   const musicCat = categories.find((c) => {
     const s = `${c.slug} ${c.name}`.toLowerCase();
     return s.includes("music") || s.includes("concert");

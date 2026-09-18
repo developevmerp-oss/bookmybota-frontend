@@ -1,5 +1,5 @@
 "use client";
-import { useState, use, useRef, useEffect, useCallback } from 'react';
+import { useState, use, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   MapPin, Phone, CheckCircle, Calendar, Users, Clock,
@@ -41,7 +41,10 @@ import {
   useGetBusinessesQuery,
   useGetCollectionsQuery,
   useGetDiningEligiblePlatformOffersQuery,
+  useGetBusinessOperatingDatesQuery,
   type DiningEligiblePlatformOffer,
+  type BusinessOperatingDate,
+  type DiningMealsConfig,
 } from '@/services/api';
 import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
@@ -320,9 +323,16 @@ const formatDateLabel = (date: Date, idx: number) => {
   return { top: date.toLocaleDateString('en-IN', { weekday: 'short' }), bottom: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) };
 };
 
-const generateTimeSlots = (
+function toLocalDateKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const generateTimeSlotsFromDay = (
   selectedDateIndex: number,
-  operatingHours?: Record<string, { open: string; close: string; closed: boolean }>,
+  day: BusinessOperatingDate | null | undefined,
   selectedDate?: Date
 ) => {
   const slots: string[] = [];
@@ -334,57 +344,34 @@ const generateTimeSlots = (
     targetDate.setDate(targetDate.getDate() + selectedDateIndex);
   }
 
-  // Determine weekday rules
-  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const dayOfWeek = days[targetDate.getDay()];
-  const dayRules = operatingHours ? operatingHours[dayOfWeek] : null;
-
-  // If closed on this day, no slots available
-  if (dayRules && dayRules.closed) {
+  if (!day || !day.is_open || !day.open_time || !day.close_time) {
     return [];
   }
 
-  // Get start/end bounds (defaulting to 08:00 - 23:30 if not defined)
-  let openTime = "08:00";
-  let closeTime = "23:30";
-  if (dayRules && dayRules.open && dayRules.close) {
-    openTime = dayRules.open;
-    closeTime = dayRules.close;
-  }
-
+  const openTime = day.open_time.slice(0, 5);
+  const closeTime = day.close_time.slice(0, 5);
   const [openH, openM] = openTime.split(':').map(Number);
   const [closeH, closeM] = closeTime.split(':').map(Number);
-
   const openVal = openH * 60 + openM;
   const closeVal = closeH * 60 + closeM;
 
   for (let h = 0; h < 24; h++) {
     for (let m = 0; m < 60; m += 30) {
-      const hour = h.toString().padStart(2, '0');
-      const min = m.toString().padStart(2, '0');
-      const slot = `${hour}:${min}`;
-
-      const currentVal = h * 60 + m;
-
-      // Check operating hours bounds (including overnight logic)
-      let isValidSlot = false;
+      const slotVal = h * 60 + m;
+      let inWindow = false;
       if (closeVal >= openVal) {
-        isValidSlot = currentVal >= openVal && currentVal <= closeVal;
+        inWindow = slotVal >= openVal && slotVal <= closeVal;
       } else {
-        // Cross-midnight overnight hours
-        isValidSlot = currentVal >= openVal || currentVal <= closeVal;
+        inWindow = slotVal >= openVal || slotVal <= closeVal;
       }
-
-      if (!isValidSlot) continue;
-
+      if (!inWindow) continue;
       if (selectedDateIndex === 0) {
-        // Only show future slots for today (add 30min buffer)
-        const slotDate = new Date();
+        const slotDate = new Date(targetDate);
         slotDate.setHours(h, m, 0, 0);
         const bufferNow = new Date(now.getTime() + 30 * 60 * 1000);
         if (slotDate <= bufferNow) continue;
       }
-      slots.push(slot);
+      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
   }
   return slots;
@@ -517,6 +504,23 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const resolvedParams = use(params);
   const router = useRouter();
   const { data: profile, isLoading } = useGetBusinessPublicQuery(resolvedParams.id);
+  const bookingDates = useMemo(() => getBookingDates(), []);
+  const opDateRange = useMemo(() => {
+    if (!bookingDates.length) return { from: '', to: '' };
+    return {
+      from: toLocalDateKey(bookingDates[0]),
+      to: toLocalDateKey(bookingDates[bookingDates.length - 1]),
+    };
+  }, [bookingDates]);
+  const { data: operatingDates = [] } = useGetBusinessOperatingDatesQuery(
+    { bizId: resolvedParams.id, from: opDateRange.from, to: opDateRange.to },
+    { skip: !resolvedParams.id || !opDateRange.from }
+  );
+  const operatingByDate = useMemo(() => {
+    const map = new Map<string, BusinessOperatingDate>();
+    for (const row of operatingDates) map.set(row.op_date, row);
+    return map;
+  }, [operatingDates]);
   const [createBooking] = useCreateBookingMutation();
   const [checkAvailabilityQuery] = useLazyCheckAvailabilityQuery();
   const { data: reviewsData } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
@@ -528,7 +532,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const { data: collections = [] } = useGetCollectionsQuery();
   const firstCollectionSlug = profile?.collection_slugs?.[0];
   const { data: similarBusinesses = [] } = useGetBusinessesQuery(
-    { collection: firstCollectionSlug },
+    { module: "dining", collection: firstCollectionSlug },
     { skip: !firstCollectionSlug }
   );
 
@@ -1072,19 +1076,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLightboxOpen, lightboxItems.length]);
 
-  const bookingDates = getBookingDates();
+  // Find if selected day is closed (calendar date row is source of truth)
+  const selectedOpDay = operatingByDate.get(toLocalDateKey(bookingDates[selectedDateIndex]));
+  const isSelectedDayClosed = !selectedOpDay || selectedOpDay.is_open === false;
 
-  // Find if selected day is closed
-  const isSelectedDayClosed = (() => {
-    if (!profile) return false;
-    const targetDate = bookingDates[selectedDateIndex];
-    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayOfWeek = days[targetDate.getDay()];
-    const dayRules = profile.operating_hours ? profile.operating_hours[dayOfWeek] : null;
-    return dayRules?.closed === true;
-  })();
-
-  const timeSlots = generateTimeSlots(selectedDateIndex, profile?.operating_hours, bookingDates[selectedDateIndex]);
+  const timeSlots = generateTimeSlotsFromDay(
+    selectedDateIndex,
+    selectedOpDay,
+    bookingDates[selectedDateIndex]
+  );
 
   const handleDateSelect = (idx: number) => {
     setSelectedDateIndex(idx);
@@ -1312,31 +1312,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const ratingValue = Number(profile.rating || 4.5).toFixed(1);
   const reviewsCount = profile.reviews_count || 120;
 
-  // Calculate dynamic timing details based on database operating hours
-  const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const todayDayName = daysOfWeek[new Date().getDay()];
-  const todayRules = profile?.operating_hours?.[todayDayName];
+  // Calculate dynamic timing details based on calendar operating dates
+  const todayOp = operatingByDate.get(toLocalDateKey(new Date()));
 
   let todayOpen = "08:00";
   let todayClose = "23:30";
-  let isClosedToday = false;
+  let isClosedToday = !todayOp || todayOp.is_open === false;
 
-  if (todayRules) {
-    if (todayRules.closed) {
-      isClosedToday = true;
-    } else {
-      todayOpen = todayRules.open || "08:00";
-      todayClose = todayRules.close || "23:30";
-    }
-  } else {
-    // Fallback: Fri-Sun: 8:00 AM - 1:00 AM, Mon-Thu: 8:00 AM - 11:30 PM
-    if (['friday', 'saturday', 'sunday'].includes(todayDayName)) {
-      todayOpen = "08:00";
-      todayClose = "01:00";
-    } else {
-      todayOpen = "08:00";
-      todayClose = "23:30";
-    }
+  if (todayOp?.is_open) {
+    todayOpen = (todayOp.open_time || "08:00").slice(0, 5);
+    todayClose = (todayOp.close_time || "23:30").slice(0, 5);
   }
 
   // Calculate if currently open
@@ -1417,6 +1402,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       <CategoryPromoBanners
         category="DINING"
         targetId={resolvedParams.id}
+        city={city}
         className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-3"
       />
 
@@ -2256,21 +2242,52 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {/* Panel Content */}
             <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : drawerStep === 1 ? 'pt-1 pb-2 bg-white' : 'p-5 bg-white'}`}>
               {drawerStep === 1 && (() => {
-                const mealsConfig = (profile.operating_hours as any)?.meals || {
+                const mealsConfig: DiningMealsConfig = selectedOpDay?.meals || {
                   breakfast: { open: '08:00', close: '11:00', active: true },
                   lunch: { open: '11:30', close: '16:00', active: true },
                   dinner: { open: '17:00', close: '23:00', active: true }
                 };
 
+                const dayOpenHm = (selectedOpDay?.open_time || '00:00').slice(0, 5);
+                const dayCloseHm = (selectedOpDay?.close_time || '23:59').slice(0, 5);
+                const clipMeal = (open: string, close: string) => {
+                  if (!dayCloseHm || dayCloseHm <= dayOpenHm) return { open, close };
+                  const toM = (t: string) => {
+                    const [h, m] = t.split(':').map(Number);
+                    return h * 60 + m;
+                  };
+                  const fromM = (n: number) =>
+                    `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+                  const lo = toM(dayOpenHm);
+                  const hi = toM(dayCloseHm);
+                  const a = Math.max(lo, toM(open));
+                  const b = Math.min(hi, toM(close));
+                  if (a >= b) return null;
+                  return { open: fromM(a), close: fromM(b) };
+                };
+
                 const isToday = selectedDateIndex === 0;
-                const breakfastSlots = mealsConfig.breakfast?.active
-                  ? generateSlotsForMeal(mealsConfig.breakfast.open, mealsConfig.breakfast.close, isToday)
+                const dayClosed = isSelectedDayClosed;
+                const breakfastWindow = mealsConfig.breakfast?.active
+                  ? clipMeal(mealsConfig.breakfast.open, mealsConfig.breakfast.close)
+                  : null;
+                const lunchWindow = mealsConfig.lunch?.active
+                  ? clipMeal(mealsConfig.lunch.open, mealsConfig.lunch.close)
+                  : null;
+                const dinnerWindow = mealsConfig.dinner?.active
+                  ? clipMeal(mealsConfig.dinner.open, mealsConfig.dinner.close)
+                  : null;
+                const breakfastSlots =
+                  !dayClosed && breakfastWindow
+                  ? generateSlotsForMeal(breakfastWindow.open, breakfastWindow.close, isToday)
                   : [];
-                const lunchSlots = mealsConfig.lunch?.active
-                  ? generateSlotsForMeal(mealsConfig.lunch.open, mealsConfig.lunch.close, isToday)
+                const lunchSlots =
+                  !dayClosed && lunchWindow
+                  ? generateSlotsForMeal(lunchWindow.open, lunchWindow.close, isToday)
                   : [];
-                const dinnerSlots = mealsConfig.dinner?.active
-                  ? generateSlotsForMeal(mealsConfig.dinner.open, mealsConfig.dinner.close, isToday)
+                const dinnerSlots =
+                  !dayClosed && dinnerWindow
+                  ? generateSlotsForMeal(dinnerWindow.open, dinnerWindow.close, isToday)
                   : [];
 
                 const mealOptions = (

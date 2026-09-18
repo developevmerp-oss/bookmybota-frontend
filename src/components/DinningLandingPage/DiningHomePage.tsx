@@ -24,7 +24,8 @@ import "swiper/css";
 import "swiper/css/pagination";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
-import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
+import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -1225,32 +1226,77 @@ export default function Home() {
     setExploreCardId((prev) => (prev === nextId ? prev : nextId));
   }, [activeCategories, businessTypes]);
 
+  const diningListArgs = useMemo(
+    () => ({
+      module: "dining" as const,
+      q: searchQuery || undefined,
+      categories: activeCategories.length > 0 ? activeCategories : undefined,
+      cuisines: diningFilters.cuisines.length > 0 ? diningFilters.cuisines : undefined,
+      min_rating: diningFilters.minRating > 0 ? diningFilters.minRating : undefined,
+      offers_only: diningFilters.offersOnly || undefined,
+      pure_veg: diningFilters.pureVeg || undefined,
+      serves_alcohol: diningFilters.servesAlcohol || undefined,
+      max_cost: diningFilters.maxCost > 0 ? diningFilters.maxCost : undefined,
+      sort: diningFilters.sort,
+      page: currentPage,
+      limit: DINING_LIST_LIMIT,
+    }),
+    [
+      searchQuery,
+      activeCategories,
+      diningFilters.cuisines,
+      diningFilters.minRating,
+      diningFilters.offersOnly,
+      diningFilters.pureVeg,
+      diningFilters.servesAlcohol,
+      diningFilters.maxCost,
+      diningFilters.sort,
+      currentPage,
+    ]
+  );
+
   const {
-    data: businessesData,
-    isLoading: businessesLoading,
-    isFetching: businessesFetching,
+    data: cityBusinessesData,
+    isLoading: cityBusinessesLoading,
+    isFetching: cityBusinessesFetching,
   } = useGetBusinessesPagedQuery({
-    module: "dining",
-    q: searchQuery || undefined,
+    ...diningListArgs,
     city: activeCity,
-    categories: activeCategories.length > 0 ? activeCategories : undefined,
-    cuisines: diningFilters.cuisines.length > 0 ? diningFilters.cuisines : undefined,
-    min_rating: diningFilters.minRating > 0 ? diningFilters.minRating : undefined,
-    offers_only: diningFilters.offersOnly || undefined,
-    pure_veg: diningFilters.pureVeg || undefined,
-    serves_alcohol: diningFilters.servesAlcohol || undefined,
-    max_cost: diningFilters.maxCost > 0 ? diningFilters.maxCost : undefined,
-    sort: diningFilters.sort,
-    page: currentPage,
-    limit: DINING_LIST_LIMIT,
   });
+  const {
+    data: allBusinessesData,
+    isLoading: allBusinessesLoading,
+    isFetching: allBusinessesFetching,
+  } = useGetBusinessesPagedQuery(diningListArgs, { skip: !activeCity });
+
+  const cityBusinessItems = cityBusinessesData?.items ?? [];
+  const usingDiningFallback =
+    Boolean(activeCity) &&
+    !cityBusinessesLoading &&
+    cityBusinessItems.length === 0 &&
+    (cityBusinessesData?.meta?.total ?? 0) === 0;
+  const businessesData = usingDiningFallback ? allBusinessesData : cityBusinessesData;
+  const businessesLoading =
+    cityBusinessesLoading ||
+    (Boolean(activeCity) && cityBusinessItems.length === 0 && allBusinessesLoading);
+  const businessesFetching =
+    cityBusinessesFetching || (usingDiningFallback && allBusinessesFetching);
   const businesses = businessesData?.items ?? [];
 
-  // Full city-scoped list for homepage sections (collections covers / cuisine chips).
-  const { data: sectionBusinesses = [] } = useGetBusinessesQuery({
+  // Full list for homepage sections — city-first, then all dining.
+  const { data: citySectionBusinesses = [] } = useGetBusinessesQuery({
     module: "dining",
     ...(activeCity ? { city: activeCity } : {}),
   });
+  const { data: allSectionBusinesses = [] } = useGetBusinessesQuery(
+    { module: "dining" },
+    { skip: !activeCity }
+  );
+  const sectionBusinesses = preferCityOrAll(
+    citySectionBusinesses,
+    allSectionBusinesses,
+    Boolean(activeCity)
+  );
   const { data: collections = [] } = useGetCollectionsQuery();
   // const { data: moods = [] } = useGetMoodsQuery();
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
@@ -1553,7 +1599,6 @@ export default function Home() {
     diningFiltersAreDefault &&
     (activeCategories.length === 0 || isBarCategoryOnly);
   const useStaticDining = canShowCatalogFallback && !hasSelectedCity;
-  const showCityEmptyDining = canShowCatalogFallback && hasSelectedCity;
   const staticDiningCards = isBarCategoryOnly ? SHOWCASE_BAR_CARDS : SHOWCASE_DINING_CARDS;
 
   const cuisinesScroll = useHorizontalScrollEdges(cuisinesRef, [
@@ -1762,6 +1807,12 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      <CategoryPromoBanners
+        category="DINING"
+        city={activeCity || locationCity || ""}
+        className="container mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+      />
 
       {/* ── 1. Hero Search Banner (centered, reference layout) ─────────────── */}
       {/* <section
@@ -2429,11 +2480,6 @@ className={`text-sm font-bold mt-2 transition-colors ${
                 <ShowcaseRestaurantCard key={place.id} place={place} />
               ))}
             </div>
-          ) : showCityEmptyDining ? (
-            <CityLocationEmptyState
-              categoryLabel={isBarCategoryOnly ? "bars" : "restaurants"}
-              city={locationCity}
-            />
           ) : displayRestaurants.length === 0 ? (
             <div className="text-center py-24">
               <div className="text-5xl mb-4">🍽️</div>

@@ -4,10 +4,9 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Navigation, Pagination } from "swiper/modules";
+import { Autoplay, Navigation } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
-import "swiper/css/pagination";
 import type { Business, MarketingCampaign, Movie, PublicEvent } from "@/services/api";
 import {
   useGetActiveMarketingPromotionsQuery,
@@ -16,7 +15,13 @@ import {
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { promotionClickHref } from "@/lib/promotionCta";
 import { useHomeCatalog } from "./useHomeCatalog";
-import { eventLandscape, eventPortrait, hasCityFilter } from "./homeUtils";
+import {
+  eventLandscape,
+  eventPortrait,
+  eventsWithImage,
+  hasCityFilter,
+  preferCityOrAll,
+} from "./homeUtils";
 import "./PromoBannerCarousel.css";
 
 type PromoBannerCarouselProps = {
@@ -90,7 +95,23 @@ function shortAbout(about?: string | null, excludeName?: string) {
   const name = normalizePhrase(excludeName).toLowerCase();
   if (name && raw.toLowerCase() === name) return undefined;
   if (name && raw.toLowerCase().startsWith(name) && raw.length - name.length < 8) return undefined;
+  // Never surface internal marketing-plan labels as customer copy
+  if (isInternalPlanLabel(raw)) return undefined;
   return raw.length > 56 ? `${raw.slice(0, 53).trim()}…` : raw;
+}
+
+/** Plan / product labels that must not appear on the public hero. */
+function isInternalPlanLabel(value?: string | null) {
+  const t = normalizePhrase(value).toLowerCase();
+  if (!t) return false;
+  return (
+    /^(list|listing)\s+promotion/.test(t) ||
+    /^landing\s+slider/.test(t) ||
+    /^category\s+rail/.test(t) ||
+    /^top\s+search\s+priority/.test(t) ||
+    t === "promotion" ||
+    t === "featured"
+  );
 }
 
 /**
@@ -99,7 +120,8 @@ function shortAbout(about?: string | null, excludeName?: string) {
  */
 function accentFromPromo(raw?: string | null) {
   const text = (raw || "").replace(/\s+/g, " ").trim();
-  return text || undefined;
+  if (!text || isInternalPlanLabel(text)) return undefined;
+  return text;
 }
 
 function taglineVisible(slide: Slide) {
@@ -180,6 +202,29 @@ function diningToSlide(place: Business, city: string): Slide {
   };
 }
 
+function resolvePromoLinks(
+  promo: MarketingCampaign,
+  ctx: {
+    eventsById: Map<string, PublicEvent>;
+    moviesById: Map<string, Movie>;
+    diningById: Map<string, Business>;
+  }
+) {
+  const targetType = String(promo.target_type || "").toUpperCase();
+  const targetId = promo.target_id ? String(promo.target_id) : "";
+  const linkedEvent =
+    targetType === "EVENT" && targetId ? ctx.eventsById.get(targetId) : undefined;
+  const linkedMovie =
+    targetType === "MOVIE" && targetId ? ctx.moviesById.get(targetId) : undefined;
+  const linkedDining =
+    (targetType === "RESTAURANT" || targetType === "BUSINESS") && targetId
+      ? ctx.diningById.get(targetId) || ctx.diningById.get(String(promo.business_id || ""))
+      : targetType === "" && promo.category?.toUpperCase() === "DINING"
+        ? ctx.diningById.get(String(promo.business_id || ""))
+        : undefined;
+  return { linkedEvent, linkedMovie, linkedDining, targetType, targetId };
+}
+
 function promoToSlide(
   promo: MarketingCampaign,
   ctx: {
@@ -192,19 +237,7 @@ function promoToSlide(
   const banner = resolveMediaUrl(promo.banner_image_url || "");
   const designed = Boolean(banner);
   const href = promotionClickHref(promo) || categoryFallbackHref(promo.category);
-  const targetType = String(promo.target_type || "").toUpperCase();
-  const targetId = promo.target_id ? String(promo.target_id) : "";
-
-  const linkedEvent =
-    targetType === "EVENT" && targetId ? ctx.eventsById.get(targetId) : undefined;
-  const linkedMovie =
-    targetType === "MOVIE" && targetId ? ctx.moviesById.get(targetId) : undefined;
-  const linkedDining =
-    (targetType === "RESTAURANT" || targetType === "BUSINESS") && targetId
-      ? ctx.diningById.get(targetId) || ctx.diningById.get(String(promo.business_id || ""))
-      : targetType === "" && promo.category?.toUpperCase() === "DINING"
-        ? ctx.diningById.get(String(promo.business_id || ""))
-        : undefined;
+  const { linkedEvent, linkedMovie, linkedDining } = resolvePromoLinks(promo, ctx);
 
   // Base from linked entity when available
   let base: Slide | null = null;
@@ -212,14 +245,22 @@ function promoToSlide(
   else if (linkedMovie) base = movieToSlide(linkedMovie);
   else if (linkedDining) base = diningToSlide(linkedDining, ctx.city);
 
-  const promoTitle = normalizePhrase(promo.title) || normalizePhrase(promo.plan_name) || "Featured";
+  // Prefer a real campaign title; never use marketing plan name as the hero title.
+  const rawPromoTitle = normalizePhrase(promo.title);
+  const promoTitle =
+    rawPromoTitle && !isInternalPlanLabel(rawPromoTitle)
+      ? rawPromoTitle
+      : base?.title || "Featured";
   const { title: splitTitle, year: splitYear } = splitTitleYear(
     promoTitle,
-    linkedEvent?.next_showtime
+    linkedEvent?.next_showtime || linkedMovie?.release_date || undefined
   );
 
-  // Prefer promotion title when organizer set one; keep linked meta (date/place)
-  const title = base && !promo.title ? base.title : splitTitle;
+  // Prefer linked event/movie/dining title when promo title is missing or is a plan label
+  const title =
+    base && (!rawPromoTitle || isInternalPlanLabel(rawPromoTitle))
+      ? base.title
+      : splitTitle;
   const year = base?.year || splitYear;
 
   const accent = accentFromPromo(promo.slider_accent_text);
@@ -228,12 +269,19 @@ function promoToSlide(
     id: `promo-${promo.id}`,
     title,
     year,
+    // Customer-facing tagline only — never marketing plan_name ("List promotion", etc.)
     tagline:
       shortAbout(base?.tagline, title) ||
-      (promo.plan_name && promo.title && promo.plan_name !== promo.title
-        ? normalizePhrase(promo.plan_name)
-        : undefined) ||
-      base?.tagline,
+      shortAbout(
+        linkedEvent?.about_event ||
+          linkedMovie?.description ||
+          linkedDining?.description ||
+          null,
+        title
+      ) ||
+      (linkedEvent?.category_name
+        ? `${linkedEvent.category_name} • Live near you`
+        : undefined),
     // Slider API requires banner — always prefer the promotion creative
     image: banner || base?.image || "",
     href,
@@ -361,32 +409,58 @@ function SlideCard({ slide }: { slide: Slide }) {
 }
 
 export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) {
-  const { bannerEvents, events, fallbackEvents, dining, isLoadingEvents, isLoadingFallback } =
-    useHomeCatalog(city);
+  const {
+    events,
+    fallbackEvents,
+    cityEvents,
+    dining,
+    isLoadingEvents,
+    isLoadingFallback,
+  } = useHomeCatalog(city);
   const hasCity = hasCityFilter(city);
-  const { data: moviesData, isLoading: loadingMovies } = useGetPublicMoviesQuery({
+  const { data: cityMoviesData, isLoading: loadingCityMovies } = useGetPublicMoviesQuery({
     limit: 50,
     ...(hasCity ? { city } : {}),
   });
+  const { data: allMoviesData, isLoading: loadingAllMovies } = useGetPublicMoviesQuery(
+    { limit: 50 },
+    { skip: !hasCity }
+  );
+  const movieItems = preferCityOrAll(
+    cityMoviesData?.items ?? [],
+    allMoviesData?.items ?? [],
+    hasCity
+  );
+  const loadingMovies =
+    loadingCityMovies || (hasCity && (cityMoviesData?.items?.length ?? 0) === 0 && loadingAllMovies);
   const { data: promotions = [], isLoading: loadingPromos } = useGetActiveMarketingPromotionsQuery({
     surface: "slider",
+    ...(hasCity ? { city } : {}),
   });
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+  const swiperRef = useRef<SwiperType | null>(null);
+  const [activeDot, setActiveDot] = useState(0);
+
+  /** Location-strict event banners: city only when selected; all when no city. Never fall back. */
+  const locationBannerEvents = useMemo(() => {
+    if (hasCity) return eventsWithImage(cityEvents);
+    return eventsWithImage(fallbackEvents.length ? fallbackEvents : events);
+  }, [hasCity, cityEvents, fallbackEvents, events]);
 
   const eventsById = useMemo(() => {
     const map = new Map<string, PublicEvent>();
-    for (const list of [bannerEvents, events, fallbackEvents]) {
+    for (const list of [locationBannerEvents, cityEvents, events, fallbackEvents]) {
       for (const e of list) map.set(String(e.id), e);
     }
     return map;
-  }, [bannerEvents, events, fallbackEvents]);
+  }, [locationBannerEvents, cityEvents, events, fallbackEvents]);
 
   const moviesById = useMemo(() => {
     const map = new Map<string, Movie>();
-    for (const m of moviesData?.items || []) map.set(String(m.id), m);
+    for (const m of movieItems) map.set(String(m.id), m);
     return map;
-  }, [moviesData?.items]);
+  }, [movieItems]);
 
   const diningById = useMemo(() => {
     const map = new Map<string, Business>();
@@ -395,29 +469,51 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
   }, [dining]);
 
   const slides = useMemo<Slide[]>(() => {
-    // Priority 1: live landing-slider promotions (dynamic)
+    const linkCtx = { city, eventsById, moviesById, diningById };
+
+    // Priority 1: location-scoped landing-slider promotions (API filters by city)
     if (promotions.length > 0) {
-      return promotions
+      const fromPromos = promotions
         .slice(0, 10)
-        .map((p) =>
-          promoToSlide(p, { city, eventsById, moviesById, diningById })
-        )
-        .filter((s) => s.image || s.title);
+        .map((p) => promoToSlide(p, linkCtx))
+        .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()));
+      if (fromPromos.length > 0) return fromPromos;
     }
 
-    // Priority 2: fallback events when no promotions are active
-    return bannerEvents.slice(0, 8).map((event) => eventToSlide(event, city));
-  }, [promotions, bannerEvents, city, eventsById, moviesById, diningById]);
+    // Priority 2: location-scoped events only — hide section if none for this city
+    return locationBannerEvents
+      .slice(0, 8)
+      .map((event) => eventToSlide(event, city))
+      .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()));
+  }, [promotions, locationBannerEvents, city, eventsById, moviesById, diningById]);
+
+  // Peek gutters need neighboring cards. With only 2–3 slides Swiper can't fill
+  // left/right peeks, so duplicate until we have enough for a seamless loop.
+  const displaySlides = useMemo(() => {
+    if (slides.length <= 1) return slides;
+    const minNeeded = 6;
+    if (slides.length >= minNeeded) return slides;
+    const out: Slide[] = [];
+    let copy = 0;
+    while (out.length < minNeeded) {
+      for (const s of slides) {
+        out.push(copy === 0 ? s : { ...s, id: `${s.id}__c${copy}` });
+        if (out.length >= minNeeded) break;
+      }
+      copy += 1;
+    }
+    return out;
+  }, [slides]);
 
   const loading =
     loadingPromos ||
     (promotions.length === 0 &&
-      (isLoadingEvents || loadingMovies || (slides.length === 0 && isLoadingFallback)));
+      (isLoadingEvents || loadingMovies || (hasCity && slides.length === 0 && isLoadingFallback)));
 
   if (loading) {
     return (
-      <section className="promo-banner-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4">
-        <div className="mx-auto w-[92%] sm:w-[88%] md:w-[86%] lg:w-[82%] max-w-[1180px]">
+      <section className="promo-banner-swiper is-single w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4">
+        <div className="promo-banner-single-wrap">
           <div className="promo-banner-frame rounded-2xl sm:rounded-3xl overflow-hidden promo-slide-skeleton" />
         </div>
       </section>
@@ -427,32 +523,38 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
   if (slides.length === 0) return null;
 
   const multi = slides.length > 1;
-  // Peek + slidesPerView:"auto" needs enough slides for loop clones;
-  // otherwise Swiper warns and disables loop. Use rewind when short.
-  const canLoop = slides.length >= 4;
+  const originalCount = slides.length;
 
   return (
-    <section className="promo-banner-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4">
-      <div className="relative w-full">
+    <section
+      className={`promo-banner-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4 ${
+        multi ? "is-multi" : "is-single"
+      }`}
+    >
+      <div className={`relative w-full ${multi ? "" : "promo-banner-single-wrap"}`}>
         <Swiper
-          key={`promo-dyn-${slides.map((s) => s.id).join("-")}`}
-          modules={[Autoplay, Navigation, Pagination]}
+          key={`promo-dyn-${slides.map((s) => s.id).join("-")}-${displaySlides.length}`}
+          modules={[Autoplay, Navigation]}
           className="promo-banner-peek w-full"
-          loop={canLoop}
-          rewind={multi && !canLoop}
-          loopAdditionalSlides={canLoop ? 2 : 0}
+          loop={multi}
+          loopAdditionalSlides={multi ? 2 : 0}
           speed={600}
-          centeredSlides
-          grabCursor
-          allowTouchMove
-          slidesPerView="auto"
-          spaceBetween={14}
-          watchSlidesProgress
-          breakpoints={{
-            640: { spaceBetween: 16 },
-            768: { spaceBetween: 18 },
-            1024: { spaceBetween: 20 },
-          }}
+          centeredSlides={multi}
+          centeredSlidesBounds={!multi}
+          grabCursor={multi}
+          allowTouchMove={multi}
+          slidesPerView={multi ? "auto" : 1}
+          spaceBetween={multi ? 14 : 0}
+          watchSlidesProgress={multi}
+          breakpoints={
+            multi
+              ? {
+                  640: { spaceBetween: 16 },
+                  768: { spaceBetween: 18 },
+                  1024: { spaceBetween: 20 },
+                }
+              : undefined
+          }
           autoplay={
             multi
               ? {
@@ -464,7 +566,6 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
                 }
               : false
           }
-          pagination={multi ? { clickable: true } : false}
           navigation={
             multi
               ? {
@@ -482,6 +583,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
             }
           }}
           onSwiper={(swiper) => {
+            swiperRef.current = swiper;
             if (!multi) return;
             setTimeout(() => {
               const nav = swiper.params?.navigation;
@@ -493,8 +595,13 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
               swiper.navigation?.update?.();
             });
           }}
+          onSlideChange={(swiper) => {
+            if (!multi || originalCount <= 0) return;
+            const real = ((swiper.realIndex % originalCount) + originalCount) % originalCount;
+            setActiveDot(real);
+          }}
         >
-          {slides.map((slide) => (
+          {displaySlides.map((slide) => (
             <SwiperSlide key={slide.id} className="promo-banner-slide">
               <Link
                 href={slide.href}
@@ -507,7 +614,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
           ))}
         </Swiper>
 
-        {multi && (
+        {multi ? (
           <>
             <button
               ref={prevRef}
@@ -525,8 +632,27 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
             >
               <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.25} />
             </button>
+            <div className="promo-banner-dots" role="tablist" aria-label="Banner slides">
+              {slides.map((slide, index) => (
+                <button
+                  key={slide.id}
+                  type="button"
+                  role="tab"
+                  aria-label={`Show ${slide.title}`}
+                  aria-selected={index === activeDot}
+                  className={`promo-banner-dot ${index === activeDot ? "is-active" : ""}`}
+                  onClick={() => {
+                    const swiper = swiperRef.current;
+                    if (!swiper) return;
+                    // Jump to the matching slide in the first copy set
+                    swiper.slideToLoop(index);
+                    setActiveDot(index);
+                  }}
+                />
+              ))}
+            </div>
           </>
-        )}
+        ) : null}
       </div>
     </section>
   );

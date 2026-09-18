@@ -188,6 +188,7 @@ function SearchContent() {
   const [loadedRestaurants, setLoadedRestaurants] = useState<Business[]>([]);
 
   const { data: businessesData, isLoading: loadingBusinesses, isFetching: loadingMore } = useGetBusinessesPagedQuery({
+    module: "dining",
     collection: collectionParam || undefined,
     mood: moodParam || undefined,
     q: queryParam || undefined,

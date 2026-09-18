@@ -142,8 +142,8 @@ export default function ProfilePage() {
         city_id: settings.city_id != null ? String(settings.city_id) : '',
         description: settings.description || '',
         average_cost: settings.average_cost ? String(settings.average_cost) : '',
-        open_time: settings.operating_hours?.['monday']?.open || '08:00',
-        close_time: settings.operating_hours?.['monday']?.close || '23:30',
+        open_time: '08:00',
+        close_time: '23:30',
       });
       setCoverUrl(settings.cover_image_url || '');
       setGalleryImages(normalizeImageList(settings.gallery_images));
@@ -161,8 +161,6 @@ export default function ProfilePage() {
   const onSave = handleSubmit(
     async (values) => {
     if (!bizId) return;
-    const openTime = values.open_time || '08:00';
-    const closeTime = values.close_time || '23:30';
     try {
       const res = await updateSettings({
         bizId,
@@ -179,15 +177,6 @@ export default function ProfilePage() {
           city_id: values.city_id ? Number(values.city_id) : null,
           cuisine,
           collection_ids: collectionIds,
-          operating_hours: {
-            sunday: { open: openTime, close: closeTime, closed: false },
-            monday: { open: openTime, close: closeTime, closed: false },
-            tuesday: { open: openTime, close: closeTime, closed: false },
-            wednesday: { open: openTime, close: closeTime, closed: false },
-            thursday: { open: openTime, close: closeTime, closed: false },
-            friday: { open: openTime, close: closeTime, closed: false },
-            saturday: { open: openTime, close: closeTime, closed: false },
-          }
         }
       }).unwrap();
       toast.success((res as { message?: string }).message || 'Profile saved successfully!');
@@ -418,17 +407,12 @@ export default function ProfilePage() {
                     )}
                     <p className={helperClass}>Choose the curated lists this venue should appear in on the dining homepage.</p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Open Time</label>
-                      <input type="time" className={inputClass} {...register('open_time')} />
-                      {errors.open_time && <p className={fieldErrorClass}>{errors.open_time.message}</p>}
-                    </div>
-                    <div>
-                      <label className={labelClass}>Close Time</label>
-                      <input type="time" className={inputClass} {...register('close_time')} />
-                      {errors.close_time && <p className={fieldErrorClass}>{errors.close_time.message}</p>}
-                    </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">Open / close hours</p>
+                    <p className="mt-1 text-amber-800/90">
+                      Manage daily open, close, and meal periods on the Dashboard calendar.
+                      Profile save no longer overwrites those dates.
+                    </p>
                   </div>
 
                   <div>

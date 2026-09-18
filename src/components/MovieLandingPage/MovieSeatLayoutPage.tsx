@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
+import { useSelectedCity } from "@/lib/useSelectedCity";
 import {
   useGetMovieShowtimeLayoutQuery,
   useCreateMovieBookingMutation,
@@ -41,6 +42,7 @@ import {
   useGetMyGiftCardsQuery,
   usePreviewGiftCardRedeemMutation,
   useGetShowtimeBeveragesQuery,
+  useValidatePlatformPromoCodeMutation,
   type MovieBookingSeatPayload,
   type GiftCardRedeemPreview,
   type CinemaBeverage,
@@ -153,6 +155,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => (state as any).auth?.user);
+  const selectedCity = useSelectedCity();
 
   const qty = useMemo(() => {
     const raw = Number(searchParams.get("qty") || 1);
@@ -175,6 +178,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [promoCode, setPromoCode] = useState("");
   const [promoApplied, setPromoApplied] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [appliedPromoOfferId, setAppliedPromoOfferId] = useState<string | null>(null);
   const [giftCardInput, setGiftCardInput] = useState("");
   const [selectedGiftCardId, setSelectedGiftCardId] = useState("");
   const [appliedGiftCard, setAppliedGiftCard] = useState<GiftCardRedeemPreview | null>(null);
@@ -206,6 +210,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [releaseHold] = useReleaseMovieSeatHoldMutation();
   const [createBooking] = useCreateMovieBookingMutation();
   const [previewGiftCard, { isLoading: validatingGiftCard }] = usePreviewGiftCardRedeemMutation();
+  const [validatePromo, { isLoading: validatingPromo }] = useValidatePlatformPromoCodeMutation();
 
   const isCustomerLoggedIn = Boolean(
     authUser && (authUser.role === "customer" || authUser.customer_id)
@@ -563,6 +568,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const resetSeatPromos = () => {
     setPromoApplied(false);
     setDiscountAmount(0);
+    setAppliedPromoOfferId(null);
     setAppliedGiftCard(null);
   };
 
@@ -778,25 +784,47 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     [myGiftCards]
   );
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const code = promoCode.trim().toUpperCase();
     if (!code) {
       toast.error("Please enter a promo code.");
       return;
     }
-    if (code === "WELCOME10" || code === "MOVIE10") {
-      const discount = money(ticketSubtotal * 0.1);
+    if (!movie?.id) {
+      toast.error("Movie details are still loading. Please try again.");
+      return;
+    }
+    if (ticketSubtotal <= 0) {
+      toast.error("Select seats before applying a promo code.");
+      return;
+    }
+
+    try {
+      const result = await validatePromo({
+        movie_id: String(movie.id),
+        promo_code: code,
+        ticket_amount: ticketSubtotal,
+        guest_phone: sanitizePhoneInput(getValues("guest_phone") || authUser?.phone || "") || undefined,
+        ...(selectedCity ? { city: selectedCity } : {}),
+      }).unwrap();
+
+      const discount = money(Number(result.discount_amount) || 0);
+      if (discount <= 0) {
+        toast.error("This promo code does not apply a discount to the current tickets.");
+        return;
+      }
+
+      setPromoCode(result.promo_code || code);
       setDiscountAmount(discount);
       setPromoApplied(true);
+      setAppliedPromoOfferId(result.offer_id || null);
       setAppliedGiftCard(null);
-      toast.success(`Promo code ${code} applied! Saved ${formatMoney(discount)}.`);
-    } else if (code === "FLAT50") {
-      setDiscountAmount(50);
-      setPromoApplied(true);
-      setAppliedGiftCard(null);
-      toast.success(`Promo code ${code} applied! Saved ${formatMoney(50)}.`);
-    } else {
-      toast.error("Invalid or expired promo code.");
+      toast.success(`Promo code ${result.promo_code || code} applied! Saved ${formatMoney(discount)}.`);
+    } catch (err) {
+      setPromoApplied(false);
+      setDiscountAmount(0);
+      setAppliedPromoOfferId(null);
+      toast.error(extractApiError(err, "Invalid or expired promo code."));
     }
   };
 
@@ -804,6 +832,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     setPromoCode("");
     setPromoApplied(false);
     setDiscountAmount(0);
+    setAppliedPromoOfferId(null);
     setAppliedGiftCard(null);
     toast.info("Promo code removed.");
   };
@@ -858,6 +887,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     setPromoApplied(false);
     setDiscountAmount(0);
     setPromoCode("");
+    setAppliedPromoOfferId(null);
     setAppliedGiftCard(null);
     setGiftCardInput("");
     setSelectedGiftCardId("");
@@ -970,6 +1000,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         guest_phone: sanitizePhoneInput(values.guest_phone),
         guest_email: values.guest_email.trim(),
         promo_code: promoApplied ? promoCode.trim() : undefined,
+        platform_offer_id: promoApplied ? appliedPromoOfferId || undefined : undefined,
         payment_method: "CASH",
         hold_id: holdId,
         session_token: sessionToken || readHoldSessionToken(),
@@ -1626,14 +1657,16 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                         type="text"
                         value={promoCode}
                         onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                        placeholder="e.g. WELCOME10"
+                        placeholder="Enter promo code"
                         className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 uppercase placeholder:text-slate-400 focus:outline-none focus:border-[#F84464] focus:ring-1 focus:ring-[#F84464]/20"
                       />
                       <button
                         type="button"
                         onClick={handleApplyPromo}
-                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer"
+                        disabled={validatingPromo || !promoCode.trim()}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                       >
+                        {validatingPromo ? <Loader2 className="size-3.5 animate-spin" /> : null}
                         Apply
                       </button>
                     </div>

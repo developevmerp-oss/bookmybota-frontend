@@ -7,9 +7,15 @@ import { useHomeCatalog } from "./useHomeCatalog";
 import { isComedyEvent } from "./homeUtils";
 
 export default function ComedyEventsRail({ city }: { city: string }) {
-  const { events, fallbackEvents, categories, isLoadingEvents } = useHomeCatalog(city);
-  const pool = events.length > 0 ? events : fallbackEvents;
-  const items = useMemo(() => pool.filter(isComedyEvent).slice(0, 16), [pool]);
+  const { cityEvents, fallbackEvents, categories, isLoadingEvents, hasCity } =
+    useHomeCatalog(city);
+
+  const items = useMemo(() => {
+    const fromCity = cityEvents.filter(isComedyEvent);
+    if (fromCity.length > 0 || !hasCity) return fromCity.slice(0, 16);
+    return fallbackEvents.filter(isComedyEvent).slice(0, 16);
+  }, [cityEvents, fallbackEvents, hasCity]);
+
   const comedyCat = categories.find((c) => {
     const s = `${c.slug} ${c.name}`.toLowerCase();
     return s.includes("comedy") || s.includes("stand") || s.includes("laughter");

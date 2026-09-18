@@ -23,6 +23,8 @@ import {
   useGetPlatformOffersQuery,
   usePatchPlatformOfferStatusMutation,
   useUpdatePlatformOfferMutation,
+  useGetGeoCountriesQuery,
+  useGetCitiesQuery,
   type PlatformOffer,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -80,6 +82,8 @@ const EMPTY_FORM: AdminPlatformOfferValues = {
   event_ids: [],
   restaurant_ids: [],
   movie_ids: [],
+  country_id: "",
+  city_id: "",
 };
 
 function statusBadge(status?: string) {
@@ -125,6 +129,8 @@ function offerToForm(o: PlatformOffer): AdminPlatformOfferValues {
     event_ids: o.event_ids || [],
     restaurant_ids: o.restaurant_ids || [],
     movie_ids: o.movie_ids || [],
+    country_id: o.country_id != null ? o.country_id : "",
+    city_id: o.city_id != null ? o.city_id : "",
   };
 }
 
@@ -157,6 +163,17 @@ export default function AdminPlatformOffersPage() {
   const eventIds = watch("event_ids") ?? [];
   const restaurantIds = watch("restaurant_ids") ?? [];
   const movieIds = watch("movie_ids") ?? [];
+  const selectedCountryId = watch("country_id");
+  const countryIdNum =
+    selectedCountryId === "" || selectedCountryId == null
+      ? undefined
+      : Number(selectedCountryId);
+
+  const { data: countries = [] } = useGetGeoCountriesQuery(undefined, { skip: !formOpen });
+  const { data: cities = [] } = useGetCitiesQuery(
+    countryIdNum ? { country_id: countryIdNum } : undefined,
+    { skip: !formOpen }
+  );
 
   const listArg = {
     page,
@@ -226,6 +243,12 @@ export default function AdminPlatformOffersPage() {
       event_ids: values.event_ids ?? [],
       restaurant_ids: values.restaurant_ids ?? [],
       movie_ids: values.movie_ids ?? [],
+      country_id:
+        values.country_id === "" || values.country_id == null
+          ? null
+          : Number(values.country_id),
+      city_id:
+        values.city_id === "" || values.city_id == null ? null : Number(values.city_id),
     };
     try {
       if (editingId) {
@@ -364,6 +387,13 @@ export default function AdminPlatformOffersPage() {
                     <td className="p-4">
                       <p className="font-semibold text-white">{offer.name}</p>
                       <p className="text-xs text-rose-400 font-mono mt-0.5">{offer.code}</p>
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                        {offer.city_name
+                          ? `${offer.city_name}${offer.country_name ? `, ${offer.country_name}` : ""}`
+                          : offer.country_name
+                            ? `All cities · ${offer.country_name}`
+                            : "All locations"}
+                      </p>
                       <p className="text-xs text-zinc-500 mt-1 hidden sm:block">
                         {formatDate(offer.start_at)} – {formatDate(offer.end_at)}
                       </p>
@@ -557,6 +587,65 @@ export default function AdminPlatformOffersPage() {
                   className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-white resize-none"
                   placeholder="Get 200 ETB off your first event booking"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+                    Country
+                  </label>
+                  <select
+                    value={selectedCountryId === "" || selectedCountryId == null ? "" : String(selectedCountryId)}
+                    onChange={(e) => {
+                      const next = e.target.value ? Number(e.target.value) : "";
+                      setValue("country_id", next, { shouldDirty: true });
+                      setValue("city_id", "", { shouldDirty: true });
+                    }}
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
+                  >
+                    <option value="">All countries</option>
+                    {countries.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-zinc-500">
+                    Leave empty for a platform-wide offer.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
+                    City
+                  </label>
+                  <select
+                    value={
+                      watch("city_id") === "" || watch("city_id") == null
+                        ? ""
+                        : String(watch("city_id"))
+                    }
+                    onChange={(e) => {
+                      const next = e.target.value ? Number(e.target.value) : "";
+                      setValue("city_id", next, { shouldDirty: true });
+                      if (next) {
+                        const match = cities.find((c) => c.id === next);
+                        if (match?.country_id) {
+                          setValue("country_id", match.country_id, { shouldDirty: true });
+                        }
+                      }
+                    }}
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
+                  >
+                    <option value="">
+                      {countryIdNum ? "All cities in country" : "All cities"}
+                    </option>
+                    {cities.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

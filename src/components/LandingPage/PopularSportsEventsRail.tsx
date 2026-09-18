@@ -1,22 +1,26 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { SHOWCASE_SPORTS_EVENT_CARDS } from "@/data/showcaseEventCards";
 import AdaptiveCardRow from "./AdaptiveCardRow";
-import CityLocationEmptyState from "./CityLocationEmptyState";
 import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import { EventPosterCard, ShowcaseEventPosterCard } from "./PosterCard";
-import { hasCityFilter, isSportsEvent } from "./homeUtils";
+import { isSportsEvent } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 
 const MIN_VISIBLE = 5;
 
 export default function PopularSportsEventsRail({ city }: { city: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { events, isLoadingEvents } = useHomeCatalog(city);
-  const sportsEvents = events.filter(isSportsEvent).slice(0, 12);
-  const hasCity = hasCityFilter(city);
+  const { cityEvents, fallbackEvents, isLoadingEvents, hasCity } = useHomeCatalog(city);
+
+  const sportsEvents = useMemo(() => {
+    const fromCity = cityEvents.filter(isSportsEvent);
+    if (fromCity.length > 0 || !hasCity) return fromCity.slice(0, 12);
+    return fallbackEvents.filter(isSportsEvent).slice(0, 12);
+  }, [cityEvents, fallbackEvents, hasCity]);
+
   const isLoading = isLoadingEvents;
   const isEmpty = !isLoading && sportsEvents.length === 0;
   const useStatic = isEmpty && !hasCity;
@@ -64,8 +68,8 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
                 </div>
               ))}
             </AdaptiveCardRow>
-          ) : isEmpty && hasCity ? (
-            <CityLocationEmptyState categoryLabel="sports events" city={city} />
+          ) : isEmpty && !useStatic ? (
+            <p className="text-sm text-[#6B7280] py-6">No sports events available yet.</p>
           ) : (
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {useStatic

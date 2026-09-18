@@ -5,6 +5,15 @@ export function hasCityFilter(city?: string) {
   return Boolean(city && city !== "All Cities");
 }
 
+/**
+ * Prefer city-scoped results; when a city is selected but returns nothing,
+ * fall back to the full unscoped list so customer surfaces stay populated.
+ */
+export function preferCityOrAll<T>(cityItems: T[], allItems: T[], hasCity: boolean): T[] {
+  if (!hasCity) return cityItems;
+  return cityItems.length > 0 ? cityItems : allItems;
+}
+
 export function eventPortrait(event: PublicEvent) {
   return resolveMediaUrl(event.poster_vertical_url || event.poster_horizontal_url || "");
 }

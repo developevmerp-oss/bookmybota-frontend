@@ -9,6 +9,7 @@ import {
   ImagePlus,
   CreditCard,
   Loader2,
+  MapPin,
   Megaphone,
   Pencil,
   Plus,
@@ -17,6 +18,7 @@ import {
 import { toast } from "sonner";
 import {
   useGetBusinessCampaignsQuery,
+  useGetBusinessPublicQuery,
   useGetOrganizerEventsQuery,
   useGetPublicMarketingPlansQuery,
   useGetPublicMoviesQuery,
@@ -145,6 +147,7 @@ export default function PartnerPromotionsPage({
     { bizId, page, limit: PAGE_SIZE },
     { skip: !bizId }
   );
+  const { data: business } = useGetBusinessPublicQuery(bizId, { skip: !bizId });
   const { data: plans = [] } = useGetPublicMarketingPlansQuery({ module }, { skip: !bizId });
   const { data: organizerEventsData } = useGetOrganizerEventsQuery(
     { page: 1, limit: 100 },
@@ -154,6 +157,23 @@ export default function PartnerPromotionsPage({
     { page: 1, limit: 100 },
     { skip: !bizId || module !== "MOVIES" }
   );
+
+  const showsInLabel = useMemo(() => {
+    if (module === "EVENTS" && targetId) {
+      const ev = (organizerEventsData?.items || []).find((e) => String(e.id) === String(targetId));
+      const cities = [
+        ...new Set(
+          (ev?.showtimes || [])
+            .map((s) => (s.city_name || "").trim())
+            .filter(Boolean)
+        ),
+      ];
+      if (cities.length > 0) return cities.join(", ");
+    }
+    const businessCity = (business?.city_name || "").trim();
+    if (businessCity) return businessCity;
+    return "";
+  }, [module, targetId, organizerEventsData?.items, business?.city_name]);
 
   const promoMaxEventDate = useMemo(() => {
     if (module !== "EVENTS" || !targetId) return "";
@@ -359,6 +379,25 @@ export default function PartnerPromotionsPage({
           <p>Reason: {editingCampaign.admin_note}</p>
         </div>
       ) : null}
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 flex items-start gap-2.5">
+        <MapPin size={16} className="text-[#e11d48] shrink-0 mt-0.5" />
+        <div className="min-w-0 text-sm leading-snug">
+          <p className="font-semibold text-slate-800">
+            Shows in:{" "}
+            <span className="font-bold text-[#e11d48]">
+              {showsInLabel || "Not set"}
+            </span>
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {showsInLabel
+              ? "Customers who select this city (or All Cities) can see this promotion. Location comes from your profile / event — it cannot be changed here."
+              : module === "EVENTS" && allowsItemTarget && !targetId
+                ? "Select an event to see which city this promotion will show in."
+                : "Set your business city on your profile so customers in that city can see this promotion."}
+          </p>
+        </div>
+      </div>
 
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">

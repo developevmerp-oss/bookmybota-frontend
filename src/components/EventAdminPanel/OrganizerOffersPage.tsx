@@ -3,17 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { Loader2, Pencil, Plus, Tag, Trash2 } from "lucide-react";
+import { Loader2, MapPin, Pencil, Plus, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateEventOfferMutation,
   useDeleteEventOfferMutation,
+  useGetBusinessPublicQuery,
   useGetOfferEligibleEventsQuery,
   useGetOrganizerOffersQuery,
   useUpdateEventOfferMutation,
   type EventOffer,
   type OfferEligibleEvent,
 } from "@/services/api";
+import { useAppSelector } from "@/lib/hooks";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import SearchInput from "@/components/Shared/SearchInput";
@@ -65,6 +67,9 @@ function OfferFormPanel({
   onCancel,
   onSaved,
 }: OfferFormPanelProps) {
+  const bizId = useAppSelector((state) => state.auth.user?.business_id?.toString() || "");
+  const { data: business } = useGetBusinessPublicQuery(bizId, { skip: !bizId });
+  const showsInLabel = (business?.city_name || "").trim();
   const [createOffer, { isLoading: creating }] = useCreateEventOfferMutation();
   const [updateOffer, { isLoading: updating }] = useUpdateEventOfferMutation();
   const saving = creating || updating;
@@ -207,6 +212,21 @@ function OfferFormPanel({
       <h3 className="portal-heading font-semibold text-lg">
         {editing ? "Edit offer" : "Create offer"}
       </h3>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 flex items-start gap-2.5">
+        <MapPin size={16} className="text-rose-600 shrink-0 mt-0.5" />
+        <div className="min-w-0 text-sm leading-snug">
+          <p className="font-semibold text-slate-800">
+            Shows in:{" "}
+            <span className="font-bold text-rose-600">{showsInLabel || "Not set"}</span>
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {showsInLabel
+              ? "Customers see this offer with events in this city (from your organiser profile). Location cannot be changed here."
+              : "Set your organiser city on your profile so location matching works for customers."}
+          </p>
+        </div>
+      </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div>

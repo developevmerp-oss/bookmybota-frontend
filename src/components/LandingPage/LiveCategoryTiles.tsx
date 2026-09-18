@@ -4,29 +4,47 @@ import { useMemo } from "react";
 import { useGetPublicMoviesQuery } from "@/services/api";
 import CategoryNavTileCard from "./CategoryNavTileCard";
 import { buildCategoryNavTiles } from "./categoryNavTiles";
-import { hasCityFilter } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 
 export default function LiveCategoryTiles({ city }: { city: string }) {
-  const { categories, events, fallbackEvents, dining, isLoadingFilters } = useHomeCatalog(city);
-  const pool = events.length > 0 ? events : fallbackEvents;
-  const hasCity = hasCityFilter(city);
-  const { data: moviesData } = useGetPublicMoviesQuery({
+  const {
+    categories,
+    cityEvents,
+    fallbackEvents,
+    dining,
+    isLoadingFilters,
+    hasCity,
+  } = useHomeCatalog(city);
+
+  const eventPool =
+    !hasCity || cityEvents.length > 0 ? cityEvents : fallbackEvents;
+
+  const { data: cityMoviesData } = useGetPublicMoviesQuery({
     limit: 100,
     ...(hasCity ? { city } : {}),
   });
-  const movieCount = moviesData?.meta?.total ?? moviesData?.items?.length ?? 0;
+  const { data: allMoviesData } = useGetPublicMoviesQuery(
+    { limit: 100 },
+    { skip: !hasCity }
+  );
+
+  const cityMovieCount =
+    cityMoviesData?.meta?.total ?? cityMoviesData?.items?.length ?? 0;
+  const allMovieCount =
+    allMoviesData?.meta?.total ?? allMoviesData?.items?.length ?? 0;
+  const movieCount =
+    !hasCity || cityMovieCount > 0 ? cityMovieCount : allMovieCount;
 
   const cards = useMemo(
     () =>
       buildCategoryNavTiles({
         categories,
-        events: pool,
+        events: eventPool,
         diningCount: dining.length,
         movieCount,
         city,
       }),
-    [categories, pool, dining.length, movieCount, city]
+    [categories, eventPool, dining.length, movieCount, city]
   );
 
   return (

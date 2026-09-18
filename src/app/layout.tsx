@@ -7,6 +7,7 @@ import { StoreProvider } from "@/providers/StoreProvider";
 import { Toaster } from "sonner";
 import HomeHeader from "@/components/LandingPage/HomeHeader";
 import PartnerAuthHeader from "@/components/Shared/PartnerAuthHeader";
+import NetworkStatusOverlay from "@/components/Shared/NetworkStatusOverlay";
 import { isArtistAdminPath, isMovieAdminPath, isVenueAdminPath } from "@/lib/authStorage";
 
 const manrope = Manrope({
@@ -217,6 +218,7 @@ export default function RootLayout({
             {showLayoutFooter && <Footer />}
           </main>
           <Toaster position="top-center" richColors />
+          <NetworkStatusOverlay />
         </StoreProvider>
       </body>
     </html>

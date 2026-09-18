@@ -68,6 +68,22 @@ export const adminCustomerFormSchema = yup.object({
     .email('Enter a valid email address.'),
 });
 
+const MAX_PARTNER_CONTACT_PERSONS = 5;
+
+const partnerContactPersonSchema = yup.object({
+  name: yup
+    .string()
+    .trim()
+    .required('Contact name is required.')
+    .min(2, 'Contact name must be at least 2 characters.'),
+  email: yup
+    .string()
+    .trim()
+    .required('Email is required.')
+    .email('Enter a valid email address.'),
+  phone: adminPhoneSchema,
+});
+
 export const partnerOnboardSchema = yup.object({
   business_name: yup
     .string()
@@ -75,17 +91,27 @@ export const partnerOnboardSchema = yup.object({
     .required('Name is required.')
     .min(2, 'Name must be at least 2 characters.'),
   address: yup.string().trim().required('Address is required.'),
-  phone: adminPhoneSchema,
   description: yup.string().trim().default(''),
   parent_type_id: yup.string().required('Please select a parent type.'),
   venue_type_id: yup.string().default(''),
   country: yup.string().default(''),
   city_id: yup.string().default(''),
-  admin_email: yup
-    .string()
-    .trim()
-    .required('Admin email is required.')
-    .email('Enter a valid email address.'),
+  contacts: yup
+    .array()
+    .of(partnerContactPersonSchema)
+    .min(1, 'At least one contact person is required.')
+    .max(
+      MAX_PARTNER_CONTACT_PERSONS,
+      `You can add at most ${MAX_PARTNER_CONTACT_PERSONS} contact persons.`
+    )
+    .required()
+    .test('unique-emails', 'Each contact must use a different email.', (rows) => {
+      if (!rows?.length) return true;
+      const emails = rows
+        .map((r) => String(r?.email || '').trim().toLowerCase())
+        .filter(Boolean);
+      return new Set(emails).size === emails.length;
+    }),
   accept_terms: yup.boolean().default(false),
 });
 

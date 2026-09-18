@@ -2173,6 +2173,8 @@ function ArtistBlock({
 interface EventFormProps {
   event?: OrganizerEvent | null;
   readOnly?: boolean;
+  /** LIVE events: only posters, gallery, and YouTube can be changed. */
+  mediaOnlyEdit?: boolean;
   canSubmit?: boolean;
   onSaveDraft: (payload: EventFormPayload) => Promise<void>;
   onSubmitForApproval: (payload: EventFormPayload) => Promise<void>;
@@ -2183,6 +2185,7 @@ interface EventFormProps {
 export default function EventForm({
   event,
   readOnly = false,
+  mediaOnlyEdit = false,
   canSubmit = !event || event.status === "DRAFT",
   onSaveDraft,
   onSubmitForApproval,
@@ -2193,11 +2196,12 @@ export default function EventForm({
   const { data: cities = [] } = useGetCitiesQuery();
   const { data: promoPlans = [] } = useGetPublicMarketingPlansQuery({ module: "EVENTS" });
   const { data: supportContact } = useGetOrganizerSupportContactQuery(undefined, {
-    skip: readOnly,
+    skip: readOnly && !mediaOnlyEdit,
   });
   const supportEmail = supportContact?.email?.trim() || null;
   const supportPhone = supportContact?.phone?.trim() || "998877456";
   const [uploadImage, { isLoading: uploading }] = useUploadImageMutation();
+  const mediaLocked = readOnly && !mediaOnlyEdit;
   const [documents, setDocuments] = useState<EventDocumentUpload[]>(() =>
     normalizeFormDocuments(event?.documents)
   );
@@ -2795,7 +2799,7 @@ export default function EventForm({
           This event is {event.status === "LIVE" ? "live" : "approved"}.
           {event.status === "APPROVED"
             ? " It stays hidden until Super Admin publishes it after the contract is fully signed."
-            : " Details are read-only here."}
+            : " You can only update posters, gallery, and YouTube — all other details stay locked."}
         </div>
       );
     }
@@ -3555,6 +3559,12 @@ export default function EventForm({
 
         {stepId === "media" && (
         <>
+        {mediaOnlyEdit ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
+            This event is live. You can update <strong>posters</strong>, <strong>gallery</strong>, and{" "}
+            <strong>YouTube</strong> only. Venue, tickets, artists, documents, and other fields stay locked.
+          </div>
+        ) : null}
         <section className="org-card p-6 space-y-5">
           <h3 className="portal-heading text-lg font-semibold">Posters</h3>
           <p className="portal-muted text-xs">Drag a crop box on the photo, then save. You can edit or remove any image later.</p>
@@ -3564,7 +3574,7 @@ export default function EventForm({
               <CroppedImageField
                 value={posterHorizontal}
                 aspect={16 / 9}
-                disabled={readOnly || uploading}
+                disabled={mediaLocked || uploading}
                 previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
                 emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
                 onRemove={() => setValue("poster_horizontal_url", "", { shouldDirty: true })}
@@ -3582,7 +3592,7 @@ export default function EventForm({
               <CroppedImageField
                 value={posterVertical}
                 aspect={2 / 3}
-                disabled={readOnly || uploading}
+                disabled={mediaLocked || uploading}
                 previewClassName="w-[160px] sm:w-[180px] aspect-[2/3] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
                 emptyClassName="flex flex-col items-center justify-center w-[160px] sm:w-[180px] aspect-[2/3] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
                 onRemove={() => setValue("poster_vertical_url", "", { shouldDirty: true })}
@@ -3607,7 +3617,7 @@ export default function EventForm({
                 key={`${url}-${i}`}
                 value={url}
                 aspect={4 / 3}
-                disabled={readOnly || uploading}
+                disabled={mediaLocked || uploading}
                 previewClassName="aspect-[4/3] rounded-xl w-full border border-slate-200 overflow-hidden bg-slate-100"
                 onRemove={() =>
                   setValue(
@@ -3627,7 +3637,7 @@ export default function EventForm({
                 }
               />
             ))}
-            {!readOnly && (
+            {!mediaLocked && (
               <ImageCropPicker
                 aspect={4 / 3}
                 disabled={uploading}
@@ -3653,7 +3663,7 @@ export default function EventForm({
             </p>
           </div>
           <input
-            disabled={readOnly}
+            disabled={mediaLocked}
             className={inputClass}
             placeholder="https://www.youtube.com/watch?v=..."
             {...register("youtube_url")}
@@ -4691,14 +4701,14 @@ export default function EventForm({
                   T&amp;C points: {selectedTerms.length} master + {customTerms.length} custom
                 </p>
                 <button type="button" className="text-sm text-rose-700 font-medium" onClick={() => goToStep("media")}>
-                  Edit documents &amp; media
+                  {mediaOnlyEdit ? "Edit posters, gallery & YouTube" : "Edit documents & media"}
                 </button>
               </div>
             </div>
           </section>
         )}
 
-        {!readOnly && (
+        {(!readOnly || mediaOnlyEdit) && (
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 sticky bottom-0 bg-background/95 backdrop-blur py-3 border-t border-white/10 z-10">
             <div className="flex flex-wrap gap-2">
               {!isFirstStep && (
@@ -4716,7 +4726,13 @@ export default function EventForm({
               onClick={runSaveDraft}
                 className="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
             >
-              {saving ? "Saving..." : event?.status === "PENDING_APPROVAL" ? "Save changes" : "Save draft"}
+              {saving
+                ? "Saving..."
+                : mediaOnlyEdit
+                  ? "Save media"
+                  : event?.status === "PENDING_APPROVAL"
+                    ? "Save changes"
+                    : "Save draft"}
             </button>
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2 text-xs text-slate-600">
@@ -4742,7 +4758,16 @@ export default function EventForm({
               </a>
             </div>
             <div className="flex flex-wrap gap-2">
-              {!isLastStep ? (
+              {mediaOnlyEdit ? (
+                <button
+                  type="button"
+                  disabled={saving || submitting}
+                  onClick={() => void runSaveDraft()}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save posters & media"}
+                </button>
+              ) : !isLastStep ? (
                 <button
                   type="button"
                   onClick={() => void goNext()}
@@ -4777,7 +4802,7 @@ export default function EventForm({
           </div>
         )}
 
-        {readOnly && (
+        {readOnly && !mediaOnlyEdit && (
           <div className="flex flex-wrap gap-2">
             {!isFirstStep && (
               <button

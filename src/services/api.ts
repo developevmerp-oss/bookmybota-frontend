@@ -42,6 +42,12 @@ export type { PaginationMeta, PaginatedList, PagedQuery } from '@/lib/pagination
 
 // ─── Type Definitions ────────────────────────────────────────────────────────
 
+export interface BusinessContactPerson {
+  name: string;
+  email: string;
+  phone: string;
+}
+
 export interface Business {
   id: string;
   name: string;
@@ -50,6 +56,7 @@ export interface Business {
   city_name?: string | null;
   phone?: string;
   description?: string;
+  contact_persons?: BusinessContactPerson[];
   type_id?: number;
   type_name?: string;
   parent_type_name?: string;
@@ -2615,6 +2622,7 @@ export const api = createApi({
         type_id?: number;
         admin_email: string;
         admin_password?: string;
+        contact_persons?: BusinessContactPerson[];
         partner_type?: 'dining' | 'event' | 'venue' | 'artist' | 'cinema';
         documents?: PartnerDocumentUpload[];
         cover_image_url?: string;
@@ -2641,6 +2649,7 @@ export const api = createApi({
         address?: string;
         phone?: string;
         description?: string;
+        contact_persons?: BusinessContactPerson[];
         type_id?: number;
         admin_email?: string;
         admin_password?: string;

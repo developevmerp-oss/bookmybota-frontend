@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner";
 import PartnerDocumentsFields from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import { extractApiError } from "@/lib/apiErrors";
-import { parseContactPerson } from "@/lib/venuePartnerInfo";
+import { parseContactPerson, resolveContactPersons } from "@/lib/venuePartnerInfo";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import {
   useArchiveBusinessMutation,
@@ -80,8 +80,13 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
         ? "Venue type"
         : "Module";
   const typeValue = hasSubtype ? biz?.type_name : isCinema ? "Cinema" : "Event";
-  const contactPerson = parseContactPerson(biz?.description);
-  const aboutVenue = (biz?.description || "").replace(/Contact person:\s*.+/i, "").trim();
+  const contactPersons = resolveContactPersons(biz);
+  const contactPerson =
+    contactPersons.map((c) => c.name).filter(Boolean).join(", ") ||
+    parseContactPerson(biz?.description);
+  const aboutVenue = (biz?.description || "")
+    .replace(/Contact persons?:\s*.+/i, "")
+    .trim();
   const moduleBadge = isArtist ? "Artist" : isCinema ? "Cinema" : "Event";
 
   const goToList = () => {
@@ -291,11 +296,43 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
             </p>
           </div>
           {isVenue && <Field label="Contact person" value={contactPerson} />}
+          {contactPersons.length > 0 && (
+            <div className="md:col-span-2 space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Contact persons
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {contactPersons.map((c, idx) => (
+                  <div
+                    key={`${c.email}-${idx}`}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 space-y-1"
+                  >
+                    <p className="text-white text-sm font-medium">
+                      {c.name || "—"}
+                      {idx === 0 ? (
+                        <span className="ml-2 text-[10px] uppercase tracking-wider text-zinc-500">
+                          Primary
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-zinc-300 text-xs flex items-center gap-1.5">
+                      <Mail size={12} className="shrink-0 text-zinc-500" />
+                      {c.email || "—"}
+                    </p>
+                    <p className="text-zinc-300 text-xs flex items-center gap-1.5">
+                      <Phone size={12} className="shrink-0 text-zinc-500" />
+                      {c.phone || "—"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-1">Admin email</p>
             <p className="text-white text-sm flex items-center gap-1.5">
               <Mail size={14} className="text-zinc-500 shrink-0" />
-              {biz.admin_email?.trim() || "—"}
+              {biz.admin_email?.trim() || contactPersons[0]?.email || "—"}
             </p>
             {biz.admin_role && (
               <p className="text-xs text-zinc-500 mt-1">{biz.admin_role}</p>

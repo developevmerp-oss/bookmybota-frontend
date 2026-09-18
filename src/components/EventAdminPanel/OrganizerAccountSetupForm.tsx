@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { CheckCircle, ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import PartnerDocumentsFields, {
   validateRequiredPartnerDocuments,
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
-import PhoneInput from "@/components/Shared/PhoneInput";
+import ContactPersonsFields from "@/components/Shared/ContactPersonsFields";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import { extractApiError } from "@/lib/apiErrors";
 import {
@@ -25,7 +25,9 @@ import VenueLocationFields from "@/components/VenueAdminPanel/VenueLocationField
 import { CANONICAL_VENUE_TYPE_SLUGS, VENUE_TYPE_LABELS, defaultVenueMeta, type VenueMeta } from "@/lib/venueCategoryConfig";
 import {
   buildOrganizerAccountSetupFormSchema,
+  emptyContactPerson,
   emptyOrganizerAccountSetupFormValues,
+  MAX_CONTACT_PERSONS,
   type OrganizerAccountSetupFormValues,
 } from "@/lib/organizerAccountSetupFormSchema";
 
@@ -162,6 +164,7 @@ export default function OrganizerAccountSetupForm({
     handleSubmit,
     setValue,
     watch,
+    control,
     trigger,
     formState: { errors },
   } = useForm<OrganizerAccountSetupFormValues>({
@@ -170,7 +173,12 @@ export default function OrganizerAccountSetupForm({
     mode: "onSubmit",
   });
 
-  const phone = watch("phone");
+  const { fields: contactFields, append: appendContact, remove: removeContact } = useFieldArray({
+    control,
+    name: "contacts",
+  });
+
+  const contacts = watch("contacts") || [];
   const subtypeId = watch("subtypeId");
 
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -332,13 +340,19 @@ export default function OrganizerAccountSetupForm({
     try {
       const cityLabel =
         regCities.find((c) => c.id === Number(cityId))?.name?.trim() || "";
+      const primary = values.contacts[0];
       const data = await registerBusiness({
         business_name: values.name.trim(),
         address: module === "artist" ? cityLabel : values.address.trim(),
-        phone: values.phone.trim(),
-        description: `Contact person: ${values.contact.trim()}`,
+        phone: primary.phone.trim(),
+        description: `Contact person: ${primary.name.trim()}`,
         type_id: resolvedTypeId,
-        admin_email: values.email.trim(),
+        admin_email: primary.email.trim(),
+        contact_persons: values.contacts.map((c) => ({
+          name: c.name.trim(),
+          email: c.email.trim(),
+          phone: c.phone.trim(),
+        })),
         partner_type: module,
         documents,
         cover_image_url: coverImageUrl.trim() || undefined,
@@ -614,54 +628,39 @@ export default function OrganizerAccountSetupForm({
               </SectionBlock>
 
               <SectionBlock title="Contact Person Details">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className={labelClass}>
-                      Full Name {reqStar}
-                    </label>
-                    <input
-                      type="text"
-                      className={inputClass}
-                      placeholder="Enter your full name"
-                      {...register("contact")}
-                    />
-                    {errors.contact && (
-                      <p className={fieldErrorClass}>{errors.contact.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className={labelClass}>
-                      Email (Admin Login Email) {reqStar}
-                    </label>
-                    <input
-                      type="email"
-                      className={inputClass}
-                      placeholder="Enter your email address"
-                      {...register("email")}
-                    />
-                    {errors.email && <p className={fieldErrorClass}>{errors.email.message}</p>}
-                    <p className="mt-1 text-xs text-slate-400">
-                      Password is auto-generated and emailed after onboarding.
-                    </p>
-                  </div>
-                  <div>
-                    <PhoneInput
-                      label="Phone Number"
-                      labelClassName={labelClass}
-                      variant="light"
-                      value={phone}
-                      onChange={(v) =>
-                        setValue("phone", v, { shouldValidate: true, shouldDirty: true })
-                      }
-                      required
-                      error={errors.phone?.message}
-                      showError={!!errors.phone}
-                      placeholder="Enter mobile number"
-                      inputClassName={inputClass}
-                      helperText="9–12 digits, numbers only"
-                    />
-                  </div>
-                </div>
+                <p className="text-xs text-slate-500 -mt-1 mb-1">
+                  Add up to {MAX_CONTACT_PERSONS} contacts. The first contact is used for admin login.
+                </p>
+                <ContactPersonsFields
+                  contacts={contacts}
+                  errors={errors.contacts as Array<{ name?: { message?: string }; email?: { message?: string }; phone?: { message?: string } } | undefined> | undefined}
+                  rootError={
+                    typeof errors.contacts?.message === "string"
+                      ? errors.contacts.message
+                      : typeof (errors.contacts as { root?: { message?: string } } | undefined)?.root
+                            ?.message === "string"
+                        ? (errors.contacts as { root?: { message?: string } }).root?.message
+                        : undefined
+                  }
+                  onChange={(index, field, value) =>
+                    setValue(`contacts.${index}.${field}`, value, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
+                  onAdd={() => {
+                    if (contactFields.length >= MAX_CONTACT_PERSONS) return;
+                    appendContact(emptyContactPerson());
+                  }}
+                  onRemove={(index) => {
+                    if (contactFields.length <= 1) return;
+                    removeContact(index);
+                  }}
+                  labelClass={labelClass}
+                  inputClass={inputClass}
+                  fieldErrorClass={fieldErrorClass}
+                  reqStar={reqStar}
+                />
               </SectionBlock>
             </>
           )}

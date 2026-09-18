@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar,
   CalendarDays,
@@ -89,6 +90,24 @@ export default function EventFormCustomerPreview({
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [previewScreen, setPreviewScreen] = useState<"home" | "event" | "booking">("home");
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  const resolvedTermLines = useMemo(() => {
+    const fromProps = (termLines || []).map((t) => String(t || "").trim()).filter(Boolean);
+    if (fromProps.length > 0) return fromProps;
+    const tp = event?.terms_points;
+    if (!tp) return [];
+    return [
+      ...(tp.selected || [])
+        .map((t) => (typeof t === "string" ? t : String(t?.text || "")).trim())
+        .filter(Boolean),
+      ...(tp.custom || []).map((t) => String(t).trim()).filter(Boolean),
+    ];
+  }, [termLines, event?.terms_points]);
 
   const eventId = event?.id || "";
   const { data: appliedLayout } = useGetEventLayoutQuery(eventId, { skip: !eventId });
@@ -121,7 +140,9 @@ export default function EventFormCustomerPreview({
     (appliedLayout?.data?.seating_config as Record<string, unknown> | null | undefined) || null;
 
   const formLayoutMode = values.showtimes?.[0]?.layout_mode || "none";
-  const wantsCustom = formLayoutMode === "custom" || Boolean(waitingRequest || pendingPickRequest || fulfilledRequest);
+  const wantsCustom =
+    formLayoutMode === "custom" ||
+    Boolean(waitingRequest || pendingPickRequest || fulfilledRequest);
 
   const bookingPreview = (() => {
     if (appliedSeats.length > 0) {
@@ -133,10 +154,14 @@ export default function EventFormCustomerPreview({
         subtitle: "This is the seat map customers use when they book.",
         seats: appliedSeats,
         config: appliedConfig,
-        status: fulfilledRequest ? "ready" : "ready",
+        status: "ready" as const,
       };
     }
-    if (fulfilledTemplate && Array.isArray(fulfilledTemplate.seats_json) && fulfilledTemplate.seats_json.length > 0) {
+    if (
+      fulfilledTemplate &&
+      Array.isArray(fulfilledTemplate.seats_json) &&
+      fulfilledTemplate.seats_json.length > 0
+    ) {
       return {
         kind: "map" as const,
         title: fulfilledTemplate.name || fulfilledRequest?.layout_name || "Custom seating layout",
@@ -146,7 +171,11 @@ export default function EventFormCustomerPreview({
         status: "ready" as const,
       };
     }
-    if (pendingTemplate && Array.isArray(pendingTemplate.seats_json) && pendingTemplate.seats_json.length > 0) {
+    if (
+      pendingTemplate &&
+      Array.isArray(pendingTemplate.seats_json) &&
+      pendingTemplate.seats_json.length > 0
+    ) {
       return {
         kind: "map" as const,
         title: pendingTemplate.name || pendingPickRequest?.layout_name || "Custom seating layout",
@@ -1036,21 +1065,21 @@ export default function EventFormCustomerPreview({
                       </div>
                     ) : null}
 
-                    {termLines.length > 0 ? (
+                    {resolvedTermLines.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => setTermsOpen(true)}
-                        className="mt-3 sm:mt-4 flex w-full items-center justify-between py-3.5 border-t border-slate-200 cursor-pointer text-left"
+                        className="mt-3 sm:mt-4 flex w-full items-center justify-between py-3.5 sm:py-4 border-t border-slate-200 cursor-pointer text-left"
                       >
-                        <span className="text-[1.0625rem] sm:text-[1.125rem] font-bold text-[#1A1A1A]">
+                        <span className="text-[1.125rem] sm:text-[1.25rem] font-bold text-[#1A1A1A]">
                           Terms &amp; Conditions
                         </span>
                         <ChevronRight size={18} className="text-slate-400 shrink-0" />
                       </button>
                     ) : (
                       <p className="mt-4 text-xs text-slate-500 border-t border-slate-100 pt-3">
-                        Tip: tap Terms &amp; Conditions (when added) to read the same text customers
-                        see.
+                        Tip: add Terms &amp; Conditions in Media — customers open them in a popup
+                        from this same row.
                       </p>
                     )}
                   </div>
@@ -1081,48 +1110,52 @@ export default function EventFormCustomerPreview({
         </div>
       </div>
 
-      {termsOpen && termLines.length > 0 ? (
-        <div
-          className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/55"
-          onClick={() => setTermsOpen(false)}
-          role="presentation"
-        >
+      {portalReady &&
+        termsOpen &&
+        resolvedTermLines.length > 0 &&
+        createPortal(
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="preview-event-terms-title"
-            className="relative w-full sm:max-w-[560px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/55"
+            onClick={() => setTermsOpen(false)}
+            role="presentation"
           >
-            <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-5 sm:pt-7 pb-2">
-              <h2
-                id="preview-event-terms-title"
-                className="text-[1.375rem] sm:text-[1.625rem] font-extrabold text-[#333] leading-tight pr-8"
-              >
-                Terms &amp; Conditions
-              </h2>
-              <button
-                type="button"
-                aria-label="Close terms"
-                onClick={() => setTermsOpen(false)}
-                className="absolute top-4 right-4 sm:top-6 sm:right-6 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8E8E8] text-[#555] hover:bg-[#ddd] cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8 pt-3 max-h-[calc(90vh-5rem)] sm:max-h-[calc(85vh-5.5rem)] space-y-1.5">
-              {termLines.map((line, i) => (
-                <p
-                  key={`${i}-${line.slice(0, 24)}`}
-                  className="text-[1rem] sm:text-[1.0625rem] leading-7 sm:leading-[1.7] text-[#4A4A4A]"
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="preview-event-terms-title"
+              className="relative w-full sm:max-w-[560px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-5 sm:pt-7 pb-2">
+                <h2
+                  id="preview-event-terms-title"
+                  className="text-[1.375rem] sm:text-[1.625rem] lg:text-[1.875rem] font-extrabold text-[#333] leading-tight pr-8"
                 >
-                  {line}
-                </p>
-              ))}
+                  Terms &amp; Conditions
+                </h2>
+                <button
+                  type="button"
+                  aria-label="Close terms"
+                  onClick={() => setTermsOpen(false)}
+                  className="absolute top-4 right-4 sm:top-6 sm:right-6 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8E8E8] text-[#555] hover:bg-[#ddd] cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8 pt-3 max-h-[calc(90vh-5rem)] sm:max-h-[calc(85vh-5.5rem)] space-y-1.5">
+                {resolvedTermLines.map((line, i) => (
+                  <p
+                    key={`${i}-${line.slice(0, 24)}`}
+                    className="text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] text-[#4A4A4A]"
+                  >
+                    {line}
+                  </p>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

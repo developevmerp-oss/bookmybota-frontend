@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { ArrowLeft, CheckCircle, Loader2, Plus, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
@@ -14,13 +14,18 @@ import PartnerTypeFields, {
 import PartnerDocumentsFields, {
   validateRequiredPartnerDocuments,
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
-import PhoneInput from "@/components/Shared/PhoneInput";
+import ContactPersonsFields from "@/components/Shared/ContactPersonsFields";
 import { extractApiError } from "@/lib/apiErrors";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
 import {
   partnerOnboardSchema,
   type PartnerOnboardValues,
 } from "@/lib/adminFormSchemas";
+import {
+  emptyContactPerson,
+  MAX_CONTACT_PERSONS,
+} from "@/lib/organizerAccountSetupFormSchema";
+import { parseContactPerson } from "@/lib/venuePartnerInfo";
 import {
   useGetBusinessTypesQuery,
   useGetPartnerDocumentMastersQuery,
@@ -34,6 +39,23 @@ import {
   type CityMaster,
   type PartnerDocumentUpload,
 } from "@/services/api";
+
+function contactsFromBusiness(biz: Business) {
+  if (Array.isArray(biz.contact_persons) && biz.contact_persons.length > 0) {
+    return biz.contact_persons.slice(0, MAX_CONTACT_PERSONS).map((c) => ({
+      name: String(c?.name || ""),
+      email: String(c?.email || ""),
+      phone: String(c?.phone || ""),
+    }));
+  }
+  return [
+    {
+      name: parseContactPerson(biz.description) || "",
+      email: biz.admin_email || "",
+      phone: biz.phone || "",
+    },
+  ];
+}
 
 type FormVariant = "light" | "dark";
 type FormMode = "create" | "edit";
@@ -80,25 +102,30 @@ export default function PartnerOnboardForm({
     clearErrors,
     watch,
     reset,
+    control,
     formState: { errors },
   } = useForm<PartnerOnboardValues>({
-    resolver: yupResolver(partnerOnboardSchema),
+    resolver: yupResolver(partnerOnboardSchema) as never,
     defaultValues: {
       business_name: "",
       address: "",
-      phone: "",
       description: "",
       parent_type_id: "",
       venue_type_id: "",
-      admin_email: "",
+      contacts: [emptyContactPerson()],
       accept_terms: mode === "edit",
     },
     mode: "onSubmit",
   });
 
+  const { fields: contactFields, append: appendContact, remove: removeContact } = useFieldArray({
+    control,
+    name: "contacts",
+  });
+
   const parentTypeId = watch("parent_type_id");
   const venueTypeId = watch("venue_type_id");
-  const phone = watch("phone");
+  const contacts = watch("contacts") || [];
   const acceptTerms = watch("accept_terms");
 
   const selectedParent = businessTypes.find((t) => String(t.id) === parentTypeId);
@@ -221,13 +248,12 @@ export default function PartnerOnboardForm({
     reset({
       business_name: editingBusiness.name || "",
       address: editingBusiness.address || "",
-      phone: editingBusiness.phone || "",
       description: editingBusiness.description || "",
       parent_type_id: nextParent,
       venue_type_id: nextVenue,
       country: currentCity?.country || "",
       city_id: editingBusiness.city_id ? String(editingBusiness.city_id) : "",
-      admin_email: editingBusiness.admin_email || "",
+      contacts: contactsFromBusiness(editingBusiness),
       accept_terms: true,
     });
     setCoverImageUrl(editingBusiness.cover_image_url || "");
@@ -262,6 +288,7 @@ export default function PartnerOnboardForm({
   const fieldErrorClass = isDark
     ? "mt-1.5 text-xs text-rose-400 font-medium"
     : "mt-1.5 text-xs text-rose-600 font-medium";
+  const reqStar = <span className="text-rose-500">*</span>;
 
   const onValid = async (values: PartnerOnboardValues) => {
     let hasLocalError = false;
@@ -288,6 +315,13 @@ export default function PartnerOnboardForm({
       return;
     }
 
+    const primary = values.contacts[0];
+    const contactPersonsPayload = values.contacts.map((c) => ({
+      name: c.name.trim(),
+      email: c.email.trim(),
+      phone: c.phone.trim(),
+    }));
+
     if (mode === "create") {
       try {
         const selectedPartner =
@@ -305,7 +339,7 @@ export default function PartnerOnboardForm({
         const data = await registerBusiness({
           business_name: values.business_name,
           address: values.address,
-          phone: values.phone,
+          phone: primary.phone,
           description: values.description || "",
           city_id: values.city_id ? parseInt(values.city_id, 10) : undefined,
           type_id: selectedPartner
@@ -313,7 +347,8 @@ export default function PartnerOnboardForm({
               ? selectedPartner.type_id
               : parseInt(values.venue_type_id, 10)
             : parseInt(values.venue_type_id, 10),
-          admin_email: values.admin_email,
+          admin_email: primary.email,
+          contact_persons: contactPersonsPayload,
           partner_type: selectedPartner ? selectedPartner.partner_type : "dining",
           documents,
           cover_image_url: coverImageUrl || undefined,
@@ -336,8 +371,9 @@ export default function PartnerOnboardForm({
         id: editingBusiness.id,
         name: values.business_name,
         address: values.address,
-        phone: values.phone,
+        phone: primary.phone,
         description: values.description || "",
+        contact_persons: contactPersonsPayload,
         city_id: values.city_id ? parseInt(values.city_id, 10) : null,
         ...(isDining
           ? { type_id: parseInt(values.venue_type_id, 10), collection_ids: collectionIds }
@@ -491,64 +527,83 @@ export default function PartnerOnboardForm({
         </select>
         {errors.city_id && <p className={fieldErrorClass}>{errors.city_id.message}</p>}
       </div>
-      <PhoneInput
-        label="Phone Number"
-        labelClassName={labelClass}
-        variant={isDark ? "dark" : "light"}
-        className={isDark ? undefined : "md:col-span-2"}
-        value={phone || ""}
-        onChange={(v) => setValue("phone", v, { shouldValidate: true, shouldDirty: true })}
-        required
-        placeholder="9876543210"
-        error={errors.phone?.message}
-        showError={Boolean(errors.phone)}
-        helperText={!isDark ? "9–12 digits, numbers only" : undefined}
-      />
-            <div className={isDark ? "" : "md:col-span-2"}>
-              <label className={labelClass}>Profile image</label>
-              <CroppedImageField
-                value={coverImageUrl}
-                aspect={1}
-                disabled={uploadingImage}
-                previewClassName="w-32 h-32 rounded-2xl"
-                emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
-                onRemove={() => setCoverImageUrl("")}
-                onCroppedFile={async (file) => {
-                  const formData = new FormData();
-                  formData.append("image", file);
-                  try {
-                    const res = await uploadImage(formData).unwrap();
-                    if (res.url) setCoverImageUrl(res.url);
-                  } catch {
-                    toast.error("Failed to upload profile image");
-                  }
-                }}
-                emptyContent={
-                  <>
-                    <ImagePlus className="text-slate-400 mb-1" size={20} />
-                    <span className="text-[10px] portal-muted">Add photo</span>
-                  </>
-                }
-              />
-            </div>
-      <div>
-        <label className={labelClass}>
-          Admin Login Email <span className="text-rose-500">*</span>
-        </label>
-        <input
-          type="email"
-          {...register("admin_email")}
-          className={`${inputClass} ${mode === "edit" ? "opacity-60 cursor-not-allowed" : ""}`}
-          placeholder="admin@example.com"
-          disabled={mode === "edit"}
-          readOnly={mode === "edit"}
+      <div className={isDark ? "" : "md:col-span-2"}>
+        <label className={labelClass}>Profile image</label>
+        <CroppedImageField
+          value={coverImageUrl}
+          aspect={1}
+          disabled={uploadingImage}
+          previewClassName="w-32 h-32 rounded-2xl"
+          emptyClassName="flex flex-col items-center justify-center w-32 h-32 rounded-2xl border border-dashed border-slate-300 hover:border-[#6900AA]"
+          onRemove={() => setCoverImageUrl("")}
+          onCroppedFile={async (file) => {
+            const formData = new FormData();
+            formData.append("image", file);
+            try {
+              const res = await uploadImage(formData).unwrap();
+              if (res.url) setCoverImageUrl(res.url);
+            } catch {
+              toast.error("Failed to upload profile image");
+            }
+          }}
+          emptyContent={
+            <>
+              <ImagePlus className="text-slate-400 mb-1" size={20} />
+              <span className="text-[10px] portal-muted">Add photo</span>
+            </>
+          }
         />
-        {errors.admin_email && <p className={fieldErrorClass}>{errors.admin_email.message}</p>}
-        <p className={`mt-1 text-xs ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
-          {mode === "create"
-            ? "Password is auto-generated and emailed after onboarding."
-            : "Login email cannot be changed from this page."}
-        </p>
+      </div>
+      <div className="md:col-span-2 space-y-3">
+        <div>
+          <p className={`${labelClass} !mb-1`}>Contact Person Details</p>
+          <p className={`text-xs ${mutedClass}`}>
+            Add up to {MAX_CONTACT_PERSONS} contacts. The first contact is used for admin login.
+          </p>
+        </div>
+        <ContactPersonsFields
+          contacts={contacts}
+          errors={
+            errors.contacts as
+              | Array<
+                  | {
+                      name?: { message?: string };
+                      email?: { message?: string };
+                      phone?: { message?: string };
+                    }
+                  | undefined
+                >
+              | undefined
+          }
+          rootError={
+            typeof errors.contacts?.message === "string"
+              ? errors.contacts.message
+              : typeof (errors.contacts as { root?: { message?: string } } | undefined)?.root
+                    ?.message === "string"
+                ? (errors.contacts as { root?: { message?: string } }).root?.message
+                : undefined
+          }
+          onChange={(index, field, value) =>
+            setValue(`contacts.${index}.${field}`, value, {
+              shouldValidate: true,
+              shouldDirty: true,
+            })
+          }
+          onAdd={() => {
+            if (contactFields.length >= MAX_CONTACT_PERSONS) return;
+            appendContact(emptyContactPerson());
+          }}
+          onRemove={(index) => {
+            if (contactFields.length <= 1) return;
+            removeContact(index);
+          }}
+          labelClass={labelClass}
+          inputClass={inputClass}
+          fieldErrorClass={fieldErrorClass}
+          reqStar={reqStar}
+          lockPrimaryEmail={mode === "edit"}
+          phoneVariant={isDark ? "dark" : "light"}
+        />
       </div>
       <div className="md:col-span-2">
         <label className={labelClass}>Description</label>

@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff, Ticket } from "lucide-react";
+import { ArrowLeft, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import EventForm from "@/components/EventAdminPanel/EventForm";
 import OrganizerTicketPurchase from "@/components/EventAdminPanel/OrganizerTicketPurchase";
@@ -11,7 +11,6 @@ import {
   useGetOrganizerEventQuery,
   useUpdateOrganizerEventMutation,
   useSubmitOrganizerEventMutation,
-  useToggleOrganizerEventVisibilityMutation,
   type EventFormPayload,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -27,24 +26,26 @@ export default function EditOrganizerEventPage({
   const { data: event, isLoading } = useGetOrganizerEventQuery(id);
   const [updateEvent, { isLoading: saving }] = useUpdateOrganizerEventMutation();
   const [submitEvent, { isLoading: submitting }] = useSubmitOrganizerEventMutation();
-  const [toggleVisibility, { isLoading: toggling }] = useToggleOrganizerEventVisibilityMutation();
 
   const editable = event?.status === "DRAFT" || event?.status === "PENDING_APPROVAL";
+  const mediaOnlyEdit = event?.status === "LIVE";
   const canSubmit = event?.status === "DRAFT";
-  const canToggleVisibility = event?.status === "LIVE";
   const canSellTickets = event?.status === "LIVE";
 
   const handleSaveDraft = async (payload: EventFormPayload) => {
     try {
       const result = await updateEvent({ id, body: payload }).unwrap();
       const pending = event?.status === "PENDING_APPROVAL";
+      const live = event?.status === "LIVE";
       toast.success(
-        pending
-          ? result.message ||
+        live
+          ? result.message || "Posters, gallery, and YouTube updated."
+          : pending
+            ? result.message ||
               "Changes saved. Super Admin can see your updates (including custom layout requests)."
-          : payload.promotion_request
-            ? "Draft saved with promotion request."
-            : "Draft saved."
+            : payload.promotion_request
+              ? "Draft saved with promotion request."
+              : "Draft saved."
       );
     } catch (e) {
       toast.error(extractApiError(e, "Failed to save event"));
@@ -64,15 +65,6 @@ export default function EditOrganizerEventPage({
     } catch (e) {
       toast.error(extractApiError(e, "Failed to submit event"));
       throw e;
-    }
-  };
-
-  const handleVisibility = async () => {
-    try {
-      await toggleVisibility({ id }).unwrap();
-      toast.success(event?.is_visible ? "Event hidden from customers" : "Event visible to customers");
-    } catch (e) {
-      toast.error(extractApiError(e, "Failed to update visibility"));
     }
   };
 
@@ -107,16 +99,6 @@ export default function EditOrganizerEventPage({
             {event.category_name || "Uncategorized"} · {event.status.replace("_", " ")}
           </p>
         </div>
-        {canToggleVisibility && (
-          <button
-            disabled={toggling}
-            onClick={handleVisibility}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {event.is_visible ? <EyeOff size={16} /> : <Eye size={16} />}
-            {event.is_visible ? "Hide from customers" : "Show to customers"}
-          </button>
-        )}
         {canSellTickets && (
           <button
             type="button"
@@ -138,6 +120,7 @@ export default function EditOrganizerEventPage({
       <EventForm
         event={event}
         readOnly={!editable}
+        mediaOnlyEdit={mediaOnlyEdit}
         canSubmit={canSubmit}
         onSaveDraft={handleSaveDraft}
         onSubmitForApproval={handleSubmit}

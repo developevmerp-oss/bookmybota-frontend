@@ -1328,6 +1328,9 @@ export interface PublicRegisteredPartner {
   city_state?: string | null;
   type_name?: string | null;
   published_layout_count?: number | null;
+  /** Present when API includes partner flags (onboarded vs event_auto stubs). */
+  partner_source?: string | null;
+  is_partner_authorized?: boolean | null;
 }
 
 export interface ArtistAvailabilitySlot {
@@ -1346,6 +1349,7 @@ export interface PublicArtistProfile extends PublicRegisteredPartner {
   gallery_images?: string[];
   artist_meta?: import("@/lib/artistMeta").ArtistMeta | null;
   slots?: ArtistAvailabilitySlot[];
+  events?: PublicEvent[];
 }
 
 export interface ArtistBookingInquiry {

@@ -31,6 +31,10 @@ import { fuzzyFilter } from "@/lib/fuzzySearch";
 import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import PlanInfoButton from "@/components/Shared/PlanInfoButton";
 import { resolveMediaUrl, extractUploadUrl } from "@/lib/mediaUrl";
+import SafeCoverImage, {
+  ARTIST_IMAGE_FALLBACK_CLASS,
+  ArtistImageFallback,
+} from "@/components/Shared/SafeCoverImage";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 
 const VenueLayoutMapPreview = dynamic(
@@ -2075,14 +2079,14 @@ function ArtistBlock({
                           businessId === a.id ? "bg-rose-50" : ""
                         }`}
                       >
-                        <div className="h-10 w-10 rounded-lg overflow-hidden bg-slate-200 shrink-0">
-                          {a.cover_image_url ? (
-                            <img src={a.cover_image_url} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-sm font-bold text-slate-500">
-                              {a.name.slice(0, 1).toUpperCase()}
-                            </div>
-                          )}
+                        <div className="h-10 w-10 rounded-lg overflow-hidden bg-[#F7E9FF] shrink-0">
+                          <SafeCoverImage
+                            src={a.cover_image_url ? resolveMediaUrl(a.cover_image_url) : ""}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            fallbackClassName={ARTIST_IMAGE_FALLBACK_CLASS}
+                            fallback={<ArtistImageFallback size={18} />}
+                          />
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-slate-800">{a.name}</p>

@@ -38,7 +38,11 @@ import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
-import SafeCoverImage, { EventImageFallback } from "@/components/Shared/SafeCoverImage";
+import SafeCoverImage, {
+  EventImageFallback,
+  ArtistImageFallback,
+  ARTIST_IMAGE_FALLBACK_CLASS,
+} from "@/components/Shared/SafeCoverImage";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { toast } from "sonner";
 import { EventDetailShimmer } from "@/components/Shared/Shimmer";
@@ -56,7 +60,13 @@ type StaticArtist = {
   description?: string;
   image_url?: string;
   unauthorized?: boolean;
+  /** Book My Bota registered partner business id (when available). */
+  businessId?: string | null;
 };
+
+function isRegisteredPlatformArtist(artist: StaticArtist): boolean {
+  return Boolean(artist.businessId) && !artist.unauthorized;
+}
 
 function parseGenres(genres?: string[] | string | null): string[] {
   if (!genres) return [];
@@ -251,17 +261,20 @@ export default function PublicEventDetailPage({
     return rows.map((a) => {
       const role = String(a.role_title || "").trim();
       const isGuestRole = /^guest$/i.test(role) || /chief\s*guest/i.test(role);
+      const businessId = a.artist_business_id ? String(a.artist_business_id) : null;
       const unauthorized =
         !isGuestRole &&
         (a.artist_source === "auto_registered" ||
           a.artist_source === "external" ||
-          a.artist_is_authorized === false);
+          a.artist_is_authorized === false ||
+          !businessId);
       return {
         name: a.name || a.artist_business_name || "Artist",
         role: a.role_title || undefined,
         description: a.description || undefined,
         image_url: a.image_url || a.artist_business_image || undefined,
         unauthorized,
+        businessId,
       };
     });
   }, [event?.artists]);
@@ -765,17 +778,23 @@ export default function PublicEventDetailPage({
                   <button
                     key={`${artist.name}-${i}`}
                     type="button"
-                    onClick={() => setArtistModal(artist)}
+                    onClick={() => {
+                      if (isRegisteredPlatformArtist(artist) && artist.businessId) {
+                        router.push(`/artists/${artist.businessId}`);
+                        return;
+                      }
+                      setArtistModal(artist);
+                    }}
                     className="w-[128px] sm:w-[148px] lg:w-[156px] 2xl:w-[164px] shrink-0 text-left cursor-pointer"
                   >
-                    <div className="relative h-[160px] sm:h-[188px] lg:h-[196px] 2xl:h-[208px] rounded-xl overflow-hidden bg-slate-200">
-                      {artist.image_url ? (
-                        <img src={resolveMediaUrl(artist.image_url)} alt={artist.name} className="absolute inset-0 w-full h-full object-cover" />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[1.375rem] sm:text-[1.625rem] font-extrabold text-white bg-[#1B365D]">
-                          {artist.name.slice(0, 1).toUpperCase()}
-                        </div>
-                      )}
+                    <div className="relative h-[160px] sm:h-[188px] lg:h-[196px] 2xl:h-[208px] rounded-xl overflow-hidden bg-[#F7E9FF]">
+                      <SafeCoverImage
+                        src={artist.image_url ? resolveMediaUrl(artist.image_url) : ""}
+                        alt={artist.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F7E9FF] text-[#6900AA]"
+                        fallback={<ArtistImageFallback size={36} />}
+                      />
                     </div>
                     <p className="mt-1.5 sm:mt-2 font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] leading-snug">
                       {artist.name}
@@ -978,7 +997,7 @@ export default function PublicEventDetailPage({
             role="dialog"
             aria-modal="true"
             aria-labelledby="artist-modal-name"
-            className="relative w-full sm:max-w-[380px] max-h-[92vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
+            className="relative w-full sm:max-w-[420px] max-h-[92vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -990,31 +1009,56 @@ export default function PublicEventDetailPage({
               <X size={16} />
             </button>
             <div className="overflow-y-auto max-h-[92vh] sm:max-h-[90vh] px-5 sm:px-6 pt-5 sm:pt-6 pb-6 sm:pb-7">
-              <div className="w-[180px] sm:w-[220px] mx-auto aspect-square rounded-xl overflow-hidden bg-slate-200">
-                {artistModal.image_url ? (
-                  <img src={resolveMediaUrl(artistModal.image_url)} alt={artistModal.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[1.875rem] sm:text-[2.25rem] font-extrabold text-white bg-[#1B365D]">
-                    {artistModal.name.slice(0, 1).toUpperCase()}
-                  </div>
-                )}
+              <div className="w-[180px] sm:w-[220px] mx-auto aspect-square rounded-xl overflow-hidden bg-[#F7E9FF]">
+                <SafeCoverImage
+                  src={artistModal.image_url ? resolveMediaUrl(artistModal.image_url) : ""}
+                  alt={artistModal.name}
+                  className="w-full h-full object-cover"
+                  fallbackClassName={ARTIST_IMAGE_FALLBACK_CLASS}
+                  fallback={<ArtistImageFallback size={48} />}
+                />
               </div>
-              <h2 id="artist-modal-name" className="mt-4 text-[1.375rem] sm:text-[1.625rem] font-extrabold text-[#1A1A1A] leading-tight">
+              {artistModal.role ? (
+                <p className="mt-4 text-center text-[0.9375rem] sm:text-[1rem] font-semibold text-[#8A8A8A]">
+                  {artistModal.role}
+                </p>
+              ) : null}
+              <h2
+                id="artist-modal-name"
+                className={`text-center text-[1.375rem] sm:text-[1.625rem] font-extrabold text-[#1A1A1A] leading-tight ${
+                  artistModal.role ? "mt-1" : "mt-4"
+                }`}
+              >
                 {artistModal.name}
               </h2>
-              {artistModal.role && (
-                <p className="mt-1 text-[1rem] sm:text-[1.0625rem] text-[#8A8A8A]">{artistModal.role}</p>
-              )}
-              {artistModal.unauthorized && (
-                <p className="mt-1 text-[0.6875rem] sm:text-xs text-[#9AA0A6] leading-snug">
-                  This artist is listed by the organizer and is not platform-authorized.
-                </p>
-              )}
-              {artistModal.description && (
-                <p className="mt-3 sm:mt-4 text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] text-[#333] whitespace-pre-wrap">
-                  {artistModal.description}
-                </p>
-              )}
+              {artistModal.description ? (
+                <div className="mt-3 sm:mt-4">
+                  <p className="text-[0.8125rem] font-bold uppercase tracking-[0.08em] text-[#9AA0A6]">
+                    About artist
+                  </p>
+                  <p className="mt-1.5 text-[1rem] sm:text-[1.0625rem] leading-7 sm:leading-[1.7] text-[#333] whitespace-pre-wrap">
+                    {artistModal.description}
+                  </p>
+                </div>
+              ) : null}
+
+              {event ? (
+                <div className="mt-5 sm:mt-6">
+                  <p className="text-[1.125rem] font-bold text-[#1A1A1A]">Events</p>
+                  <div className="mt-3">
+                    <RelatedCard
+                      event={{
+                        id: event.id,
+                        name: event.name,
+                        poster_vertical_url: event.poster_vertical_url,
+                        poster_horizontal_url: event.poster_horizontal_url,
+                        category_name: event.category_name,
+                        next_showtime: nextShowtime?.starts_at,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

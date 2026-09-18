@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import Link from "next/link";
-import { Mic2 } from "lucide-react";
 import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
@@ -10,6 +9,10 @@ import {
   SHOWCASE_ARTIST_CARDS,
   type ShowcaseArtistCard,
 } from "@/data/showcaseArtistCards";
+import SafeCoverImage, {
+  ARTIST_IMAGE_FALLBACK_CLASS,
+  ArtistImageFallback,
+} from "@/components/Shared/SafeCoverImage";
 import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import "./TopArtistsRail.css";
 
@@ -45,31 +48,6 @@ function mapShowcaseArtist(artist: ShowcaseArtistCard): RailArtistCard {
   };
 }
 
-function ArtistAvatar({ image }: { image: string }) {
-  const [failed, setFailed] = useState(false);
-  const showImage = Boolean(image) && !failed;
-
-  if (!showImage) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-[#F7E9FF] text-[#6900AA]">
-        <Mic2 size={32} strokeWidth={1.4} />
-      </div>
-    );
-  }
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={image}
-      alt=""
-      className="w-full h-full object-cover"
-      loading="lazy"
-      draggable={false}
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
 function ArtistCard({ artist }: { artist: RailArtistCard }) {
   return (
     <Link
@@ -79,7 +57,13 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
     >
       <div className="top-artists-avatar">
         <div className="top-artists-avatar-inner">
-          <ArtistAvatar image={artist.image} />
+          <SafeCoverImage
+            src={artist.image}
+            alt=""
+            className="w-full h-full object-cover"
+            fallbackClassName={ARTIST_IMAGE_FALLBACK_CLASS}
+            fallback={<ArtistImageFallback size={32} />}
+          />
         </div>
       </div>
       <p className="top-artists-name">{artist.name}</p>

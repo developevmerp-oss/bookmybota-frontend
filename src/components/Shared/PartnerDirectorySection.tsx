@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, MapPin, Mic2 } from "lucide-react";
+import { Building2, MapPin } from "lucide-react";
 import type { PublicRegisteredPartner } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import SafeCoverImage, {
+  ArtistImageFallback,
+} from "@/components/Shared/SafeCoverImage";
 
 const BRAND = "#6900AA";
 const BRAND_SOFT = "#F7E9FF";
@@ -35,7 +38,15 @@ function PartnerCard({
 
   const card = (
     <div className="group relative w-full h-full min-h-[340px] sm:min-h-[380px] rounded-[1.75rem] overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.14)] bg-[#1a1a1a]">
-      {partner.cover_image_url ? (
+      {kind === "artist" ? (
+        <SafeCoverImage
+          src={partner.cover_image_url ? resolveMediaUrl(partner.cover_image_url) : ""}
+          alt={partner.name}
+          className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+          fallbackClassName="absolute inset-0 flex items-center justify-center bg-[#F7E9FF] text-[#6900AA]"
+          fallback={<ArtistImageFallback size={48} />}
+        />
+      ) : partner.cover_image_url ? (
         <img
           src={resolveMediaUrl(partner.cover_image_url)}
           alt={partner.name}
@@ -46,11 +57,7 @@ function PartnerCard({
           className="absolute inset-0 flex items-center justify-center"
           style={{ backgroundColor: BRAND_SOFT, color: BRAND }}
         >
-          {kind === "venue" ? (
-            <Building2 size={48} strokeWidth={1.4} />
-          ) : (
-            <Mic2 size={48} strokeWidth={1.4} />
-          )}
+          <Building2 size={48} strokeWidth={1.4} />
         </div>
       )}
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Calendar, Clapperboard, Utensils } from "lucide-react";
+import { Calendar, Clapperboard, Mic2, Utensils } from "lucide-react";
 
 type SafeCoverImageProps = {
   src?: string | null;
@@ -56,3 +56,12 @@ export function DiningImageFallback({ size = 28 }: { size?: number }) {
 export function EventImageFallback({ size = 28 }: { size?: number }) {
   return <Calendar size={size} strokeWidth={1.5} />;
 }
+
+/** Same Mic2 placeholder used on the home Top Artists rail. */
+export function ArtistImageFallback({ size = 32 }: { size?: number }) {
+  return <Mic2 size={size} strokeWidth={1.4} />;
+}
+
+/** Soft brand plate behind artist image placeholders (landing style). */
+export const ARTIST_IMAGE_FALLBACK_CLASS =
+  "flex h-full w-full items-center justify-center bg-[#F7E9FF] text-[#6900AA]";

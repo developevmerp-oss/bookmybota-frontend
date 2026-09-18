@@ -28,6 +28,10 @@ import { parseEventLanguages } from "@/lib/eventValidation";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import SafeCoverImage, {
+  ARTIST_IMAGE_FALLBACK_CLASS,
+  ArtistImageFallback,
+} from "@/components/Shared/SafeCoverImage";
 import {
   adminEventRejectionSchema,
   type AdminEventRejectionValues,
@@ -692,15 +696,15 @@ export default function AdminEventDetailPage({
                   key={a.id || `${a.name}-${idx}`}
                   className="flex gap-3 border border-slate-100 rounded-xl p-3"
                 >
-                  {img ? (
-                    <img
+                  <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-[#F7E9FF]">
+                    <SafeCoverImage
                       src={img}
                       alt={a.name}
-                      className="w-14 h-14 rounded-lg object-cover shrink-0 bg-slate-100"
+                      className="w-full h-full object-cover"
+                      fallbackClassName={ARTIST_IMAGE_FALLBACK_CLASS}
+                      fallback={<ArtistImageFallback size={22} />}
                     />
-                  ) : (
-                    <div className="w-14 h-14 rounded-lg bg-slate-100 shrink-0" />
-                  )}
+                  </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-800 truncate">{a.name}</p>
                     {a.role_title && (

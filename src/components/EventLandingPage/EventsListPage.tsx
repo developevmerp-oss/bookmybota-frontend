@@ -20,7 +20,7 @@ import {
   FaSlidersH,
 } from "react-icons/fa";
 import { MapPin } from "lucide-react";
-import SafeCoverImage, { EventImageFallback } from "@/components/Shared/SafeCoverImage";
+import SafeCoverImage, { EventImageFallback, ArtistImageFallback, ARTIST_IMAGE_FALLBACK_CLASS } from "@/components/Shared/SafeCoverImage";
 import {
   api,
   useGetBusinessTypesQuery,
@@ -55,6 +55,8 @@ import {
 
 const PAGE_SIZE = 8;
 const EMPTY_EVENTS: PublicEvent[] = [];
+const EMPTY_CATEGORIES: Array<{ slug: string; name: string }> = [];
+const EMPTY_ARTISTS: PublicRegisteredPartner[] = [];
 const LANG_OPTIONS = ["English", "Amharic"] as const;
 const PRICE_BANDS: Array<{ id: string; label: string }> = [
   { id: "free", label: "Free" },
@@ -475,19 +477,14 @@ function ArtistChip({ artist }: { artist: PublicRegisteredPartner }) {
       href={`/artists/${artist.id}`}
       className="shrink-0  snap-start flex flex-col items-center gap-2.5 text-center group"
     >
-      <div className="relative h-[120px] w-[120px] sm:h-[190px] sm:w-[190px] rounded-full overflow-hidden bg-slate-200 ring-2 ring-white shadow-sm">
-        {img ? (
-          <img
-            src={img}
-            alt={artist.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-black font-bold">
-            {artist.name?.charAt(0)?.toUpperCase() || "A"}
-          </span>
-        )}
+      <div className="relative h-[120px] w-[120px] sm:h-[190px] sm:w-[190px] rounded-full overflow-hidden bg-[#F7E9FF] ring-2 ring-white shadow-sm">
+        <SafeCoverImage
+          src={img}
+          alt={artist.name}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          fallbackClassName={ARTIST_IMAGE_FALLBACK_CLASS}
+          fallback={<ArtistImageFallback size={40} />}
+        />
       </div>
       <span className="text-sm sm:text-base font-semibold text-slate-800 line-clamp-2 leading-tight px-0.5">
         {artist.name}
@@ -549,8 +546,6 @@ export default function PublicEventsPage() {
   const [promoDesktopAutoplay, setPromoDesktopAutoplay] = useState(false);
   const mobilePromoTrackRef = useRef<HTMLDivElement>(null);
   const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
-  const [posterFallbackEvents, setPosterFallbackEvents] = useState<PublicEvent[]>([]);
-  const [exploreEventPool, setExploreEventPool] = useState<PublicEvent[]>([]);
   const [recPage, setRecPage] = useState(0);
 
   const recommendRef = useRef<HTMLDivElement>(null);
@@ -681,7 +676,7 @@ export default function PublicEventsPage() {
   }, [dedicatedCategoryPage, scrollToEventsViewport, syncCategoryToUrl]);
 
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
-  const apiCategories = filterOptions?.categories ?? [];
+  const apiCategories = filterOptions?.categories ?? EMPTY_CATEGORIES;
   const { data: businessTypes = [] } = useGetBusinessTypesQuery("event");
 
   const categoryPool = useMemo(() => {
@@ -799,24 +794,34 @@ export default function PublicEventsPage() {
   const { data: eventsData, isLoading, isFetching } = useGetPublicEventsQuery(queryArg);
   const events = eventsData ?? EMPTY_EVENTS;
 
-  const { data: artists = [] } = useGetPublicRegisteredArtistsQuery();
+  const { data: allPublicEventsData } = useGetPublicEventsQuery(undefined);
+  const allPublicEvents = allPublicEventsData ?? EMPTY_EVENTS;
+
+  const { data: artistsData } = useGetPublicRegisteredArtistsQuery();
+  const artists = artistsData ?? EMPTY_ARTISTS;
+
+  const exploreEventPool = allPublicEvents;
+  const posterFallbackEvents = useMemo(
+    () =>
+      allPublicEvents
+        .filter((event) => event.poster_horizontal_url || event.poster_vertical_url || event.name)
+        .slice(0, 12),
+    [allPublicEvents]
+  );
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
-        const allEvents = await dispatch(
-          api.endpoints.getPublicEvents.initiate(undefined, { forceRefetch: false })
-        ).unwrap();
-
-        const candidates = allEvents.filter(
+        const candidates = (
+          allPublicEvents.length
+            ? allPublicEvents
+            : await dispatch(
+                api.endpoints.getPublicEvents.initiate(undefined, { forceRefetch: false })
+              ).unwrap()
+        ).filter(
           (event) => event.poster_horizontal_url || event.poster_vertical_url || event.name
         );
-        if (!cancelled) {
-          setExploreEventPool(allEvents);
-          setPosterFallbackEvents(candidates.slice(0, 12));
-        }
 
         const withOffers: PublicEvent[] = [];
         await Promise.all(
@@ -832,21 +837,15 @@ export default function PublicEventsPage() {
             }
           })
         );
-
         if (!cancelled) setOfferHeroEvents(withOffers);
       } catch {
-        if (!cancelled) {
-          setOfferHeroEvents([]);
-          setPosterFallbackEvents([]);
-          setExploreEventPool([]);
-        }
+        if (!cancelled) setOfferHeroEvents([]);
       }
     })();
-
     return () => {
       cancelled = true;
     };
-  }, [dispatch]);
+  }, [dispatch, allPublicEvents]);
 
   const categoryFilters = useMemo(
     () =>
@@ -1084,31 +1083,42 @@ export default function PublicEventsPage() {
       return pool.filter((event) => eventMatchesCategoryKey(event, activeCategoryKey, categoryPool));
     };
 
+    const preferPromoted = (pool: PublicEvent[]) => {
+      const promoted = pool.filter((e) => Boolean(e.is_promoted));
+      return (promoted.length ? promoted : pool).slice(0, 8);
+    };
+
     if (isCategoryBrowse) {
-      const fromListing = listingWithPosters;
-      if (fromListing.length) {
-        const promoted = fromListing.filter((e) => e.is_promoted);
-        return (promoted.length ? promoted : fromListing).slice(0, 8);
-      }
+      if (listingWithPosters.length) return preferPromoted(listingWithPosters);
       const fromOffers = filterByCategory(offerHeroEvents);
       if (fromOffers.length) return fromOffers.slice(0, 8);
-      const fromFallback = filterByCategory(posterFallbackEvents);
-      const promoted = fromFallback.filter((e) => e.is_promoted);
-      return (promoted.length ? promoted : fromFallback).slice(0, 8);
+      const fromFallback = filterByCategory(
+        posterFallbackEvents.length ? posterFallbackEvents : allPublicEvents
+      );
+      return preferPromoted(fromFallback);
     }
 
     if (offerHeroEvents.length) return offerHeroEvents.slice(0, 8);
-    const fromFallback = posterFallbackEvents.length ? posterFallbackEvents : listingWithPosters;
-    const promoted = fromFallback.filter((e) => e.is_promoted);
-    return (promoted.length ? promoted : fromFallback).slice(0, 8);
+    const fromFallback = posterFallbackEvents.length
+      ? posterFallbackEvents
+      : listingWithPosters.length
+        ? listingWithPosters
+        : allPublicEvents;
+    return preferPromoted(fromFallback);
   }, [
     activeCategoryKey,
     isCategoryBrowse,
     offerHeroEvents,
     posterFallbackEvents,
     listingWithPosters,
+    allPublicEvents,
     categoryPool,
   ]);
+
+  const promoEventsKey = useMemo(
+    () => promoEvents.map((e) => e.id).join("|"),
+    [promoEvents]
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -1126,7 +1136,7 @@ export default function PublicEventsPage() {
       window.requestAnimationFrame(() => setHeroSlideTransition(true));
     });
     return () => window.cancelAnimationFrame(t);
-  }, [promoEvents]);
+  }, [promoEventsKey]);
 
   // Autoplay only on desktop — mobile/tablet are manual (swipe)
   useEffect(() => {
@@ -1135,7 +1145,7 @@ export default function PublicEventsPage() {
       setHeroSlideIndex((i) => i + 1);
     }, 4500);
     return () => window.clearInterval(t);
-  }, [promoDesktopAutoplay, promoEvents, heroSlideIndex]);
+  }, [promoDesktopAutoplay, promoEventsKey, promoEvents.length]);
 
   const activeHeroDot = promoEvents.length
     ? heroSlideIndex % promoEvents.length
@@ -2091,26 +2101,27 @@ export default function PublicEventsPage() {
                 <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
                   {city ? `Artists in ${headingCity}` : "Artists in your District"}
                 </h2>
-                {artists.length > 0 ? (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      aria-label="Scroll artists left"
-                      onClick={() => scrollRow(artistsRef, -1)}
-                      className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
-                    >
-                      <FaChevronLeft size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Scroll artists right"
-                      onClick={() => scrollRow(artistsRef, 1)}
-                      className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
-                    >
-                      <FaChevronRight size={12} />
-                    </button>
-                  </div>
-                ) : null}
+                <div
+                  className={`flex gap-2 ${artists.length > 0 ? "" : "invisible"}`}
+                  aria-hidden={artists.length === 0}
+                >
+                  <button
+                    type="button"
+                    aria-label="Scroll artists left"
+                    onClick={() => scrollRow(artistsRef, -1)}
+                    className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
+                  >
+                    <FaChevronLeft size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Scroll artists right"
+                    onClick={() => scrollRow(artistsRef, 1)}
+                    className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
+                  >
+                    <FaChevronRight size={12} />
+                  </button>
+                </div>
               </div>
               {artists.length > 0 ? (
                 <div

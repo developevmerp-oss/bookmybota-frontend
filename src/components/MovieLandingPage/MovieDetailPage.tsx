@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import MovieTrailerModal from "@/components/MovieLandingPage/MovieTrailerModal";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
 import {
-  useGetMovieEligiblePlatformOffersQuery,
+  useGetPublicCinemaOffersForMovieQuery,
   useGetPublicMovieQuery,
 } from "@/services/api";
 import {
@@ -24,7 +24,6 @@ import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSectio
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import { useSelectedCity } from "@/lib/useSelectedCity";
-import { hasCityFilter } from "@/components/LandingPage/homeUtils";
 
 
 
@@ -39,21 +38,22 @@ function languageLine(languages: string[]) {
 
 
 function mapPlatformOffersToMovieOffers(
-
-  offers: Array<{ id: string; name: string; description?: string | null; discount_label: string }>
-
+  offers: Array<{
+    id: string;
+    name: string;
+    code?: string;
+    description?: string | null;
+    discount_label: string;
+  }>
 ): MovieOfferItem[] {
-
   return offers.map((offer) => ({
-
     id: offer.id,
-
     title: offer.discount_label || offer.name,
-
     subtitle: offer.description?.trim() || offer.name,
-
+    promo_code: offer.code?.trim() || undefined,
+    discount_label: offer.discount_label,
+    description: offer.description?.trim() || undefined,
   }));
-
 }
 
 
@@ -348,7 +348,6 @@ export default function MovieDetailPage() {
 
   const idOrSlug = String(params?.id || "");
   const city = useSelectedCity();
-  const hasCity = hasCityFilter(city);
 
   const {
 
@@ -366,33 +365,30 @@ export default function MovieDetailPage() {
 
 
 
-  const { data: platformOffers = [] } = useGetMovieEligiblePlatformOffersQuery(
-
-    {
-      movie_id: apiMovie?.id || "",
-      ...(hasCity ? { city } : {}),
-    },
-
-    { skip: !apiMovie?.id }
-
+  const { data: cinemaOffers = [] } = useGetPublicCinemaOffersForMovieQuery(
+    idOrSlug,
+    { skip: !idOrSlug }
   );
 
-
-
   const movie = useMemo<MovieDetailData | null>(() => {
-
     if (!apiMovie) return null;
-
     const mapped = mapApiMovieToDetail(apiMovie);
-
-    const offers = mapPlatformOffersToMovieOffers(platformOffers);
-
+    // Same as events: detail page shows partner (cinema) offers only.
+    // Super Admin platform offers appear on the landing Special Offers rail.
+    const offers = mapPlatformOffersToMovieOffers(
+      cinemaOffers.map((o) => ({
+        id: o.id,
+        name: o.cinema_name ? `${o.name} · ${o.cinema_name}` : o.name,
+        code: o.code,
+        description: o.description,
+        discount_label: o.discount_label,
+      }))
+    );
     return withMovieExtras(
       { ...mapped, offers },
-      { fillCastCrew: false, fillOffers: false, fillReviews: true, fillRating: true }
+      { fillCastCrew: false, fillOffers: false, fillReviews: false, fillRating: false }
     );
-
-  }, [apiMovie, platformOffers]);
+  }, [apiMovie, cinemaOffers]);
 
 
 

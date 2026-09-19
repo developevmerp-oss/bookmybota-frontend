@@ -1,11 +1,10 @@
 import * as yup from "yup";
 
-/** Customer dining venue review form (login + completed visit required on API). */
-export const diningReviewFormSchema = yup.object({
+export const movieReviewFormSchema = yup.object({
   user_name: yup
     .string()
     .trim()
-    .required("Your name is required.")
+    .required("Name is required.")
     .min(2, "Name must be at least 2 characters.")
     .max(80, "Name must be at most 80 characters."),
   rating: yup
@@ -21,15 +20,9 @@ export const diningReviewFormSchema = yup.object({
   text: yup
     .string()
     .trim()
-    .required("Comment is required.")
+    .required("Review text is required.")
     .min(10, "Please write at least 10 characters.")
-    .max(1000, "Comment must be at most 1000 characters."),
+    .max(1000, "Review must be at most 1000 characters."),
 });
 
-export type DiningReviewFormValues = yup.InferType<typeof diningReviewFormSchema>;
-
-export const emptyDiningReviewFormValues = (): DiningReviewFormValues => ({
-  user_name: "",
-  rating: 5,
-  text: "",
-});
+export type MovieReviewFormValues = yup.InferType<typeof movieReviewFormSchema>;

@@ -806,6 +806,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         ticket_amount: ticketSubtotal,
         guest_phone: sanitizePhoneInput(getValues("guest_phone") || authUser?.phone || "") || undefined,
         ...(selectedCity ? { city: selectedCity } : {}),
+        ...(cinema?.id
+          ? { business_id: String(cinema.id) }
+          : {}),
       }).unwrap();
 
       const discount = money(Number(result.discount_amount) || 0);
@@ -1004,6 +1007,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         payment_method: "CASH",
         hold_id: holdId,
         session_token: sessionToken || readHoldSessionToken(),
+        ...(selectedCity ? { city: selectedCity } : {}),
         gift_card_id: appliedGiftCard?.gift_card_id || undefined,
         gift_card_code:
           appliedGiftCard && giftCardInput.trim() && !selectedGiftCardId

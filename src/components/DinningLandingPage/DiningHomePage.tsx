@@ -14,18 +14,20 @@ import {
   Users,
   Tag,
   ArrowRight,
+  Crown,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import type { IconType } from "react-icons";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Navigation as SwiperNavigation, Pagination } from "swiper/modules";
+import { Autoplay, Navigation as SwiperNavigation } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
-import "swiper/css/pagination";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
 import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
+import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -140,11 +142,185 @@ const MEAL_OCCASIONS: {
   { id: "lunch", label: "Lunch", image: "/images/dining/lunch.png" },
 ];
 
-const PROMO_SLIDES = [
-  { id: "dining-hero", src: "/images/dining-hero.png", alt: "Discover dining near you" },
-  { id: "promo-rakhi", src: "/images/dining/promo-rakhi.png", alt: "Rakhi Special Celebrations" },
-  { id: "promo-cafe", src: "/images/dining/promo-cafe.png", alt: "Good Food. Great Moments." },
+type DiningPromoSlide = {
+  id: string;
+  title: string;
+  image: string;
+  location: string;
+  rating: string;
+  reviewsLabel: string;
+  cuisines: string[];
+  href: string;
+};
+
+const FALLBACK_PROMO_SLIDES: DiningPromoSlide[] = [
+  {
+    id: "dining-hero",
+    title: "The Rooftop Kitchen",
+    image: "/images/dining-hero.png",
+    location: "Bole, Addis Ababa",
+    rating: "4.7",
+    reviewsLabel: "(1.2k reviews)",
+    cuisines: ["Continental", "Italian", "Grill"],
+    href: "/dining",
+  },
+  {
+    id: "promo-rakhi",
+    title: "Rakhi Special Celebrations",
+    image: "/images/dining/promo-rakhi.png",
+    location: "Addis Ababa",
+    rating: "4.6",
+    reviewsLabel: "(860 reviews)",
+    cuisines: ["Indian", "Grill", "Family"],
+    href: "/dining",
+  },
+  {
+    id: "promo-cafe",
+    title: "Good Food. Great Moments.",
+    image: "/images/dining/promo-cafe.png",
+    location: "Kazanchis, Addis Ababa",
+    rating: "4.5",
+    reviewsLabel: "(640 reviews)",
+    cuisines: ["Cafe", "Brunch", "Desserts"],
+    href: "/dining",
+  },
 ];
+
+function formatReviewCount(count?: number | null): string {
+  const n = Number(count || 0);
+  if (!n) return "(New)";
+  if (n >= 1000) {
+    const k = n / 1000;
+    const label = k >= 10 ? `${Math.round(k)}k` : `${k.toFixed(1).replace(/\.0$/, "")}k`;
+    return `(${label} reviews)`;
+  }
+  return `(${n} review${n === 1 ? "" : "s"})`;
+}
+
+function diningLocality(business: Business): string {
+  const city = (business.city_name || "").trim();
+  const addr = (business.address || "").trim();
+  if (addr) {
+    const parts = addr.split(",").map((p) => p.trim()).filter(Boolean);
+    const area = parts[0] || addr;
+    if (city && !area.toLowerCase().includes(city.toLowerCase())) {
+      return `${area}, ${city}`;
+    }
+    if (parts.length >= 2) return `${parts[0]}, ${parts[1]}`;
+    return area;
+  }
+  return city || "Addis Ababa";
+}
+
+function diningCuisineTags(business: Business): string[] {
+  const raw =
+    business.cuisine ||
+    business.type_name ||
+    "";
+  const tags = raw
+    .split(/[,·|/]/)
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  return tags.length ? tags : ["Dining"];
+}
+
+function businessToPromoSlide(business: Business): DiningPromoSlide | null {
+  const image =
+    resolveMediaUrl(business.cover_image_url) ||
+    (business.gallery_images?.[0] ? resolveMediaUrl(business.gallery_images[0]) : "");
+  if (!image) return null;
+  return {
+    id: `biz-${business.id}`,
+    title: business.name,
+    image,
+    location: diningLocality(business),
+    rating: Number(business.rating || 4.5).toFixed(1),
+    reviewsLabel: formatReviewCount(business.reviews_count),
+    cuisines: diningCuisineTags(business),
+    href: `/restaurant/${business.id}`,
+  };
+}
+
+function DiningPromoBannerCard({ slide }: { slide: DiningPromoSlide }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const showImage = Boolean(slide.image) && !imgFailed;
+  const locationParts = slide.location.split(",").map((p) => p.trim()).filter(Boolean);
+  const placeLabel = locationParts[0] || slide.location;
+  const cityLabel = locationParts.slice(1).join(", ") || "";
+
+  return (
+    <Link
+      href={slide.href}
+      aria-label={`Book a table at ${slide.title}`}
+      className="dining-promo-card group relative flex h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
+    >
+      <div className="absolute inset-0">
+        {showImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={slide.image}
+            alt=""
+            aria-hidden
+            className="dining-promo-card-photo h-full w-full object-cover"
+            draggable={false}
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-[#1a0029] via-[#460071] to-[#6900aa]" aria-hidden />
+        )}
+        <div className="dining-promo-card-scrim pointer-events-none absolute inset-0" />
+      </div>
+
+      <div className="relative z-[2] flex h-full max-w-[58%] sm:max-w-[52%] md:max-w-[48%] lg:max-w-[46%] flex-col justify-center pl-5 pr-2 sm:pl-7 sm:pr-4 md:pl-9 md:pr-6 pb-6 sm:pb-8">
+        <span className="mb-2 sm:mb-2.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#6900AA] px-2.5 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-sm">
+          <Crown size={11} className="shrink-0" strokeWidth={2.25} fill="currentColor" />
+          Promoted
+        </span>
+
+        <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-[2rem] font-extrabold leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] line-clamp-2">
+          {slide.title}
+        </h2>
+
+        <div className="mt-3 sm:mt-4 flex items-center gap-3 sm:gap-4 text-white">
+          <div className="flex items-start gap-2 min-w-0">
+            <Star
+              className="mt-0.5 shrink-0 fill-[#F59E0B] text-[#F59E0B]"
+              size={16}
+              strokeWidth={0}
+            />
+            <div className="min-w-0 leading-tight">
+              <p className="text-[12px] sm:text-sm font-semibold truncate">{slide.rating}</p>
+              <p className="text-[10px] sm:text-xs text-white/65 truncate">
+                {slide.reviewsLabel.replace(/[()]/g, "")}
+              </p>
+            </div>
+          </div>
+
+          <span className="hidden sm:block w-px h-8 bg-white/30 shrink-0" aria-hidden />
+
+          <div className="hidden sm:flex items-start gap-2 min-w-0">
+            <MapPin className="mt-0.5 shrink-0 text-white/80" size={16} strokeWidth={2} />
+            <div className="min-w-0 leading-tight">
+              <p className="text-[12px] sm:text-sm font-semibold truncate">
+                {cityLabel || placeLabel}
+              </p>
+              {cityLabel ? (
+                <p className="text-[10px] sm:text-xs text-white/65 truncate">{placeLabel}</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <span className="mt-3.5 sm:mt-5 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#6900AA] px-4 sm:px-5 py-2 sm:py-2.5 text-[12px] sm:text-sm font-bold text-white shadow-[0_8px_22px_rgba(105,0,170,0.4)] transition-transform duration-200 group-hover:scale-[1.03]">
+          <Utensils size={15} className="shrink-0" strokeWidth={2.25} />
+          Book a Table
+          <ArrowRight size={15} className="shrink-0" strokeWidth={2.5} />
+        </span>
+      </div>
+    </Link>
+  );
+}
 
 const OFFER_THEMES = [
   { bg: "#FDE8E8", text: "#9B1C1C", accent: "#DC2626", shape: "#F5C2C2" },
@@ -1049,6 +1225,8 @@ export default function Home() {
   const foodieName = authUser?.name?.trim().split(/\s+/)[0] || "Foodie";
   const bannerPrevRef = useRef<HTMLButtonElement>(null);
   const bannerNextRef = useRef<HTMLButtonElement>(null);
+  const bannerSwiperRef = useRef<SwiperType | null>(null);
+  const [bannerActiveDot, setBannerActiveDot] = useState(0);
 
   const collectionsRef = useRef<HTMLDivElement>(null);
   const cuisinesRef = useRef<HTMLDivElement>(null);
@@ -1422,6 +1600,32 @@ export default function Home() {
     [sectionPool]
   );
 
+  const promoSlides = useMemo(() => {
+    const fromPromoted = sectionPool
+      .filter((b) => Boolean(b.is_promoted))
+      .map(businessToPromoSlide)
+      .filter((s): s is DiningPromoSlide => Boolean(s))
+      .slice(0, 8);
+    return fromPromoted.length > 0 ? fromPromoted : FALLBACK_PROMO_SLIDES;
+  }, [sectionPool]);
+
+  // Same as landing promo: duplicate so loop + peeks keep autoplay seamless.
+  const promoDisplaySlides = useMemo(() => {
+    if (promoSlides.length <= 1) return promoSlides;
+    const minNeeded = 6;
+    if (promoSlides.length >= minNeeded) return promoSlides;
+    const out: DiningPromoSlide[] = [];
+    let copy = 0;
+    while (out.length < minNeeded) {
+      for (const s of promoSlides) {
+        out.push(copy === 0 ? s : { ...s, id: `${s.id}__c${copy}` });
+        if (out.length >= minNeeded) break;
+      }
+      copy += 1;
+    }
+    return out;
+  }, [promoSlides]);
+
   const applyOfferBucket = useCallback((bucket: DiningOfferBucket) => {
     setDiningFilters((prev) => ({
       ...prev,
@@ -1739,24 +1943,67 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ── Top banner slider (movies-style, auto every 3s) ──────────────── */}
-      <section className="w-full overflow-hidden ">
-        <div className="dining-hero-swiper relative w-full">
+      {activeCity ? (
+        <section className="container mx-auto px-5 sm:px-6 lg:px-10 2xl:px-0 pt-3 sm:pt-4 pb-1">
+          <CityLocationEmptyState
+            city={activeCity}
+            forceShow={
+              usingDiningFallback ||
+              (Boolean(activeCity) &&
+                citySectionBusinesses.length === 0 &&
+                allSectionBusinesses.length > 0)
+            }
+            currentModule="dining"
+          />
+        </section>
+      ) : null}
+      {/* ── Top promo banner (card UI + BookMyShow peek when >2) ─────────── */}
+      <section
+        className={`dining-promo-swiper w-full  pt-3 sm:pt-4 pb-3 sm:pb-4 ${
+          promoSlides.length > 2 ? "is-peek" : "is-compact"
+        }`}
+      >
+        <div
+          className={`relative w-full ${
+            promoSlides.length > 2 ? "" : "dining-promo-single-wrap"
+          }`}
+        >
           <Swiper
-            modules={[Autoplay, SwiperNavigation, Pagination]}
-            className="w-full"
-            loop={PROMO_SLIDES.length > 1}
-            speed={650}
-            slidesPerView={1}
-            spaceBetween={0}
+            key={`dining-promo-${promoSlides.map((s) => s.id).join("-")}-${promoDisplaySlides.length}`}
+            modules={[Autoplay, SwiperNavigation]}
+            className="dining-promo-peek w-full"
+            loop={promoSlides.length > 1}
+            loopAdditionalSlides={promoSlides.length > 1 ? 2 : 0}
+            speed={600}
+            centeredSlides={promoSlides.length > 2}
+            centeredSlidesBounds={promoSlides.length <= 2}
+            grabCursor={promoSlides.length > 1}
+            allowTouchMove={promoSlides.length > 1}
+            slidesPerView={promoSlides.length > 2 ? "auto" : 1}
+            spaceBetween={promoSlides.length > 2 ? 14 : 0}
+            watchSlidesProgress={promoSlides.length > 2}
+            breakpoints={
+              promoSlides.length > 2
+                ? {
+                    640: { spaceBetween: 16 },
+                    768: { spaceBetween: 18 },
+                    1024: { spaceBetween: 20 },
+                  }
+                : undefined
+            }
             autoplay={
-              PROMO_SLIDES.length > 1
-                ? { delay: 3000, disableOnInteraction: false, pauseOnMouseEnter: true }
+              promoSlides.length > 1
+                ? {
+                    delay: 5000,
+                    disableOnInteraction: false,
+                    pauseOnMouseEnter: true,
+                    stopOnLastSlide: false,
+                    waitForTransition: true,
+                  }
                 : false
             }
-            pagination={PROMO_SLIDES.length > 1 ? { clickable: true } : false}
             navigation={
-              PROMO_SLIDES.length > 1
+              promoSlides.length > 1
                 ? { prevEl: bannerPrevRef.current, nextEl: bannerNextRef.current }
                 : false
             }
@@ -1768,43 +2015,74 @@ export default function Home() {
               }
             }}
             onSwiper={(swiper) => {
+              bannerSwiperRef.current = swiper;
               setTimeout(() => bindBannerNav(swiper));
             }}
+            onSlideChange={(swiper) => {
+              const originalCount = promoSlides.length;
+              if (originalCount <= 0) return;
+              const real =
+                ((swiper.realIndex % originalCount) + originalCount) % originalCount;
+              setBannerActiveDot(real);
+            }}
           >
-            {PROMO_SLIDES.map((slide) => (
-              <SwiperSlide key={slide.id} className="!h-auto">
-                <div className="relative block overflow-hidden min-h-48 sm:min-h-56 md:min-h-72 lg:min-h-75 bg-slate-900">
-                  <img
-                    src={slide.src}
-                    alt={slide.alt}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    draggable={false}
-                  />
-                </div>
+            {promoDisplaySlides.map((slide) => (
+              <SwiperSlide key={slide.id} className="dining-promo-slide">
+                <DiningPromoBannerCard slide={slide} />
               </SwiperSlide>
             ))}
           </Swiper>
 
-          {PROMO_SLIDES.length > 1 && (
+          {promoSlides.length > 1 ? (
             <>
               <button
                 ref={bannerPrevRef}
                 type="button"
                 aria-label="Previous banner"
-                className="dining-hero-nav dining-hero-nav-prev absolute z-20 hidden sm:flex items-center justify-center cursor-pointer"
+                className={`dining-promo-nav dining-promo-nav-prev ${
+                  promoSlides.length > 2 ? "is-peek-nav" : ""
+                }`}
               >
-                <ChevronLeft className="size-5" strokeWidth={2.25} />
+                <ChevronLeft
+                  className={promoSlides.length > 2 ? "size-4 sm:size-5" : "size-5 sm:size-6"}
+                  strokeWidth={2.25}
+                />
               </button>
               <button
                 ref={bannerNextRef}
                 type="button"
                 aria-label="Next banner"
-                className="dining-hero-nav dining-hero-nav-next absolute z-20 hidden sm:flex items-center justify-center cursor-pointer"
+                className={`dining-promo-nav dining-promo-nav-next ${
+                  promoSlides.length > 2 ? "is-peek-nav" : ""
+                }`}
               >
-                <ChevronRight className="size-5" strokeWidth={2.25} />
+                <ChevronRight
+                  className={promoSlides.length > 2 ? "size-4 sm:size-5" : "size-5 sm:size-6"}
+                  strokeWidth={2.25}
+                />
               </button>
+              <div className="dining-promo-dots" role="tablist" aria-label="Banner slides">
+                {promoSlides.map((slide, index) => (
+                  <button
+                    key={slide.id}
+                    type="button"
+                    role="tab"
+                    aria-label={`Show ${slide.title}`}
+                    aria-selected={index === bannerActiveDot}
+                    className={`dining-promo-dot ${
+                      index === bannerActiveDot ? "is-active" : ""
+                    }`}
+                    onClick={() => {
+                      const swiper = bannerSwiperRef.current;
+                      if (!swiper) return;
+                      swiper.slideToLoop(index);
+                      setBannerActiveDot(index);
+                    }}
+                  />
+                ))}
+              </div>
             </>
-          )}
+          ) : null}
         </div>
       </section>
 

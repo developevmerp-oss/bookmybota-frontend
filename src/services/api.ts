@@ -1147,6 +1147,10 @@ export interface EventFormPayload {
   artists?: Array<{
     artist_source: 'registered' | 'external' | 'auto_registered';
     artist_business_id?: string | null;
+    artist_business_name?: string | null;
+    artist_business_image?: string | null;
+    artist_is_authorized?: boolean;
+    artist_partner_source?: string | null;
     name: string;
     role_title?: string | null;
     description?: string | null;

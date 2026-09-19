@@ -41,68 +41,32 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { normalizeArtistMetaClient } from "@/lib/artistMeta";
 import AboutArtistModal from "@/components/ArtistAdminPanel/AboutArtistModal";
 import ArtistStageSection from "@/components/ArtistAdminPanel/ArtistStageSection";
-import SafeCoverImage, { EventImageFallback, ArtistImageFallback, ARTIST_IMAGE_FALLBACK_CLASS } from "@/components/Shared/SafeCoverImage";
+import SafeCoverImage, { ArtistImageFallback, ARTIST_IMAGE_FALLBACK_CLASS } from "@/components/Shared/SafeCoverImage";
 import {
-  eventPlaceLine,
-  eventPortrait,
-  formatEventDateLine,
-} from "@/components/LandingPage/homeUtils";
-import { formatMoney } from "@/lib/currencyFormat";
+  isExternalArtistId,
+  isRegisteredDirectoryArtist,
+  lineupRowMatchesArtist,
+  usePublicArtistsCatalog,
+} from "@/lib/usePublicArtistsCatalog";
+import PartnerLiveEventsSection, {
+  PartnerAllEventsPanel,
+} from "@/components/Shared/PartnerLiveEventsSection";
+import {
+  isEventLiveFromDetail,
+  isPublicEventLive,
+  mergePartnerEventItems,
+  type PartnerEventWithMeta,
+} from "@/lib/partnerEventHistory";
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
 const inquiryInput =
   "w-full rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/20 focus:border-[#C4B5FD] focus:bg-white";
 const EMPTY_EVENTS: PublicEvent[] = [];
+const EMPTY_EVENT_ITEMS: PartnerEventWithMeta[] = [];
 
 function todayYmd(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function priceOnwards(event: PublicEvent) {
-  if (event.min_price == null || event.min_price === "") return null;
-  const n = Number(event.min_price);
-  if (Number.isNaN(n)) return null;
-  if (n <= 0) return "Free";
-  return `${formatMoney(n, { compact: true })} onwards`;
-}
-
-function ArtistEventPosterCard({ event }: { event: PublicEvent }) {
-  const portrait = eventPortrait(event);
-  const place = eventPlaceLine(event);
-  const dateLine = formatEventDateLine(event.next_showtime);
-  const price = priceOnwards(event);
-
-  return (
-    <Link
-      href={`/events/${event.id}`}
-      className="group block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white"
-    >
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100">
-        <SafeCoverImage
-          src={portrait}
-          alt={event.name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-          fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
-          fallback={<EventImageFallback size={32} />}
-        />
-      </div>
-      <div className="space-y-1 px-3 py-3 sm:px-3.5 sm:py-3.5">
-        {dateLine ? (
-          <p className="text-xs font-semibold text-[#B59B2A] sm:text-sm">{dateLine}</p>
-        ) : null}
-        <h3 className="text-sm font-bold leading-snug text-black line-clamp-2 sm:text-base">
-          {event.name}
-        </h3>
-        {place ? (
-          <p className="text-xs font-medium text-[#6B6B6B] line-clamp-1 sm:text-sm">{place}</p>
-        ) : null}
-        {price ? (
-          <p className="text-xs font-medium text-[#6B6B6B] sm:text-sm">{price}</p>
-        ) : null}
-      </div>
-    </Link>
-  );
 }
 
 function InquiryLabel({
@@ -127,10 +91,96 @@ function isBookMyBotaRegisteredArtist(artist: {
   partner_source?: string | null;
   is_partner_authorized?: boolean | null;
 }): boolean {
-  if (artist.is_partner_authorized === false) return false;
-  const source = String(artist.partner_source || "onboarded").toLowerCase();
-  if (source === "event_auto" || source === "external") return false;
-  return true;
+  return isRegisteredDirectoryArtist(artist);
+}
+
+function NonRegisteredArtistView({
+  name,
+  typeName,
+  about,
+  coverSrc,
+  eventItems,
+}: {
+  name: string;
+  typeName?: string | null;
+  about?: string | null;
+  coverSrc: string;
+  eventItems: PartnerEventWithMeta[];
+}) {
+  const aboutText = about?.trim() || "";
+  const [showAllEvents, setShowAllEvents] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-white">
+      <header className="relative w-full overflow-hidden">
+        {coverSrc ? (
+          <img
+            src={coverSrc}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-2xl"
+          />
+        ) : (
+          <div aria-hidden className="absolute inset-0 bg-[#EDE4F7]" />
+        )}
+        <div aria-hidden className="absolute inset-0 bg-white/78" />
+
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:py-8 md:py-10">
+          <Link
+            href="/artists"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B1B3A]/80 hover:text-[#6900AA]"
+          >
+            <ArrowLeft size={16} /> All artists
+          </Link>
+
+          <div className="mt-5 flex flex-col items-center gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-start md:gap-8 lg:gap-10">
+            <div className="relative h-56 w-56 shrink-0 overflow-hidden rounded-2xl bg-[#F7E9FF] shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-100 lg:w-100">
+              <SafeCoverImage
+                src={coverSrc}
+                alt={name}
+                className="h-full w-full object-cover object-top"
+                fallbackClassName={ARTIST_IMAGE_FALLBACK_CLASS}
+                fallback={<ArtistImageFallback size={48} />}
+              />
+            </div>
+
+            <div className="min-w-0 flex-1 text-center md:text-left">
+              {typeName ? (
+                <p className="text-sm font-semibold text-[#1B1B3A]">{typeName}</p>
+              ) : null}
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-[#111111] sm:text-4xl md:text-5xl">
+                {name}
+              </h1>
+              {aboutText ? (
+                <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#374151] sm:text-[15px] whitespace-pre-wrap md:mx-0 mx-auto">
+                  {aboutText}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="bg-white container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-8 sm:py-10">
+        {eventItems.length > 0 ? (
+          showAllEvents ? (
+            <PartnerAllEventsPanel
+              items={eventItems}
+              onBack={() => setShowAllEvents(false)}
+            />
+          ) : (
+            <PartnerLiveEventsSection
+              items={eventItems}
+              coverSrc={coverSrc}
+              onSeeMore={() => setShowAllEvents(true)}
+            />
+          )
+        ) : (
+          <p className="text-sm text-[#6B6B6B]">No events for this artist right now.</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function PublicArtistProfilePage({ artistId }: { artistId: string }) {
@@ -140,7 +190,12 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
     dispatch(loadFromStorage());
   }, [dispatch]);
 
-  const { data: artist, isLoading, isError } = useGetPublicArtistQuery(artistId);
+  const skipPublicArtist = isExternalArtistId(artistId);
+  const { data: artist, isLoading, isError } = useGetPublicArtistQuery(artistId, {
+    skip: skipPublicArtist,
+  });
+  const { eventProfiles, isLoading: catalogLoading } = usePublicArtistsCatalog();
+  const eventProfile = eventProfiles[artistId] || null;
   const { data: publicEventsData } = useGetPublicEventsQuery();
   const publicEvents = publicEventsData ?? EMPTY_EVENTS;
   const customerId = user?.role === "customer" ? user.customer_id || "" : "";
@@ -150,8 +205,13 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   const [createInquiry, { isLoading: sending }] = useCreateArtistInquiryMutation();
   const [aboutOpen, setAboutOpen] = useState(false);
   const [bioOverflows, setBioOverflows] = useState(false);
-  const [lineupEvents, setLineupEvents] = useState<PublicEvent[]>(EMPTY_EVENTS);
+  const [lineupEvents, setLineupEvents] = useState<PartnerEventWithMeta[]>(EMPTY_EVENT_ITEMS);
+  const [showAllEvents, setShowAllEvents] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    setShowAllEvents(false);
+  }, [artistId]);
 
   const form = useForm<ArtistInquiryFormValues>({
     resolver: yupResolver(artistInquiryFormSchema),
@@ -211,14 +271,19 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
 
   useEffect(() => {
     const events = publicEventsData ?? EMPTY_EVENTS;
-    if (!artistId || events.length === 0) {
-      setLineupEvents(EMPTY_EVENTS);
+    const artistName = artist?.name || eventProfile?.name || "";
+    if (!artistId) {
+      setLineupEvents(EMPTY_EVENT_ITEMS);
+      return;
+    }
+    if (events.length === 0) {
+      setLineupEvents(mergePartnerEventItems("artist", artistId, EMPTY_EVENT_ITEMS));
       return;
     }
 
     let cancelled = false;
     (async () => {
-      const matched: PublicEvent[] = [];
+      const matched: PartnerEventWithMeta[] = [];
       const chunkSize = 8;
       for (let i = 0; i < events.length; i += chunkSize) {
         if (cancelled) return;
@@ -229,12 +294,15 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               const detail = await dispatch(
                 api.endpoints.getPublicEvent.initiate(event.id, { forceRefetch: false })
               ).unwrap();
-              const onLineup = (detail.artists || []).some(
-                (row) =>
-                  row.artist_business_id != null &&
-                  String(row.artist_business_id) === String(artistId)
+              const onLineup = (detail.artists || []).some((row) =>
+                lineupRowMatchesArtist(artistId, artistName, row)
               );
-              if (onLineup) matched.push(event);
+              if (onLineup) {
+                matched.push({
+                  event,
+                  live: isEventLiveFromDetail(detail, event),
+                });
+              }
             } catch {
               // skip events that fail to load
             }
@@ -243,17 +311,27 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
       }
       if (cancelled) return;
       matched.sort((a, b) => {
-        const ta = a.next_showtime ? Date.parse(a.next_showtime) : Number.POSITIVE_INFINITY;
-        const tb = b.next_showtime ? Date.parse(b.next_showtime) : Number.POSITIVE_INFINITY;
+        const ta = a.event.next_showtime
+          ? Date.parse(a.event.next_showtime)
+          : Number.POSITIVE_INFINITY;
+        const tb = b.event.next_showtime
+          ? Date.parse(b.event.next_showtime)
+          : Number.POSITIVE_INFINITY;
         return ta - tb;
       });
-      setLineupEvents(matched.length ? matched : EMPTY_EVENTS);
+      setLineupEvents(
+        mergePartnerEventItems(
+          "artist",
+          artistId,
+          matched.length ? matched : EMPTY_EVENT_ITEMS
+        )
+      );
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [artistId, dispatch, publicEventsData, publicEventsKey]);
+  }, [artistId, artist?.name, eventProfile?.name, dispatch, publicEventsData, publicEventsKey]);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -282,11 +360,63 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
     }
   });
 
-  if (isLoading) {
+  if ((!skipPublicArtist && isLoading) || (catalogLoading && !artist && !eventProfile)) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center text-slate-500">
         Loading artist…
       </div>
+    );
+  }
+
+  const canInquire = Boolean(artist && isBookMyBotaRegisteredArtist(artist));
+
+  // Non-registered / event-only artists: image, name, type, about, live events only
+  if (!canInquire) {
+    const name = eventProfile?.name || artist?.name || "";
+    if (!name) {
+      return (
+        <div className="max-w-lg mx-auto py-16 px-4 text-center space-y-4">
+          <p className="text-slate-700 font-semibold">Artist not found.</p>
+          <Link href="/artists" className="text-violet-700 font-semibold underline">
+            Back to artists
+          </Link>
+        </div>
+      );
+    }
+    const coverSrc = resolveMediaUrl(
+      eventProfile?.cover_image_url || artist?.cover_image_url || ""
+    );
+    const typeName =
+      eventProfile?.type_name ||
+      eventProfile?.role_title ||
+      artist?.type_name ||
+      "Artist";
+    const about = eventProfile?.description || artist?.description || "";
+    const eventsFromProfile: PartnerEventWithMeta[] = (eventProfile?.events || []).map(
+      (event) => ({ event, live: isPublicEventLive(event) })
+    );
+    const eventsFromArtist: PartnerEventWithMeta[] = (artist?.events || []).map((event) => ({
+      event,
+      live: isPublicEventLive(event),
+    }));
+    const eventItems = mergePartnerEventItems(
+      "artist",
+      artistId,
+      lineupEvents.length > 0
+        ? lineupEvents
+        : eventsFromProfile.length > 0
+          ? eventsFromProfile
+          : eventsFromArtist
+    );
+
+    return (
+      <NonRegisteredArtistView
+        name={name}
+        typeName={typeName}
+        about={about}
+        coverSrc={coverSrc}
+        eventItems={eventItems}
+      />
     );
   }
 
@@ -315,13 +445,26 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   );
   const instagramFollowers = social.instagram_followers;
   const youtubeFollowers = social.youtube_followers;
-  const artistEvents = lineupEvents.length > 0 ? lineupEvents : artist.events || [];
+  const artistEventItems: PartnerEventWithMeta[] = mergePartnerEventItems(
+    "artist",
+    artistId,
+    lineupEvents.length > 0
+      ? lineupEvents
+      : eventProfile?.events?.length
+        ? eventProfile.events.map((event) => ({
+            event,
+            live: isPublicEventLive(event),
+          }))
+        : (artist.events || []).map((event) => ({
+            event,
+            live: isPublicEventLive(event),
+          }))
+  );
   const hasMedia = spotlightVideos.length > 0 || audioClips.length > 0;
-  const canInquire = isBookMyBotaRegisteredArtist(artist);
-  const showStage = canInquire && hasMedia;
-  const showGallery = canInquire && galleryImages.length > 0;
+  const showStage = hasMedia;
+  const showGallery = galleryImages.length > 0;
   const showHeaderSeeMore = Boolean(artist.description?.trim()) && bioOverflows;
-  const showLeftColumn = showStage || artistEvents.length > 0 || showGallery;
+  const showLeftColumn = showStage || artistEventItems.length > 0 || showGallery;
 
   return (
     <div className="min-h-screen bg-white">
@@ -440,6 +583,12 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
 
     
         <div className="bg-white container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-8 sm:py-10">
+          {showAllEvents && artistEventItems.length > 0 ? (
+            <PartnerAllEventsPanel
+              items={artistEventItems}
+              onBack={() => setShowAllEvents(false)}
+            />
+          ) : (
           <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-10">
             {showLeftColumn ? (
               <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">
@@ -454,17 +603,12 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                   />
                 ) : null}
 
-                {artistEvents.length > 0 ? (
-                  <section>
-                    <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
-                      All Events
-                    </h2>
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
-                      {artistEvents.map((event) => (
-                        <ArtistEventPosterCard key={event.id} event={event} />
-                      ))}
-                    </div>
-                  </section>
+                {artistEventItems.length > 0 ? (
+                  <PartnerLiveEventsSection
+                    items={artistEventItems}
+                    coverSrc={coverSrc}
+                    onSeeMore={() => setShowAllEvents(true)}
+                  />
                 ) : null}
 
                 {showGallery ? (
@@ -620,6 +764,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
           </aside>
             ) : null}
         </div>
+          )}
         </div>
      
       <AboutArtistModal

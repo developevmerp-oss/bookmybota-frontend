@@ -19,7 +19,7 @@ import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowL
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
 import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
-import { useGetPublicRegisteredArtistsQuery } from "@/services/api";
+import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
 
 const FEATURE_SLIDES = [
   {
@@ -153,8 +153,7 @@ const TESTIMONIALS = [
 
 export default function ArtistLandingPage() {
   const router = useRouter();
-  const { data: registeredArtists = [], isLoading: artistsLoading } =
-    useGetPublicRegisteredArtistsQuery();
+  const { artists: registeredArtists, isLoading: artistsLoading } = usePublicArtistsCatalog();
 
   const openLogin = () => {
     const session = readSessionForRole("artist_admin");
@@ -194,12 +193,12 @@ export default function ArtistLandingPage() {
       testimonials={TESTIMONIALS}
       middleSlot={
         <PartnerDirectorySection
-          title="Registered artists on Book My Bota"
-          subtitle="Performers already onboarded and approved — open a profile to see free dates and send a booking inquiry."
+          title="Artists on Book My Bota"
+          subtitle="Registered partners and performers appearing on live events — open a profile to learn more."
           kind="artist"
           partners={registeredArtists}
           isLoading={artistsLoading}
-          emptyMessage="No registered artists yet. After an artist completes registration and approval, they will appear here."
+          emptyMessage="No artists to show yet. Registered artists and performers on live events will appear here."
         />
       }
       crossLinks={

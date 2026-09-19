@@ -7,6 +7,10 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import SafeCoverImage, {
   ArtistImageFallback,
 } from "@/components/Shared/SafeCoverImage";
+import {
+  isRegisteredDirectoryArtist,
+  type DirectoryArtist,
+} from "@/lib/usePublicArtistsCatalog";
 
 const BRAND = "#6900AA";
 const BRAND_SOFT = "#F7E9FF";
@@ -15,10 +19,11 @@ function PartnerCard({
   partner,
   kind,
 }: {
-  partner: PublicRegisteredPartner;
+  partner: DirectoryArtist;
   kind: "venue" | "artist";
 }) {
   const place = [partner.city_name, partner.city_state].filter(Boolean).join(", ");
+  const registered = kind === "artist" ? isRegisteredDirectoryArtist(partner) : true;
   const subtitle =
     kind === "venue"
       ? partner.type_name ||
@@ -27,14 +32,19 @@ function PartnerCard({
               partner.published_layout_count === 1 ? "" : "s"
             }`
           : "Registered venue")
-      : partner.type_name || "Registered artist";
+      : partner.type_name || partner.role_title || (registered ? "Registered artist" : "Artist");
 
   const detailLine =
     kind === "artist"
       ? partner.description?.trim() || place || null
       : partner.address?.trim() || place || null;
 
-  const ctaLabel = "View free dates & inquire";
+  const ctaLabel =
+    kind === "artist"
+      ? registered
+        ? "View free dates & inquire"
+        : "View profile & events"
+      : "View free dates & inquire";
 
   const card = (
     <div className="group relative w-full h-full min-h-[340px] sm:min-h-[380px] rounded-[1.75rem] overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.14)] bg-[#1a1a1a]">
@@ -63,11 +73,13 @@ function PartnerCard({
 
       <div className="absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-black/90 via-black/55 to-transparent" />
 
-      <div className="absolute top-3 left-3 z-10">
-        <span className="inline-flex rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#111111]">
-          Registered
-        </span>
-      </div>
+      {kind === "venue" || registered ? (
+        <div className="absolute top-3 left-3 z-10">
+          <span className="inline-flex rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#111111]">
+            Registered
+          </span>
+        </div>
+      ) : null}
 
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1.5 p-3.5 sm:p-4 pt-0">
         <h3 className="font-bold text-white text-[1.05rem] sm:text-lg leading-snug line-clamp-1 drop-shadow-sm">
@@ -132,7 +144,7 @@ export default function PartnerDirectorySection({
   title: string;
   subtitle: string;
   kind: "venue" | "artist";
-  partners: PublicRegisteredPartner[];
+  partners: PublicRegisteredPartner[] | DirectoryArtist[];
   isLoading?: boolean;
   emptyMessage?: string;
   showHeader?: boolean;
@@ -169,14 +181,14 @@ export default function PartnerDirectorySection({
           </div>
         ) : partners.length === 0 ? (
           <p className={`${showHeader ? "mt-12" : ""} text-center text-sm text-[#888]`}>
-            {emptyMessage || "No registered partners to show yet."}
+            {emptyMessage || "No partners to show yet."}
           </p>
         ) : (
           <div
             className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
           >
             {partners.map((p) => (
-              <PartnerCard key={p.id} partner={p} kind={kind} />
+              <PartnerCard key={p.id} partner={p as DirectoryArtist} kind={kind} />
             ))}
           </div>
         )}

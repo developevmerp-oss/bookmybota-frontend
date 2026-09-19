@@ -10,16 +10,16 @@ import {
   type RefObject,
   type TransitionEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
-  FaSearch,
   FaSlidersH,
 } from "react-icons/fa";
-import { MapPin } from "lucide-react";
+import { MapPin, Search, X } from "lucide-react";
 import SafeCoverImage, { EventImageFallback, ArtistImageFallback, ARTIST_IMAGE_FALLBACK_CLASS } from "@/components/Shared/SafeCoverImage";
 import {
   api,
@@ -39,6 +39,7 @@ import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
 import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import {
   EVENT_CATEGORY_OPTIONS,
   categorySlugsMatch,
@@ -53,6 +54,7 @@ import {
   eventPortrait,
   formatEventDateLine,
 } from "@/components/LandingPage/homeUtils";
+import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
 const PAGE_SIZE = 8;
 const EMPTY_EVENTS: PublicEvent[] = [];
@@ -72,6 +74,34 @@ const SORT_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "price-desc", label: "Price: High to Low" },
   { id: "rating", label: "Rating" },
 ];
+const EVENT_RECENT_SEARCHES_KEY = "events_recent_searches";
+const MAX_RECENT_SEARCHES = 6;
+
+function readEventRecentSearches(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(EVENT_RECENT_SEARCHES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeEventRecentSearches(items: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      EVENT_RECENT_SEARCHES_KEY,
+      JSON.stringify(items.slice(0, MAX_RECENT_SEARCHES))
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 const CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
 
@@ -392,9 +422,10 @@ function SelectionMark({ selected, multi }: { selected: boolean; multi?: boolean
   );
 }
 
-type FilterModalTab = "date" | "genre" | "language" | "pricing";
+type FilterModalTab = "sort" | "date" | "genre" | "language" | "pricing";
 
 const FILTER_MODAL_TABS: Array<{ id: FilterModalTab; label: string }> = [
+  { id: "sort", label: "Sort" },
   { id: "date", label: "Date" },
   { id: "genre", label: "Genre" },
   { id: "language", label: "Language" },
@@ -538,6 +569,7 @@ export default function PublicEventsPage() {
   const [draftUseDateRange, setDraftUseDateRange] = useState(false);
   const [draftLanguages, setDraftLanguages] = useState<string[]>([]);
   const [draftPriceBands, setDraftPriceBands] = useState<string[]>([]);
+  const [draftSort, setDraftSort] = useState("recommended");
   const [openFilters, setOpenFilters] = useState({
     categories: true,
     date: false,
@@ -546,10 +578,14 @@ export default function PublicEventsPage() {
     price: false,
     more: false,
   });
-  const [filterModalTab, setFilterModalTab] = useState<FilterModalTab>("date");
+  const [filterModalTab, setFilterModalTab] = useState<FilterModalTab>("sort");
   const [sort, setSort] = useState("recommended");
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [searchPopupOpen, setSearchPopupOpen] = useState(false);
+  const [searchDraft, setSearchDraft] = useState("");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [heroSlideTransition, setHeroSlideTransition] = useState(true);
   const [mobilePromoIndex, setMobilePromoIndex] = useState(0);
@@ -591,6 +627,7 @@ export default function PublicEventsPage() {
     setDraftUseDateRange(useDateRange);
     setDraftLanguages(selectedLanguages);
     setDraftPriceBands(selectedPriceBands);
+    setDraftSort(sort);
   }, [
     selectedSlugs,
     selectedEventGenres,
@@ -600,10 +637,12 @@ export default function PublicEventsPage() {
     useDateRange,
     selectedLanguages,
     selectedPriceBands,
+    sort,
   ]);
 
   const openFiltersModal = useCallback(
-    (tab: FilterModalTab = "date") => {
+    (tab: FilterModalTab = "sort") => {
+      setSearchPopupOpen(false);
       syncDraftFromApplied();
       setFilterModalTab(tab);
       setFiltersOpen(true);
@@ -614,6 +653,103 @@ export default function PublicEventsPage() {
   const closeFiltersModal = useCallback(() => {
     setFiltersOpen(false);
   }, []);
+
+  const closeSearchPopup = useCallback(() => {
+    setSearchPopupOpen(false);
+  }, []);
+
+  const openSearchPopup = useCallback(() => {
+    setFiltersOpen(false);
+    setSearchDraft(searchInput);
+    setRecentSearches(readEventRecentSearches());
+    setSearchPopupOpen(true);
+  }, [searchInput]);
+
+  const commitEventSearch = useCallback(
+    (raw: string) => {
+      const next = raw.trim();
+      setSearchInput(next);
+      setSearch(next);
+      if (next) {
+        const updated = [next, ...readEventRecentSearches().filter((t) => t.toLowerCase() !== next.toLowerCase())];
+        writeEventRecentSearches(updated);
+        setRecentSearches(updated.slice(0, MAX_RECENT_SEARCHES));
+      }
+      setSearchPopupOpen(false);
+      scrollToEventsViewport();
+    },
+    [scrollToEventsViewport]
+  );
+
+  useEffect(() => {
+    if (!searchPopupOpen) return;
+    const scrollY = window.scrollY;
+    const focusTimer = window.setTimeout(() => {
+      searchInputRef.current?.focus({ preventScroll: true });
+    }, 50);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSearchPopupOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+    const prevPosition = body.style.position;
+    const prevTop = body.style.top;
+    const prevWidth = body.style.width;
+    const scrollbarGap = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    if (scrollbarGap > 0) body.style.paddingRight = `${scrollbarGap}px`;
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onKey);
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
+      body.style.position = prevPosition;
+      body.style.top = prevTop;
+      body.style.width = prevWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [searchPopupOpen]);
+
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const scrollY = window.scrollY;
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+    const prevPosition = body.style.position;
+    const prevTop = body.style.top;
+    const prevWidth = body.style.width;
+    const scrollbarGap = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    if (scrollbarGap > 0) body.style.paddingRight = `${scrollbarGap}px`;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFiltersOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
+      body.style.position = prevPosition;
+      body.style.top = prevTop;
+      body.style.width = prevWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [filtersOpen]);
 
   const syncCategoryToUrl = useCallback(
     (slugs: string[] | string | null) => {
@@ -642,6 +778,7 @@ export default function PublicEventsPage() {
     setUseDateRange(draftUseDateRange);
     setSelectedLanguages(draftLanguages);
     setSelectedPriceBands(draftPriceBands);
+    setSort(draftSort);
     setFiltersOpen(false);
     scrollToEventsViewport();
   }, [
@@ -654,6 +791,7 @@ export default function PublicEventsPage() {
     draftUseDateRange,
     draftLanguages,
     draftPriceBands,
+    draftSort,
     scrollToEventsViewport,
     syncCategoryToUrl,
   ]);
@@ -666,6 +804,7 @@ export default function PublicEventsPage() {
     setDraftLanguages([]);
     setDraftPriceBands([]);
     setDraftEventGenres([]);
+    setDraftSort("recommended");
     setDatePreset("");
     setDateFrom("");
     setDateTo("");
@@ -674,6 +813,7 @@ export default function PublicEventsPage() {
     setSelectedPriceBands([]);
     setSelectedMore([]);
     setSelectedEventGenres([]);
+    setSort("recommended");
     if (!dedicatedCategoryPage) {
       categoryFromFilterRef.current = true;
       setDedicatedCategoryPage(false);
@@ -1497,6 +1637,7 @@ export default function PublicEventsPage() {
   );
 
   const tabHasSelection = (tab: FilterModalTab) => {
+    if (tab === "sort") return draftSort !== "recommended";
     if (tab === "date") return Boolean(draftDatePreset || draftDateFrom || draftDateTo);
     if (tab === "genre") {
       return isCategoryBrowse ? draftEventGenres.length > 0 : draftSlugs.length > 0;
@@ -1524,9 +1665,13 @@ export default function PublicEventsPage() {
   const districtFilterModalBody = (
     <div className="flex min-h-[280px] overflow-hidden rounded-xl bg-[#F3F3F3]">
       <div className="w-[34%] sm:w-[38%] shrink-0 bg-white py-2">
-        {FILTER_MODAL_TABS.map((tab) => {
+                {FILTER_MODAL_TABS.map((tab) => {
           const active = filterModalTab === tab.id;
           const hasValue = tabHasSelection(tab.id);
+          const sortHint =
+            tab.id === "sort" && draftSort !== "recommended"
+              ? SORT_OPTIONS.find((o) => o.id === draftSort)?.label
+              : null;
           return (
             <button
               key={tab.id}
@@ -1540,7 +1685,14 @@ export default function PublicEventsPage() {
                     : "font-medium text-slate-800 hover:bg-slate-50"
               }`}
             >
-              <span>{tab.label}</span>
+              <span className="min-w-0">
+                <span className="block">{tab.label}</span>
+                {sortHint ? (
+                  <span className="mt-0.5 block truncate text-[11px] font-medium text-[#6900AA]/80">
+                    {sortHint}
+                  </span>
+                ) : null}
+              </span>
               {hasValue ? <span className="size-1.5 rounded-full bg-[#6900AA]" /> : null}
             </button>
           );
@@ -1548,6 +1700,25 @@ export default function PublicEventsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+        {filterModalTab === "sort" ? (
+          <div className="space-y-1">
+            {SORT_OPTIONS.map((opt) => {
+              const selected = draftSort === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setDraftSort(opt.id)}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-slate-800 cursor-pointer hover:bg-white/70"
+                >
+                  <SelectionMark selected={selected} />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         {filterModalTab === "date" ? (
           <div className="space-y-1">
             {datePresets.map((d) => {
@@ -1673,32 +1844,6 @@ export default function PublicEventsPage() {
           <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900">
             {browseHeading}
           </h2>
-          {!isCategoryBrowse ? (
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
-              <label className="relative flex-1 sm:w-52">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
-                <input
-                  type="search"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search events"
-                  className="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-2 text-sm sm:text-base text-slate-800 outline-none focus:border-[#6900AA]"
-                />
-              </label>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm sm:text-base text-slate-800 outline-none focus:border-[#6900AA] cursor-pointer"
-                aria-label="Sort events"
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -1708,12 +1853,13 @@ export default function PublicEventsPage() {
         style={{ top: headerOffset }}
       >
         <div
-          className={`${CONTAINER} flex gap-2 overflow-x-auto py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+          className={`${CONTAINER} flex items-center gap-2 py-3`}
         >
+          <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ChipButton
-            label={hasActiveFilters ? "Filters · On" : "Filters"}
-            active={filtersOpen || hasActiveFilters}
-            onClick={() => openFiltersModal("date")}
+            label={hasActiveFilters || sort !== "recommended" ? "Filters · On" : "Filters"}
+            active={filtersOpen || hasActiveFilters || sort !== "recommended"}
+            onClick={() => openFiltersModal("sort")}
             icon={<FaSlidersH size={12} />}
             trailing={<FaChevronDown size={10} className="opacity-60" />}
           />
@@ -1783,6 +1929,40 @@ export default function PublicEventsPage() {
               />
             );
           })}
+          {search.trim() ? (
+            <span className="shrink-0 inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold whitespace-nowrap">
+              {`Search: "${search.trim()}"`}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearch("");
+                }}
+                className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ) : null}
+          {search.trim() || hasActiveFilters || sort !== "recommended" ? (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="shrink-0 text-xs sm:text-sm font-bold px-2 py-1.5 text-[#6900AA] transition-colors cursor-pointer hover:underline whitespace-nowrap"
+            >
+              Clear All
+            </button>
+          ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={openSearchPopup}
+            className="dining-search-trigger shrink-0 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer"
+            aria-label="Search events"
+          >
+            <Search size={18} strokeWidth={1.75} />
+          </button>
         </div>
       </div>
 
@@ -1805,20 +1985,16 @@ export default function PublicEventsPage() {
           ) : (
             <div className="mx-auto grid w-full  grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
               {emptyShowcaseCards.map((event) => (
-                <div
+                <ShowcaseEventPosterCard
                   key={event.id}
-                  className="min-w-0 overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white"
-                >
-                  <ShowcaseEventPosterCard
-                    title={event.title}
-                    image={event.image}
-                    showDate={event.showDate}
-                    place={event.place}
-                    eventType={event.eventType}
-                    href={event.href}
-                    fullWidth
-                  />
-                </div>
+                  title={event.title}
+                  image={event.image}
+                  showDate={event.showDate}
+                  place={event.place}
+                  eventType={event.eventType}
+                  href={event.href}
+                  fullWidth
+                />
               ))}
             </div>
           )
@@ -1867,6 +2043,19 @@ export default function PublicEventsPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {city.trim() ? (
+        <section className={`${CONTAINER} pt-3 sm:pt-4 pb-1`}>
+          <CityLocationEmptyState
+            city={city.trim()}
+            forceShow={
+              !isLoading &&
+              events.length === 0 &&
+              allPublicEvents.length > 0
+            }
+            currentModule="events"
+          />
+        </section>
+      ) : null}
       {activeHeroEvent ? (
         <>
           {/* Mobile + tablet — featured cards (scroll-snap, no autoplay) */}
@@ -1931,13 +2120,15 @@ export default function PublicEventsPage() {
                 const portrait = eventPortrait(event);
                 const image = portrait || landscape;
                 return (
-                  <div
+                  <Link
                     key={
                       slideIdx === promoEvents.length
                         ? `${event.id}-loop`
                         : event.id
                     }
-                    className="relative w-full shrink-0 grow-0 basis-full"
+                    href={`/events/${event.id}`}
+                    className="relative block w-full shrink-0 grow-0 basis-full cursor-pointer"
+                    aria-label={`View ${event.name}`}
                   >
                     <div className="absolute inset-0 overflow-hidden" aria-hidden>
                       <SafeCoverImage
@@ -1991,12 +2182,9 @@ export default function PublicEventsPage() {
                             </p>
                           ) : null}
                           <div className="mt-4 sm:mt-5">
-                            <Link
-                              href={`/events/${event.id}`}
-                              className="inline-flex items-center justify-center rounded-2xl bg-[#131316] px-8 py-3.5 xl:px-10 xl:py-4 text-sm xl:text-base font-bold text-[#fff8da] hover:bg-zinc-900 transition-colors"
-                            >
+                            <span className="inline-flex items-center justify-center rounded-2xl bg-[#131316] px-8 py-3.5 xl:px-10 xl:py-4 text-sm xl:text-base font-bold text-[#fff8da]">
                               Book tickets
-                            </Link>
+                            </span>
                           </div>
                         </div>
 
@@ -2014,7 +2202,7 @@ export default function PublicEventsPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -2224,6 +2412,100 @@ export default function PublicEventsPage() {
           </div>
         </div>
       ) : null}
+
+      {searchPopupOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="dining-search-popup fixed inset-0 z-[220] flex items-start justify-center px-4 pt-[min(18vh,140px)]">
+            <button
+              type="button"
+              aria-label="Close search"
+              className="dining-search-popup__backdrop absolute inset-0 bg-slate-900/35 backdrop-blur-[2px]"
+              onClick={closeSearchPopup}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Search events"
+              className="dining-search-popup__panel relative w-full max-w-[560px] bg-white rounded-2xl shadow-[0_18px_50px_rgba(15,23,42,0.18)] overflow-hidden"
+            >
+              <div className="flex items-center gap-3 px-5 sm:px-6 py-4 sm:py-[1.15rem]">
+                <Search size={20} strokeWidth={1.75} className="text-slate-500 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchDraft}
+                  onChange={(e) => setSearchDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitEventSearch(searchDraft);
+                    }
+                  }}
+                  placeholder="What are you looking for?"
+                  className="flex-1 min-w-0 bg-transparent text-[15px] sm:text-base text-slate-800 placeholder:text-slate-400 outline-none"
+                  aria-label="Search events"
+                />
+                {searchDraft ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchDraft("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="shrink-0 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    aria-label="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="dining-search-popup__results border-t border-slate-100">
+                <div className="px-5 sm:px-6 pt-4 pb-5">
+                  <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
+                  {recentSearches.length === 0 ? (
+                    <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
+                  ) : (
+                    <ul className="divide-y divide-slate-50">
+                      {recentSearches.map((term) => (
+                        <li key={term} className="flex items-center gap-3 py-3">
+                          <button
+                            type="button"
+                            onClick={() => commitEventSearch(term)}
+                            className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer group"
+                          >
+                            <Search
+                              size={16}
+                              strokeWidth={1.75}
+                              className="text-slate-400 shrink-0 group-hover:text-slate-500"
+                            />
+                            <span className="truncate text-[15px] text-slate-500 group-hover:text-slate-700">
+                              {term}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = recentSearches.filter((t) => t !== term);
+                              writeEventRecentSearches(updated);
+                              setRecentSearches(updated);
+                            }}
+                            className="shrink-0 p-1 rounded-full text-slate-300 hover:text-slate-500 hover:bg-slate-100 cursor-pointer"
+                            aria-label={`Remove ${term}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       <Footer />
     </div>

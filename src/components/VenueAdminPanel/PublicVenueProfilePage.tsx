@@ -7,9 +7,12 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Briefcase, Building2, CalendarDays, Clock, Loader2, Mail, MapPin, MessageSquare, Phone, Send, User, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
+  api,
   useCreateVenueInquiryMutation,
   useGetCustomerProfileQuery,
+  useGetPublicEventsQuery,
   useGetPublicVenueQuery,
+  type PublicEvent,
 } from "@/services/api";
 import { extractApiError, extractApiSuccessMessage } from "@/lib/apiErrors";
 import {
@@ -21,6 +24,14 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ArtistMonthCalendar from "@/components/Shared/ArtistMonthCalendar";
 import PhoneInput from "@/components/Shared/PhoneInput";
+import PartnerLiveEventsSection, {
+  PartnerAllEventsPanel,
+} from "@/components/Shared/PartnerLiveEventsSection";
+import {
+  isEventLiveFromDetail,
+  mergePartnerEventItems,
+  type PartnerEventWithMeta,
+} from "@/lib/partnerEventHistory";
 import { formatDate } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
@@ -29,6 +40,8 @@ const inquiryInput =
   "w-full rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/20 focus:border-[#C4B5FD] focus:bg-white";
 const VENUE_IMAGE_FALLBACK_CLASS =
   "flex h-full w-full items-center justify-center bg-[#F7E9FF] text-[#6900AA]";
+const EMPTY_EVENTS: PublicEvent[] = [];
+const EMPTY_EVENT_ITEMS: PartnerEventWithMeta[] = [];
 
 function InquiryLabel({
   icon: Icon,
@@ -55,6 +68,8 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
   }, [dispatch]);
 
   const { data: venue, isLoading, isError } = useGetPublicVenueQuery(venueId);
+  const { data: publicEventsData } = useGetPublicEventsQuery();
+  const publicEvents = publicEventsData ?? EMPTY_EVENTS;
   const customerId = user?.role === "customer" ? user.customer_id || "" : "";
   const { data: customerProfile } = useGetCustomerProfileQuery(customerId, {
     skip: !customerId,
@@ -62,7 +77,13 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
   const [createInquiry, { isLoading: sending }] = useCreateVenueInquiryMutation();
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [aboutOverflows, setAboutOverflows] = useState(false);
+  const [venueEvents, setVenueEvents] = useState<PartnerEventWithMeta[]>(EMPTY_EVENT_ITEMS);
+  const [showAllEvents, setShowAllEvents] = useState(false);
   const aboutTextRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    setShowAllEvents(false);
+  }, [venueId]);
 
   const freeDates = useMemo(
     () => (venue?.slots || []).map((s) => s.slot_date),
@@ -138,6 +159,76 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
       window.removeEventListener("resize", measure);
     };
   }, [venue?.description, aboutExpanded]);
+
+  const publicEventsKey = useMemo(
+    () => publicEvents.map((event) => event.id).join("|"),
+    [publicEvents]
+  );
+
+  useEffect(() => {
+    const events = publicEventsData ?? EMPTY_EVENTS;
+    if (!venueId) {
+      setVenueEvents(EMPTY_EVENT_ITEMS);
+      return;
+    }
+    if (events.length === 0) {
+      setVenueEvents(mergePartnerEventItems("venue", venueId, EMPTY_EVENT_ITEMS));
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const matched: PartnerEventWithMeta[] = [];
+      const chunkSize = 8;
+      for (let i = 0; i < events.length; i += chunkSize) {
+        if (cancelled) return;
+        const chunk = events.slice(i, i + chunkSize);
+        await Promise.all(
+          chunk.map(async (event) => {
+            try {
+              const detail = await dispatch(
+                api.endpoints.getPublicEvent.initiate(event.id, { forceRefetch: false })
+              ).unwrap();
+              const atVenue = (detail.showtimes || []).some(
+                (row) =>
+                  row.venue_business_id != null &&
+                  String(row.venue_business_id) === String(venueId)
+              );
+              if (atVenue) {
+                matched.push({
+                  event,
+                  live: isEventLiveFromDetail(detail, event),
+                });
+              }
+            } catch {
+              // skip events that fail to load
+            }
+          })
+        );
+      }
+      if (cancelled) return;
+      matched.sort((a, b) => {
+        const ta = a.event.next_showtime
+          ? Date.parse(a.event.next_showtime)
+          : Number.POSITIVE_INFINITY;
+        const tb = b.event.next_showtime
+          ? Date.parse(b.event.next_showtime)
+          : Number.POSITIVE_INFINITY;
+        return ta - tb;
+      });
+      setVenueEvents(
+        mergePartnerEventItems(
+          "venue",
+          venueId,
+          matched.length ? matched : EMPTY_EVENT_ITEMS
+        )
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [venueId, dispatch, publicEventsData, publicEventsKey]);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -264,6 +355,12 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
       </header>
 
       <div className="bg-white container mx-auto px-4 sm:px-6 lg:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+        {showAllEvents && venueEvents.length > 0 ? (
+          <PartnerAllEventsPanel
+            items={venueEvents}
+            onBack={() => setShowAllEvents(false)}
+          />
+        ) : (
         <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-5">
           <div className="min-w-0 flex-1 order-1 space-y-8 sm:space-y-10">
               {aboutText ? (
@@ -315,9 +412,17 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                 </section>
               ) : null}
 
+              {venueEvents.length > 0 ? (
+                <PartnerLiveEventsSection
+                  items={venueEvents}
+                  coverSrc={coverSrc}
+                  onSeeMore={() => setShowAllEvents(true)}
+                />
+              ) : null}
+
               <section className="w-full max-w-md mx-auto sm:max-w-lg lg:mx-0 lg:max-w-lg">
                 <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
-                  Free dates
+                  Booking Availability
                 </h2>
                 <p className="mt-1 text-sm text-[#6B6B6B]">
                   Green days are open. Select one to request a booking.
@@ -475,6 +580,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
             </form>
           </aside>
         </div>
+        )}
       </div>
     </div>
   );

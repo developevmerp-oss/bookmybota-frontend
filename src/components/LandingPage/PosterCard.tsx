@@ -9,22 +9,35 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
   eventPortrait,
   eventPlaceLine,
-  eventDateParts,
   localityFromAddress,
   venueFromEventDetail,
 } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 
-const POSTER_MEDIA = "aspect-[2/3] w-full";
+const POSTER_MEDIA = "aspect-[3/4] w-full";
 const DINING_MEDIA = "aspect-[4/3] w-full";
+
+const eventCardShell =
+  "bg-white border border-[#E5E5E5] rounded-2xl overflow-hidden";
 
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
+function listingDateLine(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const weekday = d.toLocaleString("en-GB", { weekday: "short" });
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = d.toLocaleString("en-GB", { month: "short" });
+  const time = d.toLocaleString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
+  return `${weekday}, ${day} ${month}, ${time}`;
+}
+
 function MediaFallback({ icon }: { icon: ReactNode }) {
   return (
-    <div className="flex h-full w-full min-h-full items-center justify-center bg-[#F3F4F6] text-slate-300">
+    <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300">
       {icon}
     </div>
   );
@@ -50,29 +63,11 @@ function CoverImage({
     <img
       src={url}
       alt={alt}
-      className={`w-full h-full ${objectClass} group-hover:scale-[1.04] transition-transform duration-500 ease-out`}
+      className={`absolute inset-0 h-full w-full ${objectClass} transition-transform duration-300 group-hover:scale-[1.02]`}
       loading="lazy"
       draggable={false}
       onError={() => setFailed(true)}
     />
-  );
-}
-
-function DateBadge({ iso }: { iso?: string }) {
-  const parts = eventDateParts(iso);
-  if (!parts) return null;
-  return (
-    <div className="absolute top-2.5 left-2.5 z-10 min-w-[3.15rem] rounded-xl bg-white shadow-[0_4px_14px_rgba(17,17,17,0.18)] overflow-hidden text-center leading-none">
-      <div className="bg-[#6900AA] px-2 py-1 text-[0.625rem] font-bold tracking-wider text-white">
-        {parts.month}
-      </div>
-      <div className="px-2 pt-1.5 pb-1.5">
-        <div className="text-[1.125rem] font-extrabold text-[#111827]">{parts.day}</div>
-        <div className="mt-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-[#6b7280]">
-          {parts.weekday}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -124,36 +119,37 @@ export function EventPosterCard({
     city
   );
 
+  const dateLine = listingDateLine(event.next_showtime);
+
   return (
     <Link
       href={`/events/${event.id}`}
-      className={`${widthClass} group block h-full ${cardShell} ${className}`}
+      className={`${widthClass} group block min-w-0 h-full ${eventCardShell} ${className}`}
     >
-      <div className={`relative ${POSTER_MEDIA} overflow-hidden bg-[#F3F4F6]`}>
+      <div className={`relative ${POSTER_MEDIA} overflow-hidden bg-slate-100`}>
         <CoverImage
           src={image}
           alt={event.name}
           fallback={<Calendar size={28} strokeWidth={1.5} />}
         />
-        <DateBadge iso={event.next_showtime} />
         {event.is_promoted ? (
           <span className="absolute top-2 right-2 z-[2] rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#6900AA] shadow-sm">
             Promoted
           </span>
         ) : null}
       </div>
-
-      <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
-        <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+      <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+        {dateLine ? (
+          <p className="text-sm font-semibold text-[#B59B2A]">{dateLine}</p>
+        ) : null}
+        <h3 className="text-base font-bold leading-snug text-black line-clamp-2 sm:text-lg">
           {event.name}
         </h3>
         {placeLine ? (
-          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">{placeLine}</p>
+          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{placeLine}</p>
         ) : null}
         {eventType ? (
-          <p className="mt-0.5 type-card-caption text-[#6900AA]/80 font-medium line-clamp-1">
-            {eventType}
-          </p>
+          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{eventType}</p>
         ) : null}
       </div>
     </Link>
@@ -186,32 +182,33 @@ export function ShowcaseEventPosterCard({
     ? "w-full"
     : "snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[210px]";
 
+  const dateLine = listingDateLine(showDate);
+
   return (
     <Link
       href={href}
-      className={`${widthClass} group block h-full ${cardShell} ${className}`}
+      className={`${widthClass} group block min-w-0 h-full ${eventCardShell} ${className}`}
     >
-      <div className={`relative ${POSTER_MEDIA} overflow-hidden bg-[#F3F4F6]`}>
+      <div className={`relative ${POSTER_MEDIA} overflow-hidden bg-slate-100`}>
         <CoverImage
           src={image}
           alt={title}
           fallback={<Calendar size={28} strokeWidth={1.5} />}
         />
-        <DateBadge iso={showDate} />
       </div>
-
-      <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
-        <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+      <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+        {dateLine ? (
+          <p className="text-sm font-semibold text-[#B59B2A]">{dateLine}</p>
+        ) : null}
+        <h3 className="text-base font-bold leading-snug text-black line-clamp-2 sm:text-lg">
           {title}
         </h3>
-        {place && (
-          <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">{place}</p>
-        )}
-        {eventType && (
-          <p className="mt-0.5 type-card-caption text-[#6900AA]/80 font-medium line-clamp-1">
-            {eventType}
-          </p>
-        )}
+        {place ? (
+          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{place}</p>
+        ) : null}
+        {eventType ? (
+          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{eventType}</p>
+        ) : null}
       </div>
     </Link>
   );

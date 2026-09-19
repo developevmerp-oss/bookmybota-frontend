@@ -37,12 +37,9 @@ import {
   useRegisterCustomerMutation,
   useGetReviewsQuery,
   useCreateReviewMutation,
-  useCreateReviewReplyMutation,
   useGetBusinessesQuery,
   useGetCollectionsQuery,
-  useGetDiningEligiblePlatformOffersQuery,
   useGetBusinessOperatingDatesQuery,
-  type DiningEligiblePlatformOffer,
   type BusinessOperatingDate,
   type DiningMealsConfig,
 } from '@/services/api';
@@ -523,11 +520,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   }, [operatingDates]);
   const [createBooking] = useCreateBookingMutation();
   const [checkAvailabilityQuery] = useLazyCheckAvailabilityQuery();
-  const { data: reviewsData } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
+  const {
+    data: reviewsData,
+    refetch: refetchReviews,
+  } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
   const reviews = reviewsData?.items ?? [];
-  const [createReview] = useCreateReviewMutation();
-  const [createReviewReply] = useCreateReviewReplyMutation();
-
+  const reviewEligibility = reviewsData?.eligibility;
+  const [createReview, { isLoading: submittingReview }] = useCreateReviewMutation();
   // Similar restaurants query logic
   const { data: collections = [] } = useGetCollectionsQuery();
   const firstCollectionSlug = profile?.collection_slugs?.[0];
@@ -562,11 +561,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       if (session) {
         dispatch(setCredentials({ user: session.user, token: session.token }));
       }
+      if (resolvedParams.id) {
+        void refetchReviews();
+      }
     };
     syncCustomerAuth();
     window.addEventListener('auth_changed', syncCustomerAuth);
     return () => window.removeEventListener('auth_changed', syncCustomerAuth);
-  }, [dispatch]);
+  }, [dispatch, resolvedParams.id, refetchReviews]);
 
   // Scroll to top on restaurant change/mount
   useEffect(() => {
@@ -726,88 +728,49 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [lastQrToken, setLastQrToken] = useState<string | null>(null);
   const [bookingIdCopied, setBookingIdCopied] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<DiningOffer | null>(null);
-  const [selectedPlatformOffer, setSelectedPlatformOffer] = useState<DiningEligiblePlatformOffer | null>(null);
   const [noOfferSelected, setNoOfferSelected] = useState(false);
   const allDiningOffers = normalizeDiningOffers(profile?.dining_offers);
   const visibleOffers = allDiningOffers.filter(isDiningOfferCustomerVisible);
   const bookableOffers = allDiningOffers.filter(isDiningOfferRedeemable);
-  const { data: platformOffers = [], refetch: refetchPlatformOffers } = useGetDiningEligiblePlatformOffersQuery(
-    {
-      restaurant_id: resolvedParams.id,
-      ...(authUser?.role === 'customer' && authUser.phone
-        ? { guest_phone: authUser.phone }
-        : {}),
-    },
-    { skip: !resolvedParams.id, refetchOnMountOrArgChange: true }
-  );
-  const hasAnyBookableOffer = bookableOffers.length > 0 || platformOffers.length > 0;
+  // Same as events/cinema: detail + booking show partner offers only.
+  // Super Admin platform offers appear on the landing Special Offers rail
+  // and can still apply at restaurant QR checkout.
+  const hasAnyBookableOffer = bookableOffers.length > 0;
   const appliedOffer = noOfferSelected
     ? null
-    : selectedPlatformOffer
-      ? {
-          source: 'platform' as const,
-          id: selectedPlatformOffer.id,
-          offer_id: selectedPlatformOffer.id,
-          type: 'BookMyBota Offer',
-          title: selectedPlatformOffer.name,
-          validity: '',
-          promo_code: selectedPlatformOffer.code,
-          discount_type: selectedPlatformOffer.discount_type,
-          discount_value: selectedPlatformOffer.discount_value,
-          max_discount: selectedPlatformOffer.max_discount ?? null,
-          min_bill_amount: selectedPlatformOffer.min_order_amount,
-        }
-      : selectedOffer
-        ? snapshotDiningOffer(bookableOffers, selectedOffer)
-        : null;
+    : selectedOffer
+      ? snapshotDiningOffer(bookableOffers, selectedOffer)
+      : null;
   const widgetOfferLabel = bookingWidgetOfferLabel(profile?.dining_offers);
   const offerChipLabel =
-    visibleOffers.length > 0 || platformOffers.length > 0
-      ? `${visibleOffers.length + platformOffers.length} offer${visibleOffers.length + platformOffers.length > 1 ? "s" : ""}`
+    visibleOffers.length > 0
+      ? `${visibleOffers.length} offer${visibleOffers.length > 1 ? "s" : ""}`
       : "";
   const [offersSectionOpen, setOffersSectionOpen] = useState(true);
   const [availabilityStatus, setAvailabilityStatus] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
   useEffect(() => {
-    if (authUser?.role === 'customer') {
-      void refetchPlatformOffers();
-    }
-  }, [authUser?.customer_id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     if (!hasAnyBookableOffer) {
       setSelectedOffer(null);
-      setSelectedPlatformOffer(null);
       setNoOfferSelected(true);
       return;
     }
-    // Drop platform selection if no longer eligible after login
-    if (selectedPlatformOffer && !platformOffers.some((o) => o.id === selectedPlatformOffer.id)) {
-      setSelectedPlatformOffer(null);
-      if (bookableOffers.length > 0) {
-        setSelectedOffer(bookableOffers[0]);
-        setNoOfferSelected(false);
-      } else if (platformOffers.length > 0) {
-        setSelectedPlatformOffer(platformOffers[0]);
-        setNoOfferSelected(false);
-      } else {
-        setNoOfferSelected(true);
-      }
-      return;
+    if (!noOfferSelected && !selectedOffer) {
+      setSelectedOffer(bookableOffers[0]);
+      setNoOfferSelected(false);
+    } else if (
+      selectedOffer &&
+      !bookableOffers.some(
+        (o) =>
+          (selectedOffer.id && o.id === selectedOffer.id) ||
+          (o.title === selectedOffer.title && o.promo_code === selectedOffer.promo_code)
+      )
+    ) {
+      setSelectedOffer(bookableOffers[0] || null);
+      setNoOfferSelected(!bookableOffers[0]);
     }
-    if (!noOfferSelected && !selectedOffer && !selectedPlatformOffer) {
-      if (platformOffers.length > 0) {
-        setSelectedPlatformOffer(platformOffers[0]);
-        setSelectedOffer(null);
-        setNoOfferSelected(false);
-      } else if (bookableOffers.length > 0) {
-        setSelectedOffer(bookableOffers[0]);
-        setSelectedPlatformOffer(null);
-        setNoOfferSelected(false);
-      }
-    }
-  }, [profile?.dining_offers, platformOffers]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profile?.dining_offers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Drawer & Auth states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -876,12 +839,38 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     control: reviewControl,
     handleSubmit: handleReviewSubmit,
     reset: resetReviewForm,
+    setValue: setReviewValue,
+    getValues: getReviewValues,
     formState: { errors: reviewErrors },
   } = useForm<DiningReviewFormValues>({
     resolver: yupResolver(diningReviewFormSchema) as any,
     defaultValues: emptyDiningReviewFormValues(),
     mode: 'onSubmit',
   });
+
+  const authToken = useAppSelector((state) => state.auth.token);
+  const customerSession =
+    authUser?.role === 'customer' && authToken
+      ? { user: authUser, token: authToken }
+      : readSessionForRole('customer');
+  const loggedInReviewName = String(customerSession?.user?.name || '').trim();
+  const isCustomerLoggedIn = Boolean(
+    customerSession?.token && customerSession?.user?.role === 'customer'
+  );
+  const canWriteReview = Boolean(reviewEligibility?.can_review);
+
+  const prevReviewNameRef = useRef('');
+  useEffect(() => {
+    if (!loggedInReviewName) {
+      prevReviewNameRef.current = '';
+      return;
+    }
+    const current = (getReviewValues('user_name') || '').trim();
+    if (!current || current === prevReviewNameRef.current) {
+      setReviewValue('user_name', loggedInReviewName, { shouldValidate: true, shouldDirty: false });
+    }
+    prevReviewNameRef.current = loggedInReviewName;
+  }, [loggedInReviewName, setReviewValue, getReviewValues]);
 
   // Pre-fill Name & Phone when authUser changes
   useEffect(() => {
@@ -1212,6 +1201,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   };
 
   const onAddReview = async (values: DiningReviewFormValues) => {
+    if (!isCustomerLoggedIn) {
+      setAuthModalOpen(true);
+      toast.info('Please log in to submit a review.');
+      return;
+    }
     try {
       const res = await createReview({
         businessId: resolvedParams.id,
@@ -1219,36 +1213,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         rating: values.rating,
         text: values.text.trim(),
       }).unwrap();
-      resetReviewForm(emptyDiningReviewFormValues());
-      toast.success(res.message || "Review submitted successfully!");
+      resetReviewForm({
+        user_name: loggedInReviewName || values.user_name.trim(),
+        rating: 5,
+        text: '',
+      });
+      toast.success(res.message || 'Review submitted successfully!');
+      void refetchReviews();
     } catch (err) {
-      toast.error(extractApiError(err, "Error submitting review."));
-    }
-  };
-
-  const [replyingToReviewId, setReplyingToReviewId] = useState<number | null>(null);
-  const [replyUser, setReplyUser] = useState("");
-  const [replyText, setReplyText] = useState("");
-
-  const handleAddReply = async (e: React.FormEvent, reviewId: number) => {
-    e.preventDefault();
-    if (!replyText.trim()) return;
-    try {
-      const isOwner = authUser?.business_id === resolvedParams.id;
-      await createReviewReply({
-        reviewId,
-        businessId: resolvedParams.id,
-        user_name: isOwner ? (profile?.name || "Business Owner") : (replyUser || "Customer"),
-        user_type: isOwner ? "owner" : "customer",
-        text: replyText
-      }).unwrap();
-      setReplyText("");
-      setReplyUser("");
-      setReplyingToReviewId(null);
-      toast.success("Reply added successfully!");
-    } catch (err) {
-      console.error("Failed to submit reply", err);
-      toast.error("Error submitting reply.");
+      toast.error(extractApiError(err, 'Error submitting review.'));
     }
   };
 
@@ -1887,9 +1860,35 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   id="section-reviews"
                   className="space-y-6 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
                 >
-                {/* Write Review Form */}
+                {/* Write Review Form — gated like movies: login + booking + visit ended */}
                 <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                   <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
+                  {!isCustomerLoggedIn ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-slate-600">
+                        Log in to rate this place after your visit on BookMyBota.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setAuthModalOpen(true)}
+                        className="rounded-xl px-4 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 cursor-pointer"
+                      >
+                        Log in to review
+                      </button>
+                    </div>
+                  ) : reviewEligibility?.already_reviewed ? (
+                    <p className="text-sm text-slate-600">
+                      Thanks — you have already reviewed this place.
+                    </p>
+                  ) : !reviewEligibility?.has_booking ? (
+                    <p className="text-sm text-slate-600">
+                      Book a table here on BookMyBota to leave a review.
+                    </p>
+                  ) : !reviewEligibility?.visit_ended ? (
+                    <p className="text-sm text-slate-600">
+                      You can review this place after your visit ends.
+                    </p>
+                  ) : canWriteReview ? (
                   <form onSubmit={handleReviewSubmit(onAddReview)} className="space-y-4" noValidate>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -1938,16 +1937,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <p className="mt-1.5 text-xs font-medium text-rose-500">{reviewErrors.text.message}</p>
                       )}
                     </div>
-                    <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm">
+                    <button
+                      type="submit"
+                      disabled={submittingReview}
+                      className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-2 text-base lg:text-xs font-bold transition-all shadow-sm disabled:opacity-50"
+                    >
+                      {submittingReview && <Loader2 size={14} className="animate-spin" />}
                       Submit Review
                     </button>
                   </form>
+                  ) : null}
                 </section>
 
                 {/* Review Feed */}
                 <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-5 divide-y divide-slate-100">
                   <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
-                  {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one!</p>}
+                  {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one after your visit!</p>}
                   {reviews.map((rev: any, idx: number) => (
                     <div key={rev.id} className={`${idx > 0 ? "pt-5" : ""} flex gap-3`}>
                       <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 text-slate-500 font-bold text-xs flex items-center justify-center border border-slate-200">
@@ -1965,12 +1970,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             <span>{rev.rating}</span>
                             <Star size={8} className="fill-emerald-600" />
                           </div>
+                          {rev.booked_on_platform ? (
+                            <span className="text-[0.625rem] sm:text-xs text-slate-400 font-medium">
+                              Booked on BookMyBota
+                            </span>
+                          ) : null}
                         </div>
                         <p className="text-base lg:text-xs text-slate-600 mt-2 leading-relaxed">
                           {rev.text}
                         </p>
 
-                        {/* Render Nested Replies */}
                         {rev.replies && rev.replies.length > 0 && (
                           <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100">
                             {rev.replies.map((reply: any) => (
@@ -1990,57 +1999,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             ))}
                           </div>
                         )}
-
-                        {/* Reply Form Toggle */}
-                        <div className="mt-3">
-                          {replyingToReviewId === rev.id ? (
-                            <form onSubmit={(e) => handleAddReply(e, rev.id)} className="bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2">
-                              <div className="flex items-center gap-2 mb-2">
-                                <input
-                                  type="text"
-                                  required
-                                  value={replyUser}
-                                  onChange={(e) => setReplyUser(e.target.value)}
-                                  placeholder="Your Name"
-                                  className="text-base lg:text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-rose-500 w-1/3"
-                                />
-                              </div>
-                              <textarea
-                                required
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                                placeholder="Write your reply..."
-                                className="w-full text-base lg:text-xs border border-slate-200 rounded p-2 outline-none focus:border-rose-500 min-h-[60px]"
-                              />
-                              <div className="flex justify-end gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setReplyingToReviewId(null)}
-                                  className="text-base lg:text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="submit"
-                                  className="text-base lg:text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg"
-                                >
-                                  Post Reply
-                                </button>
-                              </div>
-                            </form>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setReplyingToReviewId(rev.id);
-                                setReplyText("");
-                                setReplyUser("");
-                              }}
-                              className="text-base lg:text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
-                            >
-                              Reply to review
-                            </button>
-                          )}
-                        </div>
                       </div>
                     </div>
                   ))}
@@ -2483,7 +2441,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               )}
                             </div>
 
-                    {/* Choose an offer — merchant + BookMyBota platform offers */}
+                    {/* Choose an offer — restaurant partner offers only (platform on Special Offers / checkout) */}
                     {hasAnyBookableOffer && (
                       <div className="space-y-3 pt-2">
                               <button
@@ -2503,60 +2461,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                         {offersSectionOpen && (
                           <div className="flex flex-wrap gap-3 pt-3 pl-2">
-                            {platformOffers.map((offer, idx) => {
-                              const isActive =
-                                !noOfferSelected && selectedPlatformOffer?.id === offer.id;
-                              return (
-                                <button
-                                  key={`platform-${offer.id}`}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPlatformOffer(offer);
-                                    setSelectedOffer(null);
-                                    setNoOfferSelected(false);
-                                  }}
-                                  className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${
-                                    isActive
-                                      ? "border-[#6900AA] shadow-sm"
-                                      : "border-slate-200 hover:border-slate-300"
-                                  }`}
-                                >
-                                  <span className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full bg-[#6900AA] flex items-center justify-center text-white text-[0.55rem] font-bold shadow-sm leading-none px-0.5 text-center">
-                                    BMB
-                                  </span>
-                                  <span
-                                    className={`absolute top-3 right-3 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                                      isActive ? "border-[#6900AA]" : "border-slate-300"
-                                    }`}
-                                  >
-                                    {isActive && (
-                                      <span className="w-2 h-2 rounded-full bg-[#6900AA]" />
-                                    )}
-                                  </span>
-                                  <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-[#6900AA] pl-8 pr-5">
-                                    BookMyBota
-                                    {offer.customer_eligibility === 'NEW' ? ' · New customers' : ''}
-                                  </p>
-                                  <p className="text-base font-bold text-slate-900 mt-0.5 pl-8 pr-5 leading-snug">
-                                    {offer.name}
-                                  </p>
-                                  <p className="text-xs font-medium text-[#2563EB] mt-1 pl-8 pr-5">
-                                    {offer.discount_label}
-                                    {offer.code ? ` · ${offer.code}` : ''}
-                                  </p>
-                                  {offer.min_order_amount > 0 && (
-                                    <p className="text-[0.625rem] text-slate-400 mt-1 pl-8 pr-5">
-                                      Min bill {offer.min_order_amount} ETB at restaurant
-                                    </p>
-                                  )}
-                                </button>
-                              );
-                            })}
-
                             {bookableOffers.map((offer, idx) => {
                               const isActive =
                                 !noOfferSelected &&
-                                !selectedPlatformOffer &&
                                 ((selectedOffer?.id && selectedOffer.id === offer.id) ||
                                   (selectedOffer?.title === offer.title && selectedOffer?.promo_code === offer.promo_code));
                               const badgeColors = [
@@ -2572,7 +2479,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                         type="button"
                                   onClick={() => {
                                     setSelectedOffer(offer);
-                                    setSelectedPlatformOffer(null);
                                     setNoOfferSelected(false);
                                   }}
                                   className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${
@@ -2614,7 +2520,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 type="button"
                               onClick={() => {
                                 setSelectedOffer(null);
-                                setSelectedPlatformOffer(null);
                                 setNoOfferSelected(true);
                               }}
                               className={`relative w-[220px] sm:w-[240px] text-left rounded-xl border bg-white px-4 py-3.5 pt-4 transition-all cursor-pointer overflow-visible ${

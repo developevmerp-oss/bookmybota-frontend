@@ -39,6 +39,9 @@ export type MovieOfferItem = {
   id: string;
   title: string;
   subtitle?: string;
+  promo_code?: string;
+  discount_label?: string;
+  description?: string;
 };
 
 export type MovieReviewItem = {
@@ -378,6 +381,8 @@ export function mapApiMovieToDetail(movie: {
   director?: string | null;
   status?: string;
   is_promoted?: boolean;
+  rating?: number | string | null;
+  reviews_count?: number | null;
 }): MovieDetailData {
   const poster = resolveMediaUrl(movie.poster_url) || FALLBACK_POSTER;
   const landscape = resolveMediaUrl(movie.banner_url) || resolveMediaUrl(movie.poster_url) || undefined;
@@ -392,6 +397,10 @@ export function mapApiMovieToDetail(movie: {
       : [];
 
   const primaryTrailer = mappedTrailers.length > 0 ? mappedTrailers[0].trailerUrl : (movie.trailer_url?.trim() || undefined);
+
+  const ratingNum = Number(movie.rating);
+  const reviewsCount = Number(movie.reviews_count) || 0;
+  const hasRating = Number.isFinite(ratingNum) && ratingNum > 0 && reviewsCount > 0;
 
   return {
     id: movie.id,
@@ -416,6 +425,11 @@ export function mapApiMovieToDetail(movie: {
     promoted: isMoviePromoted(movie.is_promoted),
     cast: mapCastCrewMembers(movie.cast),
     crew: mapCastCrewMembers(movie.crew),
+    rating: hasRating ? ratingNum.toFixed(1) : undefined,
+    votes: hasRating
+      ? `${reviewsCount} review${reviewsCount === 1 ? "" : "s"}`
+      : undefined,
+    reviewsCountLabel: hasRating ? String(reviewsCount) : undefined,
   };
 }
 

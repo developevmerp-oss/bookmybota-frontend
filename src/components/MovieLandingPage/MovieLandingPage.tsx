@@ -178,6 +178,9 @@ function primaryMovieTrailerUrl(movie: Movie): string {
 }
 
 function mapCatalogMovieToCard(movie: Movie): MovieCardData {
+  const ratingNum = Number(movie.rating);
+  const reviewsCount = Number(movie.reviews_count) || 0;
+  const hasRating = Number.isFinite(ratingNum) && ratingNum > 0 && reviewsCount > 0;
   return {
     id: movie.id,
     title: formatMovieCardTitle(movie.title, movie.release_date),
@@ -189,6 +192,10 @@ function mapCatalogMovieToCard(movie: Movie): MovieCardData {
     comingSoon: movie.status === "coming_soon",
     promoted: isMoviePromoted(movie.is_promoted),
     href: `/movies/${movie.slug || movie.id}`,
+    rating: hasRating ? ratingNum.toFixed(1) : undefined,
+    votes: hasRating
+      ? `${reviewsCount} review${reviewsCount === 1 ? "" : "s"}`
+      : undefined,
   };
 }
 
@@ -488,44 +495,6 @@ function HScroll({ children }: { children: ReactNode }) {
         </button>
       )}
     </div>
-  );
-}
-
-function OfferShapeCard({
-  href,
-  title,
-  subtitle,
-  cta,
-  tone,
-}: {
-  href: string;
-  title: string;
-  subtitle: string;
-  cta: string;
-  tone: "peach" | "mint";
-}) {
-  const isPeach = tone === "peach";
-  return (
-    <Link
-      href={href}
-      className={`rounded-2xl p-5 sm:p-6 min-h-40 flex flex-col items-start justify-between ${
-        isPeach ? "bg-orange-100 text-orange-950" : "bg-sky-100 text-sky-950"
-      }`}
-    >
-      <div>
-        <p className="text-lg sm:text-xl font-bold leading-snug">{title}</p>
-        <p className={`mt-1 text-sm sm:text-base ${isPeach ? "text-orange-900/70" : "text-sky-900/70"}`}>
-          {subtitle}
-        </p>
-      </div>
-      <span
-        className={`mt-4 inline-flex w-fit items-center rounded-lg bg-white px-3 py-1.5 text-sm font-semibold ${
-          isPeach ? "text-orange-700" : "text-sky-700"
-        }`}
-      >
-        {cta}
-      </span>
-    </Link>
   );
 }
 

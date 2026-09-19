@@ -5,12 +5,9 @@ import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
+  Copy,
   Link2,
   RefreshCcw,
-  Share2,
-  Star,
-  ThumbsDown,
-  ThumbsUp,
   Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,8 +24,8 @@ import {
   type MovieDetailData,
   type MovieOfferItem,
   type MoviePerson,
-  type MovieReviewItem,
 } from "@/components/MovieLandingPage/movieCatalog";
+import MovieReviewsSection from "@/components/MovieLandingPage/MovieReviewsSection";
 import "@/components/LandingPage/RecommendedMoviesRail.css";
 
 const BRAND = "#6900AA";
@@ -38,8 +35,6 @@ const OFFER_TONES = [
   { card: "bg-violet-50/70", icon: "bg-[#6900AA] text-white", Icon: Ticket },
   { card: "bg-sky-50/70", icon: "bg-orange-400 text-white", Icon: RefreshCcw },
 ] as const;
-
-const REVIEW_ACCENTS = ["border-l-[#6900AA]", "border-l-amber-500", "border-l-emerald-500"];
 
 function SectionShell({
   children,
@@ -267,6 +262,16 @@ function HeaderCarouselSection({
 
 function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
   if (!offers.length) return null;
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success(`Copied ${code}. Use it at checkout.`);
+    } catch {
+      toast.message(`Use code ${code} at checkout`);
+    }
+  };
+
   return (
     <SectionShell>
       <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 lg:p-8">
@@ -278,12 +283,11 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
             const tone = OFFER_TONES[i % OFFER_TONES.length];
             const Icon = tone.Icon;
             const isLast = i === offers.length - 1;
+            const code = offer.promo_code?.trim();
             return (
-              <button
+              <div
                 key={offer.id}
-                type="button"
-                onClick={() => toast.message(offer.title)}
-                className={`text-left rounded-2xl ${tone.card} px-4 py-3.5 sm:px-5 sm:py-4 cursor-pointer hover:brightness-[0.98] ${
+                className={`text-left rounded-2xl ${tone.card} px-4 py-3.5 sm:px-5 sm:py-4 ${
                   isLast ? "lg:translate-x-8" : ""
                 }`}
               >
@@ -293,23 +297,34 @@ function OffersSection({ offers }: { offers: MovieOfferItem[] }) {
                   >
                     <Icon className="size-4 sm:size-5" />
                   </span>
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block text-sm sm:text-base font-bold text-[#111111] leading-snug">
                       {offer.title}
                     </span>
-                    <span className="block mt-0.5 text-xs sm:text-sm text-slate-600">
-                      {offer.subtitle || "Tap to view details"}
-                    </span>
+                    {(offer.description || offer.subtitle) && (
+                      <span className="block mt-0.5 text-xs sm:text-sm text-slate-600">
+                        {offer.description || offer.subtitle}
+                      </span>
+                    )}
+                    {code ? (
+                      <button
+                        type="button"
+                        onClick={() => copyCode(code)}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                      >
+                        <span className="font-mono">{code}</span>
+                        <Copy className="size-3.5" style={{ color: BRAND }} />
+                      </button>
+                    ) : null}
                     <span
-                      className="mt-2 inline-flex items-center gap-0.5 text-xs sm:text-sm font-semibold"
+                      className="mt-2 block text-xs sm:text-sm font-semibold"
                       style={{ color: BRAND }}
                     >
-                      View details
-                      <ChevronRight className="size-3.5" />
+                      Use code at checkout
                     </span>
                   </span>
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -382,103 +397,6 @@ function CrewSection({ crew }: { crew: MoviePerson[] }) {
         </article>
       ))}
     </HeaderCarouselSection>
-  );
-}
-
-function ReviewsSection({
-  reviews,
-  tags,
-  countLabel,
-}: {
-  reviews: MovieReviewItem[];
-  tags: Array<{ tag: string; count: number }>;
-  countLabel: string;
-}) {
-  if (!reviews.length) return null;
-  const summaryLabel = /reviews?/i.test(countLabel)
-    ? countLabel.replace(/reviews?/i, "reviews")
-    : `${countLabel} reviews`;
-  return (
-    <SectionShell>
-      <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
-        <div>
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">Top reviews</h2>
-          <p className="mt-1 text-sm sm:text-base text-slate-500">Summary of {summaryLabel}.</p>
-        </div>
-        <ViewAllButton
-          label={countLabel}
-          onClick={() => toast.message("All reviews coming soon")}
-        />
-      </div>
-
-      {tags.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-3 sm:mb-4">
-          {tags.map((t) => (
-            <span
-              key={t.tag}
-              className="shrink-0 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-slate-700"
-            >
-              <span className="font-medium">{t.tag}</span>
-              <span className="ml-1.5 text-slate-400">{t.count}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-        {reviews.map((review, i) => {
-          const booked = /booked on bookmybota/i.test(review.text);
-          const body = booked ? null : review.text;
-          return (
-            <article
-              key={review.id}
-              className={`rounded-2xl border border-slate-200 border-l-4 bg-white p-4 sm:p-5 shadow-sm ${REVIEW_ACCENTS[i % REVIEW_ACCENTS.length]}`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex size-8 sm:size-9 items-center justify-center rounded-full bg-[#F7E9FF] text-xs sm:text-sm font-bold text-[#6900AA]">
-                  {review.userName.slice(0, 1).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1 text-sm sm:text-base font-semibold text-[#111111] truncate">
-                  {review.userName}
-                </span>
-                <span className="inline-flex items-center gap-1 text-sm sm:text-base font-bold text-[#111111] shrink-0">
-                  <Star className="size-3.5 text-[#F84464]" fill="currentColor" />
-                  {review.rating}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 mb-2">
-                {booked ? review.text : "Booked on BookMyBota"}
-              </p>
-              {body && (
-                <p className="text-xs sm:text-sm text-slate-600 mb-2 leading-relaxed">{body}</p>
-              )}
-              {review.tags && review.tags.length > 0 && (
-                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed mb-4">
-                  {review.tags.join(" ")}
-                </p>
-              )}
-              <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400">
-                <span className="inline-flex items-center gap-1">
-                  <ThumbsUp className="size-3.5" /> {review.likes ?? 0}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <ThumbsDown className="size-3.5" /> 0
-                </span>
-                <span className="ml-auto">{review.timeAgo}</span>
-                <button
-                  type="button"
-                  aria-label="Share review"
-                  className="cursor-pointer hover:text-slate-600"
-                  onClick={() => toast.message("Share coming soon")}
-                >
-                  <Share2 className="size-3.5" />
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </SectionShell>
   );
 }
 
@@ -602,10 +520,14 @@ export default function MovieDetailSections({
       <AboutSection text={about} />
       <CastSection cast={movie.cast || []} />
       <CrewSection crew={movie.crew || []} />
-      <ReviewsSection
-        reviews={movie.reviews || []}
-        tags={movie.reviewTags || []}
-        countLabel={movie.reviewsCountLabel || "reviews"}
+      <MovieReviewsSection
+        movieId={movie.id}
+        movieRating={movie.rating}
+        reviewsCount={
+          movie.reviewsCountLabel
+            ? Number.parseInt(movie.reviewsCountLabel, 10) || undefined
+            : undefined
+        }
       />
       <YouMightAlsoLike idOrSlug={idOrSlug} currentId={movie.id} />
     </div>

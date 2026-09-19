@@ -77,10 +77,14 @@ function mapPlatformOffer(o: PlatformOffer, index: number): DisplayOffer {
   const scope =
     o.scope_label ||
     (o.category === "ALL"
-      ? "On Events & Dining"
+      ? "On All Bookings"
       : o.category === "EVENTS"
         ? "On Events"
-        : "On Dining");
+        : o.category === "DINING"
+          ? "On Dining"
+          : o.category === "MOVIES"
+            ? "On Movies"
+            : "On Bookings");
 
   const minAmt = Number(o.min_order_amount) || 0;
   const minBooking =

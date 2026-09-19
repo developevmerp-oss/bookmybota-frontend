@@ -353,6 +353,8 @@ export interface Movie {
   is_promoted?: boolean;
   is_active?: boolean;
   sort_order?: number;
+  rating?: number | string | null;
+  reviews_count?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -590,6 +592,7 @@ export interface CreateMovieBookingPayload {
   gift_card_code?: string;
   hold_id?: string;
   session_token?: string;
+  city?: string;
 }
 
 export interface MovieBookingResult {
@@ -2120,11 +2123,21 @@ export interface ReviewReply {
 export interface Review {
   id: number;
   business_id: string;
+  customer_id?: string | null;
   user_name: string;
   rating: number;
   text: string;
   created_at: string;
   replies?: ReviewReply[];
+  booked_on_platform?: boolean;
+}
+
+export interface DiningReviewsEligibility {
+  logged_in: boolean;
+  has_booking: boolean;
+  visit_ended: boolean;
+  already_reviewed: boolean;
+  can_review: boolean;
 }
 
 export interface EventReviewReply {
@@ -2146,6 +2159,75 @@ export interface EventReview {
   created_at: string;
   event_name?: string;
   replies?: EventReviewReply[];
+}
+
+export interface MovieReview {
+  id: number;
+  movie_id: string;
+  customer_id?: string | null;
+  user_name: string;
+  rating: number | string;
+  text: string;
+  created_at: string;
+  movie_title?: string;
+  booked_on_platform?: boolean;
+}
+
+export interface MovieReviewsListMeta {
+  logged_in: boolean;
+  has_booking: boolean;
+  show_ended: boolean;
+  already_reviewed: boolean;
+  can_review: boolean;
+}
+
+export interface CinemaOffer {
+  id: string;
+  business_id: string;
+  movie_id?: string | null;
+  movie_title?: string | null;
+  movie_ids?: string[];
+  title: string;
+  description?: string | null;
+  discount_type: 'PERCENT' | 'FLAT';
+  discount_value: number | string;
+  promo_code?: string | null;
+  min_booking_amount?: number | string;
+  apply_to?: 'THIS_MOVIE' | 'SELECTED_MOVIES' | 'ALL_MY_MOVIES';
+  usage_limit?: number | null;
+  per_customer_limit?: number | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  start_date?: string;
+  start_time?: string;
+  end_date?: string;
+  end_time?: string;
+  status?: 'DRAFT' | 'ACTIVE';
+  is_active?: boolean;
+  sort_order?: number;
+  created_at?: string;
+}
+
+export interface CinemaOfferEligibleMovie {
+  id: string;
+  title: string;
+  slug?: string;
+  poster_url?: string | null;
+  status?: string;
+}
+
+export interface PublicCinemaMovieOffer {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  discount_type: string;
+  discount_value: number;
+  min_order_amount: number;
+  discount_label: string;
+  cinema_name?: string;
+  business_id: string;
+  source: 'cinema';
 }
 
 export interface EventOffer {
@@ -2477,7 +2559,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery,
 
-  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'BusinessOperatingDates', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'CinemaSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
+  tagTypes: ['Businesses', 'Tables', 'Bookings', 'DiningOfferRedemptions', 'DiningGiftCardRedemptions', 'AdminDiningGiftCardSettlements', 'EventBookings', 'BusinessSettings', 'BusinessOperatingDates', 'AdminStats', 'Analytics', 'Reviews', 'MarketingPlans', 'MarketingCampaigns', 'PublicMarketingPromotions', 'PlatformOffers', 'OfferRedemptions', 'PublicPlatformOffers', 'GiftCardProducts', 'GiftCardDesigns', 'GiftCardDesignCategories', 'GiftCardTerms', 'GiftCardFaqs', 'GiftCardSettings', 'PublicGiftCardProducts', 'MyGiftCards', 'DiningWishlist', 'MovieWishlist', 'CustomerProfile', 'AdminEvents', 'AdminCommission', 'OrganizerEvents', 'OrganizerTicketStats', 'OrganizerBookings', 'PublicEvents', 'EventMasters', 'DiningMasters', 'CityMasters', 'EventContracts', 'EventLayouts', 'EventLayoutRequests', 'EventReviews', 'MovieReviews', 'CinemaOffers', 'EventOffers', 'OrganizerLedger', 'OrganizerLedgerCustomers', 'OrganizerPayouts', 'OrganizerSettlements', 'CinemaSettlements', 'PartnerDocuments', 'AdminCustomers', 'EventInterests', 'VenueLayouts', 'VenueLayoutLogs', 'ArtistSlots', 'ArtistInquiries', 'VenueSlots', 'VenueInquiries', 'Movies', 'MovieMasters', 'CinemaScreens', 'MovieShowtimes', 'MovieContracts'],
 
   endpoints: (builder) => ({
 
@@ -3787,9 +3869,25 @@ export const api = createApi({
 
     // ── Reviews ──────────────────────────────────────────────────────────────
 
-    getReviews: builder.query<PaginatedList<Review>, PagedBizQuery>({
+    getReviews: builder.query<
+      PaginatedList<Review> & { eligibility: DiningReviewsEligibility },
+      PagedBizQuery
+    >({
       query: (arg) => `/reviews/${bizIdOf(arg)}${pagedBizQuery(arg)}`,
-      transformResponse: (res: { data: Review[] }) => unwrapPaginated(res),
+      transformResponse: (res: {
+        data?: Review[];
+        meta?: import('@/lib/pagination').PaginationMeta;
+        eligibility?: Partial<DiningReviewsEligibility>;
+      }) => ({
+        ...unwrapPaginated(res),
+        eligibility: {
+          logged_in: Boolean(res.eligibility?.logged_in),
+          has_booking: Boolean(res.eligibility?.has_booking),
+          visit_ended: Boolean(res.eligibility?.visit_ended),
+          already_reviewed: Boolean(res.eligibility?.already_reviewed),
+          can_review: Boolean(res.eligibility?.can_review),
+        },
+      }),
       providesTags: (_result, _error, arg) => [{ type: 'Reviews', id: bizIdOf(arg) }],
     }),
 
@@ -5373,6 +5471,106 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ['EventReviews'],
+    }),
+
+    // ── Movie reviews ─────────────────────────────────────────────────────────
+
+    getPublicMovieReviews: builder.query<
+      { items: MovieReview[]; meta: MovieReviewsListMeta },
+      string
+    >({
+      query: (movieId) => `/movies/${movieId}/reviews`,
+      transformResponse: (res: { data?: MovieReview[]; meta?: Partial<MovieReviewsListMeta> }) => ({
+        items: res.data || [],
+        meta: {
+          logged_in: Boolean(res.meta?.logged_in),
+          has_booking: Boolean(res.meta?.has_booking),
+          show_ended: Boolean(res.meta?.show_ended),
+          already_reviewed: Boolean(res.meta?.already_reviewed),
+          can_review: Boolean(res.meta?.can_review),
+        },
+      }),
+      providesTags: (_r, _e, id) => [{ type: 'MovieReviews', id }],
+    }),
+
+    createMovieReview: builder.mutation<
+      { data: MovieReview; newStats?: { rating: string; reviews_count: number }; message?: string },
+      { movieId: string; user_name: string; rating: number; text: string }
+    >({
+      query: ({ movieId, ...body }) => ({
+        url: `/movies/${movieId}/reviews`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { movieId }) => [
+        { type: 'MovieReviews', id: movieId },
+        { type: 'Movies', id: `PUBLIC_${movieId}` },
+        { type: 'Movies', id: 'PUBLIC_LIST' },
+        'Movies',
+      ],
+    }),
+
+    getCinemaMovieReviews: builder.query<
+      PaginatedList<MovieReview>,
+      { movie_id?: string; q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/movies/cinema/reviews${toListQuery({
+          movie_id: params?.movie_id,
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: MovieReview[] }) => unwrapPaginated(res),
+      providesTags: ['MovieReviews'],
+    }),
+
+    getCinemaOffers: builder.query<
+      PaginatedList<CinemaOffer>,
+      { q?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) =>
+        `/movies/cinema/offers${toListQuery({
+          q: params?.q,
+          page: params?.page,
+          limit: params?.limit,
+        })}`,
+      transformResponse: (res: { data: CinemaOffer[] }) => unwrapPaginated(res),
+      providesTags: ['CinemaOffers'],
+    }),
+
+    getCinemaOfferEligibleMovies: builder.query<CinemaOfferEligibleMovie[], void>({
+      query: () => `/movies/cinema/offers/eligible-movies`,
+      transformResponse: (res: { data: CinemaOfferEligibleMovie[] }) => res.data || [],
+      providesTags: ['CinemaOffers'],
+    }),
+
+    createCinemaOffer: builder.mutation<{ data: CinemaOffer; message?: string }, Record<string, unknown>>({
+      query: (body) => ({ url: `/movies/cinema/offers`, method: 'POST', body }),
+      invalidatesTags: ['CinemaOffers'],
+    }),
+
+    updateCinemaOffer: builder.mutation<
+      { data: CinemaOffer; message?: string },
+      { offerId: string; body: Record<string, unknown> }
+    >({
+      query: ({ offerId, body }) => ({
+        url: `/movies/cinema/offers/${offerId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['CinemaOffers'],
+    }),
+
+    deleteCinemaOffer: builder.mutation<{ message?: string }, string>({
+      query: (offerId) => ({ url: `/movies/cinema/offers/${offerId}`, method: 'DELETE' }),
+      invalidatesTags: ['CinemaOffers'],
+    }),
+
+    getPublicCinemaOffersForMovie: builder.query<PublicCinemaMovieOffer[], string>({
+      query: (idOrSlug) => `/movies/${idOrSlug}/cinema-offers`,
+      transformResponse: (res: { data: PublicCinemaMovieOffer[] }) => res.data || [],
+      providesTags: (_r, _e, id) => [{ type: 'CinemaOffers', id: `PUBLIC_${id}` }],
     }),
 
     // ── Event offers ──────────────────────────────────────────────────────────
@@ -8209,6 +8407,15 @@ export const {
   useCreateEventReviewMutation,
   useGetOrganizerEventReviewsQuery,
   useCreateEventReviewReplyMutation,
+  useGetPublicMovieReviewsQuery,
+  useCreateMovieReviewMutation,
+  useGetCinemaMovieReviewsQuery,
+  useGetCinemaOffersQuery,
+  useGetCinemaOfferEligibleMoviesQuery,
+  useCreateCinemaOfferMutation,
+  useUpdateCinemaOfferMutation,
+  useDeleteCinemaOfferMutation,
+  useGetPublicCinemaOffersForMovieQuery,
   useGetOrganizerOffersQuery,
   useGetOfferEligibleEventsQuery,
   useGetPublicEventOffersQuery,

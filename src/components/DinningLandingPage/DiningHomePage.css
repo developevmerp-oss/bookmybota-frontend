@@ -1,69 +1,294 @@
-.dining-hero-swiper .swiper {
-  width: 100%;
-}
+/* Dining promo banner — landing-page sizing + BookMyShow edge nav when >2 */
 
-.dining-hero-swiper .swiper-slide {
-  height: auto;
-}
-
-.dining-hero-swiper .swiper-pagination {
-  position: absolute !important;
-  left: 50% !important;
-  right: auto !important;
-  bottom: 0.75rem !important;
-  width: auto !important;
-  transform: translateX(-50%);
-  z-index: 5;
-}
-
-.dining-hero-swiper .swiper-pagination-bullet {
-  width: 0.5rem;
-  height: 0.5rem;
-  background: rgba(255, 255, 255, 0.4);
-  opacity: 1;
-  margin: 0 0.2rem !important;
-}
-
-.dining-hero-swiper .swiper-pagination-bullet-active {
-  background: #ffffff;
-  width: 1.25rem;
-  border-radius: 9999px;
-}
-
-.dining-hero-nav {
-  top: 50%;
-  margin-top: -1.25rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 9999px;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.dining-hero-nav:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.dining-hero-nav-prev {
-  left: 0.75rem;
-}
-
-.dining-hero-nav-next {
-  right: 0.75rem;
+.dining-promo-swiper {
+  --dining-promo-slide-w: 92%;
+  overflow-x: clip;
 }
 
 @media (min-width: 640px) {
-  .dining-hero-swiper .swiper-pagination {
-    bottom: 1rem !important;
+  .dining-promo-swiper {
+    --dining-promo-slide-w: 88%;
   }
-  .dining-hero-nav-prev {
-    left: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .dining-promo-swiper {
+    --dining-promo-slide-w: 86%;
   }
-  .dining-hero-nav-next {
-    right: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .dining-promo-swiper {
+    --dining-promo-slide-w: 82%;
   }
+}
+
+@media (min-width: 1280px) {
+  .dining-promo-swiper {
+    --dining-promo-slide-w: 78%;
+  }
+}
+
+.dining-promo-swiper.is-compact {
+  --dining-promo-slide-w: 100%;
+}
+
+.dining-promo-single-wrap {
+  width: min(1180px, 92%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 640px) {
+  .dining-promo-single-wrap {
+    width: min(1180px, 88%);
+  }
+}
+
+@media (min-width: 768px) {
+  .dining-promo-single-wrap {
+    width: min(1180px, 86%);
+  }
+}
+
+@media (min-width: 1024px) {
+  .dining-promo-single-wrap {
+    width: min(1180px, 82%);
+  }
+}
+
+.dining-promo-peek.swiper,
+.dining-promo-slide.swiper-slide,
+.dining-promo-card {
+  height: 220px;
+}
+
+@media (min-width: 640px) {
+  .dining-promo-peek.swiper,
+  .dining-promo-slide.swiper-slide,
+  .dining-promo-card {
+    height: 280px;
+  }
+}
+
+@media (min-width: 768px) {
+  .dining-promo-peek.swiper,
+  .dining-promo-slide.swiper-slide,
+  .dining-promo-card {
+    height: 320px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dining-promo-peek.swiper,
+  .dining-promo-slide.swiper-slide,
+  .dining-promo-card {
+    height: 360px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dining-promo-peek.swiper,
+  .dining-promo-slide.swiper-slide,
+  .dining-promo-card {
+    height: 380px;
+  }
+}
+
+.dining-promo-peek.swiper {
+  width: 100%;
+  overflow: visible;
+}
+
+.dining-promo-swiper.is-compact .dining-promo-peek.swiper {
+  overflow: hidden;
+}
+
+.dining-promo-swiper .swiper-wrapper {
+  align-items: stretch;
+}
+
+.dining-promo-slide.swiper-slide {
+  width: var(--dining-promo-slide-w) !important;
+  box-sizing: border-box;
+}
+
+.dining-promo-card {
+  background: #111;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18);
+}
+
+.dining-promo-card-photo {
+  object-position: 68% center;
+}
+
+@media (min-width: 640px) {
+  .dining-promo-card-photo {
+    object-position: 72% center;
+  }
+}
+
+/* Same left-fade treatment as landing promo posters */
+.dining-promo-card-scrim {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(8, 0, 18, 0.88) 0%,
+      rgba(12, 0, 28, 0.72) 22%,
+      rgba(18, 0, 36, 0.38) 38%,
+      transparent 52%
+    ),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0%, transparent 38%);
+}
+
+@media (max-width: 639px) {
+  .dining-promo-card-scrim {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(8, 0, 18, 0.9) 0%,
+        rgba(12, 0, 28, 0.7) 36%,
+        rgba(18, 0, 36, 0.35) 58%,
+        rgba(0, 0, 0, 0.2) 100%
+      ),
+      linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0%, transparent 45%);
+  }
+}
+
+/* Compact (≤2): circular nav like landing page */
+.dining-promo-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  color: #111111;
+  transition:
+    background-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .dining-promo-nav {
+    display: flex;
+  }
+}
+
+.dining-promo-nav.swiper-button-disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.dining-promo-nav:not(.is-peek-nav) {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  transform: translateY(-50%);
+}
+
+@media (min-width: 640px) {
+  .dining-promo-nav:not(.is-peek-nav) {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
+
+.dining-promo-nav:not(.is-peek-nav):hover {
+  background: #ffffff;
+}
+
+.dining-promo-nav-prev:not(.is-peek-nav) {
+  left: 0.75rem;
+}
+
+.dining-promo-nav-next:not(.is-peek-nav) {
+  right: 0.75rem;
+}
+
+/*
+ * Peek mode (>2): BookMyShow-style tall bars flush to the outer ends
+ * of the slider (left: 0 / right: 0), sitting on the side peeks.
+ */
+.dining-promo-nav.is-peek-nav {
+  width: 1.75rem;
+  height: 3.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
+  transform: translateY(-50%);
+}
+
+@media (min-width: 640px) {
+  .dining-promo-nav.is-peek-nav {
+    width: 2rem;
+    height: 4rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .dining-promo-nav.is-peek-nav {
+    width: 2.25rem;
+    height: 4.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dining-promo-nav.is-peek-nav {
+    width: 2.5rem;
+    height: 5rem;
+  }
+}
+
+.dining-promo-nav.is-peek-nav:hover {
+  background: #ffffff;
+}
+
+.dining-promo-nav-prev.is-peek-nav {
+  left: 0;
+}
+
+.dining-promo-nav-next.is-peek-nav {
+  right: 0;
+}
+
+.dining-promo-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+  line-height: 0;
+}
+
+.dining-promo-dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.dining-promo-dot.is-active {
+  background: #ffffff;
+  transform: scale(1.2);
 }
 
 /* Filter bar: transparent until stuck; light translucent fill when stuck */
@@ -76,7 +301,7 @@
 }
 
 .dining-filters-sticky.is-stuck {
-  background-color: rgba(255, 255, 255, 0.90);
+  background-color: rgba(255, 255, 255, 0.9);
   border-bottom-color: rgba(226, 232, 240, 0.9);
 }
 

@@ -2,13 +2,12 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import { useGetPublicRegisteredArtistsQuery, type PublicRegisteredPartner } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import {
-  SHOWCASE_ARTIST_CARDS,
-  type ShowcaseArtistCard,
-} from "@/data/showcaseArtistCards";
+  usePublicArtistsCatalog,
+  type DirectoryArtist,
+} from "@/lib/usePublicArtistsCatalog";
 import SafeCoverImage, {
   ARTIST_IMAGE_FALLBACK_CLASS,
   ArtistImageFallback,
@@ -26,8 +25,8 @@ type RailArtistCard = {
   href: string;
 };
 
-function mapApiArtist(artist: PublicRegisteredPartner): RailArtistCard {
-  const role = artist.type_name || "Artist";
+function mapApiArtist(artist: DirectoryArtist): RailArtistCard {
+  const role = artist.type_name || artist.role_title || "Artist";
   const place = [artist.city_name, artist.city_state].filter(Boolean).join(", ");
   return {
     id: artist.id,
@@ -38,22 +37,12 @@ function mapApiArtist(artist: PublicRegisteredPartner): RailArtistCard {
   };
 }
 
-function mapShowcaseArtist(artist: ShowcaseArtistCard): RailArtistCard {
-  return {
-    id: artist.id,
-    name: artist.name,
-    image: artist.image,
-    roleLine: `${artist.role} · ${artist.place}`,
-    href: artist.href,
-  };
-}
-
 function ArtistCard({ artist }: { artist: RailArtistCard }) {
   return (
     <Link
       href={artist.href}
       className="top-artists-slot top-artists-slot-link"
-      title={`View ${artist.name} and send an inquiry`}
+      title={`View ${artist.name}`}
     >
       <div className="top-artists-avatar">
         <div className="top-artists-avatar-inner">
@@ -74,73 +63,65 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
 
 export default function TopArtistsRail() {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { data: artists = [], isLoading } = useGetPublicRegisteredArtistsQuery();
-  const useStatic = !isLoading && artists.length === 0;
-  const items = useStatic
-    ? SHOWCASE_ARTIST_CARDS.map(mapShowcaseArtist)
-    : artists.map(mapApiArtist);
-  const scrollEdges = useHorizontalScrollEdges(scrollerRef, [items.length, useStatic, isLoading]);
+  const { artists, isLoading } = usePublicArtistsCatalog();
+  const items = artists.slice(0, 12).map(mapApiArtist);
+  const edges = useHorizontalScrollEdges(scrollerRef, [items.length, isLoading]);
 
-  const scrollBy = (dir: -1 | 1) => {
+  const scrollBy = (dir: "left" | "right") => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.7, 280), behavior: "smooth" });
+    const amount = Math.max(el.clientWidth * 0.75, 200);
+    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
   };
 
+  if (!isLoading && items.length === 0) return null;
+
   return (
-    <section className="bg-white py-6 sm:py-8 lg:py-10">
-      <div className="container mx-auto px-4 md:px-5 lg:px-8">
-        <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="type-section font-semibold tracking-tight text-[#111111]">Top Artists</h2>
+    <section className="w-full bg-white py-6 sm:py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 2xl:px-0">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#111111]">
+            Top Artists
+          </h2>
           <RailSeeAllLink href="/artists" />
         </div>
 
-        {isLoading ? (
-          <div className="flex gap-4 overflow-hidden py-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex flex-col items-center w-[6.75rem] sm:w-[7.75rem] shrink-0"
-              >
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#F7E9FF] animate-pulse" />
-                <div className="mt-3 h-3 w-16 bg-slate-100 rounded animate-pulse" />
-                <div className="mt-2 h-2.5 w-12 bg-slate-50 rounded animate-pulse" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="relative overflow-visible">
-            {scrollEdges.left ? (
-              <RailOverlayNavButton
-                direction="prev"
-                side="left"
-                label="Previous artists"
-                onClick={() => scrollBy(-1)}
-                className="!flex !-left-3 sm:!-left-4 lg:!-left-5 !top-[76px] sm:!top-[86px] md:!top-[94px] lg:!top-[105px]"
-              />
-            ) : null}
+        <div className="relative">
+          {edges.left ? (
+            <RailOverlayNavButton
+              direction="prev"
+              side="left"
+              label="Previous artists"
+              onClick={() => scrollBy("left")}
+            />
+          ) : null}
+          {edges.right ? (
+            <RailOverlayNavButton
+              direction="next"
+              side="right"
+              label="Next artists"
+              onClick={() => scrollBy("right")}
+            />
+          ) : null}
 
-            <div
-              ref={scrollerRef}
-              className="top-artists-rail"
-              style={{ ["--artists-visible" as string]: VISIBLE }}
-            >
-              {items.map((artist) => (
-                <ArtistCard key={artist.id} artist={artist} />
-              ))}
-            </div>
-
-            {scrollEdges.right ? (
-              <RailOverlayNavButton
-                direction="next"
-                side="right"
-                label="Next artists"
-                onClick={() => scrollBy(1)}
-                className="!flex !-right-3 sm:!-right-4 lg:!-right-5 !top-[76px] sm:!top-[86px] md:!top-[94px] lg:!top-[105px]"
-              />
-            ) : null}
+          <div
+            ref={scrollerRef}
+            className="top-artists-rail"
+            style={{ ["--artists-visible" as string]: VISIBLE }}
+          >
+            {isLoading
+              ? Array.from({ length: VISIBLE }).map((_, i) => (
+                  <div key={i} className="top-artists-slot" aria-hidden>
+                    <div className="top-artists-avatar">
+                      <div className="top-artists-avatar-inner bg-slate-200 animate-pulse" />
+                    </div>
+                    <div className="h-3 w-16 mx-auto mt-2 rounded bg-slate-200 animate-pulse" />
+                    <div className="h-2.5 w-12 mx-auto mt-1.5 rounded bg-slate-100 animate-pulse" />
+                  </div>
+                ))
+              : items.map((artist) => <ArtistCard key={artist.id} artist={artist} />)}
           </div>
-        )}
+        </div>
       </div>
     </section>
   );

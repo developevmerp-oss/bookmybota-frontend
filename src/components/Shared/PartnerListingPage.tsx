@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Building2, Mic2, Search, X } from "lucide-react";
-import {
-  useGetPublicRegisteredArtistsQuery,
-  useGetPublicRegisteredVenuesQuery,
-} from "@/services/api";
+import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
 import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
+import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
 
 const BRAND = "#6900AA";
 
@@ -45,12 +44,11 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
     [searchArg, city]
   );
 
-  const artistsCityQuery = useGetPublicRegisteredArtistsQuery(cityQueryArgs, {
-    skip: kind !== "artist",
+  const artistsCatalog = usePublicArtistsCatalog({
+    q: q.trim() || undefined,
+    city: city.trim() || undefined,
   });
-  const artistsAllQuery = useGetPublicRegisteredArtistsQuery(searchArg, {
-    skip: kind !== "artist" || !city.trim(),
-  });
+
   const venuesCityQuery = useGetPublicRegisteredVenuesQuery(cityQueryArgs, {
     skip: kind !== "venue",
   });
@@ -58,21 +56,29 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
     skip: kind !== "venue" || !city.trim(),
   });
 
-  const cityPartners =
-    kind === "artist" ? artistsCityQuery.data ?? [] : venuesCityQuery.data ?? [];
-  const allPartners =
-    kind === "artist" ? artistsAllQuery.data ?? [] : venuesAllQuery.data ?? [];
-  const partners = preferCityOrAll(cityPartners, allPartners, Boolean(city.trim()));
+  const cityVenues = venuesCityQuery.data ?? [];
+  const allVenues = venuesAllQuery.data ?? [];
+  const venuePartners = preferCityOrAll(cityVenues, allVenues, Boolean(city.trim()));
 
-  const cityLoading = kind === "artist" ? artistsCityQuery.isLoading : venuesCityQuery.isLoading;
-  const allLoading = kind === "artist" ? artistsAllQuery.isLoading : venuesAllQuery.isLoading;
+  const partners = kind === "artist" ? artistsCatalog.artists : venuePartners;
   const isLoading =
-    cityLoading || (Boolean(city.trim()) && cityPartners.length === 0 && allLoading);
+    kind === "artist"
+      ? artistsCatalog.isLoading
+      : venuesCityQuery.isLoading ||
+        (Boolean(city.trim()) && cityVenues.length === 0 && venuesAllQuery.isLoading);
+
+  const usedCityFallback =
+    kind === "artist"
+      ? Boolean(artistsCatalog.usedCityFallback)
+      : Boolean(city.trim()) &&
+        !venuesCityQuery.isLoading &&
+        cityVenues.length === 0 &&
+        allVenues.length > 0;
 
   const title = kind === "artist" ? "Artists" : "Venues";
   const subtitle =
     kind === "artist"
-      ? "Browse all registered artists and send a booking inquiry."
+      ? "Browse registered and event artists — open a profile for details and live shows."
       : "Browse all registered venues, check free dates, and send a booking inquiry.";
   const searchPlaceholder =
     kind === "artist" ? "Search artists by name or type…" : "Search venues by name or type…";
@@ -80,6 +86,15 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
 
   return (
     <div className="min-h-screen bg-[#faf7fc]">
+      {city.trim() ? (
+        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-5">
+          <CityLocationEmptyState
+            city={city.trim()}
+            forceShow={usedCityFallback}
+            currentModule={kind === "artist" ? "artists" : "venues"}
+          />
+        </div>
+      ) : null}
       <div className="bg-white border-b border-[#F3E8FF]">
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-9">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -97,13 +112,9 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
                 <p className="mt-1.5 text-sm sm:text-base text-[#5c5c5c] max-w-2xl">{subtitle}</p>
                 {!isLoading ? (
                   <p className="mt-2 text-xs font-semibold text-[#6900AA]">
-                    {partners.length} registered {kind === "artist" ? "artist" : "venue"}
+                    {partners.length} {kind === "artist" ? "artist" : "venue"}
                     {partners.length === 1 ? "" : "s"}
-                    {city.trim() && cityPartners.length === 0 && partners.length > 0
-                      ? ` · showing all cities`
-                      : city.trim()
-                        ? ` · ${city.trim()}`
-                        : ""}
+                    {city.trim() ? ` · ${city.trim()}` : ""}
                   </p>
                 ) : null}
               </div>
@@ -146,18 +157,18 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
       </div>
 
       <PartnerDirectorySection
-          title={kind === "artist" ? "All artists" : "All venues"}
-          subtitle=""
-          kind={kind}
-          partners={partners}
-          isLoading={isLoading}
-          showHeader={false}
-          emptyMessage={
-            q.trim() || city.trim()
-              ? `No ${kind === "artist" ? "artists" : "venues"} match your search.`
-              : `No registered ${kind === "artist" ? "artists" : "venues"} yet.`
-          }
-        />
+        title={kind === "artist" ? "All artists" : "All venues"}
+        subtitle=""
+        kind={kind}
+        partners={partners}
+        isLoading={isLoading}
+        showHeader={false}
+        emptyMessage={
+          q.trim() || city.trim()
+            ? `No ${kind === "artist" ? "artists" : "venues"} match your search.`
+            : `No ${kind === "artist" ? "artists" : "venues"} to show yet.`
+        }
+      />
     </div>
   );
 }

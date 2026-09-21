@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { X } from "lucide-react";
-import { formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 
 export type VenueShowtimeRow = {
   id: string;
@@ -31,14 +31,8 @@ type Props = {
 };
 
 function formatVenueDate(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const label = formatDateCustomer(iso);
+  return label === "—" ? "" : label;
 }
 
 export default function EventVenuesModal({ open, onClose, showtimes }: Props) {

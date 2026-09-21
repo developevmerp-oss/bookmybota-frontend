@@ -11,7 +11,7 @@ import {
   type EventReview,
 } from "@/services/api";
 import { extractApiError, extractApiSuccessMessage } from "@/lib/apiErrors";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDateCustomer } from "@/lib/dateFormat";
 import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -140,7 +140,7 @@ function ReviewCard({ review }: { review: EventReview }) {
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
             <div className="min-w-0">
               <p className="font-bold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] truncate">{name}</p>
-              <p className="mt-0.5 text-[0.875rem] sm:text-[1rem] text-slate-400">{formatDate(review.created_at)}</p>
+              <p className="mt-0.5 text-[0.875rem] sm:text-[1rem] text-slate-400">{formatDateCustomer(review.created_at)}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <StarsDisplay value={rating} size={15} />

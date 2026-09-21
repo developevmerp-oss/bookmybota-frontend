@@ -38,6 +38,7 @@ import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 
 const DEFAULT_DINING_IMAGE =
   "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
@@ -83,15 +84,13 @@ function shortBookingCode(id: string) {
 }
 
 function formatDateLine(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const label = formatDateCustomer(iso);
+  return label === "—" ? "" : label;
 }
 
 function formatTimeLine(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  const label = formatTime12h(iso);
+  return label === "—" ? "" : label;
 }
 
 function formatWeekday(iso: string) {

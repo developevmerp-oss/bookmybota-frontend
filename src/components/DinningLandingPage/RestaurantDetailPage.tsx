@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
+import { formatDateCustomer } from '@/lib/dateFormat';
 import { resolveMediaUrl } from '@/lib/mediaUrl';
 import SafeCoverImage, { DiningImageFallback } from '@/components/Shared/SafeCoverImage';
 import DiningWishlistButton from '@/components/DinningLandingPage/DiningWishlistButton';
@@ -1963,7 +1964,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <div className="flex items-center justify-between">
                           <p className="text-baselg:text-xs font-bold text-slate-800">{rev.user_name}</p>
                           <p className="text-[1rem] sm:text-[0.625rem] text-slate-400 font-medium">
-                            {new Date(rev.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {formatDateCustomer(rev.created_at)}
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5 mt-1">
@@ -3128,11 +3129,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <span className="font-bold">
                                 {formatSlotLabel(selectedTime)}
                                 {' • '}
-                                {bookingDates[selectedDateIndex].toLocaleDateString('en-GB', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}
+                                {formatDateCustomer(bookingDates[selectedDateIndex])}
                               </span>
                             </p>
                           </div>

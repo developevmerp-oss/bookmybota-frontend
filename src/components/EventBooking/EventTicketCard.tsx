@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, MapPin, Package, Smartphone, User } from "lucide-react";
-import { formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { shortBookingCode } from "@/lib/eventTicketPdf";
 import { eventBookingQrValue } from "@/lib/eventScanToken";
@@ -50,20 +50,13 @@ type Props = {
 
 function formatLongDate(value?: string) {
   if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
-  return `${date}, ${weekday}`;
+  return formatDateCustomer(value);
 }
 
 function formatBookedOn(value?: string) {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
-  return `Booked on ${date}, ${time}`;
+  const label = formatDateTimeCustomer(value);
+  return label === "—" ? "" : `Booked on ${label}`;
 }
 
 function TicketPerforation() {

@@ -26,7 +26,7 @@ import { useGetBookingByIdQuery, useCancelBookingMutation } from "@/services/api
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
-import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const ACCENT = "#6900AA";
@@ -68,11 +68,7 @@ function formatTicketDate(value?: string | null) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return { date: "—", weekday: "" };
   return {
-    date: d.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }),
+    date: formatDateCustomer(d),
     weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
   };
 }
@@ -299,7 +295,7 @@ export default function BookingDetailPage({
                     </span>
                   </div>
                   <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
-                    {formatDateTime12h(booking.booking_time)}
+                    {formatDateTimeCustomer(booking.booking_time)}
                   </p>
                   {ticketDate.weekday && (
                     <p className="text-sm sm:text-base lg:text-xs text-slate-500 mt-0.5">{ticketDate.weekday}</p>
@@ -415,7 +411,7 @@ export default function BookingDetailPage({
                 {booking.created_at && (
                   <span className="inline-flex items-center gap-1.5">
                     <Calendar size={14} style={{ color: ACCENT }} />
-                    Booked on {formatDateTime12h(booking.created_at)}
+                    Booked on {formatDateTimeCustomer(booking.created_at)}
                   </span>
                 )}
               </div>

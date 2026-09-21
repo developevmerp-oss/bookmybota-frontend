@@ -1,3 +1,5 @@
+import { formatDateCustomerUtc } from "@/lib/dateFormat";
+
 /** Default gift card validity (mirrors backend). Superadmin can override via API. */
 export const DEFAULT_GIFT_CARD_VALIDITY_DAYS = 365;
 
@@ -38,15 +40,9 @@ export function computeGiftCardExpiryDate(
   return new Date(Date.UTC(y, m, d + days, 23, 59, 59, 999));
 }
 
-/** Display expiry as MM-DD-YYYY using UTC calendar day (matches stored expires_at). */
+/** Display expiry as "23 Apr 2014" using UTC calendar day (matches stored expires_at). */
 export function formatGiftCardExpiryDate(
   expiresAt: string | Date | null | undefined
 ): string {
-  if (!expiresAt) return "—";
-  const d = typeof expiresAt === "string" ? new Date(expiresAt) : expiresAt;
-  if (Number.isNaN(d.getTime())) return "—";
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const yyyy = d.getUTCFullYear();
-  return `${mm}-${dd}-${yyyy}`;
+  return formatDateCustomerUtc(expiresAt);
 }

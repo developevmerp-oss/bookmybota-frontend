@@ -25,6 +25,7 @@ import {
   emptyCinemaOfferFormValues,
   type CinemaOfferFormValues,
 } from "@/lib/cinemaOfferFormSchema";
+import { formatDate } from "@/lib/dateFormat";
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
 const reqStar = <span className="text-rose-500">*</span>;
@@ -497,7 +498,7 @@ export default function MovieAdminOffersPage() {
                     {" · "}
                     {(o.status || (o.is_active ? "ACTIVE" : "DRAFT")).replace("_", " ")}
                     {o.valid_from
-                      ? ` · ${String(o.valid_from).slice(0, 10)} → ${String(o.valid_until || "—").slice(0, 10)}`
+                      ? ` · ${formatDate(o.valid_from)} → ${formatDate(o.valid_until)}`
                       : ""}
                   </p>
                 </div>

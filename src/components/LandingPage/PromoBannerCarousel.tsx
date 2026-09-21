@@ -13,6 +13,7 @@ import {
   useGetPublicMoviesQuery,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { formatDateCustomer } from "@/lib/dateFormat";
 import { promotionClickHref } from "@/lib/promotionCta";
 import { useHomeCatalog } from "./useHomeCatalog";
 import {
@@ -76,11 +77,7 @@ function formatSlideDate(iso?: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return {
-    dateLabel: d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }),
+    dateLabel: formatDateCustomer(d),
     weekdayLabel: d.toLocaleDateString("en-US", { weekday: "long" }),
   };
 }

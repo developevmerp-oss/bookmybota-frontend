@@ -339,6 +339,7 @@ export function getCatalogMovie(idOrSlug: string) {
 
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { isMoviePromoted } from "@/lib/movieDisplay";
+import { formatDateCustomer } from "@/lib/dateFormat";
 
 const FALLBACK_POSTER =
   "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&h=750&fit=crop&q=80";
@@ -481,13 +482,8 @@ export function formatDurationShort(minutes?: number | null) {
 
 export function formatReleaseShort(iso?: string) {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const label = formatDateCustomer(iso);
+  return label === "—" ? "" : label;
 }
 
 export function formatVotesLabel(n?: number) {

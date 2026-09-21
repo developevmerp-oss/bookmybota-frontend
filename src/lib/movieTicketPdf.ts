@@ -1,4 +1,4 @@
-import { formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 
 const BRAND: [number, number, number] = [105, 0, 170];
@@ -45,14 +45,8 @@ export type MovieTicketPdfBooking = {
 function formatLongDate(value?: string) {
   if (!value) return "—";
   const normalized = String(value).includes("T") ? value : String(value).replace(" ", "T");
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const label = formatDateCustomer(normalized);
+  return label === "—" ? String(value) : label;
 }
 
 async function fetchAsDataUrl(url: string): Promise<string | null> {

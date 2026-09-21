@@ -32,7 +32,7 @@ import {
   mergePartnerEventItems,
   type PartnerEventWithMeta,
 } from "@/lib/partnerEventHistory";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDateCustomer } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
@@ -466,7 +466,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                   <input
                     readOnly
                     className={`${inquiryInput} bg-slate-50`}
-                    value={selectedDate ? formatDate(selectedDate) : "Pick a free day on the calendar"}
+                    value={selectedDate ? formatDateCustomer(selectedDate) : "Pick a free day on the calendar"}
                   />
                   {errors.event_date && <p className={fieldErrorClass}>{errors.event_date.message}</p>}
                 </div>

@@ -35,6 +35,7 @@ import {
   type MovieShowtime,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import {
@@ -84,19 +85,20 @@ function parseIsoDateAndHours(iso: string) {
 
 function formatTime(iso: string) {
   if (!iso) return "";
-  return parseIsoDateAndHours(iso).displayTime;
+  const t = formatTime12h(iso);
+  return t === "—" ? "" : t;
 }
 
 function formatDateHeader(isoDateStr: string) {
   const d = new Date(isoDateStr + "T00:00:00");
-  if (isNaN(d.getTime())) return isoDateStr;
+  if (isNaN(d.getTime())) return formatDate(isoDateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(d);
   target.setHours(0, 0, 0, 0);
 
   const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  const base = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const base = formatDate(isoDateStr);
   if (diffDays === 0) return `Today (${base})`;
   if (diffDays === 1) return `Tomorrow (${base})`;
   if (diffDays === -1) return `Yesterday (${base})`;

@@ -12,6 +12,7 @@ import {
   useGetAdminCustomerQuery,
   useUnarchiveAdminCustomerMutation,
 } from "@/services/api";
+import { formatDateTime12h } from "@/lib/dateFormat";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
@@ -174,7 +175,7 @@ export default function AdminCustomerDetailPage() {
             {(c.dining_bookings || []).map((b) => (
               <tr key={b.id}>
                 <td className="px-6 py-3">{b.venue_name || "—"}</td>
-                <td className="px-6 py-3">{b.booking_time ? new Date(b.booking_time).toLocaleString() : "—"}</td>
+                <td className="px-6 py-3">{formatDateTime12h(b.booking_time)}</td>
                 <td className="px-6 py-3">{b.status}</td>
                 <td className="px-6 py-3">{b.guests ?? "—"}</td>
               </tr>
@@ -209,7 +210,7 @@ export default function AdminCustomerDetailPage() {
                 <td className="px-6 py-3">{b.status}</td>
                 <td className="px-6 py-3">{b.ticket_qty ?? "—"}</td>
                 <td className="px-6 py-3">{b.grand_total != null ? String(b.grand_total) : "—"}</td>
-                <td className="px-6 py-3">{b.created_at ? new Date(b.created_at).toLocaleString() : "—"}</td>
+                <td className="px-6 py-3">{formatDateTime12h(b.created_at)}</td>
               </tr>
             ))}
             {(!c.event_bookings || c.event_bookings.length === 0) && (

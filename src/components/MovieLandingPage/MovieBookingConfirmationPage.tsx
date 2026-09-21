@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { useGetMovieBookingQuery } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { buildMovieTicketPdf, downloadPdfBlob } from "@/lib/movieTicketPdf";
 
 interface MovieBookingConfirmationPageProps {
@@ -38,17 +39,8 @@ export default function MovieBookingConfirmationPage({
 
   const showDateFormatted = useMemo(() => {
     if (!booking?.showtime_starts_at) return "";
-    try {
-      const dt = new Date(String(booking.showtime_starts_at).replace(" ", "T"));
-      return dt.toLocaleDateString("en-US", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-    } catch {
-      return booking.showtime_starts_at;
-    }
+    const label = formatDateCustomer(String(booking.showtime_starts_at).replace(" ", "T"));
+    return label === "—" ? String(booking.showtime_starts_at) : label;
   }, [booking?.showtime_starts_at]);
 
   const showTimeFormatted = useMemo(() => {
@@ -63,7 +55,7 @@ export default function MovieBookingConfirmationPage({
       h = h % 12 || 12;
       return `${h.toString().padStart(2, "0")}:${m} ${ampm}`;
     } catch {
-      return booking.showtime_starts_at;
+      return formatTime12h(booking.showtime_starts_at);
     }
   }, [booking?.showtime_starts_at]);
 

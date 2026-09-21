@@ -25,7 +25,7 @@ import {
 import OrganizerLandingPage from "@/components/EventAdminPanel/OrganizerLandingPage";
 import { organizerWorkflowLabel } from "@/lib/contractPlaceholders";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatTime12h } from "@/lib/dateFormat";
+import { formatDate, formatTime12h } from "@/lib/dateFormat";
 
 /** Soft corner wave — matches dining dashboard KPI cards. */
 function SoftWave({ color, id }: { color: string; id: string }) {
@@ -471,13 +471,7 @@ function OrganizerDashboard() {
                       >
                         <div className="min-w-[5.5rem] shrink-0">
                           <p className="text-sm font-semibold text-slate-800">
-                            {event.event_starts_at
-                              ? new Date(event.event_starts_at).toLocaleDateString(undefined, {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })
-                              : "—"}
+                            {event.event_starts_at ? formatDate(event.event_starts_at) : "—"}
                           </p>
                           <p className="text-xs text-slate-500 mt-0.5">
                             {event.event_starts_at

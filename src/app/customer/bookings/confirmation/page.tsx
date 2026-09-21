@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useGetBookingByIdQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDate, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 
 function IconBox({ children }: { children: ReactNode }) {
   return (
@@ -158,7 +158,7 @@ function ConfirmationContent() {
                   <div className="min-w-0">
                     <p className="text-xs text-slate-400 font-medium">Date</p>
                     <p className="text-sm font-bold text-slate-900 break-words">
-                      {formatDate(booking.booking_time)}
+                      {formatDateCustomer(booking.booking_time)}
                     </p>
                   </div>
                 </div>

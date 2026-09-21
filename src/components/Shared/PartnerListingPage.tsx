@@ -5,7 +5,6 @@ import { Building2, Mic2, Search, X } from "lucide-react";
 import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
 import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
-import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
 
 const BRAND = "#6900AA";
@@ -67,14 +66,6 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
       : venuesCityQuery.isLoading ||
         (Boolean(city.trim()) && cityVenues.length === 0 && venuesAllQuery.isLoading);
 
-  const usedCityFallback =
-    kind === "artist"
-      ? Boolean(artistsCatalog.usedCityFallback)
-      : Boolean(city.trim()) &&
-        !venuesCityQuery.isLoading &&
-        cityVenues.length === 0 &&
-        allVenues.length > 0;
-
   const title = kind === "artist" ? "Artists" : "Venues";
   const subtitle =
     kind === "artist"
@@ -86,15 +77,6 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
 
   return (
     <div className="min-h-screen bg-[#faf7fc]">
-      {city.trim() ? (
-        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-5">
-          <CityLocationEmptyState
-            city={city.trim()}
-            forceShow={usedCityFallback}
-            currentModule={kind === "artist" ? "artists" : "venues"}
-          />
-        </div>
-      ) : null}
       <div className="bg-white border-b border-[#F3E8FF]">
         <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-9">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">

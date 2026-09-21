@@ -39,7 +39,6 @@ import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
 import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
-import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
 import {
   EVENT_CATEGORY_OPTIONS,
   categorySlugsMatch,
@@ -2043,19 +2042,6 @@ export default function PublicEventsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {city.trim() ? (
-        <section className={`${CONTAINER} pt-3 sm:pt-4 pb-1`}>
-          <CityLocationEmptyState
-            city={city.trim()}
-            forceShow={
-              !isLoading &&
-              events.length === 0 &&
-              allPublicEvents.length > 0
-            }
-            currentModule="events"
-          />
-        </section>
-      ) : null}
       {activeHeroEvent ? (
         <>
           {/* Mobile + tablet — featured cards (scroll-snap, no autoplay) */}

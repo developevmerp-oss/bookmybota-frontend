@@ -27,7 +27,7 @@ import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlist
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
 import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
-import CityLocationEmptyState from "@/components/LandingPage/CityLocationEmptyState";
+import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -52,13 +52,14 @@ import {
   MdOutlineTheaters,
   MdOutlineWineBar,
 } from "react-icons/md";
-import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, Business, Collection } from "@/services/api";
+import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, useGetActiveMarketingPromotionsQuery, Business, Collection, type MarketingCampaign } from "@/services/api";
 // import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferLabel } from "@/lib/diningOffers";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { promotionClickHref } from "@/lib/promotionCta";
 import { useAppSelector } from "@/lib/hooks";
 import {
   DEFAULT_DINING_FILTERS,
@@ -66,6 +67,7 @@ import {
   DiningHomeOfferCard,
   DiningOfferBucket,
   buildDiningHomeOfferCards,
+  businessHasOffer,
   businessMatchesOfferBucket,
   extractCuisines,
   offerBucketSectionTitle,
@@ -153,39 +155,6 @@ type DiningPromoSlide = {
   href: string;
 };
 
-const FALLBACK_PROMO_SLIDES: DiningPromoSlide[] = [
-  {
-    id: "dining-hero",
-    title: "The Rooftop Kitchen",
-    image: "/images/dining-hero.png",
-    location: "Bole, Addis Ababa",
-    rating: "4.7",
-    reviewsLabel: "(1.2k reviews)",
-    cuisines: ["Continental", "Italian", "Grill"],
-    href: "/dining",
-  },
-  {
-    id: "promo-rakhi",
-    title: "Rakhi Special Celebrations",
-    image: "/images/dining/promo-rakhi.png",
-    location: "Addis Ababa",
-    rating: "4.6",
-    reviewsLabel: "(860 reviews)",
-    cuisines: ["Indian", "Grill", "Family"],
-    href: "/dining",
-  },
-  {
-    id: "promo-cafe",
-    title: "Good Food. Great Moments.",
-    image: "/images/dining/promo-cafe.png",
-    location: "Kazanchis, Addis Ababa",
-    rating: "4.5",
-    reviewsLabel: "(640 reviews)",
-    cuisines: ["Cafe", "Brunch", "Desserts"],
-    href: "/dining",
-  },
-];
-
 function formatReviewCount(count?: number | null): string {
   const n = Number(count || 0);
   if (!n) return "(New)";
@@ -225,11 +194,11 @@ function diningCuisineTags(business: Business): string[] {
   return tags.length ? tags : ["Dining"];
 }
 
-function businessToPromoSlide(business: Business): DiningPromoSlide | null {
+function businessToPromoSlide(business: Business): DiningPromoSlide {
   const image =
     resolveMediaUrl(business.cover_image_url) ||
-    (business.gallery_images?.[0] ? resolveMediaUrl(business.gallery_images[0]) : "");
-  if (!image) return null;
+    (business.gallery_images?.[0] ? resolveMediaUrl(business.gallery_images[0]) : "") ||
+    "";
   return {
     id: `biz-${business.id}`,
     title: business.name,
@@ -242,9 +211,48 @@ function businessToPromoSlide(business: Business): DiningPromoSlide | null {
   };
 }
 
+/** Prefer banner uploaded on the marketing promotion plan; fall back to restaurant media. */
+function campaignToPromoSlide(
+  promo: MarketingCampaign,
+  businessesById: Map<string, Business>
+): DiningPromoSlide {
+  const targetType = String(promo.target_type || "").toUpperCase();
+  const targetId = promo.target_id ? String(promo.target_id) : "";
+  const businessId = promo.business_id ? String(promo.business_id) : "";
+  const linkedId =
+    targetType === "RESTAURANT" || targetType === "BUSINESS"
+      ? targetId || businessId
+      : businessId;
+  const linked = linkedId
+    ? businessesById.get(linkedId) || businessesById.get(businessId)
+    : undefined;
+
+  const planBanner = resolveMediaUrl(promo.banner_image_url || "");
+  const restaurantImage = linked
+    ? resolveMediaUrl(linked.cover_image_url) ||
+      (linked.gallery_images?.[0] ? resolveMediaUrl(linked.gallery_images[0]) : "")
+    : "";
+
+  const title =
+    (promo.title || "").trim() ||
+    linked?.name ||
+    "Featured dining";
+
+  return {
+    id: `promo-${promo.id}`,
+    title,
+    image: planBanner || restaurantImage || "",
+    location: linked ? diningLocality(linked) : "Addis Ababa",
+    rating: Number(linked?.rating || 4.5).toFixed(1),
+    reviewsLabel: formatReviewCount(linked?.reviews_count),
+    cuisines: linked ? diningCuisineTags(linked) : ["Dining"],
+    href: promotionClickHref(promo) || (linkedId ? `/restaurant/${linkedId}` : "/dining"),
+  };
+}
+
 function DiningPromoBannerCard({ slide }: { slide: DiningPromoSlide }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const showImage = Boolean(slide.image) && !imgFailed;
+  const showImage = Boolean(slide.image?.trim()) && !imgFailed;
   const locationParts = slide.location.split(",").map((p) => p.trim()).filter(Boolean);
   const placeLabel = locationParts[0] || slide.location;
   const cityLabel = locationParts.slice(1).join(", ") || "";
@@ -267,17 +275,17 @@ function DiningPromoBannerCard({ slide }: { slide: DiningPromoSlide }) {
             onError={() => setImgFailed(true)}
           />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-[#1a0029] via-[#460071] to-[#6900aa]" aria-hidden />
+          <div
+            className="flex h-full w-full items-center justify-center bg-[#1a1a1a]"
+            aria-hidden
+          >
+            <Utensils size={52} className="text-white/30" strokeWidth={1.5} />
+          </div>
         )}
         <div className="dining-promo-card-scrim pointer-events-none absolute inset-0" />
       </div>
 
       <div className="relative z-[2] flex h-full max-w-[58%] sm:max-w-[52%] md:max-w-[48%] lg:max-w-[46%] flex-col justify-center pl-5 pr-2 sm:pl-7 sm:pr-4 md:pl-9 md:pr-6 pb-6 sm:pb-8">
-        <span className="mb-2 sm:mb-2.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#6900AA] px-2.5 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-sm">
-          <Crown size={11} className="shrink-0" strokeWidth={2.25} fill="currentColor" />
-          Promoted
-        </span>
-
         <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-[2rem] font-extrabold leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] line-clamp-2">
           {slide.title}
         </h2>
@@ -893,28 +901,41 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
           ) : null}
         </Link>
 
-        {isPromoted && (
-          <span className="absolute top-3 left-3 z-[1] bg-white/80 text-[#6900AA] text-xs font-semibold px-2.5 py-1 rounded-md shadow-sm">
-            Promoted
-          </span>
-        )}
-
         <DiningWishlistButton businessId={String(restaurant.id)} />
 
-        {offerLabel && (
-          <span
-            className="absolute bottom-3 left-3 z-[1] inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full text-[#9F1239] text-xs font-bold px-3 py-1.5 shadow-md pointer-events-none"
-            style={{
-              background: "linear-gradient(90deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%)",
-            }}
-          >
-            <Tag
-              size={13}
-              className="shrink-0 fill-[#9F1239] text-[#9F1239]"
-              strokeWidth={0}
-            />
-            <span className="truncate">{offerLabel}</span>
-          </span>
+        {(isPromoted || offerLabel) && (
+          <div className="absolute bottom-3 left-3 z-[1] flex flex-col gap-1.5 max-w-[calc(100%-1.5rem)] pointer-events-none">
+            {isPromoted ? (
+              <span
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full text-[#9F1239] text-xs font-bold px-3 py-1.5 shadow-md"
+                style={{
+                  background: "linear-gradient(90deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%)",
+                }}
+              >
+                <Crown
+                  size={13}
+                  className="shrink-0 fill-[#9F1239] text-[#9F1239]"
+                  strokeWidth={0}
+                />
+                <span className="truncate">Promoted</span>
+              </span>
+            ) : null}
+            {offerLabel ? (
+              <span
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full text-[#9F1239] text-xs font-bold px-3 py-1.5 shadow-md"
+                style={{
+                  background: "linear-gradient(90deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%)",
+                }}
+              >
+                <Tag
+                  size={13}
+                  className="shrink-0 fill-[#9F1239] text-[#9F1239]"
+                  strokeWidth={0}
+                />
+                <span className="truncate">{offerLabel}</span>
+              </span>
+            ) : null}
+          </div>
         )}
       </div>
 
@@ -1475,6 +1496,11 @@ export default function Home() {
     allSectionBusinesses,
     Boolean(activeCity)
   );
+  const { data: diningSliderPromotions = [] } = useGetActiveMarketingPromotionsQuery({
+    category: "DINING",
+    surface: "slider",
+    ...(activeCity ? { city: activeCity } : {}),
+  });
   const { data: collections = [] } = useGetCollectionsQuery();
   // const { data: moods = [] } = useGetMoodsQuery();
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
@@ -1600,14 +1626,39 @@ export default function Home() {
     [sectionPool]
   );
 
+  // Priority: active dining slider promotions (plan banner image) → promoted → offers → any.
   const promoSlides = useMemo(() => {
-    const fromPromoted = sectionPool
-      .filter((b) => Boolean(b.is_promoted))
-      .map(businessToPromoSlide)
-      .filter((s): s is DiningPromoSlide => Boolean(s))
-      .slice(0, 8);
-    return fromPromoted.length > 0 ? fromPromoted : FALLBACK_PROMO_SLIDES;
-  }, [sectionPool]);
+    const businessesById = new Map<string, Business>();
+    for (const b of sectionPool) businessesById.set(String(b.id), b);
+
+    if (diningSliderPromotions.length > 0) {
+      const fromPlans = diningSliderPromotions
+        .slice(0, 8)
+        .map((promo) => campaignToPromoSlide(promo, businessesById))
+        // Prefer slides that have the admin-uploaded promotion banner image.
+        .filter((slide) => Boolean(slide.image?.trim()));
+      if (fromPlans.length > 0) return fromPlans;
+      // Plans exist but no banner uploaded yet — still show plan slides (icon fallback).
+      return diningSliderPromotions
+        .slice(0, 8)
+        .map((promo) => campaignToPromoSlide(promo, businessesById));
+    }
+
+    if (!sectionPool.length) return [];
+
+    const toSlides = (list: Business[]) => list.map(businessToPromoSlide).slice(0, 8);
+
+    const promotedOnly = sectionPool.filter((b) => Boolean(b.is_promoted));
+    if (promotedOnly.length) return toSlides(promotedOnly);
+
+    const withOffers = sectionPool.filter((b) => businessHasOffer(b));
+    if (withOffers.length) {
+      const promotedOffers = withOffers.filter((b) => Boolean(b.is_promoted));
+      return toSlides(promotedOffers.length ? promotedOffers : withOffers);
+    }
+
+    return toSlides(sectionPool);
+  }, [sectionPool, diningSliderPromotions]);
 
   // Same as landing promo: duplicate so loop + peeks keep autoplay seamless.
   const promoDisplaySlides = useMemo(() => {
@@ -1941,49 +1992,39 @@ export default function Home() {
         ? `${totalRestaurants}+`
         : "5,000+";
 
+  // Landing-page carousel rules: peek when >1 slide, centered single when 1.
+  const promoMulti = promoSlides.length > 1;
+
   return (
     <div className="min-h-screen bg-white">
-      {activeCity ? (
-        <section className="container mx-auto px-5 sm:px-6 lg:px-10 2xl:px-0 pt-3 sm:pt-4 pb-1">
-          <CityLocationEmptyState
-            city={activeCity}
-            forceShow={
-              usingDiningFallback ||
-              (Boolean(activeCity) &&
-                citySectionBusinesses.length === 0 &&
-                allSectionBusinesses.length > 0)
-            }
-            currentModule="dining"
-          />
-        </section>
-      ) : null}
-      {/* ── Top promo banner (card UI + BookMyShow peek when >2) ─────────── */}
+      {/* ── Top promo banner — same carousel layout as landing PromoBannerCarousel ─ */}
+      {promoSlides.length > 0 ? (
       <section
-        className={`dining-promo-swiper w-full  pt-3 sm:pt-4 pb-3 sm:pb-4 ${
-          promoSlides.length > 2 ? "is-peek" : "is-compact"
+        className={`dining-promo-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4 ${
+          promoMulti ? "is-multi" : "is-compact"
         }`}
       >
         <div
           className={`relative w-full ${
-            promoSlides.length > 2 ? "" : "dining-promo-single-wrap"
+            promoMulti ? "" : "dining-promo-single-wrap"
           }`}
         >
           <Swiper
             key={`dining-promo-${promoSlides.map((s) => s.id).join("-")}-${promoDisplaySlides.length}`}
             modules={[Autoplay, SwiperNavigation]}
             className="dining-promo-peek w-full"
-            loop={promoSlides.length > 1}
-            loopAdditionalSlides={promoSlides.length > 1 ? 2 : 0}
+            loop={promoMulti}
+            loopAdditionalSlides={promoMulti ? 2 : 0}
             speed={600}
-            centeredSlides={promoSlides.length > 2}
-            centeredSlidesBounds={promoSlides.length <= 2}
-            grabCursor={promoSlides.length > 1}
-            allowTouchMove={promoSlides.length > 1}
-            slidesPerView={promoSlides.length > 2 ? "auto" : 1}
-            spaceBetween={promoSlides.length > 2 ? 14 : 0}
-            watchSlidesProgress={promoSlides.length > 2}
+            centeredSlides={promoMulti}
+            centeredSlidesBounds={!promoMulti}
+            grabCursor={promoMulti}
+            allowTouchMove={promoMulti}
+            slidesPerView={promoMulti ? "auto" : 1}
+            spaceBetween={promoMulti ? 14 : 0}
+            watchSlidesProgress={promoMulti}
             breakpoints={
-              promoSlides.length > 2
+              promoMulti
                 ? {
                     640: { spaceBetween: 16 },
                     768: { spaceBetween: 18 },
@@ -1992,7 +2033,7 @@ export default function Home() {
                 : undefined
             }
             autoplay={
-              promoSlides.length > 1
+              promoMulti
                 ? {
                     delay: 5000,
                     disableOnInteraction: false,
@@ -2003,11 +2044,12 @@ export default function Home() {
                 : false
             }
             navigation={
-              promoSlides.length > 1
+              promoMulti
                 ? { prevEl: bannerPrevRef.current, nextEl: bannerNextRef.current }
                 : false
             }
             onBeforeInit={(swiper: SwiperType) => {
+              if (!promoMulti) return;
               const nav = swiper.params?.navigation;
               if (nav && typeof nav !== "boolean") {
                 nav.prevEl = bannerPrevRef.current;
@@ -2016,6 +2058,7 @@ export default function Home() {
             }}
             onSwiper={(swiper) => {
               bannerSwiperRef.current = swiper;
+              if (!promoMulti) return;
               setTimeout(() => bindBannerNav(swiper));
             }}
             onSlideChange={(swiper) => {
@@ -2033,33 +2076,23 @@ export default function Home() {
             ))}
           </Swiper>
 
-          {promoSlides.length > 1 ? (
+          {promoMulti ? (
             <>
               <button
                 ref={bannerPrevRef}
                 type="button"
                 aria-label="Previous banner"
-                className={`dining-promo-nav dining-promo-nav-prev ${
-                  promoSlides.length > 2 ? "is-peek-nav" : ""
-                }`}
+                className="dining-promo-nav dining-promo-nav-prev"
               >
-                <ChevronLeft
-                  className={promoSlides.length > 2 ? "size-4 sm:size-5" : "size-5 sm:size-6"}
-                  strokeWidth={2.25}
-                />
+                <ChevronLeft className="size-5 sm:size-6" strokeWidth={2.25} />
               </button>
               <button
                 ref={bannerNextRef}
                 type="button"
                 aria-label="Next banner"
-                className={`dining-promo-nav dining-promo-nav-next ${
-                  promoSlides.length > 2 ? "is-peek-nav" : ""
-                }`}
+                className="dining-promo-nav dining-promo-nav-next"
               >
-                <ChevronRight
-                  className={promoSlides.length > 2 ? "size-4 sm:size-5" : "size-5 sm:size-6"}
-                  strokeWidth={2.25}
-                />
+                <ChevronRight className="size-5 sm:size-6" strokeWidth={2.25} />
               </button>
               <div className="dining-promo-dots" role="tablist" aria-label="Banner slides">
                 {promoSlides.map((slide, index) => (
@@ -2085,6 +2118,7 @@ export default function Home() {
           ) : null}
         </div>
       </section>
+      ) : null}
 
       <CategoryPromoBanners
         category="DINING"
@@ -2732,19 +2766,26 @@ className={`text-sm font-bold mt-2 transition-colors ${
             <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
               {getFilteredSectionTitle()}
             </h2>
-            <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
-              {locationLoading ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 size={12} className="animate-spin" /> Locating restaurants…
-                </span>
-              ) : (
-                <>
-                  <span className="font-semibold text-slate-700">{cityDisplay}</span>
-                  {" · "}
-                  {restaurantCountLabel} to explore
-                </>
-              )}
-            </p>
+            {usingDiningFallback ||
+            (Boolean(activeCity) &&
+              !cityBusinessesLoading &&
+              citySectionBusinesses.length === 0) ? (
+              <CitySectionEmptyNotice message="No dining options available in your city yet." />
+            ) : (
+              <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
+                {locationLoading ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" /> Locating restaurants…
+                  </span>
+                ) : (
+                  <>
+                    <span className="font-semibold text-slate-700">{cityDisplay}</span>
+                    {" · "}
+                    {restaurantCountLabel} to explore
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           {businessesLoading && loadedRestaurants.length === 0 ? (

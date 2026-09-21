@@ -6,15 +6,19 @@ import { SHOWCASE_EVENT_CARDS } from "@/data/showcaseEventCards";
 import { useHomeCatalog } from "./useHomeCatalog";
 
 export default function PopularEventsRail({ city }: { city: string }) {
-  const { events, isLoadingEvents, hasCity } = useHomeCatalog(city);
+  const { events, cityEvents, isLoadingEvents, hasCity } = useHomeCatalog(city);
   const rated = [...events].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
   const items = (rated.some((e) => Number(e.rating) > 0) ? rated : events).slice(0, 12);
   const isEmpty = !isLoadingEvents && items.length === 0;
   const useStatic = isEmpty && !hasCity;
+  const cityHasNoEvents = hasCity && !isLoadingEvents && cityEvents.length === 0;
 
   return (
     <ContentRail
       title="Popular Events"
+      cityNotice={
+        cityHasNoEvents ? "No events available in your city yet." : undefined
+      }
       seeAllHref="/events"
       label="popular events"
       isLoading={isLoadingEvents}

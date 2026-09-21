@@ -6,11 +6,12 @@ import { SHOWCASE_DINING_CARDS } from "@/data/showcaseDiningCards";
 import { useHomeCatalog } from "./useHomeCatalog";
 
 export default function PopularDiningRail({ city }: { city: string }) {
-  const { dining, isLoadingDining, hasCity } = useHomeCatalog(city);
+  const { dining, cityDining, isLoadingDining, hasCity } = useHomeCatalog(city);
   const items = dining.slice(0, 12);
   const isEmpty = !isLoadingDining && items.length === 0;
   // Showcase only when there is truly no dining data anywhere (no city filter).
   const useStatic = isEmpty && !hasCity;
+  const cityHasNoDining = hasCity && !isLoadingDining && cityDining.length === 0;
   const seeAllHref =
     city && city !== "All Cities"
       ? `/dining?city=${encodeURIComponent(city)}`
@@ -19,7 +20,9 @@ export default function PopularDiningRail({ city }: { city: string }) {
   return (
     <ContentRail
       title="Popular Dining"
-      subtitle="Great places people are loving right now."
+      cityNotice={
+        cityHasNoDining ? "No dining options available in your city yet." : undefined
+      }
       seeAllHref={seeAllHref}
       label="dining"
       cardStyle="dining"

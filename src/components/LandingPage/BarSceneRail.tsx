@@ -62,7 +62,6 @@ export default function BarSceneRail({ city }: { city: string }) {
   return (
     <ContentRail
       title="Raise a Glass"
-      subtitle="Bars and lounges people are loving right now."
       seeAllHref={seeAllHref}
       label="bars"
       cardStyle="dining"

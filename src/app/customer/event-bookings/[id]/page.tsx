@@ -28,12 +28,12 @@ import { buildEventTicketPdf, downloadPdfBlob, shortBookingCode } from "@/lib/ev
 import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
 import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { formatDateCustomer } from "@/lib/dateFormat";
 
 function formatDateLine(iso?: string) {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const label = formatDateCustomer(iso);
+  return label === "—" ? "" : label;
 }
 
 function formatWeekday(iso?: string) {

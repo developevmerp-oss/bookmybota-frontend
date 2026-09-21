@@ -37,7 +37,7 @@ import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDate, formatDateTime12h } from "@/lib/dateFormat";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 
 type TabKey =
@@ -502,7 +502,7 @@ export default function AdminPlatformOffersPage() {
                         -{formatMoney(r.discount_amount, { compact: true })}
                       </span>
                     </td>
-                    <td className="p-4 text-sm text-zinc-500">{formatDate(r.redeemed_at)}</td>
+                    <td className="p-4 text-sm text-zinc-500">{formatDateTime12h(r.redeemed_at)}</td>
                   </tr>
                 ))
               )}

@@ -35,7 +35,7 @@ import {
   type DiningGiftCardRedemptionRow,
   type OrganizerSettlementRun,
 } from "@/services/api";
-import { formatDate, formatTime12h, toDateOnlyParam } from "@/lib/dateFormat";
+import { formatDate, formatDateTime12h, toDateOnlyParam } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import {
@@ -2076,7 +2076,7 @@ export default function AdminOrganizerPayoutsPage() {
                             <p className="font-semibold text-white">{row.business_name || "—"}</p>
                             <p className="text-xs text-zinc-500 mt-0.5">
                               {row.redeemed_at
-                                ? `${formatDate(row.redeemed_at)} ${formatTime12h(row.redeemed_at)}`
+                                ? formatDateTime12h(row.redeemed_at)
                                 : "—"}
                             </p>
                             {(row.guest_name || row.guest_phone) && (

@@ -7,6 +7,7 @@ import { useGetOrganizerEventsQuery } from "@/services/api";
 import { contractStatusLabel, organizerWorkflowLabel } from "@/lib/contractPlaceholders";
 import Pagination from "@/components/Shared/Pagination";
 import { PAGE_SIZE } from "@/lib/pagination";
+import { formatDate } from "@/lib/dateFormat";
 
 const STATUS_FILTERS = [
   { label: "All", value: "" },
@@ -30,23 +31,20 @@ function statusPill(status: string) {
 
 function formatEventDate(startsAt?: string | null, endsAt?: string | null): string {
   if (!startsAt) return "—";
-  const start = new Date(startsAt);
-  if (Number.isNaN(start.getTime())) return "—";
-  const startLabel = start.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const startLabel = formatDate(startsAt);
+  if (startLabel === "—") return "—";
   if (!endsAt) return startLabel;
+  const endLabel = formatDate(endsAt);
+  if (endLabel === "—") return startLabel;
+  const start = new Date(startsAt);
   const end = new Date(endsAt);
-  if (Number.isNaN(end.getTime())) return startLabel;
-  const sameDay = start.toDateString() === end.toDateString();
-  if (sameDay) return startLabel;
-  const endLabel = end.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  if (
+    !Number.isNaN(start.getTime()) &&
+    !Number.isNaN(end.getTime()) &&
+    start.toDateString() === end.toDateString()
+  ) {
+    return startLabel;
+  }
   return `${startLabel} – ${endLabel}`;
 }
 

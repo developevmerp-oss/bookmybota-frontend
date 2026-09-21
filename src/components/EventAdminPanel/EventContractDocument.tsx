@@ -1,6 +1,7 @@
 "use client";
 
 import { mergeContractHtml, type EventContractRecord } from "@/lib/contractPlaceholders";
+import { formatDate, formatDateTime12h } from "@/lib/dateFormat";
 
 interface EventContractDocumentProps {
   contract: EventContractRecord;
@@ -98,13 +99,7 @@ function SignatureBlock({
   signedAt?: string | null;
   signatureUrl?: string | null;
 }) {
-  const dateLabel = signedAt
-    ? new Date(signedAt).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
-    : null;
+  const dateLabel = signedAt ? formatDate(signedAt) : null;
 
   return (
     <div className="min-w-0">
@@ -131,7 +126,7 @@ function SignatureBlock({
         )}
         {signedAt && (
           <p className="text-xs text-slate-400">
-            Signed {new Date(signedAt).toLocaleString()}
+            Signed {formatDateTime12h(signedAt)}
           </p>
         )}
       </div>

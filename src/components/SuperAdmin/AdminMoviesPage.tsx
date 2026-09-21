@@ -17,6 +17,7 @@ import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
 import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
+import { formatDate } from "@/lib/dateFormat";
 
 const STATUS_OPTIONS: Movie["status"][] = ["draft", "coming_soon", "now_showing", "archived"];
 
@@ -213,7 +214,7 @@ export default function AdminMoviesPage() {
                       {movie.duration_minutes ? `${movie.duration_minutes} min` : "—"}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      {movie.release_date ? String(movie.release_date).slice(0, 10) : "—"}
+                      {formatDate(movie.release_date)}
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">

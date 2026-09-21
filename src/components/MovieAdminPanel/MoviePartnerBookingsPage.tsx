@@ -27,6 +27,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
+import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import {
   useGetPartnerMovieBookingsQuery,
   useUpdatePartnerMovieBookingStatusMutation,
@@ -181,22 +182,6 @@ export default function MoviePartnerBookingsPage() {
       setActionTarget(null);
     } catch (err: any) {
       toast.error(err?.data?.error || "Failed to update booking status.");
-    }
-  };
-
-  const formatTime = (isoString?: string) => {
-    if (!isoString) return "";
-    try {
-      const parts = isoString.split(" ");
-      const timePart = parts[1] || parts[0];
-      const [hStr, mStr] = timePart.split(":");
-      let h = parseInt(hStr, 10);
-      const m = mStr || "00";
-      const ampm = h >= 12 ? "PM" : "AM";
-      h = h % 12 || 12;
-      return `${h.toString().padStart(2, "0")}:${m} ${ampm}`;
-    } catch {
-      return isoString;
     }
   };
 
@@ -408,12 +393,12 @@ export default function MoviePartnerBookingsPage() {
                           <span>•</span>
                           <span className="flex items-center gap-1 text-zinc-300">
                             <Calendar size={12} className="text-fuchsia-400" />
-                            {booking.showtime_starts_at ? String(booking.showtime_starts_at).slice(0, 10) : ""}
+                            {booking.showtime_starts_at ? formatDate(booking.showtime_starts_at) : ""}
                           </span>
                           <span>•</span>
                           <span className="flex items-center gap-1 text-zinc-300">
                             <Clock size={12} className="text-fuchsia-400" />
-                            {formatTime(booking.showtime_starts_at)}
+                            {booking.showtime_starts_at ? formatTime12h(booking.showtime_starts_at) : ""}
                           </span>
                         </div>
                       </div>
@@ -609,12 +594,12 @@ export default function MoviePartnerBookingsPage() {
                           <span>•</span>
                           <span className="flex items-center gap-1 text-zinc-300">
                             <Calendar size={12} className="text-amber-400" />
-                            {group.showtime_starts_at ? String(group.showtime_starts_at).slice(0, 10) : ""}
+                            {group.showtime_starts_at ? formatDate(group.showtime_starts_at) : ""}
                           </span>
                           <span>•</span>
                           <span className="flex items-center gap-1 text-zinc-300">
                             <Clock size={12} className="text-amber-400" />
-                            {formatTime(group.showtime_starts_at)}
+                            {group.showtime_starts_at ? formatTime12h(group.showtime_starts_at) : ""}
                           </span>
                         </div>
                       </div>

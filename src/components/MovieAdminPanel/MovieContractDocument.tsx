@@ -1,6 +1,7 @@
 "use client";
 
 import { mergeMovieContractHtml, type MovieContractRecord } from "@/lib/movieContractPlaceholders";
+import { formatDateTime12h } from "@/lib/dateFormat";
 
 interface MovieContractDocumentProps {
   contract: MovieContractRecord;
@@ -123,7 +124,7 @@ function SignatureBlock({
           <>
             Signed on{" "}
             <span className="font-medium text-slate-700">
-              {new Date(signedAt).toLocaleString()}
+              {formatDateTime12h(signedAt)}
             </span>
           </>
         ) : (

@@ -1,30 +1,78 @@
 /**
- * Project-wide date/time display: MM-DD-YYYY + 12-hour clock.
- * Storage/API continues to use ISO 8601; use these helpers for all UI display.
+ * Project-wide date/time display helpers.
+ * - Admin / partner: MM-DD-YYYY via formatDate / formatDateTime12h
+ * - Customer: "23 Apr 2014" via formatDateCustomer / formatDateTimeCustomer
+ * Storage/API continues to use ISO 8601.
  */
 
 const DISPLAY_LOCALE = 'en-US';
 
-/** MM-DD-YYYY */
-export function formatDate(value?: string | Date | null): string {
-  if (!value) return '—';
+const MONTHS_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+function parseCalendarParts(value: string | Date): { y: number; m: number; d: number } | null {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     // Pure calendar date from API — never shift by timezone.
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      const [yyyy, mm, dd] = trimmed.split('-');
-      return `${mm}-${dd}-${yyyy}`;
+      const [yyyy, mm, dd] = trimmed.split('-').map(Number);
+      if (!yyyy || !mm || !dd) return null;
+      return { y: yyyy, m: mm, d: dd };
     }
   }
   const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${mm}-${dd}-${yyyy}`;
+  if (Number.isNaN(d.getTime())) return null;
+  return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
 }
 
-/** MM-DD-YYYY, h:mm AM/PM */
+function formatPartsCustomer(y: number, m: number, d: number): string {
+  const month = MONTHS_SHORT[m - 1];
+  if (!month) return '—';
+  return `${d} ${month} ${y}`;
+}
+
+/** MM-DD-YYYY (admin / partner panels) */
+export function formatDate(value?: string | Date | null): string {
+  if (!value) return '—';
+  const parts = parseCalendarParts(value);
+  if (!parts) return '—';
+  const mm = String(parts.m).padStart(2, '0');
+  const dd = String(parts.d).padStart(2, '0');
+  return `${mm}-${dd}-${parts.y}`;
+}
+
+/** Customer panel: "23 Apr 2014" */
+export function formatDateCustomer(value?: string | Date | null): string {
+  if (!value) return '—';
+  const parts = parseCalendarParts(value);
+  if (!parts) return '—';
+  return formatPartsCustomer(parts.y, parts.m, parts.d);
+}
+
+/**
+ * Customer panel from UTC calendar day (gift card expiry).
+ * Example: 2014-04-23T23:59:59.999Z → "23 Apr 2014"
+ */
+export function formatDateCustomerUtc(value?: string | Date | null): string {
+  if (!value) return '—';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return formatPartsCustomer(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}
+
+/** MM-DD-YYYY, h:mm AM/PM (admin / partner) */
 export function formatDateTime12h(value?: string | Date | null): string {
   if (!value) return '—';
   const d = value instanceof Date ? value : new Date(value);
@@ -35,6 +83,14 @@ export function formatDateTime12h(value?: string | Date | null): string {
     hour12: true,
   });
   return `${formatDate(d)}, ${time}`;
+}
+
+/** Customer panel: "23 Apr 2014, 12:00 AM" */
+export function formatDateTimeCustomer(value?: string | Date | null): string {
+  if (!value) return '—';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `${formatDateCustomer(d)}, ${formatTime12h(d)}`;
 }
 
 /** h:mm AM/PM only */
@@ -51,7 +107,7 @@ export function formatTime12h(value?: string | Date | null): string {
 
 /** Convert stored HH:mm (24h) to 12-hour display, e.g. "18:57" → "6:57 PM" */
 export function formatHm12h(hm?: string | null): string {
-  if (!hm?.trim()) return '—';
+  if (!hm?.trim()) return '';
   const match = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
   if (!match) return hm.trim();
   const hours = Number(match[1]);

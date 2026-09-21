@@ -25,6 +25,7 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatDateCustomer } from "@/lib/dateFormat";
 import { GIFT_CARD_DENOMINATIONS, formatGiftCardAmountLabel } from "@/lib/giftCardDenominations";
 import {
   DEFAULT_GIFT_CARD_VALIDITY_DAYS,
@@ -179,7 +180,7 @@ export default function GiftCardBuyPage() {
     issued?.cards && issued.cards.length > 0 ? issued.cards : issued ? [issued] : [];
   const emailSentNow = issued?.email_sent !== false;
   const scheduledLabel = issued?.scheduled_delivery_at
-    ? new Date(issued.scheduled_delivery_at).toLocaleDateString()
+    ? formatDateCustomer(issued.scheduled_delivery_at)
     : null;
   const heroImg = design ? resolveMediaUrl(design.image_url) : null;
 

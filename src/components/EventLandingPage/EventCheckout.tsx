@@ -52,7 +52,7 @@ import {
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDateTime12h, formatTime12h } from "@/lib/dateFormat";
+import { formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
@@ -2165,7 +2165,7 @@ export default function EventCheckout({
                   </p>
                 {selectedShowtime && (
                     <p className="mt-1.5 text-[0.875rem] sm:text-[0.9375rem] text-slate-500 leading-relaxed">
-                      {formatDateTime12h(selectedShowtime.starts_at).replace(", ", " | ")}
+                      {formatDateTimeCustomer(selectedShowtime.starts_at).replace(", ", " | ")}
                       {event.language
                         ? ` | ${parseEventLanguages(event.language).join(", ") || event.language}`
                         : ""}

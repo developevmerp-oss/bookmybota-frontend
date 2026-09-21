@@ -31,7 +31,7 @@ import {
   useToggleEventInterestMutation,
   type PublicEvent,
 } from "@/services/api";
-import { formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
 import { readSessionForRole } from "@/lib/authStorage";
@@ -104,14 +104,8 @@ function formatInterestCount(count: number) {
 
 function formatLongDate(value?: string) {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const label = formatDateCustomer(value);
+  return label === "—" ? "" : label;
 }
 
 function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {

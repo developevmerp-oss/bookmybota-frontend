@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useGetMyGiftCardQuery } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatDateTimeCustomer } from "@/lib/dateFormat";
 import { formatGiftCardExpiryDate } from "@/lib/giftCardValidity";
 import {
   getSentGiftClaimState,
@@ -241,7 +242,7 @@ export default function CustomerGiftCardDetailPage() {
                           {tx.notes || "Transaction"}
                         </p>
                         <p className="text-[11px] sm:text-[12px] text-[#9CA3AF]">
-                          {new Date(tx.created_at).toLocaleString()}
+                          {formatDateTimeCustomer(tx.created_at)}
                         </p>
                       </div>
                       <div className="shrink-0 flex flex-row items-center gap-2">

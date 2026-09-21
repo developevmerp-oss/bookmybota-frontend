@@ -26,6 +26,7 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { formatDate, formatTime12h } from "@/lib/dateFormat";
 
 export default function MovieDashboardPage() {
   const user = useAppSelector((state) => state.auth.user);
@@ -50,23 +51,6 @@ export default function MovieDashboardPage() {
   const movieOffers = offers.filter(
     (offer) => offer.category === "MOVIES" || offer.category === "ALL"
   );
-
-  // Format time helper
-  const formatTime = (isoString?: string) => {
-    if (!isoString) return "";
-    try {
-      const parts = isoString.split(" ");
-      const timePart = parts[1] || parts[0];
-      const [hStr, mStr] = timePart.split(":");
-      let h = parseInt(hStr, 10);
-      const m = mStr || "00";
-      const ampm = h >= 12 ? "PM" : "AM";
-      h = h % 12 || 12;
-      return `${h.toString().padStart(2, "0")}:${m} ${ampm}`;
-    } catch {
-      return isoString;
-    }
-  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -247,9 +231,9 @@ export default function MovieDashboardPage() {
                   <div className="text-right">
                     <p className="text-sm font-extrabold text-white flex items-center gap-1 justify-end">
                       <Clock size={13} className="text-[#F84464]" />
-                      {formatTime(st.starts_at)}
+                      {st.starts_at ? formatTime12h(st.starts_at) : ""}
                     </p>
-                    <p className="text-zinc-500">{st.starts_at ? String(st.starts_at).slice(0, 10) : ""}</p>
+                    <p className="text-zinc-500">{st.starts_at ? formatDate(st.starts_at) : ""}</p>
                   </div>
 
                   <span

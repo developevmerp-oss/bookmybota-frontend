@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, Flame, Loader2, Sparkles, Users } from "lucide-react";
 import { useGetActivePlatformOffersQuery, type PlatformOffer } from "@/services/api";
-import { formatDate } from "@/lib/dateFormat";
+import { formatDateCustomer } from "@/lib/dateFormat";
 import { formatMoney, formatWholeNumber } from "@/lib/currencyFormat";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { readSessionForRole } from "@/lib/authStorage";
@@ -93,7 +93,7 @@ function mapPlatformOffer(o: PlatformOffer, index: number): DisplayOffer {
       : "No minimum booking";
 
   const validTill = o.end_at
-    ? `Valid till ${formatDate(o.end_at)}`
+    ? `Valid till ${formatDateCustomer(o.end_at)}`
     : "Limited time offer";
 
   const { badge, note } = eligibilityCopy(o.customer_eligibility);

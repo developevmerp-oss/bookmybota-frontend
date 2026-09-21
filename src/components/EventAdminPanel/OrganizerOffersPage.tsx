@@ -27,6 +27,7 @@ import {
   emptyEventOfferFormValues,
   type EventOfferFormValues,
 } from "@/lib/eventOfferFormSchema";
+import { formatDate } from "@/lib/dateFormat";
 
 /** YYYY-MM-DD for the day before a given date string */
 function dayBefore(dateStr: string): string {
@@ -651,7 +652,7 @@ export default function OrganizerOffersPage() {
                   {" · "}
                   {(o.status || (o.is_active ? "ACTIVE" : "DRAFT")).replace("_", " ")}
                   {o.start_date || o.valid_from
-                    ? ` · ${o.start_date || o.valid_from?.slice(0, 10)} → ${o.end_date || o.valid_until?.slice(0, 10) || "—"}`
+                    ? ` · ${formatDate(o.start_date || o.valid_from)} → ${formatDate(o.end_date || o.valid_until)}`
                     : ""}
                 </p>
               </div>

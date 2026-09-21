@@ -23,7 +23,7 @@ import EventMediaSlider from "@/components/EventLandingPage/EventMediaSlider";
 import EventGallerySection from "@/components/EventLandingPage/EventGallerySection";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatTime12h } from "@/lib/dateFormat";
+import { formatDate, formatTime12h } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { eventDateParts } from "@/components/LandingPage/homeUtils";
 import type { EventFormValues } from "@/lib/eventFormSchema";
@@ -40,19 +40,6 @@ function formatDurationLong(minutes?: number | null) {
   const hourPart = h ? `${h} hour${h === 1 ? "" : "s"}` : "";
   const minPart = m ? `${m} minute${m === 1 ? "" : "s"}` : "";
   return [hourPart, minPart].filter(Boolean).join(" ");
-}
-
-function formatLongDateFromParts(date?: string | null, time?: string | null) {
-  if (!date) return "";
-  const iso = time ? `${date}T${time}` : `${date}T12:00:00`;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
@@ -258,9 +245,9 @@ export default function EventFormCustomerPreview({
 
   const dateLabel = (() => {
     if (!firstShow?.event_date) return "";
-    const first = formatLongDateFromParts(firstShow.event_date, firstShow.start_time);
+    const first = formatDate(firstShow.event_date);
     if (!lastShow?.event_date || showtimes.length <= 1) return first;
-    const last = formatLongDateFromParts(lastShow.event_date, lastShow.start_time);
+    const last = formatDate(lastShow.event_date);
     return first && last && first !== last ? `${first} - ${last}` : first;
   })();
 
@@ -341,15 +328,9 @@ export default function EventFormCustomerPreview({
   const dateBadge = eventDateParts(showIso);
   const placeLine = [venueName, city].filter(Boolean).join(city && venueName ? ": " : "") || undefined;
   const weekdayLabel = showIso
-    ? new Date(showIso).toLocaleDateString("en-GB", { weekday: "long" })
+    ? new Date(showIso).toLocaleDateString("en-US", { weekday: "long" })
     : "";
-  const homeDateLabel = showIso
-    ? new Date(showIso).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "";
+  const homeDateLabel = showIso ? formatDate(showIso) : "";
 
   const homePosterCard = (
     <div className="snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px] bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)]">

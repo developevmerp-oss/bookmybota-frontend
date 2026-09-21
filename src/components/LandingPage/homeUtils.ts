@@ -1,5 +1,6 @@
 import type { Business, PublicEvent } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { formatDateCustomer } from "@/lib/dateFormat";
 
 export function hasCityFilter(city?: string) {
   return Boolean(city && city !== "All Cities");
@@ -118,9 +119,8 @@ export function isSportsEvent(event: PublicEvent) {
 
 export function formatShowDate(iso?: string) {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const label = formatDateCustomer(iso);
+  return label === "—" ? "" : label;
 }
 
 export function localityFromAddress(address?: string) {

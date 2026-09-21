@@ -33,6 +33,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import BusinessLandingPage from "@/components/DiningAdminPanel/BusinessLandingPage";
 import { extractApiError } from "@/lib/apiErrors";
+import { formatDate } from "@/lib/dateFormat";
 
 const MEAL_KEYS = ["breakfast", "lunch", "dinner"] as const;
 
@@ -82,13 +83,7 @@ function monthBounds(year: number, month: number) {
 }
 
 function formatSelectedLabel(dateKey: string) {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(dateKey);
 }
 
 function toMinutes(hm: string): number {
@@ -282,7 +277,7 @@ function MonthCalendar({
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  const title = new Date(year, month, 1).toLocaleDateString(undefined, {
+  const title = new Date(year, month, 1).toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });

@@ -8,6 +8,7 @@ import { useGetCustomerBookingsQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { formatDateTimeCustomer } from "@/lib/dateFormat";
 
 const FAQ_CATEGORIES = [
   {
@@ -117,7 +118,7 @@ export default function CustomerHelpPage() {
                     <div>
                       <p className="text-sm font-medium text-foreground">{b.business_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(b.booking_time).toLocaleString()} · {b.status}
+                        {formatDateTimeCustomer(b.booking_time)} · {b.status}
                       </p>
                     </div>
                     <ChevronRight size={16} className="text-slate-300" />

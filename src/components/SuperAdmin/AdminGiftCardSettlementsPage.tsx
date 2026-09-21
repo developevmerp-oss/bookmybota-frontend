@@ -17,7 +17,7 @@ import {
   useGetAdminMovieGiftCardRedemptionsQuery,
   useGetAdminGiftCardSettlementOverviewQuery,
 } from "@/services/api";
-import { formatDate, formatTime12h } from "@/lib/dateFormat";
+import { formatDateTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
@@ -455,7 +455,7 @@ export default function AdminGiftCardSettlementsPage() {
                           <p className="text-xs text-zinc-400 mt-0.5">{row.organizer_name || "—"}</p>
                           <p className="text-xs text-zinc-500 mt-0.5">
                             {row.redeemed_at
-                              ? `${formatDate(row.redeemed_at)} ${formatTime12h(row.redeemed_at)}`
+                              ? formatDateTime12h(row.redeemed_at)
                               : "—"}
                           </p>
                         </td>
@@ -611,7 +611,7 @@ export default function AdminGiftCardSettlementsPage() {
                           <p className="text-xs text-zinc-400 mt-0.5">{row.cinema_name || "—"}</p>
                           <p className="text-xs text-zinc-500 mt-0.5">
                             {row.redeemed_at
-                              ? `${formatDate(row.redeemed_at)} ${formatTime12h(row.redeemed_at)}`
+                              ? formatDateTime12h(row.redeemed_at)
                               : "—"}
                           </p>
                         </td>

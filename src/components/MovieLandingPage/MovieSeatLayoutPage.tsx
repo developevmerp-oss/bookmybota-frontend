@@ -59,6 +59,7 @@ import {
 import PhoneInput from "@/components/Shared/PhoneInput";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatDateCustomer } from "@/lib/dateFormat";
 import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
@@ -1027,17 +1028,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   const showDateFormatted = useMemo(() => {
     if (!showtime?.starts_at) return "";
-    try {
-      const dt = new Date(showtime.starts_at.replace(" ", "T"));
-      return dt.toLocaleDateString("en-US", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-    } catch {
-      return showtime.starts_at;
-    }
+    const label = formatDateCustomer(showtime.starts_at.replace(" ", "T"));
+    return label === "—" ? showtime.starts_at : label;
   }, [showtime?.starts_at]);
 
   const showTimeFormatted = useMemo(() => {

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Stage, Layer, Circle, Text, Rect, Group, Image as KonvaImage } from "react-konva";
+import { Stage, Layer, Circle, Ellipse, Line, Text, Rect, Group, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 
 type Seat = {
@@ -24,9 +24,20 @@ type Label = {
   rotation?: number;
 };
 
+type ShapeType =
+  | "rect"
+  | "roundRect"
+  | "circle"
+  | "ellipse"
+  | "diamond"
+  | "triangle"
+  | "stage"
+  | "screen"
+  | "zone";
+
 type Shape = {
   id: string;
-  type: 'rect';
+  type?: ShapeType | "rect";
   x: number;
   y: number;
   width: number;
@@ -36,6 +47,9 @@ type Shape = {
   ticket_type_id?: string;
   rotation?: number;
   opacity?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  cornerRadius?: number;
 };
 
 export default function VenueLayoutViewer({
@@ -437,7 +451,106 @@ export default function VenueLayoutViewer({
               )}
               {/* Shapes / VIP Boxes / Stage */}
               {shapes.map((shape, sIdx) => {
+                const shapeType = (shape.type || "rect") as ShapeType;
                 const isBox = shape.text?.includes("DIAMOND") || shape.text?.includes("BOX");
+                const opacity = shape.opacity ?? 1;
+                const fill = bgImage
+                  ? "rgba(255, 255, 255, 0.01)"
+                  : (isBox ? "#475569" : shape.fill || "#334155");
+                const stroke =
+                  shape.stroke ||
+                  (isBox
+                    ? "#e2e8f0"
+                    : bgImage
+                      ? "rgba(255, 255, 255, 0.2)"
+                      : "rgba(255,255,255,0.25)");
+                const strokeWidth = shape.strokeWidth ?? (isBox ? 2 : 1.5);
+                const common = {
+                  fill,
+                  stroke,
+                  strokeWidth,
+                  opacity,
+                  perfectDrawEnabled: false as const,
+                  shadowForStrokeEnabled: false as const,
+                  onMouseEnter: (e: any) => {
+                    const container = e.target.getStage()?.container();
+                    if (container) container.style.cursor = "pointer";
+                  },
+                  onMouseLeave: (e: any) => {
+                    const container = e.target.getStage()?.container();
+                    if (container) container.style.cursor = "default";
+                  },
+                  onClick: () => handleShapeClick(shape),
+                  onTap: () => handleShapeClick(shape),
+                };
+
+                const visual = (() => {
+                  switch (shapeType) {
+                    case "circle":
+                    case "ellipse":
+                      return (
+                        <Ellipse
+                          x={shape.width / 2}
+                          y={shape.height / 2}
+                          radiusX={shape.width / 2}
+                          radiusY={shape.height / 2}
+                          {...common}
+                        />
+                      );
+                    case "diamond":
+                      return (
+                        <Line
+                          points={[
+                            shape.width / 2, 0,
+                            shape.width, shape.height / 2,
+                            shape.width / 2, shape.height,
+                            0, shape.height / 2,
+                          ]}
+                          closed
+                          {...common}
+                        />
+                      );
+                    case "triangle":
+                      return (
+                        <Line
+                          points={[
+                            shape.width / 2, 0,
+                            shape.width, shape.height,
+                            0, shape.height,
+                          ]}
+                          closed
+                          {...common}
+                        />
+                      );
+                    case "roundRect":
+                    case "zone":
+                      return (
+                        <Rect
+                          x={0}
+                          y={0}
+                          width={shape.width}
+                          height={shape.height}
+                          cornerRadius={shape.cornerRadius ?? 16}
+                          {...common}
+                        />
+                      );
+                    default:
+                      return (
+                        <Rect
+                          x={0}
+                          y={0}
+                          width={shape.width}
+                          height={shape.height}
+                          cornerRadius={
+                            shape.cornerRadius ??
+                            (isBox ? 8 : shape.width > 500 && shape.height > 500 ? 300 : 3)
+                          }
+                          {...common}
+                        />
+                      );
+                  }
+                })();
+
                 return (
                   <Group
                     key={shape.id || `shape-${shape.text || ''}-${sIdx}`}
@@ -449,63 +562,33 @@ export default function VenueLayoutViewer({
                     onDblClick={() => handleToggleZoomOnShape(shape)}
                     onDblTap={() => handleToggleZoomOnShape(shape)}
                   >
-                    {(() => {
-                      const isBlock = shape.text && (shape.text.startsWith("N") || shape.text.startsWith("W") || shape.text.startsWith("E") || shape.text.startsWith("S") || shape.text.startsWith("VIP") || shape.text.startsWith("AWAY"));
-                      const isCircle = shape.width === shape.height && shape.fill === "transparent";
-                      return (
-                        <Rect
-                          x={0}
-                          y={0}
-                          width={shape.width}
-                          height={shape.height}
-                          fill={bgImage ? "rgba(255, 255, 255, 0.01)" : (isBox ? "#475569" : shape.fill || "#334155")}
-                          stroke={isBox ? "#e2e8f0" : (bgImage ? "rgba(255, 255, 255, 0.2)" : (isBlock || shape.fill === "transparent" ? "#ffffff" : "rgba(255,255,255,0.25)"))}
-                          strokeWidth={isBox ? 2 : (shape.fill === "transparent" ? 2 : (isBlock ? 1.5 : 1))}
-                          cornerRadius={isBox ? 8 : (isCircle ? shape.width / 2 : (shape.width > 500 && shape.height > 500 ? 300 : 3))}
-                          perfectDrawEnabled={false}
-                          shadowForStrokeEnabled={false}
-                          onMouseEnter={(e) => {
-                            const container = e.target.getStage()?.container();
-                            if (container) container.style.cursor = "pointer";
-                          }}
-                          onMouseLeave={(e) => {
-                            const container = e.target.getStage()?.container();
-                            if (container) container.style.cursor = "default";
-                          }}
-                          onClick={() => handleShapeClick(shape)}
-                          onTap={() => handleShapeClick(shape)}
-                        />
-                      );
-                    })()}
-                    {shape.text && !bgImage && (() => {
-                      const isBlock = shape.text.startsWith("N") || shape.text.startsWith("W") || shape.text.startsWith("E") || shape.text.startsWith("S") || shape.text.startsWith("VIP") || shape.text.startsWith("AWAY");
-                      return (
-                        <Text
-                          text={shape.text}
-                          x={0}
-                          y={0}
-                          width={shape.width}
-                          height={shape.height}
-                          align="center"
-                          verticalAlign="middle"
-                          fontSize={
-                            shape.text.includes("STAND") ? 16
-                            : shape.text.includes("PITCH") ? 15
-                            : shape.text.includes("GATE") || shape.text.includes("TEAM") || shape.text.includes("PLAYER") || shape.text.includes("REFEREE") ? 11
-                            : isBlock ? 16
-                            : 13
-                          }
-                          fontStyle="bold"
-                          fill={
-                            shape.fill === "#f8fafc" || shape.fill === "#ffffff" || shape.fill === "#fbbf24" ? "#1e293b"
+                    {visual}
+                    {shape.text && !bgImage && (
+                      <Text
+                        text={shape.text}
+                        x={0}
+                        y={0}
+                        width={shape.width}
+                        height={shape.height}
+                        align="center"
+                        verticalAlign="middle"
+                        fontSize={
+                          shape.text.includes("STAND") ? 16
+                          : shape.text.includes("PITCH") ? 15
+                          : shape.text.includes("GATE") || shape.text.includes("TEAM") || shape.text.includes("PLAYER") || shape.text.includes("REFEREE") ? 11
+                          : 13
+                        }
+                        fontStyle="bold"
+                        fill={
+                          shape.fill === "#f8fafc" || shape.fill === "#ffffff" || shape.fill === "#fbbf24" || shape.fill === "#94a3b8"
+                            ? "#1e293b"
                             : "#ffffff"
-                          }
-                          listening={false}
-                          wrap="word"
-                          perfectDrawEnabled={false}
-                        />
-                      );
-                    })()}
+                        }
+                        listening={false}
+                        wrap="word"
+                        perfectDrawEnabled={false}
+                      />
+                    )}
                   </Group>
                 );
               })}
@@ -588,6 +671,8 @@ export default function VenueLayoutViewer({
                   rotation={label.rotation || 0}
                   fontSize={label.fontSize || 16}
                   fontStyle="bold"
+                  align={(label.text || "").includes("\n") ? "center" : "left"}
+                  lineHeight={1.15}
                   fill={cinemaMode ? "#334155" : "#f1f5f9"}
                 />
               ))}

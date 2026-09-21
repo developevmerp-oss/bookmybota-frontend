@@ -9,7 +9,6 @@ import {
   Eye,
   EyeOff,
   FileSignature,
-  FileText,
   LayoutGrid,
   MapPin,
   Pencil,
@@ -742,8 +741,7 @@ export default function AdminEventDetailPage({
                 key={`${doc.document_type_id}-${idx}`}
                 className="flex items-center justify-between gap-3 text-sm border-b border-slate-100 pb-3 last:border-0 last:pb-0"
               >
-                <span className="inline-flex items-center gap-2 text-slate-800">
-                  <FileText size={16} className="text-slate-400 shrink-0" />
+                <span className="text-slate-800">
                   {doc.document_name || `Document ${idx + 1}`}
                 </span>
                 {doc.url ? (

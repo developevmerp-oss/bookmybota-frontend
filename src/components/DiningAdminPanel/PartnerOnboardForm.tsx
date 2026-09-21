@@ -821,14 +821,7 @@ export default function PartnerOnboardForm({
                 </p>
               )}
             </div>
-            <div className="px-5 py-4 border-t border-white/10 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="px-4 py-2 rounded-xl text-sm text-zinc-300 border border-white/10 hover:bg-white/5"
-              >
-                Cancel
-              </button>
+            <div className="px-5 py-4 border-t border-white/10 flex justify-end">
               <button
                 type="button"
                 onClick={() => {

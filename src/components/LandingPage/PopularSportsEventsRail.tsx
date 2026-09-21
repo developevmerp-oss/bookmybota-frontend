@@ -4,6 +4,7 @@ import { useMemo, useRef } from "react";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { SHOWCASE_SPORTS_EVENT_CARDS } from "@/data/showcaseEventCards";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import { EventPosterCard, ShowcaseEventPosterCard } from "./PosterCard";
 import { isSportsEvent } from "./homeUtils";
@@ -15,15 +16,20 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const { cityEvents, fallbackEvents, isLoadingEvents, hasCity } = useHomeCatalog(city);
 
+  const citySports = useMemo(
+    () => cityEvents.filter(isSportsEvent),
+    [cityEvents]
+  );
+
   const sportsEvents = useMemo(() => {
-    const fromCity = cityEvents.filter(isSportsEvent);
-    if (fromCity.length > 0 || !hasCity) return fromCity.slice(0, 12);
+    if (citySports.length > 0 || !hasCity) return citySports.slice(0, 12);
     return fallbackEvents.filter(isSportsEvent).slice(0, 12);
-  }, [cityEvents, fallbackEvents, hasCity]);
+  }, [citySports, fallbackEvents, hasCity]);
 
   const isLoading = isLoadingEvents;
   const isEmpty = !isLoading && sportsEvents.length === 0;
   const useStatic = isEmpty && !hasCity;
+  const cityHasNoSports = hasCity && !isLoading && citySports.length === 0;
   const cardCount = useStatic ? SHOWCASE_SPORTS_EVENT_CARDS.length : sportsEvents.length;
   const scrollEdges = useHorizontalScrollEdges(scrollerRef, [
     cardCount,
@@ -42,9 +48,14 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
     <section className="bg-white py-6 sm:py-8 lg:py-10">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="type-section font-semibold tracking-tight text-[#111111]">
-            Popular Sports Events
-          </h2>
+          <div className="min-w-0">
+            <h2 className="type-section font-semibold tracking-tight text-[#111111]">
+              Popular Sports Events
+            </h2>
+            {cityHasNoSports ? (
+              <CitySectionEmptyNotice message="No sports available in your city yet." />
+            ) : null}
+          </div>
           <RailSeeAllLink href="/events?category=sports" />
         </div>
 

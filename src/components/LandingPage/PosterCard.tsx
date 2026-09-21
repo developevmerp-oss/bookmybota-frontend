@@ -13,7 +13,6 @@ import {
   venueFromEventDetail,
 } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
-import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 
 const POSTER_MEDIA = "aspect-[3/4] w-full";
 const DINING_MEDIA = "aspect-[4/3] w-full";
@@ -298,10 +297,6 @@ export function DiningPosterCard({ place }: { place: Business }) {
           src={image}
           alt={place.name}
           fallback={<Utensils size={28} strokeWidth={1.5} />}
-        />
-        <DiningWishlistButton
-          businessId={place.id}
-          className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
         />
         {showRating && (
           <span className="absolute bottom-2.5 left-2.5 z-[2] inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 shadow-md">

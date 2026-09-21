@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, Mail, X } from "lucide-react";
 import { FaApple, FaGoogle } from "react-icons/fa";
 import { useForm } from "react-hook-form";
@@ -199,7 +200,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
 
   if (!open) return null;
 
-  return (
+  const modal = (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
       data-scroll-lock-container
@@ -451,4 +452,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modal, document.body);
 }

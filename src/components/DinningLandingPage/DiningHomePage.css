@@ -33,6 +33,10 @@
   --dining-promo-slide-w: 100%;
 }
 
+.dining-promo-swiper.is-multi .dining-promo-peek.swiper {
+  overflow: visible;
+}
+
 .dining-promo-single-wrap {
   width: min(1180px, 92%);
   margin-left: auto;
@@ -155,7 +159,7 @@
   }
 }
 
-/* Compact (≤2): circular nav like landing page */
+/* Circular glass nav — same as landing PromoBannerCarousel */
 .dining-promo-nav {
   position: absolute;
   top: 50%;
@@ -163,9 +167,17 @@
   display: none;
   align-items: center;
   justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0;
   cursor: pointer;
-  color: #111111;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  background: rgba(20, 20, 20, 0.45);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transform: translateY(-50%);
   transition:
     background-color 0.2s ease,
     opacity 0.2s ease;
@@ -174,6 +186,8 @@
 @media (min-width: 640px) {
   .dining-promo-nav {
     display: flex;
+    width: 2.5rem;
+    height: 2.5rem;
   }
 }
 
@@ -182,82 +196,26 @@
   pointer-events: none;
 }
 
-.dining-promo-nav:not(.is-peek-nav) {
-  width: 2.25rem;
-  height: 2.25rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-  transform: translateY(-50%);
+.dining-promo-nav:hover {
+  background: rgba(20, 20, 20, 0.65);
 }
 
-@media (min-width: 640px) {
-  .dining-promo-nav:not(.is-peek-nav) {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
-}
-
-.dining-promo-nav:not(.is-peek-nav):hover {
-  background: #ffffff;
-}
-
-.dining-promo-nav-prev:not(.is-peek-nav) {
+.dining-promo-nav-prev {
   left: 0.75rem;
 }
 
-.dining-promo-nav-next:not(.is-peek-nav) {
+.dining-promo-nav-next {
   right: 0.75rem;
 }
 
-/*
- * Peek mode (>2): BookMyShow-style tall bars flush to the outer ends
- * of the slider (left: 0 / right: 0), sitting on the side peeks.
- */
-.dining-promo-nav.is-peek-nav {
-  width: 1.75rem;
-  height: 3.5rem;
-  border: 0;
-  border-radius: 0.25rem;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: none;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
-  transform: translateY(-50%);
-}
-
-@media (min-width: 640px) {
-  .dining-promo-nav.is-peek-nav {
-    width: 2rem;
-    height: 4rem;
-  }
-}
-
-@media (min-width: 768px) {
-  .dining-promo-nav.is-peek-nav {
-    width: 2.25rem;
-    height: 4.5rem;
-  }
-}
-
 @media (min-width: 1024px) {
-  .dining-promo-nav.is-peek-nav {
-    width: 2.5rem;
-    height: 5rem;
+  .dining-promo-nav-prev {
+    left: 1.25rem;
   }
-}
 
-.dining-promo-nav.is-peek-nav:hover {
-  background: #ffffff;
-}
-
-.dining-promo-nav-prev.is-peek-nav {
-  left: 0;
-}
-
-.dining-promo-nav-next.is-peek-nav {
-  right: 0;
+  .dining-promo-nav-next {
+    right: 1.25rem;
+  }
 }
 
 .dining-promo-dots {

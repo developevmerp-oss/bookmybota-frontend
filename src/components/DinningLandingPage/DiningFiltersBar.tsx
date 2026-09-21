@@ -516,13 +516,41 @@ export default function DiningFiltersBar({
     return n;
   }, [filters, effectiveCategoriesSelected]);
 
-  const sortLabel =
-    SORT_OPTIONS.find((o) => o.value === filters.sort)?.label.split(":")[0] || "Sort By";
-
   const activeChips: { label: string; onClear: () => void }[] = [];
   if (filters.sort !== "relevance") {
     const lbl = SORT_OPTIONS.find((o) => o.value === filters.sort)?.label || filters.sort;
     activeChips.push({ label: lbl, onClear: () => onChange({ ...filters, sort: "relevance" }) });
+  }
+  if (filters.minRating > 0) {
+    activeChips.push({
+      label: `Rating ${filters.minRating}+`,
+      onClear: () => onChange({ ...filters, minRating: 0 }),
+    });
+  }
+  if (filters.pureVeg) {
+    activeChips.push({ label: "Pure Veg", onClear: () => onChange({ ...filters, pureVeg: false }) });
+  }
+  if (filters.servesAlcohol) {
+    activeChips.push({
+      label: "Serves Alcohol",
+      onClear: () => onChange({ ...filters, servesAlcohol: false }),
+    });
+  }
+  if (filters.offersOnly || filters.offerBucket) {
+    const offerLabel =
+      filters.offerBucket === "percent_upto_20"
+        ? "Up to 20% Off"
+        : filters.offerBucket === "percent_upto_50"
+          ? "Up to 50% Off"
+          : filters.offerBucket === "percent_high"
+            ? "Over 50% Off"
+            : filters.offerBucket === "flat"
+              ? "Flat ETB Offers"
+              : "Offers";
+    activeChips.push({
+      label: offerLabel,
+      onClear: () => onChange({ ...filters, offersOnly: false, offerBucket: null }),
+    });
   }
   for (const selectedCategory of effectiveCategoriesSelected) {
     activeChips.push({
@@ -543,37 +571,17 @@ export default function DiningFiltersBar({
         }),
     });
   }
-  if (filters.minRating > 0) {
-    activeChips.push({ label: `Rating ${filters.minRating}+`, onClear: () => onChange({ ...filters, minRating: 0 }) });
-  }
   if (filters.maxCost > 0) {
-    const costLabel = COST_OPTIONS.find((o) => o.value === filters.maxCost)?.label || `Under ${filters.maxCost} ETB`;
+    const costLabel =
+      COST_OPTIONS.find((o) => o.value === filters.maxCost)?.label || `Under ${filters.maxCost} ETB`;
     activeChips.push({ label: costLabel, onClear: () => onChange({ ...filters, maxCost: 0 }) });
-  }
-  if (filters.pureVeg) {
-    activeChips.push({ label: "Pure Veg", onClear: () => onChange({ ...filters, pureVeg: false }) });
-  }
-  if (filters.servesAlcohol) {
-    activeChips.push({ label: "Serves Alcohol", onClear: () => onChange({ ...filters, servesAlcohol: false }) });
-  }
-  if (filters.offersOnly || filters.offerBucket) {
-    const offerLabel =
-      filters.offerBucket === "percent_upto_20"
-        ? "Up to 20% Off"
-        : filters.offerBucket === "percent_upto_50"
-          ? "Up to 50% Off"
-          : filters.offerBucket === "percent_high"
-            ? "Over 50% Off"
-            : filters.offerBucket === "flat"
-              ? "Flat ETB Offers"
-              : "Offers";
-    activeChips.push({
-      label: offerLabel,
-      onClear: () => onChange({ ...filters, offersOnly: false, offerBucket: null }),
-    });
   }
 
   const rowChips = [...extraChips, ...activeChips];
+  const showClearAll = activeCount > 0 || rowChips.length > 0;
+  const sortActive = filters.sort !== "relevance";
+  const rating4Active = filters.minRating === 4;
+  const offersActive = filters.offersOnly || Boolean(filters.offerBucket);
 
   const tabs: { id: FilterTab; label: string }[] = [
     { id: "sort", label: "Sort" },
@@ -625,93 +633,6 @@ export default function DiningFiltersBar({
           <SlidersHorizontal size={14} className="text-slate-500" />
         </button>
 
-        <div className="relative shrink-0" ref={sortRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setShowFilter(false);
-              setShowSearchPopup(false);
-              setShowSort((v) => !v);
-            }}
-            className={chipClass(filters.sort !== "relevance")}
-          >
-            {filters.sort === "relevance" ? "Sort By" : sortLabel}
-            <ChevronDown size={14} className="text-slate-500" />
-          </button>
-
-          {showSort &&
-            typeof document !== "undefined" &&
-            createPortal(
-              <div
-                ref={sortMenuRef}
-                className="w-[min(92vw,320px)] max-h-[min(70vh,380px)] bg-white rounded-2xl border border-slate-200 shadow-xl p-4 flex flex-col"
-                style={{ position: "fixed", top: sortPos.top, left: sortPos.left, zIndex: 200 }}
-              >
-                <div className="divide-y divide-slate-100 overflow-y-auto min-h-0 flex-1 pr-1">
-                  {SORT_OPTIONS.map((opt) => (
-                    <RadioRow
-                      key={opt.value}
-                      label={opt.label}
-                      selected={draftSort === opt.value}
-                      onSelect={() => setDraftSort(opt.value)}
-                    />
-                  ))}
-                </div>
-                <div className="border-t border-slate-100 pt-3 mt-1 flex items-center justify-center shrink-0">
-                  <button
-                    type="button"
-                    onClick={applySort}
-                    className="text-sm sm:text-base lg:text-smfont-bold"
-                    style={{ color: ACCENT }}
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>,
-              document.body
-            )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            onChange({ ...filters, minRating: filters.minRating === 4 ? 0 : 4 })
-          }
-          className={chipClass(filters.minRating === 4)}
-        >
-          Rating 4+
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onChange({ ...filters, pureVeg: !filters.pureVeg })}
-          className={chipClass(filters.pureVeg)}
-        >
-          Pure Veg
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onChange({ ...filters, servesAlcohol: !filters.servesAlcohol })}
-          className={chipClass(filters.servesAlcohol)}
-        >
-          Serves Alcohol
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            onChange({
-              ...filters,
-              offersOnly: !filters.offersOnly && !filters.offerBucket,
-              offerBucket: null,
-            })
-          }
-          className={chipClass(filters.offersOnly || Boolean(filters.offerBucket))}
-        >
-          Offers
-        </button>
-
         {rowChips.map((chip) => (
           <span
             key={chip.label}
@@ -729,7 +650,7 @@ export default function DiningFiltersBar({
           </span>
         ))}
 
-        {rowChips.length > 0 ? (
+        {showClearAll ? (
           <button
             type="button"
             onClick={() => {
@@ -742,6 +663,101 @@ export default function DiningFiltersBar({
             style={{ color: ACCENT }}
           >
             Clear All
+          </button>
+        ) : null}
+
+        {!sortActive ? (
+          <div className="relative shrink-0" ref={sortRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowFilter(false);
+                setShowSearchPopup(false);
+                setShowSort((v) => !v);
+              }}
+              className={chipClass(false)}
+            >
+              Sort By
+              <ChevronDown size={14} className="text-slate-500" />
+            </button>
+
+            {showSort &&
+              typeof document !== "undefined" &&
+              createPortal(
+                <div
+                  ref={sortMenuRef}
+                  className="w-[min(92vw,320px)] max-h-[min(70vh,380px)] bg-white rounded-2xl border border-slate-200 shadow-xl p-4 flex flex-col"
+                  style={{ position: "fixed", top: sortPos.top, left: sortPos.left, zIndex: 200 }}
+                >
+                  <div className="divide-y divide-slate-100 overflow-y-auto min-h-0 flex-1 pr-1">
+                    {SORT_OPTIONS.map((opt) => (
+                      <RadioRow
+                        key={opt.value}
+                        label={opt.label}
+                        selected={draftSort === opt.value}
+                        onSelect={() => setDraftSort(opt.value)}
+                      />
+                    ))}
+                  </div>
+                  <div className="border-t border-slate-100 pt-3 mt-1 flex items-center justify-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={applySort}
+                      className="text-sm sm:text-base lg:text-sm font-bold"
+                      style={{ color: ACCENT }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>,
+                document.body
+              )}
+          </div>
+        ) : null}
+
+        {!rating4Active ? (
+          <button
+            type="button"
+            onClick={() => onChange({ ...filters, minRating: 4 })}
+            className={chipClass(false)}
+          >
+            Rating 4+
+          </button>
+        ) : null}
+
+        {!filters.pureVeg ? (
+          <button
+            type="button"
+            onClick={() => onChange({ ...filters, pureVeg: true })}
+            className={chipClass(false)}
+          >
+            Pure Veg
+          </button>
+        ) : null}
+
+        {!filters.servesAlcohol ? (
+          <button
+            type="button"
+            onClick={() => onChange({ ...filters, servesAlcohol: true })}
+            className={chipClass(false)}
+          >
+            Serves Alcohol
+          </button>
+        ) : null}
+
+        {!offersActive ? (
+          <button
+            type="button"
+            onClick={() =>
+              onChange({
+                ...filters,
+                offersOnly: true,
+                offerBucket: null,
+              })
+            }
+            className={chipClass(false)}
+          >
+            Offers
           </button>
         ) : null}
         </div>

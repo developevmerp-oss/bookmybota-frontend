@@ -16,6 +16,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
 import { resolveMediaUrl } from '@/lib/mediaUrl';
 import SafeCoverImage, { DiningImageFallback } from '@/components/Shared/SafeCoverImage';
+import DiningWishlistButton from '@/components/DinningLandingPage/DiningWishlistButton';
 import {
   bookingWidgetOfferLabel,
   businessHasCustomerVisibleOffer,
@@ -2073,17 +2074,23 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       href={`/restaurant/${restaurant.id}`}
                       className="group block bg-white hover:shadow-lg rounded-2xl p-3 border border-slate-100 hover:border-slate-200 transition-all duration-300 w-[280px] shrink-0 snap-start"
                     >
-                      <div className="relative h-44 rounded-xl overflow-hidden bg-[#F3F4F6] mb-3">
-                        <SafeCoverImage
-                          src={coverImg}
-                          alt={restaurant.name}
-                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                          fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
-                          fallback={<DiningImageFallback size={28} />}
+                      <div className="relative mb-3">
+                        <div className="relative h-44 rounded-xl overflow-hidden bg-[#F3F4F6]">
+                          <SafeCoverImage
+                            src={coverImg}
+                            alt={restaurant.name}
+                            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                            fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                            fallback={<DiningImageFallback size={28} />}
+                          />
+                          {coverImg ? (
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                          ) : null}
+                        </div>
+                        <DiningWishlistButton
+                          businessId={restaurant.id}
+                          className="absolute top-3 right-3 z-[3] w-9 h-9 rounded-full bg-white border border-[#6900AA]/30 shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
                         />
-                        {coverImg ? (
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
-                        ) : null}
                       </div>
 
                       <div className="px-1 pb-1">

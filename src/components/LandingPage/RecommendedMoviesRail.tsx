@@ -14,6 +14,7 @@ import {
   parseLanguageList,
 } from "@/lib/movieDisplay";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { hasCityFilter } from "./homeUtils";
 import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import "./RecommendedMoviesRail.css";
@@ -145,6 +146,7 @@ export default function RecommendedMoviesRail() {
     cityLoading || (hasCity && cityMovies.length === 0 && allLoading);
   const isEmpty = !isLoading && apiMovies.length === 0;
   const useStatic = isEmpty && !hasCity;
+  const cityHasNoMovies = hasCity && !isLoading && cityMovies.length === 0;
   const items = useStatic ? SHOWCASE_MOVIE_CARDS.map(mapShowcaseMovie) : apiMovies;
   const scrollEdges = useHorizontalScrollEdges(scrollerRef, [
     items.length,
@@ -170,9 +172,14 @@ export default function RecommendedMoviesRail() {
     <section className="bg-white py-6 sm:py-8 lg:py-10">
       <div className="container mx-auto px-4 md:px-5 lg:px-8">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="type-section font-semibold tracking-tight text-[#111111]">
-            Must-Watch Movies
-          </h2>
+          <div className="min-w-0">
+            <h2 className="type-section font-semibold tracking-tight text-[#111111]">
+              Must-Watch Movies
+            </h2>
+            {cityHasNoMovies ? (
+              <CitySectionEmptyNotice message="No movies available in your city yet." />
+            ) : null}
+          </div>
           <RailSeeAllLink href={seeAllHref} />
         </div>
 

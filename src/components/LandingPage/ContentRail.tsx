@@ -3,12 +3,15 @@
 import { useRef, Children, type CSSProperties, type ReactNode } from "react";
 import "./AdaptiveCardRow.css";
 import AdaptiveCardRow from "./AdaptiveCardRow";
+import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 
 type ContentRailProps = {
   title: string;
   subtitle?: string;
+  /** Shown under the title when the selected city has no data for this rail. */
+  cityNotice?: string;
   eyebrow?: string;
   seeAllHref?: string;
   seeAllLabel?: string;
@@ -28,6 +31,7 @@ type ContentRailProps = {
 export default function ContentRail({
   title,
   subtitle,
+  cityNotice,
   eyebrow,
   seeAllHref,
   seeAllLabel = "See All",
@@ -86,11 +90,12 @@ export default function ContentRail({
             >
               {title}
             </h2>
-            {subtitle && (
+            {cityNotice ? <CitySectionEmptyNotice message={cityNotice} /> : null}
+            {!cityNotice && subtitle ? (
               <p className={`type-body mt-1 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>
                 {subtitle}
               </p>
-            )}
+            ) : null}
           </div>
 
           {seeAllHref ? <RailSeeAllLink href={seeAllHref} label={seeAllLabel} /> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, FileText, Trash2, Upload } from "lucide-react";
+import { Eye, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetPartnerDocumentMastersQuery,
@@ -132,7 +132,6 @@ export default function PartnerDocumentsFields({
 
                 {uploadedUrl ? (
                   <div className={fileRowClass}>
-                    <FileText size={16} className="text-rose-500 shrink-0" />
                     <a
                       href={resolveMediaUrl(uploadedUrl)}
                       target="_blank"
@@ -147,10 +146,11 @@ export default function PartnerDocumentsFields({
                       <button
                         type="button"
                         onClick={() => removeDoc(doc.id)}
-                        className="text-zinc-400 hover:text-rose-500"
+                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50"
+                        title="Delete document"
                         aria-label={`Remove ${doc.name}`}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                       </button>
                     )}
                   </div>

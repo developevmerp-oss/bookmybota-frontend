@@ -38,6 +38,10 @@ type Props = {
   freeDates: string[];
   /** Dates already booked */
   bookedDates?: string[];
+  /** Dates that have pending inquiries (amber indicator) */
+  pendingDates?: string[];
+  /** Optional short label under the day number (e.g. booked contact name) */
+  dateLabels?: Record<string, string>;
   selectedDate?: string | null;
   onSelectDate?: (date: string) => void;
   /** When true, clicking a free/open day toggles selection for artist editing */
@@ -52,6 +56,8 @@ type Props = {
 export default function ArtistMonthCalendar({
   freeDates,
   bookedDates = [],
+  pendingDates = [],
+  dateLabels = {},
   selectedDate = null,
   onSelectDate,
   mode = "pick",
@@ -70,6 +76,8 @@ export default function ArtistMonthCalendar({
 
   const freeSet = useMemo(() => new Set(freeDates), [freeDates]);
   const bookedSet = useMemo(() => new Set(bookedDates), [bookedDates]);
+  const pendingSet = useMemo(() => new Set(pendingDates), [pendingDates]);
+  const hasLabels = Object.keys(dateLabels).length > 0;
 
   const cells = useMemo(() => {
     const first = new Date(cursor.year, cursor.month, 1);
@@ -455,29 +463,35 @@ export default function ArtistMonthCalendar({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className={`grid grid-cols-7 gap-1 ${hasLabels ? "gap-y-1.5" : ""}`}>
         {cells.map((cell, i) => {
-          if (!cell) return <div key={`empty-${i}`} className="aspect-square" />;
+          if (!cell) return <div key={`empty-${i}`} className={hasLabels ? "min-h-[3.25rem]" : "aspect-square"} />;
           const isPast = cell.date < today;
           const isFree = freeSet.has(cell.date);
           const isBooked = bookedSet.has(cell.date);
+          const isPending = pendingSet.has(cell.date);
           const isSelected = selectedDate === cell.date;
+          const label = dateLabels[cell.date]?.trim() || "";
           const clickable =
             Boolean(onSelectDate) &&
             !isPast &&
-            (mode === "toggle" || (mode === "pick" && isFree && !isBooked) || mode === "view");
+            (mode === "toggle" ||
+              (mode === "pick" && isFree && !isBooked) ||
+              mode === "view");
 
-          let cls =
-            "aspect-square rounded-xl text-sm font-semibold flex items-center justify-center border transition-colors ";
+          let cls = `${
+            hasLabels ? "min-h-[3.25rem] py-1 px-0.5" : "aspect-square"
+          } rounded-xl text-sm font-semibold flex flex-col items-center justify-center border transition-colors `;
           if (isPast) cls += "border-transparent text-slate-300 bg-slate-50 cursor-default";
-          else if (isBooked) cls += "border-rose-200 bg-rose-50 text-rose-700 cursor-default";
           else if (isSelected)
-            cls += "border-[#6900AA] bg-[#6900AA] text-white shadow-sm ring-2 ring-[#C084FC] ring-offset-1";
+            cls += "border-[#6900AA] bg-[#6900AA] text-white shadow-sm ring-2 ring-[#C084FC] ring-offset-1 cursor-pointer";
+          else if (isBooked) cls += "border-rose-200 bg-rose-50 text-rose-700 cursor-pointer";
+          else if (isPending) cls += "border-amber-300 bg-amber-50 text-amber-800 cursor-pointer";
           else if (isFree)
-            cls += "border-[#C084FC] bg-[#E9D5FF] text-[#57008E] hover:bg-[#DDD6FE]";
+            cls += "border-[#C084FC] bg-[#E9D5FF] text-[#57008E] hover:bg-[#DDD6FE] cursor-pointer";
           else if (mode === "toggle")
             cls += "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50";
-          else cls += "border-transparent text-slate-400 bg-slate-50 cursor-default";
+          else cls += "border-transparent text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100";
 
           return (
             <button
@@ -487,18 +501,33 @@ export default function ArtistMonthCalendar({
               onClick={() => onSelectDate?.(cell.date)}
               className={cls}
               title={
-                isBooked
-                  ? "Booked"
-                  : isSelected
-                    ? "Selected"
-                    : isFree
-                      ? "Available"
-                      : mode === "toggle"
-                        ? "Click to mark free"
-                        : undefined
+                label
+                  ? label
+                  : isBooked
+                    ? "Booked"
+                    : isPending
+                      ? "Pending inquiries"
+                      : isSelected
+                        ? "Selected"
+                        : isFree
+                          ? "Available"
+                          : mode === "toggle"
+                            ? "Click to mark free"
+                            : "View day"
               }
             >
-              {cell.day}
+              <span className="leading-none">{cell.day}</span>
+              {label ? (
+                <span
+                  className={`mt-0.5 max-w-full truncate px-0.5 text-[9px] font-semibold leading-tight ${
+                    isSelected ? "text-white/90" : isBooked ? "text-rose-600" : "text-amber-700"
+                  }`}
+                >
+                  {label}
+                </span>
+              ) : isPending ? (
+                <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+              ) : null}
             </button>
           );
         })}
@@ -507,6 +536,9 @@ export default function ArtistMonthCalendar({
       <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-medium text-slate-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded bg-[#E9D5FF] border border-[#C084FC]" /> Free
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-amber-50 border border-amber-300" /> Pending
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded bg-[#6900AA] border border-[#6900AA]" /> Selected

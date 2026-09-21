@@ -1,11 +1,11 @@
 "use client";
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } from "react";
-import { Stage, Layer, Rect, Circle, Text, Group, Transformer, Image as KonvaImage } from "react-konva";
+import { Stage, Layer, Rect, Circle, Ellipse, Line, Text, Group, Transformer, Image as KonvaImage } from "react-konva";
 import useImage from "use-image";
 import { toast } from "sonner";
 import { 
   Save, PlusSquare, MousePointer2, Trash2, Eraser, Undo2, Redo2, RotateCcw,
-  Hand, ZoomIn, ZoomOut, Maximize2, Minimize2, SlidersHorizontal, X
+  Hand, ZoomIn, ZoomOut, Maximize2, Minimize2, SlidersHorizontal, X, Shapes, Sticker
 } from "lucide-react";
 import { useGetOrganizerEventQuery, useUpdateEventLayoutMutation, useGetEventLayoutQuery } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
@@ -34,9 +34,20 @@ type Label = {
   rotation?: number;
 };
 
+type ShapeType =
+  | "rect"
+  | "roundRect"
+  | "circle"
+  | "ellipse"
+  | "diamond"
+  | "triangle"
+  | "stage"
+  | "screen"
+  | "zone";
+
 type Shape = {
   id: string;
-  type: 'rect';
+  type: ShapeType;
   x: number;
   y: number;
   width: number;
@@ -46,7 +57,135 @@ type Shape = {
   ticket_type_id?: string; // For General Admission / Section zones
   rotation?: number;
   opacity?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  cornerRadius?: number;
 };
+
+type ElementPreset = {
+  id: string;
+  label: string;
+  type: ShapeType;
+  width: number;
+  height: number;
+  fill: string;
+  text: string;
+  stroke?: string;
+  strokeWidth?: number;
+  cornerRadius?: number;
+  opacity?: number;
+};
+
+const ELEMENT_PRESETS: ElementPreset[] = [
+  { id: "stage", label: "Stage", type: "stage", width: 320, height: 110, fill: "#334155", text: "STAGE" },
+  { id: "screen", label: "Screen", type: "screen", width: 420, height: 48, fill: "#0f172a", text: "SCREEN", stroke: "#94a3b8", strokeWidth: 2 },
+  { id: "rect", label: "Rectangle", type: "rect", width: 200, height: 120, fill: "#94a3b8", text: "" },
+  { id: "round", label: "Rounded", type: "roundRect", width: 200, height: 120, fill: "#64748b", text: "", cornerRadius: 18 },
+  { id: "circle", label: "Circle", type: "circle", width: 150, height: 150, fill: "#3b82f6", text: "" },
+  { id: "ellipse", label: "Ellipse", type: "ellipse", width: 240, height: 130, fill: "#06b6d4", text: "" },
+  { id: "diamond", label: "Diamond", type: "diamond", width: 150, height: 150, fill: "#8b5cf6", text: "VIP" },
+  { id: "triangle", label: "Triangle", type: "triangle", width: 170, height: 150, fill: "#f59e0b", text: "" },
+  { id: "zone", label: "GA Zone", type: "zone", width: 280, height: 180, fill: "#16a34a", text: "GENERAL ADMISSION", opacity: 0.85, cornerRadius: 12 },
+  { id: "vipbox", label: "VIP Box", type: "roundRect", width: 170, height: 110, fill: "#475569", text: "VIP BOX", cornerRadius: 10, stroke: "#e2e8f0", strokeWidth: 2 },
+  { id: "greenroom", label: "Green Room", type: "roundRect", width: 220, height: 140, fill: "#15803d", text: "GREEN ROOM", cornerRadius: 12, stroke: "#86efac", strokeWidth: 2 },
+  { id: "toilet", label: "Toilet", type: "roundRect", width: 140, height: 120, fill: "#0ea5e9", text: "TOILET", cornerRadius: 10, stroke: "#bae6fd", strokeWidth: 2 },
+  { id: "entry", label: "Entry", type: "roundRect", width: 160, height: 70, fill: "#059669", text: "ENTRY →", cornerRadius: 8, stroke: "#a7f3d0", strokeWidth: 2 },
+  { id: "exit", label: "Exit", type: "roundRect", width: 160, height: 70, fill: "#dc2626", text: "← EXIT", cornerRadius: 8, stroke: "#fecaca", strokeWidth: 2 },
+];
+
+type IconPreset = {
+  id: string;
+  label: string;
+  emoji: string;
+  category: string;
+};
+
+/** Common venue / event-layout wayfinding icons (emoji so they render on Konva + viewer). */
+const ICON_PRESETS: IconPreset[] = [
+  // Access & doors
+  { id: "entry", label: "Entry", emoji: "➡️", category: "Access" },
+  { id: "exit", label: "Exit", emoji: "⬅️", category: "Access" },
+  { id: "emergency_exit", label: "Emergency", emoji: "🆘", category: "Access" },
+  { id: "gate", label: "Gate", emoji: "🚧", category: "Access" },
+  { id: "door", label: "Door", emoji: "🚪", category: "Access" },
+  { id: "ticket", label: "Tickets", emoji: "🎫", category: "Access" },
+  { id: "security", label: "Security", emoji: "🛡️", category: "Access" },
+  { id: "queue", label: "Queue", emoji: "🧍", category: "Access" },
+  // Facilities
+  { id: "toilet", label: "Toilet", emoji: "🚻", category: "Facilities" },
+  { id: "wc_men", label: "Men", emoji: "🚹", category: "Facilities" },
+  { id: "wc_women", label: "Women", emoji: "🚺", category: "Facilities" },
+  { id: "accessible", label: "Accessible", emoji: "♿", category: "Facilities" },
+  { id: "baby", label: "Baby Care", emoji: "👶", category: "Facilities" },
+  { id: "family", label: "Family", emoji: "👨‍👩‍👧", category: "Facilities" },
+  { id: "first_aid", label: "First Aid", emoji: "🩹", category: "Facilities" },
+  { id: "medical", label: "Medical", emoji: "🏥", category: "Facilities" },
+  { id: "water", label: "Water", emoji: "🚰", category: "Facilities" },
+  { id: "atm", label: "ATM", emoji: "🏧", category: "Facilities" },
+  { id: "info", label: "Info", emoji: "ℹ️", category: "Facilities" },
+  { id: "lost_found", label: "Lost & Found", emoji: "🧳", category: "Facilities" },
+  { id: "cloakroom", label: "Cloakroom", emoji: "🧥", category: "Facilities" },
+  { id: "prayer", label: "Prayer", emoji: "🕌", category: "Facilities" },
+  { id: "smoking", label: "Smoking", emoji: "🚬", category: "Facilities" },
+  { id: "no_smoking", label: "No Smoking", emoji: "🚭", category: "Facilities" },
+  // Food & retail
+  { id: "food", label: "Food", emoji: "🍽️", category: "Food" },
+  { id: "cafe", label: "Cafe", emoji: "☕", category: "Food" },
+  { id: "bar", label: "Bar", emoji: "🍸", category: "Food" },
+  { id: "snacks", label: "Snacks", emoji: "🍿", category: "Food" },
+  { id: "shop", label: "Shop", emoji: "🛍️", category: "Food" },
+  { id: "merchandise", label: "Merch", emoji: "👕", category: "Food" },
+  // Backstage / rooms
+  { id: "green_room", label: "Green Room", emoji: "🎙️", category: "Rooms" },
+  { id: "dressing", label: "Dressing", emoji: "🪞", category: "Rooms" },
+  { id: "office", label: "Office", emoji: "🏢", category: "Rooms" },
+  { id: "storage", label: "Storage", emoji: "📦", category: "Rooms" },
+  { id: "control", label: "Control", emoji: "🎛️", category: "Rooms" },
+  { id: "vip_lounge", label: "VIP Lounge", emoji: "⭐", category: "Rooms" },
+  { id: "meeting", label: "Meeting", emoji: "🤝", category: "Rooms" },
+  // Transport & vertical
+  { id: "parking", label: "Parking", emoji: "🅿️", category: "Transport" },
+  { id: "taxi", label: "Taxi", emoji: "🚕", category: "Transport" },
+  { id: "bus", label: "Bus", emoji: "🚌", category: "Transport" },
+  { id: "elevator", label: "Elevator", emoji: "🛗", category: "Transport" },
+  { id: "stairs", label: "Stairs", emoji: "🪜", category: "Transport" },
+  { id: "escalator", label: "Escalator", emoji: "↗️", category: "Transport" },
+  // Media & tech
+  { id: "wifi", label: "Wi‑Fi", emoji: "📶", category: "Tech" },
+  { id: "camera", label: "Camera", emoji: "📷", category: "Tech" },
+  { id: "no_photo", label: "No Photo", emoji: "📵", category: "Tech" },
+  { id: "speaker", label: "Speaker", emoji: "🔊", category: "Tech" },
+  { id: "mic", label: "Mic", emoji: "🎤", category: "Tech" },
+  { id: "power", label: "Power", emoji: "🔌", category: "Tech" },
+  // Stage / show
+  { id: "stage_icon", label: "Stage", emoji: "🎭", category: "Show" },
+  { id: "screen_icon", label: "Screen", emoji: "🖥️", category: "Show" },
+  { id: "music", label: "Music", emoji: "🎵", category: "Show" },
+  { id: "spotlight", label: "Spotlight", emoji: "💡", category: "Show" },
+  { id: "fireworks", label: "FX", emoji: "✨", category: "Show" },
+  // Safety
+  { id: "fire", label: "Fire Ext.", emoji: "🧯", category: "Safety" },
+  { id: "assembly", label: "Assembly", emoji: "🚩", category: "Safety" },
+  { id: "warning", label: "Warning", emoji: "⚠️", category: "Safety" },
+  { id: "no_entry", label: "No Entry", emoji: "⛔", category: "Safety" },
+];
+
+const ICON_CATEGORIES = Array.from(new Set(ICON_PRESETS.map((i) => i.category)));
+
+const SHAPE_FILL_PRESETS = [
+  "#334155", "#0f172a", "#94a3b8", "#64748b", "#3b82f6", "#06b6d4",
+  "#8b5cf6", "#f59e0b", "#16a34a", "#dc2626", "#ec4899", "#f97316",
+];
+
+function shapeTypeLabel(type: ShapeType): string {
+  switch (type) {
+    case "roundRect": return "Rounded rect";
+    case "stage": return "Stage";
+    case "screen": return "Screen";
+    case "zone": return "Zone";
+    default: return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+}
 
 type VenueAdapter = {
   sections?: Array<{ id: string; name: string; capacity?: number; price?: number }>;
@@ -147,7 +286,7 @@ export default function VenueLayoutBuilder({
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
   const [bgImage] = useImage(bgImageUrl || "");
-  const [mode, setMode] = useState<"select" | "pan" | "add_seat" | "add_label" | "add_shape" | "bulk_seats" | "eraser">("select");
+  const [mode, setMode] = useState<"select" | "pan" | "add_seat" | "add_label" | "add_shape" | "add_icon" | "bulk_seats" | "eraser">("select");
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
@@ -177,6 +316,9 @@ export default function VenueLayoutBuilder({
   const [isPanning, setIsPanning] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showProperties, setShowProperties] = useState(false);
+  const [selectedElementPresetId, setSelectedElementPresetId] = useState<string>(ELEMENT_PRESETS[0].id);
+  const [selectedIconPresetId, setSelectedIconPresetId] = useState<string>(ICON_PRESETS[0].id);
+  const [iconCategoryFilter, setIconCategoryFilter] = useState<string>("All");
   const didInitialFitRef = useRef(false);
 
   const venueHydratedRef = React.useRef(false);
@@ -827,17 +969,47 @@ export default function VenueLayoutBuilder({
       setLabels([...labels, newLabel]);
     } else if (clickedOnEmpty && mode === "add_shape") {
       const pos = getScaledPos();
+      const preset =
+        ELEMENT_PRESETS.find((p) => p.id === selectedElementPresetId) || ELEMENT_PRESETS[0];
       const newShape: Shape = {
         id: Math.random().toString(36).substr(2, 9),
-        type: 'rect',
+        type: preset.type,
+        x: pos.x - preset.width / 2,
+        y: pos.y - preset.height / 2,
+        width: preset.width,
+        height: preset.height,
+        fill: preset.fill,
+        text: preset.text,
+        stroke: preset.stroke,
+        strokeWidth: preset.strokeWidth,
+        cornerRadius: preset.cornerRadius,
+        opacity: preset.opacity ?? 1,
+      };
+      const nextShapes = [...shapes, newShape];
+      pushSnapshot(seats, labels, nextShapes);
+      setSelectedShapeId(newShape.id);
+      setSelectedLabelId(null);
+      setSelectedSeatId(null);
+      setShowProperties(true);
+      toast.success(`${preset.label} added — drag handles or edit in Properties`);
+    } else if (clickedOnEmpty && mode === "add_icon") {
+      const pos = getScaledPos();
+      const preset =
+        ICON_PRESETS.find((p) => p.id === selectedIconPresetId) || ICON_PRESETS[0];
+      const newLabel: Label = {
+        id: Math.random().toString(36).substr(2, 9),
+        text: `${preset.emoji}\n${preset.label}`,
         x: pos.x,
         y: pos.y,
-        width: 300,
-        height: 100,
-        fill: "#e2e8f0", // slate-200
-        text: "STAGE",
+        fontSize: 22,
       };
-      setShapes([...shapes, newShape]);
+      const nextLabels = [...labels, newLabel];
+      pushSnapshot(seats, nextLabels, shapes);
+      setSelectedLabelId(newLabel.id);
+      setSelectedShapeId(null);
+      setSelectedSeatId(null);
+      setShowProperties(true);
+      toast.success(`${preset.label} icon added — edit text/size in Properties`);
     } else if (clickedOnEmpty) {
       setSelectedSeatId(null);
       setSelectedSeatIds([]);
@@ -1194,7 +1366,8 @@ export default function VenueLayoutBuilder({
 
   const deleteSelectedShape = () => {
     if (!selectedShapeId) return;
-    setShapes(shapes.filter(s => s.id !== selectedShapeId));
+    const next = shapes.filter(s => s.id !== selectedShapeId);
+    pushSnapshot(seats, labels, next);
     setSelectedShapeId(null);
   };
 
@@ -2891,10 +3064,25 @@ export default function VenueLayoutBuilder({
           </button>
           <button 
             type="button"
-            onClick={() => setMode("add_shape")}
+            onClick={() => {
+              setMode("add_shape");
+              setShowProperties(true);
+            }}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_shape" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            title="Open Elements palette — pick a shape, then click the canvas"
           >
-            <PlusSquare size={16} /> Add Stage Element
+            <Shapes size={16} /> Elements
+          </button>
+          <button 
+            type="button"
+            onClick={() => {
+              setMode("add_icon");
+              setShowProperties(true);
+            }}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_icon" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+            title="Open Icons palette — pick an icon, then click the canvas"
+          >
+            <Sticker size={16} /> Icons
           </button>
           <button 
             type="button"
@@ -2978,6 +3166,164 @@ export default function VenueLayoutBuilder({
             </optgroup>
           </select>
         </div>
+
+        {mode === "add_shape" && (
+          <div className="rounded-xl border border-rose-200 bg-white p-2.5 shadow-sm">
+            <div className="flex items-center justify-between gap-2 mb-2 px-1">
+              <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Shapes size={14} className="text-rose-500" />
+                Elements — pick a shape, then click the canvas to place
+              </p>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                Selected: <strong className="text-rose-600">
+                  {ELEMENT_PRESETS.find((p) => p.id === selectedElementPresetId)?.label}
+                </strong>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ELEMENT_PRESETS.map((preset) => {
+                const active = selectedElementPresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setSelectedElementPresetId(preset.id)}
+                    className={`flex flex-col items-center gap-1.5 w-[72px] sm:w-[80px] px-1.5 py-2 rounded-lg border transition-all ${
+                      active
+                        ? "border-rose-400 bg-rose-50 ring-2 ring-rose-200 shadow-sm"
+                        : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white"
+                    }`}
+                    title={`Add ${preset.label}`}
+                  >
+                    <span
+                      className="flex h-9 w-9 items-center justify-center"
+                      aria-hidden
+                    >
+                      {preset.type === "circle" || preset.type === "ellipse" ? (
+                        <span
+                          className="block border border-white/40 shadow-sm"
+                          style={{
+                            width: preset.type === "circle" ? 28 : 34,
+                            height: preset.type === "circle" ? 28 : 20,
+                            borderRadius: "999px",
+                            backgroundColor: preset.fill,
+                            opacity: preset.opacity ?? 1,
+                          }}
+                        />
+                      ) : preset.type === "diamond" ? (
+                        <span
+                          className="block border border-white/30 shadow-sm"
+                          style={{
+                            width: 22,
+                            height: 22,
+                            backgroundColor: preset.fill,
+                            transform: "rotate(45deg)",
+                            borderRadius: 2,
+                          }}
+                        />
+                      ) : preset.type === "triangle" ? (
+                        <span
+                          className="block"
+                          style={{
+                            width: 0,
+                            height: 0,
+                            borderLeft: "14px solid transparent",
+                            borderRight: "14px solid transparent",
+                            borderBottom: `24px solid ${preset.fill}`,
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="block border border-white/30 shadow-sm"
+                          style={{
+                            width: 34,
+                            height: preset.type === "screen" ? 12 : 22,
+                            backgroundColor: preset.fill,
+                            borderRadius: preset.cornerRadius ? 6 : 3,
+                            opacity: preset.opacity ?? 1,
+                          }}
+                        />
+                      )}
+                    </span>
+                    <span className={`text-[10px] font-semibold leading-tight text-center ${active ? "text-rose-700" : "text-slate-600"}`}>
+                      {preset.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {mode === "add_icon" && (
+          <div className="rounded-xl border border-violet-200 bg-white p-2.5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
+              <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Sticker size={14} className="text-violet-500" />
+                Icons — pick an icon, then click the canvas to place
+              </p>
+              <div className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIconCategoryFilter("All")}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                    iconCategoryFilter === "All"
+                      ? "bg-violet-50 text-violet-700 border-violet-300"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-white"
+                  }`}
+                >
+                  All
+                </button>
+                {ICON_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setIconCategoryFilter(cat)}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                      iconCategoryFilter === cat
+                        ? "bg-violet-50 text-violet-700 border-violet-300"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-white"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pr-1">
+              {ICON_PRESETS.filter(
+                (p) => iconCategoryFilter === "All" || p.category === iconCategoryFilter
+              ).map((preset) => {
+                const active = selectedIconPresetId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setSelectedIconPresetId(preset.id)}
+                    className={`flex flex-col items-center gap-1 w-[68px] sm:w-[74px] px-1 py-1.5 rounded-lg border transition-all ${
+                      active
+                        ? "border-violet-400 bg-violet-50 ring-2 ring-violet-200 shadow-sm"
+                        : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white"
+                    }`}
+                    title={`Add ${preset.label}`}
+                  >
+                    <span className="text-2xl leading-none" aria-hidden>
+                      {preset.emoji}
+                    </span>
+                    <span
+                      className={`text-[10px] font-semibold leading-tight text-center ${
+                        active ? "text-violet-700" : "text-slate-600"
+                      }`}
+                    >
+                      {preset.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Live Capacity Indicator */}
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${
@@ -3175,7 +3521,100 @@ export default function VenueLayoutBuilder({
                 )}
                 {shapes.map(shape => {
                   const isSelected = shape.id === selectedShapeId;
-                  const isBox = shape.text?.includes("DIAMOND") || shape.text?.includes("BOX");
+                  const shapeType = (shape.type || "rect") as ShapeType;
+                  const opacity = shape.opacity ?? 1;
+                  const stroke =
+                    shape.stroke ||
+                    (isSelected
+                      ? "#f43f5e"
+                      : bgImage
+                        ? "rgba(255, 255, 255, 0.25)"
+                        : "rgba(255,255,255,0.3)");
+                  const strokeWidth = isSelected ? 3 : (shape.strokeWidth ?? 1.5);
+                  const fill = bgImage
+                    ? isSelected
+                      ? "rgba(244, 63, 94, 0.25)"
+                      : "rgba(255, 255, 255, 0.01)"
+                    : shape.fill;
+                  const common = {
+                    fill,
+                    stroke,
+                    strokeWidth,
+                    opacity,
+                    perfectDrawEnabled: false as const,
+                    shadowForStrokeEnabled: false as const,
+                  };
+
+                  const visual = (() => {
+                    switch (shapeType) {
+                      case "circle":
+                      case "ellipse":
+                        return (
+                          <Ellipse
+                            x={shape.width / 2}
+                            y={shape.height / 2}
+                            radiusX={shape.width / 2}
+                            radiusY={shape.height / 2}
+                            {...common}
+                          />
+                        );
+                      case "diamond":
+                        return (
+                          <Line
+                            points={[
+                              shape.width / 2, 0,
+                              shape.width, shape.height / 2,
+                              shape.width / 2, shape.height,
+                              0, shape.height / 2,
+                            ]}
+                            closed
+                            {...common}
+                          />
+                        );
+                      case "triangle":
+                        return (
+                          <Line
+                            points={[
+                              shape.width / 2, 0,
+                              shape.width, shape.height,
+                              0, shape.height,
+                            ]}
+                            closed
+                            {...common}
+                          />
+                        );
+                      case "roundRect":
+                      case "zone":
+                        return (
+                          <Rect
+                            x={0}
+                            y={0}
+                            width={shape.width}
+                            height={shape.height}
+                            cornerRadius={shape.cornerRadius ?? 16}
+                            {...common}
+                          />
+                        );
+                      case "stage":
+                      case "screen":
+                      case "rect":
+                      default:
+                        return (
+                          <Rect
+                            x={0}
+                            y={0}
+                            width={shape.width}
+                            height={shape.height}
+                            cornerRadius={
+                              shape.cornerRadius ??
+                              (shape.text?.includes("BOX") || shape.text?.includes("DIAMOND") ? 8 : 3)
+                            }
+                            {...common}
+                          />
+                        );
+                    }
+                  })();
+
                   return (
                     <Group
                       key={shape.id}
@@ -3192,7 +3631,8 @@ export default function VenueLayoutBuilder({
                       onDblTap={() => handleToggleZoomOnShape(shape)}
                       onClick={() => {
                         if (mode === "eraser") {
-                          setShapes(shapes.filter(s => s.id !== shape.id));
+                          const next = shapes.filter(s => s.id !== shape.id);
+                          pushSnapshot(seats, labels, next);
                           if (selectedShapeId === shape.id) setSelectedShapeId(null);
                           return;
                         }
@@ -3200,11 +3640,13 @@ export default function VenueLayoutBuilder({
                           setSelectedShapeId(shape.id);
                           setSelectedLabelId(null);
                           setSelectedSeatId(null);
+                          setShowProperties(true);
                         }
                       }}
                       onTap={() => {
                         if (mode === "eraser") {
-                          setShapes(shapes.filter(s => s.id !== shape.id));
+                          const next = shapes.filter(s => s.id !== shape.id);
+                          pushSnapshot(seats, labels, next);
                           if (selectedShapeId === shape.id) setSelectedShapeId(null);
                           return;
                         }
@@ -3212,56 +3654,38 @@ export default function VenueLayoutBuilder({
                           setSelectedShapeId(shape.id);
                           setSelectedLabelId(null);
                           setSelectedSeatId(null);
+                          setShowProperties(true);
                         }
                       }}
                     >
-                      {(() => {
-                        const isBlock = shape.text && (shape.text.startsWith("N") || shape.text.startsWith("W") || shape.text.startsWith("E") || shape.text.startsWith("S") || shape.text.startsWith("VIP") || shape.text.startsWith("AWAY"));
-                        const isCircle = shape.width === shape.height && shape.fill === "transparent";
-                        return (
-                          <Rect
-                            x={0}
-                            y={0}
-                            width={shape.width}
-                            height={shape.height}
-                            fill={bgImage ? (isSelected ? "rgba(244, 63, 94, 0.25)" : "rgba(255, 255, 255, 0.01)") : shape.fill}
-                            stroke={isSelected ? "#f43f5e" : (bgImage ? "rgba(255, 255, 255, 0.25)" : (isBlock || shape.fill === "transparent" ? "#ffffff" : "rgba(255,255,255,0.25)"))}
-                            strokeWidth={isSelected ? 3 : (shape.fill === "transparent" ? 2 : (isBlock ? 1.5 : 1))}
-                            cornerRadius={isBox ? 8 : (isCircle ? shape.width / 2 : (shape.width > 500 && shape.height > 500 ? 300 : 3))}
-                            perfectDrawEnabled={false}
-                            shadowForStrokeEnabled={false}
-                          />
-                        );
-                      })()}
-                      {shape.text && !bgImage && (() => {
-                        const isBlock = shape.text.startsWith("N") || shape.text.startsWith("W") || shape.text.startsWith("E") || shape.text.startsWith("S") || shape.text.startsWith("VIP") || shape.text.startsWith("AWAY");
-                        return (
-                          <Text
-                            text={shape.text}
-                            x={0}
-                            y={0}
-                            width={shape.width}
-                            height={shape.height}
-                            align="center"
-                            verticalAlign="middle"
-                            fontSize={
-                              shape.text.includes("STAND") ? 16
-                              : shape.text.includes("PITCH") ? 15
-                              : shape.text.includes("GATE") || shape.text.includes("TEAM") || shape.text.includes("PLAYER") || shape.text.includes("REFEREE") ? 11
-                              : isBlock ? 16
-                              : 13
-                            }
-                            fontStyle="bold"
-                            fill={
-                              shape.fill === "#f8fafc" || shape.fill === "#ffffff" || shape.fill === "#fbbf24" ? "#1e293b"
+                      {visual}
+                      {shape.text && !bgImage && (
+                        <Text
+                          text={shape.text}
+                          x={0}
+                          y={0}
+                          width={shape.width}
+                          height={shape.height}
+                          align="center"
+                          verticalAlign="middle"
+                          fontSize={
+                            shape.text.includes("STAND") ? 16
+                            : shape.text.includes("PITCH") ? 15
+                            : shape.text.includes("GATE") || shape.text.includes("TEAM") || shape.text.includes("PLAYER") || shape.text.includes("REFEREE") ? 11
+                            : shape.width < 120 ? 11
+                            : 13
+                          }
+                          fontStyle="bold"
+                          fill={
+                            shape.fill === "#f8fafc" || shape.fill === "#ffffff" || shape.fill === "#fbbf24" || shape.fill === "#94a3b8"
+                              ? "#1e293b"
                               : "#ffffff"
-                            }
-                            listening={false}
-                            wrap="word"
-                            perfectDrawEnabled={false}
-                          />
-                        );
-                      })()}
+                          }
+                          listening={false}
+                          wrap="word"
+                          perfectDrawEnabled={false}
+                        />
+                      )}
                     </Group>
                   );
                 })}
@@ -3396,6 +3820,8 @@ export default function VenueLayoutBuilder({
                       fontSize={label.fontSize}
                       fill={isSelected ? "#f43f5e" : "#334155"}
                       fontStyle="bold"
+                      align={label.text.includes("\n") ? "center" : "left"}
+                      lineHeight={1.15}
                       draggable={mode === "select"}
                       onDragEnd={(e) => handleDragEndLabel(e, label.id)}
                       onTransformEnd={(e) => handleTransformEndLabel(e, label.id)}
@@ -3836,98 +4262,204 @@ export default function VenueLayoutBuilder({
           ) : selectedShape ? (
             <div className="space-y-4">
               <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Shape type</label>
+                <select
+                  value={selectedShape.type || "rect"}
+                  onChange={(e) =>
+                    setShapes(
+                      shapes.map((s) =>
+                        s.id === selectedShape.id
+                          ? { ...s, type: e.target.value as ShapeType }
+                          : s
+                      )
+                    )
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                >
+                  {(["rect", "roundRect", "circle", "ellipse", "diamond", "triangle", "stage", "screen", "zone"] as ShapeType[]).map(
+                    (t) => (
+                      <option key={t} value={t}>
+                        {shapeTypeLabel(t)}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Element Label</label>
                 <input type="text" value={selectedShape.text || ""} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, text: e.target.value } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">Width</label>
-                  <input type="number" value={selectedShape.width} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, width: Number(e.target.value) } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                  <input type="number" min={20} value={selectedShape.width} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, width: Math.max(20, Number(e.target.value) || 20) } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">Height</label>
-                  <input type="number" value={selectedShape.height} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, height: Number(e.target.value) } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                  <input type="number" min={20} value={selectedShape.height} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, height: Math.max(20, Number(e.target.value) || 20) } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">X</label>
+                  <input type="number" value={Math.round(selectedShape.x)} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, x: Number(e.target.value) || 0 } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Y</label>
+                  <input type="number" value={Math.round(selectedShape.y)} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, y: Number(e.target.value) || 0 } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
                 </div>
               </div>
 
-              {/* Rotation for Stage / Shape Element */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-semibold text-slate-600">Rotation</label>
                   <span className="text-xs font-mono font-bold text-slate-500">{selectedShape.rotation || 0}°</span>
                 </div>
-                <input 
-                  type="range" 
-                  min={-180} 
-                  max={180} 
-                  step={5} 
-                  value={selectedShape.rotation || 0} 
+                <input
+                  type="range"
+                  min={-180}
+                  max={180}
+                  step={5}
+                  value={selectedShape.rotation || 0}
                   onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: Number(e.target.value) } : s))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-rose-500" 
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-rose-500"
                 />
                 <div className="grid grid-cols-5 gap-1 mt-2">
-                  <button 
-                    onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: ((s.rotation || 0) - 90 + 360) % 360 } : s))}
-                    className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    title="Rotate Left 90°"
-                  >
-                    ↺ 90°
-                  </button>
-                  <button 
-                    onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: (s.rotation || 0) - 15 } : s))}
-                    className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    title="Rotate Left 15°"
-                  >
-                    ↺ 15°
-                  </button>
-                  <button 
-                    onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: 0 } : s))}
-                    className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    title="Reset 0°"
-                  >
-                    0°
-                  </button>
-                  <button 
-                    onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: (s.rotation || 0) + 15 } : s))}
-                    className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    title="Rotate Right 15°"
-                  >
-                    ↻ 15°
-                  </button>
-                  <button 
-                    onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: ((s.rotation || 0) + 90) % 360 } : s))}
-                    className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded"
-                    title="Rotate Right 90°"
-                  >
-                    ↻ 90°
-                  </button>
+                  <button type="button" onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: ((s.rotation || 0) - 90 + 360) % 360 } : s))} className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded" title="Rotate Left 90°">↺ 90°</button>
+                  <button type="button" onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: (s.rotation || 0) - 15 } : s))} className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded" title="Rotate Left 15°">↺ 15°</button>
+                  <button type="button" onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: 0 } : s))} className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded" title="Reset 0°">0°</button>
+                  <button type="button" onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: (s.rotation || 0) + 15 } : s))} className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded" title="Rotate Right 15°">↻ 15°</button>
+                  <button type="button" onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, rotation: ((s.rotation || 0) + 90) % 360 } : s))} className="py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded" title="Rotate Right 90°">↻ 90°</button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-1">Color (Hex)</label>
-                  <input type="text" value={selectedShape.fill} onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, fill: e.target.value } : s))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none" />
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Fill color</label>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="color"
+                    value={/^#[0-9a-fA-F]{6}$/.test(selectedShape.fill) ? selectedShape.fill : "#334155"}
+                    onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, fill: e.target.value } : s))}
+                    className="h-10 w-12 rounded border border-slate-300 cursor-pointer bg-white"
+                  />
+                  <input
+                    type="text"
+                    value={selectedShape.fill}
+                    onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, fill: e.target.value } : s))}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-1">Link to Ticket Type (Zone)</label>
-                  <select 
-                    value={selectedShape.ticket_type_id || ""}
-                    onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, ticket_type_id: e.target.value } : s))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
-                  >
-                    <option value="">-- No Ticket Type --</option>
-                    {ticketTypes.map((t: any) => (
-                      <option key={t.id} value={t.id}>{t.ticket_type}</option>
-                    ))}
-                  </select>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHAPE_FILL_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      onClick={() => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, fill: c } : s))}
+                      className={`h-6 w-6 rounded-full border-2 ${
+                        selectedShape.fill?.toLowerCase() === c.toLowerCase()
+                          ? "border-slate-900 scale-110"
+                          : "border-white shadow"
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
                 </div>
               </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-semibold text-slate-600">Opacity</label>
+                  <span className="text-xs font-mono font-bold text-slate-500">
+                    {Math.round((selectedShape.opacity ?? 1) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.15}
+                  max={1}
+                  step={0.05}
+                  value={selectedShape.opacity ?? 1}
+                  onChange={(e) =>
+                    setShapes(
+                      shapes.map((s) =>
+                        s.id === selectedShape.id ? { ...s, opacity: Number(e.target.value) } : s
+                      )
+                    )
+                  }
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-rose-500"
+                />
+              </div>
+
+              {(selectedShape.type === "roundRect" ||
+                selectedShape.type === "zone" ||
+                selectedShape.type === "rect" ||
+                selectedShape.type === "stage" ||
+                selectedShape.type === "screen" ||
+                !selectedShape.type) && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-semibold text-slate-600">Corner radius</label>
+                    <span className="text-xs font-mono font-bold text-slate-500">
+                      {selectedShape.cornerRadius ?? 0}px
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={80}
+                    step={1}
+                    value={selectedShape.cornerRadius ?? 0}
+                    onChange={(e) =>
+                      setShapes(
+                        shapes.map((s) =>
+                          s.id === selectedShape.id
+                            ? { ...s, cornerRadius: Number(e.target.value) }
+                            : s
+                        )
+                      )
+                    }
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-rose-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Link to Ticket Type (Zone)</label>
+                <select
+                  value={selectedShape.ticket_type_id || ""}
+                  onChange={(e) => setShapes(shapes.map(s => s.id === selectedShape.id ? { ...s, ticket_type_id: e.target.value } : s))}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                >
+                  <option value="">-- No Ticket Type --</option>
+                  {ticketTypes.map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.ticket_type}</option>
+                  ))}
+                </select>
+              </div>
               <div className="pt-4 border-t border-slate-100">
-                <button onClick={deleteSelectedShape} className="w-full py-2 bg-rose-50 text-rose-600 rounded-lg text-sm font-medium hover:bg-rose-100 flex items-center justify-center gap-2">
+                <button type="button" onClick={deleteSelectedShape} className="w-full py-2 bg-rose-50 text-rose-600 rounded-lg text-sm font-medium hover:bg-rose-100 flex items-center justify-center gap-2">
                   <Trash2 size={16} /> Remove Element
                 </button>
               </div>
+            </div>
+          ) : mode === "add_shape" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-600">
+                Choose a shape in the <strong>Elements</strong> strip, then click anywhere on the canvas to place it.
+              </p>
+              <p className="text-xs text-slate-500">
+                After placing, use Select mode to drag, resize with handles, or edit fill / size / rotation here.
+              </p>
+            </div>
+          ) : mode === "add_icon" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-600">
+                Choose an icon in the <strong>Icons</strong> strip (filter by category), then click the canvas to place it.
+              </p>
+              <p className="text-xs text-slate-500">
+                Icons are saved as text labels (emoji + name). Select them to change size, rotation, or the label text.
+              </p>
             </div>
           ) : selectedSeat ? (
             <div className="space-y-4">

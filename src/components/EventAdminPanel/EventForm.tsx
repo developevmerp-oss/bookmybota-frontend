@@ -1195,23 +1195,26 @@ function EventDocUploadsList({
               <p className="portal-muted text-xs leading-relaxed">{doc.description}</p>
             )}
             {uploadedUrl ? (
-              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <FileText size={16} className="text-rose-600 shrink-0" />
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                 <a
                   href={resolveMediaUrl(uploadedUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-slate-800 truncate flex-1 hover:text-rose-700"
+                  className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                  title="View document"
+                  aria-label={`View ${doc.name}`}
                 >
-                  View uploaded file
+                  <Eye size={18} />
                 </a>
                 {!readOnly && (
                   <button
                     type="button"
                     onClick={() => onRemove(doc.id)}
-                    className="text-slate-400 hover:text-rose-600"
+                    className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                    title="Delete document"
+                    aria-label={`Remove ${doc.name}`}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} />
                   </button>
                 )}
               </div>

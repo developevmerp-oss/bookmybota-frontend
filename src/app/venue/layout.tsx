@@ -40,7 +40,8 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
   },
   "/venue/inquiries": {
     title: "Booking inquiries",
-    subtitle: "Customer requests for your free dates. Accept or decline each one.",
+    subtitle:
+      "Calendar of free, pending, and booked dates. Click a day to review inquiries and accept or decline.",
   },
   "/venue/claim-events": {
     title: "Claim events",

@@ -264,21 +264,6 @@ export default function OrganizerAccountSetupForm({
     return null;
   };
 
-  const handleSaveStep1 = async () => {
-    const ok = await trigger();
-    const extrasErr = validateExtras();
-    if (!ok || extrasErr) {
-      const message =
-        extrasErr || "Please fill all required General Information fields.";
-      setError(message);
-      toast.error(message);
-      return;
-    }
-    setStep1Done(true);
-    setError(null);
-    toast.success("Details saved");
-  };
-
   const handleProceedStep1 = async () => {
     const ok = await trigger();
     const extrasErr = validateExtras();
@@ -707,22 +692,13 @@ export default function OrganizerAccountSetupForm({
 
           <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 px-4 sm:px-5 py-5 border-t border-slate-100">
             {step === 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void handleSaveStep1()}
-                  className="h-11 px-6 rounded-md border border-slate-300 bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
-                >
-                  Save details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleProceedStep1()}
-                  className="h-11 px-8 rounded-md bg-[#e11d48] text-white text-sm font-bold hover:bg-[#be123c] transition-colors cursor-pointer"
-                >
-                  Proceed
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => void handleProceedStep1()}
+                className="h-11 px-8 rounded-md bg-[#e11d48] text-white text-sm font-bold hover:bg-[#be123c] transition-colors cursor-pointer"
+              >
+                Proceed
+              </button>
             )}
             {step === 2 && (
               <>
@@ -779,14 +755,7 @@ export default function OrganizerAccountSetupForm({
                 </p>
               )}
             </div>
-            <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="px-4 py-2 rounded-xl text-sm text-slate-600 border border-slate-200 hover:bg-slate-50 cursor-pointer"
-              >
-                Cancel
-              </button>
+            <div className="px-5 py-4 border-t border-slate-200 flex justify-end">
               <button
                 type="button"
                 onClick={() => {

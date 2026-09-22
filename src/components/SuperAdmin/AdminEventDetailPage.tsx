@@ -330,12 +330,18 @@ export default function AdminEventDetailPage({
               <FileSignature size={16} /> View contract
             </Link>
           )}
+          <Link
+            href={`/admin/events/${event.id}/layout`}
+            className="px-4 py-2 rounded-xl border border-rose-500/30 text-rose-700 hover:bg-rose-50 text-sm font-medium inline-flex items-center gap-2"
+          >
+            <LayoutGrid size={16} /> Build layout / Stadium
+          </Link>
           {primaryLayoutRequest && (
             <Link
               href={`/admin/event-layouts/${primaryLayoutRequest.id}`}
               className="px-4 py-2 rounded-xl border border-violet-500/30 text-violet-700 hover:bg-violet-50 text-sm font-medium inline-flex items-center gap-2"
             >
-              <LayoutGrid size={16} /> Open layout studio
+              <LayoutGrid size={16} /> Open layout request studio
             </Link>
           )}
           {event.status === "PENDING_APPROVAL" && (

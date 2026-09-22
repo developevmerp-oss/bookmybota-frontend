@@ -83,7 +83,24 @@ export default function OrganizerLayoutRequestsPanel({ eventId }: { eventId: str
                           Option {index + 1}: {opt.name}
                         </p>
                         <p className="text-xs text-zinc-400">
-                          {opt.seat_count ?? opt.capacity ?? 0} seats
+                          {(() => {
+                            const cfg = opt.seating_config as any;
+                            if (cfg?.layout_mode === "stadium" && Array.isArray(cfg.blocks)) {
+                              const est = cfg.blocks.reduce(
+                                (acc: number, b: any) =>
+                                  acc +
+                                  (b.tiers || []).reduce((ta: number, t: any) => {
+                                    const s = String(t.row_start || "").toUpperCase().charCodeAt(0);
+                                    const e = String(t.row_end || "").toUpperCase().charCodeAt(0);
+                                    const r = isNaN(s) || isNaN(e) || e < s ? 0 : e - s + 1;
+                                    return ta + r * (Number(t.seats_per_row) || 0);
+                                  }, 0),
+                                0
+                              );
+                              if (est > 0) return `${est.toLocaleString()} seats (Stadium)`;
+                            }
+                            return `${opt.seat_count ?? opt.capacity ?? 0} seats`;
+                          })()}
                           {shortlisted ? " · Approved" : rejected ? " · Rejected" : " · Pending"}
                         </p>
                         {pending && !rejected && (

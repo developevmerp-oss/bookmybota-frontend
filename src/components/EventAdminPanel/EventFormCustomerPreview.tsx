@@ -29,7 +29,9 @@ import { eventDateParts } from "@/components/LandingPage/homeUtils";
 import type { EventFormValues } from "@/lib/eventFormSchema";
 import { computeDurationMinutesFromShowtimes } from "@/lib/eventFormSchema";
 import type { MarketingPlan, OrganizerEvent } from "@/services/api";
-import { useGetEventLayoutQuery } from "@/services/api";
+import { useGetEventLayoutQuery, useReviewOrganizerEventLayoutRequestMutation } from "@/services/api";
+import { toast } from "sonner";
+import { extractApiError } from "@/lib/apiErrors";
 
 const BRAND = "#6900AA";
 
@@ -98,6 +100,7 @@ export default function EventFormCustomerPreview({
 
   const eventId = event?.id || "";
   const { data: appliedLayout } = useGetEventLayoutQuery(eventId, { skip: !eventId });
+  const [reviewLayout, { isLoading: isReviewing }] = useReviewOrganizerEventLayoutRequestMutation();
 
   const layoutRequests = event?.layout_requests || [];
   const fulfilledRequest = layoutRequests.find((r) => String(r.status) === "FULFILLED");
@@ -132,7 +135,11 @@ export default function EventFormCustomerPreview({
     Boolean(waitingRequest || pendingPickRequest || fulfilledRequest);
 
   const bookingPreview = (() => {
-    if (appliedSeats.length > 0) {
+    const isStadiumApplied = (appliedConfig as any)?.layout_mode === "stadium";
+    const isStadiumFulfilled = (fulfilledTemplate?.seating_config as any)?.layout_mode === "stadium";
+    const isStadiumPending = (pendingTemplate?.seating_config as any)?.layout_mode === "stadium";
+
+    if (appliedSeats.length > 0 || isStadiumApplied) {
       return {
         kind: "map" as const,
         title: fulfilledRequest
@@ -145,29 +152,35 @@ export default function EventFormCustomerPreview({
       };
     }
     if (
+
       fulfilledTemplate &&
-      Array.isArray(fulfilledTemplate.seats_json) &&
-      fulfilledTemplate.seats_json.length > 0
+
+      ((Array.isArray(fulfilledTemplate.seats_json) &&
+        fulfilledTemplate.seats_json.length > 0
+      ) || isStadiumFulfilled)
     ) {
       return {
         kind: "map" as const,
         title: fulfilledTemplate.name || fulfilledRequest?.layout_name || "Custom seating layout",
         subtitle: "Organizer-approved custom map — customers see this when booking.",
-        seats: fulfilledTemplate.seats_json,
+        seats: fulfilledTemplate.seats_json || [],
         config: (fulfilledTemplate.seating_config as Record<string, unknown> | null) || null,
         status: "ready" as const,
       };
     }
     if (
+
       pendingTemplate &&
-      Array.isArray(pendingTemplate.seats_json) &&
-      pendingTemplate.seats_json.length > 0
+
+      ((Array.isArray(pendingTemplate.seats_json) &&
+        pendingTemplate.seats_json.length > 0
+      ) || isStadiumPending)
     ) {
       return {
         kind: "map" as const,
         title: pendingTemplate.name || pendingPickRequest?.layout_name || "Custom seating layout",
         subtitle: "Approve & Go live below to make this map available to customers.",
-        seats: pendingTemplate.seats_json,
+        seats: pendingTemplate.seats_json || [],
         config: (pendingTemplate.seating_config as Record<string, unknown> | null) || null,
         status: "pending" as const,
       };
@@ -492,16 +505,14 @@ export default function EventFormCustomerPreview({
           <button
             type="button"
             onClick={() => setPreviewScreen("home")}
-            className={`flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${
-              previewScreen === "home"
+            className={`flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${previewScreen === "home"
                 ? "bg-[#6900AA] text-white shadow-sm"
                 : "bg-transparent text-slate-700 hover:bg-slate-50"
-            }`}
+              }`}
           >
             <span
-              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                previewScreen === "home" ? "bg-white/15" : "bg-[#F7E9FF] text-[#6900AA]"
-              }`}
+              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${previewScreen === "home" ? "bg-white/15" : "bg-[#F7E9FF] text-[#6900AA]"
+                }`}
             >
               <Home size={18} />
             </span>
@@ -511,9 +522,8 @@ export default function EventFormCustomerPreview({
               </span>
               <span className="block text-sm font-bold">Home page</span>
               <span
-                className={`block text-xs mt-0.5 leading-snug ${
-                  previewScreen === "home" ? "text-white/85" : "text-slate-500"
-                }`}
+                className={`block text-xs mt-0.5 leading-snug ${previewScreen === "home" ? "text-white/85" : "text-slate-500"
+                  }`}
               >
                 First thing customers see when they open BookMyBota
               </span>
@@ -522,16 +532,14 @@ export default function EventFormCustomerPreview({
           <button
             type="button"
             onClick={() => setPreviewScreen("event")}
-            className={`flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${
-              previewScreen === "event"
+            className={`flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${previewScreen === "event"
                 ? "bg-[#6900AA] text-white shadow-sm"
                 : "bg-transparent text-slate-700 hover:bg-slate-50"
-            }`}
+              }`}
           >
             <span
-              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                previewScreen === "event" ? "bg-white/15" : "bg-[#F7E9FF] text-[#6900AA]"
-              }`}
+              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${previewScreen === "event" ? "bg-white/15" : "bg-[#F7E9FF] text-[#6900AA]"
+                }`}
             >
               <Ticket size={18} />
             </span>
@@ -541,9 +549,8 @@ export default function EventFormCustomerPreview({
               </span>
               <span className="block text-sm font-bold">Your event page</span>
               <span
-                className={`block text-xs mt-0.5 leading-snug ${
-                  previewScreen === "event" ? "text-white/85" : "text-slate-500"
-                }`}
+                className={`block text-xs mt-0.5 leading-snug ${previewScreen === "event" ? "text-white/85" : "text-slate-500"
+                  }`}
               >
                 Full page after a customer taps your event
               </span>
@@ -552,16 +559,14 @@ export default function EventFormCustomerPreview({
           <button
             type="button"
             onClick={() => setPreviewScreen("booking")}
-            className={`flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${
-              previewScreen === "booking"
+            className={`flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors ${previewScreen === "booking"
                 ? "bg-[#6900AA] text-white shadow-sm"
                 : "bg-transparent text-slate-700 hover:bg-slate-50"
-            }`}
+              }`}
           >
             <span
-              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                previewScreen === "booking" ? "bg-white/15" : "bg-[#F7E9FF] text-[#6900AA]"
-              }`}
+              className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${previewScreen === "booking" ? "bg-white/15" : "bg-[#F7E9FF] text-[#6900AA]"
+                }`}
             >
               <LayoutGrid size={18} />
             </span>
@@ -571,9 +576,8 @@ export default function EventFormCustomerPreview({
               </span>
               <span className="block text-sm font-bold">Customer booking layout</span>
               <span
-                className={`block text-xs mt-0.5 leading-snug ${
-                  previewScreen === "booking" ? "text-white/85" : "text-slate-500"
-                }`}
+                className={`block text-xs mt-0.5 leading-snug ${previewScreen === "booking" ? "text-white/85" : "text-slate-500"
+                  }`}
               >
                 Seat map customers use after Book Now
               </span>
@@ -753,20 +757,49 @@ export default function EventFormCustomerPreview({
             ) : previewScreen === "booking" ? (
               <div className="space-y-4">
                 <div
-                  className={`rounded-xl border px-3.5 py-3 ${
-                    bookingPreview.kind === "map" && bookingPreview.status === "ready"
+                  className={`rounded-xl border px-3.5 py-3 ${bookingPreview.kind === "map" && bookingPreview.status === "ready"
                       ? "border-emerald-200 bg-emerald-50/70"
                       : bookingPreview.kind === "map" && bookingPreview.status === "pending"
                         ? "border-amber-200 bg-amber-50/70"
                         : bookingPreview.kind === "waiting"
                           ? "border-amber-200 bg-amber-50/70"
                           : "border-slate-200 bg-slate-50"
-                  }`}
+                    }`}
                 >
                   <p className="text-sm font-semibold text-[#1A1A1A]">{bookingPreview.title}</p>
                   <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                     {bookingPreview.subtitle}
                   </p>
+                  {bookingPreview.kind === "map" && bookingPreview.status === "pending" && pendingPickRequest && (
+                    <div className="mt-3 flex flex-wrap items-center gap-3 pt-2 border-t border-amber-200/80">
+                      <button
+                        type="button"
+                        disabled={isReviewing}
+                        onClick={async () => {
+                          const targetId =
+                            pendingTemplate?.id ||
+                            pendingPickRequest.fulfilled_template_id ||
+                            pendingPickRequest.proposed_templates?.[0]?.id;
+                          try {
+                            await reviewLayout({
+                              id: pendingPickRequest.id,
+                              action: "go_live",
+                              selected_template_id: targetId,
+                            }).unwrap();
+                            toast.success("Layout approved & live! Super Admin can now create/sign the contract.");
+                          } catch (err) {
+                            toast.error(extractApiError(err, "Failed to approve layout."));
+                          }
+                        }}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow transition-colors flex items-center gap-1.5"
+                      >
+                        <ThumbsUp size={14} /> Approve &amp; Go Live with this layout
+                      </button>
+                      <span className="text-[11px] text-slate-500">
+                        Once approved, Super Admin can finalize the contract so you can publish.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 overflow-hidden bg-[#F3F4F6]">

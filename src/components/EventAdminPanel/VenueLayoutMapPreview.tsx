@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minus, Plus, X, ZoomIn } from "lucide-react";
 import { createPortal } from "react-dom";
+import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 
 type PreviewSeat = {
   x: number;
@@ -470,6 +471,32 @@ export default function VenueLayoutMapPreview({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+
+  const config = useMemo(() => {
+    if (!seatingConfig) return null;
+    if (typeof seatingConfig === "string") {
+      try {
+        return JSON.parse(seatingConfig);
+      } catch {
+        return null;
+      }
+    }
+    return seatingConfig as Record<string, unknown>;
+  }, [seatingConfig]);
+
+  const isStadium = useMemo(() => {
+    if (!config) return false;
+    return (
+      config.layout_mode === "stadium" ||
+      (Array.isArray(config.blocks) && config.blocks.length > 0)
+    );
+  }, [config]);
+
+  const stadiumBlocks = useMemo(() => {
+    if (!config || !Array.isArray(config.blocks)) return [];
+    return config.blocks as any[];
+  }, [config]);
 
   useEffect(() => {
     setMounted(true);
@@ -488,6 +515,161 @@ export default function VenueLayoutMapPreview({
       document.body.style.overflow = prev;
     };
   }, [expanded]);
+
+  if (isStadium) {
+    return (
+      <div className={`space-y-3 ${className}`}>
+        {enableZoom && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                🏟️ Sports Stadium Layout
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Pitch: {String((config as any)?.ground?.sport_type || "Football")}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700"
+            >
+              <Maximize2 size={13} /> Open full map
+            </button>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-border bg-slate-950 overflow-hidden p-2 sm:p-3">
+          <LayoutSeatPreview
+            seats={seatsRaw}
+            config={config}
+            heightClass="h-[400px]"
+            selectedBlockId={selectedBlockId}
+            onSelectBlock={setSelectedBlockId}
+          />
+        </div>
+
+        {stadiumBlocks.length > 0 && (
+          <div className="pt-2 border-t border-border/70">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Stands &amp; Tiers Breakdown ({stadiumBlocks.length} stands)
+              </h4>
+              {selectedBlockId && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedBlockId(null)}
+                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+                >
+                  ← View Full Stadium
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-52 overflow-y-auto pr-1">
+              {stadiumBlocks.map((b: any) => {
+                const isSelected = selectedBlockId === b.id;
+                // Prefer tier-computed capacity (source of truth); fall back to b.capacity only when no tiers
+                const bCap =
+                  Array.isArray(b.tiers) && b.tiers.length > 0
+                    ? b.tiers.reduce((tAcc: number, t: any) => {
+                        const rCount = Math.max(
+                          1,
+                          (t.row_end || "A").charCodeAt(0) - (t.row_start || "A").charCodeAt(0) + 1
+                        );
+                        return tAcc + rCount * (Number(t.seats_per_row) || 0);
+                      }, 0)
+                    : Number(b.capacity) || 0;
+                return (
+                  <div
+                    key={b.id}
+                    onClick={() => setSelectedBlockId(isSelected ? null : b.id)}
+                    className={`rounded-xl border p-2.5 flex flex-col justify-between cursor-pointer transition-all ${
+                      isSelected
+                        ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/30"
+                        : "border-border bg-card hover:border-primary/50 hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold flex items-center gap-1.5 truncate">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+                          style={{ backgroundColor: b.color || "#3b82f6" }}
+                        />
+                        <span className="truncate">{b.name}</span>
+                      </span>
+                      <span className="text-xs font-bold text-amber-500 shrink-0">
+                        {bCap.toLocaleString()} seats
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 flex items-center justify-between">
+                      <span>{isSelected ? "Active stand (zoomed)" : "Click stand to zoom in"}</span>
+                      <span className="text-primary font-medium">{isSelected ? "Zoomed in" : "Zoom in →"}</span>
+                    </p>
+                    {Array.isArray(b.tiers) && b.tiers.length > 0 && (
+                      <div className="mt-1.5 pt-1.5 border-t border-border/50 text-[10px] text-muted-foreground space-y-0.5">
+                        {b.tiers.map((tier: any, tIdx: number) => {
+                          const rCount = Math.max(
+                            1,
+                            (tier.row_end || "A").charCodeAt(0) - (tier.row_start || "A").charCodeAt(0) + 1
+                          );
+                          const tierSeats = rCount * (Number(tier.seats_per_row) || 0);
+                          return (
+                            <div key={tier.id || tIdx} className="flex justify-between items-center">
+                              <span className="truncate">
+                                {tier.name || `Tier ${tIdx + 1}`} ({tier.row_start || "A"}-{tier.row_end || "A"})
+                              </span>
+                              <span className="shrink-0 font-medium text-foreground/80">
+                                {tierSeats.toLocaleString()} seats
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {mounted &&
+          expanded &&
+          createPortal(
+            <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col p-2 sm:p-4">
+              <div className="flex items-center justify-between gap-3 pb-3 px-1 text-white border-b border-white/10 mb-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                    Full Stadium Seating Map
+                  </p>
+                  <h3 className="text-lg font-bold truncate">{title}</h3>
+                  <p className="text-xs text-zinc-300">
+                    Exact stadium layout — click any stand to zoom in to seats and rows
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpanded(false)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold border border-white/10"
+                >
+                  <X size={16} /> Close
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 p-2 sm:p-4 flex flex-col">
+                <LayoutSeatPreview
+                  seats={seatsRaw}
+                  config={config}
+                  heightClass="h-full min-h-[460px]"
+                  selectedBlockId={selectedBlockId}
+                  onSelectBlock={setSelectedBlockId}
+                />
+              </div>
+            </div>,
+            document.body
+          )}
+      </div>
+    );
+  }
 
   if (!enableZoom) {
     return (

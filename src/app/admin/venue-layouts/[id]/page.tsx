@@ -173,22 +173,23 @@ export default function AdminVenueLayoutBuilderPage() {
     ? undefined
     : templates.find((item) => item.id === activeTemplateId) || (!activeTemplateId ? templates[0] : undefined);
   const selectedId = creatingNew ? null : activeTemplate?.id || null;
-  const sourceSeats = creatingNew
-    ? []
-    : ((activeTemplate?.seats_json || request?.template_seats || []) as Array<Record<string, unknown>>);
-  const sourceConfig = creatingNew
-    ? ({} as {
-        labels?: unknown[];
-        shapes?: unknown[];
-        bgImageUrl?: string | null;
-        sectionColors?: Record<string, string>;
-      })
-    : ((activeTemplate?.seating_config || request?.template_seating_config || {}) as {
-        labels?: unknown[];
-        shapes?: unknown[];
-        bgImageUrl?: string | null;
-        sectionColors?: Record<string, string>;
-      });
+  const sourceSeats = useMemo(() => {
+    if (creatingNew) return [];
+    const raw = activeTemplate?.seats_json || request?.template_seats || [];
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw); } catch { return []; }
+    }
+    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+  }, [creatingNew, activeTemplate?.seats_json, request?.template_seats]);
+
+  const sourceConfig = useMemo(() => {
+    if (creatingNew) return {};
+    const raw = activeTemplate?.seating_config || request?.template_seating_config || {};
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw); } catch { return {}; }
+    }
+    return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  }, [creatingNew, activeTemplate?.seating_config, request?.template_seating_config]);
 
   const initialSeats = Array.isArray(sourceSeats) ? mapSeatsFromJson(sourceSeats) : [];
 
@@ -522,7 +523,27 @@ export default function AdminVenueLayoutBuilderPage() {
                   {optionName || activeTemplate?.name || request.layout_name}
                 </h2>
                 <p className="text-sm text-zinc-400 mt-1">
-                  {initialSeats.length} seats mapped · {Array.isArray(sourceConfig.shapes) ? sourceConfig.shapes.length : 0} stage elements
+                  {(() => {
+                    const cfg = sourceConfig as any;
+                    const isStadium = cfg?.layout_mode === "stadium" || Array.isArray(cfg?.blocks);
+                    if (isStadium) {
+                      const blocks = Array.isArray(cfg?.blocks) ? cfg.blocks : [];
+                      const est = blocks.reduce(
+                        (acc: number, b: any) =>
+                          acc +
+                          (b.tiers || []).reduce((ta: number, t: any) => {
+                            const s = String(t.row_start || "").toUpperCase().charCodeAt(0);
+                            const e = String(t.row_end || "").toUpperCase().charCodeAt(0);
+                            const r = isNaN(s) || isNaN(e) || e < s ? 0 : e - s + 1;
+                            return ta + r * (Number(t.seats_per_row) || 0);
+                          }, 0),
+                        0
+                      );
+                      const cap = est > 0 ? est : Number((activeTemplate as any)?.seat_count ?? activeTemplate?.capacity ?? 0);
+                      return `${cap.toLocaleString()} seats across ${blocks.length} stands · Sports Stadium Layout`;
+                    }
+                    return `${initialSeats.length} seats mapped · ${Array.isArray(sourceConfig.shapes) ? sourceConfig.shapes.length : 0} stage elements`;
+                  })()}
                 </p>
               </div>
 
@@ -536,8 +557,8 @@ export default function AdminVenueLayoutBuilderPage() {
             </div>
 
             {/* Layout Seat Preview with Click to Open Overlay */}
-            <div 
-              onClick={() => setIsLayoutModalOpen(true)} 
+            <div
+              onClick={() => setIsLayoutModalOpen(true)}
               className="group relative cursor-pointer rounded-2xl border border-white/10 bg-black/40 p-4 hover:border-amber-400/60 transition-all overflow-hidden"
               title="Click to open full-screen pop-up editor"
             >
@@ -576,8 +597,9 @@ export default function AdminVenueLayoutBuilderPage() {
                 venueAdapter={{
                   sections,
                   initialSeats,
-                  maxCapacity: Number(request.capacity) || sections.reduce((s, z) => s + (z.capacity || 0), 0) || undefined,
+                  maxCapacity: undefined,
                   initialConfig: {
+                    ...sourceConfig,
                     labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
                     shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
                     bgImageUrl: sourceConfig.bgImageUrl || null,
@@ -634,9 +656,8 @@ export default function AdminVenueLayoutBuilderPage() {
                 return (
                   <div
                     key={item.id}
-                    className={`rounded-xl border p-3 transition-colors ${
-                      isActive ? "border-amber-400 bg-amber-500/10" : "border-white/10 bg-white/5"
-                    }`}
+                    className={`rounded-xl border p-3 transition-colors ${isActive ? "border-amber-400 bg-amber-500/10" : "border-white/10 bg-white/5"
+                      }`}
                   >
                     <div className="flex items-start gap-2">
                       {submittable ? (
@@ -665,7 +686,24 @@ export default function AdminVenueLayoutBuilderPage() {
                           heightClass="h-24"
                         />
                         <p className="text-sm font-medium text-white mt-2 truncate">{item.name}</p>
-                        <p className="text-[0.6875rem] text-zinc-400 mt-0.5">{optionStatusLabel(item)}</p>
+                        <p className="text-[0.6875rem] text-zinc-400 mt-0.5">
+                          {(() => {
+                            const rawCfg = typeof item.seating_config === "string"
+                              ? (() => { try { return JSON.parse(item.seating_config); } catch { return {}; } })()
+                              : (item.seating_config as any) || {};
+                            const isStadium = rawCfg?.layout_mode === "stadium" || Array.isArray(rawCfg?.blocks);
+                            if (isStadium) {
+                              const cap = Number((item as any).seat_count ?? item.capacity ?? 0);
+                              return `${cap.toLocaleString()} seats (Stadium) · ${optionStatusLabel(item)}`;
+                            }
+                            const count = Array.isArray(item.seats_json)
+                              ? item.seats_json.length
+                              : (typeof item.seats_json === "string"
+                                ? (() => { try { return JSON.parse(item.seats_json).length; } catch { return 0; } })()
+                                : 0);
+                            return `${count} seats · ${optionStatusLabel(item)}`;
+                          })()}
+                        </p>
                         {item.status === "REJECTED" && item.rejection_reason ? (
                           <p className="text-[0.6875rem] text-rose-400 mt-1 line-clamp-2">{item.rejection_reason}</p>
                         ) : null}
@@ -695,26 +733,26 @@ export default function AdminVenueLayoutBuilderPage() {
 
       {/* Full-Screen Pop-up Layout Studio Modal */}
       {isLayoutModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-2 sm:p-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between pb-3 px-2 text-white border-b border-white/10 mb-2">
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col p-2 sm:p-3 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between py-2.5 px-3 bg-slate-900/90 rounded-xl border border-slate-800 text-white mb-2 shadow-lg">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-3 py-1 rounded-lg border border-amber-400/20 shrink-0 flex items-center gap-1.5">
-                <Maximize2 size={13} /> Full Screen Layout Studio
+              <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/25 shrink-0 flex items-center gap-1.5 shadow-sm">
+                <Maximize2 size={13} className="text-amber-400" /> Layout Studio
               </span>
-              <h2 className="text-lg font-bold text-white truncate">
+              <h2 className="text-base font-bold text-white truncate tracking-tight">
                 {optionName || activeTemplate?.name || request.layout_name}
               </h2>
-              <span className="text-xs text-zinc-400 hidden md:inline truncate">
-                ({request.venue_name} · {request.layout_type})
+              <span className="text-xs text-slate-400 font-medium bg-slate-800/80 px-2.5 py-0.5 rounded-md border border-slate-700/60 hidden md:inline truncate">
+                {request.venue_name} · {request.layout_type}
               </span>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsLayoutModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-colors flex items-center gap-2 border border-white/10 shadow-sm"
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 shadow-sm active:scale-95"
               >
-                <X size={16} /> Close Studio
+                <X size={14} /> Close Studio
               </button>
             </div>
           </div>
@@ -725,8 +763,9 @@ export default function AdminVenueLayoutBuilderPage() {
               venueAdapter={{
                 sections,
                 initialSeats,
-                maxCapacity: Number(request.capacity) || sections.reduce((s, z) => s + (z.capacity || 0), 0) || undefined,
+                maxCapacity: undefined,
                 initialConfig: {
+                  ...sourceConfig,
                   labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
                   shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
                   bgImageUrl: sourceConfig.bgImageUrl || null,

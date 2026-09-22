@@ -48,6 +48,7 @@ import {
   type GiftCardRedeemPreview,
   useGetEventLayoutQuery,
   useGetPublicEventLayoutQuery,
+  useGetPublicStadiumBlocksQuery,
   type OrganizerEvent,
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
@@ -106,6 +107,11 @@ function writeHoldSessionToken(token: string) {
 
 const VenueLayoutViewer = dynamic(
   () => import("@/components/EventLandingPage/VenueLayoutViewer"),
+  { ssr: false }
+);
+
+const StadiumLayoutViewer = dynamic(
+  () => import("@/components/EventLandingPage/StadiumLayoutViewer"),
   { ssr: false }
 );
 
@@ -304,6 +310,15 @@ export default function EventCheckout({
 
   const activeLayoutData = isOrganizer ? layoutData : publicLayoutData;
 
+  // Detect stadium mode: sports events with layout_mode = "stadium" in seating_config
+  const seatingConfig = (activeLayoutData as any)?.data?.seating_config
+    ?? (activeLayoutData as any)?.seating_config
+    ?? (event as any)?.seating_config
+    ?? null;
+  const isStadiumLayout =
+    seatingConfig?.layout_mode === "stadium" ||
+    (Array.isArray(seatingConfig?.blocks) && seatingConfig.blocks.length > 0);
+
   const [createEventBooking] = useCreateEventBookingMutation();
   const [createEventSeatHold] = useCreateEventSeatHoldMutation();
   const [releaseEventSeatHold] = useReleaseEventSeatHoldMutation();
@@ -428,7 +443,8 @@ export default function EventCheckout({
       ? showtimes.find((s) => s.id === initialShowtimeId)
       : undefined;
     const firstDate = initial ? dateKey(initial.starts_at) : dateOptions[0]?.key || "";
-    setShowtimeId("");
+    const pickedShowtime = initial || (showtimes.length === 1 ? showtimes[0] : undefined);
+    setShowtimeId(pickedShowtime ? pickedShowtime.id : "");
     setSelectedDateKey(firstDate);
     setStep(1);
     setQtyByType({});
@@ -864,18 +880,21 @@ export default function EventCheckout({
     return () => window.clearInterval(id);
   }, [step, expiresAt, holdId]);
 
-  const hasReservedSeats = Boolean(activeLayoutData?.data?.seats?.length);
+  const hasReservedSeats = Boolean(activeLayoutData?.data?.seats?.length) || isStadiumLayout;
   const maxSeatQtyPick = useMemo(() => {
     if (!hasReservedSeats) return 10;
     const fromTickets = ticketTypes.map((t) =>
       Math.max(1, Number((t as { max_per_order?: number }).max_per_order) || 10)
     );
-    const available = (activeLayoutData?.data?.seats || []).filter(
-      (s: { status?: string }) => String(s.status || "").toUpperCase() === "AVAILABLE"
-    ).length;
+    const available = isStadiumLayout
+      ? 10
+      : (activeLayoutData?.data?.seats || []).filter(
+          (s: { status?: string }) => String(s.status || "").toUpperCase() === "AVAILABLE"
+        ).length;
     const cap = fromTickets.length ? Math.max(...fromTickets) : 10;
-    return Math.min(10, Math.max(1, available || cap), cap);
-  }, [hasReservedSeats, ticketTypes, activeLayoutData]);
+    if (available > 0) return Math.min(10, cap, available);
+    return Math.min(10, cap);
+  }, [hasReservedSeats, isStadiumLayout, ticketTypes, activeLayoutData]);
 
   const eventGridLayout = useMemo(() => {
     type GridSeat = {
@@ -2681,21 +2700,37 @@ export default function EventCheckout({
             {seatViewMode === "canvas" ? (
               <div className="flex-1 min-h-0 p-2 sm:p-4">
                 <div className="h-full w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
-                  <VenueLayoutViewer
-                    layoutData={activeLayoutData}
-                    ticketTypes={ticketTypes}
-                    onSeatsSelected={handleMapSeatsSelected}
-                    initialSelectedSeats={selectedSeats}
-                    maxSelectable={desiredSeatQty}
-                    cinemaMode
-                    mapTitle="Event seating map"
-                    mapDescription={`Live seating layout for this event. Pick up to ${desiredSeatQty} seats directly on the map.`}
-                    customLegend={ticketTypes.map((t) => ({
-                      name: t.ticket_type,
-                      color: "#6900AA",
-                      price: Number(t.price) || 0,
-                    }))}
-                  />
+                  {isStadiumLayout ? (
+                    // Sports stadium: 3-level hierarchical drill-down viewer
+                    <StadiumLayoutViewer
+                      eventId={event.id}
+                      ticketTypes={ticketTypes.map((t: any) => ({
+                        id: t.ticket_type_id ?? t.id,
+                        name: t.ticket_type ?? t.name,
+                        price: t.price,
+                      }))}
+                      onSeatsSelected={handleMapSeatsSelected}
+                      initialSelectedSeats={selectedSeats}
+                      maxSelectable={desiredSeatQty}
+                    />
+                  ) : (
+                    // All other events: flat canvas viewer (cinema, theatre, venue)
+                    <VenueLayoutViewer
+                      layoutData={activeLayoutData}
+                      ticketTypes={ticketTypes}
+                      onSeatsSelected={handleMapSeatsSelected}
+                      initialSelectedSeats={selectedSeats}
+                      maxSelectable={desiredSeatQty}
+                      cinemaMode
+                      mapTitle="Event seating map"
+                      mapDescription={`Live seating layout for this event. Pick up to ${desiredSeatQty} seats directly on the map.`}
+                      customLegend={ticketTypes.map((t) => ({
+                        name: t.ticket_type,
+                        color: "#6900AA",
+                        price: Number(t.price) || 0,
+                      }))}
+                    />
+                  )}
                 </div>
               </div>
             ) : (

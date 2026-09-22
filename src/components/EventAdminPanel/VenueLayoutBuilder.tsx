@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useGetOrganizerEventQuery, useUpdateEventLayoutMutation, useGetEventLayoutQuery } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
+import StadiumBlockBuilder, { StadiumSeatingConfigOutput } from "./StadiumBlockBuilder";
 
 type Seat = {
   id?: string;
@@ -271,15 +272,16 @@ export default function VenueLayoutBuilder({
   const isSaving = Boolean(venueAdapter?.saving) || isEventSaving;
 
   const maxCapacity = useMemo(() => {
-    if (typeof venueAdapter?.maxCapacity === "number" && venueAdapter.maxCapacity > 0) {
-      return venueAdapter.maxCapacity;
+    // When building layout for a venue request (venueAdapter), there is NO capacity restriction
+    if (venueAdapter) {
+      return 0;
     }
     const layoutCap = (layoutData as any)?.max_capacity ?? (layoutData as any)?.data?.max_capacity;
-    if (typeof layoutCap === "number" && layoutCap > 0) {
+    if (typeof layoutCap === "number" && layoutCap > 1) {
       return layoutCap;
     }
     return 0;
-  }, [venueAdapter?.maxCapacity, layoutData]);
+  }, [venueAdapter, layoutData]);
 
   const [seats, setSeats] = useState<Seat[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
@@ -293,6 +295,22 @@ export default function VenueLayoutBuilder({
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [moveEntireSection, setMoveEntireSection] = useState(false);
   const [sectionColors, setSectionColors] = useState<Record<string, string>>({});
+  const [layoutMode, setLayoutMode] = useState<"custom" | "stadium">("custom");
+
+  useEffect(() => {
+    const rawMode =
+      (layoutData as any)?.data?.seating_config?.layout_mode ||
+      (venueAdapter?.initialConfig as any)?.layout_mode;
+    const hasBlocks =
+      Array.isArray((layoutData as any)?.data?.seating_config?.blocks) ||
+      Array.isArray((venueAdapter?.initialConfig as any)?.blocks);
+
+    if (rawMode === "stadium" || hasBlocks) {
+      setLayoutMode("stadium");
+    } else if (rawMode === "custom") {
+      setLayoutMode("custom");
+    }
+  }, [layoutData, venueAdapter?.initialConfig]);
 
   // Undo / Redo History Stack
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
@@ -2956,7 +2974,7 @@ export default function VenueLayoutBuilder({
   };
 
   const handleSave = async (publish = false, saveAsNew = false) => {
-    if (maxCapacity > 0 && seats.length > maxCapacity) {
+    if (!venueAdapter && maxCapacity > 0 && seats.length > maxCapacity) {
       toast.error(
         `Validation Failed: Total seats placed (${seats.length}) exceeds the maximum room/screen capacity (${maxCapacity}). Please remove ${seats.length - maxCapacity} seat(s).`
       );
@@ -3023,6 +3041,91 @@ export default function VenueLayoutBuilder({
         ? "fixed inset-0 z-[999] w-screen h-screen rounded-none" 
         : "h-full w-full flex-1 border border-slate-200 rounded-2xl overflow-hidden"
     }`}>
+      {/* Layout Format Switcher Header */}
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-950 border-b border-slate-800 text-white z-40">
+        <div className="flex items-center gap-2.5">
+          <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Layout Format</span>
+          <div className="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setLayoutMode("custom")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                layoutMode === "custom"
+                  ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
+            >
+              <span>🪑 Custom Floor Plan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLayoutMode("stadium")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                layoutMode === "stadium"
+                  ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
+            >
+              <span>🏟️ Sports Stadium Layout</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          {layoutMode === "custom" ? (
+            <span className="text-slate-400 bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">Cinema / Theatre / Club / Grid Floor Plan</span>
+          ) : (
+            <span className="text-amber-400 font-semibold bg-amber-400/10 px-3 py-1 rounded-lg border border-amber-400/25 flex items-center gap-1.5">
+              <span>🏟️</span> Multi-Block Stands & Seating Tiers
+            </span>
+          )}
+        </div>
+      </div>
+
+      {layoutMode === "stadium" ? (
+        <div className="flex-1 min-h-0 h-full flex flex-col p-2 bg-slate-950 overflow-hidden">
+          <StadiumBlockBuilder
+            eventId={eventId}
+            isVenueRequest={Boolean(venueAdapter)}
+            isEventOrgRequest={Boolean(!venueAdapter && eventId)}
+            ticketTypes={ticketTypes.map((tt: any) => ({
+              id: tt.id,
+              name: tt.name || tt.ticket_type || "Ticket",
+              ticket_type: tt.name || tt.ticket_type || "Ticket",
+              price: tt.price || 0,
+              total_count: tt.total_count || 0,
+            }))}
+            initialConfig={
+              (layoutData as any)?.data?.seating_config?.layout_mode === "stadium" ||
+              Array.isArray((layoutData as any)?.data?.seating_config?.blocks)
+                ? (layoutData as any).data.seating_config
+                : (venueAdapter?.initialConfig as any)?.layout_mode === "stadium" ||
+                  Array.isArray((venueAdapter?.initialConfig as any)?.blocks)
+                ? (venueAdapter?.initialConfig as any)
+                : null
+            }
+            saving={isSaving}
+            onSave={async (stadiumConfig) => {
+              if (venueAdapter) {
+                await venueAdapter.onSave({
+                  seating_config: stadiumConfig as any,
+                  seats: [],
+                });
+                return;
+              }
+              if (eventId) {
+                await saveLayout({
+                  eventId,
+                  seating_config: stadiumConfig,
+                  seats: [],
+                }).unwrap();
+                refetch();
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <>
       {/* Toolbar — shrink-0 so tools stay visible when canvas fills the studio */}
       <div className="shrink-0 z-30 flex flex-col gap-2 p-3 sm:p-4 border-b border-slate-200 bg-slate-50">
         <div className="flex flex-wrap items-center gap-2">
@@ -4697,6 +4800,8 @@ export default function VenueLayoutBuilder({
         </div>
       )}
       </div>
+        </>
+      )}
     </div>
   );
 }

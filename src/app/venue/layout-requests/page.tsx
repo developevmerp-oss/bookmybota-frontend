@@ -88,6 +88,7 @@ export default function VenueLayoutRequestsPage() {
   const [rejectAllLayouts, { isLoading: rejectingAll }] = useRejectAllVenueLayoutTemplatesMutation();
 
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [modalBlockId, setModalBlockId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectAllOpen, setRejectAllOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -454,10 +455,54 @@ export default function VenueLayoutRequestsPage() {
                             Option {index + 1}
                           </p>
                           <p className="font-semibold text-foreground truncate mt-0.5">{option.name}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {option.hall_name || "Hall"} · {option.layout_type}
-                            {option.seat_count ? ` · ${option.seat_count} seats` : ""}
-                          </p>
+                          {(() => {
+                            const rawCfg = typeof option.seating_config === "string"
+                              ? (() => { try { return JSON.parse(option.seating_config); } catch { return {}; } })()
+                              : (option.seating_config as any) || {};
+                            const isStadium = rawCfg?.layout_mode === "stadium" || Array.isArray(rawCfg?.blocks);
+                            if (isStadium) {
+                              const blocks = Array.isArray(rawCfg?.blocks) ? rawCfg.blocks : [];
+                              const computedCap = blocks.reduce((acc: number, b: any) => {
+                                if (b.capacity && Number(b.capacity) > 0) return acc + Number(b.capacity);
+                                if (Array.isArray(b.tiers)) {
+                                  return (
+                                    acc +
+                                    b.tiers.reduce((tAcc: number, t: any) => {
+                                      const rCount = Math.max(
+                                        1,
+                                        (t.row_end || "A").charCodeAt(0) - (t.row_start || "A").charCodeAt(0) + 1
+                                      );
+                                      return tAcc + rCount * (Number(t.seats_per_row) || 0);
+                                    }, 0)
+                                  );
+                                }
+                                return acc;
+                              }, 0);
+                              const displaySeats = (
+                                option.seat_count ||
+                                computedCap ||
+                                option.capacity ||
+                                0
+                              ).toLocaleString();
+                              return (
+                                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
+                                  <span>{option.hall_name || "Stadium"}</span>
+                                  <span>·</span>
+                                  <span className="text-amber-500 font-medium">🏟️ Sports Stadium</span>
+                                  <span>·</span>
+                                  <span className="font-semibold text-foreground">{displaySeats} seats</span>
+                                </p>
+                              );
+                            }
+                            const layoutLabel = option.layout_type === "stadium" ? "Floor Plan" : option.layout_type;
+                            const seatTotal = option.seat_count || (Array.isArray(option.seats_json) ? option.seats_json.length : 0);
+                            return (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {option.hall_name || "Hall"} · {layoutLabel}
+                                {seatTotal ? ` · ${seatTotal} seats` : ""}
+                              </p>
+                            );
+                          })()}
                         </div>
                         <span
                           className={`shrink-0 text-[10px] font-bold uppercase px-2 py-1 rounded-md border ${
@@ -665,14 +710,62 @@ export default function VenueLayoutRequestsPage() {
                 <h3 className="font-display text-lg font-bold text-foreground">
                   {viewingLayout?.name || "Layout option"}
                 </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {viewingLayout?.hall_name || "Hall"} · {viewingLayout?.layout_type || ""} ·{" "}
-                  {viewingLayout?.seat_count || 0} seats
-                </p>
+                {(() => {
+                  const rawCfg = typeof viewingLayout?.seating_config === "string"
+                    ? (() => { try { return JSON.parse(viewingLayout.seating_config); } catch { return {}; } })()
+                    : (viewingLayout?.seating_config as any) || {};
+                  const isStadium = rawCfg?.layout_mode === "stadium" || Array.isArray(rawCfg?.blocks);
+                  if (isStadium) {
+                    const blocks = Array.isArray(rawCfg?.blocks) ? rawCfg.blocks : [];
+                    const computedCap = blocks.reduce((acc: number, b: any) => {
+                      if (b.capacity && Number(b.capacity) > 0) return acc + Number(b.capacity);
+                      if (Array.isArray(b.tiers)) {
+                        return (
+                          acc +
+                          b.tiers.reduce((tAcc: number, t: any) => {
+                            const rCount = Math.max(
+                              1,
+                              (t.row_end || "A").charCodeAt(0) - (t.row_start || "A").charCodeAt(0) + 1
+                            );
+                            return tAcc + rCount * (Number(t.seats_per_row) || 0);
+                          }, 0)
+                        );
+                      }
+                      return acc;
+                    }, 0);
+                    const displaySeats = (
+                      viewingLayout?.seat_count ||
+                      computedCap ||
+                      viewingLayout?.capacity ||
+                      0
+                    ).toLocaleString();
+                    return (
+                      <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                        <span>{viewingLayout?.hall_name || "Stadium"}</span>
+                        <span>·</span>
+                        <span className="text-amber-500 font-medium">🏟️ Sports Stadium Layout</span>
+                        <span>·</span>
+                        <span className="font-semibold text-foreground">
+                          {displaySeats} seats ({blocks.length} stands)
+                        </span>
+                      </p>
+                    );
+                  }
+                  const modalLayoutLabel = viewingLayout?.layout_type === "stadium" ? "Floor Plan" : (viewingLayout?.layout_type || "");
+                  return (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {viewingLayout?.hall_name || "Hall"} · {modalLayoutLabel} ·{" "}
+                      {viewingLayout?.seat_count || (Array.isArray(viewingLayout?.seats_json) ? viewingLayout.seats_json.length : 0)} seats
+                    </p>
+                  );
+                })()}
               </div>
               <button
                 type="button"
-                onClick={() => setViewingId(null)}
+                onClick={() => {
+                  setViewingId(null);
+                  setModalBlockId(null);
+                }}
                 className="h-8 w-8 rounded-full border border-border text-muted-foreground inline-flex items-center justify-center hover:bg-muted"
               >
                 <X size={16} />
@@ -681,11 +774,115 @@ export default function VenueLayoutRequestsPage() {
             {loadingView ? (
               <p className="text-muted-foreground py-10 text-center text-sm">Loading layout…</p>
             ) : (
-              <LayoutSeatPreview
-                seats={viewingLayout?.seats_json}
-                config={viewingLayout?.seating_config}
-                heightClass="h-[480px]"
-              />
+              <>
+                <LayoutSeatPreview
+                  seats={viewingLayout?.seats_json}
+                  config={viewingLayout?.seating_config}
+                  heightClass="h-[480px]"
+                  selectedBlockId={modalBlockId}
+                  onSelectBlock={setModalBlockId}
+                />
+                {(() => {
+                  const modalCfg = typeof viewingLayout?.seating_config === "string"
+                    ? (() => { try { return JSON.parse(viewingLayout.seating_config); } catch { return {}; } })()
+                    : (viewingLayout?.seating_config as any) || {};
+                  const isModalStadium = modalCfg?.layout_mode === "stadium" || Array.isArray(modalCfg?.blocks);
+                  if (!isModalStadium || !Array.isArray(modalCfg?.blocks) || modalCfg.blocks.length === 0) {
+                    return null;
+                  }
+                  const blocks = modalCfg.blocks as any[];
+                  return (
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Stands &amp; Tiers Breakdown ({blocks.length} stands)
+                        </h4>
+                        <div className="flex items-center gap-3">
+                          {modalBlockId && (
+                            <button
+                              type="button"
+                              onClick={() => setModalBlockId(null)}
+                              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+                            >
+                              ← View Full Stadium
+                            </button>
+                          )}
+                          <span className="text-xs text-muted-foreground capitalize">
+                            Pitch: {String(modalCfg.ground?.sport_type || "Football")} ·{" "}
+                            {String(modalCfg.pitch_label || "PITCH")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                        {blocks.map((b: any) => {
+                          const isSelected = modalBlockId === b.id;
+                          const bCap =
+                            b.capacity && Number(b.capacity) > 0
+                              ? Number(b.capacity)
+                              : Array.isArray(b.tiers)
+                                ? b.tiers.reduce((tAcc: number, t: any) => {
+                                    const rCount = Math.max(
+                                      1,
+                                      (t.row_end || "A").charCodeAt(0) - (t.row_start || "A").charCodeAt(0) + 1
+                                    );
+                                    return tAcc + rCount * (Number(t.seats_per_row) || 0);
+                                  }, 0)
+                                : 0;
+                          return (
+                            <div
+                              key={b.id}
+                              onClick={() => setModalBlockId(isSelected ? null : b.id)}
+                              className={`rounded-xl border p-3 flex flex-col justify-between cursor-pointer transition-all ${
+                                isSelected
+                                  ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/30"
+                                  : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/60"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold flex items-center gap-1.5 truncate">
+                                  <span
+                                    className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                                    style={{ backgroundColor: b.color || "#3b82f6" }}
+                                  />
+                                  <span className="truncate">{b.name}</span>
+                                </span>
+                                <span className="text-xs font-bold text-amber-500 shrink-0">
+                                  {bCap.toLocaleString()} seats
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-1 flex items-center justify-between">
+                                <span>{isSelected ? "Active stand (zoomed)" : "Click to zoom into stand"}</span>
+                                <span className="text-primary font-medium">{isSelected ? "Zoomed in" : "Zoom in →"}</span>
+                              </p>
+                              {Array.isArray(b.tiers) && b.tiers.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-border/50 text-[11px] text-muted-foreground space-y-1">
+                                  {b.tiers.map((tier: any, tIdx: number) => {
+                                    const rCount = Math.max(
+                                      1,
+                                      (tier.row_end || "A").charCodeAt(0) - (tier.row_start || "A").charCodeAt(0) + 1
+                                    );
+                                    const tierSeats = rCount * (Number(tier.seats_per_row) || 0);
+                                    return (
+                                      <div key={tier.id || tIdx} className="flex justify-between items-center">
+                                        <span className="truncate">
+                                          {tier.name || `Tier ${tIdx + 1}`} ({tier.row_start || "A"}-{tier.row_end || "A"})
+                                        </span>
+                                        <span className="shrink-0 font-medium text-foreground/80">
+                                          {tierSeats.toLocaleString()} ({tier.seats_per_row || 0}/row)
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
             )}
             {viewingLayout?.rejection_reason ? (
               <p className="text-sm text-rose-600 mt-4">

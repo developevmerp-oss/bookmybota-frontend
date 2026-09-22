@@ -246,12 +246,21 @@ function eventToValues(event?: OrganizerEvent | null): EventFormValues {
                 : "manual",
           venue_business_id: s.venue_business_id || null,
           venue_layout_template_id: s.venue_layout_template_id || null,
-          layout_mode:
-            s.layout_mode === "standard" || s.layout_mode === "custom"
-              ? s.layout_mode
-              : s.venue_layout_template_id
-                ? "standard"
-                : "none",
+          layout_mode: (() => {
+            const hasCustomReq = (event.layout_requests || []).some((r: any) =>
+              ["SUBMITTED", "UNDER_REVIEW", "PENDING_ORGANIZER_APPROVAL", "FULFILLED", "ORGANIZER_CHANGE_REQUESTED"].includes(
+                String(r.status)
+              )
+            );
+            const isStadium = (event as any)?.seating_config?.layout_mode === "stadium";
+            if (hasCustomReq || isStadium || s.layout_mode === "custom") {
+              return "custom";
+            }
+            if (s.layout_mode === "standard" || s.venue_layout_template_id) {
+              return "standard";
+            }
+            return "none";
+          })(),
           custom_layout_name: s.custom_layout_name || "",
           custom_layout_type: s.custom_layout_type || "custom",
           custom_layout_capacity: s.custom_layout_capacity ?? null,
@@ -839,6 +848,75 @@ function VenueNameSearchField({
   );
 }
 
+function generateTicketTypesFromLayout(
+  templateDetail: any,
+  defaultCapacity?: number | null
+): Array<{
+  ticket_type: string;
+  price: number;
+  total_count: number;
+  max_per_order: number;
+}> {
+  const cfg =
+    typeof templateDetail?.seating_config === "string"
+      ? (() => {
+          try {
+            return JSON.parse(templateDetail.seating_config);
+          } catch {
+            return {};
+          }
+        })()
+      : templateDetail?.seating_config || {};
+
+  const isStadium =
+    cfg?.layout_mode === "stadium" ||
+    (Array.isArray(cfg?.blocks) && cfg.blocks.length > 0);
+
+  if (isStadium && Array.isArray(cfg.blocks) && cfg.blocks.length > 0) {
+    const blocks = cfg.blocks as any[];
+    return blocks.map((b: any, idx: number) => {
+      // Prefer tier-computed capacity (source of truth); fall back to b.capacity only when no tiers
+      let cap = 0;
+      if (Array.isArray(b.tiers) && b.tiers.length > 0) {
+        cap = b.tiers.reduce((sum: number, t: any) => {
+          const rCount = Math.max(
+            1,
+            (t.row_end || "A").charCodeAt(0) - (t.row_start || "A").charCodeAt(0) + 1
+          );
+          return sum + rCount * (Number(t.seats_per_row) || 0);
+        }, 0);
+      }
+      if (cap <= 0) {
+        cap = Number(b.capacity) || 0;
+      }
+      const nl = String(b.name || "").toLowerCase();
+      let maxOrder = 10;
+      if (nl.includes("vip") || nl.includes("lounge") || nl.includes("box")) maxOrder = 6;
+      else if (nl.includes("east") || nl.includes("west") || nl.includes("club") || nl.includes("prime")) maxOrder = 8;
+
+      return {
+        ticket_type: String(b.name || `Stand ${idx + 1}`).trim(),
+        price: Number(b.price) || Number(b.tiers?.[0]?.price) || 500,
+        total_count: Math.max(1, cap || 100),
+        max_per_order: maxOrder,
+      };
+    });
+  }
+
+  // ── Non-stadium (flat floor plan) fallback ──
+  const totalCap =
+    Number(templateDetail?.capacity) || Number(defaultCapacity) || 500;
+  const vipCap = Math.max(1, Math.round(totalCap * 0.15));
+  const premCap = Math.max(1, Math.round(totalCap * 0.35));
+  const genCap = Math.max(1, totalCap - vipCap - premCap);
+
+  return [
+    { ticket_type: "VIP", price: 1500, total_count: vipCap, max_per_order: 6 },
+    { ticket_type: "Premium", price: 800, total_count: premCap, max_per_order: 8 },
+    { ticket_type: "General Admission", price: 350, total_count: genCap, max_per_order: 10 },
+  ];
+}
+
 function SeatingLayoutFields({
   index,
   readOnly,
@@ -851,7 +929,7 @@ function SeatingLayoutFields({
   inputClass: string;
   errorClass: string;
 }) {
-  const { watch, setValue, register } = useFormContext<EventFormValues>();
+  const { watch, setValue, register, getValues } = useFormContext<EventFormValues>();
   const venueSource = watch(`showtimes.${index}.venue_source`) || "manual";
   const venueBusinessId = watch(`showtimes.${index}.venue_business_id`);
   const isRegisteredPartner = venueSource === "registered" && Boolean(venueBusinessId);
@@ -886,7 +964,87 @@ function SeatingLayoutFields({
   const showTemplateLoading = (templateLoading || templateFetching) && !templateDetail;
   const previewLayout = liveLayouts.find((l) => l.id === previewLayoutId) || liveLayouts[0] || null;
 
-  // Registered venues: layouts are view-only. Booking layout is none or custom request only.
+  // Auto-generate ticket types from venue layout when layout details load if tickets are unconfigured
+  const prevDetailIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (readOnly || !templateDetail || !templateDetail.id) return;
+    if (prevDetailIdRef.current === templateDetail.id) return;
+    prevDetailIdRef.current = templateDetail.id;
+
+    const currentTickets = getValues("showtimes.0.ticket_types") || [];
+    const isUnconfigured =
+      currentTickets.length === 0 ||
+      (currentTickets.length === 1 &&
+        (!currentTickets[0]?.ticket_type || currentTickets[0]?.ticket_type === "General") &&
+        (!currentTickets[0]?.price || Number(currentTickets[0]?.price) === 0) &&
+        (!currentTickets[0]?.total_count || Number(currentTickets[0]?.total_count) <= 1));
+
+    if (isUnconfigured) {
+      const generated = generateTicketTypesFromLayout(templateDetail, templateDetail.capacity);
+      if (generated && generated.length > 0) {
+        setValue("showtimes.0.ticket_types", generated, { shouldDirty: true });
+        const count = (getValues("showtimes") || []).length;
+        for (let i = 1; i < count; i++) {
+          setValue(`showtimes.${i}.ticket_types`, generated, { shouldDirty: false });
+        }
+        toast.success(
+          `Auto-generated ${generated.length} ticket types matching layout capacity (${templateDetail.capacity || "stadium"} seats)`
+        );
+      }
+    }
+  }, [templateDetail, readOnly, getValues, setValue]);
+
+  // Always sync layout_capacity_snapshot from the loaded template so the validator
+  // can determine capacity even for stadium layouts (which compute it from tiers).
+  useEffect(() => {
+    if (!templateDetail || !templateDetail.id) return;
+
+    const cfg =
+      typeof templateDetail.seating_config === "string"
+        ? (() => {
+            try { return JSON.parse(templateDetail.seating_config); } catch { return {}; }
+          })()
+        : templateDetail.seating_config || {};
+
+    const isStadium =
+      cfg?.layout_mode === "stadium" ||
+      (Array.isArray(cfg?.blocks) && (cfg as any).blocks.length > 0);
+
+    let computedCap: number | null = null;
+
+    if (isStadium && Array.isArray((cfg as any).blocks) && (cfg as any).blocks.length > 0) {
+      // Sum capacity across all blocks; calculate from tiers when no explicit capacity
+      computedCap = ((cfg as any).blocks as any[]).reduce((total: number, b: any) => {
+        let cap = Number(b.capacity) || 0;
+        if (cap <= 0 && Array.isArray(b.tiers)) {
+          cap = b.tiers.reduce((s: number, t: any) => {
+            const rCount = Math.max(
+              1,
+              (t.row_end || "A").charCodeAt(0) - (t.row_start || "A").charCodeAt(0) + 1
+            );
+            return s + rCount * (Number(t.seats_per_row) || 0);
+          }, 0);
+        }
+        return total + cap;
+      }, 0);
+    }
+
+    if (!computedCap || computedCap <= 0) {
+      // Fallback for flat floor plans
+      computedCap =
+        Number(templateDetail.capacity) ||
+        Number((templateDetail as any).seat_count) ||
+        (Array.isArray((templateDetail as any).seats_json) ? (templateDetail as any).seats_json.length : 0) ||
+        null;
+    }
+
+    if (computedCap && computedCap > 0) {
+      setValue(`showtimes.${index}.layout_capacity_snapshot`, computedCap, { shouldDirty: false });
+      setValue(`showtimes.${index}.layout_seat_count_snapshot`, computedCap, { shouldDirty: false });
+    }
+  }, [templateDetail, index, setValue]);
+
+  // Registered venues: if not registered partner, reset layout mode to none
   useEffect(() => {
     if (readOnly) return;
     if (!isRegisteredPartner) {
@@ -894,11 +1052,6 @@ function SeatingLayoutFields({
         setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
       }
       setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: false });
-      return;
-    }
-    if (layoutMode === "standard") {
-      setValue(`showtimes.${index}.layout_mode`, "none", { shouldDirty: true });
-      setValue(`showtimes.${index}.venue_layout_template_id`, null, { shouldDirty: true });
     }
   }, [readOnly, isRegisteredPartner, layoutMode, index, setValue]);
 
@@ -934,10 +1087,9 @@ function SeatingLayoutFields({
     <div className="space-y-4">
       <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
         <div>
-          <p className={labelClass}>Venue layouts (view only)</p>
+          <p className={labelClass}>Venue layouts</p>
           <p className="text-xs text-slate-500 mb-2">
-            These are the venue partner&apos;s published layouts. You can preview them here but cannot edit
-            them. Choose below whether you need a custom layout for this event.
+            These are the venue partner&apos;s published layouts. Select a layout to use it for this event, or choose below to request a custom layout.
           </p>
           {layoutsFetching && <p className="text-xs text-slate-500 mb-2">Loading venue layouts…</p>}
           {!layoutsFetching && liveLayouts.length === 0 ? (
@@ -953,20 +1105,23 @@ function SeatingLayoutFields({
                     key={l.id}
                     type="button"
                     disabled={readOnly}
-                    onClick={() =>
+                    onClick={() => {
                       setValue(`showtimes.${index}.venue_layout_template_id`, l.id, {
                         shouldDirty: true,
-                      })
-                    }
+                      });
+                      setValue(`showtimes.${index}.layout_mode`, "standard", {
+                        shouldDirty: true,
+                      });
+                    }}
                     className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${
                       active
-                        ? "border-slate-400 bg-slate-50 ring-1 ring-slate-200"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
                         : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
                     <p className="text-sm font-semibold text-slate-800">{l.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {l.capacity ? `${l.capacity} seats` : "Capacity not set"} · preview only
+                      {l.capacity ? `${Number(l.capacity).toLocaleString()} seats` : "Capacity not set"} · Live layout
                     </p>
                   </button>
                 );
@@ -980,7 +1135,7 @@ function SeatingLayoutFields({
             <div>
               <p className="text-sm font-semibold text-slate-900">{previewLayout.name}</p>
               <p className="text-xs text-slate-600">
-                Read-only preview — zoom and pan to inspect the map.
+                Interactive preview — inspect the map and click any stand to zoom into seats.
               </p>
             </div>
             {showTemplateLoading ? (
@@ -1010,6 +1165,35 @@ function SeatingLayoutFields({
         inputClass={inputClass}
         allowCustom
         seedTemplateId={previewLayoutId}
+        hasLiveVenueLayout={liveLayouts.length > 0}
+        venueLayoutName={previewLayout?.name}
+        venueLayoutSeats={(() => {
+          // Prefer tier-computed capacity for stadium layouts
+          const td = templateDetail as any;
+          const cfg =
+            typeof td?.seating_config === "string"
+              ? (() => { try { return JSON.parse(td.seating_config); } catch { return {}; } })()
+              : td?.seating_config || {};
+          if (Array.isArray(cfg?.blocks) && cfg.blocks.length > 0) {
+            const fromTiers = cfg.blocks.reduce((total: number, b: any) => {
+              if (Array.isArray(b.tiers) && b.tiers.length > 0) {
+                return total + b.tiers.reduce((s: number, t: any) => {
+                  const rCount = Math.max(1, (t.row_end || "A").charCodeAt(0) - (t.row_start || "A").charCodeAt(0) + 1);
+                  return s + rCount * (Number(t.seats_per_row) || 0);
+                }, 0);
+              }
+              return total + (Number(b.capacity) || 0);
+            }, 0);
+            if (fromTiers > 0) return fromTiers;
+          }
+          return (
+            Number(td?.capacity) ||
+            Number(td?.seat_count) ||
+            (Array.isArray(td?.seats_json) ? td.seats_json.length : 0) ||
+            Number(previewLayout?.capacity) ||
+            0
+          );
+        })()}
       />
     </div>
   );
@@ -1022,18 +1206,23 @@ function LayoutPreferenceRadios({
   inputClass,
   allowCustom,
   seedTemplateId,
+  hasLiveVenueLayout = false,
+  venueLayoutName = "",
+  venueLayoutSeats = 0,
 }: {
   index: number;
   readOnly: boolean;
   labelClass: string;
   inputClass: string;
   allowCustom: boolean;
-  /** Registered venue layout the organizer previewed — kept as seed for Super Admin. */
   seedTemplateId?: string | null;
+  hasLiveVenueLayout?: boolean;
+  venueLayoutName?: string;
+  venueLayoutSeats?: number | string;
 }) {
   const { watch, setValue, register, getValues } = useFormContext<EventFormValues>();
   const layoutMode = watch(`showtimes.${index}.layout_mode`) || "none";
-  const preference = layoutMode === "custom" ? "custom" : "none";
+  const preference = layoutMode;
   const ticketTypes = watch(`showtimes.0.ticket_types`) || watch(`showtimes.${index}.ticket_types`) || [];
   const ticketSeatTotal = useMemo(
     () =>
@@ -1051,8 +1240,6 @@ function LayoutPreferenceRadios({
   }, [preference, ticketSeatTotal, index, readOnly, setValue]);
 
   const applyCustomMode = () => {
-    // Keep venue_layout_template_id when set — Super Admin uses it as a seed for an
-    // event-only copy; the registered venue layout itself is never overwritten.
     setValue(`showtimes.${index}.layout_mode`, "custom", { shouldDirty: true });
     setValue(`showtimes.${index}.custom_layout_name`, "Custom event seating layout", {
       shouldDirty: true,
@@ -1076,13 +1263,76 @@ function LayoutPreferenceRadios({
       <div>
         <p className={labelClass}>Event seating layout</p>
         <p className="text-xs text-slate-500 mb-2">
-          Optional. Request a custom layout for this event, or continue without a seat map.
+          Choose whether to use the venue&apos;s published layout, request a custom layout, or continue without a seat map.
         </p>
       </div>
       <div className="space-y-2">
+        {hasLiveVenueLayout && (
+          <label
+            className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+              layoutMode === "standard"
+                ? "border-emerald-300 bg-emerald-50/50 ring-1 ring-emerald-200"
+                : "border-slate-200 bg-slate-50 hover:bg-slate-100/60"
+            } ${readOnly ? "cursor-default" : ""}`}
+          >
+            <input
+              type="radio"
+              className="mt-1"
+              disabled={readOnly}
+              checked={layoutMode === "standard"}
+              onChange={() => {
+                setValue(`showtimes.${index}.layout_mode`, "standard", { shouldDirty: true });
+                if (seedTemplateId) {
+                  setValue(`showtimes.${index}.venue_layout_template_id`, seedTemplateId, { shouldDirty: true });
+                }
+              }}
+            />
+            <span>
+              <span className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                <span>Use venue layout: {venueLayoutName || "Published layout"}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Live
+                </span>
+              </span>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Customers will book seats directly on this {venueLayoutSeats ? `${Number(venueLayoutSeats).toLocaleString()} seats ` : ""}layout.
+              </p>
+            </span>
+          </label>
+        )}
+
+        {allowCustom ? (
+          <label
+            className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+              preference === "custom"
+                ? "border-rose-300 bg-rose-50/50 ring-1 ring-rose-200"
+                : "border-slate-200 bg-slate-50 hover:bg-slate-100/60"
+            } ${readOnly ? "cursor-default" : ""}`}
+          >
+            <input
+              type="radio"
+              className="mt-1"
+              disabled={readOnly}
+              checked={preference === "custom"}
+              onChange={applyCustomMode}
+            />
+            <span>
+              <span className="text-sm font-semibold text-slate-800">Add customise event layout</span>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Super Admin will customize from the registered venue map for this event only
+                {ticketSeatTotal > 0 ? ` (up to ${ticketSeatTotal} seats from your ticket types)` : ""}.
+                The venue&apos;s published layout is not changed. Review and approve before
+                the contract is created.
+              </p>
+            </span>
+          </label>
+        ) : null}
+
         <label
-          className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${
-            preference === "none" ? "border-rose-300 bg-rose-50/50" : "border-slate-200 bg-slate-50"
+          className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+            preference === "none"
+              ? "border-rose-300 bg-rose-50/50 ring-1 ring-rose-200"
+              : "border-slate-200 bg-slate-50 hover:bg-slate-100/60"
           } ${readOnly ? "cursor-default" : ""}`}
         >
           <input
@@ -1104,31 +1354,6 @@ function LayoutPreferenceRadios({
             </p>
           </span>
         </label>
-
-        {allowCustom ? (
-          <label
-            className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${
-              preference === "custom" ? "border-rose-300 bg-rose-50/50" : "border-slate-200 bg-slate-50"
-            } ${readOnly ? "cursor-default" : ""}`}
-          >
-            <input
-              type="radio"
-              className="mt-1"
-              disabled={readOnly}
-              checked={preference === "custom"}
-              onChange={applyCustomMode}
-            />
-            <span>
-              <span className="text-sm font-semibold text-slate-800">Add customise event layout</span>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Super Admin will customize from the registered venue map for this event only
-                {ticketSeatTotal > 0 ? ` (up to ${ticketSeatTotal} seats from your ticket types)` : ""}.
-                The venue&apos;s published layout is not changed. Review and approve on Preview before
-                the contract is created.
-              </p>
-            </span>
-          </label>
-        ) : null}
       </div>
 
       {preference === "custom" && (
@@ -1255,6 +1480,13 @@ function EventTicketTypesFields({ readOnly }: { readOnly: boolean }) {
 
   const tickets = watch("showtimes.0.ticket_types") || [];
   const showtimeCount = (watch("showtimes") || []).length;
+  const venueBusinessId = watch("showtimes.0.venue_business_id");
+  const venueLayoutId = watch("showtimes.0.venue_layout_template_id");
+
+  const { data: ticketVenueLayout } = useGetOrganizerVenueLayoutQuery(
+    { businessId: venueBusinessId!, templateId: venueLayoutId! },
+    { skip: !venueBusinessId || !venueLayoutId }
+  );
 
   useEffect(() => {
     if (showtimeCount <= 1) return;
@@ -1269,7 +1501,7 @@ function EventTicketTypesFields({ readOnly }: { readOnly: boolean }) {
 
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <p className="text-sm font-semibold text-slate-800">Ticket types</p>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -1277,30 +1509,54 @@ function EventTicketTypesFields({ readOnly }: { readOnly: boolean }) {
           </p>
         </div>
         {!readOnly && (
-          <button
-            type="button"
-            onClick={() => {
-              // Preserve schedule fields — nested field-array append can drop siblings
-              const rows = [...(getValues("showtimes") || [])];
-              const row0 = rows[0] ? { ...rows[0] } : defaultVenue();
-              append(defaultTicketType());
-              // Re-apply schedule after tick so append cannot drop date/time
-              requestAnimationFrame(() => {
-                const latest = [...(getValues("showtimes") || [])];
-                if (!latest[0]) latest[0] = defaultVenue();
-                latest[0] = {
-                  ...latest[0],
-                  event_date: row0.event_date || latest[0].event_date || "",
-                  start_time: normalizeTimeToHm(row0.start_time || latest[0].start_time || ""),
-                  end_time: normalizeTimeToHm(row0.end_time || latest[0].end_time || ""),
-                };
-                setValue("showtimes", latest, { shouldDirty: true });
-              });
-            }}
-            className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 shrink-0"
-          >
-            <Plus size={14} /> Add type
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {ticketVenueLayout && (
+              <button
+                type="button"
+                onClick={() => {
+                  const generated = generateTicketTypesFromLayout(
+                    ticketVenueLayout,
+                    ticketVenueLayout.capacity
+                  );
+                  setValue("showtimes.0.ticket_types", generated, { shouldDirty: true });
+                  const count = (getValues("showtimes") || []).length;
+                  for (let i = 1; i < count; i++) {
+                    setValue(`showtimes.${i}.ticket_types`, generated, { shouldDirty: false });
+                  }
+                  toast.success(
+                    `Generated ${generated.length} ticket types matching layout (${ticketVenueLayout.capacity || "stadium"} seats)`
+                  );
+                }}
+                className="text-xs text-amber-800 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              >
+                <span>⚡ Auto-fill from venue layout</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                // Preserve schedule fields — nested field-array append can drop siblings
+                const rows = [...(getValues("showtimes") || [])];
+                const row0 = rows[0] ? { ...rows[0] } : defaultVenue();
+                append(defaultTicketType());
+                // Re-apply schedule after tick so append cannot drop date/time
+                requestAnimationFrame(() => {
+                  const latest = [...(getValues("showtimes") || [])];
+                  if (!latest[0]) latest[0] = defaultVenue();
+                  latest[0] = {
+                    ...latest[0],
+                    event_date: row0.event_date || latest[0].event_date || "",
+                    start_time: normalizeTimeToHm(row0.start_time || latest[0].start_time || ""),
+                    end_time: normalizeTimeToHm(row0.end_time || latest[0].end_time || ""),
+                  };
+                  setValue("showtimes", latest, { shouldDirty: true });
+                });
+              }}
+              className="text-xs text-rose-600 hover:text-rose-800 flex items-center gap-1 shrink-0 font-medium"
+            >
+              <Plus size={14} /> Add type
+            </button>
+          </div>
         )}
       </div>
 
@@ -2445,7 +2701,7 @@ export default function EventForm({
       const layoutMode =
         s.layout_mode === "custom"
           ? "custom"
-          : canUseStandardLayouts && s.layout_mode === "standard"
+          : canUseStandardLayouts && (s.layout_mode === "standard" || (Boolean(s.venue_layout_template_id) && s.layout_mode !== "none"))
             ? "standard"
             : "none";
       const originalIndex = rawShowtimes.indexOf(s);
@@ -4377,7 +4633,24 @@ export default function EventForm({
                                           {opt.name}
                                         </p>
                                         <p className="text-xs text-slate-500 mt-0.5">
-                                          {opt.seat_count ?? opt.capacity ?? 0} seats
+                                          {(() => {
+                                            const cfg = opt.seating_config as any;
+                                            if (cfg?.layout_mode === "stadium" && Array.isArray(cfg.blocks)) {
+                                              const est = cfg.blocks.reduce(
+                                                (acc: number, b: any) =>
+                                                  acc +
+                                                  (b.tiers || []).reduce((ta: number, t: any) => {
+                                                    const s = String(t.row_start || "").toUpperCase().charCodeAt(0);
+                                                    const e = String(t.row_end || "").toUpperCase().charCodeAt(0);
+                                                    const r = isNaN(s) || isNaN(e) || e < s ? 0 : e - s + 1;
+                                                    return ta + r * (Number(t.seats_per_row) || 0);
+                                                  }, 0),
+                                                0
+                                              );
+                                              if (est > 0) return `${est.toLocaleString()} seats (Stadium)`;
+                                            }
+                                            return `${opt.seat_count ?? opt.capacity ?? 0} seats`;
+                                          })()}
                                         </p>
                                       </div>
                                       <span

@@ -6258,6 +6258,18 @@ export const api = createApi({
       invalidatesTags: (_r, _e, { eventId }) => [{ type: 'EventLayouts', id: eventId }],
     }),
 
+    generateStadiumSeats: builder.mutation<
+      { success: boolean; generated: number; skipped: number; blocks: number; tiers: number; errors?: string[] },
+      { eventId: string; replace?: boolean; seating_config?: any }
+    >({
+      query: ({ eventId, ...body }) => ({
+        url: `/events/admin/${eventId}/generate-stadium-seats`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { eventId }) => [{ type: 'EventLayouts', id: eventId }],
+    }),
+
     getOrganizerTicketStats: builder.query<
       OrganizerTicketStatsResponse,
       { event_id?: string } | void
@@ -6578,6 +6590,89 @@ export const api = createApi({
     getPublicEventLayout: builder.query<any, string>({
       query: (id) => `/events/public/${id}/layout`,
       providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id: `public-${id}` }],
+    }),
+
+    // ── Stadium Layout ─────────────────────────────────────────────────────────
+    /** Stadium overview: per-block availability counts (Level 1). */
+    getPublicStadiumBlocks: builder.query<
+      {
+        stadium_name: string;
+        pitch_label: string;
+        canvas_width: number;
+        canvas_height: number;
+        blocks: Array<{
+          block_id: string;
+          name: string;
+          color: string;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          rotation?: number;
+          shape?: 'rectangle' | 'pill' | 'curved' | 'oval' | 'arc';
+          innerRadius?: number;
+          outerRadius?: number;
+          startAngle?: number;
+          sweepAngle?: number;
+          stadiumCenterX?: number;
+          stadiumCenterY?: number;
+          total: number;
+          available: number;
+          booked: number;
+          tiers: Array<{ tier_id: string; name: string; ticket_type_id: string; total: number; available: number }>;
+        }>;
+      },
+      string
+    >({
+      query: (eventId) => `/events/public/${eventId}/stadium-blocks`,
+      providesTags: (_r, _e, id) => [{ type: 'EventLayouts', id: `stadium-${id}` }],
+    }),
+
+    /** Stadium block seat list: all seats for a zoomed block. */
+    getStadiumBlockSeats: builder.query<
+      {
+        seats: Array<{
+          id: string;
+          row_label: string;
+          seat_label: string;
+          coordinate_x: number;
+          coordinate_y: number;
+          status: string;
+          ticket_type_id: string;
+          section_name: string;
+          tier_id: string;
+        }>;
+      },
+      { eventId: string; blockId: string }
+    >({
+      query: ({ eventId, blockId }) =>
+        `/events/public/${eventId}/stadium-blocks/${blockId}/seats`,
+      providesTags: (_r, _e, { eventId, blockId }) => [
+        { type: 'EventLayouts', id: `stadium-block-seats-${eventId}-${blockId}` },
+      ],
+    }),
+
+    /** Stadium tier seat list: individual seats for Level 3 picker. */
+    getStadiumTierSeats: builder.query<
+      {
+        seats: Array<{
+          id: string;
+          row_label: string;
+          seat_label: string;
+          coordinate_x: number;
+          coordinate_y: number;
+          status: string;
+          ticket_type_id: string;
+          section_name: string;
+        }>;
+      },
+      { eventId: string; blockId: string; tierId: string }
+    >({
+      query: ({ eventId, blockId, tierId }) =>
+        `/events/public/${eventId}/stadium-blocks/${blockId}/tiers/${tierId}/seats`,
+      providesTags: (_r, _e, { eventId, blockId, tierId }) => [
+        { type: 'EventLayouts', id: `stadium-seats-${eventId}-${blockId}-${tierId}` },
+      ],
     }),
 
     createEventSeatHold: builder.mutation<
@@ -8450,6 +8545,7 @@ export const {
   useSearchOrganizerArtistsQuery,
   useGetEventLayoutQuery,
   useUpdateEventLayoutMutation,
+  useGenerateStadiumSeatsMutation,
   useGetOrganizerTicketStatsQuery,
   useGetOrganizerBookingsQuery,
   useScanOrganizerEventBookingMutation,
@@ -8480,6 +8576,9 @@ export const {
   useUpdateVenueMyInquiryMutation,
   useGetPublicEventQuery,
   useGetPublicEventLayoutQuery,
+  useGetPublicStadiumBlocksQuery,
+  useGetStadiumBlockSeatsQuery,
+  useGetStadiumTierSeatsQuery,
   useCreateEventSeatHoldMutation,
   useReleaseEventSeatHoldMutation,
   useCreateEventBookingMutation,

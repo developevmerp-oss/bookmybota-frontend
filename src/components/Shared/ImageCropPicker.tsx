@@ -54,7 +54,8 @@ function createInitialCrop(width: number, height: number, aspect?: number): Perc
         : makeAspectCrop({ unit: "%", height: 80 }, aspect, width, height);
     return centerCrop(seed, width, height);
   }
-  return centerCrop({ unit: "%", width: 80, height: 80, x: 0, y: 0 }, width, height);
+  // Free crop: start with the full original image.
+  return { unit: "%", width: 100, height: 100, x: 0, y: 0 };
 }
 
 async function cropImageToBlob(

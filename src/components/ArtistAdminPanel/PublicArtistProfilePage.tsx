@@ -51,6 +51,7 @@ import {
 import PartnerLiveEventsSection, {
   PartnerAllEventsPanel,
 } from "@/components/Shared/PartnerLiveEventsSection";
+import PartnerPublicGallery from "@/components/Shared/PartnerPublicGallery";
 import {
   isEventLiveFromDetail,
   isPublicEventLive,
@@ -232,7 +233,6 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
     register,
     control,
     handleSubmit,
-    setValue,
     reset,
     formState: { errors },
   } = form;
@@ -352,8 +352,16 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
           "Inquiry sent."
         )
       );
-      setValue("message", "");
-      setValue("event_date", "");
+      reset({
+        event_date: "",
+        event_time: "",
+        contact_name: "",
+        contact_email: "",
+        contact_phone: "",
+        event_type: "",
+        event_location: "",
+        message: "",
+      });
       void data;
     } catch (err) {
       toast.error(extractApiError(err, "Could not send inquiry"));
@@ -612,25 +620,10 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                 ) : null}
 
                 {showGallery ? (
-                  <section>
-                    <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
-                      Gallery
-                    </h2>
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-                      {galleryImages.map((url, idx) => (
-                        <div
-                          key={`${url}-${idx}`}
-                          className="aspect-[4/3] overflow-hidden rounded-xl border border-[#F3F4F6] bg-[#FAFAFA]"
-                        >
-                          <img
-                            src={resolveMediaUrl(url)}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </section>
+                  <PartnerPublicGallery
+                    images={galleryImages}
+                    label={`${artist.name} gallery`}
+                  />
                 ) : null}
               </div>
             ) : null}

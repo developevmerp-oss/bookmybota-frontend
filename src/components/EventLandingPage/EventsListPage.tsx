@@ -515,18 +515,18 @@ function ArtistChip({ artist }: { artist: PublicRegisteredPartner }) {
   return (
     <Link
       href={`/artists/${artist.id}`}
-      className="shrink-0  snap-start flex flex-col items-center gap-2.5 text-center group"
+      className="shrink-0 w-[120px] sm:w-[190px] snap-start flex flex-col items-center gap-2.5 text-center group"
     >
       <div className="relative h-[120px] w-[120px] sm:h-[190px] sm:w-[190px] rounded-full overflow-hidden bg-[#F7E9FF] ring-2 ring-white shadow-sm">
         <SafeCoverImage
           src={img}
           alt={artist.name}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
           fallbackClassName={ARTIST_IMAGE_FALLBACK_CLASS}
           fallback={<ArtistImageFallback size={40} />}
         />
       </div>
-      <span className="text-sm sm:text-base font-semibold text-slate-800 line-clamp-2 leading-tight px-0.5">
+      <span className="text-sm sm:text-base font-semibold text-slate-800 line-clamp-2 leading-tight px-0.5 w-full">
         {artist.name}
       </span>
     </Link>

@@ -68,7 +68,6 @@ export default function PartnerPhotoGalleryFields({
 
   const addPhotoButton = !disabled && images.length > 0 && images.length < max ? (
     <ImageCropPicker
-      aspect={4 / 3}
       disabled={uploading}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-border text-xs font-semibold text-foreground hover:border-primary cursor-pointer shrink-0"
       onCroppedFile={(file) => void uploadCropped(file)}
@@ -86,7 +85,7 @@ export default function PartnerPhotoGalleryFields({
             {title}
           </h3>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            {description} Up to {max} photos. Crop like Photos — move any side or corner.
+            {description} Up to {max} photos. Crop freely — original proportions are kept.
           </p>
         </div>
         {addPhotoButton}
@@ -102,7 +101,6 @@ export default function PartnerPhotoGalleryFields({
           <p className="text-sm text-muted-foreground">No gallery photos yet.</p>
           {!disabled ? (
             <ImageCropPicker
-              aspect={4 / 3}
               disabled={uploading}
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold cursor-pointer"
               onCroppedFile={(file) => void uploadCropped(file)}
@@ -122,7 +120,6 @@ export default function PartnerPhotoGalleryFields({
             <CroppedImageField
               key={`${url}-${idx}`}
               value={url}
-              aspect={4 / 3}
               disabled={disabled || uploading}
               previewClassName="rounded-xl border border-border aspect-[4/3] bg-muted w-full overflow-hidden"
               onRemove={() => onChange(images.filter((_, i) => i !== idx))}

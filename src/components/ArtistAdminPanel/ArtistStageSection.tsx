@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Pause, Play } from "lucide-react";
+import { ChevronRight, Film, Pause, Play } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import type { ArtistMediaClip } from "@/lib/artistMeta";
 import SafeCoverImage, {
   ARTIST_IMAGE_FALLBACK_CLASS,
   ArtistImageFallback,
 } from "@/components/Shared/SafeCoverImage";
+import PartnerMediaLightbox from "@/components/Shared/PartnerMediaLightbox";
 
 type Props = {
   name: string;
@@ -17,6 +18,8 @@ type Props = {
   spotlightVideos: ArtistMediaClip[];
   onAboutClick: () => void;
 };
+
+const AUDIO_PREVIEW_COUNT = 3;
 
 export default function ArtistStageSection({
   name,
@@ -29,39 +32,32 @@ export default function ArtistStageSection({
   const hasSpotlight = spotlightVideos.length > 0;
   const hasAudio = !hasSpotlight && audioClips.length > 0;
   const [playing, setPlaying] = useState<number | null>(null);
+  const [audioExpanded, setAudioExpanded] = useState(false);
+  const [videoLightboxOpen, setVideoLightboxOpen] = useState(false);
+  const [videoStartIndex, setVideoStartIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
 
   useEffect(() => {
     return () => {
       audioRef.current?.pause();
-      Object.values(videoRefs.current).forEach((el) => el?.pause());
     };
   }, []);
 
   useEffect(() => {
-    if (!hasSpotlight || playing == null) return;
-    void videoRefs.current[playing]?.play().catch(() => undefined);
-  }, [hasSpotlight, playing]);
+    setAudioExpanded(false);
+  }, [audioClips]);
 
   if (!hasSpotlight && !hasAudio) return null;
 
-  const stopAll = (exceptVideo?: number) => {
+  const stopAudio = () => {
     audioRef.current?.pause();
-    Object.entries(videoRefs.current).forEach(([key, el]) => {
-      if (exceptVideo != null && Number(key) === exceptVideo) return;
-      el?.pause();
-    });
   };
 
-  const toggleVideo = (idx: number) => {
-    if (playing === idx) {
-      videoRefs.current[idx]?.pause();
-      setPlaying(null);
-      return;
-    }
-    stopAll(idx);
-    setPlaying(idx);
+  const openVideoAt = (idx: number) => {
+    stopAudio();
+    setPlaying(null);
+    setVideoStartIndex(idx);
+    setVideoLightboxOpen(true);
   };
 
   const toggleAudio = (idx: number, url: string) => {
@@ -70,7 +66,7 @@ export default function ArtistStageSection({
       setPlaying(null);
       return;
     }
-    stopAll();
+    stopAudio();
     const el = audioRef.current;
     if (!el) return;
     el.src = resolveMediaUrl(url);
@@ -91,6 +87,7 @@ export default function ArtistStageSection({
   );
 
   if (hasSpotlight) {
+    const videoUrls = spotlightVideos.map((clip) => clip.url).filter(Boolean);
     return (
       <section className="min-w-0">
         <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
@@ -119,49 +116,73 @@ export default function ArtistStageSection({
 
           <div className="border-t border-[#EFEFEF] px-4 py-4 sm:px-5 sm:py-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-              {spotlightVideos.map((clip, idx) => {
-                const active = playing === idx;
+              {(spotlightVideos.length > 3
+                ? spotlightVideos.slice(0, 3)
+                : spotlightVideos
+              ).map((clip, idx) => {
+                const showMoreOverlay = spotlightVideos.length > 3 && idx === 2;
                 return (
-                  <div
+                  <button
                     key={`${clip.url}-${idx}`}
-                    className="overflow-hidden rounded-2xl border border-[#EFEFEF] bg-[#FAFAFA]"
+                    type="button"
+                    onClick={() => openVideoAt(showMoreOverlay ? 0 : idx)}
+                    className="overflow-hidden rounded-2xl border border-[#EFEFEF] bg-[#FAFAFA] text-left cursor-pointer group"
+                    aria-label={
+                      showMoreOverlay
+                        ? `View all ${spotlightVideos.length} videos`
+                        : `Play spotlight video ${idx + 1}`
+                    }
                   >
                     <div className="relative aspect-[3/4] bg-black sm:aspect-[4/5]">
                       <video
-                        ref={(node) => {
-                          videoRefs.current[idx] = node;
-                        }}
                         src={resolveMediaUrl(clip.url)}
+                        muted
                         playsInline
-                        controls={active}
-                        onEnded={() => setPlaying(null)}
-                        className="absolute inset-0 h-full w-full object-cover"
-                        onClick={() => {
-                          if (!active) toggleVideo(idx);
-                        }}
+                        preload="metadata"
+                        className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                       />
-                      {!active ? (
-                        <button
-                          type="button"
-                          aria-label="Play spotlight video"
-                          onClick={() => toggleVideo(idx)}
-                          className="absolute inset-0 flex items-center justify-center bg-black/25 cursor-pointer"
-                        >
+                      {showMoreOverlay ? (
+                        <span className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white transition-colors group-hover:bg-black/70">
+                          <Film size={22} className="mb-1" strokeWidth={1.75} />
+                          <span className="font-bold text-sm tracking-wide">
+                            View all videos
+                          </span>
+                          <span className="text-[0.625rem] text-white/70 mt-0.5">
+                            {spotlightVideos.length} Videos
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/25 transition-colors group-hover:bg-black/35">
                           <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/95 text-[#111111] shadow-md">
                             <Play size={18} fill="currentColor" className="ml-0.5" />
                           </span>
-                        </button>
-                      ) : null}
+                        </span>
+                      )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
         </div>
+
+        <PartnerMediaLightbox
+          open={videoLightboxOpen}
+          items={videoUrls}
+          startIndex={videoStartIndex}
+          kind="video"
+          label={`${name} spotlight`}
+          onClose={() => setVideoLightboxOpen(false)}
+        />
       </section>
     );
   }
+
+  const visibleAudio =
+    audioExpanded || audioClips.length <= AUDIO_PREVIEW_COUNT
+      ? audioClips
+      : audioClips.slice(0, AUDIO_PREVIEW_COUNT);
+  const canToggleAudio = audioClips.length > AUDIO_PREVIEW_COUNT;
 
   return (
     <section className="min-w-0">
@@ -197,7 +218,7 @@ export default function ArtistStageSection({
           </div>
 
           <div className="min-w-0 flex-1 border-t border-[#EFEFEF] px-2 py-2 sm:px-3 sm:py-3 md:border-t-0">
-            {audioClips.map((clip, idx) => {
+            {visibleAudio.map((clip, idx) => {
               const active = playing === idx;
               return (
                 <div
@@ -224,6 +245,17 @@ export default function ArtistStageSection({
                 </div>
               );
             })}
+            {canToggleAudio ? (
+              <div className="border-t border-[#F3F4F6] px-3 py-2.5 sm:px-4">
+                <button
+                  type="button"
+                  onClick={() => setAudioExpanded((v) => !v)}
+                  className="text-sm font-bold text-[#6900AA] cursor-pointer hover:underline"
+                >
+                  {audioExpanded ? "See less" : "See more"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

@@ -194,7 +194,6 @@ export default function VenueProfilePage() {
               <label className="portal-label block text-xs font-semibold mb-1.5">Cover image</label>
               <CroppedImageField
                 value={coverImageUrl}
-                aspect={16 / 9}
                 disabled={uploading}
                 previewClassName="w-full max-w-[280px] aspect-video rounded-xl border border-border"
                 emptyClassName="flex flex-col items-center justify-center w-full max-w-[280px] aspect-video rounded-xl border border-dashed border-border hover:border-primary"

@@ -131,7 +131,6 @@ export default function ArtistProfilePage() {
                 <label className="portal-label block text-xs font-semibold mb-1.5">Profile photo</label>
                 <CroppedImageField
                   value={coverImageUrl}
-                  aspect={1}
                   disabled={uploading}
                   previewClassName="w-28 h-28 rounded-2xl border border-border"
                   emptyClassName="flex flex-col items-center justify-center w-28 h-28 rounded-2xl border border-dashed border-border hover:border-primary"

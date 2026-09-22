@@ -132,7 +132,6 @@ export default function VenueMetaFields({
           {url && isImage ? (
             <CroppedImageField
               value={url}
-              aspect={16 / 9}
               disabled={disabled || uploading}
               previewClassName="w-full max-w-sm aspect-video rounded-lg border border-slate-200"
               emptyClassName="flex flex-col items-center justify-center w-full max-w-sm aspect-video rounded-lg border border-dashed border-slate-300"
@@ -171,7 +170,6 @@ export default function VenueMetaFields({
             <div className="space-y-2 max-w-sm">
               <CroppedImageField
                 value=""
-                aspect={16 / 9}
                 disabled={disabled || uploading}
                 previewClassName="w-full aspect-video rounded-lg border border-slate-200"
                 emptyClassName={`flex flex-col items-center justify-center w-full aspect-video rounded-lg border border-dashed cursor-pointer ${

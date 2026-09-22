@@ -9,6 +9,7 @@ import {
   Link2,
   RefreshCcw,
   Ticket,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useGetRelatedPublicMoviesQuery, type Movie } from "@/services/api";
@@ -352,51 +353,181 @@ function AboutSection({ text }: { text: string }) {
   );
 }
 
+function PersonMemberModal({
+  open,
+  kind,
+  person,
+  onClose,
+}: {
+  open: boolean;
+  kind: "Cast" | "Crew";
+  person: MoviePerson | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPaddingRight;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open || !person) return null;
+
+  const isCast = kind === "Cast";
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6 bg-black/55"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${kind} member`}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-[20rem] sm:max-w-[22rem] rounded-2xl bg-white shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 pt-4 sm:pt-5">
+          <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.14em] text-[#6900AA]">
+            {kind}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="inline-flex size-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 cursor-pointer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center px-5 sm:px-6 pb-6 pt-3 text-center">
+          <div
+            className={`overflow-hidden bg-slate-200 ${
+              isCast
+                ? "w-36 h-36 sm:w-40 sm:h-40 rounded-xl"
+                : "w-32 h-32 sm:w-36 sm:h-36 rounded-full ring-1 ring-slate-200"
+            }`}
+          >
+            <img
+              src={person.image}
+              alt={person.name}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <h3 className="mt-4 text-lg sm:text-xl font-bold text-[#111111] leading-snug">
+            {person.name}
+          </h3>
+          {person.role ? (
+            <p className="mt-1.5 text-sm sm:text-base text-slate-500 leading-snug">
+              {person.role}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CastSection({ cast }: { cast: MoviePerson[] }) {
+  const [selected, setSelected] = useState<MoviePerson | null>(null);
+
   if (!cast.length) return null;
   return (
-    <HeaderCarouselSection title="Cast" muted itemCount={cast.length}>
-      {cast.map((person) => (
-        <article
-          key={`${person.name}-${person.role}`}
-          className="shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6"
-        >
-          <div className="aspect-square rounded-xl overflow-hidden bg-slate-200">
-            <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
-          </div>
-          <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-1">
-            {person.name}
-          </p>
-          {person.role && (
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
-          )}
-        </article>
-      ))}
-    </HeaderCarouselSection>
+    <>
+      <HeaderCarouselSection title="Cast" muted itemCount={cast.length}>
+        {cast.map((person) => (
+          <button
+            key={`${person.name}-${person.role}`}
+            type="button"
+            onClick={() => setSelected(person)}
+            className="shrink-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6 text-left cursor-pointer group"
+            aria-label={`View cast member ${person.name}`}
+          >
+            <div className="aspect-square rounded-xl overflow-hidden bg-slate-200">
+              <img
+                src={person.image}
+                alt={person.name}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+            </div>
+            <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-1">
+              {person.name}
+            </p>
+            {person.role && (
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
+            )}
+          </button>
+        ))}
+      </HeaderCarouselSection>
+      <PersonMemberModal
+        open={Boolean(selected)}
+        kind="Cast"
+        person={selected}
+        onClose={() => setSelected(null)}
+      />
+    </>
   );
 }
 
 function CrewSection({ crew }: { crew: MoviePerson[] }) {
+  const [selected, setSelected] = useState<MoviePerson | null>(null);
+
   if (!crew.length) return null;
   return (
-    <HeaderCarouselSection title="Crew" itemCount={crew.length}>
-      {crew.map((person) => (
-        <article
-          key={`${person.name}-${person.role}`}
-          className="shrink-0 w-1/4 sm:w-1/5 md:w-1/6 text-center"
-        >
-          <div className="mx-auto w-4/5 aspect-square rounded-full overflow-hidden bg-slate-200 ring-1 ring-slate-200">
-            <img src={person.image} alt={person.name} className="h-full w-full object-cover" />
-          </div>
-          <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-2">
-            {person.name}
-          </p>
-          {person.role && (
-            <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
-          )}
-        </article>
-      ))}
-    </HeaderCarouselSection>
+    <>
+      <HeaderCarouselSection title="Crew" itemCount={crew.length}>
+        {crew.map((person) => (
+          <button
+            key={`${person.name}-${person.role}`}
+            type="button"
+            onClick={() => setSelected(person)}
+            className="shrink-0 w-1/4 sm:w-1/5 md:w-1/6 text-center cursor-pointer group"
+            aria-label={`View crew member ${person.name}`}
+          >
+            <div className="mx-auto w-4/5 aspect-square rounded-full overflow-hidden bg-slate-200 ring-1 ring-slate-200">
+              <img
+                src={person.image}
+                alt={person.name}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+            </div>
+            <p className="mt-2 text-sm sm:text-base font-bold text-[#111111] leading-snug line-clamp-2">
+              {person.name}
+            </p>
+            {person.role && (
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-500 line-clamp-1">{person.role}</p>
+            )}
+          </button>
+        ))}
+      </HeaderCarouselSection>
+      <PersonMemberModal
+        open={Boolean(selected)}
+        kind="Crew"
+        person={selected}
+        onClose={() => setSelected(null)}
+      />
+    </>
   );
 }
 

@@ -3321,7 +3321,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     type="button"
                     disabled={!selectedTime || !acceptedTerms}
                     onClick={proceedToBooking}
-                  className={`w-full py-3.5 rounded-md text-base font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
+                  className={`w-fit self-start px-6 sm:px-8 py-3.5 rounded-md text-base font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
                     ? 'bg-[#6900AA] hover:bg-[#57008E] text-white cursor-pointer'
                     : 'bg-[#cfcfcf] text-white cursor-not-allowed'
                     }`}

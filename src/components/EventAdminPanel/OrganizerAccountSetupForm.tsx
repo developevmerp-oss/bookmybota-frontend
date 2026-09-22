@@ -7,6 +7,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import { CheckCircle, ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import PartnerDocumentsFields, {
+  resolvePartnerDocumentsForSubmit,
   validateRequiredPartnerDocuments,
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import ContactPersonsFields from "@/components/Shared/ContactPersonsFields";
@@ -92,7 +93,7 @@ const MODULE_COPY: Record<
     addressLabel: "Organisation / Individual Address",
     addressPlaceholder: "Enter your organisation address",
     typeMissing: "Event organizer type is not configured. Please contact support.",
-    submitLabel: "Register Business",
+    submitLabel: "Submit & Register",
     termsVersion: "event-v1",
   },
   venue: {
@@ -105,7 +106,7 @@ const MODULE_COPY: Record<
     addressLabel: "Venue Address",
     addressPlaceholder: "Enter your venue address",
     typeMissing: "Venue partner type is not configured. Please contact support.",
-    submitLabel: "Register Venue",
+    submitLabel: "Submit & Register Venue",
     termsVersion: "venue-v1",
   },
   artist: {
@@ -118,7 +119,7 @@ const MODULE_COPY: Record<
     addressLabel: "City / Base Address",
     addressPlaceholder: "Enter your city or base address",
     typeMissing: "Artist partner type is not configured. Please contact support.",
-    submitLabel: "Register Artist",
+    submitLabel: "Submit & Register Artist",
     termsVersion: "artist-v1",
   },
   cinema: {
@@ -131,7 +132,7 @@ const MODULE_COPY: Record<
     addressLabel: "Cinema Address",
     addressPlaceholder: "Enter your cinema address",
     typeMissing: "Cinema partner type is not configured. Please contact support.",
-    submitLabel: "Register Cinema",
+    submitLabel: "Submit & Register Cinema",
     termsVersion: "cinema-v1",
   },
 };
@@ -150,6 +151,7 @@ export default function OrganizerAccountSetupForm({
 
   const [step, setStep] = useState<StepId>(1);
   const [step1Done, setStep1Done] = useState(false);
+  const [submittingRegistration, setSubmittingRegistration] = useState(false);
 
   const needsSubtype = module === "venue" || module === "artist";
   const requireAddress = module !== "artist";
@@ -322,7 +324,12 @@ export default function OrganizerAccountSetupForm({
     }
     setError(null);
     const resolvedTypeId = needsSubtype ? Number(values.subtypeId) : moduleParentId;
+    setSubmittingRegistration(true);
     try {
+      const resolvedDocuments = await resolvePartnerDocumentsForSubmit(documents, async (formData) =>
+        uploadImage(formData).unwrap()
+      );
+      setDocuments(resolvedDocuments);
       const cityLabel =
         regCities.find((c) => c.id === Number(cityId))?.name?.trim() || "";
       const primary = values.contacts[0];
@@ -339,7 +346,7 @@ export default function OrganizerAccountSetupForm({
           phone: c.phone.trim(),
         })),
         partner_type: module,
-        documents,
+        documents: resolvedDocuments,
         cover_image_url: coverImageUrl.trim() || undefined,
         registration_terms_accepted: true,
         registration_terms_version: copy.termsVersion,
@@ -369,6 +376,8 @@ export default function OrganizerAccountSetupForm({
       );
       setError(message);
       toast.error(message);
+    } finally {
+      setSubmittingRegistration(false);
     }
   };
 
@@ -690,12 +699,23 @@ export default function OrganizerAccountSetupForm({
             <p className="px-4 sm:px-5 text-sm font-semibold text-rose-600 text-right">{error}</p>
           )}
 
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 px-4 sm:px-5 py-5 border-t border-slate-100">
+          <div
+            className={`flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-5 border-t border-slate-100 ${
+              step === 2
+                ? "sticky bottom-0 z-10 bg-white/95 backdrop-blur-sm shadow-[0_-8px_24px_rgba(15,23,42,0.06)]"
+                : ""
+            }`}
+          >
+            {step === 2 && (
+              <p className="text-xs text-slate-500 sm:mr-auto order-3 sm:order-none">
+                Click Submit on each document field to upload, then register below.
+              </p>
+            )}
             {step === 1 && (
               <button
                 type="button"
                 onClick={() => void handleProceedStep1()}
-                className="h-11 px-8 rounded-md bg-[#e11d48] text-white text-sm font-bold hover:bg-[#be123c] transition-colors cursor-pointer"
+                className="h-11 px-8 rounded-md bg-[#e11d48] text-white text-sm font-bold hover:bg-[#be123c] transition-colors cursor-pointer sm:ml-auto"
               >
                 Proceed
               </button>
@@ -712,12 +732,15 @@ export default function OrganizerAccountSetupForm({
                 <button
                   type="button"
                   onClick={handleSubmitStep2}
-                  disabled={isLoading || !acceptTerms}
+                  disabled={isLoading || uploadingImage || submittingRegistration || !acceptTerms}
                   className="h-11 px-8 rounded-md bg-[#e11d48] text-white text-sm font-bold hover:bg-[#be123c] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer inline-flex items-center justify-center gap-2"
                 >
-                  {isLoading ? (
+                  {isLoading || uploadingImage || submittingRegistration ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" /> Registering…
+                      <Loader2 size={16} className="animate-spin" />
+                      {submittingRegistration && !isLoading
+                        ? "Uploading documents…"
+                        : "Submitting…"}
                     </>
                   ) : (
                     copy.submitLabel

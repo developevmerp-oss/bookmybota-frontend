@@ -149,6 +149,10 @@ export interface PartnerDocumentUpload {
   url: string;
   document_name?: string;
   uploaded_at?: string;
+  /** Client-only: file chosen locally; uploaded on form submit */
+  pending_file?: File;
+  pending_file_name?: string;
+  pending_preview_url?: string;
 }
 
 export interface PartnerDocumentMaster {
@@ -856,6 +860,10 @@ export interface EventDocumentUpload {
   document_type_id: number;
   url: string;
   document_name?: string;
+  /** Client-only: file chosen locally; uploaded on save/submit */
+  pending_file?: File;
+  pending_file_name?: string;
+  pending_preview_url?: string;
 }
 
 export interface EventCategoryMaster {

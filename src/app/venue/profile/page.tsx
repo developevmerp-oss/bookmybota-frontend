@@ -17,7 +17,9 @@ import {
 } from "@/services/api";
 import PhoneInput from "@/components/Shared/PhoneInput";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
-import PartnerDocumentsFields from "@/components/DiningAdminPanel/PartnerDocumentsFields";
+import PartnerDocumentsFields, {
+  resolvePartnerDocumentsForSubmit,
+} from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import VenueLocationFields from "@/components/VenueAdminPanel/VenueLocationFields";
 import PartnerPhotoGalleryFields, {
   normalizeImageList,
@@ -113,6 +115,11 @@ export default function VenueProfilePage() {
         .filter(Boolean)
         .join("\n\n");
 
+      const resolvedDocuments = await resolvePartnerDocumentsForSubmit(documents, async (formData) =>
+        uploadImage(formData).unwrap()
+      );
+      setDocuments(resolvedDocuments);
+
       await updateSettings({
         bizId,
         body: {
@@ -123,7 +130,7 @@ export default function VenueProfilePage() {
           cover_image_url: coverImageUrl || "",
           gallery_images: galleryImages,
           city_id: values.cityId ? Number(values.cityId) : null,
-          documents,
+          documents: resolvedDocuments,
           venue_meta: {
             ...venueMeta,
             registration: {

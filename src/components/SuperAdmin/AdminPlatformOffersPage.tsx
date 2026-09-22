@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
@@ -108,6 +108,12 @@ function statusBadge(status?: string) {
 }
 
 function offerToForm(o: PlatformOffer): AdminPlatformOfferValues {
+  const countryId =
+    o.country_id != null && o.country_id !== ("" as unknown)
+      ? Number(o.country_id)
+      : "";
+  const cityId =
+    o.city_id != null && o.city_id !== ("" as unknown) ? Number(o.city_id) : "";
   return {
     name: o.name || "",
     code: o.code || "",
@@ -129,8 +135,8 @@ function offerToForm(o: PlatformOffer): AdminPlatformOfferValues {
     event_ids: o.event_ids || [],
     restaurant_ids: o.restaurant_ids || [],
     movie_ids: o.movie_ids || [],
-    country_id: o.country_id != null ? o.country_id : "",
-    city_id: o.city_id != null ? o.city_id : "",
+    country_id: Number.isFinite(countryId as number) ? (countryId as number) : "",
+    city_id: Number.isFinite(cityId as number) ? (cityId as number) : "",
   };
 }
 
@@ -170,10 +176,13 @@ export default function AdminPlatformOffersPage() {
       : Number(selectedCountryId);
 
   const { data: countries = [] } = useGetGeoCountriesQuery(undefined, { skip: !formOpen });
+  // Load cities for the selected country, or all cities when country is "All"
+  // so admin can pick a city without country first (country auto-fills from city).
   const { data: cities = [] } = useGetCitiesQuery(
     countryIdNum ? { country_id: countryIdNum } : undefined,
     { skip: !formOpen }
   );
+  const selectedCityId = watch("city_id");
 
   const listArg = {
     page,
@@ -208,6 +217,32 @@ export default function AdminPlatformOffersPage() {
   const offers = offersData?.items ?? [];
   const redemptions = redemptionsData?.items ?? [];
   const listMeta = tab === "REDEMPTIONS" ? redemptionsData?.meta : offersData?.meta;
+
+  const editingOffer = useMemo(
+    () => (editingId ? offers.find((o) => o.id === editingId) : undefined),
+    [editingId, offers]
+  );
+  const cityOptions = useMemo(() => {
+    const list = [...cities];
+    const selectedId =
+      selectedCityId === "" || selectedCityId == null ? null : Number(selectedCityId);
+    if (
+      selectedId != null &&
+      Number.isFinite(selectedId) &&
+      !list.some((c) => Number(c.id) === selectedId)
+    ) {
+      list.unshift({
+        id: selectedId,
+        name: editingOffer?.city_name || `City #${selectedId}`,
+        slug: "",
+        is_popular: false,
+        is_active: true,
+        sort_order: 0,
+        country_id: countryIdNum ?? editingOffer?.country_id ?? null,
+      });
+    }
+    return list;
+  }, [cities, selectedCityId, countryIdNum, editingOffer]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -592,14 +627,14 @@ export default function AdminPlatformOffersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    Country
+                    Country <span className="text-zinc-500 font-normal normal-case">(optional)</span>
                   </label>
                   <select
                     value={selectedCountryId === "" || selectedCountryId == null ? "" : String(selectedCountryId)}
                     onChange={(e) => {
                       const next = e.target.value ? Number(e.target.value) : "";
-                      setValue("country_id", next, { shouldDirty: true });
-                      setValue("city_id", "", { shouldDirty: true });
+                      setValue("country_id", next, { shouldDirty: true, shouldValidate: true });
+                      setValue("city_id", "", { shouldDirty: true, shouldValidate: true });
                     }}
                     className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white"
                   >
@@ -611,26 +646,29 @@ export default function AdminPlatformOffersPage() {
                     ))}
                   </select>
                   <p className="mt-1 text-[11px] text-zinc-500">
-                    Leave empty for a platform-wide offer.
+                    Optional. Leave empty for a platform-wide offer (all cities).
                   </p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase mb-2">
-                    City
+                    City <span className="text-zinc-500 font-normal normal-case">(optional)</span>
                   </label>
                   <select
                     value={
-                      watch("city_id") === "" || watch("city_id") == null
+                      selectedCityId === "" || selectedCityId == null
                         ? ""
-                        : String(watch("city_id"))
+                        : String(selectedCityId)
                     }
                     onChange={(e) => {
                       const next = e.target.value ? Number(e.target.value) : "";
-                      setValue("city_id", next, { shouldDirty: true });
+                      setValue("city_id", next, { shouldDirty: true, shouldValidate: true });
                       if (next) {
-                        const match = cities.find((c) => c.id === next);
+                        const match = cityOptions.find((c) => Number(c.id) === next);
                         if (match?.country_id) {
-                          setValue("country_id", match.country_id, { shouldDirty: true });
+                          setValue("country_id", Number(match.country_id), {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
                         }
                       }
                     }}
@@ -639,12 +677,15 @@ export default function AdminPlatformOffersPage() {
                     <option value="">
                       {countryIdNum ? "All cities in country" : "All cities"}
                     </option>
-                    {cities.map((c) => (
+                    {cityOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
                     ))}
                   </select>
+                  <p className="mt-1 text-[11px] text-zinc-500">
+                    Optional. If set, this offer only appears for customers in that city.
+                  </p>
                 </div>
               </div>
 

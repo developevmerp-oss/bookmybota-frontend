@@ -492,13 +492,21 @@ export function isShowtimePersistable(
 }
 
 export function validateRequiredDocuments(
-  documents: Array<{ document_type_id: number; url: string }>,
+  documents: Array<{ document_type_id: number; url: string; pending_file?: File }>,
   requiredIds: number[],
   requiredNames: Record<number, string>
 ): string | null {
-  const uploaded = new Set(documents.filter((d) => d.url?.trim()).map((d) => d.document_type_id));
+  const uploaded = new Set(
+    documents
+      .filter((d) => Boolean(d.url?.trim()) && !d.pending_file)
+      .map((d) => d.document_type_id)
+  );
   for (const id of requiredIds) {
     if (!uploaded.has(id)) {
+      const pending = documents.some((d) => d.document_type_id === id && d.pending_file);
+      if (pending) {
+        return `Click Submit to upload: ${requiredNames[id] || "document"}.`;
+      }
       return `Required document missing: ${requiredNames[id] || 'document'}.`;
     }
   }
@@ -518,7 +526,7 @@ export type EventStepCompletionId =
 export function getCompletedEventStepIds(opts: {
   hostingType: 'single' | 'tour' | '';
   values: EventFormValues;
-  documents: Array<{ document_type_id: number; url: string }>;
+  documents: Array<{ document_type_id: number; url: string; pending_file?: File }>;
   requiredDocumentIds?: number[];
   genresConfigured?: boolean;
   categorySlug?: string | null;
@@ -575,7 +583,9 @@ export function getCompletedEventStepIds(opts: {
   if (posterOk) {
     if (requiredDocumentIds.length > 0) {
       const docsErr = validateRequiredDocuments(
-        documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
+        documents.filter(
+          (d) => d.document_type_id > 0 && Boolean(d.url?.trim()) && !d.pending_file
+        ),
         requiredDocumentIds,
         Object.fromEntries(requiredDocumentIds.map((id) => [id, 'document']))
       );
@@ -623,7 +633,8 @@ export function getCompletedEventStepIds(opts: {
   if (venueOk) done.push('venue');
 
   const artists = values.artists || [];
-  if (artists.length > 0 && artists.every((a) => Boolean(a.name?.trim()))) {
+  // Artists step is optional: empty lineup is allowed; if added, each needs a name.
+  if (artists.length === 0 || artists.every((a) => Boolean(a.name?.trim()))) {
     done.push('artists');
   }
 

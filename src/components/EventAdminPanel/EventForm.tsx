@@ -1387,7 +1387,9 @@ function EventDocUploadsList({
   documents,
   readOnly,
   uploading,
-  onUpload,
+  uploadingId,
+  onSelect,
+  onSubmitPending,
   onRemove,
   emptyMessage,
 }: {
@@ -1395,7 +1397,9 @@ function EventDocUploadsList({
   documents: EventDocumentUpload[];
   readOnly: boolean;
   uploading: boolean;
-  onUpload: (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => void;
+  uploadingId?: number | null;
+  onSelect: (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => void;
+  onSubmitPending: (documentTypeId: number) => void;
   onRemove: (documentTypeId: number) => void;
   emptyMessage?: string;
 }) {
@@ -1405,7 +1409,16 @@ function EventDocUploadsList({
   return (
     <div className="space-y-3">
       {docs.map((doc) => {
-        const uploadedUrl = documents.find((d) => d.document_type_id === doc.id)?.url;
+        const entry = documents.find((d) => d.document_type_id === doc.id);
+        const isPending = Boolean(entry?.pending_file);
+        const hasFile = isPending || Boolean(entry?.url?.trim());
+        const isUploading = uploadingId === doc.id || (uploading && isPending);
+        const viewHref = entry?.pending_preview_url
+          ? entry.pending_preview_url
+          : entry?.url
+            ? resolveMediaUrl(entry.url)
+            : "";
+        const fileLabel = entry?.pending_file_name || entry?.document_name || doc.name;
         return (
           <div key={doc.id} className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1419,40 +1432,65 @@ function EventDocUploadsList({
             {doc.description && (
               <p className="portal-muted text-xs leading-relaxed">{doc.description}</p>
             )}
-            {uploadedUrl ? (
-              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                <a
-                  href={resolveMediaUrl(uploadedUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
-                  title="View document"
-                  aria-label={`View ${doc.name}`}
-                >
-                  <Eye size={18} />
-                </a>
-                {!readOnly && (
+            {hasFile ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                  <a
+                    href={viewHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                    title="View document"
+                    aria-label={`View ${doc.name}`}
+                  >
+                    <Eye size={18} />
+                  </a>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-slate-700 truncate" title={fileLabel}>
+                      {fileLabel}
+                    </p>
+                    {isPending ? (
+                      <p className="text-[11px] text-amber-700 font-medium mt-0.5">
+                        Selected — click Submit to upload
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-emerald-700 font-medium mt-0.5">Uploaded</p>
+                    )}
+                  </div>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => onRemove(doc.id)}
+                      disabled={isUploading}
+                      className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-40"
+                      title="Delete document"
+                      aria-label={`Remove ${doc.name}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+                {!readOnly && isPending && (
                   <button
                     type="button"
-                    onClick={() => onRemove(doc.id)}
-                    className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                    title="Delete document"
-                    aria-label={`Remove ${doc.name}`}
+                    onClick={() => onSubmitPending(doc.id)}
+                    disabled={isUploading}
+                    className="w-full h-9 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50 inline-flex items-center justify-center gap-2"
                   >
-                    <Trash2 size={16} />
+                    {isUploading ? "Uploading…" : "Submit"}
                   </button>
                 )}
               </div>
             ) : (
               !readOnly && (
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 text-sm portal-muted hover:border-rose-400 cursor-pointer">
-                  <Upload size={16} /> Upload JPG, PNG, or PDF
+                  <Upload size={16} /> Choose JPG, PNG, or PDF
                   <input
                     type="file"
                     accept="image/jpeg,image/jpg,image/png,image/webp,.pdf,application/pdf"
                     className="hidden"
                     disabled={uploading}
-                    onChange={(e) => onUpload(e, doc.id)}
+                    onChange={(e) => onSelect(e, doc.id)}
                   />
                 </label>
               )
@@ -1637,7 +1675,9 @@ function VenueBlock({
   venueDocuments = [],
   documents = [],
   uploading = false,
-  onDocumentUpload,
+  uploadingId = null,
+  onDocumentSelect,
+  onDocumentSubmitPending,
   onDocumentRemove,
 }: {
   index: number;
@@ -1649,7 +1689,9 @@ function VenueBlock({
   venueDocuments?: EventDocumentMaster[];
   documents?: EventDocumentUpload[];
   uploading?: boolean;
-  onDocumentUpload?: (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => void;
+  uploadingId?: number | null;
+  onDocumentSelect?: (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => void;
+  onDocumentSubmitPending?: (documentTypeId: number) => void;
   onDocumentRemove?: (documentTypeId: number) => void;
 }) {
   const {
@@ -2093,12 +2135,12 @@ function VenueBlock({
         )}
       </div>
 
-      {index === 0 && onDocumentUpload && onDocumentRemove && (
+      {index === 0 && onDocumentSelect && onDocumentSubmitPending && onDocumentRemove && (
         <div className="space-y-3 pt-2 border-t border-slate-200">
           <div>
             <p className="text-sm font-semibold text-slate-800">Venue documents</p>
             <p className="text-xs text-slate-500 mt-1">
-              Upload venue-related documents here. General event documents are on the Media step.
+              Choose a file, then click Submit on that field to upload. General event documents are on the Media step.
             </p>
           </div>
           {venueDocuments.length > 0 ? (
@@ -2107,7 +2149,9 @@ function VenueBlock({
               documents={documents}
               readOnly={readOnly}
               uploading={uploading}
-              onUpload={onDocumentUpload}
+              uploadingId={uploadingId}
+              onSelect={onDocumentSelect}
+              onSubmitPending={onDocumentSubmitPending}
               onRemove={onDocumentRemove}
             />
           ) : (
@@ -2680,8 +2724,12 @@ export default function EventForm({
     }
   }, [categoryTypeId, masters?.genres, getValues, setValue]);
 
-  const buildPayload = (values: EventFormValues, opts?: { forDraft?: boolean }): EventFormPayload => {
+  const buildPayload = (
+    values: EventFormValues,
+    opts?: { forDraft?: boolean; documentsOverride?: EventDocumentUpload[] }
+  ): EventFormPayload => {
     const draftMode = opts?.forDraft === true;
+    const docsForPayload = opts?.documentsOverride ?? documents;
     const rawShowtimes = values.showtimes || [];
     const persistableShowtimes = draftMode
       ? rawShowtimes.filter((s) => isShowtimePersistable(s, values.duration_minutes))
@@ -2770,7 +2818,7 @@ export default function EventForm({
       poster_vertical_url: values.poster_vertical_url || "",
       gallery_images: values.gallery_images || [],
       youtube_url: values.youtube_url?.trim() || "",
-      documents: documents.filter((d) => d.document_type_id > 0 && d.url?.trim()),
+      documents: docsForPayload.filter((d) => d.document_type_id > 0 && d.url?.trim()),
       languages: values.languages || [],
       language: (values.languages || []).join(", "),
       about_event: values.about_event.trim(),
@@ -2899,6 +2947,40 @@ export default function EventForm({
 
   const saveLockRef = useRef(false);
 
+  const resolveDocumentsForSubmit = async (
+    docs: EventDocumentUpload[]
+  ): Promise<EventDocumentUpload[]> => {
+    const out: EventDocumentUpload[] = [];
+    for (const d of docs) {
+      if (d.pending_file) {
+        const formData = new FormData();
+        formData.append("image", d.pending_file);
+        const res = await uploadImage(formData).unwrap();
+        const url = extractUploadUrl(res) || res.url;
+        if (!url) throw new Error(`Failed to upload ${d.pending_file_name || "document"}`);
+        if (d.pending_preview_url) {
+          try {
+            URL.revokeObjectURL(d.pending_preview_url);
+          } catch {
+            /* ignore */
+          }
+        }
+        out.push({
+          document_type_id: d.document_type_id,
+          url,
+          document_name: d.document_name,
+        });
+      } else if (d.url?.trim()) {
+        out.push({
+          document_type_id: d.document_type_id,
+          url: d.url,
+          document_name: d.document_name,
+        });
+      }
+    }
+    return out;
+  };
+
   const runSaveDraft = async () => {
     if (saveLockRef.current || saving || submitting) return;
     const values = getValues();
@@ -2913,9 +2995,11 @@ export default function EventForm({
         return;
       }
     }
-    const payload = buildPayload(values, { forDraft: true });
     saveLockRef.current = true;
     try {
+      const resolvedDocs = await resolveDocumentsForSubmit(documents);
+      setDocuments(resolvedDocs);
+      const payload = buildPayload(values, { forDraft: true, documentsOverride: resolvedDocs });
       await onSaveDraft(payload);
       if (event?.status === "PENDING_APPROVAL") {
         reset(getValues());
@@ -2960,8 +3044,10 @@ export default function EventForm({
       toast.error(masterErr);
       return;
     }
-    const payload = buildPayload(values);
     try {
+      const resolvedDocs = await resolveDocumentsForSubmit(documents);
+      setDocuments(resolvedDocs);
+      const payload = buildPayload(values, { documentsOverride: resolvedDocs });
       await onSubmitForApproval(payload);
     } catch (e) {
       toast.error(extractApiError(e, "Failed to submit event"));
@@ -2979,7 +3065,7 @@ export default function EventForm({
     }
   };
 
-  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => {
+  const handleDocumentSelect = (e: React.ChangeEvent<HTMLInputElement>, documentTypeId: number) => {
     if (!e.target.files?.length || readOnly) return;
     const file = e.target.files[0];
     const name = file.name.toLowerCase();
@@ -2992,22 +3078,77 @@ export default function EventForm({
       e.target.value = "";
       return;
     }
+    setDocuments((prev) => {
+      const existing = prev.find((d) => d.document_type_id === documentTypeId);
+      if (existing?.pending_preview_url) {
+        try {
+          URL.revokeObjectURL(existing.pending_preview_url);
+        } catch {
+          /* ignore */
+        }
+      }
+      return [
+        ...prev.filter((d) => d.document_type_id !== documentTypeId),
+        {
+          document_type_id: documentTypeId,
+          url: "",
+          pending_file: file,
+          pending_file_name: file.name,
+          pending_preview_url: URL.createObjectURL(file),
+        },
+      ];
+    });
+    e.target.value = "";
+  };
+
+  const [docUploadingId, setDocUploadingId] = useState<number | null>(null);
+
+  const handleDocumentSubmitPending = async (documentTypeId: number) => {
+    if (readOnly) return;
+    const entry = documents.find((d) => d.document_type_id === documentTypeId);
+    if (!entry?.pending_file) return;
+    setDocUploadingId(documentTypeId);
     const formData = new FormData();
-    formData.append("image", file);
+    formData.append("image", entry.pending_file);
     try {
       const res = await uploadImage(formData).unwrap();
       const url = extractUploadUrl(res) || res.url;
-      if (url) {
-        setDocuments((prev) => [
-          ...prev.filter((d) => d.document_type_id !== documentTypeId),
-          { document_type_id: documentTypeId, url },
-        ]);
-        toast.success("Document uploaded");
+      if (!url) throw new Error("Upload failed");
+      if (entry.pending_preview_url) {
+        try {
+          URL.revokeObjectURL(entry.pending_preview_url);
+        } catch {
+          /* ignore */
+        }
       }
+      setDocuments((prev) => [
+        ...prev.filter((d) => d.document_type_id !== documentTypeId),
+        {
+          document_type_id: documentTypeId,
+          url,
+          document_name: entry.document_name,
+        },
+      ]);
+      toast.success("Document uploaded");
     } catch (err) {
-      toast.error(extractApiError(err, `Failed to upload ${file.name}`));
+      toast.error(extractApiError(err, `Failed to upload ${entry.pending_file_name || "document"}`));
+    } finally {
+      setDocUploadingId(null);
     }
-    e.target.value = "";
+  };
+
+  const removeDocument = (documentTypeId: number) => {
+    setDocuments((prev) => {
+      const existing = prev.find((d) => d.document_type_id === documentTypeId);
+      if (existing?.pending_preview_url) {
+        try {
+          URL.revokeObjectURL(existing.pending_preview_url);
+        } catch {
+          /* ignore */
+        }
+      }
+      return prev.filter((d) => d.document_type_id !== documentTypeId);
+    });
   };
 
   const toggleGenre = (name: string) => {
@@ -3077,9 +3218,17 @@ export default function EventForm({
     setVisitedSteps((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
-  const goToStep = (id: EventStepperStepId) => {
-    markVisited(stepId);
-    setStepId(id);
+  /** A later step is unlocked only when every previous step is complete. */
+  const isStepUnlocked = (targetId: EventStepperStepId): boolean => {
+    const targetIndex = steps.findIndex((s) => s.id === targetId);
+    if (targetIndex <= 0) return true;
+    if (targetIndex <= stepIndex) return true;
+    for (let i = 0; i < targetIndex; i += 1) {
+      const prevId = steps[i]?.id;
+      if (!prevId) return false;
+      if (!completedStepIds.includes(prevId)) return false;
+    }
+    return true;
   };
 
   const validateCurrentStep = async (): Promise<boolean> => {
@@ -3174,6 +3323,14 @@ export default function EventForm({
       }
       if (!(values.allowed_ticket_modes || []).length) {
         toast.error("Select at least one ticket delivery mode for customers.");
+        return false;
+      }
+      if (!values.age_group?.trim()) {
+        toast.error("Age group is required.");
+        return false;
+      }
+      if (!values.about_event?.trim()) {
+        toast.error("About event is required.");
         return false;
       }
       return true;
@@ -3320,6 +3477,32 @@ export default function EventForm({
     return true;
   };
 
+  const goToStep = async (id: EventStepperStepId) => {
+    if (id === stepId) return;
+    const targetIndex = steps.findIndex((s) => s.id === id);
+    if (targetIndex < 0) return;
+
+    // Moving forward requires current step validation + unlocked target.
+    if (targetIndex > stepIndex) {
+      if (!isStepUnlocked(id)) {
+        const firstIncomplete = steps.find(
+          (s, i) => i < targetIndex && !completedStepIds.includes(s.id)
+        );
+        toast.error(
+          firstIncomplete
+            ? `Complete "${firstIncomplete.label}" before continuing.`
+            : "Please complete the required fields on the current step first."
+        );
+        return;
+      }
+      const ok = await validateCurrentStep();
+      if (!ok) return;
+    }
+
+    markVisited(stepId);
+    setStepId(id);
+  };
+
   const goNext = async () => {
     const ok = await validateCurrentStep();
     if (!ok) return;
@@ -3346,8 +3529,9 @@ export default function EventForm({
           completedIds={completedStepIds}
           steps={steps}
           allowJump
+          isStepUnlocked={isStepUnlocked}
           onStepClick={(id) => {
-            goToStep(id);
+            void goToStep(id);
           }}
         />
 
@@ -4278,8 +4462,10 @@ export default function EventForm({
               documents={documents}
               readOnly={readOnly}
               uploading={uploading}
-              onUpload={handleDocumentUpload}
-              onRemove={(id) => setDocuments((p) => p.filter((d) => d.document_type_id !== id))}
+              uploadingId={docUploadingId}
+              onSelect={handleDocumentSelect}
+              onSubmitPending={(id) => void handleDocumentSubmitPending(id)}
+              onRemove={removeDocument}
             />
           ) : (
             <p className="text-amber-700 text-sm">No general event document types configured yet.</p>
@@ -4437,8 +4623,10 @@ export default function EventForm({
               venueDocuments={venueDocuments}
               documents={documents}
               uploading={uploading}
-              onDocumentUpload={handleDocumentUpload}
-              onDocumentRemove={(id) => setDocuments((p) => p.filter((d) => d.document_type_id !== id))}
+              uploadingId={docUploadingId}
+              onDocumentSelect={handleDocumentSelect}
+              onDocumentSubmitPending={(id) => void handleDocumentSubmitPending(id)}
+              onDocumentRemove={removeDocument}
             />
           ))}
           {errors.showtimes && typeof errors.showtimes.message === "string" && (
@@ -4498,8 +4686,10 @@ export default function EventForm({
                 documents={documents}
                 readOnly={readOnly}
                 uploading={uploading}
-                onUpload={handleDocumentUpload}
-                onRemove={(id) => setDocuments((p) => p.filter((d) => d.document_type_id !== id))}
+                uploadingId={docUploadingId}
+                onSelect={handleDocumentSelect}
+                onSubmitPending={(id) => void handleDocumentSubmitPending(id)}
+                onRemove={removeDocument}
               />
             </div>
           )}
@@ -4921,46 +5111,53 @@ export default function EventForm({
               <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Documents & T&amp;C</p>
                 {(() => {
-                  const uploaded = documents.filter((d) => d.url?.trim());
+                  const uploaded = documents.filter(
+                    (d) => Boolean(d.pending_file) || Boolean(d.url?.trim())
+                  );
                   if (!uploaded.length) {
-                    return <p className="text-sm text-slate-500">No documents uploaded yet</p>;
+                    return <p className="text-sm text-slate-500">No documents selected yet</p>;
                   }
                   const masterById = new Map((masters?.documents || []).map((d) => [d.id, d]));
                   const isImageUrl = (url: string) =>
                     /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(url) ||
                     /\/image\//i.test(url) ||
                     url.includes("cloudinary") ||
-                    url.startsWith("data:image");
+                    url.startsWith("data:image") ||
+                    url.startsWith("blob:");
                   return (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {uploaded.map((doc, idx) => {
                         const master = masterById.get(doc.document_type_id);
                         const label =
+                          doc.pending_file_name ||
                           doc.document_name ||
                           master?.name ||
                           `Document ${idx + 1}`;
                         const scope = master ? resolveDocumentAppliesTo(master) : "event";
+                        const previewSrc = doc.pending_preview_url || (doc.url ? resolveMediaUrl(doc.url) : "");
                         return (
                           <div
                             key={`${doc.document_type_id}-${idx}`}
                             className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2"
                           >
-                            {isImageUrl(doc.url) ? (
+                            {previewSrc && isImageUrl(previewSrc) ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
-                                src={resolveMediaUrl(doc.url)}
+                                src={previewSrc}
                                 alt={label}
                                 className="h-28 w-full rounded-md object-cover border border-slate-100"
                               />
                             ) : (
                               <a
-                                href={resolveMediaUrl(doc.url)}
+                                href={previewSrc || "#"}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex h-28 w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-slate-200 bg-slate-50 text-slate-500 hover:border-rose-300 hover:text-rose-700"
                               >
                                 <FileText size={22} />
-                                <span className="text-[11px]">Open file</span>
+                                <span className="text-[11px]">
+                                  {doc.pending_file ? "Selected file" : "Open file"}
+                                </span>
                               </a>
                             )}
                             <div>

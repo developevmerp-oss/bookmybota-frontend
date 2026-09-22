@@ -17,6 +17,8 @@ interface EventStepperNavProps {
   completedIds?: EventStepperStepId[];
   onStepClick?: (id: EventStepperStepId) => void;
   allowJump?: boolean;
+  /** When provided, future incomplete steps stay locked until prior steps are done. */
+  isStepUnlocked?: (id: EventStepperStepId) => boolean;
   /** Category-aware step list. Defaults to non-sport steps. */
   steps?: EventStepperStepDef[];
 }
@@ -26,6 +28,7 @@ export default function EventStepperNav({
   completedIds = [],
   onStepClick,
   allowJump = false,
+  isStepUnlocked,
   steps = EVENT_STEPPER_STEPS,
 }: EventStepperNavProps) {
   const currentIndex = steps.findIndex((s) => s.id === currentId);
@@ -37,15 +40,25 @@ export default function EventStepperNav({
         {steps.map((step, index) => {
           const done = completedSet.has(step.id);
           const active = step.id === currentId;
-          const clickable = Boolean(allowJump && onStepClick);
+          const unlocked = isStepUnlocked ? isStepUnlocked(step.id) : true;
+          const clickable = Boolean(allowJump && onStepClick && unlocked);
           return (
             <div key={step.id} className="flex items-center min-w-0 flex-1">
               <button
                 type="button"
-                disabled={!clickable || !onStepClick}
+                disabled={!clickable}
                 onClick={() => clickable && onStepClick?.(step.id)}
+                title={
+                  !unlocked && !active
+                    ? "Complete previous required steps first"
+                    : step.label
+                }
                 className={`flex flex-col items-center gap-2 px-1 w-full ${
-                  clickable ? "cursor-pointer" : "cursor-default"
+                  clickable
+                    ? "cursor-pointer"
+                    : unlocked
+                      ? "cursor-default"
+                      : "cursor-not-allowed opacity-60"
                 }`}
               >
                 <span
@@ -56,7 +69,9 @@ export default function EventStepperNav({
                         : "border-primary bg-primary text-primary-foreground"
                       : done
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                        : "border-slate-200 bg-white text-slate-400"
+                        : unlocked
+                          ? "border-slate-200 bg-white text-slate-400"
+                          : "border-slate-100 bg-slate-50 text-slate-300"
                   }`}
                 >
                   {done ? <Check size={16} strokeWidth={2.5} /> : index + 1}
@@ -69,7 +84,9 @@ export default function EventStepperNav({
                         : "text-primary"
                       : done
                         ? "text-emerald-700"
-                        : "text-slate-400"
+                        : unlocked
+                          ? "text-slate-400"
+                          : "text-slate-300"
                   }`}
                 >
                   {step.label}
@@ -105,20 +122,30 @@ export default function EventStepperNav({
           {steps.map((step) => {
             const done = completedSet.has(step.id);
             const active = step.id === currentId;
+            const unlocked = isStepUnlocked ? isStepUnlocked(step.id) : true;
             return (
-              <span
+              <button
                 key={step.id}
-                title={step.label}
+                type="button"
+                disabled={!allowJump || !onStepClick || !unlocked}
+                onClick={() => allowJump && unlocked && onStepClick?.(step.id)}
+                title={
+                  !unlocked && !active
+                    ? "Complete previous required steps first"
+                    : step.label
+                }
                 className={`rounded-full flex items-center justify-center transition-all ${
                   done
                     ? "h-5 w-5 bg-emerald-500 text-white"
                     : active
                       ? "h-2 w-5 bg-primary"
-                      : "h-1.5 w-4 bg-slate-200"
+                      : unlocked
+                        ? "h-1.5 w-4 bg-slate-200"
+                        : "h-1.5 w-4 bg-slate-100"
                 }`}
               >
                 {done ? <Check size={11} strokeWidth={3} /> : null}
-              </span>
+              </button>
             );
           })}
         </div>

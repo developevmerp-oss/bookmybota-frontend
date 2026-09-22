@@ -24,7 +24,7 @@ const NAV = [
   { href: "/customer/gift-cards", icon: Gift, label: "My Gift Cards" },
   { href: "/customer/help", icon: HelpCircle, label: "Help Centre" },
   { href: "#gift-cards", icon: Gift, label: "Gift Cards", soon: true, mobileOnly: true },
-  { href: "/offers", icon: Tag, label: "Offers", soon: true },
+  { href: "/customer/offers", icon: Tag, label: "Offers" },
 ];
 
 export default function CustomerAccountLayout({ children }: { children: React.ReactNode }) {

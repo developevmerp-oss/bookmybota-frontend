@@ -94,16 +94,12 @@ function CustomerDropdown({
             </Link>
           )}
           <Link href="/customer/help" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Help Centre</Link>
-          <button
-            type="button"
-            onClick={() => toast.message("Coming soon")}
-            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+          <Link
+            href="/customer/offers"
+            className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
           >
-            <span>Offers</span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7E9FF] text-[#6900AA]">
-              Soon
-            </span>
-          </button>
+            Offers
+          </Link>
           <button
             type="button"
             onClick={onLogout}

@@ -12,6 +12,7 @@ import PartnerTypeFields, {
   type PartnerModule,
 } from "@/components/DiningAdminPanel/PartnerTypeFields";
 import PartnerDocumentsFields, {
+  resolvePartnerDocumentsForSubmit,
   validateRequiredPartnerDocuments,
 } from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import ContactPersonsFields from "@/components/Shared/ContactPersonsFields";
@@ -90,6 +91,7 @@ export default function PartnerOnboardForm({
   const [documents, setDocuments] = useState<PartnerDocumentUpload[]>([]);
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [collectionIds, setCollectionIds] = useState<number[]>([]);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [onboardStatus, setOnboardStatus] = useState<"idle" | "success">("idle");
   const [formReady, setFormReady] = useState(false);
@@ -322,6 +324,20 @@ export default function PartnerOnboardForm({
       phone: c.phone.trim(),
     }));
 
+    let resolvedDocuments: PartnerDocumentUpload[];
+    try {
+      setUploadingDocs(true);
+      resolvedDocuments = await resolvePartnerDocumentsForSubmit(documents, async (formData) =>
+        uploadImage(formData).unwrap()
+      );
+      setDocuments(resolvedDocuments);
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Failed to upload documents"));
+      return;
+    } finally {
+      setUploadingDocs(false);
+    }
+
     if (mode === "create") {
       try {
         const selectedPartner =
@@ -350,7 +366,7 @@ export default function PartnerOnboardForm({
           admin_email: primary.email,
           contact_persons: contactPersonsPayload,
           partner_type: selectedPartner ? selectedPartner.partner_type : "dining",
-          documents,
+          documents: resolvedDocuments,
           cover_image_url: coverImageUrl || undefined,
           ...(isDining && variant === "dark" ? { collection_ids: collectionIds } : {}),
           registration_terms_accepted: true,
@@ -380,7 +396,7 @@ export default function PartnerOnboardForm({
           : isVenue || isArtist
             ? { type_id: parseInt(values.venue_type_id, 10) }
             : { type_id: parseInt(values.parent_type_id, 10) }),
-        documents,
+        documents: resolvedDocuments,
         cover_image_url: coverImageUrl || undefined,
       }).unwrap();
       toast.success(
@@ -400,7 +416,7 @@ export default function PartnerOnboardForm({
     }
   };
 
-  const busy = isOnboarding || isUpdating;
+  const busy = isOnboarding || isUpdating || uploadingDocs || uploadingImage;
 
   const handleParentTypeIdChange = useCallback((id: string) => {
     setValue("parent_type_id", id, { shouldValidate: true, shouldDirty: true });
@@ -640,7 +656,13 @@ export default function PartnerOnboardForm({
       {busy ? (
         <>
           <Loader2 size={18} className="animate-spin" />
-          {mode === "create" ? (isDark ? "Creating..." : "Registering...") : "Saving..."}
+          {uploadingDocs
+            ? "Uploading documents…"
+            : mode === "create"
+              ? isDark
+                ? "Creating..."
+                : "Registering..."
+              : "Saving..."}
         </>
       ) : (
         <>
@@ -648,11 +670,11 @@ export default function PartnerOnboardForm({
           {mode === "create"
             ? isDark
               ? isDining
-                ? "Create Dining Business"
+                ? "Submit & Create Dining"
                 : isVenue
-                  ? "Create Venue Partner"
-                  : "Create Event Organizer"
-              : "Register Business"
+                  ? "Submit & Create Venue"
+                  : "Submit & Create Organizer"
+              : "Submit & Register"
             : "Save Changes"}
         </>
       )}

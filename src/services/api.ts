@@ -6619,7 +6619,15 @@ export const api = createApi({
           total: number;
           available: number;
           booked: number;
-          tiers: Array<{ tier_id: string; name: string; ticket_type_id: string; total: number; available: number }>;
+          tiers: Array<{
+            tier_id: string;
+            name: string;
+            ticket_type_id: string;
+            total: number;
+            available: number;
+            color?: string | null;
+            price?: number;
+          }>;
         }>;
       },
       string

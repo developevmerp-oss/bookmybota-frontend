@@ -1315,6 +1315,7 @@ export interface EventArtistItem {
   artist_business_name?: string | null;
   artist_business_image?: string | null;
   artist_is_authorized?: boolean;
+  artist_partner_source?: string | null;
   name: string;
   role_title?: string | null;
   description?: string | null;

@@ -149,7 +149,6 @@ export default function EventFormCustomerPreview({
         seats: appliedSeats,
         config: appliedConfig,
         status: "ready" as const,
-        status: "ready" as const,
       };
     }
     if (

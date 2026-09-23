@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, FileSignature } from "lucide-react";
 import { toast } from "sonner";
 import { useGetAdminEventsQuery, useUpdateAdminEventMutation } from "@/services/api";
@@ -31,11 +32,34 @@ function statusBadge(status: string) {
   return map[status] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
 }
 
+function parseStatus(raw: string | null) {
+  const allowed = new Set(STATUS_FILTERS.map((f) => f.value));
+  if (raw == null) return "PENDING_APPROVAL";
+  return allowed.has(raw) ? raw : "PENDING_APPROVAL";
+}
+
 export default function AdminEventsPage() {
-  const [statusFilter, setStatusFilter] = useState("PENDING_APPROVAL");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState(() => parseStatus(searchParams.get("status")));
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    setStatusFilter(parseStatus(searchParams.get("status")));
+    setPage(1);
+  }, [searchParams]);
+
+  const setStatus = (value: string) => {
+    setStatusFilter(value);
+    setPage(1);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("status", value);
+    else params.delete("status");
+    const qs = params.toString();
+    router.replace(qs ? `/admin/events?${qs}` : "/admin/events", { scroll: false });
+  };
 
   const { data, isLoading, isFetching } = useGetAdminEventsQuery({
     page,
@@ -74,10 +98,7 @@ export default function AdminEventsPage() {
             <button
               key={f.value || "all"}
               type="button"
-              onClick={() => {
-                setStatusFilter(f.value);
-                setPage(1);
-              }}
+              onClick={() => setStatus(f.value)}
               className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
                 statusFilter === f.value
                   ? "bg-white text-rose-600 shadow-sm"

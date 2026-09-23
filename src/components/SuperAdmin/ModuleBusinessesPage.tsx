@@ -50,11 +50,11 @@ function Field({
 }) {
   return (
     <div
-      className={`flex min-w-0 flex-col gap-1 border-b border-slate-100 px-4 py-3 ${
+      className={`flex min-w-0 flex-col gap-0.5 border-b border-slate-100 px-3 py-2 ${
         full ? "sm:col-span-2" : ""
       }`}
     >
-      <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400">
+      <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-400">
         {label}
       </span>
       <div className="break-words text-sm font-medium text-slate-800">{children}</div>
@@ -334,15 +334,15 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
 
   return (
     <div className="w-full">
-      <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 lg:mb-5 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-        <div className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-100/80 p-1">
+      <div className="mb-3 flex flex-col gap-2 border-b border-slate-200 pb-3 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-3">
+        <div className="flex w-full sm:w-auto shrink-0 items-center gap-0.5 rounded-lg bg-slate-100/80 p-0.5">
           <button
             type="button"
             onClick={() => {
               setTab("active");
               setPage(1);
             }}
-            className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 sm:flex-none rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
               tab === "active"
                 ? "bg-white text-rose-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
@@ -356,7 +356,7 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
               setTab("archived");
               setPage(1);
             }}
-            className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 sm:flex-none rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
               tab === "archived"
                 ? "bg-white text-rose-600 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
@@ -365,9 +365,9 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
             Archived
           </button>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <div className="admin-list-bar-tools flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <SearchInput
-            className="w-full sm:max-w-xs lg:max-w-sm"
+            className="admin-search-wrap w-full sm:max-w-xs lg:max-w-sm"
             value={q}
             onChange={(value) => {
               setQ(value);
@@ -375,38 +375,40 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
             }}
             placeholder="Search name, address, email"
           />
-          <Link
-            href={`${listBase}/onboard`}
-            className="btn-primary inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap"
-          >
-            <Building2 size={18} /> Onboard Partner
-          </Link>
-          {isVenue && (
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Link
-              href="/admin/venue-layouts"
-              className="btn-secondary inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap"
+              href={`${listBase}/onboard`}
+              className="btn-primary inline-flex flex-1 sm:flex-none shrink-0 items-center justify-center gap-1.5 whitespace-nowrap !py-2 !px-3 text-sm"
             >
-              Layout requests
+              <Building2 size={16} /> Onboard Partner
             </Link>
-          )}
+            {isVenue && (
+              <Link
+                href="/admin/venue-layouts"
+                className="btn-secondary inline-flex flex-1 sm:flex-none shrink-0 items-center justify-center gap-1.5 whitespace-nowrap !py-2 !px-3 text-sm"
+              >
+                Layout requests
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
       {isFetching && !isLoading ? (
         <AdminListShimmer rows={limit > 10 ? 8 : 5} columns={isDining ? 8 : 7} showTabs={false} showToolbar={false} />
       ) : businesses.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center text-base text-slate-500 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white py-8 text-center text-sm text-slate-500 shadow-sm">
           {tab === "archived" ? `No archived ${emptyLabel}.` : `No ${emptyLabel} found.`}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:hidden">
             {businesses.map((biz) => (
               <article
                 key={biz.id}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
               >
-                <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-3 py-2">
                   <Link
                     href={`${listBase}/${biz.id}`}
                     className="min-w-0 text-sm font-bold text-slate-900 hover:text-rose-600"
@@ -433,32 +435,32 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
                   <Field label="Docs">{docsNode(biz)}</Field>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-1 border-t border-slate-100 bg-slate-50/80 px-3 py-2.5">
+                <div className="flex flex-wrap items-center justify-end gap-1 border-t border-slate-100 bg-slate-50/80 px-2 py-2">
                   {actionsNode(biz)}
                 </div>
               </article>
             ))}
           </div>
 
-          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:block">
+          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-base">
-                <thead className="border-b border-slate-200 bg-slate-50 text-sm text-slate-500">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
                   <tr>
-                    <th className="px-5 py-3.5 font-semibold">Business Name</th>
-                    {isDining && <th className="px-5 py-3.5 font-semibold">Parent</th>}
-                    <th className="px-5 py-3.5 font-semibold">{typeLabel}</th>
-                    <th className="px-5 py-3.5 font-semibold">Location</th>
-                    <th className="px-5 py-3.5 font-semibold">Admin</th>
-                    <th className="px-5 py-3.5 font-semibold">Docs</th>
-                    <th className="px-5 py-3.5 font-semibold">Status</th>
-                    <th className="px-5 py-3.5 font-semibold text-right">Actions</th>
+                    <th className="px-3 py-2.5 font-semibold">Business Name</th>
+                    {isDining && <th className="px-3 py-2.5 font-semibold">Parent</th>}
+                    <th className="px-3 py-2.5 font-semibold">{typeLabel}</th>
+                    <th className="px-3 py-2.5 font-semibold">Location</th>
+                    <th className="px-3 py-2.5 font-semibold">Admin</th>
+                    <th className="px-3 py-2.5 font-semibold">Docs</th>
+                    <th className="px-3 py-2.5 font-semibold">Status</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {businesses.map((biz) => (
                     <tr key={biz.id} className="transition-colors hover:bg-slate-50/80">
-                      <td className="px-5 py-4 font-semibold text-slate-900">
+                      <td className="px-3 py-2.5 font-semibold text-slate-900">
                         <Link
                           href={`${listBase}/${biz.id}`}
                           className="hover:text-rose-600 transition-colors"
@@ -467,19 +469,19 @@ export default function ModuleBusinessesPage({ module }: ModuleBusinessesPagePro
                         </Link>
                       </td>
                       {isDining && (
-                        <td className="px-5 py-4 text-slate-500">{biz.parent_type_name || "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-500">{biz.parent_type_name || "—"}</td>
                       )}
-                      <td className="px-5 py-4 text-slate-500">{typeNode(biz)}</td>
-                      <td className="px-5 py-4 text-slate-500">{biz.address}</td>
-                      <td className="px-5 py-4 text-sm text-slate-500">
+                      <td className="px-3 py-2.5 text-slate-500">{typeNode(biz)}</td>
+                      <td className="px-3 py-2.5 text-slate-500">{biz.address}</td>
+                      <td className="px-3 py-2.5 text-sm text-slate-500">
                         {biz.admin_email || "—"}
                         {biz.admin_role ? (
                           <div className="text-xs text-slate-400">{biz.admin_role}</div>
                         ) : null}
                       </td>
-                      <td className="px-5 py-4 text-sm">{docsNode(biz)}</td>
-                      <td className="px-5 py-4">{statusNode(biz)}</td>
-                      <td className="px-5 py-4">
+                      <td className="px-3 py-2.5 text-sm">{docsNode(biz)}</td>
+                      <td className="px-3 py-2.5">{statusNode(biz)}</td>
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end">{actionsNode(biz)}</div>
                       </td>
                     </tr>

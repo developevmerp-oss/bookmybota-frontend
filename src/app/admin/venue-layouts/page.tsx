@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -70,9 +70,14 @@ function canOpenBuilder(request: VenueLayoutRequest) {
 }
 
 function AdminVenueLayoutsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const businessId = searchParams.get("business_id") || "";
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("visit_requests");
+  const tabFromUrl = searchParams.get("tab") || "";
+  const initialTab = (TABS.some((t) => t.id === tabFromUrl)
+    ? tabFromUrl
+    : "visit_requests") as (typeof TABS)[number]["id"];
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(initialTab);
   const [partnerFilter, setPartnerFilter] = useState<"all" | "venue" | "cinema">("all");
   const [visitModalId, setVisitModalId] = useState<string | null>(null);
   const [visitedPerson, setVisitedPerson] = useState("");
@@ -84,6 +89,20 @@ function AdminVenueLayoutsPage() {
   const [markVisitComplete, { isLoading: completingVisit }] =
     useMarkAdminVenueLayoutVisitCompleteMutation();
   const [confirmLive, { isLoading: confirmingLive }] = useConfirmAdminVenueLayoutLiveMutation();
+
+  useEffect(() => {
+    const next = searchParams.get("tab") || "";
+    if (TABS.some((t) => t.id === next)) {
+      setTab(next as (typeof TABS)[number]["id"]);
+    }
+  }, [searchParams]);
+
+  const selectTab = (id: (typeof TABS)[number]["id"]) => {
+    setTab(id);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", id);
+    router.replace(`/admin/venue-layouts?${params.toString()}`, { scroll: false });
+  };
 
   const visibleRequests = requests.filter((request) => {
     if (partnerFilter === "all") return true;
@@ -136,7 +155,7 @@ function AdminVenueLayoutsPage() {
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => selectTab(item.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border ${
               tab === item.id ? "bg-rose-50 text-rose-600 border-rose-200" : "border-slate-200 text-slate-500"
             }`}

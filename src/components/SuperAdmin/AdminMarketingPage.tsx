@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import {
@@ -258,7 +259,18 @@ function buildPaymentSummaryFromCampaigns(campaigns: MarketingCampaign[]): Marke
 }
 
 export default function AdminMarketingPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('plans');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const initialTab: Tab =
+    tabFromUrl === 'requests' ||
+    tabFromUrl === 'active' ||
+    tabFromUrl === 'payments' ||
+    tabFromUrl === 'plans'
+      ? tabFromUrl
+      : 'plans';
+
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [planFilter, setPlanFilter] = useState<PlanFilter>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('ALL');
   const [requestFilter, setRequestFilter] = useState<RequestFilter>('all');
@@ -269,6 +281,24 @@ export default function AdminMarketingPage() {
   const [editingPlan, setEditingPlan] = useState<MarketingPlan | null>(null);
   const [planConfirm, setPlanConfirm] = useState<PlanConfirmState | null>(null);
   const [planConfirmBusy, setPlanConfirmBusy] = useState(false);
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'requests' || t === 'active' || t === 'payments' || t === 'plans') {
+      setActiveTab(t);
+      setPage(1);
+    }
+  }, [searchParams]);
+
+  const selectTab = (tab: Tab) => {
+    setActiveTab(tab);
+    setPage(1);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === 'plans') params.delete('tab');
+    else params.set('tab', tab);
+    const qs = params.toString();
+    router.replace(qs ? `/admin/marketing?${qs}` : '/admin/marketing', { scroll: false });
+  };
 
   const activeListArg = {
     page,
@@ -373,6 +403,12 @@ export default function AdminMarketingPage() {
       }
     );
   }, [paymentSummaryRaw, paymentStatsData?.items]);
+
+  const pendingRequestsCount = Number(
+    normalizePaymentSummary(paymentSummaryRaw)?.pending_requests ??
+      paymentSummary.pending_requests ??
+      0
+  );
 
   const campaigns = campaignsData?.items ?? [];
   const requests = requestsData?.items ?? [];
@@ -611,11 +647,8 @@ export default function AdminMarketingPage() {
             <button
               key={tab}
               type="button"
-              onClick={() => {
-                setActiveTab(tab);
-                setPage(1);
-              }}
-              className={`px-3 sm:px-4 py-3 font-semibold text-sm transition-all border-b-2 whitespace-nowrap ${
+              onClick={() => selectTab(tab)}
+              className={`px-3 sm:px-4 py-3 font-semibold text-sm transition-all border-b-2 whitespace-nowrap inline-flex items-center gap-1.5 ${
                 activeTab === tab
                   ? 'border-rose-500 text-rose-500 bg-rose-500/5'
                   : 'border-transparent text-zinc-400 hover:text-white'
@@ -628,6 +661,11 @@ export default function AdminMarketingPage() {
                   : tab === 'active'
                     ? 'Active Campaigns'
                     : 'Payment Ledger'}
+              {tab === 'requests' && pendingRequestsCount > 0 ? (
+                <span className="inline-flex min-w-[1.25rem] h-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-bold tabular-nums text-white shadow-sm shadow-rose-600/30">
+                  {pendingRequestsCount}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

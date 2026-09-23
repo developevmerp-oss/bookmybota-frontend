@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Search } from "lucide-react";
 import { useGetAdminEventLayoutRequestsQuery, type AdminEventLayoutRequest } from "@/services/api";
 import { formatDateTime12h } from "@/lib/dateFormat";
@@ -54,14 +55,34 @@ function proposedCount(request: AdminEventLayoutRequest) {
   return 0;
 }
 
-export default function AdminEventLayoutsPage() {
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("needs_action");
+function AdminEventLayoutsPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") || "";
+  const initialTab = (TABS.some((t) => t.id === tabFromUrl)
+    ? tabFromUrl
+    : "needs_action") as (typeof TABS)[number]["id"];
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(initialTab);
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const { data: requests = [], isLoading } = useGetAdminEventLayoutRequestsQuery({
     tab,
     ...(search ? { q: search } : {}),
   });
+
+  useEffect(() => {
+    const next = searchParams.get("tab") || "";
+    if (TABS.some((t) => t.id === next)) {
+      setTab(next as (typeof TABS)[number]["id"]);
+    }
+  }, [searchParams]);
+
+  const selectTab = (id: (typeof TABS)[number]["id"]) => {
+    setTab(id);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", id);
+    router.replace(`/admin/event-layouts?${params.toString()}`, { scroll: false });
+  };
 
   return (
     <div className="w-full space-y-6">
@@ -78,7 +99,7 @@ export default function AdminEventLayoutsPage() {
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => selectTab(item.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium border ${
               tab === item.id
                 ? "bg-rose-50 text-rose-600 border-rose-200"
@@ -237,5 +258,13 @@ export default function AdminEventLayoutsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AdminEventLayoutsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-slate-400 text-sm">Loading layouts...</div>}>
+      <AdminEventLayoutsPageInner />
+    </Suspense>
   );
 }

@@ -2487,11 +2487,69 @@ export interface CustomerProfile {
   updated_at?: string;
 }
 
+export interface AdminStatsPanel {
+  id: string;
+  label: string;
+  count: number | null;
+  href: string;
+  hint: string;
+}
+
+export interface AdminPendingWorkItem {
+  id: string;
+  label: string;
+  count: number;
+  href: string;
+  group: string;
+}
+
+export interface AdminStatsLive {
+  tickets_sold: number;
+  platform_revenue: number;
+  ticket_sales_amount: number;
+  customer_paid: number;
+  partner_payable: number;
+  disbursed_paid: number;
+  disbursed_pending: number;
+  event_tickets: number;
+  movie_tickets: number;
+  event_revenue: number;
+  movie_revenue: number;
+  dining_bookings: number;
+}
+
+export interface AdminStatsDailyPoint {
+  date: string;
+  label: string;
+  tickets: number;
+  revenue: number;
+  disbursed: number;
+  partner_due: number;
+}
+
+export interface AdminStatsMixItem {
+  name: string;
+  tickets: number;
+  revenue: number;
+}
+
 export interface AdminStats {
   total_bookings: number;
   active_users: number;
   active_businesses: number;
   platform_revenue: number;
+  customers?: number;
+  live_events?: number;
+  pending_events?: number;
+  approved_events?: number;
+  active_movies?: number;
+  pending_partners_total?: number;
+  pending_total?: number;
+  panels?: AdminStatsPanel[];
+  pending_work?: AdminPendingWorkItem[];
+  live?: AdminStatsLive;
+  series_daily?: AdminStatsDailyPoint[];
+  mix?: AdminStatsMixItem[];
 }
 
 export interface Analytics {
@@ -4926,7 +4984,13 @@ export const api = createApi({
 
     getMarketingCampaigns: builder.query<
       PaginatedList<MarketingCampaign>,
-      (PagedQuery & { status?: string; payment_status?: string; partner_requests?: boolean; business_scope?: boolean }) | void
+      (PagedQuery & {
+        status?: string;
+        payment_status?: string;
+        partner_requests?: boolean;
+        business_scope?: boolean;
+        business_id?: string;
+      }) | void
     >({
       query: (params) => {
         const sp = new URLSearchParams();
@@ -4937,6 +5001,7 @@ export const api = createApi({
         if (params?.payment_status) sp.set('payment_status', params.payment_status);
         if (params?.partner_requests) sp.set('partner_requests', 'true');
         if (params?.business_scope) sp.set('business_scope', 'true');
+        if (params?.business_id) sp.set('business_id', params.business_id);
         const qs = sp.toString();
         return `/admin/marketing-campaigns${qs ? `?${qs}` : ''}`;
       },

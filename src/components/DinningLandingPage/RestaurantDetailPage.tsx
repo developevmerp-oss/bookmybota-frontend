@@ -51,6 +51,7 @@ import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import CategoryPromoBanners from '@/components/LandingPage/CategoryPromoBanners';
+import { useSelectedCity } from '@/lib/useSelectedCity';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
 import BookingSuccessCheckAnimation from './BookingSuccessCheckAnimation';
@@ -503,6 +504,7 @@ const DETAIL_SECTION_TABS = [
 export default function RestaurantPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const selectedCity = useSelectedCity();
   const { data: profile, isLoading } = useGetBusinessPublicQuery(resolvedParams.id);
   /** Prefer UUID once public profile loads — slug URLs must not be sent as business_id FKs. */
   const bizId = profile?.id || resolvedParams.id;
@@ -1385,7 +1387,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       <CategoryPromoBanners
         category="DINING"
         targetId={bizId}
-        city={city}
+        city={selectedCity}
         className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-3"
       />
 

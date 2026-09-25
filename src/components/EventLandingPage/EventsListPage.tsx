@@ -39,7 +39,18 @@ import { artistHref } from "@/lib/businessPublicPath";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
-import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import {
+  eventLandscape,
+  eventPlaceLine,
+  eventPortrait,
+  formatEventDateLine,
+  hasCityFilter,
+  preferCityOrAll,
+} from "@/components/LandingPage/homeUtils";
+import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
+import ListingPromoSlider, {
+  useListingPromoCampaigns,
+} from "@/components/LandingPage/ListingPromoSlider";
 import {
   EVENT_CATEGORY_OPTIONS,
   categorySlugsMatch,
@@ -48,12 +59,6 @@ import {
   type EventCategoryKey,
 } from "@/lib/eventCategories";
 import { SHOWCASE_EVENT_CARDS, showcaseCardsForCategories } from "@/data/showcaseEventCards";
-import {
-  eventLandscape,
-  eventPlaceLine,
-  eventPortrait,
-  formatEventDateLine,
-} from "@/components/LandingPage/homeUtils";
 import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
 const PAGE_SIZE = 8;
@@ -963,19 +968,34 @@ export default function PublicEventsPage() {
   const { data: eventsData, isLoading, isFetching } = useGetPublicEventsQuery(queryArg);
   const events = eventsData ?? EMPTY_EVENTS;
 
-  const { data: allPublicEventsData } = useGetPublicEventsQuery(undefined);
+  const unscopedQueryArg = useMemo(() => {
+    const { city: _city, ...rest } = queryArg;
+    return rest;
+  }, [queryArg]);
+
+  const { data: allPublicEventsData } = useGetPublicEventsQuery(unscopedQueryArg, {
+    skip: !hasCityFilter(city),
+  });
   const allPublicEvents = allPublicEventsData ?? EMPTY_EVENTS;
+  const hasCity = hasCityFilter(city);
+  const { hasCampaigns: hasEventPromoCampaigns } = useListingPromoCampaigns("EVENTS", city);
+
+  /** Listing cards: city-first with same-filter all-city fallback (landing PreferCityOrAll). */
+  const listingEvents = preferCityOrAll(events, allPublicEvents, hasCity);
+
+  const { data: allEventsForExploreData } = useGetPublicEventsQuery(undefined);
+  const allEventsForExplore = allEventsForExploreData ?? EMPTY_EVENTS;
 
   const { data: artistsData } = useGetPublicRegisteredArtistsQuery();
   const artists = artistsData ?? EMPTY_ARTISTS;
 
-  const exploreEventPool = allPublicEvents;
+  const exploreEventPool = hasCity ? events : allEventsForExplore;
   const posterFallbackEvents = useMemo(
     () =>
-      allPublicEvents
+      exploreEventPool
         .filter((event) => event.poster_horizontal_url || event.poster_vertical_url || event.name)
         .slice(0, 12),
-    [allPublicEvents]
+    [exploreEventPool]
   );
 
   useEffect(() => {
@@ -983,8 +1003,8 @@ export default function PublicEventsPage() {
     (async () => {
       try {
         const candidates = (
-          allPublicEvents.length
-            ? allPublicEvents
+          exploreEventPool.length
+            ? exploreEventPool
             : await dispatch(
                 api.endpoints.getPublicEvents.initiate(undefined, { forceRefetch: false })
               ).unwrap()
@@ -1014,7 +1034,7 @@ export default function PublicEventsPage() {
     return () => {
       cancelled = true;
     };
-  }, [dispatch, allPublicEvents]);
+  }, [dispatch, exploreEventPool]);
 
   const categoryFilters = useMemo(
     () =>
@@ -1095,9 +1115,9 @@ export default function PublicEventsPage() {
   );
 
   const filtered = useMemo(() => {
-    if (!isCategoryBrowse || selectedEventGenres.length === 0) return events;
-    return events.filter((event) => eventMatchesSelectedGenres(event, selectedEventGenres));
-  }, [events, isCategoryBrowse, selectedEventGenres]);
+    if (!isCategoryBrowse || selectedEventGenres.length === 0) return listingEvents;
+    return listingEvents.filter((event) => eventMatchesSelectedGenres(event, selectedEventGenres));
+  }, [listingEvents, isCategoryBrowse, selectedEventGenres]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -1236,17 +1256,17 @@ export default function PublicEventsPage() {
 
   const listingWithPosters = useMemo(
     () =>
-      events.filter(
+      listingEvents.filter(
         (event) => event.poster_horizontal_url || event.poster_vertical_url || event.name
       ),
-    [events]
+    [listingEvents]
   );
 
   const browseHeading = activeCategoryKey
     ? CATEGORY_BROWSE_HEADING[activeCategoryKey]
     : "All Events";
 
-  /** District-style hero: prefer marketing promotions (`is_promoted`), then offers, then posters. */
+  /** District-style hero: city-scoped is_promoted first (landing parity — no cross-city filler). */
   const promoEvents = useMemo(() => {
     const filterByCategory = (pool: PublicEvent[]) => {
       if (!activeCategoryKey) return pool;
@@ -1264,13 +1284,13 @@ export default function PublicEventsPage() {
       });
     };
 
+    // When a city is selected, only use that city's listing — never all-cities explore pool.
+    const basePool = hasCity
+      ? listingWithPosters
+      : [...exploreEventPool, ...listingWithPosters, ...offerHeroEvents, ...posterFallbackEvents];
+
     const scopedBase = dedupe(
-      filterByCategory([
-        ...exploreEventPool,
-        ...listingWithPosters,
-        ...offerHeroEvents,
-        ...posterFallbackEvents,
-      ]).filter(
+      filterByCategory(basePool).filter(
         (event) =>
           event.poster_horizontal_url || event.poster_vertical_url || event.name
       )
@@ -1281,13 +1301,17 @@ export default function PublicEventsPage() {
     const promotedOnly = scopedBase.filter((e) => Boolean(e.is_promoted));
     if (promotedOnly.length) return promotedOnly.slice(0, 8);
 
-    const offersInScope = filterByCategory(offerHeroEvents);
-    if (offersInScope.length) {
-      const promotedOffers = offersInScope.filter((e) => Boolean(e.is_promoted));
-      return (promotedOffers.length ? promotedOffers : offersInScope).slice(0, 8);
+    if (!hasCity) {
+      const offersInScope = filterByCategory(offerHeroEvents);
+      if (offersInScope.length) {
+        const promotedOffers = offersInScope.filter((e) => Boolean(e.is_promoted));
+        return (promotedOffers.length ? promotedOffers : offersInScope).slice(0, 8);
+      }
+      return scopedBase.slice(0, 8);
     }
 
-    return scopedBase.slice(0, 8);
+    // City selected: promoted only — hide hero if none (landing-style, no random filler).
+    return [];
   }, [
     activeCategoryKey,
     exploreEventPool,
@@ -1295,6 +1319,7 @@ export default function PublicEventsPage() {
     posterFallbackEvents,
     listingWithPosters,
     categoryPool,
+    hasCity,
   ]);
 
   const promoEventsKey = useMemo(
@@ -1387,11 +1412,18 @@ export default function PublicEventsPage() {
   };
 
   const recommendedEvents = useMemo(() => {
-    const poolSource = events.length ? events : posterFallbackEvents;
+    const poolSource = listingEvents.length ? listingEvents : hasCity ? [] : posterFallbackEvents;
     const promoted = poolSource.filter((e) => e.is_promoted);
     const pool = promoted.length ? promoted : poolSource;
     return pool.slice(0, 15);
-  }, [events, posterFallbackEvents]);
+  }, [listingEvents, posterFallbackEvents, hasCity]);
+
+  const eventsById = useMemo(() => {
+    const map = new Map<string, PublicEvent>();
+    for (const e of listingEvents) map.set(String(e.id), e);
+    for (const e of exploreEventPool) map.set(String(e.id), e);
+    return map;
+  }, [listingEvents, exploreEventPool]);
 
   const recPages = Math.max(1, Math.ceil(recommendedEvents.length / 5));
 
@@ -1982,6 +2014,11 @@ export default function PublicEventsPage() {
                 Clear filters
               </button>
             </div>
+          ) : hasCity ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
+              <CitySectionEmptyNotice message="No events available in your city yet." />
+              <p className="mt-2 text-sm text-slate-500">Try another city or clear the location filter.</p>
+            </div>
           ) : (
             <div className="mx-auto grid w-full  grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
               {emptyShowcaseCards.map((event) => (
@@ -2043,7 +2080,11 @@ export default function PublicEventsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {activeHeroEvent ? (
+      {hasEventPromoCampaigns ? (
+        <ListingPromoSlider category="EVENTS" city={city} eventsById={eventsById} />
+      ) : null}
+
+      {!hasEventPromoCampaigns && activeHeroEvent ? (
         <>
           {/* Mobile + tablet — featured cards (scroll-snap, no autoplay) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
@@ -2251,11 +2292,16 @@ export default function PublicEventsPage() {
           <section className="pt-8 sm:pt-10 pb-2 bg-white">
             <div className={CONTAINER}>
               <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-                  {city
-                    ? `Top recommended events in ${headingCity}`
-                    : "Top recommended events"}
-                </h2>
+                <div className="min-w-0">
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+                    {city
+                      ? `Top recommended events in ${headingCity}`
+                      : "Top recommended events"}
+                  </h2>
+                  {hasCity && !isLoading && events.length === 0 ? (
+                    <CitySectionEmptyNotice message="No events available in your city yet." />
+                  ) : null}
+                </div>
                 {recommendedEvents.length > 0 ? (
                   <div className="hidden sm:flex gap-2">
                     <button

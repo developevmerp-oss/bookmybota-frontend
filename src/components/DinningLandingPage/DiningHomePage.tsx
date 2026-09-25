@@ -19,15 +19,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { IconType } from "react-icons";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Navigation as SwiperNavigation } from "swiper/modules";
-import type { Swiper as SwiperType } from "swiper";
-import "swiper/css";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
-import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import { hasCityFilter, preferCityOrAll } from "@/components/LandingPage/homeUtils";
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
+import ListingPromoSlider, {
+  diningToListingSlide,
+} from "@/components/LandingPage/ListingPromoSlider";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -52,7 +51,7 @@ import {
   MdOutlineTheaters,
   MdOutlineWineBar,
 } from "react-icons/md";
-import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, useGetActiveMarketingPromotionsQuery, Business, Collection, type MarketingCampaign } from "@/services/api";
+import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, Business, Collection, MarketingCampaign } from "@/services/api";
 // import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
@@ -60,7 +59,6 @@ import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferLabel } from "@/lib/diningOffers";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
-import { promotionClickHref } from "@/lib/promotionCta";
 import { useAppSelector } from "@/lib/hooks";
 import {
   DEFAULT_DINING_FILTERS,
@@ -68,17 +66,19 @@ import {
   DiningHomeOfferCard,
   DiningOfferBucket,
   buildDiningHomeOfferCards,
-  businessHasOffer,
   businessMatchesOfferBucket,
   extractCuisines,
   offerBucketSectionTitle,
 } from "@/lib/diningFilters";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./DiningHomePage.css";
+import { promotionClickHref } from "@/lib/promotionCta";
 
 const HERO_ACCENT = "#6900AA";
 const PAGE_MUTED = "#f6f7f8";
 const DINING_LIST_LIMIT = 12;
+/** Stable default so `data = []` does not create a new array every render. */
+const EMPTY_COLLECTIONS: Collection[] = [];
 
 const EXPLORE_DINING_CARDS = [
   {
@@ -1245,10 +1245,6 @@ export default function Home() {
   const [mealOccasion, setMealOccasion] = useState<MealOccasion | "">("");
   const authUser = useAppSelector((state) => state.auth.user);
   const foodieName = authUser?.name?.trim().split(/\s+/)[0] || "Foodie";
-  const bannerPrevRef = useRef<HTMLButtonElement>(null);
-  const bannerNextRef = useRef<HTMLButtonElement>(null);
-  const bannerSwiperRef = useRef<SwiperType | null>(null);
-  const [bannerActiveDot, setBannerActiveDot] = useState(0);
 
   const collectionsRef = useRef<HTMLDivElement>(null);
   const cuisinesRef = useRef<HTMLDivElement>(null);
@@ -1261,28 +1257,20 @@ export default function Home() {
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
 
-  const bindBannerNav = useCallback((swiper: SwiperType) => {
-    const nav = swiper.params?.navigation;
-    if (!nav || typeof nav === "boolean") return;
-    nav.prevEl = bannerPrevRef.current;
-    nav.nextEl = bannerNextRef.current;
-    swiper.navigation?.destroy?.();
-    swiper.navigation?.init?.();
-    swiper.navigation?.update?.();
-  }, []);
-
   const updateCollectionsScroll = useCallback(() => {
     const el = collectionsRef.current;
-    if (!el) {
-      setCollectionsScroll({ left: false, right: false });
-      return;
+    let next = { left: false, right: false };
+    if (el) {
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      const canOverflow = maxScroll > 2;
+      next = {
+        left: canOverflow && el.scrollLeft > 2,
+        right: canOverflow && el.scrollLeft < maxScroll - 2,
+      };
     }
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    const canOverflow = maxScroll > 2;
-    setCollectionsScroll({
-      left: canOverflow && el.scrollLeft > 2,
-      right: canOverflow && el.scrollLeft < maxScroll - 2,
-    });
+    setCollectionsScroll((prev) =>
+      prev.left === next.left && prev.right === next.right ? prev : next
+    );
   }, []);
 
   const scrollCollections = (direction: "left" | "right") => {
@@ -1415,8 +1403,8 @@ export default function Home() {
     };
   }, []);
 
-  const activeCity =
-    locationCity && locationCity !== "All Cities" ? locationCity : undefined;
+  const activeCity = hasCityFilter(locationCity) ? locationCity : undefined;
+  const hasSelectedCity = Boolean(activeCity);
 
   const { data: businessTypes = [] } = useGetBusinessTypesQuery('dining');
 
@@ -1471,14 +1459,14 @@ export default function Home() {
 
   const cityBusinessItems = cityBusinessesData?.items ?? [];
   const usingDiningFallback =
-    Boolean(activeCity) &&
+    hasSelectedCity &&
     !cityBusinessesLoading &&
     cityBusinessItems.length === 0 &&
     (cityBusinessesData?.meta?.total ?? 0) === 0;
   const businessesData = usingDiningFallback ? allBusinessesData : cityBusinessesData;
   const businessesLoading =
     cityBusinessesLoading ||
-    (Boolean(activeCity) && cityBusinessItems.length === 0 && allBusinessesLoading);
+    (hasSelectedCity && cityBusinessItems.length === 0 && allBusinessesLoading);
   const businessesFetching =
     cityBusinessesFetching || (usingDiningFallback && allBusinessesFetching);
   const businesses = businessesData?.items ?? [];
@@ -1495,14 +1483,30 @@ export default function Home() {
   const sectionBusinesses = preferCityOrAll(
     citySectionBusinesses,
     allSectionBusinesses,
-    Boolean(activeCity)
+    hasSelectedCity
   );
-  const { data: diningSliderPromotions = [] } = useGetActiveMarketingPromotionsQuery({
-    category: "DINING",
-    surface: "slider",
-    ...(activeCity ? { city: activeCity } : {}),
-  });
-  const { data: collections = [] } = useGetCollectionsQuery();
+  // City-strict pool for promo fallback (landing parity — no other-city filler).
+  const promoCityBusinesses = hasSelectedCity ? citySectionBusinesses : sectionBusinesses;
+  const diningById = useMemo(() => {
+    const map = new Map<string, Business>();
+    for (const b of sectionBusinesses) map.set(String(b.id), b);
+    for (const b of promoCityBusinesses) map.set(String(b.id), b);
+    return map;
+  }, [sectionBusinesses, promoCityBusinesses]);
+  const diningPromoFallbackSlides = useMemo(
+    () =>
+      promoCityBusinesses
+        .filter(
+          (b) =>
+            Boolean(b.is_promoted) &&
+            (Boolean(resolveMediaUrl(b.cover_image_url)?.trim()) ||
+              Boolean(b.gallery_images?.[0]))
+        )
+        .slice(0, 8)
+        .map((b) => diningToListingSlide(b, activeCity || "")),
+    [promoCityBusinesses, activeCity]
+  );
+  const { data: collections = EMPTY_COLLECTIONS } = useGetCollectionsQuery();
   // const { data: moods = [] } = useGetMoodsQuery();
   const { data: cuisineMasters = [] } = useGetDiningCuisinesQuery();
 
@@ -1626,57 +1630,6 @@ export default function Home() {
     () => buildDiningHomeOfferCards(sectionPool),
     [sectionPool]
   );
-
-  // Priority: active dining slider promotions (plan banner image) → promoted → offers → any.
-  const promoSlides = useMemo(() => {
-    const businessesById = new Map<string, Business>();
-    for (const b of sectionPool) businessesById.set(String(b.id), b);
-
-    if (diningSliderPromotions.length > 0) {
-      const fromPlans = diningSliderPromotions
-        .slice(0, 8)
-        .map((promo) => campaignToPromoSlide(promo, businessesById))
-        // Prefer slides that have the admin-uploaded promotion banner image.
-        .filter((slide) => Boolean(slide.image?.trim()));
-      if (fromPlans.length > 0) return fromPlans;
-      // Plans exist but no banner uploaded yet — still show plan slides (icon fallback).
-      return diningSliderPromotions
-        .slice(0, 8)
-        .map((promo) => campaignToPromoSlide(promo, businessesById));
-    }
-
-    if (!sectionPool.length) return [];
-
-    const toSlides = (list: Business[]) => list.map(businessToPromoSlide).slice(0, 8);
-
-    const promotedOnly = sectionPool.filter((b) => Boolean(b.is_promoted));
-    if (promotedOnly.length) return toSlides(promotedOnly);
-
-    const withOffers = sectionPool.filter((b) => businessHasOffer(b));
-    if (withOffers.length) {
-      const promotedOffers = withOffers.filter((b) => Boolean(b.is_promoted));
-      return toSlides(promotedOffers.length ? promotedOffers : withOffers);
-    }
-
-    return toSlides(sectionPool);
-  }, [sectionPool, diningSliderPromotions]);
-
-  // Same as landing promo: duplicate so loop + peeks keep autoplay seamless.
-  const promoDisplaySlides = useMemo(() => {
-    if (promoSlides.length <= 1) return promoSlides;
-    const minNeeded = 6;
-    if (promoSlides.length >= minNeeded) return promoSlides;
-    const out: DiningPromoSlide[] = [];
-    let copy = 0;
-    while (out.length < minNeeded) {
-      for (const s of promoSlides) {
-        out.push(copy === 0 ? s : { ...s, id: `${s.id}__c${copy}` });
-        if (out.length >= minNeeded) break;
-      }
-      copy += 1;
-    }
-    return out;
-  }, [promoSlides]);
 
   const applyOfferBucket = useCallback((bucket: DiningOfferBucket) => {
     setDiningFilters((prev) => ({
@@ -1845,8 +1798,6 @@ export default function Home() {
   const isBarCategoryOnly =
     activeCategories.length === 1 &&
     activeCategories[0].trim().toLowerCase() === "bar";
-  const hasSelectedCity =
-    Boolean(locationCity) && locationCity !== "All Cities";
   const canShowCatalogFallback =
     !businessesLoading &&
     displayRestaurants.length === 0 &&
@@ -1928,7 +1879,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!showHomeExtras) {
-      setCollectionsScroll({ left: false, right: false });
+      setCollectionsScroll((prev) =>
+        prev.left || prev.right ? { left: false, right: false } : prev
+      );
       return;
     }
     const frame = requestAnimationFrame(() => updateCollectionsScroll());
@@ -1945,7 +1898,7 @@ export default function Home() {
       el?.removeEventListener("scroll", updateCollectionsScroll);
       window.removeEventListener("resize", updateCollectionsScroll);
     };
-  }, [collections, showHomeExtras, updateCollectionsScroll]);
+  }, [collections.length, showHomeExtras, updateCollectionsScroll]);
 
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
@@ -1993,137 +1946,19 @@ export default function Home() {
         ? `${totalRestaurants}+`
         : "5,000+";
 
-  // Landing-page carousel rules: peek when >1 slide, centered single when 1.
-  const promoMulti = promoSlides.length > 1;
-
   return (
     <div className="min-h-screen bg-white">
-      {/* ── Top promo banner — same carousel layout as landing PromoBannerCarousel ─ */}
-      {promoSlides.length > 0 ? (
-      <section
-        className={`dining-promo-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4 ${
-          promoMulti ? "is-multi" : "is-compact"
-        }`}
-      >
-        <div
-          className={`relative w-full ${
-            promoMulti ? "" : "dining-promo-single-wrap"
-          }`}
-        >
-          <Swiper
-            key={`dining-promo-${promoSlides.map((s) => s.id).join("-")}-${promoDisplaySlides.length}`}
-            modules={[Autoplay, SwiperNavigation]}
-            className="dining-promo-peek w-full"
-            loop={promoMulti}
-            loopAdditionalSlides={promoMulti ? 2 : 0}
-            speed={600}
-            centeredSlides={promoMulti}
-            centeredSlidesBounds={!promoMulti}
-            grabCursor={promoMulti}
-            allowTouchMove={promoMulti}
-            slidesPerView={promoMulti ? "auto" : 1}
-            spaceBetween={promoMulti ? 14 : 0}
-            watchSlidesProgress={promoMulti}
-            breakpoints={
-              promoMulti
-                ? {
-                    640: { spaceBetween: 16 },
-                    768: { spaceBetween: 18 },
-                    1024: { spaceBetween: 20 },
-                  }
-                : undefined
-            }
-            autoplay={
-              promoMulti
-                ? {
-                    delay: 5000,
-                    disableOnInteraction: false,
-                    pauseOnMouseEnter: true,
-                    stopOnLastSlide: false,
-                    waitForTransition: true,
-                  }
-                : false
-            }
-            navigation={
-              promoMulti
-                ? { prevEl: bannerPrevRef.current, nextEl: bannerNextRef.current }
-                : false
-            }
-            onBeforeInit={(swiper: SwiperType) => {
-              if (!promoMulti) return;
-              const nav = swiper.params?.navigation;
-              if (nav && typeof nav !== "boolean") {
-                nav.prevEl = bannerPrevRef.current;
-                nav.nextEl = bannerNextRef.current;
-              }
-            }}
-            onSwiper={(swiper) => {
-              bannerSwiperRef.current = swiper;
-              if (!promoMulti) return;
-              setTimeout(() => bindBannerNav(swiper));
-            }}
-            onSlideChange={(swiper) => {
-              const originalCount = promoSlides.length;
-              if (originalCount <= 0) return;
-              const real =
-                ((swiper.realIndex % originalCount) + originalCount) % originalCount;
-              setBannerActiveDot(real);
-            }}
-          >
-            {promoDisplaySlides.map((slide) => (
-              <SwiperSlide key={slide.id} className="dining-promo-slide">
-                <DiningPromoBannerCard slide={slide} />
-              </SwiperSlide>
-            ))}
-          </Swiper>
-
-          {promoMulti ? (
-            <>
-              <button
-                ref={bannerPrevRef}
-                type="button"
-                aria-label="Previous banner"
-                className="dining-promo-nav dining-promo-nav-prev"
-              >
-                <ChevronLeft className="size-5 sm:size-6" strokeWidth={2.25} />
-              </button>
-              <button
-                ref={bannerNextRef}
-                type="button"
-                aria-label="Next banner"
-                className="dining-promo-nav dining-promo-nav-next"
-              >
-                <ChevronRight className="size-5 sm:size-6" strokeWidth={2.25} />
-              </button>
-              <div className="dining-promo-dots" role="tablist" aria-label="Banner slides">
-                {promoSlides.map((slide, index) => (
-                  <button
-                    key={slide.id}
-                    type="button"
-                    role="tab"
-                    aria-label={`Show ${slide.title}`}
-                    aria-selected={index === bannerActiveDot}
-                    className={`dining-promo-dot ${
-                      index === bannerActiveDot ? "is-active" : ""
-                    }`}
-                    onClick={() => {
-                      const swiper = bannerSwiperRef.current;
-                      if (!swiper) return;
-                      swiper.slideToLoop(index);
-                      setBannerActiveDot(index);
-                    }}
-                  />
-                ))}
-              </div>
-            </>
-          ) : null}
-        </div>
-      </section>
-      ) : null}
+      {/* Top promo — same marketing + city logic / banner UI as landing */}
+      <ListingPromoSlider
+        category="DINING"
+        city={activeCity || ""}
+        fallbackSlides={diningPromoFallbackSlides}
+        diningById={diningById}
+      />
 
       <CategoryPromoBanners
         category="DINING"
-        city={activeCity || locationCity || ""}
+        city={activeCity || ""}
         className="container mx-auto px-4 sm:px-6 lg:px-8 pt-3"
       />
 
@@ -2768,7 +2603,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
               {getFilteredSectionTitle()}
             </h2>
             {usingDiningFallback ||
-            (Boolean(activeCity) &&
+            (hasSelectedCity &&
               !cityBusinessesLoading &&
               citySectionBusinesses.length === 0) ? (
               <CitySectionEmptyNotice message="No dining options available in your city yet." />

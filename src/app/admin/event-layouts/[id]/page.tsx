@@ -72,11 +72,13 @@ export default function AdminEventLayoutDetailPage() {
   const [studioNonce, setStudioNonce] = useState(0);
 
   const busy = reviewing || saving || fulfilling;
-  const canBuild =
+  const canBuild = Boolean(
     request &&
-    ["SUBMITTED", "UNDER_REVIEW", "ORGANIZER_CHANGE_REQUESTED"].includes(String(request.status));
-  const canReject =
-    request && ["SUBMITTED", "UNDER_REVIEW", "ORGANIZER_CHANGE_REQUESTED"].includes(String(request.status));
+    ["SUBMITTED", "UNDER_REVIEW", "ORGANIZER_CHANGE_REQUESTED"].includes(String(request.status))
+  );
+  const canReject = Boolean(
+    request && ["SUBMITTED", "UNDER_REVIEW", "ORGANIZER_CHANGE_REQUESTED"].includes(String(request.status))
+  );
 
   useEffect(() => {
     if (!request?.templates) return;

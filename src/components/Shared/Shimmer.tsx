@@ -285,6 +285,44 @@ export function EventReviewsShimmer() {
   );
 }
 
+/** Dining home restaurant listing cards — matches RestaurantCard layout */
+export function DiningHomeRestaurantShimmer({ count = 6 }: { count?: number }) {
+  return (
+    <Wrap>
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full"
+        aria-busy="true"
+        aria-label="Loading restaurants"
+      >
+        {Array.from({ length: count }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white w-full"
+          >
+            <div className="h-[280px] sm:h-[300px] md:h-[320px] lg:h-[300px] xl:h-[320px] w-full overflow-hidden">
+              <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+            </div>
+            <div className="px-3 pt-3 pb-3.5 space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <Skeleton width="72%" height={18} />
+                <Skeleton width={44} height={20} borderRadius={6} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton width="48%" height={13} />
+                <Skeleton width={110} height={13} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton width="55%" height={13} />
+                <Skeleton width={52} height={13} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Wrap>
+  );
+}
+
 /** Super Admin list loading state — matches tabs/search bar, cards (<lg), table (lg+), pagination */
 export function AdminListShimmer({
   rows = 6,

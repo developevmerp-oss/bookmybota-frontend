@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
-import { Bookmark, Loader2 } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetDiningWishlistIdsQuery,
@@ -121,9 +121,9 @@ export default function DiningWishlistButton({ businessId, className }: Props) {
         {toggling ? (
           <Loader2 size={16} className="animate-spin text-[#6900AA]" />
         ) : (
-          <Bookmark
+          <Heart
             size={18}
-            className={saved ? "fill-[#6900AA] text-[#6900AA]" : "fill-none text-[#6900AA]"}
+            className={saved ? "fill-[#E11D48] text-[#E11D48]" : "fill-none text-[#B41739]"}
             strokeWidth={2.25}
           />
         )}

@@ -28,33 +28,33 @@
   }
 }
 
-/* One slide: fill the content width — no empty left/right gutters */
+/* One slide: full content width (only small page padding) */
 .promo-banner-swiper.is-single {
   --promo-slide-w: 100%;
-}
-
-.promo-banner-single-wrap {
-  width: min(1180px, 92%);
-  margin-left: auto;
-  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
-  .promo-banner-single-wrap {
-    width: min(1180px, 88%);
-  }
-}
-
-@media (min-width: 768px) {
-  .promo-banner-single-wrap {
-    width: min(1180px, 86%);
+  .promo-banner-swiper.is-single {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
   }
 }
 
 @media (min-width: 1024px) {
-  .promo-banner-single-wrap {
-    width: min(1180px, 82%);
+  .promo-banner-swiper.is-single {
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
+}
+
+.promo-banner-single-wrap {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .promo-banner-frame,

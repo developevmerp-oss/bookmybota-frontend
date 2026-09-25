@@ -31,6 +31,23 @@
 
 .dining-promo-swiper.is-compact {
   --dining-promo-slide-w: 100%;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .dining-promo-swiper.is-compact {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dining-promo-swiper.is-compact {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
 }
 
 .dining-promo-swiper.is-multi .dining-promo-peek.swiper {
@@ -38,27 +55,10 @@
 }
 
 .dining-promo-single-wrap {
-  width: min(1180px, 92%);
-  margin-left: auto;
-  margin-right: auto;
-}
-
-@media (min-width: 640px) {
-  .dining-promo-single-wrap {
-    width: min(1180px, 88%);
-  }
-}
-
-@media (min-width: 768px) {
-  .dining-promo-single-wrap {
-    width: min(1180px, 86%);
-  }
-}
-
-@media (min-width: 1024px) {
-  .dining-promo-single-wrap {
-    width: min(1180px, 82%);
-  }
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .dining-promo-peek.swiper,

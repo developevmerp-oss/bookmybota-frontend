@@ -90,6 +90,8 @@ export default function CategoryPromoBanners({
   // Hide the whole promotions rail when nothing matches this location
   if (isLoading || promotions.length === 0) return null;
 
+  const single = promotions.length === 1;
+
   return (
     <section className={`w-full ${className}`}>
       {onDetailsPage ? (
@@ -97,7 +99,13 @@ export default function CategoryPromoBanners({
           {CATEGORY_LABEL[category]} promotions
         </p>
       ) : null}
-      <div className="flex gap-3 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden pb-1">
+      <div
+        className={
+          single
+            ? "w-full"
+            : "flex gap-3 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden pb-1"
+        }
+      >
         {promotions.map((b) => {
           const href = promotionClickHref(b);
           const samePage = isPromotionHrefCurrentPage(href, category, targetId);
@@ -110,9 +118,15 @@ export default function CategoryPromoBanners({
             <div
               className={`${
                 onDetailsPage
-                  ? "w-[min(100%,520px)] sm:w-[420px] lg:w-[480px]"
-                  : "w-[280px] sm:w-[340px]"
-              } relative aspect-[21/9] rounded-2xl overflow-hidden bg-[#111] shrink-0 shadow-sm`}
+                  ? single
+                    ? "w-full"
+                    : "w-[min(100%,520px)] sm:w-[420px] lg:w-[480px]"
+                  : single
+                    ? "w-full"
+                    : "w-[280px] sm:w-[340px]"
+              } relative aspect-[21/9] rounded-2xl overflow-hidden bg-[#111] ${
+                single ? "" : "shrink-0"
+              } shadow-sm`}
             >
               <PromoBannerMedia src={b.banner_image_url} title={title} />
               <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
@@ -129,14 +143,14 @@ export default function CategoryPromoBanners({
 
           if (samePage || href === "#") {
             return (
-              <div key={b.id} className="shrink-0">
+              <div key={b.id} className={single ? "w-full" : "shrink-0"}>
                 {inner}
               </div>
             );
           }
 
           return (
-            <Link key={b.id} href={href} className="shrink-0">
+            <Link key={b.id} href={href} className={single ? "block w-full" : "shrink-0"}>
               {inner}
             </Link>
           );

@@ -10,16 +10,14 @@ import {
   Loader2,
   X,
   Utensils,
-  UtensilsCrossed,
-  Users,
   Tag,
   ArrowRight,
-  Crown,
   Star,
 } from "lucide-react";
 import Link from "next/link";
 import type { IconType } from "react-icons";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import { DiningHomeRestaurantShimmer } from "@/components/Shared/Shimmer";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
 import { hasCityFilter, preferCityOrAll } from "@/components/LandingPage/homeUtils";
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
@@ -833,30 +831,44 @@ async function searchLocations(query: string): Promise<NominatimResult[]> {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+/** Truncate cuisine/address lists: ≤2 join cleanly; >2 keep a 3rd start so CSS ellipsis looks like "A, B, Co..." */
+function formatCardListParts(
+  parts: string[],
+  options?: { shortSep?: string; longSep?: string; maxFullyShown?: number }
+): string {
+  const clean = parts.map((p) => p.trim()).filter(Boolean);
+  if (clean.length === 0) return "";
+  const maxFullyShown = options?.maxFullyShown ?? 2;
+  const shortSep = options?.shortSep ?? " • ";
+  const longSep = options?.longSep ?? ", ";
+  if (clean.length <= maxFullyShown) {
+    return clean.join(shortSep);
+  }
+  return clean.slice(0, maxFullyShown + 1).join(longSep);
+}
+
 function RestaurantCard({ restaurant }: { restaurant: Business }) {
   const [imgFailed, setImgFailed] = useState(false);
   const imageSrc = resolveMediaUrl(restaurant.cover_image_url) || "";
   const showImage = Boolean(imageSrc) && !imgFailed;
   const rating = Number(restaurant.rating || 4.2).toFixed(1);
-  const cuisine =
-    restaurant.cuisine ||
-    restaurant.type_name ||
-    "Italian, Chinese, Continental";
-  const cuisineLine = cuisine
-    .split(",")
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(" • ");
+  // Prefer cuisine tags only — never fall back to venue type_name (e.g. "General Restaurant")
+  const cuisineRaw = (restaurant.cuisine || "").trim();
+  const cuisineParts = cuisineRaw
+    ? cuisineRaw
+        .split(/[,|·]/)
+        .map((c) => c.trim())
+        .filter(Boolean)
+    : ["Italian", "Chinese", "Continental"];
+  const cuisineLine = formatCardListParts(cuisineParts);
 
-  const getLocality = (addr?: string | null) => {
-    if (!addr || typeof addr !== "string") return "Address not available";
-    const parts = addr.split(",");
-    if (parts.length >= 2) {
-      return `${parts[0].trim()}, ${parts[1].trim()}`;
-    }
-    return addr.trim() || "Address not available";
-  };
+  const addressParts =
+    restaurant.address && typeof restaurant.address === "string"
+      ? restaurant.address.split(",").map((p) => p.trim()).filter(Boolean)
+      : [];
+  const locality =
+    formatCardListParts(addressParts, { shortSep: ", ", longSep: ", " }) ||
+    "Address not available";
 
   const idHash =
     typeof restaurant.id === "number"
@@ -874,15 +886,15 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
   const distance = (() => {
     const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
-    return `${dists[idHash % dists.length]} km away`;
+    return `${dists[idHash % dists.length]} km`;
   })();
 
   const isPromoted = !!restaurant.is_promoted;
   const offerLabel = listingOfferLabel(restaurant.dining_offers);
 
   return (
-    <div className="group flex h-full flex-col bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-shadow duration-300 p-3">
-      <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-[#F3F4F6]">
+    <div className="group flex h-full w-full flex-col overflow-hidden bg-white rounded-2xl border border-[#E8E8E8] shadow-none hover:shadow-md transition-shadow duration-300">
+      <div className="relative w-full h-[280px] sm:h-[300px] md:h-[320px] lg:h-[300px] xl:h-[320px] shrink-0 overflow-hidden bg-[#F3F4F6]">
         <Link href={restaurantHref(restaurant)} className="absolute inset-0 block">
           {showImage ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -897,88 +909,46 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
               <Utensils size={28} strokeWidth={1.5} />
             </div>
           )}
-          {showImage ? (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
-          ) : null}
         </Link>
 
         <DiningWishlistButton businessId={String(restaurant.id)} />
 
-        {(isPromoted || offerLabel) && (
-          <div className="absolute bottom-3 left-3 z-[1] flex flex-col gap-1.5 max-w-[calc(100%-1.5rem)] pointer-events-none">
-            {isPromoted ? (
-              <span
-                className="inline-flex max-w-full items-center gap-1.5 rounded-full text-[#9F1239] text-xs font-bold px-3 py-1.5 shadow-md"
-                style={{
-                  background: "linear-gradient(90deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%)",
-                }}
-              >
-                <Crown
-                  size={13}
-                  className="shrink-0 fill-[#9F1239] text-[#9F1239]"
-                  strokeWidth={0}
-                />
-                <span className="truncate">Promoted</span>
-              </span>
-            ) : null}
-            {offerLabel ? (
-              <span
-                className="inline-flex max-w-full items-center gap-1.5 rounded-full text-[#9F1239] text-xs font-bold px-3 py-1.5 shadow-md"
-                style={{
-                  background: "linear-gradient(90deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%)",
-                }}
-              >
-                <Tag
-                  size={13}
-                  className="shrink-0 fill-[#9F1239] text-[#9F1239]"
-                  strokeWidth={0}
-                />
-                <span className="truncate">{offerLabel}</span>
-              </span>
-            ) : null}
-          </div>
-        )}
+        {isPromoted ? (
+          <span className="absolute top-3 left-3 z-[1] pointer-events-none rounded-md bg-white/75 px-2.5 py-1 text-xs font-medium text-black backdrop-blur-[2px]">
+            Promoted
+          </span>
+        ) : null}
+
+        {offerLabel ? (
+          <span className="absolute bottom-3 left-3 z-[1] pointer-events-none inline-flex max-w-[calc(100%-4.5rem)] items-center gap-1.5 rounded-full bg-[#F3E8FF] text-[#5B21B6] text-xs font-semibold px-2.5 py-1 shadow-sm">
+            <Tag size={12} className="shrink-0 text-[#7C3AED]" strokeWidth={2.25} />
+            <span className="truncate">{offerLabel}</span>
+          </span>
+        ) : null}
       </div>
 
       <Link
         href={restaurantHref(restaurant)}
-        className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-white"
+        className="flex flex-col flex-1 px-3 pt-3 pb-3.5 min-w-0 min-h-0 bg-white"
       >
-        <div className="flex justify-between items-start gap-2 mb-2">
-          <h3 className="font-bold text-[#292929] text-lg sm:text-xl leading-tight truncate flex-1 group-hover:text-[#6900AA] transition-colors">
+        <div className="flex justify-between items-center gap-2 mb-1.5 min-w-0">
+          <h3 className="font-semibold tracking-wide text-[#1A1A1A] text-lg sm:text-xl leading-snug truncate min-w-0 flex-1 group-hover:text-[#6900AA] transition-colors">
             {restaurant.name}
           </h3>
           <div className="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-1.5 py-0.5 rounded-md">
-            <span className="text-[10px]">★</span>
-            <span>{rating}+</span>
+            <span className="text-base">★</span>
+            <span>{rating}</span>
           </div>
         </div>
 
-        <div className="space-y-1.5 text-sm text-[#292929]">
-          <p className="flex items-center gap-1.5 min-w-0">
-            <UtensilsCrossed size={14} className="shrink-0 text-[#6900AA]" />
-            <span className="truncate font-medium">{cuisineLine}</span>
-          </p>
-          <div className="flex items-start justify-between gap-2 min-w-0">
-            <p className="flex items-center gap-1.5 min-w-0 flex-1">
-              <MapPin size={14} className="shrink-0 text-[#6900AA]" />
-              <span className="truncate font-medium">{getLocality(restaurant.address)}</span>
-            </p>
-            <span className="shrink-0 font-medium whitespace-nowrap text-[#292929]">{distance}</span>
-          </div>
-          <p className="flex items-center gap-1.5 min-w-0">
-            <Users size={14} className="shrink-0 text-[#6900AA]" />
-            <span className="truncate font-medium">{priceForTwo}</span>
-          </p>
+        <div className="flex items-center justify-between gap-3 min-w-0 text-sm sm:text-base text-gray-700 font-semibold">
+          <p className="truncate min-w-0 max-w-[58%]">{cuisineLine}</p>
+          <span className="shrink-0 whitespace-nowrap">{priceForTwo}</span>
         </div>
 
-        <div className="mt-auto pt-3 w-full">
-          <span
-            className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-[#6900AA] bg-white px-3.5 py-2.5 text-sm font-semibold text-[#6900AA] group-hover:bg-[#f7e9ff] transition-colors [transform:translateZ(0)] [backface-visibility:hidden]"
-          >
-            <span>View Booking</span>
-            <ArrowRight size={16} className="shrink-0" />
-          </span>
+        <div className="flex items-center justify-between gap-3 min-w-0 text-sm sm:text-base text-gray-700 font-semibold mt-1">
+          <p className="truncate min-w-0 max-w-[58%]">{locality}</p>
+          <span className="shrink-0 whitespace-nowrap">{distance}</span>
         </div>
       </Link>
     </div>
@@ -988,12 +958,18 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 /** Static showcase listing card — same look as RestaurantCard, not clickable (no detail page). */
 function ShowcaseRestaurantCard({ place }: { place: ShowcaseDiningCard }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const cuisineLine = place.cuisine
+  const cuisineParts = place.cuisine
     .split(/[·|,]/)
     .map((c) => c.trim())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(" • ");
+    .filter(Boolean);
+  const cuisineLine = formatCardListParts(cuisineParts) || place.cuisine;
+  const addressParts = place.locality
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const locality =
+    formatCardListParts(addressParts, { shortSep: ", ", longSep: ", " }) ||
+    place.locality;
   const rating = Number(place.rating || 0).toFixed(1);
   const idHash = place.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const priceForTwo = (() => {
@@ -1002,13 +978,13 @@ function ShowcaseRestaurantCard({ place }: { place: ShowcaseDiningCard }) {
   })();
   const distance = (() => {
     const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
-    return `${dists[idHash % dists.length]} km away`;
+    return `${dists[idHash % dists.length]} km`;
   })();
   const showImage = Boolean(place.image) && !imgFailed;
 
   return (
-    <div className="group flex h-full flex-col bg-white rounded-2xl border border-[#E8E8E8] shadow-sm p-3 select-none">
-      <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-[#F3F4F6]">
+    <div className="group flex h-full w-full flex-col overflow-hidden bg-white rounded-2xl border border-[#E8E8E8] shadow-none hover:shadow-md transition-shadow duration-300 select-none">
+      <div className="relative w-full h-[280px] sm:h-[300px] md:h-[320px] lg:h-[320px]  xl:h-[320px] shrink-0 overflow-hidden bg-[#F3F4F6]">
         {showImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -1023,45 +999,27 @@ function ShowcaseRestaurantCard({ place }: { place: ShowcaseDiningCard }) {
             <Utensils size={28} strokeWidth={1.5} />
           </div>
         )}
-        {showImage ? (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
-        ) : null}
       </div>
 
-      <div className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-white">
-        <div className="flex justify-between items-start gap-2 mb-2">
-          <h3 className="font-bold text-[#292929] text-lg sm:text-xl leading-tight truncate flex-1">
+      <div className="flex flex-col flex-1 px-3 pt-3 pb-3.5 min-w-0 min-h-0 bg-white">
+        <div className="flex justify-between items-center gap-2 mb-1.5 min-w-0">
+          <h3 className="font-bold text-[#1A1A1A] text-[15px] sm:text-base leading-snug truncate min-w-0 flex-1">
             {place.name}
           </h3>
           <div className="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-1.5 py-0.5 rounded-md">
             <span className="text-[10px]">★</span>
-            <span>{rating}+</span>
+            <span>{rating}</span>
           </div>
         </div>
 
-        <div className="space-y-1.5 text-sm text-[#292929]">
-          <p className="flex items-center gap-1.5 min-w-0">
-            <UtensilsCrossed size={14} className="shrink-0 text-[#6900AA]" />
-            <span className="truncate font-medium">{cuisineLine || place.cuisine}</span>
-          </p>
-          <div className="flex items-start justify-between gap-2 min-w-0">
-            <p className="flex items-center gap-1.5 min-w-0 flex-1">
-              <MapPin size={14} className="shrink-0 text-[#6900AA]" />
-              <span className="truncate font-medium">{place.locality}</span>
-            </p>
-            <span className="shrink-0 font-medium whitespace-nowrap text-[#292929]">{distance}</span>
-          </div>
-          <p className="flex items-center gap-1.5 min-w-0">
-            <Users size={14} className="shrink-0 text-[#6900AA]" />
-            <span className="truncate font-medium">{priceForTwo}</span>
-          </p>
+        <div className="flex items-center justify-between gap-3 min-w-0 text-[13px] sm:text-sm text-[#595959]">
+          <p className="truncate min-w-0 max-w-[58%]">{cuisineLine}</p>
+          <span className="shrink-0 whitespace-nowrap">{priceForTwo}</span>
         </div>
 
-        <div className="mt-auto pt-3 w-full">
-          <span className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-[#6900AA] bg-white px-3.5 py-2.5 text-sm font-semibold text-[#6900AA] opacity-70">
-            <span>View Booking</span>
-            <ArrowRight size={16} className="shrink-0" />
-          </span>
+        <div className="flex items-center justify-between gap-3 min-w-0 text-[13px] sm:text-sm text-[#595959] mt-1">
+          <p className="truncate min-w-0 max-w-[58%]">{locality}</p>
+          <span className="shrink-0 whitespace-nowrap">{distance}</span>
         </div>
       </div>
     </div>
@@ -1919,10 +1877,12 @@ export default function Home() {
     const city = locationCity;
     if (mealOccasion) {
       const mealLabel = MEAL_OCCASIONS.find((m) => m.id === mealOccasion)?.label || "Dining";
-      return (city && city !== "All Cities") ? `${mealLabel} in ${city}` : `${mealLabel} Near You`;
+      return (city && city !== "All Cities") ? `${mealLabel} in ${city}` : `${mealLabel} Across All Cities`;
     }
     if (activeCategories.length === 0) {
-      return (city && city !== "All Cities") ? `Restaurants in ${city}` : "Restaurants Near You";
+      return (city && city !== "All Cities")
+        ? `Restaurants in ${city}`
+        : "Restaurants Across All Cities";
     }
     if (activeCategories.length === 1) {
       const label = activeCategories[0];
@@ -1932,11 +1892,11 @@ export default function Home() {
     else if (lower === "cafe") name = "Cafes";
     else if (lower === "restaurant") name = "Restaurants";
       else if (!name.endsWith("s")) name = `${name}s`;
-    return (city && city !== "All Cities") ? `${name} in ${city}` : `${name} Near You`;
+    return (city && city !== "All Cities") ? `${name} in ${city}` : `${name} Across All Cities`;
     }
     return (city && city !== "All Cities")
       ? `${activeCategories.length} categories in ${city}`
-      : `${activeCategories.length} categories Near You`;
+      : `${activeCategories.length} categories Across All Cities`;
   };
 
   const heroRestaurantStat =
@@ -2598,7 +2558,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
 
           {/* ── 6. Restaurant section ───────────────────────────────────────── */}
           <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-2"}`}>
-          <div className="mb-3">
+          <div className="pt-2 pb-6">
             <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
               {getFilteredSectionTitle()}
             </h2>
@@ -2625,12 +2585,9 @@ className={`text-sm font-bold mt-2 transition-colors ${
           </div>
 
           {businessesLoading && loadedRestaurants.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
-              <Loader2 size={36} className="animate-spin text-[#6900AA]" />
-              <p className="text-sm font-medium">Loading top restaurants...</p>
-            </div>
+            <DiningHomeRestaurantShimmer count={6} />
           ) : useStaticDining ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full">
               {staticDiningCards.map((place) => (
                 <ShowcaseRestaurantCard key={place.id} place={place} />
               ))}
@@ -2674,7 +2631,7 @@ className={`text-sm font-bold mt-2 transition-colors ${
             </div>
           ) : (
             <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full">
                 {displayRestaurants.map((restaurant) => (
                 <RestaurantCard key={restaurant.id} restaurant={restaurant} />
               ))}

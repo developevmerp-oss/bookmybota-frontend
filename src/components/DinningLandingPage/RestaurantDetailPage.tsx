@@ -50,7 +50,6 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
-import CategoryPromoBanners from '@/components/LandingPage/CategoryPromoBanners';
 import { useSelectedCity } from '@/lib/useSelectedCity';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
@@ -1383,13 +1382,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           <span className="text-slate-600 truncate max-w-[14rem] sm:max-w-none">{profile.name}</span>
         </div>
       </div>
-
-      <CategoryPromoBanners
-        category="DINING"
-        targetId={bizId}
-        city={selectedCity}
-        className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-3"
-      />
 
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-2 pb-12 sm:pb-16">
         {/* ── Restaurant header (Zomato: details + actions) ── */}

@@ -16,6 +16,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { formatMoney, getCostForTwoFromRange } from '@/lib/currencyFormat';
 import { formatDateCustomer } from '@/lib/dateFormat';
 import { resolveMediaUrl } from '@/lib/mediaUrl';
+import { restaurantHref } from '@/lib/businessPublicPath';
 import SafeCoverImage, { DiningImageFallback } from '@/components/Shared/SafeCoverImage';
 import DiningWishlistButton from '@/components/DinningLandingPage/DiningWishlistButton';
 import {
@@ -308,7 +309,7 @@ function VenueMenuGallery({
 const getBookingDates = () => {
   const dates = [];
   const today = new Date();
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     dates.push(d);
@@ -503,6 +504,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const resolvedParams = use(params);
   const router = useRouter();
   const { data: profile, isLoading } = useGetBusinessPublicQuery(resolvedParams.id);
+  /** Prefer UUID once public profile loads — slug URLs must not be sent as business_id FKs. */
+  const bizId = profile?.id || resolvedParams.id;
   const bookingDates = useMemo(() => getBookingDates(), []);
   const opDateRange = useMemo(() => {
     if (!bookingDates.length) return { from: '', to: '' };
@@ -512,12 +515,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     };
   }, [bookingDates]);
   const { data: operatingDates = [] } = useGetBusinessOperatingDatesQuery(
-    { bizId: resolvedParams.id, from: opDateRange.from, to: opDateRange.to },
-    { skip: !resolvedParams.id || !opDateRange.from }
+    { bizId, from: opDateRange.from, to: opDateRange.to },
+    { skip: !bizId || !opDateRange.from || !profile?.id }
   );
   const operatingByDate = useMemo(() => {
     const map = new Map<string, BusinessOperatingDate>();
-    for (const row of operatingDates) map.set(row.op_date, row);
+    for (const row of operatingDates) {
+      const key = String(row.op_date || '').slice(0, 10);
+      if (key) map.set(key, row);
+    }
     return map;
   }, [operatingDates]);
   const [createBooking] = useCreateBookingMutation();
@@ -525,7 +531,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const {
     data: reviewsData,
     refetch: refetchReviews,
-  } = useGetReviewsQuery(resolvedParams.id, { skip: !resolvedParams.id });
+    isUninitialized: reviewsUninitialized,
+  } = useGetReviewsQuery(bizId, { skip: !bizId || !profile?.id });
   const reviews = reviewsData?.items ?? [];
   const reviewEligibility = reviewsData?.eligibility;
   const [createReview, { isLoading: submittingReview }] = useCreateReviewMutation();
@@ -538,7 +545,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   );
 
   const matchedCollection = collections.find((c) => c.slug === firstCollectionSlug);
-  const similarRestaurants = similarBusinesses.filter((b) => b.id !== resolvedParams.id);
+  const similarRestaurants = similarBusinesses.filter((b) => b.id !== bizId && b.slug !== resolvedParams.id);
 
   const similarScrollerRef = useRef<HTMLDivElement>(null);
 
@@ -563,14 +570,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       if (session) {
         dispatch(setCredentials({ user: session.user, token: session.token }));
       }
-      if (resolvedParams.id) {
+      // Skip until reviews query has started (profile UUID resolved).
+      if (!reviewsUninitialized) {
         void refetchReviews();
       }
     };
     syncCustomerAuth();
     window.addEventListener('auth_changed', syncCustomerAuth);
     return () => window.removeEventListener('auth_changed', syncCustomerAuth);
-  }, [dispatch, resolvedParams.id, refetchReviews]);
+  }, [dispatch, reviewsUninitialized, refetchReviews]);
 
   // Scroll to top on restaurant change/mount
   useEffect(() => {
@@ -1011,10 +1019,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
   // Automatically check availability on Summary step (Book a Table tab)
   useEffect(() => {
-    if (activeTab === "Book a Table" && drawerStep === 3 && selectedTime && resolvedParams.id) {
+    if (activeTab === "Book a Table" && drawerStep === 3 && selectedTime && bizId) {
       checkAvailability();
     }
-  }, [activeTab, drawerStep, selectedTime, guests]);
+  }, [activeTab, drawerStep, selectedTime, guests, bizId]);
 
   // Mount target for inline Book a Table booking UI
   const [bookTableSlot, setBookTableSlot] = useState<HTMLDivElement | null>(null);
@@ -1110,7 +1118,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     try {
       const bookingDateTime = getBookingISO();
       const data = await checkAvailabilityQuery({
-        business_id: resolvedParams.id,
+        business_id: bizId,
         date: bookingDateTime,
         guests: String(guests),
       }).unwrap();
@@ -1151,7 +1159,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       }
 
       const result = await createBooking({
-        business_id: resolvedParams.id,
+        business_id: bizId,
         customer_name: customerName,
         customer_phone: customerPhone,
         booking_time: bookingDateTime,
@@ -1210,7 +1218,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
     try {
       const res = await createReview({
-        businessId: resolvedParams.id,
+        businessId: bizId,
         user_name: values.user_name.trim(),
         rating: values.rating,
         text: values.text.trim(),
@@ -1362,21 +1370,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       {/* ── 1. Breadcrumbs ── */}
       <div className="bg-white border-b border-slate-100 py-3">
         <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 text-xs font-semibold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
-          <Link href="/" className="hover:text-rose-600 transition-colors">Home</Link>
+          <Link href="/" className="hover:text-rose-600 transition-colors">
+            Home
+          </Link>
           <ChevronRight size={10} />
-          <Link href="/" className="hover:text-rose-600 transition-colors">{country}</Link>
+          <Link href="/dining" className="hover:text-rose-600 transition-colors">
+            Dining
+          </Link>
           <ChevronRight size={10} />
-          <Link href={`/?city=${encodeURIComponent(city)}`} className="hover:text-rose-600 transition-colors">{city}</Link>
-          <ChevronRight size={10} />
-          <Link href={`/?filter=${encodeURIComponent(profile.type_name || 'Restaurant')}`} className="hover:text-rose-600 transition-colors">{profile.type_name || 'Restaurants'}</Link>
-          <ChevronRight size={10} />
-          <span className="text-slate-600">{profile.name}</span>
+          <span className="text-slate-600 truncate max-w-[14rem] sm:max-w-none">{profile.name}</span>
         </div>
       </div>
 
       <CategoryPromoBanners
         category="DINING"
-        targetId={resolvedParams.id}
+        targetId={bizId}
         city={city}
         className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-3"
       />
@@ -2072,7 +2080,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   return (
                     <Link
                       key={restaurant.id}
-                      href={`/restaurant/${restaurant.id}`}
+                      href={restaurantHref(restaurant)}
                       className="group block bg-white hover:shadow-lg rounded-2xl p-3 border border-slate-100 hover:border-slate-200 transition-all duration-300 w-[280px] shrink-0 snap-start"
                     >
                       <div className="relative mb-3">

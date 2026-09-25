@@ -7,6 +7,7 @@ import {
   useGetPublicRegisteredCinemasQuery,
   type PublicRegisteredPartner,
 } from "@/services/api";
+import { cinemaHref } from "@/lib/businessPublicPath";
 
 const PAGE_BG = "#f5f5f5";
 
@@ -23,37 +24,37 @@ const SHOWCASE_CINEMAS: CinemaCard[] = [
     name: "PVR: Palladium Mall, Addis Ababa",
     address:
       "4th floor, Palladium Mall, Bole Road, Addis Ababa, Ethiopia",
-    href: "/movies/cinemas/c1",
+    href: cinemaHref({ id: "c1" }),
   },
   {
     id: "c2",
     name: "Cinepolis: City Centre, Addis Ababa",
     address: "City Centre Mall, Mexico Square, Addis Ababa, Ethiopia",
-    href: "/movies/cinemas/c2",
+    href: cinemaHref({ id: "c2" }),
   },
   {
     id: "c3",
     name: "Edna Mall Cinema, Addis Ababa",
     address: "Edna Mall, Bole Medhanialem, Addis Ababa, Ethiopia",
-    href: "/movies/cinemas/c3",
+    href: cinemaHref({ id: "c3" }),
   },
   {
     id: "c4",
     name: "Alliance Ethio-Française Cinema",
     address: "Wollo Sefer, Near Mexico, Addis Ababa, Ethiopia",
-    href: "/movies/cinemas/c4",
+    href: cinemaHref({ id: "c4" }),
   },
   {
     id: "c5",
     name: "Century Cinema: Merkato",
     address: "Merkato Complex, Addis Ababa, Ethiopia",
-    href: "/movies/cinemas/c5",
+    href: cinemaHref({ id: "c5" }),
   },
   {
     id: "c6",
     name: "Gas Cinema: CMC",
     address: "CMC Michael, Addis Ababa, Ethiopia",
-    href: "/movies/cinemas/c6",
+    href: cinemaHref({ id: "c6" }),
   },
 ];
 
@@ -67,7 +68,7 @@ function mapVenue(v: PublicRegisteredPartner): CinemaCard {
     id: v.id,
     name: v.name,
     address,
-    href: `/movies/cinemas/${v.id}`,
+    href: cinemaHref(v),
   };
 }
 

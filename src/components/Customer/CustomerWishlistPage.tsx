@@ -38,6 +38,7 @@ import {
   readGuestMovieWishlistIds,
 } from "@/lib/movieWishlist";
 import { movieDetailPath } from "@/components/MovieLandingPage/movieCatalog";
+import { restaurantHref } from "@/lib/businessPublicPath";
 
 function WishlistRestaurantCard({
   restaurant,
@@ -74,7 +75,7 @@ function WishlistRestaurantCard({
   return (
     <div className="group flex h-full flex-col bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
       <div className="relative h-44 shrink-0 bg-slate-100">
-        <Link href={`/restaurant/${restaurant.id}`} className="absolute inset-0 block">
+        <Link href={restaurantHref(restaurant)} className="absolute inset-0 block">
           <img
             src={imageSrc}
             alt={restaurant.name}
@@ -105,7 +106,7 @@ function WishlistRestaurantCard({
         )}
       </div>
 
-      <Link href={`/restaurant/${restaurant.id}`} className="flex flex-col flex-1 p-4 min-w-0">
+      <Link href={restaurantHref(restaurant)} className="flex flex-col flex-1 p-4 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-bold text-[#111111] text-base leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
             {restaurant.name}

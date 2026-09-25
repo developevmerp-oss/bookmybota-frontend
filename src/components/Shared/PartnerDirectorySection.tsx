@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Building2, MapPin } from "lucide-react";
 import type { PublicRegisteredPartner } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { artistHref, venueHref } from "@/lib/businessPublicPath";
 import SafeCoverImage, {
   ArtistImageFallback,
 } from "@/components/Shared/SafeCoverImage";
@@ -115,7 +116,7 @@ function PartnerCard({
 
   if (kind === "artist") {
     return (
-      <Link href={`/artists/${partner.id}`} className="block h-full">
+      <Link href={artistHref(partner)} className="block h-full">
         {card}
       </Link>
     );
@@ -123,7 +124,7 @@ function PartnerCard({
 
   if (kind === "venue") {
     return (
-      <Link href={`/venues/${partner.id}`} className="block h-full">
+      <Link href={venueHref(partner)} className="block h-full">
         {card}
       </Link>
     );

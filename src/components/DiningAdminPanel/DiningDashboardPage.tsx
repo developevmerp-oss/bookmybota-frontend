@@ -391,7 +391,10 @@ function BusinessDashboard() {
 
   const byDate = useMemo(() => {
     const map = new Map<string, BusinessOperatingDate>();
-    for (const row of operatingDates) map.set(row.op_date, row);
+    for (const row of operatingDates) {
+      const key = String(row.op_date || "").slice(0, 10);
+      if (key) map.set(key, row);
+    }
     return map;
   }, [operatingDates]);
 

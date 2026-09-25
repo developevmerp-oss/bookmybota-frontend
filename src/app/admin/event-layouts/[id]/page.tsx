@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Maximize2, X } from "lucide-react";
+import { ArrowLeft, Maximize2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useFulfillAdminEventLayoutRequestMutation,
@@ -15,6 +15,7 @@ import {
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
+import { LayoutStudioModalHost } from "@/components/layoutStudio/LayoutStudioChrome";
 
 const VenueLayoutBuilder = dynamic(
   () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
@@ -734,55 +735,43 @@ export default function AdminEventLayoutDetailPage() {
         </div>
       )}
 
-      {isLayoutModalOpen && canBuild && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col p-2 sm:p-4">
-          <div className="flex items-center justify-between pb-3 px-2 text-white border-b border-white/10 mb-2">
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-rose-400">Event layout studio</p>
-              <h2 className="text-lg font-bold truncate">
-                {optionName || activeTemplate?.name || request.layout_name}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsLayoutModalOpen(false)}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold inline-flex items-center gap-2"
-            >
-              <X size={16} /> Close studio
-            </button>
-          </div>
-          <div className="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden flex flex-col">
-            <VenueLayoutBuilder
-              key={
-                creatingNew
-                  ? `new-modal-${studioNonce}-${seedFromVenue ? "seeded" : "blank"}`
-                  : `modal-${activeTemplateId || selectedId || "empty"}-${studioNonce}`
-              }
-              venueAdapter={{
-                sections,
-                initialSeats,
-                maxCapacity: targetCapacity > 0 ? targetCapacity : undefined,
-                initialConfig: {
-                  labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
-                  shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
-                  bgImageUrl: sourceConfig.bgImageUrl || null,
-                  sectionColors: sourceConfig.sectionColors,
-                },
-                saving,
-                hideSubmitToVenue: true,
-                onSave: async (payload, options) => {
-                  await handleSaveTemplatePayload(payload, options);
-                  setIsLayoutModalOpen(false);
-                },
-                onBlankPage: () => {
-                  beginNewOption(false);
-                  toast.info("Blank page ready — build, then Save as new option.");
-                },
-              }}
-            />
-          </div>
+      <LayoutStudioModalHost
+        open={isLayoutModalOpen && canBuild}
+        title={optionName || activeTemplate?.name || request.layout_name}
+        subtitle="Event layout studio"
+        onClose={() => setIsLayoutModalOpen(false)}
+      >
+        <div className="h-full min-h-0 bg-white overflow-hidden flex flex-col">
+          <VenueLayoutBuilder
+            key={
+              creatingNew
+                ? `new-modal-${studioNonce}-${seedFromVenue ? "seeded" : "blank"}`
+                : `modal-${activeTemplateId || selectedId || "empty"}-${studioNonce}`
+            }
+            venueAdapter={{
+              sections,
+              initialSeats,
+              maxCapacity: targetCapacity > 0 ? targetCapacity : undefined,
+              initialConfig: {
+                labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
+                shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
+                bgImageUrl: sourceConfig.bgImageUrl || null,
+                sectionColors: sourceConfig.sectionColors,
+              },
+              saving,
+              hideSubmitToVenue: true,
+              onSave: async (payload, options) => {
+                await handleSaveTemplatePayload(payload, options);
+                setIsLayoutModalOpen(false);
+              },
+              onBlankPage: () => {
+                beginNewOption(false);
+                toast.info("Blank page ready — build, then Save as new option.");
+              },
+            }}
+          />
         </div>
-      )}
+      </LayoutStudioModalHost>
     </div>
   );
 }

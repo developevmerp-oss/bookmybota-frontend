@@ -28,6 +28,7 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { restaurantHref } from "@/lib/businessPublicPath";
 
 const ACCENT = "#6900AA";
 const DEFAULT_DINING_IMAGE =
@@ -261,7 +262,7 @@ export default function BookingDetailPage({
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
                         {booking.business_id && (
                           <Link
-                            href={`/restaurant/${booking.business_id}`}
+                            href={restaurantHref({ id: booking.business_id })}
                             className="text-base sm:text-lg lg:text-sm font-semibold inline-flex items-center gap-1 hover:opacity-80"
                             style={{ color: ACCENT }}
                           >

@@ -34,6 +34,7 @@ import {
 import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
 import { formatMoney, formatOfferDiscount } from "@/lib/currencyFormat";
+import { artistHref } from "@/lib/businessPublicPath";
 import { readSessionForRole } from "@/lib/authStorage";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -61,6 +62,8 @@ type StaticArtist = {
   unauthorized?: boolean;
   /** Book My Bota registered partner business id (when available). */
   businessId?: string | null;
+  /** SEO slug when API provides it. */
+  slug?: string | null;
 };
 
 function isRegisteredPlatformArtist(artist: StaticArtist): boolean {
@@ -255,6 +258,11 @@ export default function PublicEventDetailPage({
       const role = String(a.role_title || "").trim();
       const isGuestRole = /^guest$/i.test(role) || /chief\s*guest/i.test(role);
       const businessId = a.artist_business_id ? String(a.artist_business_id) : null;
+      const raw = a as {
+        artist_business_slug?: string | null;
+        slug?: string | null;
+      };
+      const slug = raw.artist_business_slug || raw.slug || null;
       const unauthorized =
         !isGuestRole &&
         (a.artist_source === "auto_registered" ||
@@ -268,6 +276,7 @@ export default function PublicEventDetailPage({
         image_url: a.image_url || a.artist_business_image || undefined,
         unauthorized,
         businessId,
+        slug,
       };
     });
   }, [event?.artists]);
@@ -797,7 +806,9 @@ export default function PublicEventDetailPage({
                     type="button"
                     onClick={() => {
                       if (isRegisteredPlatformArtist(artist) && artist.businessId) {
-                        router.push(`/artists/${artist.businessId}`);
+                        router.push(
+                          artistHref({ id: artist.businessId, slug: artist.slug })
+                        );
                         return;
                       }
                       setArtistModal(artist);

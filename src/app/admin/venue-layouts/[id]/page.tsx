@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Maximize2, X } from "lucide-react";
+import { ArrowLeft, Maximize2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useConfirmAdminVenueLayoutLiveMutation,
@@ -20,6 +20,7 @@ import { formatDateTime12h } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import LayoutSeatPreview from "@/components/venue/LayoutSeatPreview";
 import VenueProfileLayoutSummary from "@/components/venue/VenueProfileLayoutSummary";
+import { LayoutStudioModalHost } from "@/components/layoutStudio/LayoutStudioChrome";
 
 const VenueLayoutBuilder = dynamic(
   () => import("@/components/EventAdminPanel/VenueLayoutBuilder"),
@@ -731,63 +732,42 @@ export default function AdminVenueLayoutBuilderPage() {
         </aside>
       </div>
 
-      {/* Full-Screen Pop-up Layout Studio Modal */}
-      {isLayoutModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col p-2 sm:p-3 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between py-2.5 px-3 bg-slate-900/90 rounded-xl border border-slate-800 text-white mb-2 shadow-lg">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/25 shrink-0 flex items-center gap-1.5 shadow-sm">
-                <Maximize2 size={13} className="text-amber-400" /> Layout Studio
-              </span>
-              <h2 className="text-base font-bold text-white truncate tracking-tight">
-                {optionName || activeTemplate?.name || request.layout_name}
-              </h2>
-              <span className="text-xs text-slate-400 font-medium bg-slate-800/80 px-2.5 py-0.5 rounded-md border border-slate-700/60 hidden md:inline truncate">
-                {request.venue_name} · {request.layout_type}
-              </span>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsLayoutModalOpen(false)}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 shadow-sm active:scale-95"
-              >
-                <X size={14} /> Close Studio
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 bg-white rounded-2xl overflow-hidden shadow-2xl border border-slate-700">
-            <VenueLayoutBuilder
-              key={creatingNew ? "new-option-modal" : `modal-${activeTemplateId || selectedId || "empty"}`}
-              venueAdapter={{
-                sections,
-                initialSeats,
-                maxCapacity: undefined,
-                initialConfig: {
-                  ...sourceConfig,
-                  labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
-                  shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
-                  bgImageUrl: sourceConfig.bgImageUrl || null,
-                  sectionColors: sourceConfig.sectionColors,
-                },
-                saving,
-                hideSubmitToVenue: true,
-                onSave: async (payload) => {
-                  await handleSaveTemplatePayload(payload);
-                  setIsLayoutModalOpen(false);
-                },
-                onBlankPage: () => {
-                  setCreatingNew(true);
-                  setActiveTemplateId(null);
-                  setOptionName(`${request.layout_name} option ${templates.length + 1}`);
-                  toast.info("Blank page ready — start building your layout.");
-                },
-              }}
-            />
-          </div>
+      <LayoutStudioModalHost
+        open={isLayoutModalOpen}
+        title={optionName || activeTemplate?.name || request.layout_name}
+        subtitle={`${request.venue_name} · ${request.layout_type}`}
+        onClose={() => setIsLayoutModalOpen(false)}
+      >
+        <div className="h-full min-h-0 bg-white overflow-hidden">
+          <VenueLayoutBuilder
+            key={creatingNew ? "new-option-modal" : `modal-${activeTemplateId || selectedId || "empty"}`}
+            venueAdapter={{
+              sections,
+              initialSeats,
+              maxCapacity: undefined,
+              initialConfig: {
+                ...sourceConfig,
+                labels: Array.isArray(sourceConfig.labels) ? (sourceConfig.labels as never[]) : [],
+                shapes: Array.isArray(sourceConfig.shapes) ? (sourceConfig.shapes as never[]) : [],
+                bgImageUrl: sourceConfig.bgImageUrl || null,
+                sectionColors: sourceConfig.sectionColors,
+              },
+              saving,
+              hideSubmitToVenue: true,
+              onSave: async (payload) => {
+                await handleSaveTemplatePayload(payload);
+                setIsLayoutModalOpen(false);
+              },
+              onBlankPage: () => {
+                setCreatingNew(true);
+                setActiveTemplateId(null);
+                setOptionName(`${request.layout_name} option ${templates.length + 1}`);
+                toast.info("Blank page ready — start building your layout.");
+              },
+            }}
+          />
         </div>
-      )}
+      </LayoutStudioModalHost>
     </div>
   );
 }

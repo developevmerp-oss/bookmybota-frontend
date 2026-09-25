@@ -22,6 +22,7 @@ import {
   extractCuisines,
 } from "@/lib/diningFilters";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { restaurantHref } from "@/lib/businessPublicPath";
 
 const DINING_LIST_LIMIT = 12;
 
@@ -82,7 +83,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
   return (
     <div className="group flex h-full flex-col bg-[#F5F5F5] rounded-2xl border border-[#E5E5E5] shadow-sm hover:shadow-xl transition-shadow duration-300 p-3">
       <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
-        <Link href={`/restaurant/${restaurant.id}`} className="absolute inset-0 block">
+        <Link href={restaurantHref(restaurant)} className="absolute inset-0 block">
           <img
             src={imageSrc}
             alt={restaurant.name}
@@ -121,7 +122,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
       </div>
 
       <Link
-        href={`/restaurant/${restaurant.id}`}
+        href={restaurantHref(restaurant)}
         className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-[#F5F5F5]"
       >
         <div className="flex justify-between items-start gap-2 mb-2">

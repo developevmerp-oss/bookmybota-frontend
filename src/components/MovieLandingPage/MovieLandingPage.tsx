@@ -28,7 +28,11 @@ import {
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useAppDispatch } from "@/lib/hooks";
-import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import { hasCityFilter, preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
+import ListingPromoSlider, {
+  useListingPromoCampaigns,
+} from "@/components/LandingPage/ListingPromoSlider";
 import {
   formatMovieCardMeta,
   formatMovieCardTitle,
@@ -640,16 +644,33 @@ export default function MovieLandingPage() {
     scrollToMoviesListing();
   }, [scrollToMoviesListing]);
 
+  useEffect(() => {
+    const applyCity = () => {
+      const stored = localStorage.getItem("selected_city");
+      setCity(stored && stored !== "All Cities" ? stored : "");
+    };
+    applyCity();
+    window.addEventListener("selected_city_changed", applyCity);
+    window.addEventListener("storage", applyCity);
+    return () => {
+      window.removeEventListener("selected_city_changed", applyCity);
+      window.removeEventListener("storage", applyCity);
+    };
+  }, []);
+
+  const hasCity = hasCityFilter(city);
+  const { hasCampaigns: hasMoviePromoCampaigns } = useListingPromoCampaigns("MOVIES", city);
+
   const moviesQueryArg = useMemo(
     () => ({
       page: 1,
       limit: 100,
-      ...(city ? { city } : {}),
+      ...(hasCity ? { city } : {}),
       ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
       ...(selectedGenres.length ? { genre: selectedGenres.join(",") } : {}),
       ...(selectedFormats.length ? { format: selectedFormats.join(",") } : {}),
     }),
-    [city, selectedLanguages, selectedGenres, selectedFormats]
+    [city, hasCity, selectedLanguages, selectedGenres, selectedFormats]
   );
 
   const unscopedMoviesQueryArg = useMemo(
@@ -663,7 +684,7 @@ export default function MovieLandingPage() {
     [selectedLanguages, selectedGenres, selectedFormats]
   );
 
-  const filtersQueryArg = useMemo(() => (city ? { city } : undefined), [city]);
+  const filtersQueryArg = useMemo(() => (hasCity ? { city } : undefined), [city, hasCity]);
 
   const {
     data: cityMoviesData,
@@ -674,21 +695,29 @@ export default function MovieLandingPage() {
     data: allMoviesData,
     isLoading: allMoviesLoading,
     isFetching: allMoviesFetching,
-  } = useGetPublicMoviesQuery(unscopedMoviesQueryArg, { skip: !city });
+  } = useGetPublicMoviesQuery(unscopedMoviesQueryArg, { skip: !hasCity });
 
   const cityMovieItems = cityMoviesData?.items ?? EMPTY_MOVIES;
   const allMovieItems = allMoviesData?.items ?? EMPTY_MOVIES;
-  const usingMoviesFallback = Boolean(city) && cityMovieItems.length === 0;
+  const usingMoviesFallback = hasCity && cityMovieItems.length === 0;
   const moviesData = usingMoviesFallback ? allMoviesData : cityMoviesData;
-  const catalogMovies = preferCityOrAll(cityMovieItems, allMovieItems, Boolean(city));
+  const catalogMovies = preferCityOrAll(cityMovieItems, allMovieItems, hasCity);
   const isLoading =
-    cityMoviesLoading || (Boolean(city) && cityMovieItems.length === 0 && allMoviesLoading);
+    cityMoviesLoading || (hasCity && cityMovieItems.length === 0 && allMoviesLoading);
   const isFetching =
     cityMoviesFetching || (usingMoviesFallback && allMoviesFetching);
   const { data: filterOptions } = useGetPublicMovieFiltersQuery(filtersQueryArg);
   const hasCinemasInCity = moviesData?.meta?.has_cinemas_in_city;
   const noCinemasInCity =
-    Boolean(city && hasCinemasInCity === false) && catalogMovies.length === 0;
+    Boolean(hasCity && hasCinemasInCity === false) && catalogMovies.length === 0;
+
+  /** City-strict promoted movies — used only inside ListingPromoSlider when campaigns exist as link context. */
+  const moviesById = useMemo(() => {
+    const map = new Map<string, Movie>();
+    for (const m of catalogMovies) map.set(String(m.id), m);
+    for (const m of cityMovieItems) map.set(String(m.id), m);
+    return map;
+  }, [catalogMovies, cityMovieItems]);
 
   const heroSlideKey = useMemo(
     () => buildHeroSlides(catalogMovies).map((slide) => slide.id).join("|"),
@@ -842,20 +871,6 @@ export default function MovieLandingPage() {
     });
   };
 
-  useEffect(() => {
-    const applyCity = () => {
-      const stored = localStorage.getItem("selected_city");
-      setCity(stored && stored !== "All Cities" ? stored : "");
-    };
-    applyCity();
-    window.addEventListener("selected_city_changed", applyCity);
-    window.addEventListener("storage", applyCity);
-    return () => {
-      window.removeEventListener("selected_city_changed", applyCity);
-      window.removeEventListener("storage", applyCity);
-    };
-  }, []);
-
   const languageOptions = useMemo(() => filterOptions?.languages ?? [], [filterOptions]);
 
   const genreOptions = useMemo(() => filterOptions?.genres ?? [], [filterOptions]);
@@ -903,7 +918,7 @@ export default function MovieLandingPage() {
   const useStaticMovies =
     !isLoading &&
     !hasActiveFilters &&
-    !city &&
+    !hasCity &&
     nowShowingSource.length === 0 &&
     comingSoonSource.length === 0;
 
@@ -1068,7 +1083,13 @@ export default function MovieLandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {activeHeroSlide ? (
+      {/* Landing-aligned marketing slider when paid MOVIES campaigns exist */}
+      {hasMoviePromoCampaigns ? (
+        <ListingPromoSlider category="MOVIES" city={city} moviesById={moviesById} />
+      ) : null}
+
+      {/* Native spotlight hero when no paid slider campaigns (keeps existing movies UI) */}
+      {!hasMoviePromoCampaigns && activeHeroSlide ? (
         <>
           {/* Mobile + tablet — featured cards (centered active + side peeks) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
@@ -1257,9 +1278,14 @@ export default function MovieLandingPage() {
       >
         <div className={CONTAINER}>
           <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
-            <h2 className="text-lg font-extrabold text-slate-900 sm:text-xl md:text-2xl lg:text-3xl">
-              Only in Theatres
-            </h2>
+            <div className="min-w-0">
+              <h2 className="text-lg font-extrabold text-slate-900 sm:text-xl md:text-2xl lg:text-3xl">
+                Only in Theatres
+              </h2>
+              {hasCity && !isLoading && cityMovieItems.length === 0 ? (
+                <CitySectionEmptyNotice message="No movies available in your city yet." />
+              ) : null}
+            </div>
             <Link
               href={cinemasHref}
               className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#6900AA] hover:text-[#57008E]"

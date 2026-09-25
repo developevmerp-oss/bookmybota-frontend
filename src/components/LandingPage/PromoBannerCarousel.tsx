@@ -13,6 +13,7 @@ import {
   useGetPublicMoviesQuery,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { restaurantHref } from "@/lib/businessPublicPath";
 import { formatDateCustomer } from "@/lib/dateFormat";
 import { promotionClickHref } from "@/lib/promotionCta";
 import { useHomeCatalog } from "./useHomeCatalog";
@@ -189,7 +190,7 @@ function diningToSlide(place: Business, city: string): Slide {
     title,
     tagline: shortAbout(place.description, place.name) || "Reserve your table",
     image: resolveMediaUrl(place.cover_image_url || ""),
-    href: `/restaurant/${place.id}`,
+    href: restaurantHref(place),
     badge: "DINING",
     cityLabel: cityLabel || undefined,
     placeLabel: place.address?.split(",")[0]?.trim() || undefined,

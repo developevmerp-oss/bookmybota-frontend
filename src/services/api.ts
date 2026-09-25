@@ -50,6 +50,8 @@ export interface BusinessContactPerson {
 
 export interface Business {
   id: string;
+  /** SEO-friendly public URL slug */
+  slug?: string | null;
   name: string;
   address: string;
   city_id?: number | null;
@@ -1359,6 +1361,8 @@ export interface PublicEvent {
 /** Approved onboarded venue / artist partners for partner landing pages. */
 export interface PublicRegisteredPartner {
   id: string;
+  /** SEO-friendly public URL slug */
+  slug?: string | null;
   name: string;
   address?: string | null;
   description?: string | null;

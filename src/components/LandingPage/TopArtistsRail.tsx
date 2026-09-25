@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { artistHref } from "@/lib/businessPublicPath";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import {
   usePublicArtistsCatalog,
@@ -29,7 +30,7 @@ function mapApiArtist(artist: DirectoryArtist): RailArtistCard {
     id: artist.id,
     name: artist.name,
     image: resolveMediaUrl(artist.cover_image_url),
-    href: `/artists/${artist.id}`,
+    href: artistHref(artist),
   };
 }
 

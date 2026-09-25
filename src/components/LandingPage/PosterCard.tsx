@@ -6,6 +6,7 @@ import { Building2, Calendar, MapPin, Star, Utensils } from "lucide-react";
 import type { Business, PublicEvent, PublicRegisteredPartner } from "@/services/api";
 import { useGetPublicEventQuery } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { restaurantHref, venueHref } from "@/lib/businessPublicPath";
 import {
   eventPortrait,
   eventPlaceLine,
@@ -246,7 +247,7 @@ export function VenuePosterCard({
 
   return (
     <Link
-      href={`/venues/${venue.id}`}
+      href={venueHref(venue)}
       className={`${widthClass} group block h-full ${cardShell} ${className}`}
       title={`View ${venue.name} availability and send an inquiry`}
     >
@@ -291,7 +292,7 @@ export function DiningPosterCard({ place }: { place: Business }) {
     : "snap-start shrink-0 w-[260px] sm:w-[300px] lg:w-[350px]";
 
   return (
-    <Link href={`/restaurant/${place.id}`} className={`${widthClass} group block h-full ${cardShell}`}>
+    <Link href={restaurantHref(place)} className={`${widthClass} group block h-full ${cardShell}`}>
       <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7]`}>
         <CoverImage
           src={image}

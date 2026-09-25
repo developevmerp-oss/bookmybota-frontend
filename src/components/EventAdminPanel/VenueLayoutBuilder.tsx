@@ -10,6 +10,16 @@ import {
 import { useGetOrganizerEventQuery, useUpdateEventLayoutMutation, useGetEventLayoutQuery } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import StadiumBlockBuilder, { StadiumSeatingConfigOutput } from "./StadiumBlockBuilder";
+import {
+  LayoutFormatSwitcher,
+  LayoutStudioShell,
+  StudioDivider,
+  StudioFullscreenToggle,
+  StudioToolButton,
+  StudioToolbarSection,
+  StudioZoomControls,
+  type LayoutStudioFormat,
+} from "@/components/layoutStudio/LayoutStudioChrome";
 
 type Seat = {
   id?: string;
@@ -295,7 +305,7 @@ export default function VenueLayoutBuilder({
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [moveEntireSection, setMoveEntireSection] = useState(false);
   const [sectionColors, setSectionColors] = useState<Record<string, string>>({});
-  const [layoutMode, setLayoutMode] = useState<"custom" | "stadium">("custom");
+  const [layoutMode, setLayoutMode] = useState<LayoutStudioFormat>("custom");
 
   useEffect(() => {
     const rawMode =
@@ -3035,52 +3045,30 @@ export default function VenueLayoutBuilder({
   const selectedLabel = labels.find(l => l.id === selectedLabelId);
   const selectedShape = shapes.find(s => s.id === selectedShapeId);
 
-  return (
-    <div className={`flex flex-col min-h-0 bg-white shadow-sm transition-all ${
-      isFullscreen 
-        ? "fixed inset-0 z-[999] w-screen h-screen rounded-none" 
-        : "h-full w-full flex-1 border border-slate-200 rounded-2xl overflow-hidden"
-    }`}>
-      {/* Layout Format Switcher Header */}
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-950 border-b border-slate-800 text-white z-40">
-        <div className="flex items-center gap-2.5">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Layout Format</span>
-          <div className="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800 shadow-inner">
-            <button
-              type="button"
-              onClick={() => setLayoutMode("custom")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                layoutMode === "custom"
-                  ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-              }`}
-            >
-              <span>🪑 Custom Floor Plan</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setLayoutMode("stadium")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                layoutMode === "stadium"
-                  ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-              }`}
-            >
-              <span>🏟️ Sports Stadium Layout</span>
-            </button>
-          </div>
-        </div>
+  const handleFormatSwitch = (next: LayoutStudioFormat): boolean => {
+    if (next === layoutMode) return false;
+    const customHasWork =
+      seats.length > 0 || labels.length > 0 || shapes.length > 0 || Boolean(bgImageUrl);
+    const leavingCustom = layoutMode === "custom" && next === "stadium" && customHasWork;
+    const leavingStadium = layoutMode === "stadium" && next === "custom";
+    if (leavingCustom || leavingStadium) {
+      const ok = window.confirm(
+        leavingCustom
+          ? "Switch to Sports Stadium? Your Custom Floor Plan stays in memory for this session, but you will edit the stadium builder instead. Continue?"
+          : "Switch to Custom Floor Plan? Your stadium edits stay in memory for this session, but you will edit the seat canvas instead. Continue?"
+      );
+      if (!ok) return false;
+    }
+    return true;
+  };
 
-        <div className="flex items-center gap-2 text-xs">
-          {layoutMode === "custom" ? (
-            <span className="text-slate-400 bg-slate-900 px-3 py-1 rounded-lg border border-slate-800">Cinema / Theatre / Club / Grid Floor Plan</span>
-          ) : (
-            <span className="text-amber-400 font-semibold bg-amber-400/10 px-3 py-1 rounded-lg border border-amber-400/25 flex items-center gap-1.5">
-              <span>🏟️</span> Multi-Block Stands & Seating Tiers
-            </span>
-          )}
-        </div>
-      </div>
+  return (
+    <LayoutStudioShell isFullscreen={isFullscreen}>
+      <LayoutFormatSwitcher
+        value={layoutMode}
+        onChange={setLayoutMode}
+        confirmBeforeSwitch={handleFormatSwitch}
+      />
 
       {layoutMode === "stadium" ? (
         <div className="flex-1 min-h-0 h-full flex flex-col p-2 bg-slate-950 overflow-hidden">
@@ -3126,148 +3114,135 @@ export default function VenueLayoutBuilder({
         </div>
       ) : (
         <>
-      {/* Toolbar — shrink-0 so tools stay visible when canvas fills the studio */}
-      <div className="shrink-0 z-30 flex flex-col gap-2 p-3 sm:p-4 border-b border-slate-200 bg-slate-50">
+      {/* Toolbar — grouped for clarity; all custom-floor features kept */}
+      <div className="shrink-0 z-30 flex flex-col gap-2 p-2.5 sm:p-3 border-b border-slate-200 bg-slate-50">
         <div className="flex flex-wrap items-center gap-2">
-          <button 
-            type="button"
-            onClick={() => setMode("select")}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "select" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-          >
-            <MousePointer2 size={16} /> Select
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMode("pan")}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "pan" ? "bg-rose-50 text-rose-600 border-rose-200 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-            title="Pan layout (or hold Spacebar + drag, or middle-click drag)"
-          >
-            <Hand size={16} /> Pan
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMode("add_seat")}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_seat" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-          >
-            <PlusSquare size={16} /> Add Single Seat
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMode("bulk_seats")}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "bulk_seats" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-          >
-            <PlusSquare size={16} /> Add Grid
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMode("add_label")}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_label" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-          >
-            <PlusSquare size={16} /> Add Text
-          </button>
-          <button 
-            type="button"
-            onClick={() => {
-              setMode("add_shape");
-              setShowProperties(true);
-            }}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_shape" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-            title="Open Elements palette — pick a shape, then click the canvas"
-          >
-            <Shapes size={16} /> Elements
-          </button>
-          <button 
-            type="button"
-            onClick={() => {
-              setMode("add_icon");
-              setShowProperties(true);
-            }}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "add_icon" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-            title="Open Icons palette — pick an icon, then click the canvas"
-          >
-            <Sticker size={16} /> Icons
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMode("eraser")}
-            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${mode === "eraser" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
-          >
-            <Eraser size={16} /> Eraser
-          </button>
-
-          <div className="hidden sm:block w-px h-8 bg-slate-300 mx-1" />
-
-          {/* Undo / Redo & Clear History Controls */}
-          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-            <button 
-              type="button"
-              onClick={handleUndo} 
-              disabled={historyIndex <= 0}
-              className="p-1.5 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-700 transition-colors"
-              title="Undo (Ctrl+Z)"
+          <StudioToolbarSection label="Tools">
+            <StudioToolButton active={mode === "select"} onClick={() => setMode("select")} title="Select & move">
+              <MousePointer2 size={16} /> <span className="hidden xs:inline sm:inline">Select</span>
+            </StudioToolButton>
+            <StudioToolButton
+              active={mode === "pan"}
+              onClick={() => setMode("pan")}
+              title="Pan layout (or hold Space + drag, or middle-click drag)"
             >
-              <Undo2 size={16} />
-            </button>
-            <button 
-              type="button"
-              onClick={handleRedo} 
-              disabled={historyIndex >= history.length - 1}
-              className="p-1.5 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-700 transition-colors"
-              title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+              <Hand size={16} /> <span className="hidden sm:inline">Pan</span>
+            </StudioToolButton>
+            <StudioToolButton active={mode === "add_seat"} onClick={() => setMode("add_seat")} title="Add a single seat">
+              <PlusSquare size={16} /> <span className="hidden md:inline">Seat</span>
+            </StudioToolButton>
+            <StudioToolButton
+              active={mode === "bulk_seats"}
+              onClick={() => setMode("bulk_seats")}
+              title="Add a seat grid (opens Properties)"
             >
-              <Redo2 size={16} />
-            </button>
-            <button 
-              type="button"
-              onClick={handleClearCanvas}
-              disabled={seats.length === 0 && labels.length === 0 && shapes.length === 0 && !bgImageUrl}
-              className="p-1.5 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-500 transition-colors"
-              title="Clear Canvas"
+              <PlusSquare size={16} /> <span className="hidden md:inline">Grid</span>
+            </StudioToolButton>
+            <StudioToolButton active={mode === "add_label"} onClick={() => setMode("add_label")} title="Add text label">
+              <PlusSquare size={16} /> <span className="hidden md:inline">Text</span>
+            </StudioToolButton>
+            <StudioToolButton
+              active={mode === "add_shape"}
+              onClick={() => {
+                setMode("add_shape");
+                setShowProperties(true);
+              }}
+              title="Elements palette — pick a shape, then click the canvas"
             >
-              <RotateCcw size={16} />
-            </button>
-          </div>
+              <Shapes size={16} /> <span className="hidden md:inline">Elements</span>
+            </StudioToolButton>
+            <StudioToolButton
+              active={mode === "add_icon"}
+              onClick={() => {
+                setMode("add_icon");
+                setShowProperties(true);
+              }}
+              title="Icons palette — pick an icon, then click the canvas"
+            >
+              <Sticker size={16} /> <span className="hidden md:inline">Icons</span>
+            </StudioToolButton>
+            <StudioToolButton active={mode === "eraser"} onClick={() => setMode("eraser")} title="Eraser">
+              <Eraser size={16} /> <span className="hidden md:inline">Eraser</span>
+            </StudioToolButton>
+          </StudioToolbarSection>
 
-          <div className="hidden sm:block w-px h-8 bg-slate-300 mx-1" />
+          <StudioDivider />
 
-          <select 
-            onChange={(e) => {
-              if (e.target.value === "classic_football") generateClassicFootballLayout();
-              else if (e.target.value === "ethiopia_stadium") generateEthiopiaFootballStadium();
-              else if (e.target.value === "ethiopia_football_seats") generateEthiopiaFullSeatingStadium();
-              else if (e.target.value === "amphitheatre") generateGrandAmphitheatre();
-              else if (e.target.value === "cinema") generateCinemaMultiplex();
-              else if (e.target.value === "theater") generateTheater();
-              else if (e.target.value === "comedy") generateComedyClub();
-              else if (e.target.value === "arena") generateArena();
-              else if (e.target.value === "concert") generateConcertHall();
-              else if (e.target.value === "conference") generateConference();
-              else if (e.target.value === "fashion") generateFashionShow();
-              e.target.value = "";
-            }}
-            className="px-3 sm:px-4 py-2 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 focus:outline-none cursor-pointer shadow-sm hover:bg-emerald-100 transition-colors"
-          >
-            <option value="">✨ Add Template...</option>
-            <optgroup label="🏟️ Stadiums & Sports">
-              <option value="classic_football">⚽ Classic Football Stadium (4 Straight Stands)</option>
-              <option value="ethiopia_stadium">🇪🇹 Ethiopia Football Stadium (Addis Ababa Stadium)</option>
-              <option value="ethiopia_football_seats">🇪🇹⚽ Ethiopia Football Ground & Seating Stadium (Full Bowl)</option>
-              <option value="arena">🥊 Arena (In-The-Round)</option>
-            </optgroup>
-            <optgroup label="🎭 Theatres & Auditoriums">
-              <option value="amphitheatre">🎭 Grand Theatre & Diamond VIP Boxes (Exact NMACC Layout)</option>
-              <option value="theater">🏛️ Classic Proscenium Theater</option>
-              <option value="concert">🎸 Large Concert Hall</option>
-            </optgroup>
-            <optgroup label="🎬 Cinema & Screenings">
-              <option value="cinema">🎬 Cinema Multiplex (Recliner, Prime, Classic)</option>
-            </optgroup>
-            <optgroup label="🎤 Clubs & Events">
-              <option value="comedy">🎤 Comedy Club Tables & GA Bar</option>
-              <option value="fashion">✨ Fashion Show Runway</option>
-              <option value="conference">🏫 Conference / Seminar Hall</option>
-            </optgroup>
-          </select>
+          <StudioToolbarSection label="Edit">
+            <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm">
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={historyIndex <= 0}
+                className="p-1.5 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-700 transition-colors cursor-pointer"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleRedo}
+                disabled={historyIndex >= history.length - 1}
+                className="p-1.5 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-700 transition-colors cursor-pointer"
+                title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+              >
+                <Redo2 size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleClearCanvas}
+                disabled={seats.length === 0 && labels.length === 0 && shapes.length === 0 && !bgImageUrl}
+                className="p-1.5 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:hover:bg-transparent rounded text-slate-500 transition-colors cursor-pointer"
+                title="Clear Canvas"
+              >
+                <RotateCcw size={16} />
+              </button>
+            </div>
+          </StudioToolbarSection>
+
+          <StudioDivider />
+
+          <StudioToolbarSection label="Templates">
+            <select
+              onChange={(e) => {
+                if (e.target.value === "classic_football") generateClassicFootballLayout();
+                else if (e.target.value === "ethiopia_stadium") generateEthiopiaFootballStadium();
+                else if (e.target.value === "ethiopia_football_seats") generateEthiopiaFullSeatingStadium();
+                else if (e.target.value === "amphitheatre") generateGrandAmphitheatre();
+                else if (e.target.value === "cinema") generateCinemaMultiplex();
+                else if (e.target.value === "theater") generateTheater();
+                else if (e.target.value === "comedy") generateComedyClub();
+                else if (e.target.value === "arena") generateArena();
+                else if (e.target.value === "concert") generateConcertHall();
+                else if (e.target.value === "conference") generateConference();
+                else if (e.target.value === "fashion") generateFashionShow();
+                e.target.value = "";
+              }}
+              className="px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 focus:outline-none cursor-pointer shadow-sm hover:bg-emerald-100 transition-colors max-w-[min(100%,16rem)]"
+              title="Start from a ready-made floor plan (cinema, theatre, club, sports look, …)"
+            >
+              <option value="">Add Template…</option>
+              <optgroup label="Stadiums & Sports (seat-map look)">
+                <option value="classic_football">Classic Football Stadium (4 Straight Stands)</option>
+                <option value="ethiopia_stadium">Ethiopia Football Stadium (Addis Ababa Stadium)</option>
+                <option value="ethiopia_football_seats">Ethiopia Football Ground & Seating (Full Bowl)</option>
+                <option value="arena">Arena (In-The-Round)</option>
+              </optgroup>
+              <optgroup label="Theatres & Auditoriums">
+                <option value="amphitheatre">Grand Theatre & Diamond VIP Boxes</option>
+                <option value="theater">Classic Proscenium Theater</option>
+                <option value="concert">Large Concert Hall</option>
+              </optgroup>
+              <optgroup label="Cinema & Screenings">
+                <option value="cinema">Cinema Multiplex (Recliner, Prime, Classic)</option>
+              </optgroup>
+              <optgroup label="Clubs & Events">
+                <option value="comedy">Comedy Club Tables & GA Bar</option>
+                <option value="fashion">Fashion Show Runway</option>
+                <option value="conference">Conference / Seminar Hall</option>
+              </optgroup>
+            </select>
+          </StudioToolbarSection>
         </div>
 
         {mode === "add_shape" && (
@@ -3473,18 +3448,18 @@ export default function VenueLayoutBuilder({
             </div>
           )}
 
-          <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
-            <button type="button" onClick={() => setZoomScale(s => Math.max(0.15, Number((s - 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">-</button>
-            <span className="text-xs font-semibold text-slate-600 min-w-[44px] text-center">{Math.round(zoomScale * 100)}%</span>
-            <button type="button" onClick={() => setZoomScale(s => Math.min(4.0, Number((s + 0.1).toFixed(2))))} className="px-2 py-1 hover:bg-slate-100 rounded text-slate-600 font-bold">+</button>
-          </div>
+          <StudioZoomControls
+            zoomPercent={Math.round(zoomScale * 100)}
+            onZoomOut={() => setZoomScale((s) => Math.max(0.15, Number((s - 0.1).toFixed(2))))}
+            onZoomIn={() => setZoomScale((s) => Math.min(4.0, Number((s + 0.1).toFixed(2))))}
+          />
 
           {/* Properties Toggle & Fullscreen Toggle */}
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setShowProperties(prev => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+              onClick={() => setShowProperties((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
                 showProperties
                   ? "bg-rose-50 text-rose-700 border-rose-300 shadow-inner"
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -3494,19 +3469,10 @@ export default function VenueLayoutBuilder({
               <SlidersHorizontal size={14} />
               <span>{showProperties ? "Hide Panel" : "Properties"}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setIsFullscreen(prev => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
-                isFullscreen
-                  ? "bg-rose-600 text-white border-rose-600 shadow-sm hover:bg-rose-700"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-              }`}
-              title={isFullscreen ? "Exit Fullscreen (Esc)" : "Full Window"}
-            >
-              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              <span className="hidden sm:inline">{isFullscreen ? "Exit" : "Expand"}</span>
-            </button>
+            <StudioFullscreenToggle
+              isFullscreen={isFullscreen}
+              onToggle={() => setIsFullscreen((prev) => !prev)}
+            />
           </div>
 
           <button type="button" onClick={() => void handleSave(false)} disabled={isSaving} className="btn-secondary flex items-center gap-2">
@@ -4802,6 +4768,6 @@ export default function VenueLayoutBuilder({
       </div>
         </>
       )}
-    </div>
+    </LayoutStudioShell>
   );
 }

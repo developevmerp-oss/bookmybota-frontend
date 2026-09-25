@@ -35,6 +35,7 @@ import {
 import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { artistHref } from "@/lib/businessPublicPath";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import { EventListShimmer } from "@/components/Shared/Shimmer";
@@ -514,7 +515,7 @@ function ArtistChip({ artist }: { artist: PublicRegisteredPartner }) {
     : "";
   return (
     <Link
-      href={`/artists/${artist.id}`}
+      href={artistHref(artist)}
       className="shrink-0 w-[120px] sm:w-[190px] snap-start flex flex-col items-center gap-2.5 text-center group"
     >
       <div className="relative h-[120px] w-[120px] sm:h-[190px] sm:w-[190px] rounded-full overflow-hidden bg-[#F7E9FF] ring-2 ring-white shadow-sm">

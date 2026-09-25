@@ -59,6 +59,7 @@ import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferLabel } from "@/lib/diningOffers";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { restaurantHref } from "@/lib/businessPublicPath";
 import { promotionClickHref } from "@/lib/promotionCta";
 import { useAppSelector } from "@/lib/hooks";
 import {
@@ -207,7 +208,7 @@ function businessToPromoSlide(business: Business): DiningPromoSlide {
     rating: Number(business.rating || 4.5).toFixed(1),
     reviewsLabel: formatReviewCount(business.reviews_count),
     cuisines: diningCuisineTags(business),
-    href: `/restaurant/${business.id}`,
+    href: restaurantHref(business),
   };
 }
 
@@ -246,7 +247,7 @@ function campaignToPromoSlide(
     rating: Number(linked?.rating || 4.5).toFixed(1),
     reviewsLabel: formatReviewCount(linked?.reviews_count),
     cuisines: linked ? diningCuisineTags(linked) : ["Dining"],
-    href: promotionClickHref(promo) || (linkedId ? `/restaurant/${linkedId}` : "/dining"),
+    href: promotionClickHref(promo) || (linked ? restaurantHref(linked) : linkedId ? restaurantHref({ id: linkedId }) : "/dining"),
   };
 }
 
@@ -882,7 +883,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
   return (
     <div className="group flex h-full flex-col bg-white rounded-2xl border border-[#E8E8E8] shadow-sm hover:shadow-md transition-shadow duration-300 p-3">
       <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-[#F3F4F6]">
-        <Link href={`/restaurant/${restaurant.id}`} className="absolute inset-0 block">
+        <Link href={restaurantHref(restaurant)} className="absolute inset-0 block">
           {showImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -940,7 +941,7 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
       </div>
 
       <Link
-        href={`/restaurant/${restaurant.id}`}
+        href={restaurantHref(restaurant)}
         className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0 min-h-0 bg-white"
       >
         <div className="flex justify-between items-start gap-2 mb-2">

@@ -11,6 +11,7 @@ import {
 import { isComedyEvent, isMusicEvent, isOutdoorEvent } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 import { lockBodyScroll } from "@/lib/lockBodyScroll";
+import { artistHref, restaurantHref, venueHref } from "@/lib/businessPublicPath";
 
 type SearchOverlayProps = {
   open: boolean;
@@ -108,7 +109,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
     }
     for (const d of dining) {
       if ((d.name || "").toLowerCase().includes(q) || (d.cuisine || "").toLowerCase().includes(q)) {
-        push({ id: d.id, label: d.name, href: `/restaurant/${d.id}`, kind: "dining" });
+        push({ id: d.id, label: d.name, href: restaurantHref(d), kind: "dining" });
       }
     }
     for (const a of artists) {
@@ -117,7 +118,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
         push({
           id: `artist-${a.id}`,
           label: a.type_name ? `${a.name} · ${a.type_name}` : a.name,
-          href: `/artists/${a.id}`,
+          href: artistHref(a),
           kind: "artist",
         });
       }
@@ -128,7 +129,7 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
         push({
           id: `venue-${v.id}`,
           label: v.type_name ? `${v.name} · ${v.type_name}` : v.name,
-          href: `/venues/${v.id}`,
+          href: venueHref(v),
           kind: "venue",
         });
       }

@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   CheckCircle,
   ImageOff,
+  Images,
   Mail,
   MapPin,
   Megaphone,
@@ -15,13 +16,14 @@ import {
   Phone,
   Undo2,
   UserRound,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import PartnerDocumentsFields from "@/components/DiningAdminPanel/PartnerDocumentsFields";
 import { extractApiError } from "@/lib/apiErrors";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { parseContactPerson, resolveContactPersons } from "@/lib/venuePartnerInfo";
+import { resolveContactPersons } from "@/lib/venuePartnerInfo";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import {
   useArchiveBusinessMutation,
@@ -43,6 +45,122 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
     <div className="flex flex-col gap-0.5 sm:grid sm:grid-cols-[9rem_1fr] sm:gap-3 py-2 border-b border-slate-100 last:border-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
       <dd className="text-sm text-slate-800 font-medium min-w-0 break-words">{children}</dd>
+    </div>
+  );
+}
+
+function ExpandableText({ text, emptyLabel = "—" }: { text: string; emptyLabel?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const trimmed = text.trim();
+  if (!trimmed) return <>{emptyLabel}</>;
+
+  const needsToggle = trimmed.length > 220 || trimmed.split(/\s+/).length > 40;
+
+  return (
+    <div className="min-w-0">
+      <p
+        className={`text-sm text-slate-800 font-medium whitespace-pre-wrap break-words leading-relaxed ${
+          expanded ? "max-h-48 overflow-y-auto pr-1" : "line-clamp-4"
+        }`}
+      >
+        {trimmed}
+      </p>
+      {needsToggle ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function normalizeImageList(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object" && "url" in item) {
+          return String((item as { url?: string }).url || "").trim();
+        }
+        return "";
+      })
+      .filter(Boolean);
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      return normalizeImageList(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function GalleryLightbox({
+  images,
+  index,
+  onClose,
+  onChange,
+}: {
+  images: string[];
+  index: number;
+  onClose: () => void;
+  onChange: (next: number) => void;
+}) {
+  if (index < 0 || !images[index]) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 cursor-pointer"
+        aria-label="Close"
+      >
+        <X size={20} />
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={images[index]}
+        alt={`Gallery ${index + 1}`}
+        className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+      {images.length > 1 ? (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded-md bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange((index - 1 + images.length) % images.length);
+            }}
+          >
+            Prev
+          </button>
+          <span className="text-xs text-white/80 tabular-nums">
+            {index + 1} / {images.length}
+          </span>
+          <button
+            type="button"
+            className="rounded-md bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange((index + 1) % images.length);
+            }}
+          >
+            Next
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -138,6 +256,7 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [tab, setTab] = useState<DetailTab>("overview");
+  const [galleryPreviewIndex, setGalleryPreviewIndex] = useState(-1);
 
   const { data: promotionsData, isLoading: promotionsLoading } = useGetMarketingCampaignsQuery(
     { business_id: id, page: 1, limit: 50 },
@@ -178,6 +297,22 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
     .replace(/Contact persons?:\s*.+/i, "")
     .trim();
   const coverUrl = resolveMediaUrl(biz?.cover_image_url);
+  const galleryImages = useMemo(
+    () =>
+      normalizeImageList(biz?.gallery_images)
+        .map((url) => resolveMediaUrl(url))
+        .filter(Boolean) as string[],
+    [biz?.gallery_images]
+  );
+  const menuImages = useMemo(
+    () =>
+      isDining
+        ? (normalizeImageList(biz?.menu_images)
+            .map((url) => resolveMediaUrl(url))
+            .filter(Boolean) as string[])
+        : [],
+    [biz?.menu_images, isDining]
+  );
 
   const tabs = useMemo(() => {
     const items: Array<{ id: DetailTab; label: string }> = [{ id: "overview", label: "Overview" }];
@@ -445,16 +580,16 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
                   ) : null}
                   {isDining ? <InfoRow label="Cuisine">{biz.cuisine?.trim() || "—"}</InfoRow> : null}
                   <InfoRow label={isVenue ? "About" : "Description"}>
-                    {aboutText || parseContactPerson(biz.description) ? aboutText || "—" : "—"}
+                    <ExpandableText text={aboutText} />
                   </InfoRow>
                 </dl>
               </div>
 
-              <div className="md:col-span-5 xl:col-span-4 order-1 md:order-2 bg-slate-50 p-3 sm:p-4 md:p-5 flex flex-col">
+              <div className="md:col-span-5 xl:col-span-4 order-1 md:order-2 bg-slate-50 p-3 sm:p-4 md:p-5 flex flex-col self-start w-full">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
                   {entityLabel} profile image
                 </p>
-                <div className="relative w-full aspect-[16/10] md:aspect-auto md:flex-1 md:min-h-[12rem] lg:min-h-[14rem] rounded-xl overflow-hidden border border-slate-200 bg-white">
+                <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-slate-200 bg-white">
                   {coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -471,6 +606,86 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 sm:p-4 md:p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
+                <Images size={15} />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Gallery</h2>
+                <p className="text-[11px] text-slate-500">
+                  Photos uploaded by this {entityLabel.toLowerCase()} from their panel
+                </p>
+              </div>
+              {galleryImages.length > 0 ? (
+                <span className="ml-auto text-[11px] font-semibold text-slate-500 tabular-nums">
+                  {galleryImages.length} photo{galleryImages.length === 1 ? "" : "s"}
+                </span>
+              ) : null}
+            </div>
+
+            {galleryImages.length === 0 ? (
+              <p className="text-sm text-slate-500 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center">
+                No gallery images uploaded yet
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                {galleryImages.map((src, idx) => (
+                  <button
+                    key={`${src}-${idx}`}
+                    type="button"
+                    onClick={() => setGalleryPreviewIndex(idx)}
+                    className="relative aspect-[4/3] rounded-lg overflow-hidden border border-slate-200 bg-slate-100 hover:border-rose-300 hover:shadow-sm transition-all cursor-pointer group"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={`${biz.name} gallery ${idx + 1}`}
+                      className="absolute inset-0 h-full w-full object-cover group-hover:scale-[1.02] transition-transform"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isDining ? (
+              <div className="mt-5 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-sm font-bold text-slate-900">Menu images</h3>
+                  {menuImages.length > 0 ? (
+                    <span className="text-[11px] font-semibold text-slate-500 tabular-nums">
+                      {menuImages.length}
+                    </span>
+                  ) : null}
+                </div>
+                {menuImages.length === 0 ? (
+                  <p className="text-sm text-slate-500 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center">
+                    No menu images uploaded yet
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                    {menuImages.map((src, idx) => (
+                      <a
+                        key={`${src}-menu-${idx}`}
+                        href={src}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative aspect-[4/3] rounded-lg overflow-hidden border border-slate-200 bg-slate-100 hover:border-rose-300 hover:shadow-sm transition-all"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt={`${biz.name} menu ${idx + 1}`}
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 sm:p-4 md:p-5">
@@ -571,6 +786,13 @@ export default function AdminPartnerDetailPage({ module }: AdminPartnerDetailPag
           )}
         </section>
       )}
+
+      <GalleryLightbox
+        images={galleryImages}
+        index={galleryPreviewIndex}
+        onClose={() => setGalleryPreviewIndex(-1)}
+        onChange={setGalleryPreviewIndex}
+      />
 
       <ConfirmDialog
         open={!!confirmAction}

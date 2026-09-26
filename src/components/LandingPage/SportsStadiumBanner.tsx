@@ -11,7 +11,7 @@ export default function SportsStadiumBanner() {
 
   return (
     <section className="bg-white py-4 sm:py-6 lg:py-8">
-      <div className="container mx-auto px-4 md:px-5 lg:px-8">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <Link
           href="/events?category=sports"
           className="block w-full overflow-hidden rounded-4xl"

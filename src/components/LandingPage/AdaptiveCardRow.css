@@ -6,10 +6,16 @@
   width: 100%;
   gap: var(--adaptive-gap);
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
-  padding-bottom: 0.5rem;
-  padding-top: 0.25rem;
+  /* Room for dining hover plate (-m-2.5) + soft shadow — card layout size stays put */
+  padding-top: 0.85rem;
+  padding-bottom: 1.15rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  margin-top: -0.5rem;
+  margin-bottom: -0.65rem;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
@@ -18,10 +24,21 @@
   display: none;
 }
 
+/* Popular Dining / Raise a Glass — 1 card mobile, 2 tablet, 4 desktop */
+.adaptive-card-row--dining {
+  --adaptive-visible: 1;
+  --adaptive-gap: 1.1rem;
+}
+
 @media (min-width: 640px) {
   .adaptive-card-row {
     --adaptive-visible: 3;
     --adaptive-gap: 1rem;
+  }
+
+  .adaptive-card-row--dining {
+    --adaptive-visible: 2;
+    --adaptive-gap: 1.35rem;
   }
 }
 
@@ -29,12 +46,18 @@
   .adaptive-card-row {
     --adaptive-visible: 5;
   }
+
+  .adaptive-card-row--dining {
+    --adaptive-visible: 4;
+    --adaptive-gap: 1.5rem;
+  }
 }
 
 /* Always use the breakpoint card width — fewer items leave empty space on the right
    instead of stretching 1–2 cards across the full row. */
 .adaptive-card-slot {
   min-width: 0;
+  overflow: visible;
   scroll-snap-align: start;
   flex: 0 0
     calc(

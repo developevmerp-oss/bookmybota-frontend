@@ -16,13 +16,25 @@ import {
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 
 const POSTER_MEDIA = "aspect-[3/4] w-full";
-const DINING_MEDIA = "aspect-[4/3] w-full";
+/** Portrait-leaning cover — matches marketplace dining card proportions */
+const DINING_MEDIA = "aspect-[5/4] w-full";
 
 const eventCardShell =
   "bg-white border border-[#E5E5E5] rounded-2xl overflow-hidden";
 
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
+
+/** Same hover as landing movie cards (lift + shadow); size stays put. */
+const diningCardShell =
+  "rounded-2xl border-0 bg-transparent shadow-none p-2 " +
+  "hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 " +
+  "transition-[box-shadow,transform] duration-300";
+
+/** Title + rating + address only. */
+const diningCardBody = "pt-2.5 pb-1 flex flex-col gap-1 min-w-0";
+const diningCardWidth =
+  "snap-start shrink-0 w-[260px] sm:w-[280px] lg:w-[320px]";
 
 function listingDateLine(iso?: string) {
   if (!iso) return "";
@@ -49,11 +61,13 @@ function CoverImage({
   alt,
   fallback,
   objectClass = "object-cover",
+  hoverScaleClass = "group-hover:scale-[1.02]",
 }: {
   src?: string;
   alt: string;
   fallback: ReactNode;
   objectClass?: string;
+  hoverScaleClass?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const url = (src || "").trim();
@@ -63,29 +77,12 @@ function CoverImage({
     <img
       src={url}
       alt={alt}
-      className={`absolute inset-0 h-full w-full ${objectClass} transition-transform duration-300 group-hover:scale-[1.02]`}
+      className={`absolute inset-0 h-full w-full ${objectClass} transition-transform duration-500 ease-out ${hoverScaleClass}`}
       loading="lazy"
       draggable={false}
       onError={() => setFailed(true)}
     />
   );
-}
-
-function diningMetaLine(place: Business): string {
-  const cuisineParts = (place.cuisine || "")
-    .split(/[·|,]/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .filter((p) => !/^(Br)+$/i.test(p.replace(/\s+/g, "")) && !/^₹+$/.test(p));
-
-  const type = place.type_name?.trim() || "";
-
-  const parts: string[] = [];
-  for (const part of cuisineParts) {
-    if (!parts.some((p) => p.toLowerCase() === part.toLowerCase())) parts.push(part);
-  }
-  if (type && !parts.some((p) => p.toLowerCase() === type.toLowerCase())) parts.push(type);
-  return parts.slice(0, 3).join(" · ");
 }
 
 export function EventPosterCard({
@@ -282,42 +279,35 @@ export function MusicEventCard({ event, city }: { event: PublicEvent; city?: str
 export function DiningPosterCard({ place }: { place: Business }) {
   const adaptive = useAdaptiveCard();
   const image = resolveMediaUrl(place.cover_image_url) || "";
-  const rating = Number(place.rating);
-  const showRating = Number.isFinite(rating) && rating > 0;
+  const parsedRating = Number(place.rating);
+  const rating =
+    Number.isFinite(parsedRating) && parsedRating > 0 ? parsedRating : 4.2;
   const locality = localityFromAddress(place.address) || place.city_name?.trim() || "";
-  const meta = diningMetaLine(place);
-  const fillSlot = Boolean(adaptive);
-  const widthClass = fillSlot
-    ? "w-full"
-    : "snap-start shrink-0 w-[260px] sm:w-[300px] lg:w-[350px]";
+  const widthClass = adaptive ? "w-full" : diningCardWidth;
 
   return (
-    <Link href={restaurantHref(place)} className={`${widthClass} group block h-full ${cardShell}`}>
-      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7]`}>
+    <Link href={restaurantHref(place)} className={`${widthClass} group block ${diningCardShell}`}>
+      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7] rounded-2xl`}>
         <CoverImage
           src={image}
           alt={place.name}
           fallback={<Utensils size={28} strokeWidth={1.5} />}
+          hoverScaleClass="group-hover:scale-[1.04]"
         />
-        {showRating && (
-          <span className="absolute bottom-2.5 left-2.5 z-[2] inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 shadow-md">
-            <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
-            <span className="text-xs font-bold text-[#111827]">{rating.toFixed(1)}</span>
-          </span>
-        )}
       </div>
-      <div className="px-3.5 pt-3 pb-3.5 flex flex-col gap-1 min-h-0">
-        <h3 className="type-card-title font-bold text-[#111827] line-clamp-1 group-hover:text-[#6900AA] transition-colors">
-          {place.name}
-        </h3>
+      <div className={diningCardBody}>
+        <div className="flex items-center justify-between gap-4 min-w-0">
+          <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
+            {place.name}
+          </h3>
+          <div className="shrink-0 inline-flex items-center gap-0.5 bg-[#24963F] text-white text-[11px] font-bold px-1.5 py-0.5 rounded">
+            <span>{rating.toFixed(1)}</span>
+            <span className="text-xs text-yellow-200">★</span>
+          </div>
+        </div>
+
         {locality ? (
-          <p className="type-card-body text-[#6B6B6B] line-clamp-1 flex items-center gap-1">
-            <MapPin size={13} className="shrink-0 text-slate-400" />
-            <span className="truncate">{locality}</span>
-          </p>
-        ) : null}
-        {meta ? (
-          <p className="type-card-caption text-[#9A9A9A] line-clamp-1">{meta}</p>
+          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{locality}</p>
         ) : null}
       </div>
     </Link>
@@ -330,7 +320,7 @@ export function ShowcaseDiningPosterCard({
   image,
   rating,
   locality,
-  cuisine,
+  cuisine: _cuisine,
   href,
   className = "",
 }: {
@@ -343,39 +333,34 @@ export function ShowcaseDiningPosterCard({
   className?: string;
 }) {
   const adaptive = useAdaptiveCard();
-  const showRating = typeof rating === "number" && Number.isFinite(rating) && rating > 0;
-  const fillSlot = Boolean(adaptive);
-  const widthClass = fillSlot
-    ? "w-full"
-    : "snap-start shrink-0 w-[260px] sm:w-[300px] lg:w-[350px]";
+  const parsedRating = typeof rating === "number" ? rating : Number(rating);
+  const displayRating =
+    Number.isFinite(parsedRating) && parsedRating > 0 ? parsedRating : 4.2;
+  const widthClass = adaptive ? "w-full" : diningCardWidth;
 
   const body = (
     <>
-      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7]`}>
+      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7] rounded-2xl`}>
         <CoverImage
           src={image}
           alt={name}
           fallback={<Utensils size={28} strokeWidth={1.5} />}
+          hoverScaleClass="group-hover:scale-[1.04]"
         />
-        {showRating && (
-          <span className="absolute bottom-2.5 left-2.5 z-[2] inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 shadow-md">
-            <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
-            <span className="text-xs font-bold text-[#111827]">{rating!.toFixed(1)}</span>
-          </span>
-        )}
       </div>
-      <div className="px-3.5 pt-3 pb-3.5 flex flex-col gap-1 min-h-0">
-        <h3 className="type-card-title font-bold text-[#111827] line-clamp-1 group-hover:text-[#6900AA] transition-colors">
-          {name}
-        </h3>
+      <div className={diningCardBody}>
+        <div className="flex items-center justify-between gap-3 min-w-0">
+          <h3 className="text-[15px] sm:text-base font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug group-hover:text-[#6900AA] transition-colors">
+            {name}
+          </h3>
+          <div className="shrink-0 inline-flex items-center gap-0.5 bg-[#24963F] text-white text-[11px] font-bold px-1.5 py-0.5 rounded">
+            <span>{displayRating.toFixed(1)}</span>
+            <span className="text-[9px]">★</span>
+          </div>
+        </div>
+
         {locality ? (
-          <p className="type-card-body text-[#6B6B6B] line-clamp-1 flex items-center gap-1">
-            <MapPin size={13} className="shrink-0 text-slate-400" />
-            <span className="truncate">{locality}</span>
-          </p>
-        ) : null}
-        {cuisine ? (
-          <p className="type-card-caption text-[#9A9A9A] line-clamp-1">{cuisine}</p>
+          <p className="text-[13px] text-[#696969] truncate leading-snug">{locality}</p>
         ) : null}
       </div>
     </>
@@ -383,14 +368,14 @@ export function ShowcaseDiningPosterCard({
 
   if (!href) {
     return (
-      <div className={`${widthClass} group block h-full ${cardShell} ${className} select-none`}>
+      <div className={`${widthClass} group block ${diningCardShell} ${className} select-none`}>
         {body}
       </div>
     );
   }
 
   return (
-    <Link href={href} className={`${widthClass} group block h-full ${cardShell} ${className}`}>
+    <Link href={href} className={`${widthClass} group block ${diningCardShell} ${className}`}>
       {body}
     </Link>
   );

@@ -60,13 +60,13 @@ export default function ContentRail({
     <section
       className={
         dark
-          ? "bg-[#111111] py-6 sm:py-8 lg:py-10"
+          ? "bg-[#111111] py-6 sm:py-8 lg:pt-0"
           : alt
-            ? "bg-[#F7F7F7] py-6 sm:py-8 lg:py-10"
-            : "bg-white py-6 sm:py-8 lg:py-10"
+            ? "bg-[#F7F7F7] py-6 sm:py-8 lg:pt-0"
+            : "bg-white py-6 sm:py-8 lg:py-5"
       }
     >
-      <div className="container mx-auto px-4 md:px-5 lg:px-8">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
             {eyebrow ? (
@@ -103,14 +103,14 @@ export default function ContentRail({
 
         {isLoading ? (
           <div
-            className="adaptive-card-row overflow-hidden"
+            className={`adaptive-card-row overflow-hidden${cardStyle === "dining" ? " adaptive-card-row--dining" : ""}`}
             style={{ ["--adaptive-count" as string]: minVisible } as CSSProperties}
           >
             {Array.from({ length: minVisible }).map((_, i) => (
               <div key={i} className="adaptive-card-slot">
                 <div
                   className={`rounded-xl ${
-                    cardStyle === "dining" ? "aspect-[4/3]" : "aspect-[2/3]"
+                    cardStyle === "dining" ? "aspect-[5/4]" : "aspect-[2/3]"
                   } ${dark ? "bg-white/10" : alt ? "bg-white" : "bg-[#F7F7F7]"}`}
                 />
                 <div
@@ -140,12 +140,17 @@ export default function ContentRail({
               <RailOverlayNavButton
                 direction="prev"
                 side="left"
+                inset={cardStyle === "dining"}
                 label={`Previous ${label}`}
                 onClick={() => scrollBy(-1)}
               />
             ) : null}
             {adaptive ? (
-              <AdaptiveCardRow minVisible={minVisible} scrollerRef={scrollerRef}>
+              <AdaptiveCardRow
+                minVisible={minVisible}
+                scrollerRef={scrollerRef}
+                className={cardStyle === "dining" ? "adaptive-card-row--dining" : undefined}
+              >
                 {children}
               </AdaptiveCardRow>
             ) : (
@@ -160,6 +165,7 @@ export default function ContentRail({
               <RailOverlayNavButton
                 direction="next"
                 side="right"
+                inset={cardStyle === "dining"}
                 label={`Next ${label}`}
                 onClick={() => scrollBy(1)}
               />

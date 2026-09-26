@@ -45,8 +45,8 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
   };
 
   return (
-    <section className="bg-white py-6 sm:py-8 lg:py-10">
-      <div className="container mx-auto px-4 md:px-5 lg:px-8">
+    <section className="bg-white py-6 sm:py-8 lg:pb-5">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
             <h2 className="type-section font-semibold tracking-tight text-[#111111]">
@@ -57,7 +57,7 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
             ) : null}
           </div>
           <RailSeeAllLink href="/events?category=sports" />
-        </div>
+        </div>  
 
         <div className="relative overflow-visible">
           {!isEmpty && scrollEdges.left ? (

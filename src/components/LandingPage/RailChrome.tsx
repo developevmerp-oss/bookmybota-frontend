@@ -30,23 +30,32 @@ export function RailOverlayNavButton({
   label,
   onClick,
   side,
+  inset = false,
   className = "",
 }: {
   direction: "prev" | "next";
   label: string;
   onClick: () => void;
   side: "left" | "right";
+  /** Center on the dining card image edge — half on card, half outside. */
+  inset?: boolean;
   className?: string;
 }) {
   const Icon = direction === "prev" ? ChevronLeft : ChevronRight;
+  // inset: left-0 / right-0 + dining row pad + card p-2 ≈ half button on the image
+  const sideClass = inset
+    ? side === "left"
+      ? "left-0"
+      : "right-0"
+    : side === "left"
+      ? "-left-3 lg:-left-5"
+      : "-right-3 lg:-right-5";
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={`${RAIL_OVERLAY_NAV_CLASS} ${
-        side === "left" ? "-left-3 lg:-left-5" : "-right-3 lg:-right-5"
-      } ${className}`}
+      className={`${RAIL_OVERLAY_NAV_CLASS} ${sideClass} ${className}`}
     >
       <Icon size={16} strokeWidth={1.75} />
     </button>

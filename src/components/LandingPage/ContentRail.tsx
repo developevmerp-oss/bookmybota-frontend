@@ -103,8 +103,19 @@ export default function ContentRail({
 
         {isLoading ? (
           <div
-            className={`adaptive-card-row overflow-hidden${cardStyle === "dining" ? " adaptive-card-row--dining" : ""}`}
-            style={{ ["--adaptive-count" as string]: minVisible } as CSSProperties}
+            className={`adaptive-card-row overflow-hidden${
+              cardStyle === "dining"
+                ? " adaptive-card-row--dining"
+                : minVisible === 4
+                  ? " adaptive-card-row--four"
+                  : ""
+            }`}
+            style={
+              {
+                ["--adaptive-count" as string]: minVisible,
+                ["--adaptive-min-visible" as string]: String(minVisible),
+              } as CSSProperties
+            }
           >
             {Array.from({ length: minVisible }).map((_, i) => (
               <div key={i} className="adaptive-card-slot">
@@ -140,7 +151,13 @@ export default function ContentRail({
               <AdaptiveCardRow
                 minVisible={minVisible}
                 scrollerRef={scrollerRef}
-                className={cardStyle === "dining" ? "adaptive-card-row--dining" : undefined}
+                className={
+                  cardStyle === "dining"
+                    ? "adaptive-card-row--dining"
+                    : minVisible === 4
+                      ? "adaptive-card-row--four"
+                      : undefined
+                }
               >
                 {children}
               </AdaptiveCardRow>

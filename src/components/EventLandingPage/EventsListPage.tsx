@@ -257,7 +257,7 @@ function PromoFeatureCard({
   return (
     <Link
       href={`/events/${event.id}`}
-      className={`group block overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-none origin-center transition-transform duration-300 ease-out ${
+      className={`group block overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)] origin-center transition-[transform,box-shadow] duration-300 ease-out hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] ${
         active ? "scale-100" : "scale-[0.92]"
       }`}
     >
@@ -265,7 +265,7 @@ function PromoFeatureCard({
         <SafeCoverImage
           src={image}
           alt={event.name}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
           fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
           fallback={<EventImageFallback size={32} />}
         />
@@ -485,13 +485,13 @@ function DistrictEventCard({
   return (
     <Link
       href={`/events/${event.id}`}
-      className="group block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white"
+      className="group block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300"
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100">
         <SafeCoverImage
           src={portrait}
           alt={event.name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
           fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
           fallback={<EventImageFallback size={32} />}
         />
@@ -522,13 +522,13 @@ function RecommendCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: s
   return (
     <Link
       href={`/events/${event.id}`}
-      className="group shrink-0 w-[48vw] sm:w-[200px] md:w-[220px] lg:w-[240px] 2xl:w-[240px] snap-start"
+      className="group shrink-0 w-[48vw] sm:w-[200px] md:w-[220px] lg:w-[240px] 2xl:w-[240px] snap-start rounded-2xl transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5"
     >
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-100">
+      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-100 shadow-[0_1px_3px_rgba(17,17,17,0.06)] group-hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] transition-shadow duration-300">
         <SafeCoverImage
           src={portrait}
           alt={event.name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
           fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
           fallback={<EventImageFallback size={32} />}
         />

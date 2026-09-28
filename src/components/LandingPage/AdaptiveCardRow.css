@@ -30,6 +30,14 @@
   --adaptive-gap: 1.1rem;
 }
 
+/* Exact 4-up rails (events / sports / movies) — same gap as before the last bump */
+.adaptive-card-row--four {
+  --adaptive-visible: 2;
+  --adaptive-gap: 1.5rem;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 @media (min-width: 640px) {
   .adaptive-card-row {
     --adaptive-visible: 3;
@@ -40,6 +48,11 @@
     --adaptive-visible: 2;
     --adaptive-gap: 1.35rem;
   }
+
+  .adaptive-card-row--four {
+    --adaptive-visible: 3;
+    --adaptive-gap: 1.35rem;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -48,6 +61,11 @@
   }
 
   .adaptive-card-row--dining {
+    --adaptive-visible: var(--adaptive-min-visible, 4);
+    --adaptive-gap: 1.5rem;
+  }
+
+  .adaptive-card-row--four {
     --adaptive-visible: var(--adaptive-min-visible, 4);
     --adaptive-gap: 1.5rem;
   }

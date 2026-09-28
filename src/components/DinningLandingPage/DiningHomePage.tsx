@@ -11,13 +11,12 @@ import {
   Loader2,
   X,
   Utensils,
-  Tag,
   ArrowRight,
   Star,
 } from "lucide-react";
 import Link from "next/link";
 import type { IconType } from "react-icons";
-import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import { DiningPosterCard, ShowcaseDiningPosterCard } from "@/components/LandingPage/PosterCard";
 import { DiningHomeRestaurantShimmer } from "@/components/Shared/Shimmer";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
 import { hasCityFilter, preferCityOrAll } from "@/components/LandingPage/homeUtils";
@@ -54,8 +53,6 @@ import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQ
 // import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
-import { formatMoney } from "@/lib/currencyFormat";
-import { listingOfferLabel } from "@/lib/diningOffers";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 import { useAppSelector } from "@/lib/hooks";
@@ -823,198 +820,22 @@ async function searchLocations(query: string): Promise<NominatimResult[]> {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-/** Truncate cuisine/address lists: ≤2 join cleanly; >2 keep a 3rd start so CSS ellipsis looks like "A, B, Co..." */
-function formatCardListParts(
-  parts: string[],
-  options?: { shortSep?: string; longSep?: string; maxFullyShown?: number }
-): string {
-  const clean = parts.map((p) => p.trim()).filter(Boolean);
-  if (clean.length === 0) return "";
-  const maxFullyShown = options?.maxFullyShown ?? 2;
-  const shortSep = options?.shortSep ?? " • ";
-  const longSep = options?.longSep ?? ", ";
-  if (clean.length <= maxFullyShown) {
-    return clean.join(shortSep);
-  }
-  return clean.slice(0, maxFullyShown + 1).join(longSep);
-}
-
 function RestaurantCard({ restaurant }: { restaurant: Business }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const imageSrc = resolveMediaUrl(restaurant.cover_image_url) || "";
-  const showImage = Boolean(imageSrc) && !imgFailed;
-  const rating = Number(restaurant.rating || 4.2).toFixed(1);
-  // Prefer cuisine tags only — never fall back to venue type_name (e.g. "General Restaurant")
-  const cuisineRaw = (restaurant.cuisine || "").trim();
-  const cuisineParts = cuisineRaw
-    ? cuisineRaw
-        .split(/[,|·]/)
-        .map((c) => c.trim())
-        .filter(Boolean)
-    : ["Italian", "Chinese", "Continental"];
-  const cuisineLine = formatCardListParts(cuisineParts);
-
-  const addressParts =
-    restaurant.address && typeof restaurant.address === "string"
-      ? restaurant.address.split(",").map((p) => p.trim()).filter(Boolean)
-      : [];
-  const locality =
-    formatCardListParts(addressParts, { shortSep: ", ", longSep: ", " }) ||
-    "Address not available";
-
-  const idHash =
-    typeof restaurant.id === "number"
-      ? restaurant.id
-      : restaurant.id
-        ? restaurant.id.toString().split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-        : 0;
-
-  const priceForTwo = restaurant.average_cost
-    ? `${formatMoney(restaurant.average_cost, { compact: true })} for two`
-    : (() => {
-        const bases = [1200, 1500, 2000, 2400, 1800];
-        return `${formatMoney(bases[idHash % bases.length], { compact: true })} for two`;
-      })();
-
-  const distance = (() => {
-    const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
-    return `${dists[idHash % dists.length]} km`;
-  })();
-
-  const isPromoted = !!restaurant.is_promoted;
-  const offerLabel = listingOfferLabel(restaurant.dining_offers);
-
-  return (
-    <div className="group flex h-full w-full flex-col overflow-hidden bg-white rounded-2xl border border-[#E8E8E8] shadow-none hover:shadow-md transition-shadow duration-300">
-      <div className="relative w-full h-[280px] sm:h-[300px] md:h-[320px] lg:h-[300px] xl:h-[320px] shrink-0 overflow-hidden bg-[#F3F4F6]">
-        <Link href={restaurantHref(restaurant)} className="absolute inset-0 block">
-          {showImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imageSrc}
-              alt={restaurant.name}
-              className="w-full h-full object-cover"
-              onError={() => setImgFailed(true)}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-slate-300">
-              <Utensils size={28} strokeWidth={1.5} />
-            </div>
-          )}
-        </Link>
-
-        <DiningWishlistButton businessId={String(restaurant.id)} />
-
-        {isPromoted ? (
-          <span className="absolute top-3 left-3 z-[1] pointer-events-none rounded-md bg-white/75 px-2.5 py-1 text-xs font-medium text-black backdrop-blur-[2px]">
-            Promoted
-          </span>
-        ) : null}
-
-        {offerLabel ? (
-          <span className="absolute bottom-3 left-3 z-[1] pointer-events-none inline-flex max-w-[calc(100%-4.5rem)] items-center gap-1.5 rounded-full bg-[#F3E8FF] text-[#5B21B6] text-xs font-semibold px-2.5 py-1 shadow-sm">
-            <Tag size={12} className="shrink-0 text-[#7C3AED]" strokeWidth={2.25} />
-            <span className="truncate">{offerLabel}</span>
-          </span>
-        ) : null}
-      </div>
-
-      <Link
-        href={restaurantHref(restaurant)}
-        className="flex flex-col flex-1 px-3 pt-3 pb-3.5 min-w-0 min-h-0 bg-white"
-      >
-        <div className="flex justify-between items-center gap-2 mb-1.5 min-w-0">
-          <h3 className="font-semibold tracking-wide text-[#1A1A1A] text-lg sm:text-xl leading-snug truncate min-w-0 flex-1 group-hover:text-[#6900AA] transition-colors">
-            {restaurant.name}
-          </h3>
-          <div className="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-1.5 py-0.5 rounded-md">
-            <span className="text-base">★</span>
-            <span>{rating}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 min-w-0 text-sm sm:text-base text-gray-700 font-semibold">
-          <p className="truncate min-w-0 max-w-[58%]">{cuisineLine}</p>
-          <span className="shrink-0 whitespace-nowrap">{priceForTwo}</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 min-w-0 text-sm sm:text-base text-gray-700 font-semibold mt-1">
-          <p className="truncate min-w-0 max-w-[58%]">{locality}</p>
-          <span className="shrink-0 whitespace-nowrap">{distance}</span>
-        </div>
-      </Link>
-    </div>
-  );
+  return <DiningPosterCard place={restaurant} variant="listing" />;
 }
 
-/** Static showcase listing card — same look as RestaurantCard, not clickable (no detail page). */
+/** Static showcase listing card — same landing dining UI, not linked to a detail page. */
 function ShowcaseRestaurantCard({ place }: { place: ShowcaseDiningCard }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const cuisineParts = place.cuisine
-    .split(/[·|,]/)
-    .map((c) => c.trim())
-    .filter(Boolean);
-  const cuisineLine = formatCardListParts(cuisineParts) || place.cuisine;
-  const addressParts = place.locality
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean);
-  const locality =
-    formatCardListParts(addressParts, { shortSep: ", ", longSep: ", " }) ||
-    place.locality;
-  const rating = Number(place.rating || 0).toFixed(1);
-  const idHash = place.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const priceForTwo = (() => {
-    const bases = [1200, 1500, 2000, 2400, 1800];
-    return `${formatMoney(bases[idHash % bases.length], { compact: true })} for two`;
-  })();
-  const distance = (() => {
-    const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
-    return `${dists[idHash % dists.length]} km`;
-  })();
-  const showImage = Boolean(place.image) && !imgFailed;
-
   return (
-    <div className="group flex h-full w-full flex-col overflow-hidden bg-white rounded-2xl border border-[#E8E8E8] shadow-none hover:shadow-md transition-shadow duration-300 select-none">
-      <div className="relative w-full h-[280px] sm:h-[300px] md:h-[320px] lg:h-[320px]  xl:h-[320px] shrink-0 overflow-hidden bg-[#F3F4F6]">
-        {showImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={place.image}
-            alt={place.name}
-            className="w-full h-full object-cover"
-            draggable={false}
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-slate-300">
-            <Utensils size={28} strokeWidth={1.5} />
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col flex-1 px-3 pt-3 pb-3.5 min-w-0 min-h-0 bg-white">
-        <div className="flex justify-between items-center gap-2 mb-1.5 min-w-0">
-          <h3 className="font-bold text-[#1A1A1A] text-[15px] sm:text-base leading-snug truncate min-w-0 flex-1">
-            {place.name}
-          </h3>
-          <div className="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-1.5 py-0.5 rounded-md">
-            <span className="text-[10px]">★</span>
-            <span>{rating}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 min-w-0 text-[13px] sm:text-sm text-[#595959]">
-          <p className="truncate min-w-0 max-w-[58%]">{cuisineLine}</p>
-          <span className="shrink-0 whitespace-nowrap">{priceForTwo}</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 min-w-0 text-[13px] sm:text-sm text-[#595959] mt-1">
-          <p className="truncate min-w-0 max-w-[58%]">{locality}</p>
-          <span className="shrink-0 whitespace-nowrap">{distance}</span>
-        </div>
-      </div>
-    </div>
+    <ShowcaseDiningPosterCard
+      name={place.name}
+      image={place.image}
+      rating={place.rating}
+      locality={place.locality}
+      cuisine={place.cuisine}
+      className="w-full"
+      listingMeta
+    />
   );
 }
 
@@ -1814,7 +1635,8 @@ export default function Home() {
     const topOffset = siteHeaderHeight + (showStickyCuisineNames ? 52 : 0);
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsFiltersStuck(!entry.isIntersecting);
+        const next = !entry.isIntersecting;
+        setIsFiltersStuck((prev) => (prev === next ? prev : next));
       },
       {
         root: null,
@@ -2488,11 +2310,11 @@ export default function Home() {
           }}
         >
           <div
-            className={`dining-filters-sticky w-full transition-[background-color,border-color] duration-200 ${
+            className={`dining-filters-sticky w-full ${
               isFiltersStuck ? "is-stuck" : ""
             }`}
           >
-            <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-4">
+            <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-4 pb-1">
               <DiningFiltersBar
                 cuisines={cuisineOptions}
                 filters={diningFilters}
@@ -2640,7 +2462,7 @@ export default function Home() {
           {businessesLoading && loadedRestaurants.length === 0 ? (
             <DiningHomeRestaurantShimmer count={6} />
           ) : useStaticDining ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7 w-full">
               {staticDiningCards.map((place) => (
                 <ShowcaseRestaurantCard key={place.id} place={place} />
               ))}
@@ -2684,7 +2506,7 @@ export default function Home() {
             </div>
           ) : (
             <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7 w-full">
                 {displayRestaurants.map((restaurant) => (
                 <RestaurantCard key={restaurant.id} restaurant={restaurant} />
               ))}

@@ -2,9 +2,9 @@
 
 import { useRef } from "react";
 import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
-import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import AdaptiveCardRow from "./AdaptiveCardRow";
-import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
+import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import { VenuePosterCard } from "./PosterCard";
 
 const MIN_VISIBLE = 5;
@@ -17,14 +17,14 @@ export default function TopVenuesRail() {
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+    scrollRailBy(el, dir);
   };
 
   return (
     <section className="bg-white py-6 sm:py-8 lg:py-0">
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="type-section font-semibold tracking-tight text-[#111111]">Top Venues</h2>
+          <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">Top Venues</h2>
           <RailSeeAllLink href="/venues" />
         </div>
 
@@ -50,30 +50,22 @@ export default function TopVenuesRail() {
             dates you can inquire about.
           </p>
         ) : (
-          <div className="relative overflow-visible">
-            {scrollEdges.left ? (
-              <RailOverlayNavButton
-                direction="prev"
-                side="left"
-                label="Previous venues"
-                onClick={() => scrollBy(-1)}
-              />
-            ) : null}
-
+          <div>
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {venues.map((venue) => (
                 <VenuePosterCard key={venue.id} venue={venue} />
               ))}
             </AdaptiveCardRow>
 
-            {scrollEdges.right ? (
-              <RailOverlayNavButton
-                direction="next"
-                side="right"
-                label="Next venues"
-                onClick={() => scrollBy(1)}
-              />
-            ) : null}
+            <RailPagerNav
+              canPrev={scrollEdges.left}
+              canNext={scrollEdges.right}
+              pageCount={scrollEdges.pageCount}
+              activePage={scrollEdges.activePage}
+              onPrev={() => scrollBy(-1)}
+              onNext={() => scrollBy(1)}
+              label="venues"
+            />
           </div>
         )}
       </div>

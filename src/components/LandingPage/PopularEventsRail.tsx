@@ -21,6 +21,7 @@ export default function PopularEventsRail({ city }: { city: string }) {
       }
       seeAllHref="/events"
       label="popular events"
+      minVisible={4}
       isLoading={isLoadingEvents}
       empty={isEmpty && !useStatic ? "No events available yet." : undefined}
     >

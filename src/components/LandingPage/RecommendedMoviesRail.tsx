@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Clapperboard } from "lucide-react";
 import { useGetPublicMoviesQuery, type Movie } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { SHOWCASE_MOVIE_CARDS, type ShowcaseMovieCard } from "@/data/showcaseMovieCards";
 import {
   formatMovieCardMeta,
@@ -16,7 +16,7 @@ import {
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { hasCityFilter } from "./homeUtils";
-import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
+import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import "./RecommendedMoviesRail.css";
 
 const MIN_VISIBLE = 5;
@@ -94,11 +94,11 @@ function MovieCard({ movie }: { movie: RailMovieCard }) {
           ) : null}
         </div>
         <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
-          <h3 className="font-bold text-[#111827] type-card-title leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
+          <h3 className="text-base tracking-wide sm:text-lg font-bold  text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
             {movie.title}
           </h3>
           {meta ? (
-            <p className="type-card-body text-[#6b7280] leading-snug line-clamp-2">{meta}</p>
+            <p className="type-card-body text-sm tracking-wide text-gray-600 truncate leading-snug">{meta}</p>
           ) : null}
         </div>
       </article>
@@ -159,7 +159,7 @@ export default function RecommendedMoviesRail() {
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+    scrollRailBy(el, dir);
   };
 
   // Prefer city movies link when city has results; otherwise browse all movies
@@ -173,7 +173,7 @@ export default function RecommendedMoviesRail() {
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
-            <h2 className="type-section font-semibold tracking-tight text-[#111111]">
+            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
               Must-Watch Movies
             </h2>
             {cityHasNoMovies ? (
@@ -183,16 +183,7 @@ export default function RecommendedMoviesRail() {
           <RailSeeAllLink href={seeAllHref} />
         </div>
 
-        <div className="relative overflow-visible">
-          {scrollEdges.left ? (
-            <RailOverlayNavButton
-              direction="prev"
-              side="left"
-              label="Previous movies"
-              onClick={() => scrollBy(-1)}
-            />
-          ) : null}
-
+        <div>
           {isLoading ? (
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
@@ -218,12 +209,15 @@ export default function RecommendedMoviesRail() {
             </AdaptiveCardRow>
           )}
 
-          {scrollEdges.right ? (
-            <RailOverlayNavButton
-              direction="next"
-              side="right"
-              label="Next movies"
-              onClick={() => scrollBy(1)}
+          {items.length > 0 || isLoading ? (
+            <RailPagerNav
+              canPrev={scrollEdges.left}
+              canNext={scrollEdges.right}
+              pageCount={scrollEdges.pageCount}
+              activePage={scrollEdges.activePage}
+              onPrev={() => scrollBy(-1)}
+              onNext={() => scrollBy(1)}
+              label="movies"
             />
           ) : null}
         </div>

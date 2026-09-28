@@ -10,6 +10,7 @@ import "swiper/css";
 import type { Business, MarketingCampaign, Movie, PublicEvent } from "@/services/api";
 import { useGetActiveMarketingPromotionsQuery } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { restaurantHref } from "@/lib/businessPublicPath";
 import { formatDateCustomer } from "@/lib/dateFormat";
 import { promotionClickHref } from "@/lib/promotionCta";
 import { eventLandscape, eventPortrait, hasCityFilter } from "./homeUtils";
@@ -118,17 +119,6 @@ function accentFromPromo(raw?: string | null) {
   const text = (raw || "").replace(/\s+/g, " ").trim();
   if (!text || isInternalPlanLabel(text)) return undefined;
   return text;
-}
-
-function taglineVisible(slide: ListingPromoSlide) {
-  if (!slide.tagline?.trim()) return false;
-  const t = slide.tagline.trim().toLowerCase().replace(/\s+/g, " ");
-  const title = slide.title.trim().toLowerCase();
-  const withYear = `${title} ${slide.year || ""}`.trim().toLowerCase();
-  if (t === title || t === withYear) return false;
-  if (withYear.includes(t) && t.length <= withYear.length) return false;
-  if (t.includes(title) && Math.abs(t.length - withYear.length) < 8) return false;
-  return true;
 }
 
 export function eventToListingSlide(event: PublicEvent, city: string): ListingPromoSlide {
@@ -248,7 +238,10 @@ function campaignToListingSlide(
         title
       ),
     image: banner || base?.image || "",
-    href: promotionClickHref(promo) || categoryFallbackHref(promo.category),
+    href:
+      promotionClickHref(promo) ||
+      (linkedDining ? restaurantHref(linkedDining) : "") ||
+      categoryFallbackHref(promo.category),
     badge: categoryBadge(promo.category || base?.badge, base?.badge || "EVENT"),
     dateLabel: base?.dateLabel,
     weekdayLabel: base?.weekdayLabel,
@@ -260,9 +253,48 @@ function campaignToListingSlide(
   };
 }
 
-function SlideCard({ slide }: { slide: ListingPromoSlide }) {
+function taglineVisible(slide: ListingPromoSlide) {
+  if (!slide.tagline?.trim()) return false;
+  const t = slide.tagline.trim().toLowerCase().replace(/\s+/g, " ");
+  const title = slide.title.trim().toLowerCase();
+  const withYear = `${title} ${slide.year || ""}`.trim().toLowerCase();
+  if (t === title || t === withYear) return false;
+  if (withYear.includes(t) && t.length <= withYear.length) return false;
+  if (t.includes(title) && Math.abs(t.length - withYear.length) < 8) return false;
+  return true;
+}
+
+function SlideCard({
+  slide,
+  plainImage = false,
+}: {
+  slide: ListingPromoSlide;
+  /** Customer dining home: banner image only (no scrim / details / accent). */
+  plainImage?: boolean;
+}) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(slide.image) && !failed;
+
+  if (plainImage) {
+    return (
+      <div className="absolute inset-0">
+        {showImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={slide.image}
+            alt=""
+            aria-hidden
+            className="promo-slide-photo h-full w-full object-cover"
+            draggable={false}
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <div className="h-full w-full promo-slide-fallback" aria-hidden />
+        )}
+      </div>
+    );
+  }
+
   const hasMeta = Boolean(slide.dateLabel || slide.cityLabel);
   const showTagline = taglineVisible(slide);
   const showAccent = Boolean(slide.accent?.trim());
@@ -525,7 +557,7 @@ export default function ListingPromoSlider({
                 aria-label={`${slide.title}${slide.year ? ` ${slide.year}` : ""}`}
                 className="promo-banner-card group relative flex h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
               >
-                <SlideCard slide={slide} />
+                <SlideCard slide={slide} plainImage={category === "DINING"} />
               </Link>
             </SwiperSlide>
           ))}

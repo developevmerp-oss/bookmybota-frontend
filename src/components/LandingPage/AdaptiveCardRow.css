@@ -44,11 +44,11 @@
 
 @media (min-width: 1024px) {
   .adaptive-card-row {
-    --adaptive-visible: 5;
+    --adaptive-visible: var(--adaptive-min-visible, 5);
   }
 
   .adaptive-card-row--dining {
-    --adaptive-visible: 4;
+    --adaptive-visible: var(--adaptive-min-visible, 4);
     --adaptive-gap: 1.5rem;
   }
 }

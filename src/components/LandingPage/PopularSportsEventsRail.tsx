@@ -1,16 +1,16 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { SHOWCASE_SPORTS_EVENT_CARDS } from "@/data/showcaseEventCards";
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
-import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
+import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import { EventPosterCard, ShowcaseEventPosterCard } from "./PosterCard";
 import { isSportsEvent } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 
-const MIN_VISIBLE = 5;
+const MIN_VISIBLE = 4;
 
 export default function PopularSportsEventsRail({ city }: { city: string }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -41,7 +41,7 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
+    scrollRailBy(el, dir);
   };
 
   return (
@@ -49,7 +49,7 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
-            <h2 className="type-section font-semibold tracking-tight text-[#111111]">
+            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
               Popular Sports Events
             </h2>
             {cityHasNoSports ? (
@@ -59,16 +59,7 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
           <RailSeeAllLink href="/events?category=sports" />
         </div>  
 
-        <div className="relative overflow-visible">
-          {!isEmpty && scrollEdges.left ? (
-            <RailOverlayNavButton
-              direction="prev"
-              side="left"
-              label="Previous sports events"
-              onClick={() => scrollBy(-1)}
-            />
-          ) : null}
-
+        <div>
           {isLoading ? (
             <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
               {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
@@ -101,12 +92,15 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
             </AdaptiveCardRow>
           )}
 
-          {!isEmpty && scrollEdges.right ? (
-            <RailOverlayNavButton
-              direction="next"
-              side="right"
-              label="Next sports events"
-              onClick={() => scrollBy(1)}
+          {!(isEmpty && !useStatic) ? (
+            <RailPagerNav
+              canPrev={scrollEdges.left}
+              canNext={scrollEdges.right}
+              pageCount={scrollEdges.pageCount}
+              activePage={scrollEdges.activePage}
+              onPrev={() => scrollBy(-1)}
+              onNext={() => scrollBy(1)}
+              label="sports events"
             />
           ) : null}
         </div>

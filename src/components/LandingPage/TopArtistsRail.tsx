@@ -4,7 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { artistHref } from "@/lib/businessPublicPath";
-import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import {
   usePublicArtistsCatalog,
   type DirectoryArtist,
@@ -13,7 +13,7 @@ import SafeCoverImage, {
   ARTIST_IMAGE_FALLBACK_CLASS,
   ArtistImageFallback,
 } from "@/components/Shared/SafeCoverImage";
-import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
+import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import "./TopArtistsRail.css";
 
 const VISIBLE = 6;
@@ -51,7 +51,7 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
           fallback={<ArtistImageFallback size={40} />}
         />
       </div>
-      <p className="top-artists-name text-base tracking-wide sm:text-lg font-semibold text-slate-800 line-clamp-2 leading-tight px-0.5 w-full">
+      <p className="top-artists-name text-base tracking-wide sm:text-lg font-bold  text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
         {artist.name}
       </p>
     </Link>
@@ -67,8 +67,7 @@ export default function TopArtistsRail() {
   const scrollBy = (dir: "left" | "right") => {
     const el = scrollerRef.current;
     if (!el) return;
-    const amount = Math.max(el.clientWidth * 0.75, 200);
-    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
+    scrollRailBy(el, dir === "left" ? -1 : 1);
   };
 
   if (!isLoading && items.length === 0) return null;
@@ -77,30 +76,13 @@ export default function TopArtistsRail() {
     <section className="w-full bg-white py-6 sm:py-0">
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="mb-4 flex items-end justify-between gap-3">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[#111111]">
+          <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
             Top Artists
           </h2>
           <RailSeeAllLink href="/artists" />
         </div>
 
-        <div className="relative">
-          {edges.left ? (
-            <RailOverlayNavButton
-              direction="prev"
-              side="left"
-              label="Previous artists"
-              onClick={() => scrollBy("left")}
-            />
-          ) : null}
-          {edges.right ? (
-            <RailOverlayNavButton
-              direction="next"
-              side="right"
-              label="Next artists"
-              onClick={() => scrollBy("right")}
-            />
-          ) : null}
-
+        <div>
           <div
             ref={scrollerRef}
             className="top-artists-rail"
@@ -119,6 +101,16 @@ export default function TopArtistsRail() {
                 ))
               : items.map((artist) => <ArtistCard key={artist.id} artist={artist} />)}
           </div>
+
+          <RailPagerNav
+            canPrev={edges.left}
+            canNext={edges.right}
+            pageCount={edges.pageCount}
+            activePage={edges.activePage}
+            onPrev={() => scrollBy("left")}
+            onNext={() => scrollBy("right")}
+            label="artists"
+          />
         </div>
       </div>
     </section>

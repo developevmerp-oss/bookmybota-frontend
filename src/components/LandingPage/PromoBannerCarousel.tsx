@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Navigation } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
@@ -122,17 +122,6 @@ function accentFromPromo(raw?: string | null) {
   return text;
 }
 
-function taglineVisible(slide: Slide) {
-  if (!slide.tagline?.trim()) return false;
-  const t = slide.tagline.trim().toLowerCase().replace(/\s+/g, " ");
-  const title = slide.title.trim().toLowerCase();
-  const withYear = `${title} ${slide.year || ""}`.trim().toLowerCase();
-  if (t === title || t === withYear) return false;
-  if (withYear.includes(t) && t.length <= withYear.length) return false;
-  if (t.includes(title) && Math.abs(t.length - withYear.length) < 8) return false;
-  return true;
-}
-
 function eventToSlide(event: PublicEvent, city: string): Slide {
   const when = formatSlideDate(event.next_showtime);
   const { title, year } = splitTitleYear(event.name, event.next_showtime);
@@ -234,8 +223,11 @@ function promoToSlide(
 ): Slide {
   const banner = resolveMediaUrl(promo.banner_image_url || "");
   const designed = Boolean(banner);
-  const href = promotionClickHref(promo) || categoryFallbackHref(promo.category);
   const { linkedEvent, linkedMovie, linkedDining } = resolvePromoLinks(promo, ctx);
+  const href =
+    promotionClickHref(promo) ||
+    (linkedDining ? restaurantHref(linkedDining) : "") ||
+    categoryFallbackHref(promo.category);
 
   // Base from linked entity when available
   let base: Slide | null = null;
@@ -298,111 +290,25 @@ function promoToSlide(
 function SlideCard({ slide }: { slide: Slide }) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(slide.image) && !failed;
-  const hasMeta = Boolean(slide.dateLabel || slide.cityLabel);
-  const showTagline = taglineVisible(slide);
-  const showAccent = Boolean(slide.accent?.trim());
-  const isDesignedPoster = Boolean(slide.designed && showImage);
 
+  // Customer landing: banner image only — no dark scrim, text panel, or accent overlay.
+  // Whole card is already wrapped in <Link href={slide.href}>.
   return (
-    <>
-      <div className="absolute inset-0">
-        {showImage ? (
-          <img
-            src={slide.image}
-            alt=""
-            aria-hidden
-            className={`promo-slide-photo h-full w-full object-cover ${
-              isDesignedPoster ? "promo-slide-photo--designed" : ""
-            }`}
-            draggable={false}
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <div className="h-full w-full promo-slide-fallback" aria-hidden />
-        )}
-        <div
-          className={`pointer-events-none absolute inset-0 ${
-            isDesignedPoster
-              ? "promo-slide-scrim-designed"
-              : showImage
-                ? "promo-slide-scrim-poster"
-                : "promo-slide-scrim"
-          }`}
+    <div className="absolute inset-0">
+      {showImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={slide.image}
+          alt=""
+          aria-hidden
+          className="promo-slide-photo h-full w-full object-cover"
+          draggable={false}
+          onError={() => setFailed(true)}
         />
-      </div>
-
-      {showAccent ? (
-        <div className="promo-accent-wrap pointer-events-none absolute z-[3] hidden sm:block" aria-hidden>
-          <span className="promo-accent-glow" />
-          <span className="promo-accent-script">{slide.accent}</span>
-        </div>
-      ) : null}
-
-      <div
-        className={`relative z-[2] flex h-full flex-col justify-center pl-5 pr-2 sm:pl-7 sm:pr-4 md:pl-9 md:pr-6 pb-6 sm:pb-8 ${
-          isDesignedPoster
-            ? "max-w-[52%] sm:max-w-[46%] md:max-w-[42%]"
-            : "max-w-[58%] sm:max-w-[52%] md:max-w-[48%] lg:max-w-[46%]"
-        }`}
-      >
-        <span className="w-fit mb-2 sm:mb-2.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full bg-[#6900AA] text-white shadow-sm">
-          {slide.badge}
-        </span>
-
-        <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-[2rem] font-extrabold leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] line-clamp-2">
-          {slide.title}
-          {slide.year ? (
-            <>
-              {" "}
-              <span className="promo-year-gradient">{slide.year}</span>
-            </>
-          ) : null}
-        </h2>
-
-        {showTagline ? (
-          <p className="mt-1 sm:mt-1.5 text-white/75 text-[11px] sm:text-sm font-medium line-clamp-1">
-            {slide.tagline}
-          </p>
-        ) : null}
-
-        {hasMeta ? (
-          <div className="mt-3 sm:mt-4 flex items-center gap-3 sm:gap-4 text-white">
-            {slide.dateLabel ? (
-              <div className="flex items-start gap-2 min-w-0">
-                <CalendarDays className="mt-0.5 shrink-0 text-white/80" size={16} strokeWidth={2} />
-                <div className="min-w-0 leading-tight">
-                  <p className="text-[12px] sm:text-sm font-semibold truncate">{slide.dateLabel}</p>
-                  {slide.weekdayLabel ? (
-                    <p className="text-[10px] sm:text-xs text-white/65">{slide.weekdayLabel}</p>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
-            {slide.dateLabel && slide.cityLabel ? (
-              <span className="hidden sm:block w-px h-8 bg-white/30 shrink-0" aria-hidden />
-            ) : null}
-
-            {slide.cityLabel ? (
-              <div className="hidden sm:flex items-start gap-2 min-w-0">
-                <MapPin className="mt-0.5 shrink-0 text-white/80" size={16} strokeWidth={2} />
-                <div className="min-w-0 leading-tight">
-                  <p className="text-[12px] sm:text-sm font-semibold truncate">{slide.cityLabel}</p>
-                  {slide.placeLabel ? (
-                    <p className="text-[10px] sm:text-xs text-white/65 truncate">{slide.placeLabel}</p>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        <span className="promo-cta-btn mt-3.5 sm:mt-5 inline-flex w-fit items-center gap-1.5 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 text-[12px] sm:text-sm font-bold text-white shadow-[0_8px_20px_rgba(236,72,153,0.35)] transition-transform duration-200 group-hover:scale-[1.03]">
-          {slide.cta}
-          <ArrowRight size={15} strokeWidth={2.5} />
-        </span>
-      </div>
-    </>
+      ) : (
+        <div className="h-full w-full promo-slide-fallback" aria-hidden />
+      )}
+    </div>
   );
 }
 

@@ -4,8 +4,8 @@ import { useRef, Children, type CSSProperties, type ReactNode } from "react";
 import "./AdaptiveCardRow.css";
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
-import { RailOverlayNavButton, RailSeeAllLink } from "./RailChrome";
-import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 
 type ContentRailProps = {
   title: string;
@@ -53,7 +53,7 @@ export default function ContentRail({
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.8, 640), behavior: "smooth" });
+    scrollRailBy(el, dir);
   };
 
   return (
@@ -84,8 +84,8 @@ export default function ContentRail({
               </p>
             ) : null}
             <h2
-              className={`type-section font-semibold tracking-tight ${
-                dark ? "text-white" : "text-[#111111]"
+              className={`text-xl sm:text-2xl lg:text-xl font-bold ${
+                dark ? "text-white" : "text-slate-800"
               }`}
             >
               {title}
@@ -135,16 +135,7 @@ export default function ContentRail({
             )}
           </div>
         ) : (
-          <div className="relative overflow-visible">
-            {showOverlayNav && scrollEdges.left ? (
-              <RailOverlayNavButton
-                direction="prev"
-                side="left"
-                inset={cardStyle === "dining"}
-                label={`Previous ${label}`}
-                onClick={() => scrollBy(-1)}
-              />
-            ) : null}
+          <div>
             {adaptive ? (
               <AdaptiveCardRow
                 minVisible={minVisible}
@@ -161,13 +152,15 @@ export default function ContentRail({
                 {children}
               </div>
             )}
-            {showOverlayNav && scrollEdges.right ? (
-              <RailOverlayNavButton
-                direction="next"
-                side="right"
-                inset={cardStyle === "dining"}
-                label={`Next ${label}`}
-                onClick={() => scrollBy(1)}
+            {showOverlayNav ? (
+              <RailPagerNav
+                canPrev={scrollEdges.left}
+                canNext={scrollEdges.right}
+                pageCount={scrollEdges.pageCount}
+                activePage={scrollEdges.activePage}
+                onPrev={() => scrollBy(-1)}
+                onNext={() => scrollBy(1)}
+                label={label}
               />
             ) : null}
           </div>

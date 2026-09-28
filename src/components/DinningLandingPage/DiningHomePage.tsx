@@ -1,5 +1,6 @@
 ﻿"use client";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { motion } from "motion/react";
 import {
   Search,
   MapPin,
@@ -82,52 +83,43 @@ const EXPLORE_DINING_CARDS = [
   {
     id: "all-dining",
     title: "All dining",
-    image: "/images/dining-category-all.png",
+    image: "/images/dining-category-all_1.png",
     match: null as readonly string[] | null,
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.85) 0%, transparent 72%), linear-gradient(165deg, #FFFCF5 0%, #FFF0C8 48%, #FFE29A 100%)",
+    border: "#E5D0A0",
+    shadow: "0 8px 22px rgba(212, 168, 64, 0.16)",
   },
   {
     id: "bar",
     title: "Bar",
-    image: "/images/dining-category-bar.png",
+    image: "/images/dining-category-bar_2.png",
     match: ["bar"] as const,
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.85) 0%, transparent 72%), linear-gradient(165deg, #FFF9F6 0%, #FFE4D6 48%, #FFCBB5 100%)",
+    border: "#E8C4B0",
+    shadow: "0 8px 22px rgba(232, 140, 110, 0.16)",
   },
   {
     id: "restaurant",
     title: "Restaurant",
-    image: "/images/dining-category-restaurant.png",
+    image: "/images/dining-category-restaurant_4.png",
     match: ["restaurant"] as const,
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.85) 0%, transparent 72%), linear-gradient(165deg, #FFF8F4 0%, #FFE0CE 48%, #FFC4A6 100%)",
+    border: "#E8BFA8",
+    shadow: "0 8px 22px rgba(232, 130, 90, 0.16)",
   },
-  // {
-  //   id: "bar-grill",
-  //   title: "Bar & Grill",
-  //   image: "/images/dining-category-bar-grill.png",
-  //   match: ["grill", "bar & grill", "bar and grill"] as const,
-  // },
   {
     id: "cafe",
     title: "Cafe",
-    image: "/images/dining-category-cafe.png",
+    image: "/images/dining-category-cafe_3.png",
     match: ["cafe", "café", "coffee"] as const,
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.88) 0%, transparent 72%), linear-gradient(165deg, #FFFBF6 0%, #F3E2C8 48%, #E4CBA8 100%)",
+    border: "#D8C4A8",
+    shadow: "0 8px 22px rgba(180, 140, 90, 0.15)",
   },
-  // Hidden from Explore Dining (frontend only) — keep entries for easy restore.
-  // {
-  //   id: "pub",
-  //   title: "Pub",
-  //   image: "/images/dining-category-pub.png",
-  //   match: ["pub"] as const,
-  // },
-  // {
-  //   id: "fine-dining",
-  //   title: "Fine dining",
-  //   image: "/images/dining-category-fine-dining.png",
-  //   match: ["fine dining", "fine-dining", "fine"] as const,
-  // },
-  // {
-  //   id: "general-restaurant",
-  //   title: "General restaurant",
-  //   image: "/images/dining-category-general.png",
-  //   match: ["general restaurant", "general"] as const,
-  // },
 ] as const;
 
 type MealOccasion = "lunch" | "breakfast" | "dinner" | "fastfood";
@@ -2086,17 +2078,34 @@ export default function Home() {
             </div>
       </section> */}
 
-      {/* ── Explore Dining categories ─────────────────────────────────────── */}
+      {/* ── Explore Dining — polished pastel category cards ───────────────── */}
       <section
         id="explore-dining"
-        className="w-full bg-white border-b border-slate-100"
+        className="w-full bg-white"
         style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
       >
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-6 sm:py-3">
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-5 tracking-tight">
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-8 sm:pt-10 pb-3">
+          <motion.h2
+            className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 mb-2 sm:mb-3 tracking-tight"
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.6 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          >
             Explore Dining
-          </h2>
-          <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pt-1.5 pb-1">
+          </motion.h2>
+          <motion.div
+            className="flex gap-4 sm:gap-5 overflow-x-auto px-1 pt-5 pb-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, amount: 0.35 }}
+            variants={{
+              hidden: {},
+              show: {
+                transition: { staggerChildren: 0.09, delayChildren: 0.05 },
+              },
+            }}
+          >
             {EXPLORE_DINING_CARDS.map((card) => {
               const resolvedCategory = resolveExploreTypeName(
                 card.match,
@@ -2104,24 +2113,19 @@ export default function Home() {
                 card.title
               );
               const isActive = exploreCardId === card.id;
-                    return (
-                <div
+              return (
+                <motion.button
                   key={card.id}
-                  className="text-center flex flex-col items-center justify-center transition-all shrink-0"
-                >
-                            <button
-                              type="button"
+                  type="button"
+                  aria-label={card.title}
+                  aria-pressed={isActive}
                   onClick={() => {
-                    // Re-clicking the active card must keep selection + results.
-                    // Resetting categories with a new array would clear the list
-                    // while RTK Query returns the same cached page and never rehydrates.
                     if (exploreCardId === card.id) {
                       scrollToDiningBrowseViewport();
                       return;
                     }
                     setExploreCardId(card.id);
                     if (resolvedCategory) {
-                      // Use the same label as Filters → Category so both stay highlighted together.
                       const filterLabel =
                         exploreDiningFilterCategories.find(
                           (c) => c.toLowerCase() === resolvedCategory.toLowerCase()
@@ -2133,40 +2137,89 @@ export default function Home() {
                     setCurrentPage(1);
                     scrollToDiningBrowseViewport();
                   }}
-                  className="text-center cursor-pointer w-[120px] h-[140px] sm:w-[132px] sm:h-[160px] rounded-2xl transition-all hover:-translate-y-0.5"
-                  aria-pressed={isActive}
+                  className="flex h-[188px] w-[148px] shrink-0 cursor-pointer flex-col items-center rounded-[22px] border p-0 sm:h-[180px] sm:w-[140px]"
+                  style={{
+                    background: card.gradient,
+                    borderColor: isActive ? "#6900AA" : card.border,
+                    boxShadow: isActive
+                      ? `0 0 0 2px rgba(105,0,170,0.22), ${card.shadow}`
+                      : card.shadow,
+                  }}
+                  variants={{
+                    hidden: { opacity: 0, y: 28, scale: 0.9 },
+                    show: {
+                      opacity: 1,
+                      y: isActive ? -4 : 0,
+                      scale: isActive ? 1.02 : 1,
+                      transition: {
+                        type: "spring",
+                        stiffness: 320,
+                        damping: 22,
+                        mass: 0.8,
+                      },
+                    },
+                    hover: {
+                      y: -8,
+                      scale: 1.03,
+                      transition: { type: "spring", stiffness: 420, damping: 16 },
+                    },
+                  }}
+                  whileHover="hover"
+                  whileTap={{
+                    scale: 0.97,
+                    y: -2,
+                    transition: { type: "spring", stiffness: 520, damping: 28 },
+                  }}
                 >
-                  <span className={`block w-full h-full rounded-2xl transition-all ${
-                    isActive ? "border-[2px] border-[#6900AA]" : "border-[2px] border-transparent"
-                  }`}>
-                    <img
-                      src={card.image}
-                              alt={card.title}
-                      className={`w-full h-full block rounded-xl transition-all ${
-                        isActive ? "opacity-100" : "opacity-90 hover:opacity-100"
-                      }`}
-                    />
+                  <span className="flex h-full w-full flex-col items-center overflow-hidden rounded-[21px]">
+                    <motion.span
+                      className="shrink-0 px-2 pt-3.5 sm:pt-4 text-center text-[15px] sm:text-[16px] font-extrabold leading-none tracking-tight"
+                      animate={{ color: isActive ? "#6900AA" : "#0f172a" }}
+                      transition={{ duration: 0.22 }}
+                    >
+                      {card.title}
+                    </motion.span>
+                    <span className="flex min-h-0 w-full flex-1 items-center justify-center px-2.5 pb-3.5 pt-1.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <motion.img
+                        src={card.image}
+                        alt=""
+                        aria-hidden
+                        className="h-full w-full max-h-[118px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.14)]"
+                        draggable={false}
+                        variants={{
+                          hidden: { opacity: 0, y: 12, scale: 0.86 },
+                          show: {
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                            transition: {
+                              type: "spring",
+                              stiffness: 280,
+                              damping: 18,
+                              delay: 0.05,
+                            },
+                          },
+                          hover: {
+                            y: -6,
+                            rotate: -2,
+                            scale: 1.06,
+                            transition: {
+                              type: "spring",
+                              stiffness: 340,
+                              damping: 14,
+                            },
+                          },
+                        }}
+                      />
+                    </span>
                   </span>
-                  
-                </button>
-
-<p
-className={`text-sm font-bold mt-2 transition-colors ${
-  isActive ? "text-[#6900AA]" : "text-slate-800"
-}`}
->
-{card.title}
-</p>
-
-                            </div>
-
-                
-                    );
-                  })}
-              </div>
-
-            </div>
-          </section>
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        </div>
+      </section>
 
       {/* Explore Cuisines — only after Restaurant is selected in Explore Dining */}
       {exploreCardId === "restaurant" && cuisineCards.length > 0 && (

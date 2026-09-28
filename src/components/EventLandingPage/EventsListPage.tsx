@@ -10,6 +10,7 @@ import {
   type RefObject,
   type TransitionEvent,
 } from "react";
+import { motion } from "motion/react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -111,10 +112,42 @@ function writeEventRecentSearches(items: string[]) {
 const CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
 
 const EXPLORE_EVENT_CATEGORIES = [
-  { key: "music" as const, label: "Music", image: "/images/events/explore/music.png?v=3" },
-  { key: "concert" as const, label: "Concert", image: "/images/events/explore/concert.png?v=3" },
-  { key: "comedy" as const, label: "Comedy", image: "/images/events/explore/comedy.png?v=3" },
-  { key: "sports" as const, label: "Sports", image: "/images/events/explore/sports.png?v=3" },
+  {
+    key: "music" as const,
+    label: "Music",
+    image: "/images/events/explore/music_1.png?v=3",
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.88) 0%, transparent 72%), linear-gradient(165deg, #F8F7FF 0%, #E4DFFF 48%, #CDC6F5 100%)",
+    border: "#C8C0E8",
+    shadow: "0 8px 22px rgba(140, 120, 210, 0.16)",
+  },
+  {
+    key: "concert" as const,
+    label: "Concert",
+    image: "/images/events/explore/concert_1.png?v=3",
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.85) 0%, transparent 72%), linear-gradient(165deg, #FFFCF5 0%, #FFF0C8 48%, #FFE29A 100%)",
+    border: "#E5D0A0",
+    shadow: "0 8px 22px rgba(212, 168, 64, 0.16)",
+  },
+  {
+    key: "comedy" as const,
+    label: "Comedy",
+    image: "/images/events/explore/comedy_1.png?v=3",
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.88) 0%, transparent 72%), linear-gradient(165deg, #F5FFF8 0%, #D8F5E2 48%, #B8EBC8 100%)",
+    border: "#A8D8B8",
+    shadow: "0 8px 22px rgba(90, 180, 120, 0.15)",
+  },
+  {
+    key: "sports" as const,
+    label: "Sports",
+    image: "/images/events/explore/sports_1.png?v=3",
+    gradient:
+      "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.85) 0%, transparent 72%), linear-gradient(165deg, #FFF8F4 0%, #FFE0CE 48%, #FFC4A6 100%)",
+    border: "#E8BFA8",
+    shadow: "0 8px 22px rgba(232, 130, 90, 0.16)",
+  },
 ];
 
 const CATEGORY_BROWSE_HEADING: Record<EventCategoryKey, string> = {
@@ -2258,32 +2291,111 @@ export default function PublicEventsPage() {
 
       {!isCategoryBrowse ? (
         <>
-          {/* 2) Explore Events — only categories that currently have events */}
+          {/* 2) Explore Events — polished pastel category cards */}
           {exploreCategoriesWithEvents.length > 0 ? (
-            <section className="pt-8 sm:pt-10 pb-2 bg-white">
+            <section className="pt-8 sm:pt-10 pb-3 bg-white">
               <div className={CONTAINER}>
-                <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800 pb-4">
+                <motion.h2
+                  className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800 pb-4"
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.6 }}
+                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                >
                   Explore Events
-                </h2>
-                <div className="flex gap-5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                </motion.h2>
+                <motion.div
+                  className="flex gap-4 sm:gap-5 overflow-x-auto px-1 pt-5 pb-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, amount: 0.35 }}
+                  variants={{
+                    hidden: {},
+                    show: {
+                      transition: { staggerChildren: 0.09, delayChildren: 0.05 },
+                    },
+                  }}
+                >
                   {exploreCategoriesWithEvents.map((cat) => (
-                    <button
+                    <motion.button
                       key={cat.key}
                       type="button"
                       aria-label={cat.label}
                       onClick={() => onExploreCategory(cat.key)}
-                      className="h-[180px] w-[140px] shrink-0 cursor-pointer overflow-hidden rounded-2xl border-0 bg-transparent p-0 hover:opacity-95 transition-opacity sm:h-[170px] sm:w-[130px]"
+                      className="flex h-[188px] w-[148px] shrink-0 cursor-pointer flex-col items-center rounded-[22px] border p-0 sm:h-[180px] sm:w-[140px]"
+                      style={{
+                        background: cat.gradient,
+                        borderColor: cat.border,
+                        boxShadow: cat.shadow,
+                      }}
+                      variants={{
+                        hidden: { opacity: 0, y: 28, scale: 0.9 },
+                        show: {
+                          opacity: 1,
+                          y: 0,
+                          scale: 1,
+                          transition: {
+                            type: "spring",
+                            stiffness: 320,
+                            damping: 22,
+                            mass: 0.8,
+                          },
+                        },
+                        hover: {
+                          y: -8,
+                          scale: 1.03,
+                          transition: { type: "spring", stiffness: 420, damping: 16 },
+                        },
+                      }}
+                      whileHover="hover"
+                      whileTap={{
+                        scale: 0.97,
+                        y: -2,
+                        transition: { type: "spring", stiffness: 520, damping: 28 },
+                      }}
                     >
-                      <img
-                        src={cat.image}
-                        alt={cat.label}
-                        width={146}
-                        height={190}
-                        className="block h-full w-full object-fill"
-                      />
-                    </button>
+                      <span className="flex h-full w-full flex-col items-center overflow-hidden rounded-[21px]">
+                        <span className="shrink-0 px-2 pt-3.5 sm:pt-4 text-center text-[15px] sm:text-[16px] font-extrabold leading-none tracking-tight text-slate-900">
+                          {cat.label}
+                        </span>
+                        <span className="flex min-h-0 w-full flex-1 items-center justify-center px-2.5 pb-3.5 pt-1.5">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <motion.img
+                            src={cat.image}
+                            alt=""
+                            aria-hidden
+                            className="h-full w-full max-h-[118px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.14)]"
+                            draggable={false}
+                            variants={{
+                              hidden: { opacity: 0, y: 12, scale: 0.86 },
+                              show: {
+                                opacity: 1,
+                                y: 0,
+                                scale: 1,
+                                transition: {
+                                  type: "spring",
+                                  stiffness: 280,
+                                  damping: 18,
+                                  delay: 0.05,
+                                },
+                              },
+                              hover: {
+                                y: -6,
+                                rotate: -2,
+                                scale: 1.06,
+                                transition: {
+                                  type: "spring",
+                                  stiffness: 340,
+                                  damping: 14,
+                                },
+                              },
+                            }}
+                          />
+                        </span>
+                      </span>
+                    </motion.button>
                   ))}
-                </div>
+                </motion.div>
               </div>
             </section>
           ) : null}

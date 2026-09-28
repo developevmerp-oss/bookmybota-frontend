@@ -61,7 +61,11 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
 
         <div>
           {isLoading ? (
-            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
+            <AdaptiveCardRow
+              minVisible={MIN_VISIBLE}
+              scrollerRef={scrollerRef}
+              className="adaptive-card-row--four"
+            >
               {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
                 <div key={i} className="adaptive-card-slot">
                   <div className="aspect-[2/3] w-full rounded-xl bg-[#F7F7F7]" />
@@ -73,7 +77,11 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
           ) : isEmpty && !useStatic ? (
             <p className="text-sm text-[#6B7280] py-6">No sports events available yet.</p>
           ) : (
-            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
+            <AdaptiveCardRow
+              minVisible={MIN_VISIBLE}
+              scrollerRef={scrollerRef}
+              className="adaptive-card-row--four"
+            >
               {useStatic
                 ? SHOWCASE_SPORTS_EVENT_CARDS.map((event) => (
                     <ShowcaseEventPosterCard

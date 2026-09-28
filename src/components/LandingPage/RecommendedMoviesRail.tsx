@@ -19,7 +19,7 @@ import { hasCityFilter } from "./homeUtils";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import "./RecommendedMoviesRail.css";
 
-const MIN_VISIBLE = 5;
+const MIN_VISIBLE = 4;
 const MOVIES_HOME_HREF = "/movies";
 
 const cardShell =
@@ -185,7 +185,11 @@ export default function RecommendedMoviesRail() {
 
         <div>
           {isLoading ? (
-            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
+            <AdaptiveCardRow
+              minVisible={MIN_VISIBLE}
+              scrollerRef={scrollerRef}
+              className="adaptive-card-row--four"
+            >
               {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
                 <div
                   key={i}
@@ -202,7 +206,11 @@ export default function RecommendedMoviesRail() {
           ) : items.length === 0 ? (
             <p className="text-sm text-[#6B7280] py-6">No movies available yet.</p>
           ) : (
-            <AdaptiveCardRow minVisible={MIN_VISIBLE} scrollerRef={scrollerRef}>
+            <AdaptiveCardRow
+              minVisible={MIN_VISIBLE}
+              scrollerRef={scrollerRef}
+              className="adaptive-card-row--four"
+            >
               {items.map((movie) => (
                 <MovieCard key={movie.id} movie={movie} />
               ))}

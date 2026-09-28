@@ -134,6 +134,19 @@ export function listingOfferLabel(raw: unknown): string | null {
   return title || null;
 }
 
+/** Blue image-banner copy, e.g. "Flat 20% OFF". Falls back to offer title. */
+export function listingOfferBannerLabel(raw: unknown): string | null {
+  const offer = primaryDiningOffer(raw);
+  if (!offer) return null;
+  if (offer.discount_type === "PERCENT" && offer.discount_value != null) {
+    return `Flat ${offer.discount_value}% OFF`;
+  }
+  if (offer.discount_type === "FLAT" && offer.discount_value != null) {
+    return `Flat ${offer.discount_value} ETB OFF`;
+  }
+  return offer.title?.trim() || null;
+}
+
 export function bookingWidgetOfferLabel(raw: unknown): string | null {
   const offers = normalizeDiningOffers(raw).filter(isDiningOfferCustomerVisible);
   if (offers.length === 0) return null;

@@ -5,9 +5,9 @@ import { Calendar, Flame, Loader2, Sparkles, Users } from "lucide-react";
 import { useGetActivePlatformOffersQuery, type PlatformOffer } from "@/services/api";
 import { formatDateCustomer } from "@/lib/dateFormat";
 import { formatMoney, formatWholeNumber } from "@/lib/currencyFormat";
-import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { readSessionForRole } from "@/lib/authStorage";
-import { RailOverlayNavButton } from "./RailChrome";
+import { RailPagerNav } from "./RailChrome";
 import "./SpecialOffersRail.css";
 
 type OfferTheme = "magenta" | "violet" | "ocean" | "sunset" | "emerald";
@@ -226,7 +226,7 @@ export default function SpecialOffersRail({ city = "" }: { city?: string }) {
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: "smooth" });
+    scrollRailBy(el, dir);
   };
 
   // Hide the whole Special Offers section when nothing is available for this user
@@ -238,12 +238,12 @@ export default function SpecialOffersRail({ city = "" }: { city?: string }) {
     <section id="offers" className="bg-white py-6 sm:py-8 lg:pb-5 scroll-mt-28">
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
-          <h2 className="type-section font-semibold tracking-tight text-[#111111]">
+          <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
             Special Offers
           </h2>
         </div>
 
-        <div className="relative overflow-visible">
+        <div>
           {isLoading || (isFetching && offers.length === 0) ? (
             <div className="flex items-center justify-center py-12 type-body text-[#666] gap-2">
               <Loader2 className="animate-spin" size={20} />
@@ -251,31 +251,21 @@ export default function SpecialOffersRail({ city = "" }: { city?: string }) {
             </div>
           ) : (
             <>
-              {scrollEdges.left ? (
-                <RailOverlayNavButton
-                  direction="prev"
-                  side="left"
-                  label="Previous offers"
-                  onClick={() => scrollBy(-1)}
-                  className="!-left-4 md:!-left-5 lg:!-left-4 !top-1/2"
-                />
-              ) : null}
-
               <div ref={scrollerRef} className="offers-rail">
                 {offers.map((offer) => (
                   <OfferCard key={offer.id} offer={offer} />
                 ))}
               </div>
 
-              {scrollEdges.right ? (
-                <RailOverlayNavButton
-                  direction="next"
-                  side="right"
-                  label="Next offers"
-                  onClick={() => scrollBy(1)}
-                  className="!-right-4 md:!-right-5 lg:!-right-4 !top-1/2"
-                />
-              ) : null}
+              <RailPagerNav
+                canPrev={scrollEdges.left}
+                canNext={scrollEdges.right}
+                pageCount={scrollEdges.pageCount}
+                activePage={scrollEdges.activePage}
+                onPrev={() => scrollBy(-1)}
+                onNext={() => scrollBy(1)}
+                label="offers"
+              />
             </>
           )}
         </div>

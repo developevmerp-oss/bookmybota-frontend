@@ -25,11 +25,12 @@ const eventCardShell =
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
-/** Same hover as landing movie cards (lift + shadow); size stays put. */
+/** Same hover as landing movie cards (lift + shadow); a bit more padding on hover. */
 const diningCardShell =
   "rounded-2xl border-0 bg-transparent shadow-none p-2 " +
+  "hover:bg-white hover:p-3 " +
   "hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 " +
-  "transition-[box-shadow,transform] duration-300";
+  "transition-[box-shadow,transform,padding,background-color] duration-300";
 
 /** Title + rating + address only. */
 const diningCardBody = "pt-2.5 pb-1 flex flex-col gap-1 min-w-0";
@@ -137,16 +138,16 @@ export function EventPosterCard({
       </div>
       <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-sm font-semibold text-[#B59B2A]">{dateLine}</p>
+          <p className="text-sm tracking-wide  truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
         ) : null}
-        <h3 className="text-base font-bold leading-snug text-black line-clamp-2 sm:text-lg">
+        <h3 className="text-base tracking-wide sm:text-lg font-bold  text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
           {event.name}
         </h3>
         {placeLine ? (
-          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{placeLine}</p>
+          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{placeLine}</p>
         ) : null}
         {eventType ? (
-          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{eventType}</p>
+          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
         ) : null}
       </div>
     </Link>
@@ -195,16 +196,16 @@ export function ShowcaseEventPosterCard({
       </div>
       <div className="space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
         {dateLine ? (
-          <p className="text-sm font-semibold text-[#B59B2A]">{dateLine}</p>
+          <p className="text-sm tracking-wide  truncate leading-snug font-semibold text-[#B59B2A]">{dateLine}</p>
         ) : null}
-        <h3 className="text-base font-bold leading-snug text-black line-clamp-2 sm:text-lg">
+        <h3 className="text-base tracking-wide sm:text-lg font-bold  text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
           {title}
         </h3>
         {place ? (
-          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{place}</p>
+          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{place}</p>
         ) : null}
         {eventType ? (
-          <p className="text-sm font-medium text-[#6B6B6B] line-clamp-1">{eventType}</p>
+          <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">{eventType}</p>
         ) : null}
       </div>
     </Link>
@@ -297,12 +298,12 @@ export function DiningPosterCard({ place }: { place: Business }) {
       </div>
       <div className={diningCardBody}>
         <div className="flex items-center justify-between gap-4 min-w-0">
-          <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
+          <h3 className="text-base tracking-wide sm:text-lg font-bold  text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
             {place.name}
           </h3>
-          <div className="shrink-0 inline-flex items-center gap-0.5 bg-[#24963F] text-white text-[11px] font-bold px-1.5 py-0.5 rounded">
+          <div className="shrink-0 inline-flex items-center gap-1 bg-[#24963F] text-white text-[0.9rem] font-bold px-2 py-0.5 rounded">
             <span>{rating.toFixed(1)}</span>
-            <span className="text-xs text-yellow-200">★</span>
+            <span className="text-[0.9rem] text-white">★</span>
           </div>
         </div>
 
@@ -350,12 +351,12 @@ export function ShowcaseDiningPosterCard({
       </div>
       <div className={diningCardBody}>
         <div className="flex items-center justify-between gap-3 min-w-0">
-          <h3 className="text-[15px] sm:text-base font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug group-hover:text-[#6900AA] transition-colors">
+          <h3 className="text-sm sm:text-base font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug group-hover:text-[#6900AA] transition-colors">
             {name}
           </h3>
-          <div className="shrink-0 inline-flex items-center gap-0.5 bg-[#24963F] text-white text-[11px] font-bold px-1.5 py-0.5 rounded">
+          <div className="shrink-0 inline-flex items-center gap-0.5 bg-[#24963F] text-white text-sm font-bold px-1.5 py-0.5 rounded">
             <span>{displayRating.toFixed(1)}</span>
-            <span className="text-[9px]">★</span>
+            <span className="text-sm text-white">★</span>
           </div>
         </div>
 

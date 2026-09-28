@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+// font family
 import { Manrope } from "next/font/google";
 import RootLayoutClient from "./RootLayoutClient";
 import "./globals.css";
-
+// font family
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-manrope",
@@ -72,7 +73,9 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href={`/apple-icon.png?v=${FAVICON_V}`} />
         <link rel="shortcut icon" href={`/favicon.ico?v=${FAVICON_V}`} />
       </head>
+      {/* font family */}
       <body className={`${manrope.className} ${manrope.variable}`}>
+      {/* <body> */}
         <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>

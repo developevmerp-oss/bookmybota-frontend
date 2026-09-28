@@ -78,6 +78,7 @@ export default function AdaptiveCardRow({
         style={
           {
             ["--adaptive-count" as string]: count,
+            ["--adaptive-min-visible" as string]: String(minVisible),
           } as CSSProperties
         }
       >

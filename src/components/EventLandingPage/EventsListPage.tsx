@@ -1873,7 +1873,7 @@ export default function PublicEventsPage() {
     >
       <div className={CONTAINER}>
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4 sm:mb-5">
-          <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900">
+          <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
             {browseHeading}
           </h2>
         </div>
@@ -2262,7 +2262,7 @@ export default function PublicEventsPage() {
           {exploreCategoriesWithEvents.length > 0 ? (
             <section className="pt-8 sm:pt-10 pb-2 bg-white">
               <div className={CONTAINER}>
-                <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 mb-4 sm:mb-5">
+                <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800 pb-4">
                   Explore Events
                 </h2>
                 <div className="flex gap-5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -2293,7 +2293,7 @@ export default function PublicEventsPage() {
             <div className={CONTAINER}>
               <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
                 <div className="min-w-0">
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+                  <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
                     {city
                       ? `Top recommended events in ${headingCity}`
                       : "Top recommended events"}
@@ -2364,7 +2364,7 @@ export default function PublicEventsPage() {
           <section className="pt-8 sm:pt-10 pb-2 bg-white">
             <div className={CONTAINER}>
               <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+                <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
                   {city ? `Artists in ${headingCity}` : "Artists in your District"}
                 </h2>
                 <div

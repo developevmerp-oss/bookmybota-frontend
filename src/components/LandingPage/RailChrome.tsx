@@ -97,9 +97,9 @@ export function RailPagerNav({
   if (dots < 2) return null;
 
   const active = Math.min(Math.max(0, activePage), dots - 1);
-  // Trust scroll edges: start → no left; end → no right
-  const showPrev = canPrev;
-  const showNext = canNext;
+  // Start → no left; end → no right (same for every landing rail using this pager)
+  const showPrev = canPrev && active > 0;
+  const showNext = canNext && active < dots - 1;
 
   return (
     <div

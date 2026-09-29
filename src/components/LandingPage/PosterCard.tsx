@@ -30,12 +30,12 @@ const eventCardShell =
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
-/** Same hover as landing movie cards (lift + shadow); a bit more padding on hover. */
+/** Hover plate like reference: inset padding + white bg. Padding is always p-3 so size never jumps. */
 const diningCardShell =
-  "rounded-2xl border-0 bg-transparent shadow-none p-2 " +
-  "hover:bg-white hover:p-3 " +
+  "rounded-2xl border-0 bg-transparent shadow-none p-3 " +
+  "hover:bg-white " +
   "hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 " +
-  "transition-[box-shadow,transform,padding,background-color] duration-300";
+  "transition-[box-shadow,transform,background-color] duration-300";
 
 /** Title + rating + address only. */
 const diningCardBody = "pt-2.5 pb-1 flex flex-col gap-1 min-w-0";
@@ -363,6 +363,7 @@ export function DiningPosterCard({
           src={image}
           alt={place.name}
           fallback={<Utensils size={28} strokeWidth={1.5} />}
+          objectClass="object-cover object-top"
           hoverScaleClass="group-hover:scale-[1.04]"
         />
 
@@ -467,6 +468,7 @@ export function ShowcaseDiningPosterCard({
           src={image}
           alt={name}
           fallback={<Utensils size={28} strokeWidth={1.5} />}
+          objectClass="object-cover object-top"
           hoverScaleClass="group-hover:scale-[1.04]"
         />
       </div>

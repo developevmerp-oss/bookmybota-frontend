@@ -650,22 +650,6 @@ export default function DiningFiltersBar({
           </span>
         ))}
 
-        {showClearAll ? (
-          <button
-            type="button"
-            onClick={() => {
-              onReset?.();
-              onCategoriesChange?.([]);
-              if (!onCategoriesChange) onCategoryChange?.("All");
-              onClearExtras?.();
-            }}
-            className="shrink-0 text-xs font-bold px-2 py-1.5 transition-colors cursor-pointer hover:underline whitespace-nowrap"
-            style={{ color: ACCENT }}
-          >
-            Clear All
-          </button>
-        ) : null}
-
         {!sortActive ? (
           <div className="relative shrink-0" ref={sortRef}>
             <button
@@ -758,6 +742,22 @@ export default function DiningFiltersBar({
             className={chipClass(false)}
           >
             Offers
+          </button>
+        ) : null}
+
+        {showClearAll ? (
+          <button
+            type="button"
+            onClick={() => {
+              onReset?.();
+              onCategoriesChange?.([]);
+              if (!onCategoriesChange) onCategoryChange?.("All");
+              onClearExtras?.();
+            }}
+            className="shrink-0 text-xs font-bold px-2 py-1.5 transition-colors cursor-pointer hover:underline whitespace-nowrap"
+            style={{ color: ACCENT }}
+          >
+            Clear All
           </button>
         ) : null}
         </div>

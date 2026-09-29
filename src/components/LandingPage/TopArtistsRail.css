@@ -25,10 +25,6 @@
   cursor: pointer;
 }
 
-.top-artists-slot-link:hover .top-artists-name {
-  color: #6900aa;
-}
-
 .top-artists-slot-link:hover .top-artists-photo {
   transform: scale(1.05);
 }

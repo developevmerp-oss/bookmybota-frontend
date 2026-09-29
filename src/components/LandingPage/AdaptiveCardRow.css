@@ -9,7 +9,7 @@
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
-  /* Room for dining hover plate (-m-2.5) + soft shadow — card layout size stays put */
+  /* Room for dining hover plate + soft shadow (card size fixed — padding reserved) */
   padding-top: 0.85rem;
   padding-bottom: 1.15rem;
   padding-left: 0.75rem;

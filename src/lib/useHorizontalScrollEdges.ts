@@ -36,8 +36,9 @@ function computeEdges(el: HTMLElement): HorizontalScrollEdges {
   // Dot count = how many button clicks from start to end (inclusive of start)
   const pageCount = Math.max(2, Math.floor(maxScroll / pageWidth) + 1);
 
-  const atStart = el.scrollLeft <= 4;
-  const atEnd = el.scrollLeft >= maxScroll - 4;
+  // Slightly tolerant so padding / scroll-snap never leaves a stale “can go left” at start
+  const atStart = el.scrollLeft <= 12;
+  const atEnd = el.scrollLeft >= maxScroll - 12;
   const progress = Math.min(1, Math.max(0, el.scrollLeft / maxScroll));
 
   let activePage: number;

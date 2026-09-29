@@ -1897,6 +1897,113 @@ export default function PublicEventsPage() {
     (d) => d.id === "today" || d.id === "tomorrow" || d.id === "weekend"
   );
 
+  /** Selected filters as removable chips (dining-style), shown first after Filters. */
+  const selectedFilterChips: { key: string; label: string; onClear: () => void }[] = [];
+
+  if (sort !== "recommended") {
+    const lbl = SORT_OPTIONS.find((o) => o.id === sort)?.label || sort;
+    selectedFilterChips.push({
+      key: `sort-${sort}`,
+      label: lbl,
+      onClear: () => {
+        setSort("recommended");
+        scrollToEventsViewport();
+      },
+    });
+  }
+
+  if (datePreset) {
+    const preset = datePresets.find((d) => d.id === datePreset);
+    selectedFilterChips.push({
+      key: `date-${datePreset}`,
+      label: preset?.label || datePreset,
+      onClear: () => {
+        setDatePreset("");
+        setDateFrom("");
+        setDateTo("");
+        setUseDateRange(false);
+        scrollToEventsViewport();
+      },
+    });
+  } else if (dateFrom || dateTo) {
+    const label =
+      dateFrom && dateTo
+        ? `${dateFrom} – ${dateTo}`
+        : dateFrom
+          ? `From ${dateFrom}`
+          : `Until ${dateTo}`;
+    selectedFilterChips.push({
+      key: "date-range",
+      label,
+      onClear: () => {
+        setDateFrom("");
+        setDateTo("");
+        setUseDateRange(false);
+        scrollToEventsViewport();
+      },
+    });
+  }
+
+  if (!isCategoryBrowse) {
+    for (const cat of categoryFilters) {
+      if (!selectedSlugs.some((s) => categorySlugsMatch(s, cat.slug, categoryPool))) continue;
+      selectedFilterChips.push({
+        key: `cat-${cat.slug}`,
+        label: cat.name,
+        onClear: () => {
+          selectSlug(cat.slug);
+          scrollToEventsViewport();
+        },
+      });
+    }
+  } else {
+    for (const genre of selectedEventGenres) {
+      selectedFilterChips.push({
+        key: `genre-${genre}`,
+        label: genre,
+        onClear: () => {
+          toggleEventGenre(genre);
+          scrollToEventsViewport();
+        },
+      });
+    }
+  }
+
+  for (const lang of selectedLanguages) {
+    selectedFilterChips.push({
+      key: `lang-${lang}`,
+      label: lang,
+      onClear: () => {
+        toggleIn(selectedLanguages, lang, setSelectedLanguages);
+        scrollToEventsViewport();
+      },
+    });
+  }
+
+  for (const bandId of selectedPriceBands) {
+    const band = priceBands.find((b) => b.id === bandId);
+    if (!band) continue;
+    selectedFilterChips.push({
+      key: `price-${band.id}`,
+      label: band.label,
+      onClear: () => {
+        toggleIn(selectedPriceBands, band.id, setSelectedPriceBands);
+        scrollToEventsViewport();
+      },
+    });
+  }
+
+  if (search.trim()) {
+    selectedFilterChips.push({
+      key: "search",
+      label: `Search: "${search.trim()}"`,
+      onClear: () => {
+        setSearchInput("");
+        setSearch("");
+      },
+    });
+  }
+
   const eventsGridSection = (
     <section
       ref={allEventsRef}
@@ -1928,88 +2035,58 @@ export default function PublicEventsPage() {
             icon={<FaSlidersH size={12} />}
             trailing={<FaChevronDown size={10} className="opacity-60" />}
           />
-          {quickDateChips.map((d) => (
-            <ChipButton
-              key={d.id}
-              label={d.label}
-              active={datePreset === d.id}
-              onClick={() => {
-                setDatePreset((p) => (p === d.id ? "" : d.id));
-                setDateFrom("");
-                setDateTo("");
-                setUseDateRange(false);
-                scrollToEventsViewport();
-              }}
-            />
-          ))}
-          {!isCategoryBrowse
-            ? categoryFilters.map((cat) => (
-                <ChipButton
-                  key={cat.slug}
-                  label={cat.name}
-                  active={selectedSlugs.some((s) => categorySlugsMatch(s, cat.slug, categoryPool))}
-                  onClick={() => {
-                    selectSlug(cat.slug);
-                    scrollToEventsViewport();
-                  }}
-                />
-              ))
-            : null}
-          {isCategoryBrowse
-            ? selectedEventGenres.map((genre) => (
-                <ChipButton
-                  key={`genre-${genre}`}
-                  label={genre}
-                  active
-                  onClick={() => {
-                    toggleEventGenre(genre);
-                    scrollToEventsViewport();
-                  }}
-                />
-              ))
-            : null}
-          {selectedLanguages.map((lang) => (
-            <ChipButton
-              key={`lang-${lang}`}
-              label={lang}
-              active
-              onClick={() => {
-                toggleIn(selectedLanguages, lang, setSelectedLanguages);
-                scrollToEventsViewport();
-              }}
-            />
-          ))}
-          {selectedPriceBands.map((bandId) => {
-            const band = priceBands.find((b) => b.id === bandId);
-            if (!band) return null;
-            return (
-              <ChipButton
-                key={`price-${band.id}`}
-                label={band.label}
-                active
-                onClick={() => {
-                  toggleIn(selectedPriceBands, band.id, setSelectedPriceBands);
-                  scrollToEventsViewport();
-                }}
-              />
-            );
-          })}
-          {search.trim() ? (
-            <span className="shrink-0 inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold whitespace-nowrap">
-              {`Search: "${search.trim()}"`}
+          {/* Selected options first — purple removable chips (same as dining) */}
+          {selectedFilterChips.map((chip) => (
+            <span
+              key={chip.key}
+              className="shrink-0 inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-md px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-medium whitespace-nowrap"
+            >
+              {chip.label}
               <button
                 type="button"
-                onClick={() => {
-                  setSearchInput("");
-                  setSearch("");
-                }}
+                onClick={chip.onClear}
                 className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors cursor-pointer"
-                aria-label="Clear search"
+                aria-label={`Remove ${chip.label}`}
               >
                 <X size={12} />
               </button>
             </span>
-          ) : null}
+          ))}
+          {/* Unselected quick chips after selected ones */}
+          {quickDateChips
+            .filter((d) => datePreset !== d.id)
+            .map((d) => (
+              <ChipButton
+                key={d.id}
+                label={d.label}
+                active={false}
+                onClick={() => {
+                  setDatePreset((p) => (p === d.id ? "" : d.id));
+                  setDateFrom("");
+                  setDateTo("");
+                  setUseDateRange(false);
+                  scrollToEventsViewport();
+                }}
+              />
+            ))}
+          {!isCategoryBrowse
+            ? categoryFilters
+                .filter(
+                  (cat) =>
+                    !selectedSlugs.some((s) => categorySlugsMatch(s, cat.slug, categoryPool))
+                )
+                .map((cat) => (
+                  <ChipButton
+                    key={cat.slug}
+                    label={cat.name}
+                    active={false}
+                    onClick={() => {
+                      selectSlug(cat.slug);
+                      scrollToEventsViewport();
+                    }}
+                  />
+                ))
+            : null}
           {search.trim() || hasActiveFilters || sort !== "recommended" ? (
             <button
               type="button"

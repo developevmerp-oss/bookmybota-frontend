@@ -1019,12 +1019,9 @@ export default function Home() {
 
   const collectionsRef = useRef<HTMLDivElement>(null);
   const cuisinesRef = useRef<HTMLDivElement>(null);
-  const stickyCuisinesRef = useRef<HTMLDivElement>(null);
-  const cuisineStickySentinelRef = useRef<HTMLDivElement>(null);
   const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
   const offersRef = useRef<HTMLDivElement>(null);
   const [collectionsScroll, setCollectionsScroll] = useState({ left: false, right: false });
-  const [showStickyCuisineNames, setShowStickyCuisineNames] = useState(false);
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
 
@@ -1054,7 +1051,7 @@ export default function Home() {
   };
 
   const scrollCuisines = (direction: "left" | "right") => {
-    const el = (showStickyCuisineNames ? stickyCuisinesRef : cuisinesRef).current;
+    const el = cuisinesRef.current;
     if (!el) return;
     const amount = Math.max(el.clientWidth * 0.7, 160);
     el.scrollBy({
@@ -1583,11 +1580,6 @@ export default function Home() {
     cuisineCards.length,
     exploreCardId,
   ]);
-  const stickyCuisinesScroll = useHorizontalScrollEdges(stickyCuisinesRef, [
-    cuisineCards.length,
-    exploreCardId,
-    showStickyCuisineNames,
-  ]);
   const offersScroll = useHorizontalScrollEdges(offersRef, [
     homeOfferCards.length,
     showHomeExtras,
@@ -1604,35 +1596,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const sentinel = cuisineStickySentinelRef.current;
-    if (!sentinel || exploreCardId !== "restaurant" || cuisineCards.length === 0) {
-      setShowStickyCuisineNames(false);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowStickyCuisineNames(!entry.isIntersecting);
-      },
-      {
-        root: null,
-        threshold: 0,
-        rootMargin: siteHeaderHeight > 0 ? `-${siteHeaderHeight}px 0px 0px 0px` : "-120px 0px 0px 0px",
-      }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [exploreCardId, cuisineCards.length, siteHeaderHeight]);
-
-  useEffect(() => {
     const sentinel = filtersStickySentinelRef.current;
     if (!sentinel) {
       setIsFiltersStuck(false);
       return;
     }
 
-    const topOffset = siteHeaderHeight + (showStickyCuisineNames ? 52 : 0);
+    const topOffset = siteHeaderHeight;
     const observer = new IntersectionObserver(
       ([entry]) => {
         const next = !entry.isIntersecting;
@@ -1647,7 +1617,7 @@ export default function Home() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [siteHeaderHeight, showStickyCuisineNames]);
+  }, [siteHeaderHeight]);
 
   useEffect(() => {
     if (!showHomeExtras) {
@@ -2091,21 +2061,29 @@ export default function Home() {
                       className="shrink-0 snap-start flex flex-col items-center w-[72px] sm:w-[96px] md:w-[112px] lg:w-[124px] cursor-pointer group"
                     >
                       <span
-                        className={`w-[64px] h-[64px] sm:w-[84px] sm:h-[84px] md:w-[100px] md:h-[100px] lg:w-[112px] lg:h-[112px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${
-                          isActive ? "ring-2 ring-[#6900AA] ring-offset-1 sm:ring-offset-2" : ""
+                        className={`inline-flex shrink-0 items-center justify-center rounded-full p-[2px] ${
+                          isActive ? "bg-[#d295ff]" : "bg-transparent"
                         }`}
                       >
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          onError={(e) => {
-                            const el = e.target as HTMLImageElement;
-                            if (el.src !== CUISINE_IMAGE_FALLBACK) {
-                              el.src = CUISINE_IMAGE_FALLBACK;
-                            }
-                          }}
-                        />
+                        <span
+                          className={`inline-flex items-center justify-center rounded-full bg-white ${
+                            isActive ? "p-1 sm:p-[5px]" : "p-0"
+                          }`}
+                        >
+                          <span className="block h-[58px] w-[58px] sm:h-[77px] sm:w-[77px] md:h-[93px] md:w-[93px] lg:h-[105px] lg:w-[105px] rounded-full overflow-hidden bg-white shadow-[0_6px_16px_rgba(15,23,42,0.1)]">
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              onError={(e) => {
+                                const el = e.target as HTMLImageElement;
+                                if (el.src !== CUISINE_IMAGE_FALLBACK) {
+                                  el.src = CUISINE_IMAGE_FALLBACK;
+                                }
+                              }}
+                            />
+                          </span>
+                        </span>
                       </span>
                       <span className="mt-1.5 sm:mt-3 text-sm sm:text-lg lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
                         {item.name}
@@ -2114,67 +2092,7 @@ export default function Home() {
                   );
                 })}
               </div>
-              <div ref={cuisineStickySentinelRef} className="h-px w-full" aria-hidden />
             </section>
-          </div>
-        </div>
-      )}
-
-      {exploreCardId === "restaurant" && cuisineCards.length > 0 && (
-        <div
-          className={`dining-sticky-cuisine-names fixed left-0 right-0 z-40 bg-white border-b border-slate-100 shadow-[0_2px_8px_rgba(15,23,42,0.06)] transition-[opacity,transform] duration-200 ${
-            showStickyCuisineNames
-              ? "opacity-100 translate-y-0 pointer-events-auto"
-              : "opacity-0 -translate-y-1 pointer-events-none"
-          }`}
-          style={siteHeaderHeight > 0 ? { top: siteHeaderHeight } : undefined}
-          aria-hidden={!showStickyCuisineNames}
-        >
-          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
-            <div className="relative py-2.5 sm:py-3">
-              {stickyCuisinesScroll.left && (
-                <button
-                  type="button"
-                  aria-label="Previous cuisines"
-                  onClick={() => scrollCuisines("left")}
-                  className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm items-center justify-center text-slate-600 hover:bg-slate-50"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-              )}
-              {stickyCuisinesScroll.right && (
-                <button
-                  type="button"
-                  aria-label="Next cuisines"
-                  onClick={() => scrollCuisines("right")}
-                  className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm items-center justify-center text-slate-600 hover:bg-slate-50"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
-              <div
-                ref={stickyCuisinesRef}
-                className="flex items-center gap-5 sm:gap-6 md:gap-8 overflow-x-auto scrollbar-hide scroll-smooth px-0.5"
-              >
-                {cuisineCards.map((item) => {
-                  const isActive = diningFilters.cuisines.some(
-                    (selected) => selected.toLowerCase() === item.name.toLowerCase()
-                  );
-                  return (
-                    <button
-                      key={`sticky-${item.name}`}
-                      type="button"
-                      onClick={() => handleCuisineSelect(item.name)}
-                      className={`shrink-0 text-sm sm:text-base font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-                        isActive ? "text-[#6900AA]" : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {item.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -2303,9 +2221,7 @@ export default function Home() {
           id="dining-filters-bar"
           className="sticky z-30 w-full"
           style={{
-            top:
-              siteHeaderHeight +
-              (showStickyCuisineNames ? 52 : 0),
+            top: siteHeaderHeight,
             scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8,
           }}
         >

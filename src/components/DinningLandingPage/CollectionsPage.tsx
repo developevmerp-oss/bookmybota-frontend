@@ -84,8 +84,8 @@ function CollectionsContent() {
                         "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
                     }}
                   />
-                  {/* Backdrop Gradient Overlay matching collection color scheme */}
-                  <div className={`absolute inset-0 bg-gradient-to-t ${collection.color_gradient || 'from-rose-950/85'} via-black/10 to-transparent`} />
+                  {/* Neutral dark scrim — keeps title readable without colored tints */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
                   
                   {/* Content container */}
                   <div className="absolute inset-0 flex flex-col justify-end p-5 select-none">

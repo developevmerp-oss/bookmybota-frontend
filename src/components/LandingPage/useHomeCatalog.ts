@@ -7,8 +7,10 @@ import {
 import { eventsWithImage, hasCityFilter, preferCityOrAll } from "./homeUtils";
 
 /**
- * Landing catalog: prefer city-scoped listings; when a city filter returns
- * nothing, fall back to the full (unscoped) list so rails stay populated.
+ * Landing catalog cascade for cards:
+ * 1. Prefer city-scoped listings
+ * 2. When city returns nothing → fall back to full (unscoped) list
+ * 3. Callers show showcase/static demos when both city + global are empty
  */
 export function useHomeCatalog(city: string) {
   const hasCity = hasCityFilter(city);

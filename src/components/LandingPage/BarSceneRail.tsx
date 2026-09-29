@@ -5,7 +5,7 @@ import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery } from "@/services
 import ContentRail from "./ContentRail";
 import { DiningPosterCard, ShowcaseDiningPosterCard } from "./PosterCard";
 import { SHOWCASE_BAR_CARDS } from "@/data/showcaseDiningCards";
-import { hasCityFilter } from "./homeUtils";
+import { hasCityFilter, shouldShowShowcaseCards } from "./homeUtils";
 
 function resolveBarCategoryName(types: { name: string }[]): string {
   const exact = types.find((t) => t.name.trim().toLowerCase() === "bar");
@@ -51,7 +51,8 @@ export default function BarSceneRail({ city }: { city: string }) {
     cityBarsLoading ||
     (hasCity && cityItems.length === 0 && allBarsLoading);
   const isEmpty = !isLoading && items.length === 0;
-  const useStatic = isEmpty && !hasCity;
+  // City → global → showcase when both empty (even with city selected)
+  const useStatic = shouldShowShowcaseCards(isEmpty);
 
   const seeAllParams = new URLSearchParams();
   // Link to city dining when city has bars; otherwise browse all bars

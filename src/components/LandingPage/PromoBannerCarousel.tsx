@@ -416,7 +416,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
 
   if (loading) {
     return (
-      <section className="promo-banner-swiper is-single w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4">
+      <section className="promo-banner-swiper is-single w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4">
         <div className="promo-banner-single-wrap">
           <div className="promo-banner-frame rounded-2xl sm:rounded-3xl overflow-hidden promo-slide-skeleton" />
         </div>
@@ -431,7 +431,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
 
   return (
     <section
-      className={`promo-banner-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4 ${
+      className={`promo-banner-swiper w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 ${
         multi ? "is-multi" : "is-single"
       }`}
     >

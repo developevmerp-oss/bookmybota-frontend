@@ -15,7 +15,7 @@ import {
 } from "@/lib/movieDisplay";
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
-import { hasCityFilter } from "./homeUtils";
+import { hasCityFilter, shouldShowShowcaseCards } from "./homeUtils";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import "./RecommendedMoviesRail.css";
 
@@ -145,7 +145,8 @@ export default function RecommendedMoviesRail() {
   const isLoading =
     cityLoading || (hasCity && cityMovies.length === 0 && allLoading);
   const isEmpty = !isLoading && apiMovies.length === 0;
-  const useStatic = isEmpty && !hasCity;
+  // City → global → showcase when both empty (even with city selected)
+  const useStatic = shouldShowShowcaseCards(isEmpty);
   const cityHasNoMovies = hasCity && !isLoading && cityMovies.length === 0;
   const items = useStatic ? SHOWCASE_MOVIE_CARDS.map(mapShowcaseMovie) : apiMovies;
   const scrollEdges = useHorizontalScrollEdges(scrollerRef, [

@@ -194,21 +194,8 @@ export function buildDiningHomeOfferCards(businesses: Business[]): DiningHomeOff
     });
   }
 
-  cards.push({
-    id: "any",
-    bucket: "any",
-    badge: "Special Offers",
-    title: "Special Offers",
-    subtitle: `${withOffers.length} restaurant${withOffers.length === 1 ? "" : "s"} with dining promo codes`,
-    cta: "Explore Offers",
-    restaurantCount: withOffers.length,
-  });
-
-  const preferred = cards.filter((c) => c.bucket !== "any");
-  const special = cards.find((c) => c.bucket === "any");
-  const top = preferred.slice(0, 3);
-  if (special) top.push(special);
-  return top.length > 0 ? top : cards;
+  // Specific buckets only — no catch-all "Special Offers" card (that duplicates % + flat).
+  return cards.slice(0, 3);
 }
 
 export function offerBucketSectionTitle(bucket: DiningOfferBucket | null): string | null {

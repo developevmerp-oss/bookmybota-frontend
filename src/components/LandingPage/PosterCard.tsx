@@ -324,8 +324,10 @@ export function DiningPosterCard({
   const adaptive = useAdaptiveCard();
   const image = resolveMediaUrl(place.cover_image_url) || "";
   const parsedRating = Number(place.rating);
-  const rating =
-    Number.isFinite(parsedRating) && parsedRating > 0 ? parsedRating : 4.2;
+  const reviewsCount = Number(place.reviews_count) || 0;
+  const hasRating =
+    reviewsCount > 0 && Number.isFinite(parsedRating) && parsedRating > 0;
+  const rating = hasRating ? parsedRating : null;
   const locality = localityFromAddress(place.address) || place.city_name?.trim() || "";
   const isListing = variant === "listing";
   const widthClass = isListing ? "w-full" : adaptive ? "w-full" : diningCardWidth;
@@ -403,10 +405,16 @@ export function DiningPosterCard({
           <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug transition-colors pr-1">
             {place.name}
           </h3>
-          <div className="shrink-0 inline-flex items-center gap-1 bg-[#24963F] text-white text-[0.9rem] font-bold px-2 py-0.5 rounded ml-1">
-            <span>{rating.toFixed(1)}</span>
-            <span className="text-[0.9rem] text-white">★</span>
-          </div>
+          {rating != null ? (
+            <div className="shrink-0 inline-flex items-center gap-1 bg-[#24963F] text-white text-[0.9rem] font-bold px-2 py-0.5 rounded ml-1">
+              <span>{rating.toFixed(1)}</span>
+              <span className="text-[0.9rem] text-white">★</span>
+            </div>
+          ) : (
+            <div className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.75rem] font-bold px-2 py-0.5 rounded ml-1">
+              New
+            </div>
+          )}
         </div>
 
         {isListing ? (
@@ -452,8 +460,8 @@ export function ShowcaseDiningPosterCard({
 }) {
   const adaptive = useAdaptiveCard();
   const parsedRating = typeof rating === "number" ? rating : Number(rating);
-  const displayRating =
-    Number.isFinite(parsedRating) && parsedRating > 0 ? parsedRating : 4.2;
+  const hasRating = Number.isFinite(parsedRating) && parsedRating > 0;
+  const displayRating = hasRating ? parsedRating : null;
   const widthClass = listingMeta || adaptive ? "w-full" : diningCardWidth;
   const idHash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const priceForTwo = `${formatMoney([1200, 1500, 2000, 2400, 1800][idHash % 5], {
@@ -477,10 +485,16 @@ export function ShowcaseDiningPosterCard({
           <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug pr-1">
             {name}
           </h3>
-          <div className="shrink-0 inline-flex items-center gap-1 bg-[#24963F] text-white text-[0.9rem] font-bold px-2 py-0.5 rounded ml-1">
-            <span>{displayRating.toFixed(1)}</span>
-            <span className="text-[0.9rem] text-white">★</span>
-          </div>
+          {displayRating != null ? (
+            <div className="shrink-0 inline-flex items-center gap-1 bg-[#24963F] text-white text-[0.9rem] font-bold px-2 py-0.5 rounded ml-1">
+              <span>{displayRating.toFixed(1)}</span>
+              <span className="text-[0.9rem] text-white">★</span>
+            </div>
+          ) : (
+            <div className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.75rem] font-bold px-2 py-0.5 rounded ml-1">
+              New
+            </div>
+          )}
         </div>
 
         {listingMeta ? (

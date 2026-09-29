@@ -7,7 +7,7 @@ import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import { EventPosterCard, ShowcaseEventPosterCard } from "./PosterCard";
-import { isSportsEvent } from "./homeUtils";
+import { isSportsEvent, shouldShowShowcaseCards } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 
 const MIN_VISIBLE = 4;
@@ -28,7 +28,8 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
 
   const isLoading = isLoadingEvents;
   const isEmpty = !isLoading && sportsEvents.length === 0;
-  const useStatic = isEmpty && !hasCity;
+  // City → global → showcase when both empty (even with city selected)
+  const useStatic = shouldShowShowcaseCards(isEmpty);
   const cityHasNoSports = hasCity && !isLoading && citySports.length === 0;
   const cardCount = useStatic ? SHOWCASE_SPORTS_EVENT_CARDS.length : sportsEvents.length;
   const scrollEdges = useHorizontalScrollEdges(scrollerRef, [

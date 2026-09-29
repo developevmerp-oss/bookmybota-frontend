@@ -7,12 +7,22 @@ export function hasCityFilter(city?: string) {
 }
 
 /**
- * Prefer city-scoped results; when a city is selected but returns nothing,
- * fall back to the full unscoped list so customer surfaces stay populated.
+ * Card catalog cascade (city → global):
+ * 1. City selected + city has items → city items
+ * 2. City selected + city empty → global (all-cities) items
+ * 3. No city → unscoped / global items
+ *
+ * Callers that still have an empty list after this should show showcase/static demos
+ * (even when a city is selected).
  */
 export function preferCityOrAll<T>(cityItems: T[], allItems: T[], hasCity: boolean): T[] {
   if (!hasCity) return cityItems;
   return cityItems.length > 0 ? cityItems : allItems;
+}
+
+/** True when city + global catalogs are both empty — show showcase/static demos. */
+export function shouldShowShowcaseCards(isEmpty: boolean) {
+  return isEmpty;
 }
 
 export function eventPortrait(event: PublicEvent) {

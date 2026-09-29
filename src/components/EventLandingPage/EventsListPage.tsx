@@ -1445,11 +1445,12 @@ export default function PublicEventsPage() {
   };
 
   const recommendedEvents = useMemo(() => {
-    const poolSource = listingEvents.length ? listingEvents : hasCity ? [] : posterFallbackEvents;
+    // City → global (listingEvents via preferCityOrAll) → poster/showcase fallback when both empty
+    const poolSource = listingEvents.length ? listingEvents : posterFallbackEvents;
     const promoted = poolSource.filter((e) => e.is_promoted);
     const pool = promoted.length ? promoted : poolSource;
     return pool.slice(0, 15);
-  }, [listingEvents, posterFallbackEvents, hasCity]);
+  }, [listingEvents, posterFallbackEvents]);
 
   const eventsById = useMemo(() => {
     const map = new Map<string, PublicEvent>();
@@ -2124,10 +2125,28 @@ export default function PublicEventsPage() {
                 Clear filters
               </button>
             </div>
-          ) : hasCity ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
-              <CitySectionEmptyNotice message="No events available in your city yet." />
-              <p className="mt-2 text-sm text-slate-500">Try another city or clear the location filter.</p>
+          ) : hasCity && listingEvents.length === 0 ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-center">
+                <CitySectionEmptyNotice message="No events available in your city yet." />
+                <p className="mt-2 text-sm text-slate-500">
+                  Showing highlights while we wait for events in your city.
+                </p>
+              </div>
+              <div className="mx-auto grid w-full grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
+                {emptyShowcaseCards.map((event) => (
+                  <ShowcaseEventPosterCard
+                    key={event.id}
+                    title={event.title}
+                    image={event.image}
+                    showDate={event.showDate}
+                    place={event.place}
+                    eventType={event.eventType}
+                    href={event.href}
+                    fullWidth
+                  />
+                ))}
+              </div>
             </div>
           ) : (
             <div className="mx-auto grid w-full  grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
@@ -2544,7 +2563,19 @@ export default function PublicEventsPage() {
                   ) : null}
                 </>
               ) : (
-                <p className="text-sm text-slate-500">No recommended events yet.</p>
+                <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {emptyShowcaseCards.slice(0, 8).map((event) => (
+                    <ShowcaseEventPosterCard
+                      key={`rec-showcase-${event.id}`}
+                      title={event.title}
+                      image={event.image}
+                      showDate={event.showDate}
+                      place={event.place}
+                      eventType={event.eventType}
+                      href={event.href}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </section>

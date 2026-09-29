@@ -38,7 +38,11 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
 
   const imageSrc =
     resolveMediaUrl(restaurant.cover_image_url) || getFallbackImageForType(restaurant.type_name);
-  const rating = Number(restaurant.rating || 4.2).toFixed(1);
+  const reviewsCount = Number(restaurant.reviews_count) || 0;
+  const parsedRating = Number(restaurant.rating);
+  const hasRating =
+    reviewsCount > 0 && Number.isFinite(parsedRating) && parsedRating > 0;
+  const ratingLabel = hasRating ? `${parsedRating.toFixed(1)}+` : "New";
   const cuisine =
     restaurant.cuisine ||
     restaurant.type_name ||
@@ -129,9 +133,15 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
           <h3 className="font-bold text-[#292929] text-lg sm:text-xl leading-tight truncate flex-1 group-hover:text-[#6900AA] transition-colors">
             {restaurant.name}
           </h3>
-          <div className="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-1.5 py-0.5 rounded-md">
-            <span className="text-[10px]">★</span>
-            <span>{rating}+</span>
+          <div
+            className={`shrink-0 inline-flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-md ${
+              hasRating
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-slate-100 text-slate-600 border border-slate-200"
+            }`}
+          >
+            {hasRating ? <span className="text-[10px]">★</span> : null}
+            <span>{ratingLabel}</span>
           </div>
         </div>
 

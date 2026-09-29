@@ -460,7 +460,7 @@ export default function ListingPromoSlider({
   if (isLoading) {
     return (
       <section
-        className={`promo-banner-swiper is-single w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4 ${className}`}
+        className={`promo-banner-swiper is-single w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 ${className}`}
       >
         <div className="promo-banner-single-wrap">
           <div className="promo-banner-frame rounded-2xl sm:rounded-3xl overflow-hidden promo-slide-skeleton" />
@@ -476,7 +476,7 @@ export default function ListingPromoSlider({
 
   return (
     <section
-      className={`promo-banner-swiper w-full bg-[#F5F5F5] pt-3 sm:pt-4 pb-3 sm:pb-4 ${
+      className={`promo-banner-swiper w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 ${
         multi ? "is-multi" : "is-single"
       } ${className}`}
     >

@@ -19,7 +19,7 @@ import type { IconType } from "react-icons";
 import { DiningPosterCard, ShowcaseDiningPosterCard } from "@/components/LandingPage/PosterCard";
 import { DiningHomeRestaurantShimmer } from "@/components/Shared/Shimmer";
 import { SHOWCASE_BAR_CARDS, SHOWCASE_DINING_CARDS, type ShowcaseDiningCard } from "@/data/showcaseDiningCards";
-import { hasCityFilter, preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import { hasCityFilter, preferCityOrAll, shouldShowShowcaseCards } from "@/components/LandingPage/homeUtils";
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
 import ListingPromoSlider, {
@@ -182,6 +182,15 @@ function diningCuisineTags(business: Business): string[] {
   return tags.length ? tags : ["Dining"];
 }
 
+function diningRatingLabel(business?: Business | null): string {
+  const reviewsCount = Number(business?.reviews_count) || 0;
+  const parsed = Number(business?.rating);
+  if (reviewsCount > 0 && Number.isFinite(parsed) && parsed > 0) {
+    return parsed.toFixed(1);
+  }
+  return "New";
+}
+
 function businessToPromoSlide(business: Business): DiningPromoSlide {
   const image =
     resolveMediaUrl(business.cover_image_url) ||
@@ -192,7 +201,7 @@ function businessToPromoSlide(business: Business): DiningPromoSlide {
     title: business.name,
     image,
     location: diningLocality(business),
-    rating: Number(business.rating || 4.5).toFixed(1),
+    rating: diningRatingLabel(business),
     reviewsLabel: formatReviewCount(business.reviews_count),
     cuisines: diningCuisineTags(business),
     href: restaurantHref(business),
@@ -231,7 +240,7 @@ function campaignToPromoSlide(
     title,
     image: planBanner || restaurantImage || "",
     location: linked ? diningLocality(linked) : "Addis Ababa",
-    rating: Number(linked?.rating || 4.5).toFixed(1),
+    rating: diningRatingLabel(linked),
     reviewsLabel: formatReviewCount(linked?.reviews_count),
     cuisines: linked ? diningCuisineTags(linked) : ["Dining"],
     href: promotionClickHref(promo) || (linked ? restaurantHref(linked) : linkedId ? restaurantHref({ id: linkedId }) : "/dining"),
@@ -856,7 +865,7 @@ function CollectionCard({
   return (
     <Link
       href={href}
-      className="relative shrink-0 w-[200px] h-[268px] sm:w-[220px] sm:h-[300px] lg:w-[236px] lg:h-[320px] rounded-2xl overflow-hidden cursor-pointer group shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 block"
+      className="relative shrink-0 snap-start block overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer group h-[248px] w-[calc((100vw-2.5rem-0.75rem)/2)] sm:h-[280px] sm:w-[calc((100vw-5rem-2rem)/3)] md:h-[300px] md:w-[calc((100vw-5rem-3rem)/4)] lg:h-[320px] lg:w-[calc((100%-4rem)/5)] xl:h-[330px] xl:w-[calc((100%-4rem)/5)]"
     >
       <img
         src={resolveMediaUrl(collection.image_url) || "https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80"}
@@ -867,9 +876,10 @@ function CollectionCard({
             "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
         }}
       />
-      <div className={`absolute inset-0 bg-gradient-to-t ${collection.color_gradient || 'from-rose-900/80'} to-transparent`} />
+      {/* Neutral dark scrim — keeps title readable without colored tints */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 p-4">
-        <h3 className="text-white font-bold text-base sm:text-lg leading-tight">{collection.title}</h3>
+        <h3 className="text-white font-bold text-[15px] sm:text-base leading-tight tracking-tight">{collection.title}</h3>
         <p className="text-white/80 text-xs sm:text-sm mt-1 flex items-center gap-0.5">
           {subtitle} <ChevronRight size={14} className="opacity-80" />
         </p>
@@ -1043,7 +1053,8 @@ export default function Home() {
 
   const scrollCollections = (direction: "left" | "right") => {
     if (!collectionsRef.current) return;
-    const amount = Math.max(collectionsRef.current.clientWidth * 0.7, 236);
+    // Scroll by roughly one card (~1/5 of the row on desktop)
+    const amount = Math.max(collectionsRef.current.clientWidth * 0.2 + 16, 200);
       collectionsRef.current.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
@@ -1573,7 +1584,8 @@ export default function Home() {
     !mealOccasion &&
     diningFiltersAreDefault &&
     (activeCategories.length === 0 || isBarCategoryOnly);
-  const useStaticDining = canShowCatalogFallback && !hasSelectedCity;
+  // City → global (preferCityOrAll / paged fallback) → showcase when both empty
+  const useStaticDining = shouldShowShowcaseCards(canShowCatalogFallback);
   const staticDiningCards = isBarCategoryOnly ? SHOWCASE_BAR_CARDS : SHOWCASE_DINING_CARDS;
 
   const cuisinesScroll = useHorizontalScrollEdges(cuisinesRef, [
@@ -2019,7 +2031,7 @@ export default function Home() {
           <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5 sm:py-6">
             <section id="explore-cuisines" className="scroll-mt-24">
               <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
-                <h2 className="font-bold text-[#1A1A1A] text-base sm:text-lg md:text-xl min-w-0 truncate">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight min-w-0 truncate">
                   Explore Cuisines
                 </h2>
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -2085,7 +2097,7 @@ export default function Home() {
                           </span>
                         </span>
                       </span>
-                      <span className="mt-1.5 sm:mt-3 text-sm sm:text-lg lg:text-[1.1rem] font-semibold text-slate-500 text-center leading-tight line-clamp-2 w-full">
+                      <span className="mt-1.5 sm:mt-3 text-[15px] sm:text-base font-extrabold text-slate-900 text-center leading-tight tracking-tight line-clamp-2 w-full">
                         {item.name}
                       </span>
                     </button>
@@ -2098,14 +2110,14 @@ export default function Home() {
       )}
 
       {showHomeExtras && (
-      <div className="w-full" style={{ backgroundColor: PAGE_MUTED }}>
+      <div className="w-full bg-white">
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-5 pb-2">
         {/* ── 2. Collections (after hero) ──────────────────────────────────── */}
           <section className="w-full">
             {/* Mobile / tablet: title + All collections on one line, subtitle below */}
             <div className="lg:hidden mb-2">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-bold text-slate-800 shrink-0">Collections</h2>
+                <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 shrink-0 tracking-tight">Collections</h2>
                 <Link
                   href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
                   className="flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
@@ -2121,7 +2133,7 @@ export default function Home() {
             {/* Desktop: title + subtitle left, All collections right */}
             <div className="hidden lg:flex items-center justify-between mb-2">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">Collections</h2>
+                <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">Collections</h2>
                 <p className="text-sm text-slate-500 mt-0.5">
                   Explore curated lists of top restaurants, cafes and bars
                 </p>
@@ -2139,7 +2151,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => scrollCollections("left")}
-                  className="absolute left-0 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
+                  className="absolute left-2 top-1/2 z-20 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
                   aria-label="Scroll left"
                 >
                   <ChevronLeft size={22} strokeWidth={1.75} />
@@ -2148,9 +2160,9 @@ export default function Home() {
 
               <div
                 ref={collectionsRef}
-                className="overflow-x-auto pt-1 pb-4 scrollbar-hide scroll-smooth"
+                className="overflow-x-auto pt-1 pb-4 scrollbar-hide scroll-smooth snap-x snap-mandatory"
               >
-                <div className="flex gap-4 w-max">
+                <div className="flex w-full min-w-full gap-3 sm:gap-4">
                   {collections.map((col) => (
                     <CollectionCard key={col.id} collection={col} city={activeCity} />
                   ))}
@@ -2161,7 +2173,7 @@ export default function Home() {
               <button
                 type="button"
                   onClick={() => scrollCollections("right")}
-                  className="absolute right-0 top-1/2 z-20 translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
+                  className="absolute right-2 top-1/2 z-20 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
                   aria-label="Scroll right"
               >
                   <ChevronRight size={22} strokeWidth={1.75} />
@@ -2350,7 +2362,7 @@ export default function Home() {
           {/* ── 6. Restaurant section ───────────────────────────────────────── */}
           <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-2"}`}>
           <div className="pt-2 pb-6">
-            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
               {getFilteredSectionTitle()}
             </h2>
             {usingDiningFallback ||
@@ -2359,7 +2371,7 @@ export default function Home() {
               citySectionBusinesses.length === 0) ? (
               <CitySectionEmptyNotice message="No dining options available in your city yet." />
             ) : (
-              <p className="text-sm sm:text-base lg:text-sm text-slate-500 mt-0.5">
+              <p className="text-sm text-slate-500 mt-0.5">
                 {locationLoading ? (
                   <span className="flex items-center gap-1.5">
                     <Loader2 size={12} className="animate-spin" /> Locating restaurants…
@@ -2378,7 +2390,7 @@ export default function Home() {
           {businessesLoading && loadedRestaurants.length === 0 ? (
             <DiningHomeRestaurantShimmer count={6} />
           ) : useStaticDining ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
               {staticDiningCards.map((place) => (
                 <ShowcaseRestaurantCard key={place.id} place={place} />
               ))}
@@ -2422,7 +2434,7 @@ export default function Home() {
             </div>
           ) : (
             <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
                 {displayRestaurants.map((restaurant) => (
                 <RestaurantCard key={restaurant.id} restaurant={restaurant} />
               ))}

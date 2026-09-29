@@ -1293,8 +1293,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const costText = profile?.average_cost
     ? `${formatMoney(profile.average_cost, { compact: true })} for two (approx.)`
     : getCostForTwoFromRange(profile?.price_range);
-  const ratingValue = Number(profile.rating || 4.5).toFixed(1);
-  const reviewsCount = profile.reviews_count || 120;
+  const reviewsCount = Number(profile.reviews_count) || 0;
+  const parsedProfileRating = Number(profile.rating);
+  const hasProfileRating =
+    reviewsCount > 0 && Number.isFinite(parsedProfileRating) && parsedProfileRating > 0;
+  const ratingValue = hasProfileRating ? parsedProfileRating.toFixed(1) : null;
 
   // Calculate dynamic timing details based on calendar operating dates
   const todayOp = operatingByDate.get(toLocalDateKey(new Date()));
@@ -1406,13 +1409,21 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <div className="bg-emerald-600 text-white rounded-md px-3 py-2 flex items-center gap-1.5 shadow-sm">
-                <span className="font-bold text-lg leading-none">{ratingValue}</span>
-                <Star size={15} className="fill-white" />
-              </div>
+              {ratingValue ? (
+                <div className="bg-emerald-600 text-white rounded-md px-3 py-2 flex items-center gap-1.5 shadow-sm">
+                  <span className="font-bold text-lg leading-none">{ratingValue}</span>
+                  <Star size={15} className="fill-white" />
+                </div>
+              ) : (
+                <div className="bg-slate-100 text-slate-600 rounded-md px-3 py-2 flex items-center shadow-sm">
+                  <span className="font-bold text-sm leading-none">New</span>
+                </div>
+              )}
               <div className="text-left sm:text-right">
                 <p className="text-sm lg:text-xs font-bold text-slate-800 uppercase tracking-wide">Dine-out rating</p>
-                <p className="text-slate-500 text-sm lg:text-xs font-medium">{reviewsCount} Reviews</p>
+                <p className="text-slate-500 text-sm lg:text-xs font-medium">
+                  {reviewsCount > 0 ? `${reviewsCount} Reviews` : "No reviews yet"}
+                </p>
               </div>
             </div>
           </div>
@@ -2063,7 +2074,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 className="flex gap-6 overflow-x-auto pb-6 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x scroll-smooth"
               >
                 {similarRestaurants.map((restaurant) => {
-                  const rating = Number(restaurant.rating || 4.2).toFixed(1);
+                  const reviewsCount = Number(restaurant.reviews_count) || 0;
+                  const parsedRating = Number(restaurant.rating);
+                  const hasRating =
+                    reviewsCount > 0 && Number.isFinite(parsedRating) && parsedRating > 0;
+                  const rating = hasRating ? parsedRating.toFixed(1) : null;
                   const cuisine = restaurant.cuisine || "Italian, Chinese, Continental";
                   const coverImg = resolveMediaUrl(restaurant.cover_image_url) || "";
                   const locality = restaurant.address ? restaurant.address.split(",")[0].trim() : "";
@@ -2102,10 +2117,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </h4>
 
                         <div className="flex items-center gap-1.5 mt-1.5">
-                          <span className="bg-emerald-700 text-white text-[0.625rem] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                            <span>{rating}</span>
-                            <span className="text-[0.5rem]">★</span>
-                          </span>
+                          {rating ? (
+                            <span className="bg-emerald-700 text-white text-[0.625rem] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                              <span>{rating}</span>
+                              <span className="text-[0.5rem]">★</span>
+                            </span>
+                          ) : (
+                            <span className="bg-slate-100 text-slate-600 text-[0.625rem] font-black px-1.5 py-0.5 rounded">
+                              New
+                            </span>
+                          )}
                           <span className="text-[0.5625rem] text-slate-400 font-bold tracking-wider uppercase">DINING</span>
                         </div>
 

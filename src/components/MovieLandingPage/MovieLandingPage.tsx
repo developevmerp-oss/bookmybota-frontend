@@ -28,7 +28,7 @@ import {
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useAppDispatch } from "@/lib/hooks";
-import { hasCityFilter, preferCityOrAll } from "@/components/LandingPage/homeUtils";
+import { hasCityFilter, preferCityOrAll, shouldShowShowcaseCards } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
 import ListingPromoSlider, {
   useListingPromoCampaigns,
@@ -915,12 +915,13 @@ export default function MovieLandingPage() {
   const hasActiveFilters =
     selectedLanguages.length > 0 || selectedGenres.length > 0 || selectedFormats.length > 0;
 
-  const useStaticMovies =
+  // City → global (preferCityOrAll) → showcase when both empty (even with city selected)
+  const useStaticMovies = shouldShowShowcaseCards(
     !isLoading &&
-    !hasActiveFilters &&
-    !hasCity &&
-    nowShowingSource.length === 0 &&
-    comingSoonSource.length === 0;
+      !hasActiveFilters &&
+      nowShowingSource.length === 0 &&
+      comingSoonSource.length === 0
+  );
 
   const movies = useStaticMovies
     ? SHOWCASE_NOW_SHOWING_MOVIE_CARDS.map(mapShowcaseMovieToCard)

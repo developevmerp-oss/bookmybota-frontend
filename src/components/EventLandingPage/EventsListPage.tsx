@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type ReactNode,
-  type RefObject,
   type TransitionEvent,
 } from "react";
 import { motion } from "motion/react";
@@ -49,9 +48,8 @@ import {
   preferCityOrAll,
 } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
-import ListingPromoSlider, {
-  useListingPromoCampaigns,
-} from "@/components/LandingPage/ListingPromoSlider";
+import { RailPagerNav } from "@/components/LandingPage/RailChrome";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import {
   EVENT_CATEGORY_OPTIONS,
   categorySlugsMatch,
@@ -547,6 +545,50 @@ function RecommendCard({ event, cityLabel }: { event: PublicEvent; cityLabel?: s
   );
 }
 
+/** Static fallback for Top recommended only — same layout as RecommendCard. */
+function RecommendShowcaseCard({
+  title,
+  image,
+  showDate,
+  place,
+  href,
+}: {
+  title: string;
+  image: string;
+  showDate?: string;
+  place?: string;
+  href: string;
+}) {
+  const dateLine = formatEventDateLine(showDate);
+
+  return (
+    <Link
+      href={href}
+      className="group shrink-0 w-[48vw] sm:w-[200px] md:w-[220px] lg:w-[240px] 2xl:w-[240px] snap-start rounded-2xl transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5"
+    >
+      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-100 shadow-[0_1px_3px_rgba(17,17,17,0.06)] group-hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] transition-shadow duration-300">
+        <SafeCoverImage
+          src={image}
+          alt={title}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+          fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+          fallback={<EventImageFallback size={32} />}
+        />
+      </div>
+      <div className="mt-2 space-y-0.5">
+        {place ? (
+          <p className="flex items-center gap-1 text-sm font-semibold text-slate-600 line-clamp-1">
+            <MapPin className="shrink-0 text-[#6900AA]" size={13} strokeWidth={2} />
+            <span className="truncate">{place}</span>
+          </p>
+        ) : null}
+        <h3 className="text-sm sm:text-lg font-bold text-slate-900 line-clamp-1">{title}</h3>
+        {dateLine ? <p className="text-sm font-semibold text-slate-500 line-clamp-1">{dateLine}</p> : null}
+      </div>
+    </Link>
+  );
+}
+
 function ArtistChip({ artist }: { artist: PublicRegisteredPartner }) {
   const img = artist.cover_image_url?.trim()
     ? resolveMediaUrl(artist.cover_image_url.trim())
@@ -570,12 +612,6 @@ function ArtistChip({ artist }: { artist: PublicRegisteredPartner }) {
       </span>
     </Link>
   );
-}
-
-function scrollRow(ref: RefObject<HTMLDivElement | null>, dir: 1 | -1) {
-  const el = ref.current;
-  if (!el) return;
-  el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.75, 420), behavior: "smooth" });
 }
 
 export default function PublicEventsPage() {
@@ -630,7 +666,6 @@ export default function PublicEventsPage() {
   const [promoDesktopAutoplay, setPromoDesktopAutoplay] = useState(false);
   const mobilePromoTrackRef = useRef<HTMLDivElement>(null);
   const [offerHeroEvents, setOfferHeroEvents] = useState<PublicEvent[]>([]);
-  const [recPage, setRecPage] = useState(0);
 
   const recommendRef = useRef<HTMLDivElement>(null);
   const artistsRef = useRef<HTMLDivElement>(null);
@@ -1011,7 +1046,6 @@ export default function PublicEventsPage() {
   });
   const allPublicEvents = allPublicEventsData ?? EMPTY_EVENTS;
   const hasCity = hasCityFilter(city);
-  const { hasCampaigns: hasEventPromoCampaigns } = useListingPromoCampaigns("EVENTS", city);
 
   /** Listing cards: city-first with same-filter all-city fallback (landing PreferCityOrAll). */
   const listingEvents = preferCityOrAll(events, allPublicEvents, hasCity);
@@ -1299,6 +1333,9 @@ export default function PublicEventsPage() {
     ? CATEGORY_BROWSE_HEADING[activeCategoryKey]
     : "All Events";
 
+  /** Selected city has zero events — show under event section titles (listing + category browse). */
+  const cityHasNoEvents = hasCity && !isLoading && events.length === 0;
+
   /** District-style hero: city-scoped is_promoted first (landing parity — no cross-city filler). */
   const promoEvents = useMemo(() => {
     const filterByCategory = (pool: PublicEvent[]) => {
@@ -1416,6 +1453,29 @@ export default function PublicEventsPage() {
     setMobilePromoIndex(best);
   }, []);
 
+  const centerMobilePromoCard = useCallback(
+    (index = 0, behavior: ScrollBehavior = "auto") => {
+      const el = mobilePromoTrackRef.current;
+      if (!el) return;
+      const cards = el.querySelectorAll<HTMLElement>("[data-promo-card]");
+      const card = cards[index];
+      if (!card) return;
+      const left =
+        card.offsetLeft - Math.max(0, (el.clientWidth - card.offsetWidth) / 2);
+      el.scrollTo({ left, behavior });
+      setMobilePromoIndex(index);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (promoEvents.length < 2) return;
+    const frame = window.requestAnimationFrame(() => {
+      centerMobilePromoCard(0, "auto");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [promoEventsKey, promoEvents.length, centerMobilePromoCard]);
+
   const goNextPromo = () => setHeroSlideIndex((i) => i + 1);
   const goPrevPromo = () => {
     if (promoEvents.length <= 1) return;
@@ -1452,18 +1512,13 @@ export default function PublicEventsPage() {
     return pool.slice(0, 15);
   }, [listingEvents, posterFallbackEvents]);
 
-  const eventsById = useMemo(() => {
-    const map = new Map<string, PublicEvent>();
-    for (const e of listingEvents) map.set(String(e.id), e);
-    for (const e of exploreEventPool) map.set(String(e.id), e);
-    return map;
-  }, [listingEvents, exploreEventPool]);
-
-  const recPages = Math.max(1, Math.ceil(recommendedEvents.length / 5));
-
-  useEffect(() => {
-    setRecPage(0);
-  }, [recommendedEvents]);
+  const recommendSlideCount =
+    recommendedEvents.length > 0 ? recommendedEvents.length : emptyShowcaseCards.slice(0, 8).length;
+  const recommendScrollEdges = useHorizontalScrollEdges(recommendRef, [
+    recommendSlideCount,
+    isLoading,
+  ]);
+  const artistsScrollEdges = useHorizontalScrollEdges(artistsRef, [artists.length]);
 
   const onExploreCategory = (key: string) => {
     const slug = resolveCategorySlug(key, categoryPool);
@@ -2014,9 +2069,14 @@ export default function PublicEventsPage() {
     >
       <div className={CONTAINER}>
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4 sm:mb-5">
-          <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
-            {browseHeading}
-          </h2>
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+              {browseHeading}
+            </h2>
+            {cityHasNoEvents ? (
+              <CitySectionEmptyNotice message="No events available in your city yet." />
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -2127,12 +2187,9 @@ export default function PublicEventsPage() {
             </div>
           ) : hasCity && listingEvents.length === 0 ? (
             <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-center">
-                <CitySectionEmptyNotice message="No events available in your city yet." />
-                <p className="mt-2 text-sm text-slate-500">
-                  Showing highlights while we wait for events in your city.
-                </p>
-              </div>
+              <p className="text-sm text-slate-500 text-center sm:text-left">
+                Showing highlights while we wait for events in your city.
+              </p>
               <div className="mx-auto grid w-full grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
                 {emptyShowcaseCards.map((event) => (
                   <ShowcaseEventPosterCard
@@ -2209,13 +2266,10 @@ export default function PublicEventsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {hasEventPromoCampaigns ? (
-        <ListingPromoSlider category="EVENTS" city={city} eventsById={eventsById} />
-      ) : null}
-
-      {!hasEventPromoCampaigns && activeHeroEvent ? (
+      {/* Movie-style native hero (mobile feature cards + desktop blur banner) */}
+      {activeHeroEvent ? (
         <>
-          {/* Mobile + tablet — featured cards (scroll-snap, no autoplay) */}
+          {/* Mobile + tablet — featured cards (centered active + side peeks) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
             <div className="mb-3 px-5 sm:px-8 md:mb-4">
               <h2 className="text-lg font-extrabold text-[#111111] sm:text-xl">
@@ -2224,18 +2278,26 @@ export default function PublicEventsPage() {
             </div>
             <div
               ref={mobilePromoTrackRef}
-              className="flex snap-x snap-mandatory items-center gap-3 overflow-x-auto scroll-smooth pb-1 pl-[max(1rem,calc((100vw-min(78vw,20rem))/2))] pr-[max(1rem,calc((100vw-min(78vw,20rem))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-4 md:pl-[max(1.5rem,calc((100vw-min(52vw,21.25rem))/2))] md:pr-[max(1.5rem,calc((100vw-min(52vw,21.25rem))/2))]"
-              onScroll={syncMobilePromoIndex}
+              className={`flex snap-x snap-mandatory items-center overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                promoEvents.length > 1
+                  ? "gap-3 md:gap-4 px-[max(0.75rem,calc((100%-min(72vw,18.5rem))/2))] md:px-[max(1.25rem,calc((100%-min(46vw,21rem))/2))]"
+                  : "justify-center px-5 sm:px-8"
+              }`}
+              onScroll={promoEvents.length > 1 ? syncMobilePromoIndex : undefined}
             >
               {promoEvents.map((event, slideIdx) => (
                 <div
                   key={event.id}
                   data-promo-card
-                  className="w-[min(78vw,20rem)] shrink-0 snap-center md:w-[min(52vw,21.25rem)]"
+                  className={`shrink-0 snap-center ${
+                    promoEvents.length > 1
+                      ? "w-[min(72vw,18.5rem)] md:w-[min(46vw,21rem)]"
+                      : "w-[min(78vw,20rem)] md:w-[min(52vw,21.25rem)]"
+                  }`}
                 >
                   <PromoFeatureCard
                     event={event}
-                    active={slideIdx === mobilePromoIndex}
+                    active={promoEvents.length <= 1 || slideIdx === mobilePromoIndex}
                   />
                 </div>
               ))}
@@ -2309,12 +2371,17 @@ export default function PublicEventsPage() {
                     <div
                       className={`relative mx-auto w-full container px-5 sm:px-10  lg:px-10  2xl:px-0 py-10 xl:py-12 ${
                         promoEvents.length > 1
-                          ? "px-14 xl:px-16 2xl:px-20 pb-14"
-                          : "px-10 xl:px-12 2xl:px-16"
+                          ? "px-14 2xl:px-0 pb-14"
+                          : "2xl:px-0"
                       }`}
                     >
                       <div className="flex items-center gap-8 lg:gap-8 2xl:gap-5">
                         <div className="min-w-0 flex-1 text-slate-900">
+                        {event.is_promoted ? (
+                            <p className="mb-2 inline-flex items-center rounded-md bg-[#6900AA]/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[#6900AA]">
+                              Promoted
+                            </p>
+                          ) : null}
                           {formatPromoDateTime(event.next_showtime) ? (
                             <p className="text-sm md:text-base font-medium text-slate-600">
                               {formatPromoDateTime(event.next_showtime)}
@@ -2323,11 +2390,7 @@ export default function PublicEventsPage() {
                           <h1 className="mt-2 text-2xl md:text-3xl xl:text-4xl font-extrabold leading-tight line-clamp-3">
                             {event.name}
                           </h1>
-                          {event.is_promoted ? (
-                            <p className="mt-2 inline-flex items-center rounded-md bg-[#6900AA]/10 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[#6900AA]">
-                              Promoted
-                            </p>
-                          ) : null}
+                          
                           {eventPlaceLine(event, city || undefined) ? (
                             <p className="mt-2 text-base md:text-lg font-medium text-slate-700 line-clamp-2">
                               {eventPlaceLine(event, city || undefined)}
@@ -2391,15 +2454,20 @@ export default function PublicEventsPage() {
           {exploreCategoriesWithEvents.length > 0 ? (
             <section className="pt-8 sm:pt-10 pb-3 bg-white">
               <div className={CONTAINER}>
-                <motion.h2
-                  className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800 pb-4"
-                  initial={{ opacity: 0, y: 12 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.6 }}
-                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  Explore Events
-                </motion.h2>
+                <div className="min-w-0 pb-4">
+                  <motion.h2
+                    className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800"
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    Explore Events
+                  </motion.h2>
+                  {cityHasNoEvents ? (
+                    <CitySectionEmptyNotice message="No events available in your city yet." />
+                  ) : null}
+                </div>
                 <motion.div
                   className="flex gap-4 sm:gap-5 overflow-x-auto px-1 pt-5 pb-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   initial="hidden"
@@ -2506,30 +2574,10 @@ export default function PublicEventsPage() {
                       ? `Top recommended events in ${headingCity}`
                       : "Top recommended events"}
                   </h2>
-                  {hasCity && !isLoading && events.length === 0 ? (
+                  {cityHasNoEvents ? (
                     <CitySectionEmptyNotice message="No events available in your city yet." />
                   ) : null}
                 </div>
-                {recommendedEvents.length > 0 ? (
-                  <div className="hidden sm:flex gap-2">
-                    <button
-                      type="button"
-                      aria-label="Scroll recommendations left"
-                      onClick={() => scrollRow(recommendRef, -1)}
-                      className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
-                    >
-                      <FaChevronLeft size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Scroll recommendations right"
-                      onClick={() => scrollRow(recommendRef, 1)}
-                      className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
-                    >
-                      <FaChevronRight size={12} />
-                    </button>
-                  </div>
-                ) : null}
               </div>
               {recommendedEvents.length > 0 ? (
                 <>
@@ -2541,41 +2589,55 @@ export default function PublicEventsPage() {
                       <RecommendCard key={event.id} event={event} cityLabel={city || undefined} />
                     ))}
                   </div>
-                  {recommendedEvents.length > 5 ? (
-                    <div className="mt-4 flex justify-center gap-1.5">
-                      {Array.from({ length: recPages }, (_, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          aria-label={`Recommendations page ${i + 1}`}
-                          onClick={() => {
-                            setRecPage(i);
-                            const el = recommendRef.current;
-                            if (!el) return;
-                            el.scrollTo({ left: i * el.clientWidth * 0.85, behavior: "smooth" });
-                          }}
-                          className={`h-1.5 rounded-full cursor-pointer transition-all ${
-                            i === recPage ? "w-5 bg-[#6900AA]" : "w-1.5 bg-slate-300"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+                  <RailPagerNav
+                    canPrev={recommendScrollEdges.left}
+                    canNext={recommendScrollEdges.right}
+                    pageCount={recommendScrollEdges.pageCount}
+                    activePage={recommendScrollEdges.activePage}
+                    onPrev={() => {
+                      const el = recommendRef.current;
+                      if (el) scrollRailBy(el, -1);
+                    }}
+                    onNext={() => {
+                      const el = recommendRef.current;
+                      if (el) scrollRailBy(el, 1);
+                    }}
+                    label="recommended events"
+                  />
                 </>
               ) : (
-                <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {emptyShowcaseCards.slice(0, 8).map((event) => (
-                    <ShowcaseEventPosterCard
-                      key={`rec-showcase-${event.id}`}
-                      title={event.title}
-                      image={event.image}
-                      showDate={event.showDate}
-                      place={event.place}
-                      eventType={event.eventType}
-                      href={event.href}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div
+                    ref={recommendRef}
+                    className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {emptyShowcaseCards.slice(0, 8).map((event) => (
+                      <RecommendShowcaseCard
+                        key={`rec-showcase-${event.id}`}
+                        title={event.title}
+                        image={event.image}
+                        showDate={event.showDate}
+                        place={event.place}
+                        href={event.href}
+                      />
+                    ))}
+                  </div>
+                  <RailPagerNav
+                    canPrev={recommendScrollEdges.left}
+                    canNext={recommendScrollEdges.right}
+                    pageCount={recommendScrollEdges.pageCount}
+                    activePage={recommendScrollEdges.activePage}
+                    onPrev={() => {
+                      const el = recommendRef.current;
+                      if (el) scrollRailBy(el, -1);
+                    }}
+                    onNext={() => {
+                      const el = recommendRef.current;
+                      if (el) scrollRailBy(el, 1);
+                    }}
+                    label="recommended events"
+                  />
+                </>
               )}
             </div>
           </section>
@@ -2587,37 +2649,33 @@ export default function PublicEventsPage() {
                 <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
                   {city ? `Artists in ${headingCity}` : "Artists in your District"}
                 </h2>
-                <div
-                  className={`flex gap-2 ${artists.length > 0 ? "" : "invisible"}`}
-                  aria-hidden={artists.length === 0}
-                >
-                  <button
-                    type="button"
-                    aria-label="Scroll artists left"
-                    onClick={() => scrollRow(artistsRef, -1)}
-                    className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
-                  >
-                    <FaChevronLeft size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Scroll artists right"
-                    onClick={() => scrollRow(artistsRef, 1)}
-                    className="size-9 rounded-full border border-slate-200 bg-white text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"
-                  >
-                    <FaChevronRight size={12} />
-                  </button>
-                </div>
               </div>
               {artists.length > 0 ? (
-                <div
-                  ref={artistsRef}
-                  className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                >
-                  {artists.map((artist) => (
-                    <ArtistChip key={artist.id} artist={artist} />
-                  ))}
-                </div>
+                <>
+                  <div
+                    ref={artistsRef}
+                    className="flex gap-4 sm:gap-5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {artists.map((artist) => (
+                      <ArtistChip key={artist.id} artist={artist} />
+                    ))}
+                  </div>
+                  <RailPagerNav
+                    canPrev={artistsScrollEdges.left}
+                    canNext={artistsScrollEdges.right}
+                    pageCount={artistsScrollEdges.pageCount}
+                    activePage={artistsScrollEdges.activePage}
+                    onPrev={() => {
+                      const el = artistsRef.current;
+                      if (el) scrollRailBy(el, -1);
+                    }}
+                    onNext={() => {
+                      const el = artistsRef.current;
+                      if (el) scrollRailBy(el, 1);
+                    }}
+                    label="artists"
+                  />
+                </>
               ) : (
                 <p className="text-sm text-slate-500">
                   No artists listed yet.{" "}

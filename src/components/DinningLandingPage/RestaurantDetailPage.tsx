@@ -7,7 +7,7 @@ import {
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
   ChevronLeft, X, Navigation, User,
   Send, ShieldCheck, ArrowRight, Check, ChevronDown, Tag, CheckCheck,
-  Sun, Moon, Sunrise, FileText, BadgeCheck, Utensils
+  Sun, Moon, Sunrise, FileText, BadgeCheck, Utensils, Upload, PartyPopper,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -19,6 +19,7 @@ import { resolveMediaUrl } from '@/lib/mediaUrl';
 import { restaurantHref } from '@/lib/businessPublicPath';
 import SafeCoverImage, { DiningImageFallback } from '@/components/Shared/SafeCoverImage';
 import DiningWishlistButton from '@/components/DinningLandingPage/DiningWishlistButton';
+import AboutVenueModal from '@/components/DinningLandingPage/AboutVenueModal';
 import {
   bookingWidgetOfferLabel,
   businessHasCustomerVisibleOffer,
@@ -68,6 +69,25 @@ import {
   type DiningReviewFormValues,
 } from '@/lib/diningReviewFormSchema';
 import { extractApiError } from '@/lib/apiErrors';
+
+function FacilityDiamondIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 10 10"
+      width="10"
+      height="10"
+      className={className}
+      aria-hidden
+      fill="currentColor"
+    >
+      <circle cx="5" cy="1.2" r="1.15" />
+      <circle cx="1.2" cy="5" r="1.15" />
+      <circle cx="5" cy="5" r="1.15" />
+      <circle cx="8.8" cy="5" r="1.15" />
+      <circle cx="5" cy="8.8" r="1.15" />
+    </svg>
+  );
+}
 
 /** Same customer session the header Login button uses (token + user in localStorage). */
 function readCustomerSessionFromStorage() {
@@ -203,19 +223,19 @@ function VenuePhotosGallery({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
       {visibleUrls.slice(0, 3).map((url, idx) => {
         const showMoreOverlay = visibleUrls.length > 3 && idx === 2;
         return (
           <div
             key={url}
             onClick={() => onOpen(showMoreOverlay ? 0 : idx, visibleUrls)}
-            className="relative rounded-xl overflow-hidden h-40 bg-slate-100 border border-slate-100 hover:shadow-md transition-shadow cursor-pointer group"
+            className="relative aspect-[3/4] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 hover:shadow-md transition-shadow cursor-pointer group"
           >
             <img
               src={url}
               alt=""
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               onError={() => markBroken(url)}
             />
             {showMoreOverlay && (
@@ -761,6 +781,26 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [offersSectionOpen, setOffersSectionOpen] = useState(true);
   const [availabilityStatus, setAvailabilityStatus] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [venueInfoModal, setVenueInfoModal] = useState<"about" | "location" | "phone" | null>(null);
+  const [aboutDescOverflows, setAboutDescOverflows] = useState(false);
+  const aboutDescRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = aboutDescRef.current;
+    if (!el) {
+      setAboutDescOverflows(false);
+      return;
+    }
+    const update = () => setAboutDescOverflows(el.scrollHeight > el.clientHeight + 1);
+    update();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [profile?.description, profile?.id]);
 
   useEffect(() => {
     if (!hasAnyBookableOffer) {
@@ -794,6 +834,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [bookingPolicyFocus, setBookingPolicyFocus] = useState<DiningBookingPolicySection>("terms");
   const [bookingDropdownOpen, setBookingDropdownOpen] = useState<'date' | 'guests' | 'meal' | null>(null);
   const bookingFiltersRef = useRef<HTMLDivElement>(null);
+  const [reserveWidgetDropdown, setReserveWidgetDropdown] = useState<"date" | "guests" | null>(null);
+  const reserveWidgetRef = useRef<HTMLDivElement>(null);
 
   const [loginStep, setLoginStep] = useState(1); // 1: phone, 2: OTP, 3: register profile
   const [loginPhone, setLoginPhone] = useState('');
@@ -939,6 +981,24 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [bookingDropdownOpen]);
+
+  useEffect(() => {
+    if (!reserveWidgetDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (reserveWidgetRef.current && !reserveWidgetRef.current.contains(e.target as Node)) {
+        setReserveWidgetDropdown(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setReserveWidgetDropdown(null);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [reserveWidgetDropdown]);
 
   const handlePhoneLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1335,6 +1395,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     .split(",")
     .map((c) => c.trim())
     .filter(Boolean);
+  const aboutDescription =
+    profile.description?.trim() ||
+    "This venue has not provided a description yet. Enjoy a curated dining experience with premium seats, lovely ambiance, and delicious gourmet specialties.";
+  const aboutCostDisplay = profile?.average_cost
+    ? `${formatMoney(profile.average_cost, { compact: true })} for two`
+    : costText?.replace(/\s*\(approx\.\)\s*$/i, "") || costText;
+  const cuisineDisplay = cuisineList.join(", ");
 
   // Dynamic city & country parsing helper
   const parseAddressLocation = (address?: string) => {
@@ -1366,8 +1433,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     <div className="min-h-screen bg-white text-slate-700">
 
       {/* ── 1. Breadcrumbs ── */}
-      <div className="bg-white border-b border-slate-100 py-3">
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 text-xs font-semibold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+      <div className="bg-white pt-9">
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
           <Link href="/" className="hover:text-rose-600 transition-colors">
             Home
           </Link>
@@ -1376,132 +1443,75 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             Dining
           </Link>
           <ChevronRight size={10} />
-          <span className="text-slate-600 truncate max-w-[14rem] sm:max-w-none">{profile.name}</span>
+          <span className="text-slate-800 truncate max-w-[14rem] sm:max-w-none">{profile.name}</span>
         </div>
       </div>
 
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-2 pb-12 sm:pb-16">
-        {/* ── Restaurant header (Zomato: details + actions) ── */}
-        <div className="bg-white pt-2 mb-3">
-          {/* Row 1: title left · rating right */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-2 pb-12 sm:pb-16 py-5">
+        {/* ── Header: title + icon actions + rating ── */}
+        <div className="bg-white pt-2 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-3xl sm:text-4xl lg:text-[2.5rem] font-semibold text-slate-900 tracking-tight leading-tight">
-                  {profile.name}
-                </h1>
-                {profile.is_promoted ? (
-                  <span className="inline-flex items-center rounded-full bg-[#6900AA]/10 text-[#6900AA] border border-[#6900AA]/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                    Promoted
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-slate-600 text-lg sm:text-xl lg:text-base mt-1 font-medium">{cuisines}</p>
-              <p className="text-slate-500 text-base sm:text-lg lg:text-sm mt-1 flex items-center gap-1.5">
-                <MapPin size={13} className="text-[#6900AA] shrink-0" />
-                <span>{profile.address || 'Address hidden'}</span>
-              </p>
+              <h1 className="text-3xl sm:text-4xl lg:text-[2rem] font-semibold text-slate-900 tracking-wide leading-tight">
+                {profile.name}
+              </h1>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              {ratingValue ? (
-                <div className="bg-emerald-600 text-white rounded-md px-3 py-2 flex items-center gap-1.5 shadow-sm">
-                  <span className="font-bold text-lg leading-none">{ratingValue}</span>
-                  <Star size={15} className="fill-white" />
-                </div>
-              ) : (
-                <div className="bg-slate-100 text-slate-600 rounded-md px-3 py-2 flex items-center shadow-sm">
-                  <span className="font-bold text-sm leading-none">New</span>
-                </div>
-              )}
-              <div className="text-left sm:text-right">
-                <p className="text-sm lg:text-xs font-bold text-slate-800 uppercase tracking-wide">Dine-out rating</p>
-                <p className="text-slate-500 text-sm lg:text-xs font-medium">
-                  {reviewsCount > 0 ? `${reviewsCount} Reviews` : "No reviews yet"}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          {/* Row 2: open-time left · Direction / Share / Reviews / Book a Table right (same line) */}
-          <div className="mt-2 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base sm:text-lg lg:text-sm text-slate-500 min-w-0">
-                {isOpenNow ? (
-                  <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-emerald-600 font-semibold text-xs">
-                    Open now
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-0.5 text-rose-600 font-semibold text-xs">
-                    Closed
-                  </span>
-                )}
-                <span>{timingText}</span>
-                <span>·</span>
-                <span>{costText}</span>
-                {profile.phone && (
-                  <>
-                    <span>·</span>
-                    <a href={`tel:${profile.phone}`} className="text-[#6900AA] hover:underline inline-flex items-center gap-1">
-                      <Phone size={12} />
-                      {profile.phone}
-                    </a>
-                  </>
-                )}
-              </div>
-            <div className="flex flex-wrap items-center gap-2.5 shrink-0 lg:justify-end">
-            <button
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 self-start">
+              <DiningWishlistButton
+                businessId={String(profile.id)}
+                tone="neutral"
+                className="relative w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-70 shadow-none border-0"
+              />
+              <button
                 type="button"
-              onClick={() => {
-                if (profile.address) {
-                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`, '_blank', 'noopener,noreferrer');
-                }
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-            >
-              <Compass size={14} className="text-[#6900AA]" />
-              {copied ? "Copied!" : "Direction"}
-            </button>
-            <button
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({ title: profile.name, url: window.location.href });
+                  } else {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast.success("Link copied to clipboard!");
+                  }
+                }}
+                className="w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Share"
+              >
+                <Send size={17} className="text-[#292929]" strokeWidth={2.5} />
+              </button>
+              <button
                 type="button"
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({ title: profile.name, url: window.location.href });
-                } else {
+                onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
                   toast.success("Link copied to clipboard!");
-                }
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-            >
-              <Share2 size={14} className="text-[#6900AA]" />
-              Share
-            </button>
-            <button
-                type="button"
-                onClick={() => scrollToDetailSection("section-reviews", "Reviews")}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-slate-700 text-sm font-semibold border border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-            >
-              <MessageSquare size={14} className="text-[#6900AA]" />
-              Reviews
-            </button>
-            <button
-                type="button"
-              onClick={() => handleQuickBook()}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
-                activeTab === "Book a Table"
-                  ? "border-[#6900AA] text-[#6900AA] bg-[#f7e9ff]"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <Calendar size={14} className="text-[#6900AA]" />
-              Book a Table
-            </button>
-          </div>
+                }}
+                className="w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Copy link"
+              >
+                <Upload size={17} className="text-[#292929]" strokeWidth={2.5} />
+              </button>
+
+              {ratingValue ? (
+                <div className="flex items-center gap-1.5 pl-2 sm:pl-3">
+                  <Star size={18} className="fill-[#F5C518] text-[#F5C518] shrink-0" />
+                  <span className="font-bold text-slate-900 text-base sm:text-lg leading-none">
+                    {ratingValue}
+                  </span>
+                  <span className="text-slate-500 text-sm font-medium leading-none">
+                    ({reviewsCount})
+                  </span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 text-[0.75rem] font-bold ml-1">
+                  New
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* ── Gallery + sticky table reservation ── */}
         <div
-          className={`grid items-start gap-5 sm:gap-6 lg:gap-2 2xl:gap-10 ${
+          className={`grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${
             hideBookingSidebar ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
           }`}
         >
@@ -1576,6 +1586,41 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               })
               )}
             </div>
+
+            {/* Status bar under gallery — Open/Closed · hours | map | phone */}
+            <div className="relative mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 px-0.5">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+                {isOpenNow ? (
+                  <span className="inline-flex items-center text-emerald-600 font-semibold">
+                    Open now
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center text-red-600 font-semibold">
+                    Closed
+                  </span>
+                )}
+                <span className="text-slate-400">·</span>
+                <span className="text-slate-600">{timingText}</span>
+              </div>
+              <div className="relative flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setVenueInfoModal("location")}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
+                  aria-label="Show location"
+                >
+                  <MapPin size={16} className="text-[#292929]" strokeWidth={2.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVenueInfoModal("phone")}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
+                  aria-label="Show phone number"
+                >
+                  <Phone size={16} className="text-[#292929]" strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
           </div>
 
           {!hideBookingSidebar ? (
@@ -1589,86 +1634,173 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   <GuestTableAnimation count={Number(guests)} />
                 </div>
               ) : (
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden p-4">
-                  <div className="flex items-start gap-2.5 sm:gap-4">
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-wide uppercase leading-tight">
-                        Table reservation
-                      </h3>
-                      {widgetOfferLabel ? (
-                        <p className="mt-1 text-sm text-slate-800 font-semibold leading-snug flex flex-wrap items-center gap-x-0.5">
-                          {widgetOfferLabel.split(/(\d+%?\s*off|\d+\s*ETB\s*off)/i).map((part, idx) =>
-                            /\d/i.test(part) && /off/i.test(part) ? (
-                              <span key={idx} className="text-[#6900AA] font-bold">{part}</span>
-                            ) : (
-                              <span key={idx}>{part}</span>
-                            )
-                          )}
-                          <ChevronRight size={15} className="inline shrink-0 text-slate-800 ml-0.5" />
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-sm text-slate-600 font-medium leading-snug">
-                          Reserve a table at this venue
-                        </p>
-                      )}
-                    </div>
-                    <img
-                      src="/images/dining/tag-removebg-preview.png"
-                      alt=""
-                      className="w-12 h-12 sm:w-14 sm:h-12 object-contain shrink-0"
-                      aria-hidden
-                    />
-                  </div>
+                <div
+                  ref={reserveWidgetRef}
+                  className="bg-white rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)] overflow-visible p-4 sm:p-5"
+                >
+                  <h3 className="text-xl sm:text-[1.3rem] font-semibold text-slate-900 tracking-tight leading-tight">
+                    Reserve a Table
+                  </h3>
 
-                  <div className="mt-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="relative">
-                        <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6900AA] pointer-events-none z-[1]" />
-                        <select
-                          value={selectedDateIndex}
-                          onChange={(e) => handleDateSelect(Number(e.target.value))}
-                          className="w-full bg-white border border-slate-200 rounded-full pl-9 pr-8 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#6900AA]/40 appearance-none cursor-pointer"
-                        >
-                          {bookingDates.map((d, idx) => {
-                            let label = "";
-                            if (idx === 0) label = "Today";
-                            else if (idx === 1) label = "Tomorrow";
-                            else label = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-                            return (
-                              <option key={idx} value={idx}>
-                                {label}
-                              </option>
-                            );
-                          })}
-                        </select>
-                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  <div className="mt-4 space-y-3.5">
+                    {/* {visibleOffers[0] ? (
+                      <div className="rounded-xl border border-[#6900AA]/20 bg-[#f7e9ff] px-3 py-2.5 flex items-start gap-2.5">
+                        <PartyPopper size={16} className="text-[#6900AA] shrink-0 mt-0.5" strokeWidth={2.25} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-[#6900AA] leading-snug">
+                            {formatDiningOfferDiscount(visibleOffers[0])}
+                            {visibleOffers.length > 1
+                              ? ` · +${visibleOffers.length - 1} more offer${visibleOffers.length > 2 ? "s" : ""}`
+                              : ""}
+                          </p>
+                        </div>
                       </div>
+                    ) : null} */}
 
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-1.5">
+                        Date
+                      </label>
                       <div className="relative">
-                        <Users size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6900AA] pointer-events-none z-[1]" />
-                        <select
-                          value={guests}
-                          onChange={(e) => { setGuests(e.target.value); setAvailabilityStatus(null); }}
-                          className="w-full bg-white border border-slate-200 rounded-full pl-9 pr-8 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#6900AA]/40 appearance-none cursor-pointer"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReserveWidgetDropdown((prev) => (prev === "date" ? null : "date"))
+                          }
+                          className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-9 py-2.5 text-sm font-semibold text-[#292929] text-left focus:outline-none focus:border-slate-300 cursor-pointer"
+                          aria-haspopup="listbox"
+                          aria-expanded={reserveWidgetDropdown === "date"}
                         >
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                            <option key={num} value={num}>
-                              {num} {num === 1 ? 'guest' : 'guests'}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                          {(() => {
+                            const d = bookingDates[selectedDateIndex];
+                            const datePart = d.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            });
+                            if (selectedDateIndex === 0) return `Today, ${datePart}`;
+                            if (selectedDateIndex === 1) return `Tomorrow, ${datePart}`;
+                            return `${d.toLocaleDateString("en-US", { weekday: "short" })}, ${datePart}`;
+                          })()}
+                        </button>
+                        <Calendar size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#292929] pointer-events-none z-[1]" strokeWidth={2.5} />
+                        <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#292929] pointer-events-none" strokeWidth={2.5} />
+
+                        {reserveWidgetDropdown === "date" ? (
+                          <ul
+                            role="listbox"
+                            className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto border border-slate-500 bg-white shadow-md"
+                          >
+                            {bookingDates.map((d, idx) => {
+                              const datePart = d.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              });
+                              let label = datePart;
+                              if (idx === 0) label = `Today, ${datePart}`;
+                              else if (idx === 1) label = `Tomorrow, ${datePart}`;
+                              else label = `${d.toLocaleDateString("en-US", { weekday: "short" })}, ${datePart}`;
+                              const selected = selectedDateIndex === idx;
+                              return (
+                                <li key={idx} role="option" aria-selected={selected}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleDateSelect(idx);
+                                      setReserveWidgetDropdown(null);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${
+                                      selected
+                                        ? "bg-[#2563EB] text-white"
+                                        : "bg-white text-[#292929] hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {label}
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-1.5">
+                        Guests
+                      </label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReserveWidgetDropdown((prev) => (prev === "guests" ? null : "guests"))
+                          }
+                          className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-9 py-2.5 text-sm font-semibold text-[#292929] text-left focus:outline-none focus:border-slate-300 cursor-pointer"
+                          aria-haspopup="listbox"
+                          aria-expanded={reserveWidgetDropdown === "guests"}
+                        >
+                          {Number(guests)} {Number(guests) === 1 ? "Guest" : "Guests"}
+                        </button>
+                        <Users size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#292929] pointer-events-none z-[1]" strokeWidth={2.5} />
+                        <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#292929] pointer-events-none" strokeWidth={2.5} />
+
+                        {reserveWidgetDropdown === "guests" ? (
+                          <ul
+                            role="listbox"
+                            className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto border border-slate-500 bg-white shadow-md"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                              const selected = Number(guests) === num;
+                              return (
+                                <li key={num} role="option" aria-selected={selected}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setGuests(String(num));
+                                      setAvailabilityStatus(null);
+                                      setReserveWidgetDropdown(null);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm font-medium cursor-pointer ${
+                                      selected
+                                        ? "bg-[#2563EB] text-white"
+                                        : "bg-white text-[#292929] hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {num} {num === 1 ? "Guest" : "Guests"}
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
                       </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleQuickBook()}
-                      className="w-full rounded-full border border-[#6900AA] bg-[#efd7ff] text-[#6900AA] py-2.5 px-4 text-sm sm:text-base font-bold transition-all cursor-pointer flex items-center justify-center gap-1 hover:bg-[#efd7ff]"
+                      className="w-full rounded-xl bg-[#111111] text-white py-3 px-4 text-sm sm:text-[1rem] font-bold transition-colors cursor-pointer hover:bg-black"
                     >
-                      Book a table
-                      <ChevronRight size={16} className="shrink-0" />
+                      Book a Table
                     </button>
+
+                    {costText ? (
+                      <div className="border-t border-slate-100 pt-3 space-y-2">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-xs text-slate-400">Average cost for two</span>
+                          <span className="text-sm font-bold text-slate-900 text-right">
+                            {profile?.average_cost
+                              ? `${formatMoney(profile.average_cost, { compact: true })} (approx.)`
+                              : costText}
+                          </span>
+                        </div>
+                        {/* <p className="text-[11px] text-slate-400 leading-snug flex items-start gap-1.5">
+                          <AlertCircle size={12} className="shrink-0 mt-0.5" strokeWidth={2.25} />
+                          Exclusive of applicable taxes and charges
+                        </p> */}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -1677,7 +1809,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
           <div className="min-w-0 order-3">
             {/* ── Sticky tabs (under gallery, left column) ── */}
-            <div ref={tabsSentinelRef} className="h-0 mt-6" aria-hidden />
+            <div ref={tabsSentinelRef} className="h-0 mt-1" aria-hidden />
             <div
               id="restaurant-tabs"
               className={`sticky z-40 bg-white border-b border-slate-200 ${
@@ -1691,7 +1823,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     key={tab.id}
                     type="button"
                     onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                    className={`py-3.5 text-base sm:text-lg lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`py-3 text-base sm:text-lg lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                       activeTab === tab.id
                         ? "border-[#6900AA] text-[#6900AA] font-bold"
                         : "border-transparent text-slate-400 hover:text-slate-600"
@@ -1705,50 +1837,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
             <div
               id="tab-panel-start"
-              className="space-y-8 pt-8 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+              className="space-y-4 pt-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
             >
 
             {/* Single-page Overview with scroll-spy sections (District-style) */}
             {activeTab !== "Book a Table" && (
-              <div className="space-y-8">
+              <div className="space-y-4">
 
-                {/* Overview first — About the Venue (+ offers if any) */}
-                <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-8">
-                  {/* About Venue & Average Cost */}
-                  <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-3">About the Venue</h3>
-                    <p className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap">
-                      {profile.description || 'This venue has not provided a description yet. Enjoy a curated dining experience with premium seats, lovely ambiance, and delicious gourmet specialties.'}
-                    </p>
-
-                    <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-1">Average Cost</h4>
-                    <p className="text-base sm:text-lg lg:text-sm text-slate-600 font-medium">{costText}</p>
-                    <p className="text-base  lg:text-sm text-slate-400 mt-1">Exclusive of applicable taxes and charges, if any</p>
-
-                    {profile.amenities && profile.amenities.length > 0 && (
-                      <>
-                        <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-6 mb-3">More Info</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
-                          {profile.amenities.map((info: string) => (
-                            <div key={info} className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600">
-                              <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                                <Check size={10} strokeWidth={3} />
-                              </span>
-                              <span>{info}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </section>
-
+                {/* Overview — Dining Offers above About */}
+                <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-4 pb-5">
                   {visibleOffers.length > 0 && (
-                <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
+                <section className="bg-white p-0 sm:p-0">
                   <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Dining Offers</h3>
                   {visibleOffers.length > 1 && (
-                    <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-4">Tap on any offer to know more</p>
+                    <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-3">Tap on any offer to know more</p>
                   )}
-                  {visibleOffers.length <= 1 && <div className="mb-4" />}
+                  {visibleOffers.length <= 1 && <div className="mb-3" />}
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                       {visibleOffers.map((offer, idx) => {
                         const isFeatured = idx === 0;
@@ -1805,14 +1909,71 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </div>
                 </section>
                   )}
+
+                  {/* About Venue — Cost + Cuisines */}
+                  <section className="bg-white p-0 sm:py-7">
+                    <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800 mb-2">
+                      About the restaurant
+                    </h3>
+                    <div className="min-w-0">
+                      <p
+                        ref={aboutDescRef}
+                        className="text-slate-500 text-base sm:text-lg lg:text-sm leading-relaxed whitespace-pre-wrap line-clamp-2"
+                      >
+                        {aboutDescription}
+                      </p>
+                      {aboutDescOverflows ? (
+                        <button
+                          type="button"
+                          onClick={() => setVenueInfoModal("about")}
+                          className="mt-1.5 inline-flex items-center text-sm font-bold text-[#111111] cursor-pointer hover:underline"
+                        >
+                          See more
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {aboutCostDisplay ? (
+                      <div className="mt-5">
+                        <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cost</h4>
+                        <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{aboutCostDisplay}</p>
+                      </div>
+                    ) : null}
+
+                    {cuisineDisplay ? (
+                      <div className="mt-5">
+                        <h4 className="text-base sm:text-lg lg:text-base font-bold text-zinc-800">Cuisines</h4>
+                        <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500">{cuisineDisplay}</p>
+                      </div>
+                    ) : null}
+
+                    {profile.amenities && profile.amenities.length > 0 && (
+                      <>
+                        <h4 className="text-lg sm:text-xl lg:text-base font-bold text-zinc-800 mt-5 mb-3">
+                          Available Facilities
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 space-y-2 ">
+                          {profile.amenities.map((info: string) => (
+                            <div
+                              key={info}
+                              className="flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-600"
+                            >
+                              <FacilityDiamondIcon className="text-[#292929] shrink-0" />
+                              <span>{info}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </section>
                 </div>
 
-                {/* Menu — bordered card, cuisine pills, stack preview → lightbox */}
+                {/* Menu — stack preview → lightbox */}
                 <section
                   id="section-menu"
-                  className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+                  className="bg-white p-0 sm:p-0 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
                 >
-                  <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center justify-between gap-3 mb-3">
                     <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Menu</h3>
                     {venueMenuImages.length > 0 && (
                       <button
@@ -1823,20 +1984,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         See all menus <ChevronRight size={16} />
                       </button>
                     )}
-                  </div>
-
-                  <h4 className="text-sm font-semibold text-[#9a7b2f] mb-2.5">Cuisines</h4>
-                  <div className="flex flex-wrap gap-2 mb-5">
-                    {cuisineList.map((c) => (
-                      <span
-                        key={c}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-[#e8d9a8] text-[#9a7b2f] text-sm font-medium"
-                      >
-                        <span className="text-[0.625rem] leading-none" aria-hidden>✦</span>
-                        {c}
-                        <span className="text-[0.625rem] leading-none" aria-hidden>✦</span>
-                      </span>
-                    ))}
                   </div>
 
                   {venueMenuImages.length > 0 ? (
@@ -1855,9 +2002,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {/* Photos Gallery — max 3; 3rd gets “View all photos” overlay when more exist */}
                 <section
                   id="section-photos"
-                  className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+                  className="bg-white  scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
                 >
-                  <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-5">Photos Gallery</h3>
+                  <h3 className="text-xl sm:text-2xl lg:text-lg font-bold text-slate-800 mb-3">Photos Gallery</h3>
                   <VenuePhotosGallery
                     urls={venueGalleryPhotos}
                     onOpen={(index, items) => openLightbox(index, items)}
@@ -1867,11 +2014,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 {/* Reviews — same UI as before, shown in Overview scroll */}
                 <div
                   id="section-reviews"
-                  className="space-y-6 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+                  className="space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] py-7"
                 >
                 {/* Write Review Form — gated like movies: login + booking + visit ended */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-4">Write a Review</h3>
+                <section className="bg-white  py-7">
+                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-3">Write a Review</h3>
                   {!isCustomerLoggedIn ? (
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm text-slate-600">
@@ -1959,11 +2106,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 </section>
 
                 {/* Review Feed */}
-                <section className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-5 divide-y divide-slate-100">
+                <section className="bg-white p-0 sm:p-0 space-y-4 divide-y divide-slate-100">
                   <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
                   {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one after your visit!</p>}
                   {reviews.map((rev: any, idx: number) => (
-                    <div key={rev.id} className={`${idx > 0 ? "pt-5" : ""} flex gap-3`}>
+                    <div key={rev.id} className={`${idx > 0 ? "pt-4" : ""} flex gap-3`}>
                       <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 text-slate-500 font-bold text-xs flex items-center justify-center border border-slate-200">
                         {(rev.user_name || '?').charAt(0).toUpperCase()}
                       </div>
@@ -2029,8 +2176,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
           {/* Similar Restaurants Horizontal Shelf */}
           {similarRestaurants.length > 0 && (
-            <div className="mt-12 pt-10 border-t border-slate-200 animate-fadeIn">
-              <div className="flex items-center justify-between mb-6">
+            <div className="mt-8 pt-6 border-t border-slate-200 animate-fadeIn">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-2xl sm:text-3xl lg:text-xl font-extrabold text-slate-800 tracking-tight">
                     {(() => {
@@ -3371,6 +3518,17 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           open={bookingPolicyOpen}
           focusSection={bookingPolicyFocus}
           onClose={() => setBookingPolicyOpen(false)}
+        />
+
+        <AboutVenueModal
+          open={venueInfoModal != null}
+          mode={venueInfoModal || "about"}
+          onClose={() => setVenueInfoModal(null)}
+          name={profile.name}
+          coverSrc={photos[0] || resolveMediaUrl(profile.cover_image_url) || ""}
+          description={aboutDescription}
+          address={profile.address}
+          phone={profile.phone}
         />
       </div>
       );

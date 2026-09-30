@@ -20,12 +20,21 @@ import {
 type Props = {
   businessId: string;
   className?: string;
+  /** `glass` = frosted white circle + light heart (Option 2 card on media). */
+  appearance?: "default" | "glass";
+  /** `neutral` = #292929 heart (dining detail header). */
+  tone?: "default" | "neutral";
 };
 
 /** Avoid every card on a grid firing guest→account sync at once */
 let guestWishlistSyncStarted = false;
 
-export default function DiningWishlistButton({ businessId, className }: Props) {
+export default function DiningWishlistButton({
+  businessId,
+  className,
+  appearance = "default",
+  tone = "default",
+}: Props) {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
   const isCustomer = authUser?.role === "customer";
@@ -105,6 +114,24 @@ export default function DiningWishlistButton({ businessId, className }: Props) {
     [businessId, isCustomer, saved, toggleWishlist]
   );
 
+  const defaultClass =
+    appearance === "glass"
+      ? "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white/35 backdrop-blur-md border border-white/50 shadow-sm flex items-center justify-center hover:bg-white/50 transition-colors cursor-pointer disabled:opacity-70"
+      : "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70";
+
+  const heartClass =
+    appearance === "glass"
+      ? saved
+        ? "fill-white text-white"
+        : "fill-none text-white"
+      : tone === "neutral"
+        ? saved
+          ? "fill-[#292929] text-[#292929]"
+          : "fill-none text-[#292929]"
+        : saved
+          ? "fill-[#E11D48] text-[#E11D48]"
+          : "fill-none text-[#B41739]";
+
   return (
     <>
       <button
@@ -113,19 +140,21 @@ export default function DiningWishlistButton({ businessId, className }: Props) {
         disabled={toggling}
         aria-label={saved ? "Remove from favourites" : "Add to favourites"}
         aria-pressed={saved}
-        className={
-          className ||
-          "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
-        }
+        className={className || defaultClass}
       >
         {toggling ? (
-          <Loader2 size={16} className="animate-spin text-[#6900AA]" />
-        ) : (
-          <Heart
-            size={18}
-            className={saved ? "fill-[#E11D48] text-[#E11D48]" : "fill-none text-[#B41739]"}
-            strokeWidth={2.25}
+          <Loader2
+            size={16}
+            className={`animate-spin ${
+              appearance === "glass"
+                ? "text-white"
+                : tone === "neutral"
+                  ? "text-[#292929]"
+                  : "text-[#6900AA]"
+            }`}
           />
+        ) : (
+          <Heart size={18} className={heartClass} strokeWidth={2.5} />
         )}
       </button>
 

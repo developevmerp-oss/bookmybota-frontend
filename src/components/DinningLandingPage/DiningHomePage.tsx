@@ -25,6 +25,8 @@ import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNot
 import ListingPromoSlider, {
   diningToListingSlide,
 } from "@/components/LandingPage/ListingPromoSlider";
+import { RailPagerNav } from "@/components/LandingPage/RailChrome";
+import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -53,6 +55,9 @@ import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQ
 // import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
+import DiningCollectionsOption2 from "@/components/DinningLandingPage/DiningCollectionsOption2";
+import DiningOffersOption2 from "@/components/DinningLandingPage/DiningOffersOption2";
+import DiningRestaurantCardOption2 from "@/components/DinningLandingPage/DiningRestaurantCardOption2";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 import { useAppSelector } from "@/lib/hooks";
@@ -76,7 +81,6 @@ import {
   setOrDeleteParam,
   stableSearchParamsString,
 } from "@/lib/filterUrlSync";
-import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./DiningHomePage.css";
 import { promotionClickHref } from "@/lib/promotionCta";
 
@@ -858,6 +862,7 @@ function ShowcaseRestaurantCard({ place }: { place: ShowcaseDiningCard }) {
   );
 }
 
+/* ── Collections card UI Option One (title + places count, left-aligned) ── */
 function CollectionCard({
   collection,
   city,
@@ -1060,34 +1065,12 @@ export default function Home() {
   const cuisinesRef = useRef<HTMLDivElement>(null);
   const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
   const offersRef = useRef<HTMLDivElement>(null);
-  const [collectionsScroll, setCollectionsScroll] = useState({ left: false, right: false });
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
 
-  const updateCollectionsScroll = useCallback(() => {
-    const el = collectionsRef.current;
-    let next = { left: false, right: false };
-    if (el) {
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      const canOverflow = maxScroll > 2;
-      next = {
-        left: canOverflow && el.scrollLeft > 2,
-        right: canOverflow && el.scrollLeft < maxScroll - 2,
-      };
-    }
-    setCollectionsScroll((prev) =>
-      prev.left === next.left && prev.right === next.right ? prev : next
-    );
-  }, []);
-
   const scrollCollections = (direction: "left" | "right") => {
     if (!collectionsRef.current) return;
-    // Scroll by roughly one card (~1/5 of the row on desktop)
-    const amount = Math.max(collectionsRef.current.clientWidth * 0.2 + 16, 200);
-      collectionsRef.current.scrollBy({
-      left: direction === "left" ? -amount : amount,
-      behavior: "smooth",
-      });
+    scrollRailBy(collectionsRef.current, direction === "left" ? -1 : 1);
   };
 
   const scrollCuisines = (direction: "left" | "right") => {
@@ -1664,6 +1647,10 @@ export default function Home() {
     homeOfferCards.length,
     showHomeExtras,
   ]);
+  const collectionsScroll = useHorizontalScrollEdges(collectionsRef, [
+    collections.length,
+    showHomeExtras,
+  ]);
 
   useEffect(() => {
     const measureHeader = () => {
@@ -1698,29 +1685,6 @@ export default function Home() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [siteHeaderHeight]);
-
-  useEffect(() => {
-    if (!showHomeExtras) {
-      setCollectionsScroll((prev) =>
-        prev.left || prev.right ? { left: false, right: false } : prev
-      );
-      return;
-    }
-    const frame = requestAnimationFrame(() => updateCollectionsScroll());
-    const el = collectionsRef.current;
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => updateCollectionsScroll()) : null;
-    if (el) {
-      ro?.observe(el);
-      el.addEventListener("scroll", updateCollectionsScroll, { passive: true });
-    }
-    window.addEventListener("resize", updateCollectionsScroll);
-    return () => {
-      cancelAnimationFrame(frame);
-      ro?.disconnect();
-      el?.removeEventListener("scroll", updateCollectionsScroll);
-      window.removeEventListener("resize", updateCollectionsScroll);
-    };
-  }, [collections.length, showHomeExtras, updateCollectionsScroll]);
 
   const cityDisplay =
     locationCity && locationCity !== "All Cities" ? locationCity : "All Cities";
@@ -2214,40 +2178,33 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="relative mt-5">
-              {collectionsScroll.left && (
-                <button
-                  type="button"
-                  onClick={() => scrollCollections("left")}
-                  className="absolute left-2 top-1/2 z-20 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
-                  aria-label="Scroll left"
-                >
-                  <ChevronLeft size={22} strokeWidth={1.75} />
-                </button>
-              )}
-
+            {/* ========== UI OPTION ONE (existing card UI) — comment this block to hide ========== */}
+            <div className="mt-5">
               <div
                 ref={collectionsRef}
-                className="overflow-x-auto pt-1 pb-4 scrollbar-hide scroll-smooth snap-x snap-mandatory"
+                className="overflow-x-auto pt-1 pb-1 scrollbar-hide scroll-smooth snap-x snap-mandatory"
               >
                 <div className="flex w-full min-w-full gap-3 sm:gap-4">
                   {collections.map((col) => (
                     <CollectionCard key={col.id} collection={col} city={activeCity} />
                   ))}
+                </div>
               </div>
-              </div>
-
-              {collectionsScroll.right && (
-              <button
-                type="button"
-                  onClick={() => scrollCollections("right")}
-                  className="absolute right-2 top-1/2 z-20 -translate-y-1/2 w-9 h-9 rounded-full bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.22)] hidden md:flex items-center justify-center transition-shadow cursor-pointer"
-                  aria-label="Scroll right"
-              >
-                  <ChevronRight size={22} strokeWidth={1.75} />
-              </button>
-              )}
+              <RailPagerNav
+                canPrev={collectionsScroll.left}
+                canNext={collectionsScroll.right}
+                pageCount={collectionsScroll.pageCount}
+                activePage={collectionsScroll.activePage}
+                onPrev={() => scrollCollections("left")}
+                onNext={() => scrollCollections("right")}
+                label="Collections"
+              />
             </div>
+            {/* ========== END UI OPTION ONE ========== */}
+
+            {/* ========== UI OPTION TWO — comment out to hide ========== */}
+            <DiningCollectionsOption2 collections={collections} city={activeCity} />
+            {/* ========== END UI OPTION TWO ========== */}
           </section>
 
         {/* ── 3. Tab section (hidden — categories live in Filter popup) ──── */}
@@ -2373,6 +2330,7 @@ export default function Home() {
           {/* ── 5. Offer Section ────────────────────────────────────────────── */}
           {showHomeExtras && homeOfferCards.length > 0 && (
             <section id="dining-offers" className="pt-3 pb-5 sm:pt-2 scroll-mt-24">
+              {/* ========== UI OPTION ONE (existing colored offer cards) — comment this block to hide ========== */}
               {homeOfferCards.length > 3 ? (
                 <div className="relative">
                   {offersScroll.left && (
@@ -2424,6 +2382,15 @@ export default function Home() {
                   ))}
                 </div>
               )}
+              {/* ========== END UI OPTION ONE ========== */}
+
+              {/* ========== UI OPTION TWO — comment out to hide ========== */}
+              <DiningOffersOption2
+                cards={homeOfferCards}
+                locationCity={locationCity}
+                onSelect={applyOfferBucket}
+              />
+              {/* ========== END UI OPTION TWO ========== */}
             </section>
           )}
 
@@ -2502,11 +2469,24 @@ export default function Home() {
             </div>
           ) : (
             <>
+            {/* ========== UI OPTION ONE (existing restaurant cards) — comment to hide ========== */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
                 {displayRestaurants.map((restaurant) => (
                 <RestaurantCard key={restaurant.id} restaurant={restaurant} />
               ))}
             </div>
+            {/* ========== END UI OPTION ONE ========== */}
+
+            {/* ========== UI OPTION TWO — comment out to hide ========== */}
+            <div className="mt-5 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
+              {displayRestaurants.map((restaurant) => (
+                <DiningRestaurantCardOption2
+                  key={`opt2-${restaurant.id}`}
+                  place={restaurant}
+                />
+              ))}
+            </div>
+            {/* ========== END UI OPTION TWO ========== */}
               {hasMoreRestaurants && (
                 <div className="mt-8 flex justify-center">
                   <button

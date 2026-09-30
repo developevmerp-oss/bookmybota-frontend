@@ -37,6 +37,7 @@ import {
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 const PAGE_BG = "#F4F2F8";
 const BRAND = "#6900AA";
@@ -720,11 +721,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   };
 
   if (loadingCinema && !apiCinema && !showcase) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
-        <Loader2 className="animate-spin text-[#6900AA]" size={32} />
-      </div>
-    );
+    return <CustomerFullscreenShimmer label="Loading cinema" />;
   }
 
   if (!apiCinema && !showcase) {

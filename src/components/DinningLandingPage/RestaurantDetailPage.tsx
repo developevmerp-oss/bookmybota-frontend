@@ -51,6 +51,7 @@ import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import { useSelectedCity } from '@/lib/useSelectedCity';
+import { RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
 import BookingSuccessCheckAnimation from './BookingSuccessCheckAnimation';
@@ -1263,14 +1264,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400">
-        <div className="text-center">
-          <Loader2 size={36} className="animate-spin text-rose-600 mx-auto mb-3" />
-          <p className="text-sm font-semibold">Loading venue details...</p>
-        </div>
-      </div>
-    );
+    return <RestaurantDetailShimmer />;
   }
 
   if (!profile) {

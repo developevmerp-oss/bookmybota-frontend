@@ -5,6 +5,7 @@ import { useGetPublicMoviesQuery } from "@/services/api";
 import CategoryNavTileCard from "./CategoryNavTileCard";
 import { buildCategoryNavTiles } from "./categoryNavTiles";
 import { useHomeCatalog } from "./useHomeCatalog";
+import { CategoryTilesShimmer } from "@/components/Shared/Shimmer";
 
 export default function LiveCategoryTiles({ city }: { city: string }) {
   const {
@@ -55,14 +56,7 @@ export default function LiveCategoryTiles({ city }: { city: string }) {
         </h2>
 
         {isLoadingFilters ? (
-          <div className="flex flex-wrap gap-2.5 sm:gap-3 md:gap-4 items-start">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="w-[calc((100%-0.625rem)/2)] sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-5rem)/6)] aspect-[3/4] sm:aspect-[5/7] rounded-2xl bg-[#F7F7F7] shrink-0"
-              />
-            ))}
-          </div>
+          <CategoryTilesShimmer count={6} />
         ) : cards.length === 0 ? (
           <p className="type-body text-[#6B6B6B] py-6">No event categories yet.</p>
         ) : (

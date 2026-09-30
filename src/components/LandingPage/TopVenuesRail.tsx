@@ -6,6 +6,7 @@ import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrol
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import { VenuePosterCard } from "./PosterCard";
+import { CustomerRailShimmer } from "@/components/Shared/Shimmer";
 
 const MIN_VISIBLE = 5;
 
@@ -29,21 +30,7 @@ export default function TopVenuesRail() {
         </div>
 
         {isLoading ? (
-          <div className="flex gap-3 sm:gap-4 overflow-hidden py-1">
-            {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
-              <div
-                key={i}
-                className="snap-start shrink-0 w-[180px] sm:w-[200px] md:w-[220px] rounded-2xl border border-[#EAEAEA] overflow-hidden bg-white"
-              >
-                <div className="aspect-[3/4] bg-[#F3F4F6] animate-pulse" />
-                <div className="px-3.5 pt-3.5 pb-4 space-y-2">
-                  <div className="h-4 w-4/5 bg-slate-100 rounded animate-pulse" />
-                  <div className="h-3 w-3/5 bg-slate-50 rounded animate-pulse" />
-                  <div className="h-3 w-1/3 bg-[#F7E9FF] rounded animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <CustomerRailShimmer count={MIN_VISIBLE} variant="poster" />
         ) : venues.length === 0 ? (
           <p className="text-sm text-[#6b6b6b] py-6">
             No registered venues yet. After venues are approved, they will appear here with free

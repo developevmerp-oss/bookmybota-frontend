@@ -19,10 +19,15 @@ import { listingOfferLabel } from "@/lib/diningOffers";
 import {
   DEFAULT_DINING_FILTERS,
   DiningFilterState,
+  diningFiltersEqual,
+  diningFiltersFromSearchParams,
   extractCuisines,
+  writeDiningFiltersToSearchParams,
 } from "@/lib/diningFilters";
+import { stableSearchParamsString } from "@/lib/filterUrlSync";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
+import { DiningSearchShimmer } from "@/components/Shared/Shimmer";
 
 const DINING_LIST_LIMIT = 12;
 
@@ -193,10 +198,37 @@ function SearchContent() {
   const moodParam = searchParams.get("mood") || "";
   const queryParam = searchParams.get("search") || "";
   const cityParam = searchParams.get("city") || "";
+  const searchParamsKey = searchParams.toString();
 
-  const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
+  const [diningFilters, setDiningFilters] = useState<DiningFilterState>(() =>
+    diningFiltersFromSearchParams(searchParams)
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [loadedRestaurants, setLoadedRestaurants] = useState<Business[]>([]);
+
+  useEffect(() => {
+    const next = diningFiltersFromSearchParams(searchParams);
+    setDiningFilters((prev) => (diningFiltersEqual(prev, next) ? prev : next));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParamsKey drives URL hydration
+  }, [searchParamsKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    // Preserve listing context keys from the current URL.
+    if (collectionParam) params.set("collection", collectionParam);
+    else params.delete("collection");
+    if (moodParam) params.set("mood", moodParam);
+    else params.delete("mood");
+    if (queryParam) params.set("search", queryParam);
+    else params.delete("search");
+    if (cityParam) params.set("city", cityParam);
+    else params.delete("city");
+    writeDiningFiltersToSearchParams(params, diningFilters);
+    if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
+    const qs = params.toString();
+    router.replace(qs ? `/search?${qs}` : "/search", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit searchParams so inbound URL nav is not overwritten by stale state
+  }, [diningFilters, collectionParam, moodParam, queryParam, cityParam, router]);
 
   const { data: businessesData, isLoading: loadingBusinesses, isFetching: loadingMore } = useGetBusinessesPagedQuery({
     module: "dining",
@@ -478,10 +510,7 @@ function SearchContent() {
 
         {/* ── 3. Listings Grid ─────────────────────────────────────────────── */}
         {loadingBusinesses && loadedRestaurants.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 gap-3 text-slate-400">
-            <Loader2 size={36} className="animate-spin text-rose-600" />
-            <p className="text-sm font-semibold">Loading top establishments...</p>
-          </div>
+          <DiningSearchShimmer count={6} />
         ) : filteredRestaurants.length === 0 ? (
           <div className="text-center py-24 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 max-w-xl mx-auto">
             <div className="text-6xl mb-5">🍽️</div>
@@ -535,14 +564,7 @@ function SearchContent() {
 
 export default function SearchPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-slate-400">
-          <Loader2 size={36} className="animate-spin text-rose-600" />
-          <p className="text-sm font-semibold">Loading search space...</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<DiningSearchShimmer count={6} />}>
       <SearchContent />
     </Suspense>
   );

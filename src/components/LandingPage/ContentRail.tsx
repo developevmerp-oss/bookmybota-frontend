@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, Children, type CSSProperties, type ReactNode } from "react";
+import { useRef, Children, type ReactNode } from "react";
 import "./AdaptiveCardRow.css";
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { CustomerRailShimmer } from "@/components/Shared/Shimmer";
 
 type ContentRailProps = {
   title: string;
@@ -102,41 +103,10 @@ export default function ContentRail({
         </div>
 
         {isLoading ? (
-          <div
-            className={`adaptive-card-row overflow-hidden${
-              cardStyle === "dining"
-                ? " adaptive-card-row--dining"
-                : minVisible === 4
-                  ? " adaptive-card-row--four"
-                  : ""
-            }`}
-            style={
-              {
-                ["--adaptive-count" as string]: minVisible,
-                ["--adaptive-min-visible" as string]: String(minVisible),
-              } as CSSProperties
-            }
-          >
-            {Array.from({ length: minVisible }).map((_, i) => (
-              <div key={i} className="adaptive-card-slot">
-                <div
-                  className={`rounded-xl ${
-                    cardStyle === "dining" ? "aspect-[5/4]" : "aspect-[2/3]"
-                  } ${dark ? "bg-white/10" : alt ? "bg-white" : "bg-[#F7F7F7]"}`}
-                />
-                <div
-                  className={`mt-3 h-4 w-4/5 rounded ${
-                    dark ? "bg-white/10" : alt ? "bg-white" : "bg-[#F7F7F7]"
-                  }`}
-                />
-                <div
-                  className={`mt-2 h-3 w-3/5 rounded ${
-                    dark ? "bg-white/10" : alt ? "bg-white" : "bg-[#F7F7F7]"
-                  }`}
-                />
-              </div>
-            ))}
-          </div>
+          <CustomerRailShimmer
+            count={minVisible}
+            variant={cardStyle === "dining" ? "dining" : "poster"}
+          />
         ) : empty ? (
           <div className={`py-2 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>
             {typeof empty === "string" ? (

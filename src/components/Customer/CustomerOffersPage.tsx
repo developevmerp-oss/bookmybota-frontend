@@ -6,7 +6,6 @@ import {
   Clapperboard,
   Copy,
   Flame,
-  Loader2,
   Sparkles,
   Tag,
   UtensilsCrossed,
@@ -21,6 +20,7 @@ import { formatDateCustomer } from "@/lib/dateFormat";
 import { formatMoney, formatWholeNumber } from "@/lib/currencyFormat";
 import { useSelectedCity } from "@/lib/useSelectedCity";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { OffersRailShimmer } from "@/components/Shared/Shimmer";
 import "@/components/LandingPage/SpecialOffersRail.css";
 
 type OfferCategoryTab = "ALL" | "MOVIES" | "DINING" | "EVENTS";
@@ -297,10 +297,7 @@ export default function CustomerOffersPage() {
             </div>
 
             {isLoading || (isFetching && activeOffers.length === 0) ? (
-              <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
-                <Loader2 size={18} className="animate-spin" />
-                Loading offers…
-              </div>
+              <OffersRailShimmer count={4} />
             ) : filtered.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-14 text-center">
                 <Tag className="mx-auto text-slate-300 mb-3" size={28} />

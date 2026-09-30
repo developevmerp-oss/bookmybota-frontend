@@ -63,6 +63,7 @@ import { formatDateCustomer } from "@/lib/dateFormat";
 import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
+import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 const HOLD_SESSION_KEY = "bmb_movie_hold_session";
 
@@ -1233,12 +1234,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   );
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F5F5F7] text-slate-900 flex flex-col items-center justify-center gap-3">
-        <Loader2 className="size-10 animate-spin text-[#F84464]" />
-        <p className="text-sm font-medium text-slate-500">Loading cinema seat layout…</p>
-      </div>
-    );
+    return <CustomerFullscreenShimmer label="Loading seat layout" />;
   }
 
   if (isError || !layoutData) {

@@ -39,6 +39,7 @@ import {
 } from "@/lib/movieWishlist";
 import { movieDetailPath } from "@/components/MovieLandingPage/movieCatalog";
 import { restaurantHref } from "@/lib/businessPublicPath";
+import { CustomerPageShimmer } from "@/components/Shared/Shimmer";
 
 function WishlistRestaurantCard({
   restaurant,
@@ -250,10 +251,7 @@ function WishlistSection({
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
-          <Loader2 className="animate-spin" size={20} />
-          Loading…
-        </div>
+        <CustomerPageShimmer rows={4} />
       ) : isError ? (
         <div className="text-center py-10 rounded-xl border border-slate-200 bg-slate-50">
           <p className="text-slate-600 font-medium">Could not load this section.</p>
@@ -345,10 +343,7 @@ export default function CustomerWishlistPage() {
         </div>
 
         {isLoading && movies.length === 0 && restaurants.length === 0 ? (
-          <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
-            <Loader2 className="animate-spin" size={22} />
-            Loading favourites…
-          </div>
+          <CustomerPageShimmer rows={6} />
         ) : (
           <div className="space-y-10">
             <WishlistSection

@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { useGetPublicMovieQuery } from "@/services/api";
 import {
   mapApiMovieToDetail,
@@ -11,6 +10,7 @@ import {
   type MovieDetailData,
 } from "@/components/MovieLandingPage/movieCatalog";
 import MovieShowtimeSelector from "@/components/MovieLandingPage/MovieShowtimeSelector";
+import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 function releaseYearFromApi(releaseDate?: string | null, comingSoon?: boolean) {
   if (comingSoon || !releaseDate) return undefined;
@@ -46,12 +46,7 @@ export default function MovieShowtimesPage() {
   const releaseYear = releaseYearFromApi(apiMovie?.release_date, apiMovie?.status === "coming_soon");
 
   if (isLoading) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 text-slate-400 bg-[#F5F5F5]">
-        <Loader2 className="size-8 animate-spin text-[#F84464]" />
-        <p className="text-sm sm:text-base font-medium">Loading showtimes…</p>
-      </div>
-    );
+    return <CustomerFullscreenShimmer label="Loading showtimes" />;
   }
 
   if (!movie || isError || movie.comingSoon) {

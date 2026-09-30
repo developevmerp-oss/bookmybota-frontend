@@ -1,10 +1,11 @@
 "use client";
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useGetCollectionsQuery } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { CollectionsShimmer } from "@/components/Shared/Shimmer";
 
 function CollectionsContent() {
   const searchParams = useSearchParams();
@@ -52,10 +53,7 @@ function CollectionsContent() {
 
         {/* ── Collections Grid ────────────────────────────────────────────── */}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-32 gap-3 text-slate-400">
-            <Loader2 size={36} className="animate-spin text-rose-600" />
-            <p className="text-sm font-semibold">Gathering collections guides...</p>
-          </div>
+          <CollectionsShimmer count={8} />
         ) : collections.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 max-w-md mx-auto">
             <div className="text-5xl mb-4">📚</div>
@@ -112,14 +110,7 @@ function CollectionsContent() {
 
 export default function CollectionsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-slate-400">
-          <Loader2 size={36} className="animate-spin text-rose-600" />
-          <p className="text-sm font-semibold">Loading guides space...</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<CollectionsShimmer count={8} />}>
       <CollectionsContent />
     </Suspense>
   );

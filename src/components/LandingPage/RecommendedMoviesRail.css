@@ -48,28 +48,44 @@
 
 .movies-rail-badge {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 0.75rem;
+  right: 0.75rem;
   left: auto;
   z-index: 2;
   pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  max-width: calc(100% - 1.5rem);
   border-radius: 9999px;
-  background: #ffffff;
-  padding: 3px 8px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1.2;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
 }
 
 .movies-rail-badge--promoted {
-  color: #e11d48;
+  color: #ffffff;
+  background: #6900aa;
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 2px 10px rgba(105, 0, 170, 0.35);
 }
 
 .movies-rail-badge--soon {
-  color: #15803d;
+  color: #ffffff;
+  background: rgba(17, 17, 17, 0.72);
+  border-color: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
 }
 
 .movies-rail-meta {

@@ -20,11 +20,17 @@ import {
 type Props = {
   movieId: string;
   className?: string;
+  /** `onLight` = dark outline heart on white chip; fills when saved. */
+  tone?: "default" | "onLight";
 };
 
 let guestWishlistSyncStarted = false;
 
-export default function MovieWishlistButton({ movieId, className }: Props) {
+export default function MovieWishlistButton({
+  movieId,
+  className,
+  tone = "default",
+}: Props) {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
   const isCustomer = authUser?.role === "customer" && Boolean(authUser.customer_id);
@@ -128,10 +134,22 @@ export default function MovieWishlistButton({ movieId, className }: Props) {
       }
     >
       {toggling ? (
-        <Loader2 className="size-4 sm:size-5 animate-spin text-white" />
+        <Loader2
+          className={`size-4 sm:size-5 animate-spin ${
+            tone === "onLight" ? "text-[#6900AA]" : "text-white"
+          }`}
+        />
       ) : (
         <Heart
-          className={`size-4 sm:size-5 ${saved ? "fill-[#F84464] text-[#F84464]" : "text-white"}`}
+          className={
+            saved
+              ? tone === "onLight"
+                ? "size-4 sm:size-5 fill-[#E11D48] text-[#E11D48]"
+                : "size-4 sm:size-5 fill-[#F84464] text-[#F84464]"
+              : tone === "onLight"
+                ? "size-4 sm:size-5 fill-none text-[#111111]"
+                : "size-4 sm:size-5 text-white"
+          }
           strokeWidth={2}
         />
       )}

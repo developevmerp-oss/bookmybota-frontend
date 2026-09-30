@@ -30,9 +30,9 @@ const eventCardShell =
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
-/** Hover plate like reference: inset padding + white bg. Padding is always p-3 so size never jumps. */
+/** Hover plate like reference: vertical pad only so card left edge aligns with section title. */
 const diningCardShell =
-  "rounded-2xl border-0 bg-transparent shadow-none p-3 " +
+  "rounded-2xl border-0 bg-transparent shadow-none" +
   "hover:bg-white " +
   "hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 " +
   "transition-[box-shadow,transform,background-color] duration-300";

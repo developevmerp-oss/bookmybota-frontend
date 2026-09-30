@@ -17,17 +17,57 @@ import {
   readGuestDiningWishlistIds,
 } from "@/lib/diningWishlist";
 
+type Appearance = "default" | "glass";
+/** Icon colors — independent of button chrome (`appearance` / `className`). */
+type Tone = "default" | "neutral" | "onDark";
+
 type Props = {
   businessId: string;
   className?: string;
-  /** `glass` = frosted white circle + light heart (Option 2 card on media). */
-  appearance?: "default" | "glass";
-  /** `neutral` = #292929 heart (dining detail header). */
-  tone?: "default" | "neutral";
+  /** Button chrome when `className` is omitted. `glass` = frosted circle on media. */
+  appearance?: Appearance;
+  /**
+   * Heart / loader color:
+   * - `default` — brand rose (white chip cards)
+   * - `neutral` — #292929 (dining detail header)
+   * - `onDark` — white outline on dark overlays; rose fill when saved
+   */
+  tone?: Tone;
 };
 
 /** Avoid every card on a grid firing guest→account sync at once */
 let guestWishlistSyncStarted = false;
+
+function resolveIconClasses(
+  appearance: Appearance,
+  tone: Tone,
+  saved: boolean
+): { heart: string; loader: string } {
+  // Frosted glass chip sits on media — treat like onDark for outline contrast
+  const mediaOverlay = appearance === "glass" || tone === "onDark";
+
+  if (mediaOverlay) {
+    return {
+      // Outline white on photo; brand rose fill when favourited (readable on glass + dark chips)
+      heart: saved ? "fill-[#E11D48] text-[#E11D48]" : "fill-none text-white",
+      loader: "animate-spin text-white",
+    };
+  }
+
+  if (tone === "neutral") {
+    return {
+      heart: saved
+        ? "fill-[#292929] text-[#292929]"
+        : "fill-none text-[#292929]",
+      loader: "animate-spin text-[#292929]",
+    };
+  }
+
+  return {
+    heart: saved ? "fill-[#E11D48] text-[#E11D48]" : "fill-none text-[#B41739]",
+    loader: "animate-spin text-[#6900AA]",
+  };
+}
 
 export default function DiningWishlistButton({
   businessId,
@@ -119,18 +159,11 @@ export default function DiningWishlistButton({
       ? "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white/35 backdrop-blur-md border border-white/50 shadow-sm flex items-center justify-center hover:bg-white/50 transition-colors cursor-pointer disabled:opacity-70"
       : "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70";
 
-  const heartClass =
-    appearance === "glass"
-      ? saved
-        ? "fill-white text-white"
-        : "fill-none text-white"
-      : tone === "neutral"
-        ? saved
-          ? "fill-[#292929] text-[#292929]"
-          : "fill-none text-[#292929]"
-        : saved
-          ? "fill-[#E11D48] text-[#E11D48]"
-          : "fill-none text-[#B41739]";
+  const { heart: heartClass, loader: loaderClass } = resolveIconClasses(
+    appearance,
+    tone,
+    saved
+  );
 
   return (
     <>
@@ -143,18 +176,9 @@ export default function DiningWishlistButton({
         className={className || defaultClass}
       >
         {toggling ? (
-          <Loader2
-            size={16}
-            className={`animate-spin ${
-              appearance === "glass"
-                ? "text-white"
-                : tone === "neutral"
-                  ? "text-[#292929]"
-                  : "text-[#6900AA]"
-            }`}
-          />
+          <Loader2 size={16} className={loaderClass} />
         ) : (
-          <Heart size={18} className={heartClass} strokeWidth={2.5} />
+          <Heart size={18} className={heartClass} strokeWidth={2.25} />
         )}
       </button>
 

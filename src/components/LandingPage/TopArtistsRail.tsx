@@ -77,7 +77,7 @@ export default function TopArtistsRail() {
     <section className="w-full bg-white py-6 sm:py-0">
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="mb-4 flex items-end justify-between gap-3">
-          <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
             Top Artists
           </h2>
           <RailSeeAllLink href="/artists" />

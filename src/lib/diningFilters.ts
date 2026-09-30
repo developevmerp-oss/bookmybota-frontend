@@ -42,6 +42,90 @@ export const DEFAULT_DINING_FILTERS: DiningFilterState = {
   maxCost: 0,
 };
 
+const OFFER_BUCKETS: DiningOfferBucket[] = [
+  "any",
+  "percent_upto_20",
+  "percent_upto_50",
+  "percent_high",
+  "flat",
+];
+
+const SORT_OPTIONS: SortOption[] = ["relevance", "rating", "popular", "costAsc", "costDesc"];
+
+/** Read dining filter state from URL search params. */
+export function diningFiltersFromSearchParams(params: URLSearchParams): DiningFilterState {
+  const cuisinesRaw = params.get("cuisines") || params.get("cuisine") || "";
+  const cuisines = cuisinesRaw
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const minRating = Number(params.get("rating") || 0) || 0;
+  const maxCost = Number(params.get("max_cost") || 0) || 0;
+  const sortRaw = (params.get("sort") || "relevance") as SortOption;
+  const sort = SORT_OPTIONS.includes(sortRaw) ? sortRaw : "relevance";
+  const bucketRaw = params.get("offer_bucket") as DiningOfferBucket | null;
+  const offerBucket =
+    bucketRaw && OFFER_BUCKETS.includes(bucketRaw) ? bucketRaw : null;
+  return {
+    cuisines,
+    minRating: minRating > 0 ? minRating : 0,
+    offersOnly: params.get("offers") === "1" || params.get("offers") === "true" || Boolean(offerBucket),
+    offerBucket,
+    sort,
+    bookTable: params.get("book_table") === "1" || params.get("book_table") === "true",
+    pureVeg: params.get("pure_veg") === "1" || params.get("pure_veg") === "true",
+    servesAlcohol: params.get("alcohol") === "1" || params.get("alcohol") === "true",
+    maxCost: maxCost > 0 ? maxCost : 0,
+  };
+}
+
+/** Write dining filter fields onto URL search params (mutates params). */
+export function writeDiningFiltersToSearchParams(
+  params: URLSearchParams,
+  filters: DiningFilterState
+) {
+  if (filters.cuisines.length) params.set("cuisines", filters.cuisines.join(","));
+  else {
+    params.delete("cuisines");
+    params.delete("cuisine");
+  }
+  if (filters.minRating > 0) params.set("rating", String(filters.minRating));
+  else params.delete("rating");
+  if (filters.offerBucket) {
+    params.set("offer_bucket", filters.offerBucket);
+    params.set("offers", "1");
+  } else {
+    params.delete("offer_bucket");
+    if (filters.offersOnly) params.set("offers", "1");
+    else params.delete("offers");
+  }
+  if (filters.sort && filters.sort !== "relevance") params.set("sort", filters.sort);
+  else params.delete("sort");
+  if (filters.bookTable) params.set("book_table", "1");
+  else params.delete("book_table");
+  if (filters.pureVeg) params.set("pure_veg", "1");
+  else params.delete("pure_veg");
+  if (filters.servesAlcohol) params.set("alcohol", "1");
+  else params.delete("alcohol");
+  if (filters.maxCost > 0) params.set("max_cost", String(filters.maxCost));
+  else params.delete("max_cost");
+}
+
+export function diningFiltersEqual(a: DiningFilterState, b: DiningFilterState): boolean {
+  if (a.minRating !== b.minRating) return false;
+  if (a.offersOnly !== b.offersOnly) return false;
+  if (a.offerBucket !== b.offerBucket) return false;
+  if (a.sort !== b.sort) return false;
+  if (a.bookTable !== b.bookTable) return false;
+  if (a.pureVeg !== b.pureVeg) return false;
+  if (a.servesAlcohol !== b.servesAlcohol) return false;
+  if (a.maxCost !== b.maxCost) return false;
+  if (a.cuisines.length !== b.cuisines.length) return false;
+  const sa = [...a.cuisines].map((c) => c.toLowerCase()).sort();
+  const sb = [...b.cuisines].map((c) => c.toLowerCase()).sort();
+  return sa.every((v, i) => v === sb[i]);
+}
+
 export type DiningHomeOfferCard = {
   id: string;
   bucket: DiningOfferBucket;

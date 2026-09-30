@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Car,
   ChevronDown,
@@ -33,6 +33,13 @@ import {
   type PublicMovieCinemaGroup,
   type PublicMovieShowtimeItem,
 } from "@/services/api";
+import {
+  parseCsvParam,
+  sameStringList,
+  setOrDeleteCsvParam,
+  setOrDeleteParam,
+  stableSearchParamsString,
+} from "@/lib/filterUrlSync";
 
 const BRAND = "#6900AA";
 const DATE_ACTIVE_GRADIENT =
@@ -712,22 +719,40 @@ function ShowtimeChip({
 
 export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectShowtime }: Props) {
   const router = useRouter();
+  const pathname = usePathname() || "";
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
   const dateOptions = useMemo(() => generateDateOptions(7), []);
-  const [selectedDate, setSelectedDate] = useState<string>(dateOptions[0].dateStr);
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const fromUrl = searchParams.get("date") || "";
+    if (fromUrl && dateOptions.some((d) => d.dateStr === fromUrl)) return fromUrl;
+    return dateOptions[0].dateStr;
+  });
   const [selectedCity, setSelectedCity] = useState<string>(() => {
+    const cityParam = searchParams.get("city");
+    if (cityParam) return cityParam === "All Cities" ? "" : cityParam;
     if (typeof window === "undefined") return "";
     const stored = localStorage.getItem("selected_city") || "";
     return stored && stored !== "All Cities" ? stored : "";
   });
-  const [languageFilters, setLanguageFilters] = useState<string[]>([]);
-  const [priceFilters, setPriceFilters] = useState<string[]>([]);
-  const [timeFilters, setTimeFilters] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<SortKey>("relevance");
+  const [languageFilters, setLanguageFilters] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("language"))
+  );
+  const [priceFilters, setPriceFilters] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("price"))
+  );
+  const [timeFilters, setTimeFilters] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("time"))
+  );
+  const [sortBy, setSortBy] = useState<SortKey>(() => {
+    const s = searchParams.get("sort");
+    return s === "popularity" || s === "distance" || s === "relevance" ? s : "relevance";
+  });
   const [openFilter, setOpenFilter] = useState<"language" | "price" | "time" | "sort" | null>(null);
   const [favoritedIds, setFavoritedIds] = useState<Record<string, boolean>>({});
   const [infoOpenId, setInfoOpenId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
-  const [cinemaSearch, setCinemaSearch] = useState("");
+  const [cinemaSearch, setCinemaSearch] = useState(() => searchParams.get("q") || "");
   const [headerOffset, setHeaderOffset] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -740,6 +765,59 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     window.addEventListener("selected_city_changed", handleCitySync);
     return () => window.removeEventListener("selected_city_changed", handleCitySync);
   }, []);
+
+  useEffect(() => {
+    const dateFromUrl = searchParams.get("date") || "";
+    const languagesFromUrl = parseCsvParam(searchParams.get("language"));
+    const priceFromUrl = parseCsvParam(searchParams.get("price"));
+    const timeFromUrl = parseCsvParam(searchParams.get("time"));
+    const sortFromUrl = searchParams.get("sort");
+    const qFromUrl = searchParams.get("q") || "";
+    const cityParam = searchParams.get("city");
+
+    if (dateFromUrl && dateOptions.some((d) => d.dateStr === dateFromUrl)) {
+      setSelectedDate((prev) => (prev === dateFromUrl ? prev : dateFromUrl));
+    }
+    setLanguageFilters((prev) =>
+      sameStringList(prev, languagesFromUrl) ? prev : languagesFromUrl
+    );
+    setPriceFilters((prev) => (sameStringList(prev, priceFromUrl) ? prev : priceFromUrl));
+    setTimeFilters((prev) => (sameStringList(prev, timeFromUrl) ? prev : timeFromUrl));
+    if (sortFromUrl === "popularity" || sortFromUrl === "distance" || sortFromUrl === "relevance") {
+      setSortBy((prev) => (prev === sortFromUrl ? prev : sortFromUrl));
+    }
+    setCinemaSearch((prev) => (prev === qFromUrl ? prev : qFromUrl));
+    if (cityParam) {
+      const nextCity = cityParam === "All Cities" ? "" : cityParam;
+      setSelectedCity((prev) => (prev === nextCity ? prev : nextCity));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParamsKey drives URL hydration
+  }, [searchParamsKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    setOrDeleteParam(params, "date", selectedDate);
+    setOrDeleteCsvParam(params, "language", languageFilters);
+    setOrDeleteCsvParam(params, "price", priceFilters);
+    setOrDeleteCsvParam(params, "time", timeFilters);
+    if (sortBy && sortBy !== "relevance") setOrDeleteParam(params, "sort", sortBy);
+    setOrDeleteParam(params, "q", cinemaSearch);
+    setOrDeleteParam(params, "city", selectedCity);
+    if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit searchParams so inbound URL nav is not overwritten by stale state
+  }, [
+    selectedDate,
+    languageFilters,
+    priceFilters,
+    timeFilters,
+    sortBy,
+    cinemaSearch,
+    selectedCity,
+    pathname,
+    router,
+  ]);
 
   useEffect(() => {
     const header = document.querySelector("header");

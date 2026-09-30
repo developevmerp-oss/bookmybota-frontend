@@ -10,11 +10,11 @@ import {
   type TransitionEvent,
 } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
-  Loader2,
   Star,
   ThumbsUp,
   Ticket,
@@ -28,11 +28,19 @@ import {
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { useAppDispatch } from "@/lib/hooks";
+import {
+  parseCsvParam,
+  sameStringList,
+  setOrDeleteCsvParam,
+  setOrDeleteParam,
+  stableSearchParamsString,
+} from "@/lib/filterUrlSync";
 import { hasCityFilter, preferCityOrAll, shouldShowShowcaseCards } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
 import ListingPromoSlider, {
   useListingPromoCampaigns,
 } from "@/components/LandingPage/ListingPromoSlider";
+import { MovieGridShimmer } from "@/components/Shared/Shimmer";
 import {
   formatMovieCardMeta,
   formatMovieCardTitle,
@@ -605,12 +613,30 @@ function MovieReleasesGrid({
 
 export default function MovieLandingPage() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
+  const pathname = usePathname() || "/movies";
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
   const mobilePromoTrackRef = useRef<HTMLDivElement>(null);
   const moviesListingRef = useRef<HTMLElement>(null);
-  const [city, setCity] = useState("");
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
+  const [city, setCity] = useState(() => {
+    const cityParam = searchParams.get("city");
+    if (cityParam) return cityParam === "All Cities" ? "" : cityParam;
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("selected_city");
+      return stored && stored !== "All Cities" ? stored : "";
+    }
+    return "";
+  });
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("language") || searchParams.get("languages"))
+  );
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("genre") || searchParams.get("genres"))
+  );
+  const [selectedFormats, setSelectedFormats] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("format") || searchParams.get("formats"))
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterModalTab, setFilterModalTab] = useState<MovieFilterModalTab>("language");
   const [headerOffset, setHeaderOffset] = useState(112);
@@ -657,6 +683,41 @@ export default function MovieLandingPage() {
       window.removeEventListener("storage", applyCity);
     };
   }, []);
+
+  useEffect(() => {
+    const languagesFromUrl = parseCsvParam(
+      searchParams.get("language") || searchParams.get("languages")
+    );
+    const genresFromUrl = parseCsvParam(searchParams.get("genre") || searchParams.get("genres"));
+    const formatsFromUrl = parseCsvParam(
+      searchParams.get("format") || searchParams.get("formats")
+    );
+    const cityParam = searchParams.get("city");
+
+    setSelectedLanguages((prev) =>
+      sameStringList(prev, languagesFromUrl) ? prev : languagesFromUrl
+    );
+    setSelectedGenres((prev) => (sameStringList(prev, genresFromUrl) ? prev : genresFromUrl));
+    setSelectedFormats((prev) => (sameStringList(prev, formatsFromUrl) ? prev : formatsFromUrl));
+
+    if (cityParam) {
+      const nextCity = cityParam === "All Cities" ? "" : cityParam;
+      setCity((prev) => (prev === nextCity ? prev : nextCity));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParamsKey drives URL hydration
+  }, [searchParamsKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    setOrDeleteCsvParam(params, "language", selectedLanguages);
+    setOrDeleteCsvParam(params, "genre", selectedGenres);
+    setOrDeleteCsvParam(params, "format", selectedFormats);
+    setOrDeleteParam(params, "city", city);
+    if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit searchParams so inbound URL nav is not overwritten by stale state
+  }, [selectedLanguages, selectedGenres, selectedFormats, city, pathname, router]);
 
   const hasCity = hasCityFilter(city);
   const { hasCampaigns: hasMoviePromoCampaigns } = useListingPromoCampaigns("MOVIES", city);
@@ -1415,10 +1476,7 @@ export default function MovieLandingPage() {
           ) : (
             <div className="space-y-8 sm:space-y-10">
               {isLoading ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
-                  <Loader2 className="size-8 animate-spin text-[#6900AA]" />
-                  <p className="text-sm font-medium sm:text-base">Loading movies...</p>
-                </div>
+                <MovieGridShimmer count={10} />
               ) : noCinemasInCity && !useStaticMovies ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
                   <p className="text-sm font-semibold text-slate-800">No cinemas in {headingCity} yet</p>

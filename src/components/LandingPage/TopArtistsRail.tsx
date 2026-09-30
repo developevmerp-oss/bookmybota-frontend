@@ -14,6 +14,7 @@ import SafeCoverImage, {
   ArtistImageFallback,
 } from "@/components/Shared/SafeCoverImage";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
+import { ArtistRailShimmer } from "@/components/Shared/Shimmer";
 import "./TopArtistsRail.css";
 
 const VISIBLE = 6;
@@ -83,34 +84,31 @@ export default function TopArtistsRail() {
         </div>
 
         <div>
-          <div
-            ref={scrollerRef}
-            className="top-artists-rail"
-            style={{ ["--artists-visible" as string]: VISIBLE }}
-          >
-            {isLoading
-              ? Array.from({ length: VISIBLE }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="top-artists-slot shrink-0 w-[120px] sm:w-[190px] flex flex-col items-center gap-2.5"
-                    aria-hidden
-                  >
-                    <div className="top-artists-avatar h-[120px] w-[120px] sm:h-[190px] sm:w-[190px] rounded-full bg-slate-200 animate-pulse" />
-                    <div className="h-3 w-16 rounded bg-slate-200 animate-pulse" />
-                  </div>
-                ))
-              : items.map((artist) => <ArtistCard key={artist.id} artist={artist} />)}
-          </div>
+          {isLoading ? (
+            <ArtistRailShimmer count={VISIBLE} />
+          ) : (
+            <>
+              <div
+                ref={scrollerRef}
+                className="top-artists-rail"
+                style={{ ["--artists-visible" as string]: VISIBLE }}
+              >
+                {items.map((artist) => (
+                  <ArtistCard key={artist.id} artist={artist} />
+                ))}
+              </div>
 
-          <RailPagerNav
-            canPrev={edges.left}
-            canNext={edges.right}
-            pageCount={edges.pageCount}
-            activePage={edges.activePage}
-            onPrev={() => scrollBy("left")}
-            onNext={() => scrollBy("right")}
-            label="artists"
-          />
+              <RailPagerNav
+                canPrev={edges.left}
+                canNext={edges.right}
+                pageCount={edges.pageCount}
+                activePage={edges.activePage}
+                onPrev={() => scrollBy("left")}
+                onNext={() => scrollBy("right")}
+                label="artists"
+              />
+            </>
+          )}
         </div>
       </div>
     </section>

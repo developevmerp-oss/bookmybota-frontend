@@ -24,6 +24,7 @@ import {
   hasCityFilter,
   preferCityOrAll,
 } from "./homeUtils";
+import { PromoBannerShimmer } from "@/components/Shared/Shimmer";
 import "./PromoBannerCarousel.css";
 
 type PromoBannerCarouselProps = {
@@ -415,13 +416,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
       (isLoadingEvents || loadingMovies || (hasCity && slides.length === 0 && isLoadingFallback)));
 
   if (loading) {
-    return (
-      <section className="promo-banner-swiper is-single w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4">
-        <div className="promo-banner-single-wrap">
-          <div className="promo-banner-frame rounded-2xl sm:rounded-3xl overflow-hidden promo-slide-skeleton" />
-        </div>
-      </section>
-    );
+    return <PromoBannerShimmer />;
   }
 
   if (slides.length === 0) return null;

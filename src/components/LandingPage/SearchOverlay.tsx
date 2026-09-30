@@ -12,6 +12,7 @@ import { isComedyEvent, isMusicEvent, isOutdoorEvent } from "./homeUtils";
 import { useHomeCatalog } from "./useHomeCatalog";
 import { lockBodyScroll } from "@/lib/lockBodyScroll";
 import { artistHref, restaurantHref, venueHref } from "@/lib/businessPublicPath";
+import { CustomerPageShimmer } from "@/components/Shared/Shimmer";
 
 type SearchOverlayProps = {
   open: boolean;
@@ -192,7 +193,9 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
 
         <div className="bg-white rounded-xl border border-[#EDEDED] shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
           {isLoadingEvents ? (
-            <p className="px-5 py-6 type-body text-[#6B6B6B]">Loading...</p>
+            <div className="px-5 py-4">
+              <CustomerPageShimmer rows={3} />
+            </div>
           ) : filtered.length === 0 ? (
             <p className="px-5 py-6 type-body text-[#6B6B6B]">
               {query.trim() ? "No matches found." : "No trending events yet."}

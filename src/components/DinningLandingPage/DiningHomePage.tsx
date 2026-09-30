@@ -51,7 +51,7 @@ import {
 } from "react-icons/md";
 import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQuery, useGetCollectionsQuery, useGetDiningCuisinesQuery, Business, Collection, MarketingCampaign } from "@/services/api";
 // import { useGetMoodsQuery, Mood } from "@/services/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
@@ -63,9 +63,19 @@ import {
   DiningOfferBucket,
   buildDiningHomeOfferCards,
   businessMatchesOfferBucket,
+  diningFiltersEqual,
+  diningFiltersFromSearchParams,
   extractCuisines,
   offerBucketSectionTitle,
+  writeDiningFiltersToSearchParams,
 } from "@/lib/diningFilters";
+import {
+  parseCsvParam,
+  sameStringList,
+  setOrDeleteCsvParam,
+  setOrDeleteParam,
+  stableSearchParamsString,
+} from "@/lib/filterUrlSync";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import "./DiningHomePage.css";
 import { promotionClickHref } from "@/lib/promotionCta";
@@ -1016,14 +1026,33 @@ function LocationDropdown({ onSelect, onDetect, detecting, onClose }: LocationDr
 
 export default function Home() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [activeCategories, setActiveCategories] = useState<string[]>([]);
+  const pathname = usePathname() || "/dining";
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+
+  const [searchQuery, setSearchQuery] = useState(() =>
+    (searchParams.get("search") || searchParams.get("q") || "").trim()
+  );
+  const [searchInput, setSearchInput] = useState(() =>
+    searchParams.get("search") || searchParams.get("q") || ""
+  );
+  const [activeCategories, setActiveCategories] = useState<string[]>(() => {
+    const fromFilter = parseCsvParam(searchParams.get("filter") || searchParams.get("category"));
+    return fromFilter;
+  });
   const [exploreCardId, setExploreCardId] = useState("all-dining");
-  const [diningFilters, setDiningFilters] = useState<DiningFilterState>(DEFAULT_DINING_FILTERS);
+  const [diningFilters, setDiningFilters] = useState<DiningFilterState>(() =>
+    diningFiltersFromSearchParams(searchParams)
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [loadedRestaurants, setLoadedRestaurants] = useState<Business[]>([]);
-  const [mealOccasion, setMealOccasion] = useState<MealOccasion | "">("");
+  const [mealOccasion, setMealOccasion] = useState<MealOccasion | "">(() => {
+    const raw = (searchParams.get("meal") || "").trim().toLowerCase();
+    if (raw === "lunch" || raw === "breakfast" || raw === "dinner" || raw === "fastfood") {
+      return raw;
+    }
+    return "";
+  });
   const authUser = useAppSelector((state) => state.auth.user);
   const foodieName = authUser?.name?.trim().split(/\s+/)[0] || "Foodie";
 
@@ -1122,8 +1151,24 @@ export default function Home() {
   };
 
   // ── Location state ──
-  const [locationLabel, setLocationLabel] = useState("All Cities");
-  const [locationCity, setLocationCity] = useState("");
+  const [locationLabel, setLocationLabel] = useState(() => {
+    const cityParam = searchParams.get("city");
+    if (cityParam && cityParam !== "All Cities") return cityParam;
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("selected_city") || "";
+      if (stored && stored !== "All Cities") return stored;
+    }
+    return "All Cities";
+  });
+  const [locationCity, setLocationCity] = useState(() => {
+    const cityParam = searchParams.get("city");
+    if (cityParam && cityParam !== "All Cities") return cityParam;
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("selected_city") || "";
+      if (stored && stored !== "All Cities") return stored;
+    }
+    return "";
+  });
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
@@ -1134,15 +1179,24 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-      const params = new URLSearchParams(window.location.search);
-    const filterParam = params.get("filter");
-    const cityParam = params.get("city");
-    const searchParam = params.get("search");
+    const cityParam = searchParams.get("city");
+    const searchParam = searchParams.get("search") || searchParams.get("q") || "";
+    const filterParam = searchParams.get("filter") || searchParams.get("category");
+    const mealParam = (searchParams.get("meal") || "").trim().toLowerCase();
     const storedCity = localStorage.getItem("selected_city") || "";
+    const nextFilters = diningFiltersFromSearchParams(searchParams);
+    const catsFromUrl = parseCsvParam(filterParam);
 
-    if (filterParam) {
-      setActiveCategories([filterParam]);
-      setExploreCardId(exploreCardIdForCategories([filterParam], []));
+    setDiningFilters((prev) => (diningFiltersEqual(prev, nextFilters) ? prev : nextFilters));
+    setActiveCategories((prev) => (sameStringList(prev, catsFromUrl) ? prev : catsFromUrl));
+    if (catsFromUrl.length) {
+      setExploreCardId(exploreCardIdForCategories(catsFromUrl, []));
+    }
+
+    if (mealParam === "lunch" || mealParam === "breakfast" || mealParam === "dinner" || mealParam === "fastfood") {
+      setMealOccasion((prev) => (prev === mealParam ? prev : mealParam));
+    } else {
+      setMealOccasion((prev) => (prev === "" ? prev : ""));
     }
 
     const nextCity =
@@ -1155,16 +1209,30 @@ export default function Home() {
     setLocationCity(nextCity);
     setLocationLabel(nextCity || "All Cities");
 
-      if (cityParam && cityParam !== "All Cities") {
+    if (cityParam && cityParam !== "All Cities") {
       localStorage.setItem("selected_city", cityParam);
       window.dispatchEvent(new Event("selected_city_changed"));
     }
 
-      if (searchParam) {
-        setSearchQuery(searchParam);
-        setSearchInput(searchParam);
-    }
-  }, []);
+    const nextSearch = searchParam.trim();
+    setSearchQuery((prev) => (prev === nextSearch ? prev : nextSearch));
+    setSearchInput((prev) => (prev === searchParam ? prev : searchParam));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParamsKey drives URL hydration
+  }, [searchParamsKey]);
+
+  // Persist dining filters in the URL so refresh keeps the selection.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    setOrDeleteParam(params, "search", searchQuery);
+    setOrDeleteCsvParam(params, "filter", activeCategories);
+    setOrDeleteParam(params, "meal", mealOccasion || "");
+    setOrDeleteParam(params, "city", locationCity);
+    writeDiningFiltersToSearchParams(params, diningFilters);
+    if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- omit searchParams so inbound URL nav is not overwritten by stale state
+  }, [searchQuery, activeCategories, mealOccasion, locationCity, diningFilters, pathname, router]);
 
   // Stay in sync when top-bar city changes while on dining.
   useEffect(() => {

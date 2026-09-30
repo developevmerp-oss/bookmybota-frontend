@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -38,7 +39,13 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { artistHref } from "@/lib/businessPublicPath";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
-import { EventListShimmer } from "@/components/Shared/Shimmer";
+import {
+  ArtistRailShimmer,
+  CustomerRailShimmer,
+  EventExploreShimmer,
+  EventHeroShimmer,
+  EventListShimmer,
+} from "@/components/Shared/Shimmer";
 import {
   eventLandscape,
   eventPlaceLine,
@@ -58,6 +65,11 @@ import {
   type EventCategoryKey,
 } from "@/lib/eventCategories";
 import { SHOWCASE_EVENT_CARDS, showcaseCardsForCategories } from "@/data/showcaseEventCards";
+import {
+  setOrDeleteCsvParam,
+  setOrDeleteParam,
+  stableSearchParamsString,
+} from "@/lib/filterUrlSync";
 import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
 const PAGE_SIZE = 8;
@@ -617,23 +629,43 @@ function ArtistChip({ artist }: { artist: PublicRegisteredPartner }) {
 export default function PublicEventsPage() {
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = useState(() => searchParams.get("q") || "");
   const router = useRouter();
   const pathname = usePathname() || "/events";
-  const [search, setSearch] = useState("");
-  const [city, setCity] = useState("");
-  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
+  const [search, setSearch] = useState(() => (searchParams.get("q") || "").trim());
+  const [city, setCity] = useState(() => {
+    const cityParam = searchParams.get("city");
+    if (cityParam) return cityParam === "All Cities" ? "" : cityParam;
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("selected_city");
+      return stored && stored !== "All Cities" ? stored : "";
+    }
+    return "";
+  });
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("category"))
+  );
   /** Admin genre masters — category page filter modal only (not sent to public events API). */
-  const [selectedEventGenres, setSelectedEventGenres] = useState<string[]>([]);
-  const [datePreset, setDatePreset] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [useDateRange, setUseDateRange] = useState(false);
+  const [selectedEventGenres, setSelectedEventGenres] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("genres"))
+  );
+  const [datePreset, setDatePreset] = useState(() => searchParams.get("date_preset") || "");
+  const [dateFrom, setDateFrom] = useState(() => searchParams.get("date_from") || "");
+  const [dateTo, setDateTo] = useState(() => searchParams.get("date_to") || "");
+  const [useDateRange, setUseDateRange] = useState(() =>
+    Boolean(searchParams.get("date_from") || searchParams.get("date_to"))
+  );
   const [calTab, setCalTab] = useState<"start" | "end">("start");
   const [calMonth, setCalMonth] = useState(() => new Date());
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-  const [selectedPriceBands, setSelectedPriceBands] = useState<string[]>([]);
-  const [selectedMore, setSelectedMore] = useState<string[]>([]);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("language"))
+  );
+  const [selectedPriceBands, setSelectedPriceBands] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("price"))
+  );
+  const [selectedMore, setSelectedMore] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("more"))
+  );
   /** Draft selections inside the filter popup — committed only on Apply / Clear. */
   const [draftSlugs, setDraftSlugs] = useState<string[]>([]);
   const [draftEventGenres, setDraftEventGenres] = useState<string[]>([]);
@@ -653,7 +685,10 @@ export default function PublicEventsPage() {
     more: false,
   });
   const [filterModalTab, setFilterModalTab] = useState<FilterModalTab>("sort");
-  const [sort, setSort] = useState("recommended");
+  const [sort, setSort] = useState(() => {
+    const sortParam = searchParams.get("sort");
+    return sortParam && SORT_OPTIONS.some((o) => o.id === sortParam) ? sortParam : "recommended";
+  });
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchPopupOpen, setSearchPopupOpen] = useState(false);
@@ -671,7 +706,10 @@ export default function PublicEventsPage() {
   const artistsRef = useRef<HTMLDivElement>(null);
   const allEventsRef = useRef<HTMLElement>(null);
   const categoryFromFilterRef = useRef(false);
-  const [dedicatedCategoryPage, setDedicatedCategoryPage] = useState(false);
+  // One category in URL → dedicated browse from first paint (avoids home showcase flash)
+  const [dedicatedCategoryPage, setDedicatedCategoryPage] = useState(
+    () => parseCsvParam(searchParams.get("category")).length === 1
+  );
   const [headerOffset, setHeaderOffset] = useState(112);
 
   useEffect(() => {
@@ -824,16 +862,58 @@ export default function PublicEventsPage() {
     };
   }, [filtersOpen]);
 
+  /** Persist all listing filters in the URL so refresh keeps the same selection. */
+  const buildEventsFilterParams = useCallback(() => {
+    const params = new URLSearchParams();
+    setOrDeleteParam(params, "q", search);
+    setOrDeleteCsvParam(params, "category", selectedSlugs);
+    setOrDeleteParam(params, "city", city);
+    setOrDeleteCsvParam(params, "language", selectedLanguages);
+    setOrDeleteCsvParam(params, "price", selectedPriceBands);
+    setOrDeleteCsvParam(params, "more", selectedMore);
+    setOrDeleteCsvParam(params, "genres", selectedEventGenres);
+    if (datePreset) {
+      setOrDeleteParam(params, "date_preset", datePreset);
+    } else {
+      setOrDeleteParam(params, "date_from", dateFrom);
+      setOrDeleteParam(params, "date_to", dateTo);
+    }
+    if (sort && sort !== "recommended") setOrDeleteParam(params, "sort", sort);
+    return params;
+  }, [
+    search,
+    selectedSlugs,
+    city,
+    selectedLanguages,
+    selectedPriceBands,
+    selectedMore,
+    selectedEventGenres,
+    datePreset,
+    dateFrom,
+    dateTo,
+    sort,
+  ]);
+
+  useEffect(() => {
+    const params = buildEventsFilterParams();
+    // Compare against live searchParams, but do NOT depend on them — otherwise a
+    // nav click (URL→new category) re-runs this with stale state and overwrites the URL.
+    if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omit searchParams to avoid clobbering inbound navigation
+  }, [buildEventsFilterParams, pathname, router]);
+
   const syncCategoryToUrl = useCallback(
     (slugs: string[] | string | null) => {
-      const params = new URLSearchParams(searchParams.toString());
       const list = Array.isArray(slugs) ? slugs : slugs ? [slugs] : [];
-      if (list.length) params.set("category", list.join(","));
-      else params.delete("category");
+      const params = buildEventsFilterParams();
+      setOrDeleteCsvParam(params, "category", list);
+      if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [searchParams, pathname, router]
+    [buildEventsFilterParams, searchParams, pathname, router]
   );
 
   const applyFiltersAndClose = useCallback(() => {
@@ -843,7 +923,6 @@ export default function PublicEventsPage() {
       categoryFromFilterRef.current = true;
       setDedicatedCategoryPage(false);
       setSelectedSlugs(draftSlugs);
-      syncCategoryToUrl(draftSlugs);
     }
     setDatePreset(draftDatePreset);
     setDateFrom(draftDateFrom);
@@ -866,7 +945,6 @@ export default function PublicEventsPage() {
     draftPriceBands,
     draftSort,
     scrollToEventsViewport,
-    syncCategoryToUrl,
   ]);
 
   const clearModalFiltersAndApply = useCallback(() => {
@@ -892,11 +970,10 @@ export default function PublicEventsPage() {
       setDedicatedCategoryPage(false);
       setDraftSlugs([]);
       setSelectedSlugs([]);
-      syncCategoryToUrl([]);
     }
     setFiltersOpen(false);
     scrollToEventsViewport();
-  }, [dedicatedCategoryPage, scrollToEventsViewport, syncCategoryToUrl]);
+  }, [dedicatedCategoryPage, scrollToEventsViewport]);
 
   const { data: filterOptions } = useGetPublicEventFiltersQuery();
   const apiCategories = filterOptions?.categories ?? EMPTY_CATEGORIES;
@@ -921,7 +998,7 @@ export default function PublicEventsPage() {
     return () => window.clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const q = searchParams.get("q") || "";
     const cat = searchParams.get("category");
     const cityParam = searchParams.get("city");
@@ -937,6 +1014,7 @@ export default function PublicEventsPage() {
     const languagesFromUrl = parseCsvParam(language);
     const priceFromUrl = parseCsvParam(price);
     const moreFromUrl = parseCsvParam(more);
+    const genresFromUrl = parseCsvParam(searchParams.get("genres"));
     const nextSearch = q.trim();
 
     setSearchInput((prev) => (prev === q ? prev : q));
@@ -947,6 +1025,9 @@ export default function PublicEventsPage() {
     );
     setSelectedPriceBands((prev) => (sameStringList(prev, priceFromUrl) ? prev : priceFromUrl));
     setSelectedMore((prev) => (sameStringList(prev, moreFromUrl) ? prev : moreFromUrl));
+    setSelectedEventGenres((prev) =>
+      sameStringList(prev, genresFromUrl) ? prev : genresFromUrl
+    );
 
     if (categoryFromFilterRef.current) {
       categoryFromFilterRef.current = false;
@@ -976,6 +1057,8 @@ export default function PublicEventsPage() {
 
     if (sortParam && SORT_OPTIONS.some((o) => o.id === sortParam)) {
       setSort((prev) => (prev === sortParam ? prev : sortParam));
+    } else if (!sortParam) {
+      setSort((prev) => (prev === "recommended" ? prev : "recommended"));
     }
 
     let nextCity = "";
@@ -1033,7 +1116,8 @@ export default function PublicEventsPage() {
     dateTo,
     sort,
   ]);
-  const { data: eventsData, isLoading, isFetching } = useGetPublicEventsQuery(queryArg);
+  const { data: eventsData, isLoading, isFetching, isUninitialized } =
+    useGetPublicEventsQuery(queryArg);
   const events = eventsData ?? EMPTY_EVENTS;
 
   const unscopedQueryArg = useMemo(() => {
@@ -1041,7 +1125,11 @@ export default function PublicEventsPage() {
     return rest;
   }, [queryArg]);
 
-  const { data: allPublicEventsData } = useGetPublicEventsQuery(unscopedQueryArg, {
+  const {
+    data: allPublicEventsData,
+    isLoading: loadingAllPublic,
+    isFetching: fetchingAllPublic,
+  } = useGetPublicEventsQuery(unscopedQueryArg, {
     skip: !hasCityFilter(city),
   });
   const allPublicEvents = allPublicEventsData ?? EMPTY_EVENTS;
@@ -1050,13 +1138,30 @@ export default function PublicEventsPage() {
   /** Listing cards: city-first with same-filter all-city fallback (landing PreferCityOrAll). */
   const listingEvents = preferCityOrAll(events, allPublicEvents, hasCity);
 
-  const { data: allEventsForExploreData } = useGetPublicEventsQuery(undefined);
+  const {
+    data: allEventsForExploreData,
+    isLoading: loadingExplore,
+    isFetching: fetchingExplore,
+  } = useGetPublicEventsQuery(undefined);
   const allEventsForExplore = allEventsForExploreData ?? EMPTY_EVENTS;
 
-  const { data: artistsData } = useGetPublicRegisteredArtistsQuery();
+  const { data: artistsData, isLoading: artistsLoading } = useGetPublicRegisteredArtistsQuery();
   const artists = artistsData ?? EMPTY_ARTISTS;
 
   const exploreEventPool = hasCity ? events : allEventsForExplore;
+
+  /** True until city/global catalog settles — never flash showcase during this window. */
+  const catalogPending =
+    isUninitialized ||
+    isLoading ||
+    (isFetching && events.length === 0) ||
+    (hasCity &&
+      events.length === 0 &&
+      (loadingAllPublic || (fetchingAllPublic && allPublicEvents.length === 0))) ||
+    (!hasCity &&
+      (loadingExplore || (fetchingExplore && allEventsForExplore.length === 0)));
+
+  const showEventShowcase = !catalogPending && listingEvents.length === 0;
   const posterFallbackEvents = useMemo(
     () =>
       exploreEventPool
@@ -1113,6 +1218,8 @@ export default function PublicEventsPage() {
   );
 
   const exploreCategoriesWithEvents = useMemo(() => {
+    // While catalog loads, return empty so UI can shimmer (don't flash all static tiles)
+    if (catalogPending) return [];
     const pool =
       exploreEventPool.length > 0
         ? exploreEventPool
@@ -1123,7 +1230,7 @@ export default function PublicEventsPage() {
     return EXPLORE_EVENT_CATEGORIES.filter((cat) =>
       pool.some((event) => eventMatchesCategoryKey(event, cat.key, categoryPool))
     );
-  }, [exploreEventPool, events, posterFallbackEvents, categoryPool]);
+  }, [catalogPending, exploreEventPool, events, posterFallbackEvents, categoryPool]);
 
   const emptyShowcaseCards = useMemo(() => {
     if (selectedSlugs.length === 0) return SHOWCASE_EVENT_CARDS;
@@ -1157,10 +1264,17 @@ export default function PublicEventsPage() {
 
   const activeCategoryKey = useMemo(() => {
     if (selectedSlugs.length !== 1) return null;
-    return resolveCategoryKeyFromSlug(selectedSlugs[0], categoryPool);
+    const fromPool = resolveCategoryKeyFromSlug(selectedSlugs[0], categoryPool);
+    if (fromPool) return fromPool;
+    // URL slug may match a known category key before API category pool loads
+    const raw = selectedSlugs[0].trim().toLowerCase();
+    const known = EVENT_CATEGORY_OPTIONS.find(
+      (opt) => opt.key === raw || opt.label.toLowerCase() === raw
+    );
+    return known?.key ?? null;
   }, [selectedSlugs, categoryPool]);
 
-  const isCategoryBrowse = Boolean(dedicatedCategoryPage && activeCategoryKey);
+  const isCategoryBrowse = Boolean(dedicatedCategoryPage && selectedSlugs.length === 1);
 
   const categoryTypeId = useMemo(() => {
     if (!isCategoryBrowse || selectedSlugs.length !== 1) return undefined;
@@ -1253,7 +1367,6 @@ export default function PublicEventsPage() {
     setSearchInput("");
     setSearch("");
     setSort("recommended");
-    syncCategoryToUrl([]);
   };
 
   const toggleEventGenre = (name: string) => {
@@ -1334,7 +1447,7 @@ export default function PublicEventsPage() {
     : "All Events";
 
   /** Selected city has zero events — show under event section titles (listing + category browse). */
-  const cityHasNoEvents = hasCity && !isLoading && events.length === 0;
+  const cityHasNoEvents = hasCity && !catalogPending && events.length === 0;
 
   /** District-style hero: city-scoped is_promoted first (landing parity — no cross-city filler). */
   const promoEvents = useMemo(() => {
@@ -1505,20 +1618,28 @@ export default function PublicEventsPage() {
   };
 
   const recommendedEvents = useMemo(() => {
-    // City → global (listingEvents via preferCityOrAll) → poster/showcase fallback when both empty
+    if (catalogPending) return [];
+    // City → global (listingEvents via preferCityOrAll) → poster fallback when both empty
     const poolSource = listingEvents.length ? listingEvents : posterFallbackEvents;
     const promoted = poolSource.filter((e) => e.is_promoted);
     const pool = promoted.length ? promoted : poolSource;
     return pool.slice(0, 15);
-  }, [listingEvents, posterFallbackEvents]);
+  }, [catalogPending, listingEvents, posterFallbackEvents]);
 
   const recommendSlideCount =
-    recommendedEvents.length > 0 ? recommendedEvents.length : emptyShowcaseCards.slice(0, 8).length;
+    catalogPending
+      ? 4
+      : recommendedEvents.length > 0
+        ? recommendedEvents.length
+        : emptyShowcaseCards.slice(0, 8).length;
   const recommendScrollEdges = useHorizontalScrollEdges(recommendRef, [
     recommendSlideCount,
-    isLoading,
+    catalogPending,
   ]);
-  const artistsScrollEdges = useHorizontalScrollEdges(artistsRef, [artists.length]);
+  const artistsScrollEdges = useHorizontalScrollEdges(artistsRef, [
+    artists.length,
+    artistsLoading,
+  ]);
 
   const onExploreCategory = (key: string) => {
     const slug = resolveCategorySlug(key, categoryPool);
@@ -2170,7 +2291,7 @@ export default function PublicEventsPage() {
       </div>
 
       <div className={`${CONTAINER} pt-5`}>
-        {isLoading || (isFetching && paged.length === 0) ? (
+        {catalogPending ? (
           <EventListShimmer />
         ) : paged.length === 0 ? (
           hasNonCityFilters || Boolean(search.trim()) ? (
@@ -2185,11 +2306,13 @@ export default function PublicEventsPage() {
                 Clear filters
               </button>
             </div>
-          ) : hasCity && listingEvents.length === 0 ? (
+          ) : showEventShowcase ? (
             <div className="space-y-4">
-              <p className="text-sm text-slate-500 text-center sm:text-left">
-                Showing highlights while we wait for events in your city.
-              </p>
+              {hasCity ? (
+                <p className="text-sm text-slate-500 text-center sm:text-left">
+                  Showing highlights while we wait for events in your city.
+                </p>
+              ) : null}
               <div className="mx-auto grid w-full grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
                 {emptyShowcaseCards.map((event) => (
                   <ShowcaseEventPosterCard
@@ -2206,20 +2329,7 @@ export default function PublicEventsPage() {
               </div>
             </div>
           ) : (
-            <div className="mx-auto grid w-full  grid-cols-1 gap-5 md:max-w-none md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
-              {emptyShowcaseCards.map((event) => (
-                <ShowcaseEventPosterCard
-                  key={event.id}
-                  title={event.title}
-                  image={event.image}
-                  showDate={event.showDate}
-                  place={event.place}
-                  eventType={event.eventType}
-                  href={event.href}
-                  fullWidth
-                />
-              ))}
-            </div>
+            <EventListShimmer />
           )
         ) : (
           <div className="  grid w-full  grid-cols-1 gap-5  md:grid-cols-2 md:gap-4 lg:grid-cols-4 lg:gap-5">
@@ -2267,7 +2377,9 @@ export default function PublicEventsPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Movie-style native hero (mobile feature cards + desktop blur banner) */}
-      {activeHeroEvent ? (
+      {catalogPending && !activeHeroEvent ? (
+        <EventHeroShimmer />
+      ) : activeHeroEvent ? (
         <>
           {/* Mobile + tablet — featured cards (centered active + side peeks) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
@@ -2451,7 +2563,18 @@ export default function PublicEventsPage() {
       {!isCategoryBrowse ? (
         <>
           {/* 2) Explore Events — polished pastel category cards */}
-          {exploreCategoriesWithEvents.length > 0 ? (
+          {catalogPending ? (
+            <section className="pt-8 sm:pt-10 pb-3 bg-white">
+              <div className={CONTAINER}>
+                <div className="min-w-0 pb-4">
+                  <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+                    Explore Events
+                  </h2>
+                </div>
+                <EventExploreShimmer count={6} />
+              </div>
+            </section>
+          ) : exploreCategoriesWithEvents.length > 0 ? (
             <section className="pt-8 sm:pt-10 pb-3 bg-white">
               <div className={CONTAINER}>
                 <div className="min-w-0 pb-4">
@@ -2579,7 +2702,9 @@ export default function PublicEventsPage() {
                   ) : null}
                 </div>
               </div>
-              {recommendedEvents.length > 0 ? (
+              {catalogPending ? (
+                <CustomerRailShimmer count={4} variant="poster" />
+              ) : recommendedEvents.length > 0 ? (
                 <>
                   <div
                     ref={recommendRef}
@@ -2605,7 +2730,7 @@ export default function PublicEventsPage() {
                     label="recommended events"
                   />
                 </>
-              ) : (
+              ) : showEventShowcase ? (
                 <>
                   <div
                     ref={recommendRef}
@@ -2638,6 +2763,8 @@ export default function PublicEventsPage() {
                     label="recommended events"
                   />
                 </>
+              ) : (
+                <CustomerRailShimmer count={4} variant="poster" />
               )}
             </div>
           </section>
@@ -2650,7 +2777,9 @@ export default function PublicEventsPage() {
                   {city ? `Artists in ${headingCity}` : "Artists in your District"}
                 </h2>
               </div>
-              {artists.length > 0 ? (
+              {artistsLoading ? (
+                <ArtistRailShimmer count={6} />
+              ) : artists.length > 0 ? (
                 <>
                   <div
                     ref={artistsRef}

@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Heart, Loader2, Search } from "lucide-react";
+import { Heart, Search } from "lucide-react";
 import {
   useGetPublicRegisteredCinemasQuery,
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { cinemaHref } from "@/lib/businessPublicPath";
+import { CinemaListShimmer } from "@/components/Shared/Shimmer";
 
 const PAGE_BG = "#f5f5f5";
 
@@ -214,10 +215,7 @@ export default function CinemaListingPage() {
         </div>
 
         {isLoading && apiCinemas.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
-            <Loader2 size={32} className="animate-spin text-[#6900AA]" />
-            <p className="text-sm font-medium">Loading cinemas...</p>
-          </div>
+          <CinemaListShimmer count={6} />
         ) : cinemas.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-lg border border-slate-200">
             <p className="text-slate-600 font-medium">No cinemas found</p>

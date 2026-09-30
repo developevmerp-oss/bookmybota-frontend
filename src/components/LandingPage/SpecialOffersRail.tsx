@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, Flame, Loader2, Sparkles, Users } from "lucide-react";
+import { Calendar, Flame, Sparkles, Users } from "lucide-react";
 import { useGetActivePlatformOffersQuery, type PlatformOffer } from "@/services/api";
 import { formatDateCustomer } from "@/lib/dateFormat";
 import { formatMoney, formatWholeNumber } from "@/lib/currencyFormat";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { readSessionForRole } from "@/lib/authStorage";
+import { OffersRailShimmer } from "@/components/Shared/Shimmer";
 import { RailPagerNav } from "./RailChrome";
 import "./SpecialOffersRail.css";
 
@@ -245,10 +246,7 @@ export default function SpecialOffersRail({ city = "" }: { city?: string }) {
 
         <div>
           {isLoading || (isFetching && offers.length === 0) ? (
-            <div className="flex items-center justify-center py-12 type-body text-[#666] gap-2">
-              <Loader2 className="animate-spin" size={20} />
-              Loading offers…
-            </div>
+            <OffersRailShimmer count={4} />
           ) : (
             <>
               <div ref={scrollerRef} className="offers-rail">

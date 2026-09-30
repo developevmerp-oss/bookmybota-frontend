@@ -20,6 +20,7 @@ import {
   listingPromoQueryArgs,
   type ListingPromoCategory,
 } from "@/lib/listingPromoLogic";
+import { PromoBannerShimmer } from "@/components/Shared/Shimmer";
 import "./PromoBannerCarousel.css";
 
 export type ListingPromoSlide = {
@@ -458,15 +459,7 @@ export default function ListingPromoSlider({
   const [activeDot, setActiveDot] = useState(0);
 
   if (isLoading) {
-    return (
-      <section
-        className={`promo-banner-swiper is-single w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 ${className}`}
-      >
-        <div className="promo-banner-single-wrap">
-          <div className="promo-banner-frame rounded-2xl sm:rounded-3xl overflow-hidden promo-slide-skeleton" />
-        </div>
-      </section>
-    );
+    return <PromoBannerShimmer />;
   }
 
   if (slides.length === 0) return null;

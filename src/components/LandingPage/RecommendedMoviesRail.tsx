@@ -17,6 +17,7 @@ import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { hasCityFilter, shouldShowShowcaseCards } from "./homeUtils";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
+import { CustomerRailShimmer } from "@/components/Shared/Shimmer";
 import "./RecommendedMoviesRail.css";
 
 const MIN_VISIBLE = 4;
@@ -186,24 +187,7 @@ export default function RecommendedMoviesRail() {
 
         <div>
           {isLoading ? (
-            <AdaptiveCardRow
-              minVisible={MIN_VISIBLE}
-              scrollerRef={scrollerRef}
-              className="adaptive-card-row--four"
-            >
-              {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-full overflow-hidden rounded-2xl border border-[#EAEAEA] bg-white"
-                >
-                  <div className="aspect-[3/4] w-full bg-[#F7F7F7]" />
-                  <div className="px-3 pt-3 pb-3.5 space-y-2">
-                    <div className="h-4 w-4/5 rounded bg-[#F7F7F7]" />
-                    <div className="h-3.5 w-3/5 rounded bg-[#F7F7F7]" />
-                  </div>
-                </div>
-              ))}
-            </AdaptiveCardRow>
+            <CustomerRailShimmer count={MIN_VISIBLE} variant="movie" />
           ) : items.length === 0 ? (
             <p className="text-sm text-[#6B7280] py-6">No movies available yet.</p>
           ) : (

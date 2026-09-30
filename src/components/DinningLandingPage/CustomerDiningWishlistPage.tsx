@@ -14,6 +14,7 @@ import { listingOfferLabel } from "@/lib/diningOffers";
 import { extractApiError } from "@/lib/apiErrors";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
+import { CustomerPageShimmer } from "@/components/Shared/Shimmer";
 
 function WishlistRestaurantCard({
   restaurant,
@@ -136,10 +137,7 @@ export default function CustomerDiningWishlistPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
-            <Loader2 className="animate-spin" size={22} />
-            Loading favourites…
-          </div>
+          <CustomerPageShimmer rows={6} />
         ) : isError ? (
           <div className="text-center py-16">
             <p className="text-slate-600 font-medium">Could not load your favourites.</p>

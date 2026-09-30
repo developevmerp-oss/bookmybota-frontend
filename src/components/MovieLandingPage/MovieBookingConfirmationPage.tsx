@@ -25,6 +25,7 @@ import { useGetMovieBookingQuery } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
 import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { buildMovieTicketPdf, downloadPdfBlob } from "@/lib/movieTicketPdf";
+import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 interface MovieBookingConfirmationPageProps {
   bookingId: string;
@@ -105,12 +106,7 @@ export default function MovieBookingConfirmationPage({
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F5F5F7] text-slate-800 flex flex-col items-center justify-center gap-3">
-        <Loader2 className="size-10 animate-spin text-[#6900AA]" />
-        <p className="text-sm font-medium text-slate-500">Loading your M-Ticket…</p>
-      </div>
-    );
+    return <CustomerFullscreenShimmer label="Loading ticket" />;
   }
 
   if (isError || !booking) {

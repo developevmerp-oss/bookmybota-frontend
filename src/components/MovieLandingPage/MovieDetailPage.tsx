@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { useParams } from "next/navigation";
 
-import { ArrowRight, ChevronRight, Loader2, Play, Share2, Star, ThumbsUp } from "lucide-react";
+import { ArrowRight, ChevronRight, Play, Share2, Star, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import MovieTrailerModal from "@/components/MovieLandingPage/MovieTrailerModal";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
@@ -24,6 +24,7 @@ import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSectio
 import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import { useSelectedCity } from "@/lib/useSelectedCity";
+import { MovieDetailShimmer } from "@/components/Shared/Shimmer";
 
 
 
@@ -393,19 +394,7 @@ export default function MovieDetailPage() {
 
 
   if (isLoading) {
-
-    return (
-
-      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 text-slate-400">
-
-        <Loader2 className="size-8 animate-spin text-[#6900AA]" />
-
-        <p className="text-sm sm:text-base font-medium">Loading movie...</p>
-
-      </div>
-
-    );
-
+    return <MovieDetailShimmer />;
   }
 
 

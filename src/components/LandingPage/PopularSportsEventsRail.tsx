@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { SHOWCASE_SPORTS_EVENT_CARDS } from "@/data/showcaseEventCards";
+import { CustomerRailShimmer } from "@/components/Shared/Shimmer";
 import AdaptiveCardRow from "./AdaptiveCardRow";
 import CitySectionEmptyNotice from "./CitySectionEmptyNotice";
 import { RailPagerNav, RailSeeAllLink } from "./RailChrome";
@@ -62,19 +63,7 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
 
         <div>
           {isLoading ? (
-            <AdaptiveCardRow
-              minVisible={MIN_VISIBLE}
-              scrollerRef={scrollerRef}
-              className="adaptive-card-row--four"
-            >
-              {Array.from({ length: MIN_VISIBLE }).map((_, i) => (
-                <div key={i} className="adaptive-card-slot">
-                  <div className="aspect-[2/3] w-full rounded-xl bg-[#F7F7F7]" />
-                  <div className="mt-3 h-4 w-4/5 rounded bg-[#F7F7F7]" />
-                  <div className="mt-2 h-3 w-3/5 rounded bg-[#F7F7F7]" />
-                </div>
-              ))}
-            </AdaptiveCardRow>
+            <CustomerRailShimmer count={MIN_VISIBLE} variant="poster" />
           ) : isEmpty && !useStatic ? (
             <p className="text-sm text-[#6B7280] py-6">No sports events available yet.</p>
           ) : (

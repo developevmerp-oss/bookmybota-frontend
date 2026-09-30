@@ -602,10 +602,10 @@ export function OffersRailShimmer({ count = 4 }: { count?: number }) {
 export function PromoBannerShimmer() {
   return (
     <Wrap>
-      <div className="w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4" aria-busy="true" aria-label="Loading promotions">
-        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6">
-          <div className="overflow-hidden rounded-2xl sm:rounded-3xl aspect-[21/9] min-h-[160px] sm:min-h-[220px]">
-            <Skeleton className="!block !h-full !w-full !rounded-2xl sm:!rounded-3xl" height="100%" />
+      <div className="w-full bg-white pt-5 sm:pt-6 lg:pt-7 pb-5 sm:pb-6 lg:pb-7" aria-busy="true" aria-label="Loading promotions">
+        <div className="relative flex w-full justify-center h-[250px] sm:h-[320px] md:h-[380px] lg:h-[440px] xl:h-[480px]">
+          <div className="h-full aspect-[21/9] max-w-[96vw] overflow-hidden rounded-xl sm:rounded-2xl bg-[#111]">
+            <Skeleton className="!block !h-full !w-full !rounded-xl sm:!rounded-2xl" height="100%" />
           </div>
         </div>
       </div>

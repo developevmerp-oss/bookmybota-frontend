@@ -292,17 +292,16 @@ function SlideCard({ slide }: { slide: Slide }) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(slide.image) && !failed;
 
-  // Customer landing: banner image only — no dark scrim, text panel, or accent overlay.
-  // Whole card is already wrapped in <Link href={slide.href}>.
+  // Frame is 21:9 — same crop partners use when uploading slider banners.
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 overflow-hidden bg-[#111]">
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={slide.image}
           alt=""
           aria-hidden
-          className="promo-slide-photo h-full w-full object-cover"
+          className="promo-slide-photo h-full w-full object-cover object-center"
           draggable={false}
           onError={() => setFailed(true)}
         />
@@ -376,39 +375,35 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
   const slides = useMemo<Slide[]>(() => {
     const linkCtx = { city, eventsById, moviesById, diningById };
 
+    const dedupeByImage = (list: Slide[]) => {
+      const seen = new Set<string>();
+      return list.filter((s) => {
+        const key = (s.image || "").trim();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
     // Priority 1: location-scoped landing-slider promotions (API filters by city)
     if (promotions.length > 0) {
-      const fromPromos = promotions
-        .slice(0, 10)
-        .map((p) => promoToSlide(p, linkCtx))
-        .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()));
+      const fromPromos = dedupeByImage(
+        promotions
+          .slice(0, 10)
+          .map((p) => promoToSlide(p, linkCtx))
+          .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()))
+      );
       if (fromPromos.length > 0) return fromPromos;
     }
 
     // Priority 2: location-scoped events only — hide section if none for this city
-    return locationBannerEvents
-      .slice(0, 8)
-      .map((event) => eventToSlide(event, city))
-      .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()));
+    return dedupeByImage(
+      locationBannerEvents
+        .slice(0, 8)
+        .map((event) => eventToSlide(event, city))
+        .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()))
+    );
   }, [promotions, locationBannerEvents, city, eventsById, moviesById, diningById]);
-
-  // Peek gutters need neighboring cards. With only 2–3 slides Swiper can't fill
-  // left/right peeks, so duplicate until we have enough for a seamless loop.
-  const displaySlides = useMemo(() => {
-    if (slides.length <= 1) return slides;
-    const minNeeded = 6;
-    if (slides.length >= minNeeded) return slides;
-    const out: Slide[] = [];
-    let copy = 0;
-    while (out.length < minNeeded) {
-      for (const s of slides) {
-        out.push(copy === 0 ? s : { ...s, id: `${s.id}__c${copy}` });
-        if (out.length >= minNeeded) break;
-      }
-      copy += 1;
-    }
-    return out;
-  }, [slides]);
 
   const loading =
     loadingPromos ||
@@ -422,35 +417,39 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
   if (slides.length === 0) return null;
 
   const multi = slides.length > 1;
+  // Loop clones only — never pad the track with copied promotions (that made
+  // the same DJ Night appear in the center and side peeks at once).
+  const canLoop = slides.length >= 3;
   const originalCount = slides.length;
 
   return (
     <section
-      className={`promo-banner-swiper w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 ${
+      className={`promo-banner-swiper w-full bg-white pt-5 sm:pt-6 lg:pt-7 pb-5 sm:pb-6 lg:pb-7 ${
         multi ? "is-multi" : "is-single"
       }`}
     >
-      <div className={`relative w-full ${multi ? "" : "promo-banner-single-wrap"}`}>
+      <div className={`relative w-full promo-banner-frame ${multi ? "" : "promo-banner-single-wrap"}`}>
         <Swiper
-          key={`promo-dyn-${slides.map((s) => s.id).join("-")}-${displaySlides.length}`}
+          key={`promo-dyn-${slides.map((s) => s.id).join("-")}`}
           modules={[Autoplay, Navigation]}
           className="promo-banner-peek w-full"
-          loop={multi}
-          loopAdditionalSlides={multi ? 2 : 0}
+          loop={canLoop}
+          loopAdditionalSlides={canLoop ? 1 : 0}
+          rewind={!canLoop && multi}
           speed={600}
           centeredSlides={multi}
           centeredSlidesBounds={!multi}
           grabCursor={multi}
           allowTouchMove={multi}
           slidesPerView={multi ? "auto" : 1}
-          spaceBetween={multi ? 14 : 0}
+          spaceBetween={multi ? 12 : 0}
           watchSlidesProgress={multi}
           breakpoints={
             multi
               ? {
-                  640: { spaceBetween: 16 },
-                  768: { spaceBetween: 18 },
-                  1024: { spaceBetween: 20 },
+                  640: { spaceBetween: 14 },
+                  768: { spaceBetween: 16 },
+                  1024: { spaceBetween: 18 },
                 }
               : undefined
           }
@@ -500,12 +499,12 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
             setActiveDot(real);
           }}
         >
-          {displaySlides.map((slide) => (
+          {slides.map((slide) => (
             <SwiperSlide key={slide.id} className="promo-banner-slide">
               <Link
                 href={slide.href}
                 aria-label={`${slide.title}${slide.year ? ` ${slide.year}` : ""}`}
-                className="promo-banner-card group relative flex h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
+                className="promo-banner-card group relative block h-full w-full overflow-hidden rounded-xl sm:rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
               >
                 <SlideCard slide={slide} />
               </Link>
@@ -521,7 +520,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
               aria-label="Previous banner"
               className="promo-nav-btn promo-nav-prev"
             >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.25} />
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
             </button>
             <button
               ref={nextRef}
@@ -529,7 +528,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
               aria-label="Next banner"
               className="promo-nav-btn promo-nav-next"
             >
-              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.25} />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
             </button>
             <div className="promo-banner-dots" role="tablist" aria-label="Banner slides">
               {slides.map((slide, index) => (
@@ -543,8 +542,8 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
                   onClick={() => {
                     const swiper = swiperRef.current;
                     if (!swiper) return;
-                    // Jump to the matching slide in the first copy set
-                    swiper.slideToLoop(index);
+                    if (canLoop) swiper.slideToLoop(index);
+                    else swiper.slideTo(index);
                     setActiveDot(index);
                   }}
                 />

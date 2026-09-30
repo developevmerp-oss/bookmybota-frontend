@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, Crown } from "lucide-react";
 import { useGetPublicMoviesQuery, type Movie } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
@@ -87,11 +87,13 @@ function MovieCard({ movie }: { movie: RailMovieCard }) {
               <Clapperboard size={32} strokeWidth={1.4} />
             </div>
           )}
-          {movie.promoted ? (
-            <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
-          ) : null}
-          {movie.comingSoon && !movie.promoted ? (
+          {movie.comingSoon ? (
             <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
+          ) : movie.promoted ? (
+            <span className="movies-rail-badge movies-rail-badge--promoted">
+              <Crown size={11} className="shrink-0 text-[#FCD34D]" strokeWidth={2.25} fill="#FCD34D" />
+              Promoted
+            </span>
           ) : null}
         </div>
         <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">
@@ -175,7 +177,7 @@ export default function RecommendedMoviesRail() {
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
               Must-Watch Movies
             </h2>
             {cityHasNoMovies ? (

@@ -85,7 +85,7 @@ export default function ContentRail({
               </p>
             ) : null}
             <h2
-              className={`text-xl sm:text-2xl lg:text-xl font-bold ${
+              className={`text-xl sm:text-2xl font-bold ${
                 dark ? "text-white" : "text-slate-800"
               }`}
             >

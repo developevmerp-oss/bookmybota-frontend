@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
-// font family
-import { Manrope } from "next/font/google";
+import { Inter } from "next/font/google";
 import RootLayoutClient from "./RootLayoutClient";
 import "./globals.css";
-// font family
+
+/** Active system-wide UI font. */
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+/* ─── Previous font (Manrope) — keep for easy restore ───
+import { Manrope } from "next/font/google";
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-manrope",
   weight: ["400", "500", "600", "700", "800"],
 });
+─── */
 
 /** Bump this when replacing favicon files so browsers drop stale cache. */
 const FAVICON_V = "20260923";
@@ -54,7 +63,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="customer-theme" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`customer-theme ${inter.variable} ${inter.className}`}
+      suppressHydrationWarning
+    >
       <head>
         <link rel="icon" href={`/favicon.ico?v=${FAVICON_V}`} sizes="any" />
         <link
@@ -73,9 +86,8 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href={`/apple-icon.png?v=${FAVICON_V}`} />
         <link rel="shortcut icon" href={`/favicon.ico?v=${FAVICON_V}`} />
       </head>
-      {/* font family */}
-      <body className={`${manrope.className} ${manrope.variable}`}>
-      {/* <body> */}
+      {/* Previous body: className={`${manrope.className} ${manrope.variable}`} */}
+      <body className={inter.className}>
         <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>

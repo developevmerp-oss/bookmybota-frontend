@@ -16,7 +16,6 @@ import { promotionClickHref } from "@/lib/promotionCta";
 import { eventLandscape, eventPortrait, hasCityFilter } from "./homeUtils";
 import {
   campaignsWithBanner,
-  duplicateSlidesForPeek,
   listingPromoQueryArgs,
   type ListingPromoCategory,
 } from "@/lib/listingPromoLogic";
@@ -441,17 +440,30 @@ export default function ListingPromoSlider({
       moviesById: moviesById || new Map(),
       diningById: diningById || new Map(),
     };
-    const fromCampaigns = campaignsWithBanner(promotions)
-      .slice(0, 10)
-      .map((p) => campaignToListingSlide(p, linkCtx))
-      .filter((s): s is ListingPromoSlide => Boolean(s?.image?.trim() && s?.title?.trim()));
-    if (fromCampaigns.length > 0) return fromCampaigns;
-    return fallbackSlides
-      .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()))
-      .slice(0, 8);
-  }, [promotions, fallbackSlides, city, eventsById, moviesById, diningById]);
 
-  const displaySlides = useMemo(() => duplicateSlidesForPeek(slides), [slides]);
+    const dedupeByImage = (list: ListingPromoSlide[]) => {
+      const seen = new Set<string>();
+      return list.filter((s) => {
+        const key = (s.image || "").trim();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
+    const fromCampaigns = dedupeByImage(
+      campaignsWithBanner(promotions)
+        .slice(0, 10)
+        .map((p) => campaignToListingSlide(p, linkCtx))
+        .filter((s): s is ListingPromoSlide => Boolean(s?.image?.trim() && s?.title?.trim()))
+    );
+    if (fromCampaigns.length > 0) return fromCampaigns;
+    return dedupeByImage(
+      fallbackSlides
+        .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()))
+        .slice(0, 8)
+    );
+  }, [promotions, fallbackSlides, city, eventsById, moviesById, diningById]);
 
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
@@ -465,21 +477,24 @@ export default function ListingPromoSlider({
   if (slides.length === 0) return null;
 
   const multi = slides.length > 1;
+  // Loop clones only — never pad with copied slides (same promo in center + peeks).
+  const canLoop = slides.length >= 3;
   const originalCount = slides.length;
 
   return (
     <section
-      className={`promo-banner-swiper w-full bg-white pt-3 sm:pt-4 pb-3 sm:pb-4 ${
+      className={`promo-banner-swiper w-full bg-white pt-5 sm:pt-6 lg:pt-7 pb-5 sm:pb-6 lg:pb-7 ${
         multi ? "is-multi" : "is-single"
       } ${className}`}
     >
-      <div className={`relative w-full ${multi ? "" : "promo-banner-single-wrap"}`}>
+      <div className={`relative w-full promo-banner-frame ${multi ? "" : "promo-banner-single-wrap"}`}>
         <Swiper
-          key={`listing-promo-${category}-${hasCity ? city : "all"}-${slides.map((s) => s.id).join("-")}-${displaySlides.length}`}
+          key={`listing-promo-${category}-${hasCity ? city : "all"}-${slides.map((s) => s.id).join("-")}`}
           modules={[Autoplay, Navigation]}
           className="promo-banner-peek w-full"
-          loop={multi}
-          loopAdditionalSlides={multi ? 2 : 0}
+          loop={canLoop}
+          loopAdditionalSlides={canLoop ? 1 : 0}
+          rewind={!canLoop && multi}
           speed={600}
           centeredSlides={multi}
           centeredSlidesBounds={!multi}
@@ -543,7 +558,7 @@ export default function ListingPromoSlider({
             setActiveDot(real);
           }}
         >
-          {displaySlides.map((slide) => (
+          {slides.map((slide) => (
             <SwiperSlide key={slide.id} className="promo-banner-slide">
               <Link
                 href={slide.href}
@@ -564,7 +579,7 @@ export default function ListingPromoSlider({
               aria-label="Previous banner"
               className="promo-nav-btn promo-nav-prev"
             >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.25} />
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
             </button>
             <button
               ref={nextRef}
@@ -572,7 +587,7 @@ export default function ListingPromoSlider({
               aria-label="Next banner"
               className="promo-nav-btn promo-nav-next"
             >
-              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.25} />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
             </button>
             <div className="promo-banner-dots" role="tablist" aria-label="Banner slides">
               {slides.map((slide, index) => (
@@ -586,7 +601,8 @@ export default function ListingPromoSlider({
                   onClick={() => {
                     const swiper = swiperRef.current;
                     if (!swiper) return;
-                    swiper.slideToLoop(index);
+                    if (canLoop) swiper.slideToLoop(index);
+                    else swiper.slideTo(index);
                     setActiveDot(index);
                   }}
                 />

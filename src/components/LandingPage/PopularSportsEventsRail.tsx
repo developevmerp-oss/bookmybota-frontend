@@ -51,7 +51,7 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
               Popular Sports Events
             </h2>
             {cityHasNoSports ? (

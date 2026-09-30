@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
+  Crown,
   Star,
   ThumbsUp,
   Ticket,
@@ -397,12 +398,14 @@ function MovieCard({ movie }: { movie: MovieCardData }) {
           )}
         </div>
 
-        {movie.promoted && (
-          <span className="movie-listing-badge movie-listing-badge--promoted">Promoted</span>
-        )}
-        {movie.comingSoon && !movie.promoted && (
+        {movie.comingSoon ? (
           <span className="movie-listing-badge movie-listing-badge--soon">Coming Soon</span>
-        )}
+        ) : movie.promoted ? (
+          <span className="movie-listing-badge movie-listing-badge--promoted">
+            <Crown size={11} className="shrink-0 text-[#FCD34D]" strokeWidth={2.25} fill="#FCD34D" />
+            Promoted
+          </span>
+        ) : null}
 
         {(movie.likes || movie.rating) && (
           <div className="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-1.5 bg-black/45 backdrop-blur-[2px] px-2 py-1 text-white">

@@ -524,6 +524,20 @@
     animation: fadeIn 0.25s ease-out forwards;
   }
 
+  @keyframes diningLightboxSlideUp {
+    from {
+      transform: translateY(28%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  .animate-diningLightboxSlideUp {
+    animation: diningLightboxSlideUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
   @keyframes successCheckCircle {
     from { stroke-dashoffset: 151; }
     to { stroke-dashoffset: 0; }

@@ -501,14 +501,15 @@ export default function ListingPromoSlider({
           grabCursor={multi}
           allowTouchMove={multi}
           slidesPerView={multi ? "auto" : 1}
-          spaceBetween={multi ? 14 : 0}
+          spaceBetween={multi ? 8 : 0}
           watchSlidesProgress={multi}
           breakpoints={
             multi
               ? {
-                  640: { spaceBetween: 16 },
-                  768: { spaceBetween: 18 },
-                  1024: { spaceBetween: 20 },
+                  640: { spaceBetween: 10 },
+                  768: { spaceBetween: 12 },
+                  1024: { spaceBetween: 14 },
+                  1280: { spaceBetween: 16 },
                 }
               : undefined
           }

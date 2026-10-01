@@ -46,28 +46,28 @@ export default function Home() {
         <PromoBannerCarousel city={city} />
         <LiveCategoryTiles city={city} />
       </div>
-      <PopularDiningRail city={city} />
+      {/* <PopularDiningRail city={city} />
       <FeaturedDiningRail city={city} />
-      <OverlayDiningRail city={city} />
+      <OverlayDiningRail city={city} /> */}
       <EditorialDiningRail city={city} />
-      <BarSceneRail city={city} />
+      {/* <BarSceneRail city={city} />
       <FeaturedBarRail city={city} />
-      <OverlayBarRail city={city} />
+      <OverlayBarRail city={city} /> */}
       <EditorialBarRail city={city} />
       <TopArtistsRail />
-      <RecommendedMoviesRail />
+      {/* <RecommendedMoviesRail />
       <FeaturedMoviesRail />
-      <CompactMoviesRail />
+      <CompactMoviesRail /> */}
       <NotifyMoviesRail />
       <PopularEventsRail city={city} />
-      <FeaturedPopularEventsRail city={city} />
+      {/* <FeaturedPopularEventsRail city={city} />
       <OverlayPopularEventsRail city={city} />
-      <EditorialPopularEventsRail city={city} />
+      <EditorialPopularEventsRail city={city} /> */}
       <SpecialOffersRail city={city} />
       <PopularSportsEventsRail city={city} />
-      <FeaturedSportsEventsRail city={city} />
+      {/* <FeaturedSportsEventsRail city={city} />
       <OverlaySportsEventsRail city={city} />
-      <EditorialSportsEventsRail city={city} />
+      <EditorialSportsEventsRail city={city} /> */}
       <Footer />
     </div>
   );

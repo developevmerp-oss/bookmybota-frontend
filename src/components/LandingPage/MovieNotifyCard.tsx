@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Clapperboard } from "lucide-react";
+import { ArrowRight, Clapperboard, Crown, Star } from "lucide-react";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import {
   formatMovieReleaseLabel,
@@ -16,7 +16,7 @@ const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
 /**
- * Notify / Coming Soon movie card — status label, tag line, release date, Notify Me CTA.
+ * Must-Watch movie card — status + rating on poster, genre meta, release date, CTA.
  */
 export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -24,11 +24,14 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
   const meta = movieDetailMeta(movie);
   const releaseLabel = formatMovieReleaseLabel(movie.releaseDate);
   const comingSoon = Boolean(movie.comingSoon);
-  const statusLabel = comingSoon
-    ? "Coming Soon"
-    : movie.promoted
-      ? "Promoted"
-      : "Now Showing";
+  const promoted = Boolean(movie.promoted);
+  const rating = meta.rating;
+  const showRating = rating != null;
+  const ctaClass =
+    "shrink-0 inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-[12px] font-semibold tracking-wide text-[#1C1C1C] shadow-sm transition-colors border-[#D4C4A8] group-hover:border-[#B08D57]";
+
+  // Genre · Language · Format
+  const detailParts = [meta.genres, meta.language, meta.format].filter(Boolean);
 
   return (
     <Link href={movie.href} className={`group block h-full w-full ${cardShell}`}>
@@ -50,39 +53,73 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
             </div>
           )}
 
+          {/* Status — top left on poster (Coming Soon wins over Promoted) */}
+          {comingSoon ? (
+            <span className="absolute top-3 left-3 z-[2] inline-flex max-w-[65%] items-center rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white backdrop-blur-[2px] shadow-sm">
+              Coming Soon
+            </span>
+          ) : promoted ? (
+            <span className="absolute top-3 left-3 z-[2] inline-flex max-w-[65%] items-center gap-1 rounded-full bg-[#6900AA] px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white shadow-sm">
+              <Crown
+                size={11}
+                className="shrink-0 text-[#FCD34D]"
+                strokeWidth={2.25}
+                fill="#FCD34D"
+              />
+              Promoted
+            </span>
+          ) : null}
+
           <MovieWishlistButton
             movieId={String(movie.id)}
             tone="onLight"
             className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
           />
+
+          {/* Rating — bottom right on poster */}
+          {showRating ? (
+            <span className="absolute bottom-3 right-3 z-[2] inline-flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-1 text-white backdrop-blur-[2px]">
+              <Star
+                size={11}
+                className="fill-[#F5C518] text-[#F5C518]"
+                strokeWidth={0}
+              />
+              <span className="text-[12px] font-bold tabular-nums leading-none">
+                {rating.toFixed(1)}
+              </span>
+            </span>
+          ) : null}
         </div>
 
-        <div className="flex flex-1 flex-col gap-2 px-3.5 pt-3.5 pb-3.5 min-w-0">
-          <div className="min-w-0">
-            <p
-              className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.08em]"
-              style={{ color: ACCENT }}
-            >
-              {statusLabel}
-            </p>
-            <span
-              className="mt-1 block h-px w-8"
-              style={{ backgroundColor: ACCENT }}
-              aria-hidden
-            />
-          </div>
-
+        <div className="flex flex-col gap-1 px-3.5 pt-3 pb-3.5 min-w-0">
           <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate leading-snug">
             {movie.title}
           </h3>
 
-          {meta.tagLine ? (
-            <p className="text-sm tracking-wide text-gray-600 truncate leading-snug">
-              {meta.tagLine}
+          {showRating || detailParts.length > 0 ? (
+            <p className="inline-flex items-center gap-1.5 min-w-0 text-sm tracking-wide text-gray-600 truncate leading-snug">
+              {showRating ? (
+                <>
+                  <Star
+                    size={12}
+                    className="shrink-0 fill-[#F5C518] text-[#F5C518]"
+                    strokeWidth={0}
+                  />
+                  <span className="font-semibold text-[#1C1C1C] tabular-nums">
+                    {rating.toFixed(1)}
+                  </span>
+                  {detailParts.length > 0 ? (
+                    <span className="text-gray-400">·</span>
+                  ) : null}
+                </>
+              ) : null}
+              {detailParts.length > 0 ? (
+                <span className="truncate">{detailParts.join(" · ")}</span>
+              ) : null}
             </p>
           ) : null}
 
-          <div className="mt-auto flex items-center justify-between gap-2 pt-3 min-w-0">
+          <div className="flex items-center justify-between gap-2 pt-1.5 min-w-0">
             {releaseLabel ? (
               <p
                 className="min-w-0 truncate text-sm font-semibold tracking-wide"
@@ -95,12 +132,12 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
             )}
 
             {comingSoon ? (
-              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[12px] font-semibold tracking-wide text-[#1C1C1C] shadow-sm group-hover:border-[#D1D5DB]">
-                Notify Me
+              <span className={ctaClass}>
+                View Details
                 <ArrowRight size={13} strokeWidth={2.25} />
               </span>
             ) : (
-              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[12px] font-semibold tracking-wide text-[#C45C26] shadow-sm group-hover:border-[#D1D5DB]">
+              <span className={ctaClass}>
                 Book Now
                 <ArrowRight size={13} strokeWidth={2.25} />
               </span>

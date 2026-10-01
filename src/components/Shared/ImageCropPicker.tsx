@@ -15,7 +15,7 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import "react-image-crop/dist/ReactCrop.css";
 import "./ImageCropPicker.css";
 
-const MAX_EDGE = 1600;
+const MAX_EDGE = 1920;
 const MIN_EDGE = 320;
 
 /** Human-readable crop ratio label for the modal. */
@@ -28,6 +28,7 @@ export function cropAspectLabel(aspect?: number): string | null {
   if (near(aspect, 4 / 3)) return "Landscape · 4:3";
   if (near(aspect, 1)) return "Square · 1:1";
   if (near(aspect, 16 / 10)) return "Wide · 16:10";
+  if (near(aspect, 3)) return "Landing banner · 3:1";
   if (near(aspect, 21 / 9)) return "Banner · 21:9";
   if (aspect > 1) return `Horizontal · ${aspect.toFixed(2)}:1`;
   return `Vertical · 1:${(1 / aspect).toFixed(2)}`;

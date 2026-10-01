@@ -623,7 +623,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const hideSiteNav = titlePast;
   const showRestaurantSticky = titlePast;
   const isBookTableFlow = activeTab === "Book a Table";
-  const isBookTimeSlotStep = isBookTableFlow && drawerStep === 1;
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false
   );
@@ -633,8 +632,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [mobileTabsHeight, setMobileTabsHeight] = useState(0);
   const mobileTabsRef = useRef<HTMLDivElement>(null);
   const showMobileSectionTabs = isMobileViewport && heroPast && !isBookTableFlow;
-  /** Desktop book time-slot: inline section tabs above booking details (not sticky top). */
-  const showDesktopBookTabsInline = isBookTableFlow && isBookTimeSlotStep && isLgViewport;
+  /** Desktop book steps 1–3: section tabs + Book a Table (selected). */
+  const showDesktopBookTabsInline =
+    isBookTableFlow && isLgViewport && drawerStep >= 1 && drawerStep <= 3;
   const showSectionTabs = showRestaurantSticky && heroPast && !isBookTableFlow;
   const restaurantStickyVisible = !isBookTableFlow && showRestaurantSticky;
 
@@ -1609,12 +1609,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const { city, country } = parseAddressLocation(profile.address);
   const hideBookingSidebar =
     activeTab === "Book a Table" && (drawerStep === 3 || drawerStep === 4);
+  const isBookingSuccess = isBookTableFlow && drawerStep === 4;
   const galleryStickyTop =
-    (showRestaurantSticky
-      ? Math.max(restaurantStickyHeight, 64)
-      : siteHeaderHeight > 0
-        ? siteHeaderHeight
-        : 72) + 12;
+    isBookTableFlow && isLgViewport
+      ? (siteHeaderHeight > 0 ? siteHeaderHeight : 72) + 20
+      : (showRestaurantSticky
+          ? Math.max(restaurantStickyHeight, 64)
+          : siteHeaderHeight > 0
+            ? siteHeaderHeight
+            : 72) + 12;
   const stickyThumb =
     photos[0] || resolveMediaUrl(profile.cover_image_url) || "";
   const stickyMetaLine = [infoCostText, profile.address?.trim()]
@@ -1624,10 +1627,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="min-h-screen bg-white text-slate-700">
 
-      {/* ── 1. Breadcrumbs (tablet/desktop; hidden during immersive book on <lg) ── */}
+      {/* ── 1. Breadcrumbs (keep on success; hide on immersive mobile/tablet book) ── */}
       <div
         className={`bg-white pt-9 ${
-          isBookTableFlow ? "hidden lg:block" : "hidden md:block"
+          isBookingSuccess
+            ? "hidden md:block"
+            : isBookTableFlow
+              ? "hidden lg:block"
+              : "hidden md:block"
         }`}
       >
         <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
@@ -1646,14 +1653,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       <div
         className={`container mx-auto lg:px-10 2xl:px-0 pb-24 md:pb-16 ${
           isBookTableFlow
-            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 px-5 sm:px-10 py-5"
+            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 px-5 sm:px-10 py-5 lg:pt-4"
             : "max-md:px-0 max-md:pt-0 px-5 sm:px-10 py-5"
         }`}
       >
-        {/* ── Header: title + icon actions + rating (tablet/desktop) ── */}
+        {/* ── Header: title + icon actions + rating (hidden on booking success) ── */}
         <div
           className={`bg-white pt-2 mb-4 ${
-            isBookTableFlow ? "hidden lg:block" : "hidden md:block"
+            isBookingSuccess
+              ? "hidden"
+              : isBookTableFlow
+                ? "hidden lg:block"
+                : "hidden md:block"
           }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -1725,7 +1736,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
           }`}
         >
-          <div className={`min-w-0 order-1 ${isBookTableFlow ? "max-lg:hidden" : ""}`}>
+          <div
+            className={`min-w-0 order-1 ${
+              isBookingSuccess ? "hidden" : isBookTableFlow ? "max-lg:hidden" : ""
+            }`}
+          >
             <div ref={titleSentinelRef} className="h-px w-full" aria-hidden />
             {/* Mobile full-bleed hero — taller, edge-to-edge, no top gap */}
             <div className="md:hidden relative w-full h-[62vw] min-h-[280px] max-h-[440px] overflow-hidden bg-[#F3F4F6]">
@@ -2020,7 +2035,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             <aside
               ref={bookingWidgetRef}
               className={`w-full order-2 md:row-span-2 md:sticky lg:sticky z-30 self-start ${
-                isBookTableFlow ? "hidden lg:block" : "hidden md:block"
+                isBookTableFlow ? "hidden lg:block lg:mt-3" : "hidden md:block"
               }`}
               style={{ top: galleryStickyTop }}
             >
@@ -2570,7 +2585,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
           {/* Similar Restaurants Horizontal Shelf */}
           {similarRestaurants.length > 0 && (
-            <div className={`mt-8 pt-6 border-t border-slate-200 animate-fadeIn ${isBookTableFlow ? "max-lg:hidden" : ""}`}>
+            <div className={`mt-8 pt-6 border-t border-slate-200 animate-fadeIn ${isBookTableFlow ? "hidden" : ""}`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-2xl sm:text-3xl lg:text-xl font-extrabold text-slate-800 tracking-tight">
@@ -2686,14 +2701,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         {/* ── 7. Lightbox / Image Slider Modal ── */}
         {isLightboxOpen && lightboxItems.length > 0 && (
           <div className="fixed inset-0 z-[110] bg-black flex flex-col select-none animate-fadeIn">
-            {/* Back — District-style exit */}
+            {/* Close — top right on all breakpoints (menu / gallery) */}
             <button
               type="button"
               onClick={closeLightbox}
-              className="absolute top-3 left-3 sm:top-5 sm:left-5 z-20 w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center cursor-pointer hover:bg-white/25"
+              className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center cursor-pointer hover:bg-white/25 active:scale-95"
               aria-label="Close gallery"
             >
-              <ChevronLeft size={22} className="text-white" strokeWidth={2.25} />
+              <X size={22} className="text-white" strokeWidth={2.25} />
             </button>
 
             {/* Image stage */}
@@ -2764,7 +2779,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         {activeTab === "Book a Table" && bookTableSlot && createPortal(
           <div className="w-full bg-white flex flex-col pb-12 sm:pb-16">
 
-            {/* Immersive book header (mobile + tablet) */}
+            {/* Immersive book header (mobile + tablet; hidden on success) */}
+            {!isBookingSuccess ? (
             <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-100 px-4 sm:px-5 py-3 flex items-start gap-2.5">
               <button
                 type="button"
@@ -2781,9 +2797,35 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 <p className="text-sm text-slate-500 font-medium truncate mt-0.5">{profile.name}</p>
               </div>
             </div>
+            ) : null}
+
+            {/* Desktop booking steps: Overview / Menu / Photos / Reviews / Book a Table */}
+            {showDesktopBookTabsInline ? (
+              <div className="hidden lg:block border-b border-slate-200 mb-4">
+                <div className="flex gap-6 overflow-x-auto scrollbar-hide">
+                  {DETAIL_SECTION_TABS.map((tab) => (
+                    <button
+                      key={`book-flow-tab-${tab.id}`}
+                      type="button"
+                      onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
+                      className="py-2.5 text-sm font-semibold tracking-wide border-b-2 border-transparent text-slate-400 hover:text-slate-900 transition-all whitespace-nowrap cursor-pointer"
+                    >
+                      {tab.id}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="py-2.5 text-sm font-bold tracking-wide border-b-2 border-slate-900 text-slate-900 whitespace-nowrap cursor-default"
+                    aria-current="page"
+                  >
+                    Book a Table
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {/* Panel Content */}
-            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : drawerStep === 1 ? 'pt-1 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
+            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white lg:pt-0' : drawerStep === 1 ? 'pt-1 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
               {drawerStep === 1 && (() => {
                 const mealsConfig: DiningMealsConfig = selectedOpDay?.meals || {
                   breakfast: { open: '08:00', close: '11:00', active: true },
@@ -2863,24 +2905,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                 return (
                   <div className="space-y-5">
-                    {/* Desktop: section tabs sit above booking details on time-slot step */}
-                    {showDesktopBookTabsInline ? (
-                      <div className="hidden lg:block border-b border-slate-200 -mt-1 mb-1">
-                        <div className="flex gap-6 overflow-x-auto scrollbar-hide">
-                          {DETAIL_SECTION_TABS.map((tab) => (
-                            <button
-                              key={`book-inline-tab-${tab.id}`}
-                              type="button"
-                              onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                              className="py-2.5 text-sm font-semibold tracking-wide border-b-2 border-transparent text-slate-400 hover:text-slate-900 transition-all whitespace-nowrap cursor-pointer"
-                            >
-                              {tab.id}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
                     {/* Desktop book intro (mobile/tablet use immersive header above) */}
                     <h4 className="hidden lg:block text-xl font-semibold text-slate-900 tracking-tight">
                       Select your booking details
@@ -3728,7 +3752,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               )}
 
               {drawerStep === 4 && (
-                <div className="w-full max-w-[960px] mx-auto">
+                <div className="w-full max-w-[960px] mx-auto lg:mt-2 px-4 sm:px-0">
                   <div
                     className="rounded-[22px] bg-white px-5 py-5 sm:px-8 sm:py-7"
                     style={{

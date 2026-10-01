@@ -55,6 +55,7 @@ import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQ
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import DiningCollectionsOption2 from "@/components/DinningLandingPage/DiningCollectionsOption2";
+import ExploreDiningCardOption2 from "@/components/DinningLandingPage/ExploreDiningCardOption2";
 import DiningOffersOption2 from "@/components/DinningLandingPage/DiningOffersOption2";
 import DiningRestaurantCardOption2 from "@/components/DinningLandingPage/DiningRestaurantCardOption2";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
@@ -1864,7 +1865,8 @@ export default function Home() {
             </div>
       </section> */}
 
-      {/* ── Explore Dining — polished pastel category cards ───────────────── */}
+      {/* ── Explore Dining Option 1 (pastel cards) — commented, keep for reference ─
+      {/* ── Explore Dining — previous pastel category cards (above Option 2) ─ * /}
       <section
         id="explore-dining"
         className="w-full bg-white"
@@ -1966,7 +1968,7 @@ export default function Home() {
                       {card.title}
                     </motion.span>
                     <span className="flex min-h-0 w-full flex-1 items-center justify-center px-2.5 pb-3.5 pt-1.5">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {/* eslint-disable-next-line @next/next/no-img-element * /}
                       <motion.img
                         src={card.image}
                         alt=""
@@ -2004,6 +2006,51 @@ export default function Home() {
               );
             })}
           </motion.div>
+        </div>
+      </section>
+
+
+
+
+      */}
+
+      {/* ── Explore Dining — Option 2 cards (desktop horizontal / mobile tiles) ─ */}
+      <section
+        id="explore-dining"
+        className="w-full bg-white"
+        style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
+      >
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-2 sm:pt-3 pb-3">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 mb-3 sm:mb-4 tracking-tight">
+            Explore Dining
+          </h2>
+          <ExploreDiningCardOption2
+            cards={EXPLORE_DINING_CARDS}
+            activeId={exploreCardId}
+            onSelect={(card) => {
+              const resolvedCategory = resolveExploreTypeName(
+                card.match ?? null,
+                businessTypes,
+                card.title
+              );
+              if (exploreCardId === card.id) {
+                scrollToDiningBrowseViewport();
+                return;
+              }
+              setExploreCardId(card.id);
+              if (resolvedCategory) {
+                const filterLabel =
+                  exploreDiningFilterCategories.find(
+                    (c) => c.toLowerCase() === resolvedCategory.toLowerCase()
+                  ) || resolvedCategory;
+                setActiveCategories([filterLabel]);
+              } else {
+                setActiveCategories([]);
+              }
+              setCurrentPage(1);
+              scrollToDiningBrowseViewport();
+            }}
+          />
         </div>
       </section>
 
@@ -2091,89 +2138,6 @@ export default function Home() {
         </div>
       )}
 
-      {showHomeExtras && (
-      <div className="w-full bg-white">
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-5 pb-2">
-        {/* ── 2. Collections (after hero) ──────────────────────────────────── */}
-          <section className="w-full">
-            {/* Mobile / tablet: title + All collections on one line, subtitle below */}
-            <div className="lg:hidden mb-2">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 shrink-0 tracking-tight">Collections</h2>
-                <Link
-                  href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
-                  className="flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                >
-                  All collections <ChevronRight size={16} />
-                </Link>
-                    </div>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Explore curated lists of top restaurants, cafes and bars
-              </p>
-              </div>
-
-            {/* Desktop: title + subtitle left, All collections right */}
-            <div className="hidden lg:flex items-center justify-between mb-2">
-              <div>
-                <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">Collections</h2>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  Explore curated lists of top restaurants, cafes and bars
-                </p>
-              </div>
-              <Link
-                href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
-                className="flex items-center gap-1 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer"
-              >
-                All collections <ChevronRight size={16} />
-              </Link>
-            </div>
-
-            {/* Collections — image + title only */}
-            <DiningCollectionsOption2 collections={collections} city={activeCity} />
-          </section>
-
-        {/* ── 3. Tab section (hidden — categories live in Filter popup) ──── */}
-       
-        {/* <div>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="relative">
-              <div className="flex flex-nowrap items-center gap-2 sm:gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory py-1 px-1 pr-4">
-            {filters.map((f) => {
-              const isActive = activeFilter.toLowerCase() === f.label.toLowerCase();
-              const theme = getDiningTypeVisual(f.label);
-              const displayName = f.label.toLowerCase() === "all" ? "All Dining" : f.label;
-              const TypeIcon = theme.Icon;
-              return (
-                <button
-                  key={f.label}
-                  type="button"
-                  onClick={() => {
-                    setActiveFilter(f.label);
-                    const element = document.getElementById("restaurant-listings");
-                    if (element) {
-                      element.scrollIntoView({ behavior: "smooth" });
-                    }
-                  }}
-                      className={`shrink-0 snap-start inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[12px] sm:text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-                        isActive
-                          ? "text-white"
-                          : "bg-[#eef0f2] text-slate-700 hover:bg-slate-200"
-                      }`}
-                      style={isActive ? { backgroundColor: "#6900AA" } : undefined}
-                    >
-                      <TypeIcon size={16} color={isActive ? "#ffffff" : theme.accent} />
-                    {displayName}
-                </button>
-              );
-            })}
-            </div>
-          </div>
-        </div>
-        </div> */}
-        
-      </div>
-      </div>
-      )}
 
       <div className="w-full bg-white">
         {/* Sentinel: when it leaves the sticky offset, filter bar is "stuck" */}
@@ -2250,7 +2214,7 @@ export default function Home() {
           </div>
         </section>
 
-      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 py-5">
+      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-2 pb-5">
         <div >
           {/* ── 5. Offer Section (commented out) ───────────────────────────── */}
           {/* {showHomeExtras && homeOfferCards.length > 0 && (
@@ -2316,9 +2280,9 @@ export default function Home() {
           )} */}
 
           {/* ── 6. Restaurant section ───────────────────────────────────────── */}
-          <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-2"}`}>
-          <div className="pt-2 pb-6">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
+          <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-0"}`}>
+          <div className="pt-1 pb-4">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
               {getFilteredSectionTitle()}
             </h2>
             {usingDiningFallback ||
@@ -2390,16 +2354,16 @@ export default function Home() {
             </div>
           ) : (
             <>
-            {/* ========== UI OPTION ONE (existing restaurant cards) — comment to hide ========== */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
+            {/* ========== UI OPTION ONE (existing restaurant cards) — commented ========== */}
+            {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
                 {displayRestaurants.map((restaurant) => (
                 <RestaurantCard key={restaurant.id} restaurant={restaurant} />
               ))}
-            </div>
+            </div> */}
             {/* ========== END UI OPTION ONE ========== */}
 
-            {/* ========== UI OPTION TWO — comment out to hide ========== */}
-            <div className="mt-5 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
+            {/* ========== UI OPTION TWO ========== */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
               {displayRestaurants.map((restaurant) => (
                 <DiningRestaurantCardOption2
                   key={`opt2-${restaurant.id}`}
@@ -2430,6 +2394,44 @@ export default function Home() {
             </>
           )}
         </section>
+
+          {showHomeExtras && (
+            <section className="w-full pt-8 sm:pt-10 pb-2">
+              {/* Collections — after restaurant listings */}
+              <div className="lg:hidden mb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 shrink-0 tracking-tight">Collections</h2>
+                  <Link
+                    href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
+                    className="flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                  >
+                    All collections <ChevronRight size={16} />
+                  </Link>
+                </div>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Explore curated lists of top restaurants, cafes and bars
+                </p>
+              </div>
+
+              <div className="hidden lg:flex items-center justify-between mb-2">
+                <div>
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">Collections</h2>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Explore curated lists of top restaurants, cafes and bars
+                  </p>
+                </div>
+                <Link
+                  href={locationCity ? `/collections?city=${encodeURIComponent(locationCity)}` : "/collections"}
+                  className="flex items-center gap-1 text-sm font-semibold text-[#6900AA] hover:text-[#57008E] transition-colors cursor-pointer"
+                >
+                  All collections <ChevronRight size={16} />
+                </Link>
+              </div>
+
+              <DiningCollectionsOption2 collections={collections} city={activeCity} />
+            </section>
+          )}
+
         </div>
       </div>
       </div>

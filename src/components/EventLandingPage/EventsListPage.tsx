@@ -510,7 +510,7 @@ function DistrictEventCard({
         {dateLine ? (
           <p className="text-sm font-semibold text-[#B59B2A]">{dateLine}</p>
         ) : null}
-        <h3 className="text-base font-bold leading-snug text-black line-clamp-2 sm:text-lg">
+        <h3 className="text-base font-semibold leading-snug text-black line-clamp-2 sm:text-xl">
           {event.name}
         </h3>
         {place ? (
@@ -2191,7 +2191,7 @@ export default function PublicEventsPage() {
       <div className={CONTAINER}>
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4 sm:mb-5">
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800">
               {browseHeading}
             </h2>
             {cityHasNoEvents ? (
@@ -2383,11 +2383,6 @@ export default function PublicEventsPage() {
         <>
           {/* Mobile + tablet — featured cards (centered active + side peeks) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
-            <div className="mb-3 px-5 sm:px-8 md:mb-4">
-              <h2 className="text-lg font-extrabold text-[#111111] sm:text-xl">
-                {promoEvents.some((e) => e.is_promoted) ? "Promoted events" : "Featured events"}
-              </h2>
-            </div>
             <div
               ref={mobilePromoTrackRef}
               className={`flex snap-x snap-mandatory items-center overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
@@ -2450,18 +2445,24 @@ export default function PublicEventsPage() {
                 const landscape = eventLandscape(event);
                 const portrait = eventPortrait(event);
                 const image = portrait || landscape;
+                const detailHref = `/events/${event.id}`;
                 return (
-                  <Link
+                  <div
                     key={
                       slideIdx === promoEvents.length
                         ? `${event.id}-loop`
                         : event.id
                     }
-                    href={`/events/${event.id}`}
-                    className="relative block w-full shrink-0 grow-0 basis-full cursor-pointer"
-                    aria-label={`View ${event.name}`}
+                    className="relative block w-full shrink-0 grow-0 basis-full"
                   >
-                    <div className="absolute inset-0 overflow-hidden" aria-hidden>
+                    {/* Full-banner hit target → event detail */}
+                    <Link
+                      href={detailHref}
+                      className="absolute inset-0 z-[5] cursor-pointer"
+                      aria-label={`View ${event.name}`}
+                    />
+
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
                       <SafeCoverImage
                         src={image}
                         alt=""
@@ -2481,7 +2482,7 @@ export default function PublicEventsPage() {
                     </div>
 
                     <div
-                      className={`relative mx-auto w-full container px-5 sm:px-10  lg:px-10  2xl:px-0 py-10 xl:py-12 ${
+                      className={`pointer-events-none relative mx-auto w-full container px-5 sm:px-10  lg:px-10  2xl:px-0 py-10 xl:py-12 ${
                         promoEvents.length > 1
                           ? "px-14 2xl:px-0 pb-14"
                           : "2xl:px-0"
@@ -2534,7 +2535,7 @@ export default function PublicEventsPage() {
                         </div>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
@@ -2567,7 +2568,7 @@ export default function PublicEventsPage() {
             <section className="pt-8 sm:pt-10 pb-3 bg-white">
               <div className={CONTAINER}>
                 <div className="min-w-0 pb-4">
-                  <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
                     Explore Events
                   </h2>
                 </div>
@@ -2579,7 +2580,7 @@ export default function PublicEventsPage() {
               <div className={CONTAINER}>
                 <div className="min-w-0 pb-4">
                   <motion.h2
-                    className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800"
+                    className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800"
                     initial={{ opacity: 0, y: 12 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.6 }}
@@ -2692,7 +2693,7 @@ export default function PublicEventsPage() {
             <div className={CONTAINER}>
               <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
                 <div className="min-w-0">
-                  <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
                     {city
                       ? `Top recommended events in ${headingCity}`
                       : "Top recommended events"}
@@ -2773,7 +2774,7 @@ export default function PublicEventsPage() {
           <section className="pt-8 sm:pt-10 pb-2 bg-white">
             <div className={CONTAINER}>
               <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
-                <h2 className="text-xl sm:text-2xl lg:text-xl font-bold text-slate-800">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
                   {city ? `Artists in ${headingCity}` : "Artists in your District"}
                 </h2>
               </div>

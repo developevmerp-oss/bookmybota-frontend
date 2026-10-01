@@ -654,11 +654,11 @@ export default function PublicEventDetailPage({
         <div className="flex items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-5">
           <h1 className="min-w-0 text-[1.75rem] sm:text-[2rem] lg:text-[2.25rem] 2xl:text-[2.5rem] font-extrabold text-[#1A1A1A] leading-tight tracking-tight break-words">
             {event.name}
-            {event.is_promoted ? (
+            {/* {event.is_promoted ? (
               <span className="ml-2 align-middle inline-flex items-center rounded-full bg-[#6900AA]/10 text-[#6900AA] border border-[#6900AA]/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
                 Promoted
               </span>
-            ) : null}
+            ) : null} */}
           </h1>
           <button
             type="button"

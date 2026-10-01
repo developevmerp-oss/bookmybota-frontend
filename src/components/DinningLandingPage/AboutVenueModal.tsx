@@ -6,7 +6,13 @@ import { Copy, MapPin, Phone, X } from "lucide-react";
 import { toast } from "sonner";
 import SafeCoverImage, { DiningImageFallback } from "@/components/Shared/SafeCoverImage";
 
-type Mode = "about" | "location" | "phone";
+type Mode = "about" | "location" | "phone" | "hours";
+
+export type OpeningHourRow = {
+  day: string;
+  hours: string;
+  isToday?: boolean;
+};
 
 type Props = {
   open: boolean;
@@ -17,6 +23,7 @@ type Props = {
   description?: string | null;
   address?: string | null;
   phone?: string | null;
+  openingHours?: OpeningHourRow[];
 };
 
 export default function AboutVenueModal({
@@ -28,6 +35,7 @@ export default function AboutVenueModal({
   description,
   address,
   phone,
+  openingHours = [],
 }: Props) {
   useEffect(() => {
     if (!open) return;
@@ -46,7 +54,13 @@ export default function AboutVenueModal({
   if (!open || typeof document === "undefined") return null;
 
   const title =
-    mode === "about" ? "About the restaurant" : mode === "location" ? "Location" : "Call";
+    mode === "about"
+      ? "About the restaurant"
+      : mode === "location"
+        ? "Location"
+        : mode === "hours"
+          ? "Opening hours"
+          : "Call";
 
   const copyText = async (value: string, successMsg: string) => {
     try {
@@ -173,6 +187,35 @@ export default function AboutVenueModal({
               </div>
             ) : (
               <p className="py-4 text-sm font-medium text-slate-500">Phone not available</p>
+            )
+          ) : null}
+
+          {mode === "hours" ? (
+            openingHours.length > 0 ? (
+              <div className="divide-y divide-[#EFEFEF]">
+                {openingHours.map((row) => (
+                  <div
+                    key={row.day}
+                    className="flex items-center justify-between gap-3 py-3.5"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-medium text-[#292929]">{row.day}</span>
+                      {row.isToday ? (
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                          Today
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-sm font-medium text-[#4A4A4A] shrink-0 tabular-nums">
+                      {row.hours}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-4 text-sm font-medium text-slate-500">
+                Opening hours not available
+              </p>
             )
           ) : null}
         </div>

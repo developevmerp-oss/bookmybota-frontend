@@ -607,13 +607,36 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     window.scrollTo(0, 0);
   }, [resolvedParams.id]);
 
-  // Sticky section tabs (Overview / Menu / Photos / Reviews) — scroll-spy like District
+  // Sticky section tabs (Overview / Menu / Photos / Reviews) — District-like staged sticky nav
   const [activeTab, setActiveTab] = useState<string>("Overview");
-  const [tabsStuck, setTabsStuck] = useState(false);
+  const [drawerStep, setDrawerStep] = useState(1); // 1: Selections, 2: Login/OTP/Register, 3: Summary, 4: Success
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
   const [sidebarStickyTop, setSidebarStickyTop] = useState(140);
-  const tabsSentinelRef = useRef<HTMLDivElement>(null);
+  const [titlePast, setTitlePast] = useState(false);
+  const [heroPast, setHeroPast] = useState(false);
+  const [restaurantStickyHeight, setRestaurantStickyHeight] = useState(0);
+  const titleSentinelRef = useRef<HTMLDivElement>(null);
+  const heroEndSentinelRef = useRef<HTMLDivElement>(null);
+  const restaurantStickyRef = useRef<HTMLDivElement>(null);
   const scrollSpyPausedRef = useRef(false);
+
+  const hideSiteNav = titlePast;
+  const showRestaurantSticky = titlePast;
+  const isBookTableFlow = activeTab === "Book a Table";
+  const isBookTimeSlotStep = isBookTableFlow && drawerStep === 1;
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false
+  );
+  const [isLgViewport, setIsLgViewport] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : false
+  );
+  const [mobileTabsHeight, setMobileTabsHeight] = useState(0);
+  const mobileTabsRef = useRef<HTMLDivElement>(null);
+  const showMobileSectionTabs = isMobileViewport && heroPast && !isBookTableFlow;
+  /** Desktop book time-slot: inline section tabs above booking details (not sticky top). */
+  const showDesktopBookTabsInline = isBookTableFlow && isBookTimeSlotStep && isLgViewport;
+  const showSectionTabs = showRestaurantSticky && heroPast && !isBookTableFlow;
+  const restaurantStickyVisible = !isBookTableFlow && showRestaurantSticky;
 
   useEffect(() => {
     const measureHeader = () => {
@@ -623,47 +646,128 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     measureHeader();
     window.addEventListener("resize", measureHeader);
     return () => window.removeEventListener("resize", measureHeader);
+  }, [isBookTableFlow, isLgViewport, isMobileViewport]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mqMobile = window.matchMedia("(max-width: 767px)");
+    const mqLg = window.matchMedia("(min-width: 1024px)");
+    const sync = () => {
+      setIsMobileViewport(mqMobile.matches);
+      setIsLgViewport(mqLg.matches);
+    };
+    sync();
+    mqMobile.addEventListener("change", sync);
+    mqLg.addEventListener("change", sync);
+    return () => {
+      mqMobile.removeEventListener("change", sync);
+      mqLg.removeEventListener("change", sync);
+    };
   }, []);
 
   useEffect(() => {
-    const sentinel = tabsSentinelRef.current;
-    if (!sentinel || typeof IntersectionObserver === "undefined") return;
-    const topInset = siteHeaderHeight > 0 ? siteHeaderHeight : 120;
-    const observer = new IntersectionObserver(
-      ([entry]) => setTabsStuck(!entry.isIntersecting),
-      { rootMargin: `-${topInset}px 0px 0px 0px`, threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [siteHeaderHeight]);
+    // Mobile: always hide site chrome. Tablet book: immersive. Desktop book: keep main + sub header.
+    const hideChrome =
+      isMobileViewport ||
+      (isBookTableFlow && !isLgViewport) ||
+      (!isBookTableFlow && (hideSiteNav || showRestaurantSticky));
+    document.body.dataset.diningDetailNav = hideChrome ? "1" : "0";
+    if (isBookTableFlow && !isLgViewport) {
+      document.body.dataset.diningBookImmersive = "1";
+    } else {
+      delete document.body.dataset.diningBookImmersive;
+    }
+    return () => {
+      delete document.body.dataset.diningDetailNav;
+      delete document.body.dataset.diningBookImmersive;
+    };
+  }, [isBookTableFlow, isMobileViewport, isLgViewport, hideSiteNav, showRestaurantSticky]);
+
+  useEffect(() => {
+    const el = mobileTabsRef.current;
+    if (!el || !showMobileSectionTabs) {
+      setMobileTabsHeight(0);
+      return;
+    }
+    const update = () => setMobileTabsHeight(el.offsetHeight || 0);
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showMobileSectionTabs, activeTab]);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observers: IntersectionObserver[] = [];
+
+    const watch = (
+      el: HTMLElement | null,
+      onChange: (past: boolean) => void,
+      rootMargin = "0px 0px 0px 0px"
+    ) => {
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => onChange(!entry.isIntersecting && entry.boundingClientRect.top < 0),
+        { rootMargin, threshold: 0 }
+      );
+      observer.observe(el);
+      observers.push(observer);
+    };
+
+    watch(titleSentinelRef.current, setTitlePast, "-1px 0px 0px 0px");
+    watch(heroEndSentinelRef.current, setHeroPast, "-1px 0px 0px 0px");
+
+    return () => observers.forEach((o) => o.disconnect());
+  }, [resolvedParams.id, profile?.id]);
+
+  useEffect(() => {
+    const el = restaurantStickyRef.current;
+    if (!el || typeof ResizeObserver === "undefined") {
+      setRestaurantStickyHeight(restaurantStickyVisible ? 72 : 0);
+      return;
+    }
+    const update = () => setRestaurantStickyHeight(el.offsetHeight || 0);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [restaurantStickyVisible, showSectionTabs]);
 
   const getDetailStickyOffset = useCallback(() => {
-    const tabsEl = document.getElementById("restaurant-tabs");
-    if (tabsEl) {
-      const headerTop = parseFloat(getComputedStyle(tabsEl).top) || 0;
-      return headerTop + tabsEl.offsetHeight + 8;
-    }
     if (typeof window === "undefined") return 140;
-    if (siteHeaderHeight > 0) {
-      const tabsEl = document.getElementById("restaurant-tabs");
-      return siteHeaderHeight + (tabsEl?.offsetHeight ?? 52) + 8;
+    if (isMobileViewport) {
+      if (showMobileSectionTabs) {
+        return (mobileTabsHeight || 48) + 8;
+      }
+      return 8;
     }
+    if (restaurantStickyVisible) {
+      const sticky = document.getElementById("dining-restaurant-sticky");
+      const h = sticky?.offsetHeight || restaurantStickyHeight || 72;
+      return h + 8;
+    }
+    if (siteHeaderHeight > 0) return siteHeaderHeight + 8;
     if (window.matchMedia("(min-width: 1280px)").matches) return 148;
     if (window.matchMedia("(min-width: 1024px)").matches) return 140;
     if (window.matchMedia("(min-width: 768px)").matches) return 132;
     return 124;
-  }, [siteHeaderHeight]);
+  }, [
+    siteHeaderHeight,
+    restaurantStickyVisible,
+    restaurantStickyHeight,
+    isMobileViewport,
+    showMobileSectionTabs,
+    mobileTabsHeight,
+  ]);
 
   useEffect(() => {
     const updateSidebarTop = () => setSidebarStickyTop(getDetailStickyOffset());
     updateSidebarTop();
     window.addEventListener("resize", updateSidebarTop);
-    const tabsEl = document.getElementById("restaurant-tabs");
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateSidebarTop) : null;
-    if (tabsEl) ro?.observe(tabsEl);
     return () => {
       window.removeEventListener("resize", updateSidebarTop);
-      ro?.disconnect();
     };
   }, [getDetailStickyOffset]);
 
@@ -685,8 +789,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         window.setTimeout(() => {
           scrollSpyPausedRef.current = false;
         }, 900);
-      return;
-    }
+        return;
+      }
       if (attempt < 12) {
         window.setTimeout(() => tryScroll(attempt + 1), 50);
       } else {
@@ -717,19 +821,30 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     requestAnimationFrame(() => tryScroll());
   }, [getDetailStickyOffset]);
 
-  // Highlight sticky tab from scroll position (About → Menu → Photos → Reviews)
+  // Highlight sticky tab from scroll position (Overview → Menu → Photos → Reviews)
   useEffect(() => {
     if (activeTab === "Book a Table") return;
 
     const syncActiveTabFromScroll = () => {
       if (scrollSpyPausedRef.current) return;
       const offset = getDetailStickyOffset();
+      const lastTab = DETAIL_SECTION_TABS[DETAIL_SECTION_TABS.length - 1];
+      const nearBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 160;
+
+      // Last section often can't fully cross the sticky line — select it near page end
+      if (nearBottom) {
+        setActiveTab((prev) => (prev === lastTab.id ? prev : lastTab.id));
+        return;
+      }
+
       let currentId: string = DETAIL_SECTION_TABS[0].id;
       for (const tab of DETAIL_SECTION_TABS) {
         const el = document.getElementById(tab.sectionId);
         if (!el) continue;
-        // Last section whose top has crossed under the sticky tabs line wins
-        if (el.getBoundingClientRect().top - offset <= 0) {
+        // Activate when section reaches just under the sticky bar
+        if (el.getBoundingClientRect().top - offset <= 24) {
           currentId = tab.id;
         }
       }
@@ -781,7 +896,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [offersSectionOpen, setOffersSectionOpen] = useState(true);
   const [availabilityStatus, setAvailabilityStatus] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
-  const [venueInfoModal, setVenueInfoModal] = useState<"about" | "location" | "phone" | null>(null);
+  const [venueInfoModal, setVenueInfoModal] = useState<"about" | "location" | "phone" | "hours" | null>(null);
   const [aboutDescOverflows, setAboutDescOverflows] = useState(false);
   const aboutDescRef = useRef<HTMLParagraphElement>(null);
 
@@ -826,7 +941,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
   // Drawer & Auth states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [drawerStep, setDrawerStep] = useState(1); // 1: Selections, 2: Login/OTP/Register, 3: Summary, 4: Success
   // Radio-style meal accordion — only one section open at a time
   const [activeMealSection, setActiveMealSection] = useState<'breakfast' | 'lunch' | 'dinner' | null>('lunch');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -1134,6 +1248,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       if (e.key === 'Escape') closeLightbox();
     };
     window.addEventListener('keydown', handleKeyDown);
+    if (isLightboxOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        document.body.style.overflow = prevOverflow;
+      };
+    }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLightboxOpen, lightboxItems.length]);
 
@@ -1315,7 +1437,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
     setDrawerStep(1);
     setActiveTab("Book a Table");
-    scrollToTabPanelStart();
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      scrollToTabPanelStart();
+    }
   };
 
   const closeBookingPanel = () => {
@@ -1386,9 +1512,64 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
   const todayOpenFormatted = formatSlotLabel(todayOpen);
   const todayCloseFormatted = formatSlotLabel(todayClose);
-  const timingText = isClosedToday
-    ? "Closed Today"
-    : `${todayOpenFormatted} - ${todayCloseFormatted} (Today)`;
+  const openStatusLabel = isOpenNow ? "Open now" : "Closed";
+  const openStatusDetail = isClosedToday
+    ? null
+    : isOpenNow
+      ? `Closes at ${todayCloseFormatted}`
+      : `Opens at ${todayOpenFormatted}`;
+  const phoneDisplay = profile.phone?.trim() || "";
+
+  const WEEKDAY_ROWS = [
+    { key: "monday", label: "Monday" },
+    { key: "tuesday", label: "Tuesday" },
+    { key: "wednesday", label: "Wednesday" },
+    { key: "thursday", label: "Thursday" },
+    { key: "friday", label: "Friday" },
+    { key: "saturday", label: "Saturday" },
+    { key: "sunday", label: "Sunday" },
+  ] as const;
+  const todayWeekdayKey = WEEKDAY_ROWS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1].key;
+  const hoursByWeekdayKey = (() => {
+    const map = new Map<string, { open: string; close: string; closed: boolean }>();
+    for (const [dateKey, row] of operatingByDate.entries()) {
+      const d = new Date(`${dateKey}T12:00:00`);
+      if (Number.isNaN(d.getTime())) continue;
+      const weekdayKey = WEEKDAY_ROWS[d.getDay() === 0 ? 6 : d.getDay() - 1].key;
+      if (map.has(weekdayKey)) continue;
+      map.set(weekdayKey, {
+        closed: row.is_open === false,
+        open: (row.open_time || "").slice(0, 5),
+        close: (row.close_time || "").slice(0, 5),
+      });
+    }
+    return map;
+  })();
+  const openingHourRows = WEEKDAY_ROWS.map(({ key, label }) => {
+    const weekly = profile.operating_hours?.[key];
+    const fromCalendar = hoursByWeekdayKey.get(key);
+    const dayHours =
+      weekly && (weekly.closed || (weekly.open && weekly.close))
+        ? {
+            closed: !!weekly.closed,
+            open: (weekly.open || "").slice(0, 5),
+            close: (weekly.close || "").slice(0, 5),
+          }
+        : fromCalendar;
+    let hoursLabel = "Hours not set";
+    if (dayHours?.closed) {
+      hoursLabel = "Closed";
+    } else if (dayHours?.open && dayHours?.close) {
+      hoursLabel = `${formatSlotLabel(dayHours.open)} - ${formatSlotLabel(dayHours.close)}`;
+    } else if (!isClosedToday && key === todayWeekdayKey) {
+      hoursLabel = `${todayOpenFormatted} - ${todayCloseFormatted}`;
+    }
+    return {
+      day: label,
+      hours: hoursLabel,
+      isToday: key === todayWeekdayKey,
+    };
+  });
   const cuisines = profile.cuisine || "Continental, Italian, Fast Food";
   const cuisineList = cuisines
     .replace(/·/g, ",")
@@ -1401,6 +1582,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const aboutCostDisplay = profile?.average_cost
     ? `${formatMoney(profile.average_cost, { compact: true })} for two`
     : costText?.replace(/\s*\(approx\.\)\s*$/i, "") || costText;
+  const infoCostText = aboutCostDisplay;
   const cuisineDisplay = cuisineList.join(", ");
 
   // Dynamic city & country parsing helper
@@ -1427,13 +1609,27 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const { city, country } = parseAddressLocation(profile.address);
   const hideBookingSidebar =
     activeTab === "Book a Table" && (drawerStep === 3 || drawerStep === 4);
-  const galleryStickyTop = (siteHeaderHeight > 0 ? siteHeaderHeight : 72) + 12;
+  const galleryStickyTop =
+    (showRestaurantSticky
+      ? Math.max(restaurantStickyHeight, 64)
+      : siteHeaderHeight > 0
+        ? siteHeaderHeight
+        : 72) + 12;
+  const stickyThumb =
+    photos[0] || resolveMediaUrl(profile.cover_image_url) || "";
+  const stickyMetaLine = [infoCostText, profile.address?.trim()]
+    .filter(Boolean)
+    .join(" | ");
 
   return (
     <div className="min-h-screen bg-white text-slate-700">
 
-      {/* ── 1. Breadcrumbs ── */}
-      <div className="bg-white pt-9">
+      {/* ── 1. Breadcrumbs (tablet/desktop; hidden during immersive book on <lg) ── */}
+      <div
+        className={`bg-white pt-9 ${
+          isBookTableFlow ? "hidden lg:block" : "hidden md:block"
+        }`}
+      >
         <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
           <Link href="/" className="hover:text-rose-600 transition-colors">
             Home
@@ -1447,9 +1643,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-2 pb-12 sm:pb-16 py-5">
-        {/* ── Header: title + icon actions + rating ── */}
-        <div className="bg-white pt-2 mb-4">
+      <div
+        className={`container mx-auto lg:px-10 2xl:px-0 pb-24 md:pb-16 ${
+          isBookTableFlow
+            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 px-5 sm:px-10 py-5"
+            : "max-md:px-0 max-md:pt-0 px-5 sm:px-10 py-5"
+        }`}
+      >
+        {/* ── Header: title + icon actions + rating (tablet/desktop) ── */}
+        <div
+          className={`bg-white pt-2 mb-4 ${
+            isBookTableFlow ? "hidden lg:block" : "hidden md:block"
+          }`}
+        >
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h1 className="text-3xl sm:text-4xl lg:text-[2rem] font-semibold text-slate-900 tracking-wide leading-tight">
@@ -1512,11 +1718,74 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         {/* ── Gallery + sticky table reservation ── */}
         <div
           className={`grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${
-            hideBookingSidebar ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
+            hideBookingSidebar
+              ? ""
+              : isBookTableFlow
+                ? "lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
+                : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
           }`}
         >
-          <div className="min-w-0 order-1">
-            <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[260px] md:h-[380px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 mb-0 bg-[#F3F4F6]">
+          <div className={`min-w-0 order-1 ${isBookTableFlow ? "max-lg:hidden" : ""}`}>
+            <div ref={titleSentinelRef} className="h-px w-full" aria-hidden />
+            {/* Mobile full-bleed hero — taller, edge-to-edge, no top gap */}
+            <div className="md:hidden relative w-full h-[62vw] min-h-[280px] max-h-[440px] overflow-hidden bg-[#F3F4F6]">
+              {photos[0] ? (
+                <button
+                  type="button"
+                  className="absolute inset-0 w-full h-full cursor-pointer"
+                  onClick={() => openLightbox(0)}
+                  aria-label="View gallery"
+                >
+                  <SafeCoverImage
+                    src={photos[0]}
+                    alt={profile.name}
+                    className="w-full h-full object-cover"
+                    fallbackClassName="flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
+                    fallback={<DiningImageFallback size={36} />}
+                  />
+                </button>
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-slate-300">
+                  <Utensils size={40} strokeWidth={1.5} />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="absolute top-3 left-3 z-20 w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer"
+                aria-label="Go back"
+              >
+                <ChevronLeft size={20} className="text-slate-900" strokeWidth={2.25} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({ title: profile.name, url: window.location.href });
+                  } else {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast.success("Link copied to clipboard!");
+                  }
+                }}
+                className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer"
+                aria-label="Share"
+              >
+                <Upload size={16} className="text-slate-900" strokeWidth={2.25} />
+              </button>
+              {photos.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => openLightbox(0)}
+                  className="absolute bottom-3 right-3 z-20 bg-black/65 text-white text-xs font-semibold px-2.5 py-1 rounded-md cursor-pointer"
+                  aria-label={`View gallery, ${photos.length} photos`}
+                >
+                  1 / {photos.length}
+                </button>
+              ) : null}
+            </div>
+
+            {/* Tablet/desktop mosaic gallery */}
+            <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2 h-[260px] md:h-[380px] rounded-2xl overflow-hidden shadow-sm border border-slate-100 mb-0 bg-[#F3F4F6]">
               {photos.length === 0 ? (
                 <div className="col-span-4 row-span-2 flex items-center justify-center text-slate-300">
                   <Utensils size={40} strokeWidth={1.5} />
@@ -1587,46 +1856,172 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               )}
             </div>
 
-            {/* Status bar under gallery — Open/Closed · hours | map | phone */}
-            <div className="relative mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 px-0.5">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
-                {isOpenNow ? (
-                  <span className="inline-flex items-center text-emerald-600 font-semibold">
-                    Open now
+            {/* Status bar under gallery — tablet/desktop row */}
+            <div className="relative mt-3 space-y-2 px-0.5 hidden md:block">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm min-w-0 text-slate-600">
+                {infoCostText ? (
+                  <>
+                    <span className="font-medium text-wide text-slate-600">{infoCostText}</span>
+                    <span className="text-slate-600 select-none" aria-hidden>
+                      |
+                    </span>
+                  </>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => setVenueInfoModal("hours")}
+                  className="inline-flex items-center gap-1.5 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  aria-label="Show opening hours"
+                >
+                  <span
+                    className={`font-semibold shrink-0 ${
+                      isOpenNow ? "text-emerald-600" : "text-[#C2410C]"
+                    }`}
+                  >
+                    {openStatusLabel}
                   </span>
-                ) : (
-                  <span className="inline-flex items-center text-red-600 font-semibold">
-                    Closed
-                  </span>
-                )}
-                <span className="text-slate-400">·</span>
-                <span className="text-slate-600">{timingText}</span>
+                  {openStatusDetail ? (
+                    <>
+                      <span
+                        className={`shrink-0 ${isOpenNow ? "text-emerald-600" : "text-[#C2410C]"}`}
+                        aria-hidden
+                      >
+                        •
+                      </span>
+                      <span className="font-medium  text-wide text-slate-600 truncate">
+                        {openStatusDetail}
+                      </span>
+                    </>
+                  ) : null}
+                  <ChevronDown
+                    size={15}
+                    className="text-slate-700 shrink-0"
+                    strokeWidth={2.25}
+                  />
+                </button>
+
+                {phoneDisplay ? (
+                  <>
+                    <span className="text-slate-600 select-none" aria-hidden>
+                      |
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 font-medium  text-wide text-slate-600">
+                      <Phone size={15} className="text-black shrink-0" strokeWidth={2.25} />
+                      {phoneDisplay}
+                    </span>
+                  </>
+                ) : null}
               </div>
-              <div className="relative flex items-center gap-1.5 shrink-0">
+
+              {profile.address?.trim() ? (
+                <div className="flex items-start gap-1.5 text-sm  text-wide text-slate-600">
+                  <MapPin
+                    size={15}
+                    className="text-black shrink-0 mt-0.5"
+                    strokeWidth={2.25}
+                  />
+                  <span className="font-medium leading-snug">{profile.address.trim()}</span>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Mobile District-style meta under gallery */}
+            <div className="md:hidden mt-4 space-y-3 px-5">
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="text-[1.65rem] font-semibold text-slate-900 tracking-tight leading-tight min-w-0">
+                  {profile.name}
+                </h1>
+                {ratingValue ? (
+                  <div className="inline-flex items-center gap-1 shrink-0 rounded-md bg-emerald-600 text-white px-2 py-1 text-sm font-bold">
+                    {ratingValue} <Star size={12} className="fill-white text-white" />
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 text-[0.75rem] font-bold shrink-0">
+                    New
+                  </div>
+                )}
+              </div>
+
+              {profile.address?.trim() ? (
+                <p className="text-sm text-slate-500 leading-snug">{profile.address.trim()}</p>
+              ) : null}
+
+              {infoCostText ? (
+                <p className="text-sm font-medium text-slate-700">{infoCostText}</p>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setVenueInfoModal("hours")}
+                className="inline-flex items-center gap-1.5 cursor-pointer text-sm"
+                aria-label="Show opening hours"
+              >
+                <span className={`font-semibold ${isOpenNow ? "text-emerald-600" : "text-[#C2410C]"}`}>
+                  {openStatusLabel}
+                </span>
+                {openStatusDetail ? (
+                  <>
+                    <span className={isOpenNow ? "text-emerald-600" : "text-[#C2410C]"} aria-hidden>•</span>
+                    <span className="font-medium text-slate-600">{openStatusDetail}</span>
+                  </>
+                ) : null}
+                <ChevronDown size={15} className="text-slate-700" strokeWidth={2.25} />
+              </button>
+
+              <div className="flex flex-wrap gap-2.5 pt-1">
+                {profile.address?.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address || "")}`,
+                        "_blank",
+                        "noopener,noreferrer"
+                      );
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
+                  >
+                    <Navigation size={15} strokeWidth={2.25} />
+                    Directions
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => setVenueInfoModal("location")}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
-                  aria-label="Show location"
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({ title: profile.name, url: window.location.href });
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success("Link copied to clipboard!");
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
                 >
-                  <MapPin size={16} className="text-[#292929]" strokeWidth={2.5} />
+                  <Upload size={15} strokeWidth={2.25} />
+                  Share
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setVenueInfoModal("phone")}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
-                  aria-label="Show phone number"
-                >
-                  <Phone size={16} className="text-[#292929]" strokeWidth={2.5} />
-                </button>
+                {phoneDisplay ? (
+                  <a
+                    href={`tel:${phoneDisplay}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    <Phone size={15} strokeWidth={2.25} />
+                    Call
+                  </a>
+                ) : null}
               </div>
             </div>
+
+            <div ref={heroEndSentinelRef} className="h-px w-full" aria-hidden />
           </div>
 
           {!hideBookingSidebar ? (
             <aside
               ref={bookingWidgetRef}
-              className="w-full order-2 lg:row-span-2 lg:sticky z-30 self-start"
+              className={`w-full order-2 md:row-span-2 md:sticky lg:sticky z-30 self-start ${
+                isBookTableFlow ? "hidden lg:block" : "hidden md:block"
+              }`}
               style={{ top: galleryStickyTop }}
             >
               {activeTab === "Book a Table" && drawerStep === 1 ? (
@@ -1639,7 +2034,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   className="bg-white rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)] overflow-visible p-4 sm:p-5"
                 >
                   <h3 className="text-xl sm:text-[1.3rem] font-semibold text-slate-900 tracking-tight leading-tight">
-                    Reserve a Table
+                    Book a table
                   </h3>
 
                   <div className="mt-4 space-y-3.5">
@@ -1784,23 +2179,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     >
                       Book a Table
                     </button>
-
-                    {costText ? (
-                      <div className="border-t border-slate-100 pt-3 space-y-2">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-xs text-slate-400">Average cost for two</span>
-                          <span className="text-sm font-bold text-slate-900 text-right">
-                            {profile?.average_cost
-                              ? `${formatMoney(profile.average_cost, { compact: true })} (approx.)`
-                              : costText}
-                          </span>
-                        </div>
-                        {/* <p className="text-[11px] text-slate-400 leading-snug flex items-start gap-1.5">
-                          <AlertCircle size={12} className="shrink-0 mt-0.5" strokeWidth={2.25} />
-                          Exclusive of applicable taxes and charges
-                        </p> */}
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               )}
@@ -1808,107 +2186,123 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           ) : null}
 
           <div className="min-w-0 order-3">
-            {/* ── Sticky tabs (under gallery, left column) ── */}
-            <div ref={tabsSentinelRef} className="h-0 mt-1" aria-hidden />
-            <div
-              id="restaurant-tabs"
-              className={`sticky z-40 bg-white border-b border-slate-200 ${
-                tabsStuck ? "shadow-[0_4px_12px_rgba(15,23,42,0.08)]" : ""
-              }`}
-              style={{ top: siteHeaderHeight > 0 ? siteHeaderHeight : 124 }}
-            >
-              <div className="flex gap-6 overflow-x-auto scrollbar-hide">
-                {DETAIL_SECTION_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                    className={`py-3 text-base sm:text-lg lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                      activeTab === tab.id
-                        ? "border-[#6900AA] text-[#6900AA] font-bold"
-                        : "border-transparent text-slate-400 hover:text-slate-600"
-                    }`}
-                  >
-                    {tab.id}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div
               id="tab-panel-start"
-              className="space-y-4 pt-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem]"
+              className={`space-y-4 pt-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${
+                isBookTableFlow ? "" : "max-md:px-5"
+              }`}
             >
 
             {/* Single-page Overview with scroll-spy sections (District-style) */}
             {activeTab !== "Book a Table" && (
               <div className="space-y-4">
 
-                {/* Overview — Dining Offers above About */}
+                {/* Overview — Dining Offers + About (Overview tab highlights for both) */}
                 <div id="section-overview" className="scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] space-y-4 pb-5">
-                  {visibleOffers.length > 0 && (
-                <section className="bg-white p-0 sm:p-0">
-                  <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">Dining Offers</h3>
-                  {visibleOffers.length > 1 && (
-                    <p className="text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-3">Tap on any offer to know more</p>
-                  )}
-                  {visibleOffers.length <= 1 && <div className="mb-3" />}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {visibleOffers.map((offer, idx) => {
-                        const isFeatured = idx === 0;
-                        const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
-                        return (
-                          <button
-                            key={`${offer.id || offer.title}-${idx}`}
-                            type="button"
-                            onClick={() => handleQuickBook(offer)}
-                            className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
-                              isFeatured
-                                ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
-                                : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
-                            }`}
-                          >
-                            {scheduled && (
-                              <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
-                                Coming soon
+                  {visibleOffers.length > 0 ? (
+                    <section className="bg-white p-0 sm:p-0">
+                      <h3 className="text-2xl sm:text-3xl lg:text-xl font-bold text-zinc-800">
+                        Dining Offers
+                      </h3>
+                      {visibleOffers.length > 1 && (
+                        <p className="hidden md:block text-base sm:text-lg lg:text-sm text-zinc-500 mt-0.5 mb-3">
+                          Tap on any offer to know more
+                        </p>
+                      )}
+                      {visibleOffers.length <= 1 && <div className="hidden md:block mb-3" />}
+                      {/* Mobile — same blue dining-offer cards as desktop */}
+                      <div className="md:hidden mt-3 space-y-3">
+                        {visibleOffers.map((offer, idx) => {
+                          const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
+                          return (
+                            <button
+                              key={`m-offer-${offer.id || offer.title}-${idx}`}
+                              type="button"
+                              onClick={() => handleQuickBook(offer)}
+                              className="relative overflow-hidden w-full rounded-xl text-left cursor-pointer min-h-[120px] p-3.5 bg-[#2563eb] text-white shadow-sm"
+                            >
+                              {scheduled && (
+                                <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                  Coming soon
+                                </span>
+                              )}
+                              <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-white/85">
+                                {offer.type || "Offer"}
+                              </p>
+                              <p className="font-extrabold mt-1.5 leading-snug text-xl text-white">
+                                {offer.title}
+                              </p>
+                              <p className="mt-2 leading-snug font-semibold text-sm text-white/90">
+                                {formatDiningOfferDiscount(offer)}
+                                {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
+                              </p>
+                              <span
+                                className="pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl text-white/15"
+                                aria-hidden
+                              >
+                                %
                               </span>
-                            )}
-                            <p
-                              className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
-                                isFeatured ? "text-white/85" : "text-[#2563eb]"
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Tablet/desktop — existing card grid (unchanged) */}
+                      <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-0">
+                        {visibleOffers.map((offer, idx) => {
+                          const isFeatured = idx === 0;
+                          const scheduled = getEffectiveDiningOfferStatus(offer) === "SCHEDULED";
+                          return (
+                            <button
+                              key={`${offer.id || offer.title}-${idx}`}
+                              type="button"
+                              onClick={() => handleQuickBook(offer)}
+                              className={`relative overflow-hidden rounded-xl text-left transition-all cursor-pointer h-full min-h-[120px] p-3.5 sm:p-4 ${
+                                isFeatured
+                                  ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm"
+                                  : "bg-white text-zinc-900 border border-[#d7e6ff] hover:border-[#93c5fd]"
                               }`}
                             >
-                              {offer.type || "Offer"}
-                            </p>
-                            <p
-                              className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
-                                isFeatured ? "text-white" : "text-zinc-900"
-                              }`}
-                            >
-                              {offer.title}
-                            </p>
-                            <p
-                              className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
-                                isFeatured ? "text-white/90" : "text-[#2563eb]"
-                              }`}
-                            >
-                              {formatDiningOfferDiscount(offer)}
-                              {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
-                            </p>
-                            <span
-                              className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
-                                isFeatured ? "text-white/15" : "text-[#2563eb]/10"
-                              }`}
-                              aria-hidden
-                            >
-                              %
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                </section>
-                  )}
+                              {scheduled && (
+                                <span className="absolute top-3 right-3 text-[0.625rem] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                  Coming soon
+                                </span>
+                              )}
+                              <p
+                                className={`text-[1rem] lg:text-[0.625rem] font-extrabold uppercase tracking-wider ${
+                                  isFeatured ? "text-white/85" : "text-[#2563eb]"
+                                }`}
+                              >
+                                {offer.type || "Offer"}
+                              </p>
+                              <p
+                                className={`font-extrabold mt-1.5 leading-snug text-xl sm:text-xl lg:text-base ${
+                                  isFeatured ? "text-white" : "text-zinc-900"
+                                }`}
+                              >
+                                {offer.title}
+                              </p>
+                              <p
+                                className={`mt-2 leading-snug font-semibold text-[1rem] lg:text-xs ${
+                                  isFeatured ? "text-white/90" : "text-[#2563eb]"
+                                }`}
+                              >
+                                {formatDiningOfferDiscount(offer)}
+                                {offer.promo_code ? ` · Code ${offer.promo_code}` : ""}
+                              </p>
+                              <span
+                                className={`pointer-events-none absolute font-black leading-none select-none -bottom-3 -right-1 text-7xl ${
+                                  isFeatured ? "text-white/15" : "text-[#2563eb]/10"
+                                }`}
+                                aria-hidden
+                              >
+                                %
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ) : null}
 
                   {/* About Venue — Cost + Cuisines */}
                   <section className="bg-white p-0 sm:py-7">
@@ -2176,7 +2570,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
           {/* Similar Restaurants Horizontal Shelf */}
           {similarRestaurants.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-slate-200 animate-fadeIn">
+            <div className={`mt-8 pt-6 border-t border-slate-200 animate-fadeIn ${isBookTableFlow ? "max-lg:hidden" : ""}`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-2xl sm:text-3xl lg:text-xl font-extrabold text-slate-800 tracking-tight">
@@ -2291,77 +2685,78 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
         {/* ── 7. Lightbox / Image Slider Modal ── */}
         {isLightboxOpen && lightboxItems.length > 0 && (
-          <div className="fixed inset-0 z-50 bg-black/95 flex flex-col justify-between py-6 px-4 select-none animate-fadeIn">
-            {/* Header */}
-            <div className="flex justify-between items-center max-w-7xl mx-auto w-full text-white">
-              <span className="text-sm font-semibold tracking-wider text-slate-300 font-mono">
-                {currentPhotoIdx + 1} of {lightboxItems.length}
-              </span>
-              <button
-                onClick={closeLightbox}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors text-white cursor-pointer"
-                aria-label="Close gallery"
-              >
-                <X size={24} />
-              </button>
-            </div>
+          <div className="fixed inset-0 z-[110] bg-black flex flex-col select-none animate-fadeIn">
+            {/* Back — District-style exit */}
+            <button
+              type="button"
+              onClick={closeLightbox}
+              className="absolute top-3 left-3 sm:top-5 sm:left-5 z-20 w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center cursor-pointer hover:bg-white/25"
+              aria-label="Close gallery"
+            >
+              <ChevronLeft size={22} className="text-white" strokeWidth={2.25} />
+            </button>
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex items-center container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 justify-between w-full gap-2 sm:gap-4 my-4 relative">
-              {/* Left Button */}
+            {/* Image stage */}
+            <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-10 relative">
               {lightboxItems.length > 1 ? (
                 <button
+                  type="button"
                   onClick={prevPhoto}
-                  className="p-2 sm:p-3 bg-white/5 hover:bg-white/15 active:scale-95 text-white rounded-full transition-all cursor-pointer backdrop-blur-sm shadow-lg border border-white/10 shrink-0"
+                  className="hidden sm:flex absolute left-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
                   aria-label="Previous image"
                 >
-                  <ChevronLeft size={24} />
+                  <ChevronLeft size={22} />
                 </button>
-              ) : (
-                <div className="w-10 sm:w-12 shrink-0" />
-              )}
+              ) : null}
 
-              {/* Current Image Container */}
-              <div className="flex-1 h-full flex items-center justify-center overflow-auto px-1 sm:px-2">
+              <div className="w-full flex-1 flex items-center justify-center overflow-hidden">
                 <img
+                  key={lightboxItems[currentPhotoIdx] + "-" + currentPhotoIdx}
                   src={lightboxItems[currentPhotoIdx]}
                   alt={`Gallery image ${currentPhotoIdx + 1}`}
-                  className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl transition-all duration-300 select-none bg-white"
+                  className="max-h-[78vh] w-full sm:w-auto sm:max-w-[min(920px,90vw)] object-contain select-none animate-diningLightboxSlideUp"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (lightboxItems.length > 1) nextPhoto();
+                  }}
                 />
               </div>
 
-              {/* Right Button */}
               {lightboxItems.length > 1 ? (
                 <button
+                  type="button"
                   onClick={nextPhoto}
-                  className="p-2 sm:p-3 bg-white/5 hover:bg-white/15 active:scale-95 text-white rounded-full transition-all cursor-pointer backdrop-blur-sm shadow-lg border border-white/10 shrink-0"
+                  className="hidden sm:flex absolute right-4 z-10 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full cursor-pointer"
                   aria-label="Next image"
                 >
-                  <ChevronRight size={24} />
+                  <ChevronRight size={22} />
                 </button>
-              ) : (
-                <div className="w-10 sm:w-12 shrink-0" />
-              )}
+              ) : null}
+
+              <p className="shrink-0 text-white text-sm font-semibold tracking-wide py-4">
+                {currentPhotoIdx + 1} / {lightboxItems.length}
+              </p>
             </div>
 
-            {/* Thumbnails Row */}
+            {/* Thumbnails — tablet/desktop only */}
             {lightboxItems.length > 1 && (
-              <div className="max-w-4xl mx-auto w-full overflow-x-auto py-2 flex justify-center gap-2.5 px-4 scrollbar-hide">
+              <div className="hidden md:flex max-w-4xl mx-auto w-full overflow-x-auto py-3 justify-center gap-2.5 px-4 scrollbar-hide">
                 {lightboxItems.map((url, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => setCurrentPhotoIdx(idx)}
-                    className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${currentPhotoIdx === idx
-                      ? 'border-rose-500 scale-105 opacity-100 shadow-md'
-                      : 'border-transparent opacity-50 hover:opacity-80'
-                      }`}
+                    className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${
+                      currentPhotoIdx === idx
+                        ? "border-white scale-105 opacity-100"
+                        : "border-transparent opacity-50 hover:opacity-80"
+                    }`}
                   >
                     <img src={url} alt={`thumb ${idx}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
             )}
-
           </div>
         )}
 
@@ -2369,8 +2764,26 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         {activeTab === "Book a Table" && bookTableSlot && createPortal(
           <div className="w-full bg-white flex flex-col pb-12 sm:pb-16">
 
+            {/* Immersive book header (mobile + tablet) */}
+            <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-100 px-4 sm:px-5 py-3 flex items-start gap-2.5">
+              <button
+                type="button"
+                onClick={closeBookingPanel}
+                className="mt-0.5 w-9 h-9 -ml-1 rounded-full flex items-center justify-center cursor-pointer hover:bg-slate-50 shrink-0"
+                aria-label="Back to restaurant"
+              >
+                <ChevronLeft size={22} className="text-slate-900" strokeWidth={2.25} />
+              </button>
+              <div className="min-w-0 pt-0.5">
+                <h4 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">
+                  Book a table
+                </h4>
+                <p className="text-sm text-slate-500 font-medium truncate mt-0.5">{profile.name}</p>
+              </div>
+            </div>
+
             {/* Panel Content */}
-            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : drawerStep === 1 ? 'pt-1 pb-2 bg-white' : 'p-5 bg-white'}`}>
+            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white' : drawerStep === 1 ? 'pt-1 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
               {drawerStep === 1 && (() => {
                 const mealsConfig: DiningMealsConfig = selectedOpDay?.meals || {
                   breakfast: { open: '08:00', close: '11:00', active: true },
@@ -2450,15 +2863,78 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                 return (
                   <div className="space-y-5">
-                    <h4 className="text-xl font-semibold text-slate-900 tracking-tight">
+                    {/* Desktop: section tabs sit above booking details on time-slot step */}
+                    {showDesktopBookTabsInline ? (
+                      <div className="hidden lg:block border-b border-slate-200 -mt-1 mb-1">
+                        <div className="flex gap-6 overflow-x-auto scrollbar-hide">
+                          {DETAIL_SECTION_TABS.map((tab) => (
+                            <button
+                              key={`book-inline-tab-${tab.id}`}
+                              type="button"
+                              onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
+                              className="py-2.5 text-sm font-semibold tracking-wide border-b-2 border-transparent text-slate-400 hover:text-slate-900 transition-all whitespace-nowrap cursor-pointer"
+                            >
+                              {tab.id}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Desktop book intro (mobile/tablet use immersive header above) */}
+                    <h4 className="hidden lg:block text-xl font-semibold text-slate-900 tracking-tight">
                       Select your booking details
                     </h4>
 
-                    <div className="space-y-5 bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-                    {/* Number of guest(s) — chip row */}
+                    <div className="space-y-5 bg-white rounded-none border-0 px-0 md:rounded-xl md:border md:border-slate-200 md:p-5 p-0">
+                    {/* Guests — dropdown on mobile, chips on tablet/desktop */}
                     <div>
-                      <p className="text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
-                      <div className="flex flex-wrap gap-2.5">
+                      <p className="md:hidden text-sm text-slate-500 mb-2">Select number of guests</p>
+                      <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">Number of guest(s)</p>
+
+                      <div className="md:hidden relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReserveWidgetDropdown((prev) => (prev === "guests" ? null : "guests"))
+                          }
+                          className="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-10 py-3 text-sm font-semibold text-[#292929] text-left cursor-pointer"
+                          aria-haspopup="listbox"
+                          aria-expanded={reserveWidgetDropdown === "guests"}
+                        >
+                          {Number(guests)} {Number(guests) === 1 ? "guest" : "guests"}
+                        </button>
+                        <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        {reserveWidgetDropdown === "guests" ? (
+                          <ul
+                            role="listbox"
+                            className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto border border-slate-300 bg-white shadow-md rounded-xl"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                              const selected = Number(guests) === num;
+                              return (
+                                <li key={num} role="option" aria-selected={selected}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setGuests(String(num));
+                                      setAvailabilityStatus(null);
+                                      setReserveWidgetDropdown(null);
+                                    }}
+                                    className={`w-full text-left px-4 py-2.5 text-sm font-medium cursor-pointer ${
+                                      selected ? "bg-slate-900 text-white" : "bg-white text-slate-800 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {num} {num === 1 ? "guest" : "guests"}
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </div>
+
+                      <div className="hidden md:flex flex-wrap gap-2.5">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
                               const selected = Number(guests) === num;
                           return (
@@ -2482,10 +2958,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       </div>
                     </div>
 
-                    {/* When are you visiting? — horizontal day strip */}
+                    {/* Dates */}
                     <div>
-                      <p className="text-sm font-semibold text-slate-800 mb-3">When are you visiting?</p>
-                      <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+                      <p className="md:hidden text-base font-bold text-slate-900 mb-3">Select day and time</p>
+                      <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">When are you visiting?</p>
+                      <div className="flex gap-0 md:gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin items-stretch">
+                        <div className="md:hidden shrink-0 flex items-center pr-2 mr-1 border-r border-slate-200">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl] rotate-180">
+                            {bookingDates[selectedDateIndex]?.toLocaleDateString("en-US", { month: "short" })}
+                          </span>
+                        </div>
                         {bookingDates.map((d, idx) => {
                           const labels = formatDateLabel(d, idx);
                           const selected = selectedDateIndex === idx;
@@ -2494,16 +2976,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               key={idx}
                               type="button"
                               onClick={() => handleDateSelect(idx)}
-                              className={`min-w-[72px] sm:min-w-[78px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${
+                              className={`min-w-[64px] sm:min-w-[72px] md:min-w-[78px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${
                                     selected
-                                  ? 'border border-[#6900AA] bg-[#f7e9ff]'
-                                  : 'border border-slate-200 bg-white hover:border-slate-300'
+                                  ? 'md:border md:border-[#6900AA] md:bg-[#f7e9ff] bg-slate-900 text-white border-transparent'
+                                  : 'md:border md:border-slate-200 md:bg-white md:hover:border-slate-300 border-transparent bg-transparent'
                               }`}
                             >
-                              <p className={`text-sm font-semibold leading-tight ${selected ? 'text-[#6900AA]' : 'text-slate-700'}`}>
+                              <p className={`text-sm font-semibold leading-tight ${selected ? 'md:text-[#6900AA] text-white' : 'text-slate-700'}`}>
                                 {labels.top}
                               </p>
-                              <p className={`text-[0.8rem] font-medium mt-0.5 leading-tight ${selected ? 'text-[#6900AA]' : 'text-slate-500'}`}>
+                              <p className={`text-[0.8rem] font-medium mt-0.5 leading-tight ${selected ? 'md:text-[#6900AA] text-white/80' : 'text-slate-500'}`}>
                                 {labels.bottom}
                               </p>
                             </button>
@@ -2514,9 +2996,36 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                     {/* Meal period accordions + time slots */}
                     <div className="space-y-3 pt-1">
-                      <p className="text-sm font-semibold text-slate-800">
+                      <p className="hidden md:block text-sm font-semibold text-slate-800">
                         Select the time of day to see the offers
                       </p>
+
+                      {/* Mobile meal chips */}
+                      {!isSelectedDayClosed && mealOptions.length > 0 ? (
+                        <div className="md:hidden flex flex-wrap gap-2 mb-1">
+                          {mealOptions.map((meal) => {
+                            const selected = openMealId === meal.id;
+                            return (
+                              <button
+                                key={`chip-${meal.id}`}
+                                type="button"
+                                onClick={() => {
+                                  setActiveMealSection(meal.id);
+                                  setSelectedTime('');
+                                  setAvailabilityStatus(null);
+                                }}
+                                className={`rounded-full px-4 py-2 text-sm font-semibold border cursor-pointer ${
+                                  selected
+                                    ? "bg-slate-100 border-slate-300 text-slate-900"
+                                    : "bg-white border-slate-200 text-slate-700"
+                                }`}
+                              >
+                                {meal.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
 
                       {isSelectedDayClosed ? (
                         <div className="text-center py-8 bg-white border border-slate-200 rounded-2xl">
@@ -2530,6 +3039,56 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         </div>
                       ) : (
                         <div className="space-y-3">
+                          {/* Mobile: show slots for active meal only as flat grid */}
+                          {openMealId ? (
+                            <div className="md:hidden">
+                              {(() => {
+                                const meal = mealOptions.find((m) => m.id === openMealId);
+                                if (!meal) return null;
+                                if (meal.slots.length === 0) {
+                                  return (
+                                    <p className="text-xs text-slate-400 font-medium py-3 text-center">
+                                      No slots available in this period.
+                                    </p>
+                                  );
+                                }
+                                return (
+                                  <div className="grid grid-cols-2 gap-2.5">
+                                    {meal.slots.map((slot) => {
+                                      const isSelected = selectedTime === slot;
+                                      const promoText = offerChipLabel;
+                                      return (
+                                        <button
+                                          key={slot}
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveMealSection(meal.id);
+                                            handleTimeSelect(slot);
+                                          }}
+                                          className={`min-h-[56px] px-2 py-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                                            isSelected
+                                              ? "border-slate-900 bg-slate-900 text-white"
+                                              : "border-slate-200 bg-white text-slate-800"
+                                          }`}
+                                        >
+                                          <span className="text-sm font-bold leading-none">
+                                            {formatSlotLabel(slot)}
+                                          </span>
+                                          {promoText ? (
+                                            <span className={`text-[0.65rem] font-bold mt-1.5 leading-none ${isSelected ? "text-white/80" : "text-[#6900AA]"}`}>
+                                              {promoText}
+                                            </span>
+                                          ) : null}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          ) : null}
+
+                          <div className="hidden md:block space-y-3">
                           {mealOptions.map((meal) => {
                             const isOpen = openMealId === meal.id;
                             const cfg = mealsConfig[meal.id];
@@ -2609,6 +3168,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               </div>
                                     );
                                   })}
+                          </div>
                                 </div>
                               )}
                             </div>
@@ -3149,7 +3709,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <div className="flex flex-col items-start gap-3">
                           <button
                             type="submit"
-                            className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-primary hover:bg-[#57008E] text-white text-sm font-bold transition-colors cursor-pointer shadow-sm"
+                            className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-[#111111] hover:bg-black text-white text-sm font-bold transition-colors cursor-pointer shadow-sm"
                           >
                             Confirm Booking
                           </button>
@@ -3399,7 +3959,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           closeBookingPanel();
                           router.push(`/customer/bookings/${lastBookingId}`);
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl bg-[#f8f2ff] border-[#6900AA] border-[1.5px] hover:bg-[#57008E] hover:text-white disabled:opacity-50 text-[#6900AA] text-[14px] font-bold px-4 py-3.5 transition-colors cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl bg-[#111111] hover:bg-black disabled:opacity-50 text-white text-[14px] font-bold px-4 py-3.5 transition-colors cursor-pointer"
                       >
                         <FileText size={16} strokeWidth={2} />
                         View Booking Details
@@ -3411,7 +3971,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           closeBookingPanel();
                           router.push('/dining');
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl border-[1.5px] border-[#6900AA] bg-white text-[#6900AA] text-[14px] font-bold px-4 py-3.5 hover:bg-[#f8f2ff] transition-colors cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-2 max-w-xs rounded-xl border-[1.5px] border-[#111111] bg-white text-[#111111] text-[14px] font-bold px-4 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <Compass size={16} strokeWidth={2} />
                         Explore More Restaurants
@@ -3430,8 +3990,59 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
             {/* Step 1 footer — Zomato-like proceed bar */}
             {drawerStep === 1 && (
-              <div className="mt-8">
-                <label className="flex items-start gap-2.5 cursor-pointer select-none mb-4">
+              <div className="mt-8 md:mt-8 max-md:sticky max-md:bottom-0 max-md:z-40 max-md:-mx-5 max-md:px-5 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:bg-white max-md:border-t max-md:border-slate-200">
+                <div className="md:hidden mb-3 rounded-xl bg-slate-100 px-3.5 py-3">
+                  <p className="text-sm font-bold text-slate-900 mb-1">Terms &amp; Conditions</p>
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <div className="relative mt-0.5 shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${acceptedTerms ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-300'}`}
+                      >
+                        {acceptedTerms && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-500 font-medium leading-relaxed">
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        className="text-slate-900 font-semibold underline cursor-pointer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setBookingPolicyFocus("terms");
+                          setBookingPolicyOpen(true);
+                        }}
+                      >
+                        Terms &amp; Conditions
+                      </button>
+                      {' '}and{' '}
+                      <button
+                        type="button"
+                        className="text-slate-900 font-semibold underline cursor-pointer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setBookingPolicyFocus("cancellation");
+                          setBookingPolicyOpen(true);
+                        }}
+                      >
+                        Cancellation Policy
+                      </button>
+                    </span>
+                  </label>
+                </div>
+
+                <label className="hidden md:flex items-start gap-2.5 cursor-pointer select-none mb-4">
                     <div className="relative mt-0.5 shrink-0">
                       <input
                         type="checkbox"
@@ -3485,8 +4096,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     type="button"
                     disabled={!selectedTime || !acceptedTerms}
                     onClick={proceedToBooking}
-                  className={`w-fit self-start px-6 sm:px-8 py-3.5 rounded-md text-base font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
-                    ? 'bg-[#6900AA] hover:bg-[#57008E] text-white cursor-pointer'
+                  className={`w-full md:max-w-sm lg:max-w-md md:self-start px-6 sm:px-8 py-3.5 rounded-xl text-base font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
+                    ? 'bg-[#111111] hover:bg-black text-white cursor-pointer'
                     : 'bg-[#cfcfcf] text-white cursor-not-allowed'
                     }`}
                 >
@@ -3497,6 +4108,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
         , bookTableSlot)}
+
+        {/* Mobile sticky Book a table CTA (overview) */}
+        {!hideBookingSidebar && activeTab !== "Book a Table" && !isLightboxOpen ? (
+          <div className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              onClick={() => handleQuickBook()}
+              className="w-full rounded-xl border border-slate-900 bg-white text-slate-900 py-3.5 text-base font-bold cursor-pointer hover:bg-slate-50"
+            >
+              Book a table
+            </button>
+          </div>
+        ) : null}
 
         <CustomerAuthModal
           open={authModalOpen}
@@ -3514,6 +4138,114 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           }}
         />
 
+        {typeof document !== "undefined" &&
+          createPortal(
+            <div
+              id="dining-restaurant-sticky"
+              ref={restaurantStickyRef}
+              className={`fixed top-0 left-0 right-0 z-[60] transition-all duration-300 ease-out ${
+                isBookTableFlow ? "hidden" : "hidden md:block"
+              } ${
+                restaurantStickyVisible && !isLightboxOpen
+                  ? "translate-y-0 opacity-100"
+                  : "-translate-y-full opacity-0 pointer-events-none"
+              }`}
+              aria-hidden={!restaurantStickyVisible || isLightboxOpen}
+            >
+              <div className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-[0_4px_18px_rgba(15,23,42,0.06)]">
+                <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-1.5">
+                  <div className="flex items-center gap-3 py-1.5 min-w-0">
+                    <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-slate-100 shrink-0">
+                      {stickyThumb ? (
+                        <SafeCoverImage
+                          src={stickyThumb}
+                          alt={profile.name}
+                          className="h-full w-full object-cover"
+                          fallbackClassName="flex h-full w-full items-center justify-center bg-slate-100 text-slate-300"
+                          fallback={<DiningImageFallback size={18} />}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-slate-300">
+                          <Utensils size={18} strokeWidth={1.5} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm sm:text-base font-bold text-slate-900 truncate leading-tight">
+                        {profile.name}
+                      </p>
+                      {stickyMetaLine ? (
+                        <p className="mt-0.5 text-xs sm:text-sm text-slate-500 truncate leading-snug">
+                          {stickyMetaLine}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div
+                    id="restaurant-tabs"
+                    className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+                      showSectionTabs
+                        ? "max-h-16 opacity-100"
+                        : "max-h-0 opacity-0 pointer-events-none"
+                    }`}
+                  >
+                    <div className="flex gap-6 overflow-x-auto scrollbar-hide pt-0.5 pb-0.5">
+                      {DETAIL_SECTION_TABS.map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
+                          className={`py-2.5 text-sm sm:text-base lg:text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                            activeTab === tab.id
+                              ? "border-slate-900 text-slate-900 font-bold"
+                              : "border-transparent text-slate-400 hover:text-slate-900"
+                          }`}
+                        >
+                          {tab.id}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+
+        {/* Mobile section tab bar (District-style; replaces restaurant sticky on mobile) */}
+        {typeof document !== "undefined" &&
+          createPortal(
+            <div
+              ref={mobileTabsRef}
+              id="dining-mobile-section-tabs"
+              className={`md:hidden fixed top-0 left-0 right-0 z-[60] bg-white border-b border-slate-200 transition-all duration-300 ease-out ${
+                showMobileSectionTabs && !isLightboxOpen
+                  ? "translate-y-0 opacity-100"
+                  : "-translate-y-full opacity-0 pointer-events-none"
+              }`}
+              aria-hidden={!showMobileSectionTabs || isLightboxOpen}
+            >
+              <div className="px-5 flex gap-5 overflow-x-auto scrollbar-hide">
+                {DETAIL_SECTION_TABS.map((tab) => (
+                  <button
+                    key={`mobile-tab-${tab.id}`}
+                    type="button"
+                    onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
+                    className={`py-3 text-sm font-semibold tracking-wide border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                      activeTab === tab.id
+                        ? "border-slate-900 text-slate-900 font-bold"
+                        : "border-transparent text-slate-400"
+                    }`}
+                  >
+                    {tab.id}
+                  </button>
+                ))}
+              </div>
+            </div>,
+            document.body
+          )}
+
         <DiningBookingPolicyModal
           open={bookingPolicyOpen}
           focusSection={bookingPolicyFocus}
@@ -3529,6 +4261,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           description={aboutDescription}
           address={profile.address}
           phone={profile.phone}
+          openingHours={openingHourRows}
         />
       </div>
       );

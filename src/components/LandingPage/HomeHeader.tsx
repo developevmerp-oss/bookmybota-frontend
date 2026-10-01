@@ -216,9 +216,34 @@ export default function HomeHeader() {
   const displayName = customer?.name || customer?.email?.split("@")[0] || "Account";
   const initial = displayName.charAt(0).toUpperCase();
   const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
+  const [diningDetailNavHidden, setDiningDetailNavHidden] = useState(false);
+  const [diningBookImmersive, setDiningBookImmersive] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      setDiningDetailNavHidden(document.body.dataset.diningDetailNav === "1");
+      setDiningBookImmersive(document.body.dataset.diningBookImmersive === "1");
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-dining-detail-nav", "data-dining-book-immersive"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-white text-[#111111]">
+    <header
+      className={`sticky top-0 z-50 bg-white text-[#111111] transition-transform duration-300 ease-out ${
+        diningDetailNavHidden
+          ? `-translate-y-full pointer-events-none ${
+              diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
+            }`
+          : "translate-y-0"
+      }`}
+      aria-hidden={diningDetailNavHidden}
+    >
       <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2 border-b-2 border-[#a044d9]">
         {/* Mobile: logo + actions, then full-width search */}
         <div className="flex flex-col gap-2 md:hidden">

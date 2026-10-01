@@ -2,7 +2,6 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import type { Collection } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { RailPagerNav } from "@/components/LandingPage/RailChrome";
@@ -15,11 +14,6 @@ function CollectionCardOption2({
   collection: Collection;
   city?: string;
 }) {
-  const placesLabel =
-    collection.places_count !== undefined
-      ? `${collection.places_count} place${collection.places_count !== 1 ? "s" : ""}`
-      : "0 places";
-  const subtitle = collection.subtitle?.trim() || placesLabel;
   const href = city
     ? `/search?collection=${encodeURIComponent(collection.slug)}&city=${encodeURIComponent(city)}`
     : `/search?collection=${encodeURIComponent(collection.slug)}`;
@@ -27,7 +21,7 @@ function CollectionCardOption2({
   return (
     <Link
       href={href}
-      className="relative shrink-0 snap-start block overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer group h-[248px] w-[calc((100vw-2.5rem-0.75rem)/2)] sm:h-[280px] sm:w-[calc((100vw-5rem-2rem)/3)] md:h-[300px] md:w-[calc((100vw-5rem-3rem)/4)] lg:h-[320px] lg:w-[calc((100%-4rem)/5)] xl:h-[330px] xl:w-[calc((100%-4rem)/5)]"
+      className="relative shrink-0 snap-start block overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer group h-[248px] w-[calc((100vw-2.5rem)/2.35)] sm:h-[280px] sm:w-[calc((100vw-5rem)/2.6)] md:h-[300px] md:w-[calc((100vw-5rem)/3.35)] lg:h-[320px] lg:w-auto lg:flex-[0_0_calc((100%-3rem)/4)] xl:h-[330px]"
     >
       <img
         src={
@@ -41,34 +35,19 @@ function CollectionCardOption2({
             "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
         }}
       />
-      <div
-        className="absolute inset-x-0 bottom-0 h-[55%] pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%)",
-        }}
-      />
-      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 flex items-end justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-white font-bold text-base sm:text-lg leading-tight tracking-tight truncate">
-            {collection.title}
-          </h3>
-          <p className="text-white/85 text-xs sm:text-sm mt-1 truncate">{subtitle}</p>
-        </div>
-        <span
-          className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-white/80 flex items-center justify-center text-white group-hover:bg-white/15 transition-colors"
-          aria-hidden
-        >
-          <ArrowRight size={16} strokeWidth={2} />
-        </span>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-4">
+        <h3 className="text-white font-bold text-[15px] sm:text-base leading-tight tracking-tight">
+          {collection.title}
+        </h3>
       </div>
     </Link>
   );
 }
 
 /**
- * Dining homepage Collections — UI Option Two (gradient + title/subtitle + circular arrow).
- * Comment out the usage in DiningHomePage to hide this row.
+ * Dining homepage Collections — image + title only.
+ * Mobile/tablet: peek next card (no pager). Desktop: exactly 4 full cards + pager nav.
  */
 export default function DiningCollectionsOption2({
   collections,
@@ -83,30 +62,33 @@ export default function DiningCollectionsOption2({
   if (collections.length === 0) return null;
 
   return (
-    <div className="mt-4">
-      <div
-        ref={scrollerRef}
-        className="overflow-x-auto pt-1 pb-1 scrollbar-hide scroll-smooth snap-x snap-mandatory"
-      >
-        <div className="flex w-full min-w-full gap-3 sm:gap-4">
+    <div className="mt-5">
+      {/* Full-bleed peek on mobile/tablet; desktop clips to exactly 4 cards */}
+      <div className="lg:mx-0 -mx-5 sm:-mx-10 px-5 sm:px-10 lg:px-0">
+        <div
+          ref={scrollerRef}
+          className="flex gap-3 sm:gap-4 overflow-x-auto pt-1 pb-1 scrollbar-hide scroll-smooth snap-x snap-mandatory pr-5 sm:pr-10 lg:pr-0 lg:gap-4"
+        >
           {collections.map((col) => (
-            <CollectionCardOption2 key={`opt2-${col.id}`} collection={col} city={city} />
+            <CollectionCardOption2 key={col.id} collection={col} city={city} />
           ))}
         </div>
       </div>
-      <RailPagerNav
-        canPrev={scrollEdges.left}
-        canNext={scrollEdges.right}
-        pageCount={scrollEdges.pageCount}
-        activePage={scrollEdges.activePage}
-        onPrev={() => {
-          if (scrollerRef.current) scrollRailBy(scrollerRef.current, -1);
-        }}
-        onNext={() => {
-          if (scrollerRef.current) scrollRailBy(scrollerRef.current, 1);
-        }}
-        label="Collections option two"
-      />
+      <div className="hidden lg:block">
+        <RailPagerNav
+          canPrev={scrollEdges.left}
+          canNext={scrollEdges.right}
+          pageCount={scrollEdges.pageCount}
+          activePage={scrollEdges.activePage}
+          onPrev={() => {
+            if (scrollerRef.current) scrollRailBy(scrollerRef.current, -1);
+          }}
+          onNext={() => {
+            if (scrollerRef.current) scrollRailBy(scrollerRef.current, 1);
+          }}
+          label="Collections"
+        />
+      </div>
     </div>
   );
 }

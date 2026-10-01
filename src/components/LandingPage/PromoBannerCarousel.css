@@ -1,8 +1,9 @@
-/* Event hero carousel — matches partner slider crop (21:9) + BMS peeks */
+/* Landing promo carousel — height for layout; width locks to partner crop aspect (3:1) */
 .promo-banner-swiper {
-  /* PartnerPromotionsPage uploads landing banners at 21:9 */
   --promo-h: 250px;
-  --promo-slide-w: min(96%, calc(var(--promo-h) * 21 / 9));
+  --promo-aspect: 3; /* must match LANDING_PROMO_BANNER_ASPECT / partner crop */
+  --promo-slide-w: min(92%, calc(var(--promo-h) * var(--promo-aspect)));
+  --promo-peek-gap: 0.5rem;
   overflow-x: clip;
   overflow-y: visible;
   isolation: isolate;
@@ -13,35 +14,65 @@
 
 @media (min-width: 640px) {
   .promo-banner-swiper {
-    --promo-h: 320px;
-    --promo-slide-w: min(94%, calc(var(--promo-h) * 21 / 9));
+    --promo-h: 300px;
+    --promo-slide-w: min(90%, calc(var(--promo-h) * var(--promo-aspect)));
+    --promo-peek-gap: 0.65rem;
   }
 }
 
 @media (min-width: 768px) {
   .promo-banner-swiper {
-    --promo-h: 380px;
-    --promo-slide-w: min(92%, calc(var(--promo-h) * 21 / 9));
+    --promo-h: 340px;
+    --promo-slide-w: min(90%, calc(var(--promo-h) * var(--promo-aspect)));
+    --promo-peek-gap: 0.75rem;
   }
 }
 
 @media (min-width: 1024px) {
   .promo-banner-swiper {
-    --promo-h: 440px;
-    --promo-slide-w: min(90%, calc(var(--promo-h) * 21 / 9));
+    --promo-h: 380px;
+    --promo-slide-w: min(90%, calc(var(--promo-h) * var(--promo-aspect)));
+    --promo-peek-gap: 0.85rem;
   }
 }
 
 @media (min-width: 1280px) {
   .promo-banner-swiper {
-    --promo-h: 480px;
-    --promo-slide-w: min(88%, calc(var(--promo-h) * 21 / 9));
+    --promo-h: 400px;
+    --promo-slide-w: min(88%, calc(var(--promo-h) * var(--promo-aspect)));
+    --promo-peek-gap: 1rem;
   }
 }
 
-/* One slide: keep 21:9, pad page edges */
+@media (min-width: 1536px) {
+  .promo-banner-swiper {
+    --promo-h: 440px;
+    --promo-slide-w: min(86%, calc(var(--promo-h) * var(--promo-aspect)));
+  }
+}
+
+/* MacBook / short laptop viewports — free space for “The Best of Live Events” */
+@media (min-width: 1024px) and (max-height: 900px) {
+  .promo-banner-swiper {
+    --promo-h: 320px;
+  }
+}
+
+@media (min-width: 1280px) and (max-height: 900px) {
+  .promo-banner-swiper {
+    --promo-h: 340px;
+  }
+}
+
+@media (min-width: 1536px) and (max-height: 900px) {
+  .promo-banner-swiper {
+    --promo-h: 360px;
+  }
+}
+
+/* One slide: keep the same 3:1 frame, pad page edges */
 .promo-banner-swiper.is-single {
-  --promo-slide-w: min(100%, calc(var(--promo-h) * 21 / 9));
+  --promo-slide-w: min(100%, calc(var(--promo-h) * var(--promo-aspect)));
   padding-left: 1rem;
   padding-right: 1rem;
   box-sizing: border-box;
@@ -99,7 +130,7 @@
 
 .promo-banner-slide.swiper-slide {
   width: var(--promo-slide-w) !important;
-  max-width: 96vw;
+  max-width: 100%;
   box-sizing: border-box;
 }
 

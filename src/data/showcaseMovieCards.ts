@@ -19,6 +19,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     certification: "UA16+",
     language: "Telugu, Hindi",
     year: "2026",
+    promoted: true,
     href: "/movies",
   },
   {
@@ -28,6 +29,7 @@ export const SHOWCASE_MOVIE_CARDS: ShowcaseMovieCard[] = [
     certification: "UA 7+",
     language: "Gujarati",
     year: "2026",
+    promoted: true,
     href: "/movies",
   },
   {

@@ -292,7 +292,7 @@ function SlideCard({ slide }: { slide: Slide }) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(slide.image) && !failed;
 
-  // Frame is 21:9 — same crop partners use when uploading slider banners.
+  // Frame aspect matches partner admin crop (3:1 / 1920×640).
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#111]">
       {showImage ? (
@@ -442,14 +442,15 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
           grabCursor={multi}
           allowTouchMove={multi}
           slidesPerView={multi ? "auto" : 1}
-          spaceBetween={multi ? 12 : 0}
+          spaceBetween={multi ? 8 : 0}
           watchSlidesProgress={multi}
           breakpoints={
             multi
               ? {
-                  640: { spaceBetween: 14 },
-                  768: { spaceBetween: 16 },
-                  1024: { spaceBetween: 18 },
+                  640: { spaceBetween: 10 },
+                  768: { spaceBetween: 12 },
+                  1024: { spaceBetween: 14 },
+                  1280: { spaceBetween: 16 },
                 }
               : undefined
           }

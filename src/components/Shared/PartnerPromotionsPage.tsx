@@ -43,6 +43,10 @@ import {
   partnerPromotionsFormSchema,
   type PartnerPromotionsFormValues,
 } from "@/lib/partnerPromotionsFormSchema";
+import {
+  LANDING_PROMO_BANNER_ASPECT,
+  LANDING_PROMO_BANNER_SIZE_HINT,
+} from "@/lib/landingPromoBanner";
 
 type PartnerModule = "DINING" | "EVENTS" | "MOVIES";
 
@@ -468,10 +472,10 @@ export default function PartnerPromotionsPage({
           </span>
           <CroppedImageField
             value={bannerUrl || ""}
-            aspect={21 / 9}
+            aspect={LANDING_PROMO_BANNER_ASPECT}
             disabled={uploading}
-            previewClassName="w-full aspect-[21/9] object-cover rounded-xl border border-slate-200 overflow-hidden"
-            emptyClassName="flex flex-col items-center justify-center w-full aspect-[21/9] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
+            previewClassName="w-full aspect-[3/1] object-cover rounded-xl border border-slate-200 overflow-hidden"
+            emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:border-rose-400 text-slate-400"
             emptyLabel="Upload & crop banner"
             emptyContent={
               <>
@@ -484,6 +488,11 @@ export default function PartnerPromotionsPage({
             onRemove={() => setValue("banner_image_url", "", { shouldValidate: true, shouldDirty: true })}
             onCroppedFile={(file) => void onUpload(file)}
           />
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            Crop to <span className="font-semibold text-slate-600">3:1</span> — recommended{" "}
+            <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
+            Same size as the home page promotion slider so the banner shows without cropping.
+          </p>
           {errors.banner_image_url && (
             <p className={fieldErrorClass}>{errors.banner_image_url.message}</p>
           )}
@@ -825,10 +834,10 @@ export default function PartnerPromotionsPage({
                     <img
                       src={resolveMediaUrl(camp.banner_image_url)}
                       alt={camp.title || camp.plan_name || "Promotion"}
-                      className="w-full aspect-[21/9] object-cover"
+                      className="w-full aspect-[3/1] object-cover"
                     />
                   ) : (
-                    <div className="w-full aspect-[21/9] bg-slate-100 flex items-center justify-center px-4 text-center text-slate-600 text-sm font-semibold">
+                    <div className="w-full aspect-[3/1] bg-slate-100 flex items-center justify-center px-4 text-center text-slate-600 text-sm font-semibold">
                       {showTargetName || "Listing boost only"}
                     </div>
                   )}

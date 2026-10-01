@@ -42,7 +42,7 @@ const diningCardBody = "pt-2.5 pb-1 flex flex-col gap-1 min-w-0";
 const diningCardWidth =
   "snap-start shrink-0 w-[260px] sm:w-[280px] lg:w-[320px]";
 
-/** White circle with a centered dark % mark. */
+/** White seal with brand-purple % — used on listing offer ribbon. */
 function OfferPercentSeal({ className = "" }: { className?: string }) {
   return (
     <span
@@ -55,11 +55,11 @@ function OfferPercentSeal({ className = "" }: { className?: string }) {
         focusable="false"
       >
         <g transform="translate(12 12)">
-          <circle cx="-4.35" cy="-4.35" r="2.05" fill="#1E3A8A" />
-          <circle cx="4.35" cy="4.35" r="2.05" fill="#1E3A8A" />
+          <circle cx="-4.35" cy="-4.35" r="2.05" fill="#7B5DFA" />
+          <circle cx="4.35" cy="4.35" r="2.05" fill="#7B5DFA" />
           <path
             d="M4.6 -4.6L-4.6 4.6"
-            stroke="#1E3A8A"
+            stroke="#7B5DFA"
             strokeWidth="2.35"
             strokeLinecap="round"
           />
@@ -67,6 +67,56 @@ function OfferPercentSeal({ className = "" }: { className?: string }) {
       </svg>
     </span>
   );
+}
+
+/** Purple → transparent fishtail ribbon (ref lavender offer gradient). */
+const LISTING_OFFER_RIBBON_BG =
+  "linear-gradient(90deg, #7B5DFA 0%, rgba(123,93,250,0.96) 36%, rgba(162,139,250,0.75) 66%, rgba(196,181,253,0.16) 100%)";
+
+function normalizeGalleryList(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String).map((s) => s.trim()).filter(Boolean);
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map(String).map((s) => s.trim()).filter(Boolean);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return [];
+}
+
+function resolveGalleryUrls(urls: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const u of urls) {
+    const resolved = resolveMediaUrl(u)?.trim();
+    if (!resolved || seen.has(resolved)) continue;
+    seen.add(resolved);
+    out.push(resolved);
+  }
+  return out;
+}
+
+/** Up to 2 overlapping gallery thumbs for listing cards (cover excluded when possible). */
+function listingGalleryPreviews(place: Business): string[] {
+  const cover = place.cover_image_url?.trim() || "";
+  const gallery = normalizeGalleryList(place.gallery_images);
+  const galleryOnly = gallery.filter((img) => img !== cover);
+  const pool = galleryOnly.length > 0 ? galleryOnly : gallery;
+  if (pool.length === 0) return [];
+  const resolvedPool = resolveGalleryUrls(pool);
+  if (resolvedPool.length >= 2) return resolvedPool.slice(0, 2);
+  if (resolvedPool.length === 1) {
+    const coverResolved = cover ? resolveMediaUrl(cover)?.trim() : "";
+    if (coverResolved && coverResolved !== resolvedPool[0]) {
+      return [resolvedPool[0], coverResolved];
+    }
+    return resolvedPool;
+  }
+  return [];
 }
 
 function listingDateLine(iso?: string) {
@@ -354,13 +404,22 @@ export function DiningPosterCard({
   const offerLabel = listingOfferBannerLabel(place.dining_offers);
   /** Shorter than full address — locality / first segment only. */
   const addressLine = locality || place.city_name?.trim() || "";
+  const galleryPreviews = isListing ? listingGalleryPreviews(place) : [];
 
   return (
     <Link
       href={restaurantHref(place)}
-      className={`${widthClass} group block ${diningCardShell} ${className}`}
+      className={`${widthClass} group block ${
+        isListing
+          ? "overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300"
+          : diningCardShell
+      } ${className}`}
     >
-      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7] rounded-2xl`}>
+      <div
+        className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7] ${
+          isListing ? "" : "rounded-2xl"
+        }`}
+      >
         <CoverImage
           src={image}
           alt={place.name}
@@ -382,11 +441,10 @@ export function DiningPosterCard({
 
             {offerLabel ? (
               <span
-                className="absolute bottom-3 left-0 z-[1] pointer-events-none inline-flex max-w-[90%] items-center gap-2 pl-2.5 pr-5 py-[7px] text-white text-xs sm:text-[13px] font-bold tracking-wide"
+                className="absolute bottom-3.5 left-0 z-[1] pointer-events-none inline-flex max-w-[90%] items-center gap-2 pl-2.5 pr-5 py-[7px] text-white text-xs sm:text-[13px] font-bold tracking-wide"
                 style={{
-                  background:
-                    "linear-gradient(90deg, #1D4ED8 0%, rgba(37,99,235,0.95) 40%, rgba(59,130,246,0.7) 72%, rgba(147,197,253,0.2) 100%)",
-                  /* Fishtail / swallowtail ribbon (sketch reference) */
+                  background: LISTING_OFFER_RIBBON_BG,
+                  /* Fishtail / swallowtail ribbon */
                   clipPath:
                     "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)",
                   textShadow: "0 1px 2px rgba(15,23,42,0.4)",
@@ -400,7 +458,7 @@ export function DiningPosterCard({
         ) : null}
       </div>
 
-      <div className={diningCardBody}>
+      <div className={isListing ? "px-4 pt-3.5 pb-4 flex flex-col gap-1.5 min-w-0" : diningCardBody}>
         <div className="flex items-center justify-between gap-5 sm:gap-6 min-w-0">
           <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug transition-colors pr-1">
             {place.name}
@@ -419,11 +477,33 @@ export function DiningPosterCard({
 
         {isListing ? (
           <>
-            {addressLine ? (
-              <p className="text-sm tracking-wide text-gray-600 truncate leading-snug max-w-[88%]">
-                {addressLine}
-              </p>
-            ) : null}
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              {addressLine ? (
+                <p className="text-sm tracking-wide text-gray-600 truncate leading-snug min-w-0 flex-1 pr-1">
+                  {addressLine}
+                </p>
+              ) : (
+                <span className="min-w-0 flex-1" />
+              )}
+              {galleryPreviews.length > 0 ? (
+                <span
+                  className="relative shrink-0 flex items-center h-10 sm:h-11 pointer-events-none"
+                  style={{ width: galleryPreviews.length > 1 ? "3.25rem" : "2.25rem" }}
+                  aria-hidden
+                >
+                  {galleryPreviews.map((url, i) => (
+                    <span
+                      key={`${place.id}-lg-${i}`}
+                      className="absolute top-0 size-9 sm:size-10 rounded-full overflow-hidden border-[2.5px] border-white bg-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
+                      style={{ left: i * 14, zIndex: galleryPreviews.length - i }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+            </div>
             <div className="flex items-center justify-between gap-4 min-w-0 pt-0.5 text-sm tracking-wide text-gray-600 truncate leading-snug">
               <span className="min-w-0 truncate">{priceForTwo}</span>
               <span className="shrink-0 whitespace-nowrap">{distance}</span>

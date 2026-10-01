@@ -1561,27 +1561,48 @@ export default function EventCheckout({
         {isPage && (
           <div className="z-30 bg-white border-b border-slate-200 shrink-0">
             <div className="relative h-[4.75rem] sm:h-[5.25rem] flex items-center px-3 sm:px-5">
-              <Link href="/" className="absolute left-3 sm:left-5 shrink-0 flex items-center z-[1]">
+              {/* Logo — desktop/laptop only */}
+              <Link
+                href="/"
+                className="absolute left-3 sm:left-5 hidden lg:flex shrink-0 items-center z-[1]"
+              >
                 <img
                   src={typeof images.logo === "string" ? images.logo : images.logo.src}
                   alt="Book My Bota"
                   className="h-[3.75rem] sm:h-[4.5rem] w-auto max-w-[16rem] sm:max-w-[20rem] object-contain object-left"
                 />
               </Link>
-              <div className="w-full max-w-[36rem] mx-auto px-12 sm:px-16 flex items-center gap-2.5">
-              <button
-                type="button"
+
+              {/* Mobile + tablet: back left, event name centered */}
+              <div className="relative w-full flex items-center justify-center lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
+                  aria-label="Back to event"
+                  className="absolute left-0 h-9 w-9 rounded-full text-slate-700 flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0 z-[1]"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <p className="min-w-0 max-w-[calc(100%-5.5rem)] text-[1.0625rem] sm:text-[1.1875rem] font-bold text-slate-900 truncate text-center px-1">
+                  {event.name}
+                </p>
+              </div>
+
+              {/* Desktop: back + title under logo-aware layout */}
+              <div className="hidden lg:flex w-full max-w-[36rem] mx-auto px-12 sm:px-16 items-center gap-2.5">
+                <button
+                  type="button"
                   onClick={() => (step === 4 ? requestLeaveConfirmStep("exit") : onClose())}
                   aria-label="Back to event"
                   className="h-9 w-9 rounded-full text-slate-700 flex items-center justify-center hover:bg-slate-100 cursor-pointer shrink-0"
-              >
-                <ArrowLeft size={18} />
-              </button>
-                <p className="min-w-0 flex-1 text-[1.0625rem] sm:text-[1.1875rem] font-bold text-slate-900 truncate text-center sm:text-left">
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <p className="min-w-0 flex-1 text-[1.0625rem] sm:text-[1.1875rem] font-bold text-slate-900 truncate text-left">
                   {event.name}
                 </p>
+              </div>
             </div>
-          </div>
             {pageStepper}
           </div>
         )}

@@ -174,6 +174,8 @@ export default function HomeHeader() {
   const [customer, setCustomer] = useState<StoredCustomer | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  /** Movie detail only (`/movies/:id`) — hide site header + subnav on mobile/tablet */
+  const isMovieDetailPage = Boolean(pathname?.match(/^\/movies\/[^/]+\/?$/));
 
   useEffect(() => {
     const syncCity = () => setCity(readCity());
@@ -240,9 +242,11 @@ export default function HomeHeader() {
           ? `-translate-y-full pointer-events-none ${
               diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
             }`
-          : "translate-y-0"
+          : isMovieDetailPage
+            ? "max-lg:hidden"
+            : "translate-y-0"
       }`}
-      aria-hidden={diningDetailNavHidden}
+      aria-hidden={diningDetailNavHidden || undefined}
     >
       <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2 border-b-2 border-[#a044d9]">
         {/* Mobile: logo + actions, then full-width search */}

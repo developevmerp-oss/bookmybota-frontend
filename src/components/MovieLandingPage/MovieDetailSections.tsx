@@ -345,7 +345,7 @@ function AboutSection({ text }: { text: string }) {
   return (
     <SectionShell>
       <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111] mb-3 sm:mb-4">
-        About the movie
+        About
       </h2>
       <p className="text-sm sm:text-base text-slate-600 leading-relaxed whitespace-pre-wrap">
         {text}

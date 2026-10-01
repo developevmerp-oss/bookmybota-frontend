@@ -3,7 +3,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Tag, Utensils, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Utensils, X } from "lucide-react";
 import type { Business } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
@@ -12,8 +12,35 @@ import { listingOfferBannerLabel } from "@/lib/diningOffers";
 import { localityFromAddress } from "@/components/LandingPage/homeUtils";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
 
-const OFFER_BANNER_GRADIENT =
-  "linear-gradient(90deg, #6A5AD2 0%, #7B68DE 45%, #9B87EC 100%)";
+/** Purple → transparent fishtail ribbon (ref lavender offer gradient). */
+const OFFER_RIBBON_BG =
+  "linear-gradient(90deg, #7B5DFA 0%, rgba(123,93,250,0.96) 36%, rgba(162,139,250,0.75) 66%, rgba(196,181,253,0.16) 100%)";
+
+function OfferPercentSeal({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-white shadow-sm leading-none ${className}`}
+      aria-hidden
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="block h-[66%] w-[66%] shrink-0"
+        focusable="false"
+      >
+        <g transform="translate(12 12)">
+          <circle cx="-4.35" cy="-4.35" r="2.05" fill="#7B5DFA" />
+          <circle cx="4.35" cy="4.35" r="2.05" fill="#7B5DFA" />
+          <path
+            d="M4.6 -4.6L-4.6 4.6"
+            stroke="#7B5DFA"
+            strokeWidth="2.35"
+            strokeLinecap="round"
+          />
+        </g>
+      </svg>
+    </span>
+  );
+}
 
 function CoverMedia({ src, alt }: { src: string; alt: string }) {
   const [failed, setFailed] = useState(false);
@@ -305,27 +332,60 @@ export default function DiningRestaurantCardOption2({
           ) : null}
 
           <DiningWishlistButton businessId={String(place.id)} appearance="glass" />
+
+          {offerLabel ? (
+            <span
+              className="absolute bottom-3.5 left-0 z-[1] pointer-events-none inline-flex max-w-[90%] items-center gap-2 pl-2.5 pr-5 py-[7px] text-white text-xs sm:text-[13px] font-bold tracking-wide"
+              style={{
+                background: OFFER_RIBBON_BG,
+                clipPath:
+                  "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)",
+                textShadow: "0 1px 2px rgba(15,23,42,0.4)",
+              }}
+            >
+              <OfferPercentSeal className="h-[18px] w-[18px]" />
+              <span className="truncate leading-none pr-1">{offerLabel}</span>
+            </span>
+          ) : null}
         </div>
 
-        {/* Offer strip — full-width banner under image (reference gradient) */}
-        {offerLabel ? (
-          <div
-            className="flex items-center gap-2 px-3 py-2 min-w-0"
-            style={{ background: OFFER_BANNER_GRADIENT }}
-          >
-            <Tag size={14} className="shrink-0 text-white -rotate-45" strokeWidth={2.25} aria-hidden />
-            <span className="text-white text-xs sm:text-[13px] font-semibold truncate leading-none">
-              {offerLabel}
-            </span>
-          </div>
-        ) : null}
-
-        <div className="px-4 pt-3.5 pb-4 flex flex-col gap-1.5 min-w-0">
-          {/* Title row: name + gallery circles */}
+        <div className="px-4 pt-3 pb-3.5 flex flex-col gap-2 min-w-0">
+          {/* Row 1: title + rating (no bg, yellow star) */}
           <div className="flex items-center justify-between gap-2 min-w-0">
             <h3 className="text-base sm:text-xl font-bold text-[#1C1C1C] truncate leading-snug min-w-0 flex-1 tracking-wide pr-1">
               {place.name}
             </h3>
+            {hasRating && rating != null ? (
+              <div className="shrink-0 inline-flex items-center gap-0.5 text-[#1C1C1C] text-[0.9rem] font-bold leading-none">
+                 <span className="text-[0.95rem] text-[#F5B301]" aria-hidden>
+                  ★
+                </span>
+                <span>{rating.toFixed(1)}</span>
+               
+              </div>
+            ) : (
+              <div className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.75rem] font-bold px-2 py-0.5 rounded">
+                New
+              </div>
+            )}
+          </div>
+
+          {/* Row 2: address + distance */}
+          <div className="flex items-center justify-between gap-2 min-w-0 text-sm tracking-wide text-gray-600 leading-snug">
+            {cityLine ? (
+              <p className="truncate min-w-0 flex-1 pr-1">{cityLine}</p>
+            ) : (
+              <span className="min-w-0 flex-1" />
+            )}
+            <span className="shrink-0 whitespace-nowrap">{distanceLabel}</span>
+          </div>
+
+          {/* Row 3: price + gallery circles */}
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <p className="min-w-0 truncate text-sm tracking-wide text-gray-600 leading-snug">
+              <span className="font-bold text-[#1C1C1C]">{priceLabel}</span>
+              <span> for two</span>
+            </p>
 
             {previews.length > 0 ? (
               <button
@@ -335,15 +395,15 @@ export default function DiningRestaurantCardOption2({
                 aria-label={`Open gallery for ${place.name}`}
               >
                 <span
-                  className="relative flex items-center h-11 sm:h-12"
-                  style={{ width: previews.length > 1 ? "3.5rem" : "2.5rem" }}
+                  className="relative flex items-center h-10 sm:h-11"
+                  style={{ width: previews.length > 1 ? "3.25rem" : "2.25rem" }}
                 >
                   {previews.map((url, i) => (
                     <span
                       key={`${place.id}-g-${i}`}
-                      className="absolute top-0 size-10 sm:size-11 rounded-full overflow-hidden border-[2.5px] border-white bg-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
+                      className="absolute top-0 size-9 sm:size-10 rounded-full overflow-hidden border-[2.5px] border-white bg-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
                       style={{
-                        left: i * 16,
+                        left: i * 14,
                         zIndex: previews.length - i,
                       }}
                     >
@@ -362,31 +422,6 @@ export default function DiningRestaurantCardOption2({
                 </span>
               </button>
             ) : null}
-          </div>
-
-          {/* Rating / New — below title */}
-          {hasRating && rating != null ? (
-            <div className="inline-flex w-fit items-center gap-1 bg-[#24963F] text-white text-[0.9rem] font-bold px-2 py-0.5 rounded">
-              <span>{rating.toFixed(1)}</span>
-              <span className="text-[0.9rem] text-white">★</span>
-            </div>
-          ) : (
-            <div className="inline-flex w-fit items-center bg-slate-100 text-slate-600 text-[0.75rem] font-bold px-2 py-0.5 rounded">
-              New
-            </div>
-          )}
-
-          {cityLine ? (
-            <p className="text-sm text-gray-600 truncate leading-snug tracking-wide">{cityLine}</p>
-          ) : null}
-
-          {/* Price + distance */}
-          <div className="flex items-center justify-between gap-3 min-w-0 pt-0.5 text-sm tracking-wide text-gray-600">
-            <p className="min-w-0 truncate">
-              <span className="font-bold text-[#1C1C1C]">{priceLabel}</span>
-              <span> for two</span>
-            </p>
-            <span className="shrink-0 whitespace-nowrap">{distanceLabel}</span>
           </div>
         </div>
       </Link>

@@ -1547,7 +1547,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                   className={`size-6 sm:size-7 rounded-[3px] text-[10px] sm:text-[11px] font-semibold transition-colors duration-100 flex items-center justify-center select-none relative z-10 ${seat.isBooked
                                       ? "bg-[#d3d3d3] text-transparent cursor-not-allowed border border-[#d3d3d3]"
                                       : isSelected
-                                        ? "bg-[#1ea83c] text-white border border-[#1ea83c] cursor-pointer"
+                                        ? "bg-[#F84464] text-white border border-[#F84464] cursor-pointer"
                                         : "bg-white text-[#1ea83c] border border-[#1ea83c] hover:bg-[#e8f8ec] cursor-pointer"
                                     }`}
                                   title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
@@ -1639,7 +1639,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                         seat.isBooked
                                           ? "bg-[#8a8a8a]"
                                           : isSelected
-                                            ? "bg-[#1ea83c]"
+                                            ? "bg-[#F84464]"
                                             : "bg-[#d6d6d6]"
                                       }`}
                                     />
@@ -1713,7 +1713,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 <span>Sold</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="size-3.5 rounded-[2px] bg-[#1ea83c] border border-[#1ea83c]" />
+                <div className="size-3.5 rounded-[2px] bg-[#F84464] border border-[#F84464]" />
                 <span>Selected</span>
               </div>
             </div>
@@ -1727,7 +1727,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               <span className="text-slate-600">Available</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-gradient-to-r from-[#F84464] to-[#6900AA] border border-[#F84464] shadow shadow-[#F84464]/30" />
+              <div className="size-4 rounded-md bg-[#F84464] border border-[#F84464] shadow shadow-[#F84464]/30" />
               <span className="text-slate-900 font-bold">Selected</span>
             </div>
             <div className="flex items-center gap-2">
@@ -1795,7 +1795,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                               className={`size-7 sm:size-8 rounded-lg text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${seat.isBooked
                                   ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed"
                                   : isSelected
-                                    ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white border border-[#F84464]/40 shadow-lg shadow-[#F84464]/25 scale-110 z-10"
+                                    ? "bg-[#F84464] text-white border border-[#F84464] shadow-lg shadow-[#F84464]/25 scale-110 z-10"
                                     : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:scale-105 cursor-pointer"
                                 }`}
                               title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
@@ -1869,10 +1869,15 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   setStep("seats");
                   return;
                 }
-                router.back();
+                const movieKey = movie?.slug || movie?.id;
+                if (movieKey) {
+                  router.push(`/movies/${movieKey}/showtimes`);
+                  return;
+                }
+                router.push("/movies");
               }}
               className="p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 transition-colors cursor-pointer shrink-0"
-              title={step === "review" ? "Back to snacks" : step === "beverages" ? "Back to seats" : "Go Back"}
+              title={step === "review" ? "Back to snacks" : step === "beverages" ? "Back to seats" : "Back to showtimes"}
             >
               <ArrowLeft className="size-5" />
             </button>
@@ -1907,7 +1912,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
+          <div className="hidden lg:flex items-center gap-2 text-xs">
             <span
               className={`px-2.5 py-1 rounded-lg border font-bold ${step === "seats"
                   ? "bg-rose-50 border-rose-200 text-[#F84464]"
@@ -2139,7 +2144,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   <button
                     type="button"
                     onClick={() => setStep("review")}
-                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-extrabold shadow-lg shadow-[#F84464]/20 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-extrabold shadow-lg shadow-[#6D28D9]/30 cursor-pointer flex items-center justify-center gap-2 hover:opacity-95"
                   >
                     Continue to Review <ChevronRight className="size-4" />
                   </button>
@@ -2373,11 +2378,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       {selectedSeats.map((seat) => (
                         <span
                           key={seat.seat_identifier}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-rose-50 to-purple-50 border border-rose-200 text-xs font-bold text-slate-900"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#F84464]/08 border border-[#F84464]/30 text-xs font-bold text-[#F84464]"
                         >
-                          <Armchair className="size-3 text-rose-500" />
+                          <Armchair className="size-3 text-[#F84464]" />
                           {seat.seat_identifier}
-                          <span className="text-rose-600 font-normal">
+                          <span className="text-[#F84464]/80 font-normal">
                             ({formatMoney(seat.unit_price, { compact: true })})
                           </span>
                         </span>
@@ -2416,7 +2421,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       <span className="text-slate-900">
                         {giftCardAmount > 0 ? "Amount due" : "Total payable"}
                       </span>
-                      <span className="text-lg text-transparent bg-clip-text bg-gradient-to-r from-[#F84464] to-[#6900AA]">
+                      <span className="text-lg font-extrabold text-[#F84464]">
                         {formatMoney(grandTotal)}
                       </span>
                     </div>
@@ -2425,7 +2430,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   <button
                     type="submit"
                     disabled={submitting || timeOutOpen}
-                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-extrabold shadow-lg shadow-[#F84464]/20 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3.5 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-extrabold shadow-lg shadow-[#6D28D9]/30 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 hover:opacity-95"
                   >
                     {submitting ? (
                       <>
@@ -2468,7 +2473,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               <button
                 type="button"
                 onClick={() => setStep("review")}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-extrabold shadow-lg shadow-[#F84464]/20 cursor-pointer min-w-[8.5rem] flex items-center justify-center gap-2"
+                className="px-6 py-3 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-extrabold shadow-lg shadow-[#6D28D9]/30 cursor-pointer min-w-[8.5rem] flex items-center justify-center gap-2 hover:opacity-95"
               >
                 Continue <ChevronRight className="size-4" />
               </button>
@@ -2510,7 +2515,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 type="button"
                 disabled={!canContinue}
                 onClick={handleContinue}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-extrabold shadow-lg shadow-[#F84464]/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-w-[8.5rem] flex items-center justify-center gap-2"
+                className="px-6 py-3 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-extrabold shadow-lg shadow-[#6D28D9]/30 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-w-[8.5rem] flex items-center justify-center gap-2 hover:opacity-95"
               >
                 {holding ? (
                   <>

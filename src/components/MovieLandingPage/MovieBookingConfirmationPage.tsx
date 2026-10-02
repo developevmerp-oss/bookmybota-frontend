@@ -328,7 +328,7 @@ export default function MovieBookingConfirmationPage({
             type="button"
             onClick={() => void handleDownloadPdf()}
             disabled={downloading}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-bold shadow-md hover:opacity-95 disabled:opacity-60 cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-bold shadow-md shadow-[#6D28D9]/30 hover:opacity-95 disabled:opacity-60 cursor-pointer"
           >
             {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
             {downloading ? "Preparing PDF…" : "Download Ticket (PDF)"}

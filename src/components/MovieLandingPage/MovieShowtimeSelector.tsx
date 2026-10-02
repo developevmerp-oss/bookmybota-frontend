@@ -1091,13 +1091,14 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
       {/* ── Mobile / tablet chrome (BookMyShow-style) ── */}
       <div className="lg:hidden sticky top-0 z-30 -mx-3 sm:-mx-6 bg-white border-b border-[#E8E8E8] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5">
-          <Link
-            href={backHref}
+          <button
+            type="button"
             aria-label="Back to movie"
+            onClick={() => router.push(backHref)}
             className="shrink-0 p-1.5 -ml-1 text-[#111111] hover:text-[#6900AA] cursor-pointer"
           >
             <ArrowLeft size={22} strokeWidth={2.25} />
-          </Link>
+          </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-[15px] sm:text-base font-extrabold text-[#111111] leading-tight truncate">
               {movie.title}
@@ -1777,9 +1778,14 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                           onClick={() => setSeatQty(n)}
                           className={`h-11 rounded-xl text-sm font-bold cursor-pointer transition ${
                             seatQty === n
-                              ? "bg-[#6900AA] text-white"
+                              ? "text-white shadow-sm"
                               : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7]"
                           }`}
+                          style={
+                            seatQty === n
+                              ? { background: DATE_ACTIVE_GRADIENT }
+                              : undefined
+                          }
                         >
                           {n}
                         </button>
@@ -1788,7 +1794,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                     <button
                       type="button"
                       onClick={confirmSeatQty}
-                      className="w-full h-11 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-bold cursor-pointer"
+                      className="w-full h-11 rounded-xl border border-slate-900 bg-[#111111] text-white text-sm font-bold cursor-pointer hover:bg-black transition-colors"
                     >
                       Select seats
                     </button>

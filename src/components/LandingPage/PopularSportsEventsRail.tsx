@@ -91,15 +91,17 @@ export default function PopularSportsEventsRail({ city }: { city: string }) {
           )}
 
           {!(isEmpty && !useStatic) ? (
-            <RailPagerNav
-              canPrev={scrollEdges.left}
-              canNext={scrollEdges.right}
-              pageCount={scrollEdges.pageCount}
-              activePage={scrollEdges.activePage}
-              onPrev={() => scrollBy(-1)}
-              onNext={() => scrollBy(1)}
-              label="sports events"
-            />
+            <div className="hidden lg:block">
+              <RailPagerNav
+                canPrev={scrollEdges.left}
+                canNext={scrollEdges.right}
+                pageCount={scrollEdges.pageCount}
+                activePage={scrollEdges.activePage}
+                onPrev={() => scrollBy(-1)}
+                onNext={() => scrollBy(1)}
+                label="sports events"
+              />
+            </div>
           ) : null}
         </div>
       </div>

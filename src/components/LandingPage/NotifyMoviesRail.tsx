@@ -61,15 +61,17 @@ export default function NotifyMoviesRail() {
           )}
 
           {items.length > 0 || isLoading ? (
-            <RailPagerNav
-              canPrev={scrollEdges.left}
-              canNext={scrollEdges.right}
-              pageCount={scrollEdges.pageCount}
-              activePage={scrollEdges.activePage}
-              onPrev={() => scrollBy(-1)}
-              onNext={() => scrollBy(1)}
-              label="notify-movies"
-            />
+            <div className="hidden lg:block">
+              <RailPagerNav
+                canPrev={scrollEdges.left}
+                canNext={scrollEdges.right}
+                pageCount={scrollEdges.pageCount}
+                activePage={scrollEdges.activePage}
+                onPrev={() => scrollBy(-1)}
+                onNext={() => scrollBy(1)}
+                label="notify-movies"
+              />
+            </div>
           ) : null}
         </div>
       </div>

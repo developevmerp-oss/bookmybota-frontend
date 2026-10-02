@@ -255,15 +255,17 @@ export default function SpecialOffersRail({ city = "" }: { city?: string }) {
                 ))}
               </div>
 
-              <RailPagerNav
-                canPrev={scrollEdges.left}
-                canNext={scrollEdges.right}
-                pageCount={scrollEdges.pageCount}
-                activePage={scrollEdges.activePage}
-                onPrev={() => scrollBy(-1)}
-                onNext={() => scrollBy(1)}
-                label="offers"
-              />
+              <div className="hidden lg:block">
+                <RailPagerNav
+                  canPrev={scrollEdges.left}
+                  canNext={scrollEdges.right}
+                  pageCount={scrollEdges.pageCount}
+                  activePage={scrollEdges.activePage}
+                  onPrev={() => scrollBy(-1)}
+                  onNext={() => scrollBy(1)}
+                  label="offers"
+                />
+              </div>
             </>
           )}
         </div>

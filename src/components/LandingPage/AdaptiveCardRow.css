@@ -24,18 +24,19 @@
   display: none;
 }
 
-/* Popular Dining / Raise a Glass — 1 card mobile, 2 tablet, 4 desktop */
+/* Popular Dining / Raise a Glass — one roomy card + peek (content-heavy cards) */
 .adaptive-card-row--dining {
-  --adaptive-visible: 1;
-  --adaptive-gap: 1.1rem;
+  --adaptive-visible: 1.38;
+  --adaptive-gap: 1rem;
+  padding-right: 1.25rem;
 }
 
-/* Exact 4-up rails (events / sports / movies) — same gap as before the last bump */
+/* Exact 4-up rails (events / sports / movies) — one roomy card + peek on phone */
 .adaptive-card-row--four {
-  --adaptive-visible: 2;
-  --adaptive-gap: 1.5rem;
+  --adaptive-visible: 1.38;
+  --adaptive-gap: 1rem;
   padding-left: 0;
-  padding-right: 0;
+  padding-right: 1.25rem;
 }
 
 @media (min-width: 640px) {
@@ -45,13 +46,15 @@
   }
 
   .adaptive-card-row--dining {
-    --adaptive-visible: 2;
-    --adaptive-gap: 1.35rem;
+    --adaptive-visible: 2.2;
+    --adaptive-gap: 1.15rem;
+    padding-right: 0;
   }
 
   .adaptive-card-row--four {
-    --adaptive-visible: 3;
-    --adaptive-gap: 1.35rem;
+    --adaptive-visible: 2.2;
+    --adaptive-gap: 1.15rem;
+    padding-right: 0;
   }
 }
 
@@ -63,11 +66,13 @@
   .adaptive-card-row--dining {
     --adaptive-visible: var(--adaptive-min-visible, 4);
     --adaptive-gap: 1.5rem;
+    padding-right: 0;
   }
 
   .adaptive-card-row--four {
     --adaptive-visible: var(--adaptive-min-visible, 4);
     --adaptive-gap: 1.5rem;
+    padding-right: 0;
   }
 }
 

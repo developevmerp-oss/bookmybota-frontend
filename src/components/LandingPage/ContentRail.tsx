@@ -140,15 +140,17 @@ export default function ContentRail({
               </div>
             )}
             {showOverlayNav ? (
-              <RailPagerNav
-                canPrev={scrollEdges.left}
-                canNext={scrollEdges.right}
-                pageCount={scrollEdges.pageCount}
-                activePage={scrollEdges.activePage}
-                onPrev={() => scrollBy(-1)}
-                onNext={() => scrollBy(1)}
-                label={label}
-              />
+              <div className="hidden lg:block">
+                <RailPagerNav
+                  canPrev={scrollEdges.left}
+                  canNext={scrollEdges.right}
+                  pageCount={scrollEdges.pageCount}
+                  activePage={scrollEdges.activePage}
+                  onPrev={() => scrollBy(-1)}
+                  onNext={() => scrollBy(1)}
+                  label={label}
+                />
+              </div>
             ) : null}
           </div>
         )}

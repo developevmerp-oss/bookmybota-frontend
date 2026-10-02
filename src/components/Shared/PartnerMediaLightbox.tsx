@@ -156,10 +156,20 @@ export default function PartnerMediaLightbox({
               >
                 {kind === "video" ? (
                   <video
-                    src={url}
+                    src={`${url}#t=0.1`}
                     muted
                     playsInline
                     preload="metadata"
+                    onLoadedMetadata={(e) => {
+                      const v = e.currentTarget;
+                      if (v.duration && Number.isFinite(v.duration) && v.duration > 0.2) {
+                        try {
+                          v.currentTime = Math.min(0.25, v.duration * 0.05);
+                        } catch {
+                          /* ignore */
+                        }
+                      }
+                    }}
                     className="w-full h-full object-cover pointer-events-none"
                     aria-hidden
                   />

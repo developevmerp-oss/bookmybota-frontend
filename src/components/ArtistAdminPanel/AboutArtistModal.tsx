@@ -124,6 +124,8 @@ export default function AboutArtistModal({
   spotlightVideos,
 }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [renderModal, setRenderModal] = useState(false);
+  const [entered, setEntered] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [bioTruncated, setBioTruncated] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<number | null>(null);
@@ -135,6 +137,19 @@ export default function AboutArtistModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      setRenderModal(true);
+      const id = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setEntered(true));
+      });
+      return () => window.cancelAnimationFrame(id);
+    }
+    setEntered(false);
+    const t = window.setTimeout(() => setRenderModal(false), 300);
+    return () => window.clearTimeout(t);
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -178,7 +193,7 @@ export default function AboutArtistModal({
     void el?.play().catch(() => undefined);
   }, [playingVideo]);
 
-  if (!mounted || !open) return null;
+  if (!mounted || !renderModal) return null;
 
   const showYoutube = hasCount(youtubeFollowers);
   const showInstagram = hasCount(instagramFollowers);
@@ -232,13 +247,19 @@ export default function AboutArtistModal({
       <button
         type="button"
         aria-label="Close about artist"
-        className="absolute inset-0 cursor-pointer bg-black/50"
+        className={`absolute inset-0 cursor-pointer bg-black/50 transition-opacity duration-300 ease-out ${
+          entered ? "opacity-100" : "opacity-0"
+        }`}
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-artist-title"
-        className="relative z-10 flex w-full max-h-[92vh] sm:max-h-[90vh] sm:max-w-[520px] md:max-w-[560px] flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl pb-[env(safe-area-inset-bottom)]"
+        className={`relative z-10 flex w-full max-h-[92vh] sm:max-h-[90vh] sm:max-w-[520px] md:max-w-[560px] flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl pb-[env(safe-area-inset-bottom)] transition-all duration-300 ease-out will-change-transform ${
+          entered
+            ? "translate-y-0 opacity-100 sm:scale-100"
+            : "translate-y-full opacity-100 sm:translate-y-0 sm:opacity-0 sm:scale-[0.98]"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-[#F3F4F6] bg-white px-4 py-3.5 sm:px-5 sm:py-4">

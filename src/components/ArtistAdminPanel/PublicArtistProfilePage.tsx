@@ -550,7 +550,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                       .getElementById("artist-inquiry")
                       ?.scrollIntoView({ behavior: "smooth", block: "start" })
                   }
-                  className="mt-5 inline-flex h-11 items-center justify-center rounded-full bg-[#111111] px-7 text-sm font-bold text-white transition-opacity hover:opacity-90 cursor-pointer"
+                  className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#111111] px-7 text-sm font-bold text-white transition-colors hover:bg-black cursor-pointer"
                 >
                   Send inquiry
                 </button>
@@ -741,8 +741,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               <button
                 type="submit"
                 disabled={sending}
-                className="w-full inline-flex items-center justify-center gap-2 h-12 rounded-full px-5 text-white font-bold disabled:opacity-50 cursor-pointer shadow-[0_10px_24px_rgba(105,0,170,0.28)]"
-                style={{ background: "linear-gradient(90deg, #8B5CF6 0%, #C026D3 55%, #E879F9 100%)" }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] text-white py-3 px-4 text-sm sm:text-[1rem] font-bold transition-colors cursor-pointer hover:bg-black disabled:opacity-50"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : null}
                 Send inquiry

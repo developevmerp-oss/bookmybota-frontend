@@ -16,6 +16,41 @@ import {
 const BRAND = "#6900AA";
 const BRAND_SOFT = "#F7E9FF";
 
+/** Mobile/tablet peek rail: ~1 full card + half of the next (dining collections style). */
+function PartnerPeekCarousel({
+  title,
+  partners,
+  kind,
+}: {
+  title?: string;
+  partners: DirectoryArtist[];
+  kind: "venue" | "artist";
+}) {
+  if (partners.length === 0) return null;
+
+  return (
+    <div>
+      {title ? (
+        <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-[#111111] mb-3 px-0">
+          {title}
+        </h2>
+      ) : null}
+      <div className="-mx-4 sm:-mx-6 px-4 sm:px-6">
+        <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-1 pr-4 sm:pr-6">
+          {partners.map((p) => (
+            <div
+              key={p.id}
+              className="shrink-0 snap-start w-[calc((100vw-2.5rem)/1.45)] sm:w-[calc((100vw-5rem)/1.5)] md:w-[calc((100vw-5rem)/1.55)]"
+            >
+              <PartnerCard partner={p} kind={kind} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PartnerCard({
   partner,
   kind,
@@ -150,6 +185,12 @@ export default function PartnerDirectorySection({
   emptyMessage?: string;
   showHeader?: boolean;
 }) {
+  const artistList = partners as DirectoryArtist[];
+  const registeredArtists =
+    kind === "artist" ? artistList.filter((p) => isRegisteredDirectoryArtist(p)) : [];
+  const eventArtists =
+    kind === "artist" ? artistList.filter((p) => !isRegisteredDirectoryArtist(p)) : [];
+
   return (
     <section
       id="partners"
@@ -168,30 +209,91 @@ export default function PartnerDirectorySection({
         ) : null}
 
         {isLoading ? (
-          <div
-            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
-          >
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-[1.75rem] overflow-hidden bg-[#f3f0f6] animate-pulse min-h-[340px] sm:min-h-[380px]"
-              >
-                <div className="h-full w-full bg-[#E5E7EB]" />
-              </div>
-            ))}
-          </div>
+          <>
+            {/* Mobile / tablet shimmer rails */}
+            <div className={`lg:hidden ${showHeader ? "mt-12" : ""} space-y-8`}>
+              {(kind === "artist" ? [0, 1] : [0]).map((row) => (
+                <div key={row}>
+                  {kind === "artist" ? (
+                    <div className="h-6 w-40 rounded-md bg-[#E5E7EB] animate-pulse mb-3" />
+                  ) : null}
+                  <div className="-mx-4 sm:-mx-6 px-4 sm:px-6 flex gap-3 overflow-hidden">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="shrink-0 w-[calc((100vw-2.5rem)/1.45)] sm:w-[calc((100vw-5rem)/1.5)] rounded-[1.75rem] overflow-hidden bg-[#f3f0f6] animate-pulse min-h-[340px]"
+                      >
+                        <div className="h-full w-full bg-[#E5E7EB]" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div
+              className={`${showHeader ? "mt-12" : ""} hidden lg:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
+            >
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-[1.75rem] overflow-hidden bg-[#f3f0f6] animate-pulse min-h-[340px] sm:min-h-[380px]"
+                >
+                  <div className="h-full w-full bg-[#E5E7EB]" />
+                </div>
+              ))}
+            </div>
+          </>
         ) : partners.length === 0 ? (
           <p className={`${showHeader ? "mt-12" : ""} text-center text-sm text-[#888]`}>
             {emptyMessage || "No partners to show yet."}
           </p>
+        ) : kind === "artist" ? (
+          <>
+            {/* Mobile / tablet: registered rail, then event (non-registered) rail */}
+            <div className={`lg:hidden ${showHeader ? "mt-12" : ""} space-y-8`}>
+              <PartnerPeekCarousel
+                title="Registered artists"
+                partners={registeredArtists}
+                kind="artist"
+              />
+              <PartnerPeekCarousel
+                title="Event artists"
+                partners={eventArtists}
+                kind="artist"
+              />
+              {registeredArtists.length === 0 && eventArtists.length === 0 ? (
+                <p className="text-center text-sm text-[#888]">
+                  {emptyMessage || "No partners to show yet."}
+                </p>
+              ) : null}
+            </div>
+            {/* Desktop: unchanged grid */}
+            <div
+              className={`${showHeader ? "mt-12" : ""} hidden lg:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
+            >
+              {artistList.map((p) => (
+                <PartnerCard key={p.id} partner={p} kind="artist" />
+              ))}
+            </div>
+          </>
         ) : (
-          <div
-            className={`${showHeader ? "mt-12" : ""} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
-          >
-            {partners.map((p) => (
-              <PartnerCard key={p.id} partner={p as DirectoryArtist} kind={kind} />
-            ))}
-          </div>
+          <>
+            {/* Mobile / tablet: registered venues peek carousel */}
+            <div className={`lg:hidden ${showHeader ? "mt-12" : ""}`}>
+              <PartnerPeekCarousel
+                partners={partners as DirectoryArtist[]}
+                kind="venue"
+              />
+            </div>
+            {/* Desktop: unchanged grid */}
+            <div
+              className={`${showHeader ? "mt-12" : ""} hidden lg:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`}
+            >
+              {partners.map((p) => (
+                <PartnerCard key={p.id} partner={p as DirectoryArtist} kind="venue" />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </section>

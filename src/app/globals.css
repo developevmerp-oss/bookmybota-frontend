@@ -524,6 +524,73 @@
     animation: fadeIn 0.25s ease-out forwards;
   }
 
+  @keyframes mobileFilterBackdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes mobileFilterSheetIn {
+    from {
+      transform: translateY(18%);
+      opacity: 0.92;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes mobileFilterBackdropOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes mobileFilterSheetOut {
+    from {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateY(14%);
+      opacity: 0.92;
+    }
+  }
+  .mobile-filter-sheet-backdrop {
+    animation: mobileFilterBackdropIn 0.22s ease-out forwards;
+  }
+  .mobile-filter-sheet-panel {
+    animation: mobileFilterSheetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform, opacity;
+  }
+  .mobile-filter-sheet-backdrop-out {
+    animation: mobileFilterBackdropOut 0.2s ease-in forwards;
+  }
+  .mobile-filter-sheet-panel-out {
+    animation: mobileFilterSheetOut 0.22s ease-in forwards;
+    will-change: transform, opacity;
+  }
+
+  .cinema-details-expand {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .cinema-details-expand.is-open {
+    grid-template-rows: 1fr;
+  }
+  .cinema-details-expand__inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .cinema-details-expand__content {
+    opacity: 0;
+    transform: translateY(-6px);
+    transition:
+      opacity 0.26s ease-out,
+      transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .cinema-details-expand.is-open .cinema-details-expand__content {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   @keyframes diningLightboxSlideUp {
     from {
       transform: translateY(28%);

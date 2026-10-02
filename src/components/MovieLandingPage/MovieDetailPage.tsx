@@ -18,15 +18,8 @@ import {
   type MovieOfferItem,
 } from "@/components/MovieLandingPage/movieCatalog";
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
-import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
-import { useSelectedCity } from "@/lib/useSelectedCity";
 import { MovieDetailShimmer } from "@/components/Shared/Shimmer";
-
-function languageLine(languages: string[]) {
-  if (languages.length <= 4) return languages.join(", ");
-  return `${languages.slice(0, 3).join(", ")}, +${languages.length - 3}`;
-}
 
 function mapPlatformOffersToMovieOffers(
   offers: Array<{
@@ -101,7 +94,7 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
   };
 
   const bookClass =
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] px-5 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base font-bold text-white shadow-lg shadow-[#6900AA]/20 hover:opacity-90 transition-opacity";
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity";
 
   const bookLabel = (
     <>
@@ -223,7 +216,7 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/30" />
         </div>
 
-        <div className="relative container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-8 sm:py-10 lg:py-14">
+        <div className="relative container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-8 sm:py-10 lg:py-8">
           <button
             type="button"
             onClick={handleShare}
@@ -241,8 +234,8 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
             <span className="text-white/90 truncate">{movie.title}</span>
           </nav>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 lg:gap-10 items-start">
-            <div className="hidden lg:block rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 aspect-[2/3] max-w-[220px] bg-[#F3F4F6]">
+          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 lg:gap-16 xl:gap-20 items-center">
+            <div className="hidden lg:block rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 aspect-[2/3] max-w-[250px] h-[380px] bg-[#F3F4F6]">
               <SafeCoverImage
                 src={movie.poster}
                 alt={movie.title}
@@ -253,22 +246,33 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
               />
             </div>
 
-            <div className="min-w-0 text-white">
+            <div className="min-w-0 text-white flex flex-col justify-center">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-tight">
                 {movie.title}
-                {movie.promoted ? (
+                {/* {movie.promoted ? (
                   <span className="ml-2 align-middle inline-flex items-center rounded-full bg-white/95 text-[#6900AA] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
                     Promoted
                   </span>
-                ) : null}
+                ) : null} */}
               </h1>
 
               {metaParts.length > 0 && (
                 <p className="mt-2 text-sm sm:text-base text-white/80">{metaParts.join(" · ")}</p>
               )}
 
-              {movie.languages.length > 0 && (
-                <p className="mt-2 text-xs sm:text-sm text-white/70">{languageLine(movie.languages)}</p>
+              {(movie.formats.length > 0 || movie.languages.length > 0) && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {movie.formats.length > 0 ? (
+                    <span className="inline-flex items-center rounded-md bg-white/95 px-3 py-1.5 text-xs sm:text-sm font-semibold text-[#333333]">
+                      {movie.formats.join(", ")}
+                    </span>
+                  ) : null}
+                  {movie.languages.length > 0 ? (
+                    <span className="inline-flex items-center rounded-md bg-white/95 px-3 py-1.5 text-xs sm:text-sm font-semibold text-[#333333]">
+                      {movie.languages.join(", ")}
+                    </span>
+                  ) : null}
+                </div>
               )}
 
               {(movie.rating || movie.votes || movie.likes) && (
@@ -315,9 +319,9 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
                       movie.trailers?.[0]?.language
                     )
                   }
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20 transition-colors cursor-pointer"
+                  className="mt-5 inline-flex w-fit self-start items-center gap-2 rounded-xl border border-white/60 bg-transparent px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer"
                 >
-                  <Play className="size-4 text-rose-400" fill="currentColor" />
+                  <Play className="size-3.5 text-[#C084FC]" fill="currentColor" />
                   Watch trailer
                 </button>
               ) : null}
@@ -354,7 +358,6 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 export default function MovieDetailPage() {
   const params = useParams();
   const idOrSlug = String(params?.id || "");
-  const city = useSelectedCity();
 
   const { data: apiMovie, isLoading, isError } = useGetPublicMovieQuery(idOrSlug, {
     skip: !idOrSlug,
@@ -403,13 +406,7 @@ export default function MovieDetailPage() {
     <div className="min-h-screen bg-white pb-24 lg:pb-0">
       <MovieDetailBanner movie={movie} />
 
-      <CategoryPromoBanners
-        category="MOVIES"
-        city={city}
-        targetId={movie.id}
-        className="hidden lg:block container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-4"
-      />
-
+      
       <MovieDetailSections movie={movie} idOrSlug={idOrSlug} />
 
       {/* Sticky Book Tickets — mobile / tablet */}

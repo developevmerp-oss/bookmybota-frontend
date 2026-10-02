@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
@@ -16,6 +16,7 @@ import {
   Maximize2,
   Map as MapIcon,
   LayoutGrid,
+  Rows3,
   X,
   Ticket,
   User,
@@ -188,10 +189,35 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [selectedBeverages, setSelectedBeverages] = useState<Record<string, SelectedBeverage>>({});
   const [bevCategoryFilter, setBevCategoryFilter] = useState<string>("ALL");
 
-  const [viewMode, setViewMode] = useState<"canvas" | "grid">("canvas");
+  const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("canvas");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [classicZoom, setClassicZoom] = useState(1.45);
+  const [showClassicMinimap, setShowClassicMinimap] = useState(false);
+  const [classicContentSize, setClassicContentSize] = useState({ w: 0, h: 0 });
+  const [classicViewport, setClassicViewport] = useState({
+    top: 0,
+    left: 0,
+    height: 1,
+    width: 1,
+    canScroll: false,
+  });
 
   const proceedRef = useRef<() => Promise<void>>(async () => { });
+  const classicViewportRef = useRef<HTMLDivElement | null>(null);
+  const classicContentRef = useRef<HTMLDivElement | null>(null);
+  const classicMinimapHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const classicDragRef = useRef<{
+    active: boolean;
+    moved: boolean;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    pointerId: number;
+  } | null>(null);
+  const classicMinimapDragRef = useRef(false);
+  const classicZoomRef = useRef(1.45);
+  const isTouchClassicRef = useRef(false);
 
   useEffect(() => {
     dispatch(loadFromStorage());
@@ -1049,13 +1075,311 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     }
   }, [showtime?.starts_at]);
 
+  const classicMaxSeatSlots = useMemo(() => {
+    let max = 1;
+    for (const row of gridRows) {
+      let slots = 0;
+      row.seats.forEach((seat, i) => {
+        slots += 1;
+        if (seat.isAisleGap ?? (i === 3 || i === 9)) slots += 0.55;
+      });
+      max = Math.max(max, slots);
+    }
+    return max;
+  }, [gridRows]);
+
+  const classicSeatTrackPx = Math.ceil(classicMaxSeatSlots * 30);
+
   const canContinue = selectedSeats.length === qty && !holding;
+
+  const revealClassicMinimap = useCallback(() => {
+    setShowClassicMinimap(true);
+    if (classicMinimapHideTimer.current) clearTimeout(classicMinimapHideTimer.current);
+    // Show on scroll / zoom-in / zoom-out, then hide (not sticky)
+    classicMinimapHideTimer.current = setTimeout(() => {
+      setShowClassicMinimap(false);
+    }, 1600);
+  }, []);
+
+  const getClassicFitZoom = useCallback(() => {
+    const viewport = classicViewportRef.current;
+    const content = classicContentRef.current;
+    if (!viewport || !content) return 1;
+    const pad = 24;
+    const baseW = Math.max(content.offsetWidth, classicContentSize.w, 1);
+    const baseH = Math.max(content.offsetHeight, classicContentSize.h, 1);
+    const zw = (viewport.clientWidth - pad * 2) / baseW;
+    const zh = (viewport.clientHeight - pad * 2) / baseH;
+    return Math.min(1, Math.max(0.4, Math.min(zw, zh)));
+  }, [classicContentSize.h, classicContentSize.w]);
+
+  /** Stay zoomed into a section so the top-right navigator red box is useful (all screen sizes). */
+  const getClassicMinZoom = useCallback(() => {
+    return Math.max(1.15, getClassicFitZoom());
+  }, [getClassicFitZoom]);
+
+  const updateClassicViewport = useCallback(() => {
+    const el = classicViewportRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollTop, scrollWidth, scrollHeight, clientWidth, clientHeight } = el;
+    const canScroll = scrollWidth > clientWidth + 2 || scrollHeight > clientHeight + 2;
+    setClassicViewport({
+      left: scrollWidth > 0 ? scrollLeft / scrollWidth : 0,
+      top: scrollHeight > 0 ? scrollTop / scrollHeight : 0,
+      width: scrollWidth > 0 ? Math.min(Math.max(clientWidth / scrollWidth, 0.06), 1) : 1,
+      height: scrollHeight > 0 ? Math.min(Math.max(clientHeight / scrollHeight, 0.06), 1) : 1,
+      canScroll,
+    });
+  }, []);
+
+  const centerClassicScroll = useCallback(() => {
+    const el = classicViewportRef.current;
+    if (!el) return;
+    el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
+    el.scrollTop = 0;
+    updateClassicViewport();
+  }, [updateClassicViewport]);
+
+  useEffect(() => {
+    if (viewMode !== "classic") return;
+    const content = classicContentRef.current;
+    if (!content || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      setClassicContentSize({
+        w: content.offsetWidth,
+        h: content.offsetHeight,
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [viewMode, gridRows, classicSeatTrackPx]);
+
+  const fitClassicToView = useCallback(
+    (showNav = true) => {
+      // Never snap to tiny full-hall overview — keep section zoom (like mobile)
+      const minZ = getClassicMinZoom();
+      const next = Math.max(minZ, Math.round((classicZoomRef.current - 0.2) * 100) / 100);
+      classicZoomRef.current = next;
+      setClassicZoom(next);
+      requestAnimationFrame(() => {
+        updateClassicViewport();
+        if (showNav) revealClassicMinimap();
+      });
+    },
+    [getClassicMinZoom, revealClassicMinimap, updateClassicViewport]
+  );
+
+  useEffect(() => {
+    classicZoomRef.current = classicZoom;
+  }, [classicZoom]);
+
+  useEffect(() => {
+    if (viewMode !== "classic") return;
+    if (!classicContentSize.w || !classicContentSize.h) return;
+    const id = requestAnimationFrame(() => {
+      updateClassicViewport();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [classicContentSize, classicZoom, viewMode, updateClassicViewport]);
+
+  useEffect(() => {
+    if (viewMode !== "classic") {
+      setShowClassicMinimap(false);
+      return;
+    }
+    // Same section zoom as mobile so top-right scroll navigator works
+    classicZoomRef.current = 1.45;
+    setClassicZoom(1.45);
+    const id = requestAnimationFrame(() => {
+      centerClassicScroll();
+      updateClassicViewport();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [viewMode, gridRows, centerClassicScroll, updateClassicViewport]);
+
+  useEffect(() => {
+    return () => {
+      if (classicMinimapHideTimer.current) clearTimeout(classicMinimapHideTimer.current);
+    };
+  }, []);
+
+  const handleClassicScroll = useCallback(() => {
+    updateClassicViewport();
+    revealClassicMinimap();
+  }, [revealClassicMinimap, updateClassicViewport]);
+
+  // Desktop mouse drag-to-scroll; touch uses native free scroll
+  const handleClassicPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (e.pointerType === "touch") return;
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("[data-classic-seat]")) return;
+      if (target?.closest("[data-classic-minimap]")) return;
+      if (target?.closest("[data-classic-zoom]")) return;
+      if (target?.closest("button, a, input, textarea, select, label")) return;
+      const el = classicViewportRef.current;
+      if (!el) return;
+      classicDragRef.current = {
+        active: true,
+        moved: false,
+        startX: e.clientX,
+        startY: e.clientY,
+        originX: el.scrollLeft,
+        originY: el.scrollTop,
+        pointerId: e.pointerId,
+      };
+      revealClassicMinimap();
+    },
+    [revealClassicMinimap]
+  );
+
+  const handleClassicPointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = classicDragRef.current;
+      const el = classicViewportRef.current;
+      if (!drag?.active || !el) return;
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      if (!drag.moved) {
+        if (Math.hypot(dx, dy) < 6) return;
+        drag.moved = true;
+        (e.currentTarget as HTMLElement).setPointerCapture?.(drag.pointerId);
+      }
+      e.preventDefault();
+      el.scrollLeft = drag.originX - dx;
+      el.scrollTop = drag.originY - dy;
+      updateClassicViewport();
+      revealClassicMinimap();
+    },
+    [revealClassicMinimap, updateClassicViewport]
+  );
+
+  const handleClassicPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = classicDragRef.current;
+    if (!drag?.active) return;
+    if (drag.moved) {
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    }
+    classicDragRef.current = null;
+  }, []);
+
+  const jumpClassicFromMinimap = useCallback(
+    (clientX: number, clientY: number, minimapEl: HTMLElement) => {
+      const el = classicViewportRef.current;
+      if (!el) return;
+      const rect = minimapEl.getBoundingClientRect();
+      const xRatio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+      const yRatio = Math.min(Math.max((clientY - rect.top) / rect.height, 0), 1);
+      el.scrollLeft = Math.max(
+        0,
+        Math.min(el.scrollWidth - el.clientWidth, xRatio * el.scrollWidth - el.clientWidth / 2)
+      );
+      el.scrollTop = Math.max(
+        0,
+        Math.min(el.scrollHeight - el.clientHeight, yRatio * el.scrollHeight - el.clientHeight / 2)
+      );
+      updateClassicViewport();
+      revealClassicMinimap();
+    },
+    [revealClassicMinimap, updateClassicViewport]
+  );
+
+  const handleMinimapPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      classicMinimapDragRef.current = true;
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      jumpClassicFromMinimap(e.clientX, e.clientY, e.currentTarget);
+    },
+    [jumpClassicFromMinimap]
+  );
+
+  const handleMinimapPointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!classicMinimapDragRef.current) return;
+      jumpClassicFromMinimap(e.clientX, e.clientY, e.currentTarget);
+    },
+    [jumpClassicFromMinimap]
+  );
+
+  const handleMinimapPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    classicMinimapDragRef.current = false;
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+  }, []);
+
+  const setClassicZoomLevel = useCallback(
+    (
+      nextZoom: number,
+      focus?: { clientX: number; clientY: number } | null
+    ) => {
+      const el = classicViewportRef.current;
+      const minZoom = getClassicMinZoom();
+      const clamped = Math.min(2.4, Math.max(minZoom, Math.round(nextZoom * 100) / 100));
+      revealClassicMinimap();
+      const prevZoom = classicZoomRef.current;
+      if (Math.abs(clamped - prevZoom) < 0.001) {
+        return;
+      }
+
+      let anchorX = 0.5;
+      let anchorY = 0.5;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const fx = focus ? focus.clientX - rect.left : el.clientWidth / 2;
+        const fy = focus ? focus.clientY - rect.top : el.clientHeight / 2;
+        anchorX = el.scrollWidth > 0 ? (el.scrollLeft + fx) / el.scrollWidth : 0.5;
+        anchorY = el.scrollHeight > 0 ? (el.scrollTop + fy) / el.scrollHeight : 0.5;
+      }
+
+      classicZoomRef.current = clamped;
+      setClassicZoom(clamped);
+      requestAnimationFrame(() => {
+        const scroller = classicViewportRef.current;
+        if (scroller) {
+          scroller.scrollLeft = Math.max(
+            0,
+            anchorX * scroller.scrollWidth - (focus ? focus.clientX - scroller.getBoundingClientRect().left : scroller.clientWidth / 2)
+          );
+          scroller.scrollTop = Math.max(
+            0,
+            anchorY * scroller.scrollHeight - (focus ? focus.clientY - scroller.getBoundingClientRect().top : scroller.clientHeight / 2)
+          );
+          updateClassicViewport();
+        }
+        revealClassicMinimap();
+      });
+    },
+    [getClassicMinZoom, revealClassicMinimap, updateClassicViewport]
+  );
+
+  useEffect(() => {
+    if (viewMode !== "classic") return;
+    const el = classicViewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const step = Math.min(0.35, Math.max(0.08, Math.abs(e.deltaY) * 0.0015));
+        const next = classicZoomRef.current + (e.deltaY < 0 ? step : -step);
+        setClassicZoomLevel(next, { clientX: e.clientX, clientY: e.clientY });
+        return;
+      }
+      // Normal wheel / trackpad scroll → show top-right layout navigator (like mobile)
+      revealClassicMinimap();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [viewMode, setClassicZoomLevel, revealClassicMinimap]);
 
   const seatMapSection = (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm">
-        {hasCanvasLayout ? (
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+          {hasCanvasLayout && (
             <button
               type="button"
               onClick={() => setViewMode("canvas")}
@@ -1067,24 +1391,30 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               <MapIcon className="size-3.5" />
               <span>Interactive Map</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "grid"
-                  ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/20"
-                  : "text-slate-500 hover:text-slate-900 hover:bg-white"
-                }`}
-            >
-              <LayoutGrid className="size-3.5" />
-              <span>Grid View</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 px-2 text-xs font-bold text-slate-700">
-            <LayoutGrid className="size-4 text-[#F84464]" />
-            <span>Cinema Seating Layout</span>
-          </div>
-        )}
+          )}
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "grid" || (!hasCanvasLayout && viewMode === "canvas")
+                ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/20"
+                : "text-slate-500 hover:text-slate-900 hover:bg-white"
+              }`}
+          >
+            <LayoutGrid className="size-3.5" />
+            <span>Grid View</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("classic")}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "classic"
+                ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/20"
+                : "text-slate-500 hover:text-slate-900 hover:bg-white"
+              }`}
+          >
+            <Rows3 className="size-3.5" />
+            <span>Classic View</span>
+          </button>
+        </div>
 
         <p className="text-xs text-slate-500">
           Select exactly <span className="text-slate-900 font-bold">{qty}</span> seat
@@ -1121,6 +1451,274 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             customLegend={cinemaLegend}
           />
         </div>
+      ) : viewMode === "classic" ? (
+        <>
+          <div className="relative rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+            <div
+              ref={classicViewportRef}
+              onScroll={handleClassicScroll}
+              onPointerDown={handleClassicPointerDown}
+              onPointerMove={handleClassicPointerMove}
+              onPointerUp={handleClassicPointerUp}
+              onPointerCancel={handleClassicPointerUp}
+              className="relative h-[min(62vh,580px)] sm:h-[min(66vh,640px)] lg:h-[min(70vh,700px)] overflow-auto overscroll-contain bg-white select-none [-webkit-overflow-scrolling:touch] touch-pan-x touch-pan-y"
+            >
+              {/* Outer box uses scaled size so mobile can scroll to the last row + screen */}
+              <div
+                style={{
+                  width: Math.max((classicContentSize.w || classicSeatTrackPx + 40) * classicZoom, 1),
+                  height: Math.max((classicContentSize.h || 400) * classicZoom, 1),
+                  position: "relative",
+                }}
+              >
+                <div
+                  ref={classicContentRef}
+                  className="absolute top-0 left-0 px-3 sm:px-6 pt-5 sm:pt-6 pb-24 sm:pb-20 w-max space-y-3"
+                  style={{
+                    transform: `scale(${classicZoom})`,
+                    transformOrigin: "0 0",
+                  }}
+                >
+                {screenPosition === "top" && (
+                  <div className="pb-4 pt-1 text-center space-y-2" style={{ width: classicSeatTrackPx + 28 }}>
+                    <p className="text-[11px] tracking-wide text-slate-500">
+                      All eyes this way please
+                    </p>
+                    <div
+                      className="mx-auto h-3 w-[72%] max-w-md bg-gradient-to-b from-[#b8d4f0] to-[#8eb8e0]"
+                      style={{
+                        clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)",
+                      }}
+                    />
+                  </div>
+                )}
+
+                {gridRows.map((rowGroup, idx) => {
+                  const prevRow = gridRows[idx - 1];
+                  const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
+
+                  return (
+                    <div
+                      key={`classic-row-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
+                      className="space-y-2"
+                    >
+                      {isNewTier && (
+                        <div
+                          className="flex items-center gap-3 pt-3 pb-1"
+                          style={{ width: classicSeatTrackPx + 28 }}
+                        >
+                          <div className="h-px flex-1 bg-slate-200" />
+                          <span className="shrink-0 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            {formatMoney(rowGroup.price, { compact: true })} {rowGroup.tierName}{" "}
+                            ROWS
+                          </span>
+                          <div className="h-px flex-1 bg-slate-200" />
+                        </div>
+                      )}
+
+                      {/* Previous style: row letter on both sides */}
+                      <div className="flex items-center justify-center gap-3">
+                        <span className="w-5 text-center text-[11px] font-semibold text-slate-500 shrink-0">
+                          {rowGroup.rowLabel}
+                        </span>
+                        <div className="flex items-center gap-1 sm:gap-1.5">
+                          {rowGroup.seats.map((seat, seatIdx) => {
+                            const isSelected = selectedSeats.some(
+                              (s) => s.seat_identifier === seat.id
+                            );
+                            const isAisleGap =
+                              seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
+                            const seatLabel = String(seat.number).padStart(2, "0");
+
+                            return (
+                              <div
+                                key={`classic-${idx}-${rowGroup.tierName}-${seat.id}-${seatIdx}`}
+                                className="flex items-center"
+                              >
+                                <button
+                                  type="button"
+                                  data-classic-seat
+                                  disabled={seat.isBooked}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSeatClick(seat);
+                                  }}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  className={`size-6 sm:size-7 rounded-[3px] text-[10px] sm:text-[11px] font-semibold transition-colors duration-100 flex items-center justify-center select-none relative z-10 ${seat.isBooked
+                                      ? "bg-[#d3d3d3] text-transparent cursor-not-allowed border border-[#d3d3d3]"
+                                      : isSelected
+                                        ? "bg-[#1ea83c] text-white border border-[#1ea83c] cursor-pointer"
+                                        : "bg-white text-[#1ea83c] border border-[#1ea83c] hover:bg-[#e8f8ec] cursor-pointer"
+                                    }`}
+                                  title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
+                                >
+                                  {seat.isBooked ? "" : seatLabel}
+                                </button>
+                                {isAisleGap && (
+                                  <div className="w-3 sm:w-5" aria-hidden="true" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <span className="w-5 text-center text-[11px] font-semibold text-slate-500 shrink-0">
+                          {rowGroup.rowLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {screenPosition === "bottom" && (
+                  <div className="pt-8 pb-6 text-center space-y-2" style={{ width: classicSeatTrackPx + 28 }}>
+                    <div
+                      className="mx-auto h-3 w-[72%] max-w-md bg-gradient-to-b from-[#b8d4f0] to-[#8eb8e0]"
+                      style={{
+                        clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)",
+                      }}
+                    />
+                    <p className="text-[11px] tracking-wide text-slate-500">
+                      All eyes this way please
+                    </p>
+                  </div>
+                )}
+                {/* Extra scroll room so last row clears zoom controls on mobile */}
+                <div className="h-8 sm:h-4" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+
+              {/* Top-right navigator: shows on scroll & zoom, then hides */}
+              <div
+                className={`absolute top-3 right-3 z-30 transition-opacity duration-200 ${
+                  showClassicMinimap ? "opacity-100" : "opacity-0 pointer-events-none"
+                }`}
+                aria-hidden={!showClassicMinimap}
+              >
+                <div
+                  data-classic-minimap
+                  onPointerDown={handleMinimapPointerDown}
+                  onPointerMove={handleMinimapPointerMove}
+                  onPointerUp={handleMinimapPointerUp}
+                  onPointerCancel={handleMinimapPointerUp}
+                  className="pointer-events-auto relative w-[96px] h-[210px] sm:w-[112px] sm:h-[248px] rounded-md bg-[#585858]/92 shadow-[0_2px_14px_rgba(0,0,0,0.32)] overflow-hidden cursor-crosshair touch-none"
+                  title="Current visible section"
+                >
+                  <div className="absolute inset-[6px] flex flex-col">
+                    {screenPosition === "top" && (
+                      <div className="mb-1 flex flex-col items-center shrink-0">
+                        <div className="w-[70%] h-[3px] bg-[#8eb8e0]/70 rounded-[1px]" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-h-0 flex flex-col justify-between relative">
+                      {gridRows.map((rowGroup, idx) => {
+                        const prevRow = gridRows[idx - 1];
+                        const isNewTier = !prevRow || prevRow.tierName !== rowGroup.tierName;
+                        return (
+                          <div
+                            key={`mini-${idx}-${rowGroup.rowLabel}`}
+                            className="w-full flex flex-col items-center"
+                          >
+                            {isNewTier && idx > 0 && (
+                              <div className="w-[80%] h-px bg-white/25 mb-[1px]" />
+                            )}
+                            <div className="flex items-center justify-center gap-px">
+                              {rowGroup.seats.map((seat, seatIdx) => {
+                                const isSelected = selectedSeats.some(
+                                  (s) => s.seat_identifier === seat.id
+                                );
+                                const isAisleGap =
+                                  seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
+                                return (
+                                  <div
+                                    key={`mini-seat-${idx}-${seatIdx}`}
+                                    className="flex items-center"
+                                  >
+                                    <span
+                                      className={`block size-[3px] sm:size-[3.5px] rounded-[0.5px] ${
+                                        seat.isBooked
+                                          ? "bg-[#8a8a8a]"
+                                          : isSelected
+                                            ? "bg-[#1ea83c]"
+                                            : "bg-[#d6d6d6]"
+                                      }`}
+                                    />
+                                    {isAisleGap && <span className="w-[2px]" />}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {screenPosition === "bottom" && (
+                      <div className="mt-1 flex flex-col items-center shrink-0">
+                        <div className="w-[70%] h-[3px] bg-[#8eb8e0]/70 rounded-[1px]" />
+                      </div>
+                    )}
+
+                    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+                      <div
+                        className="absolute border-[1.5px] border-[#ff3b30] bg-[#ff3b30]/15"
+                        style={{
+                          top: `${classicViewport.top * 100}%`,
+                          left: `${classicViewport.left * 100}%`,
+                          width: `${classicViewport.width * 100}%`,
+                          height: `${classicViewport.height * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            <div
+              data-classic-zoom
+              className="absolute bottom-3 right-3 z-30 flex flex-col gap-1.5"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  isTouchClassicRef.current = true;
+                  setClassicZoomLevel(classicZoom + 0.2);
+                }}
+                disabled={classicZoom >= 2.4}
+                className="size-9 sm:size-8 rounded-full bg-white/95 border border-slate-200 shadow-md text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer flex items-center justify-center"
+                title="Zoom in"
+              >
+                <Plus className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  isTouchClassicRef.current = true;
+                  setClassicZoomLevel(classicZoom - 0.2);
+                }}
+                disabled={classicZoom <= getClassicMinZoom() + 0.01}
+                className="size-9 sm:size-8 rounded-full bg-white/95 border border-slate-200 shadow-md text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer flex items-center justify-center"
+                title="Zoom out"
+              >
+                <Minus className="size-3.5" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 border-t border-slate-200 bg-white py-3 px-4 text-xs text-slate-600">
+              <div className="flex items-center gap-2">
+                <div className="size-3.5 rounded-[2px] bg-white border border-[#1ea83c]" />
+                <span>Available</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="size-3.5 rounded-[2px] bg-[#d3d3d3] border border-[#d3d3d3]" />
+                <span>Sold</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="size-3.5 rounded-[2px] bg-[#1ea83c] border border-[#1ea83c]" />
+                <span>Selected</span>
+              </div>
+            </div>
+          </div>
+        </>
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-center gap-6 py-2.5 px-4 rounded-2xl bg-white border border-slate-200 text-xs shadow-sm">

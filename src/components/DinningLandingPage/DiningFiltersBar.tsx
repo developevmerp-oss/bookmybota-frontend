@@ -47,6 +47,10 @@ interface DiningFiltersBarProps {
   onClearExtras?: () => void;
   /** Show search icon on the right of the filter row (Dining Home). */
   showSearch?: boolean;
+  /** Optional classes for the in-bar search button (e.g. hide on mobile). */
+  searchButtonClassName?: string;
+  /** Increment to open the search popup from an external trigger. */
+  openSearchSignal?: number;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   onSearchSubmit?: (value: string) => void;
@@ -363,6 +367,8 @@ export default function DiningFiltersBar({
   extraChips = [],
   onClearExtras,
   showSearch = false,
+  searchButtonClassName = "",
+  openSearchSignal = 0,
   searchValue = "",
   onSearchChange,
   onSearchSubmit,
@@ -452,6 +458,13 @@ export default function DiningFiltersBar({
     // Intentionally only re-run when the popup opens — not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSearchPopup]);
+
+  useEffect(() => {
+    if (!showSearch || !openSearchSignal) return;
+    setShowFilter(false);
+    setShowSort(false);
+    setShowSearchPopup(true);
+  }, [openSearchSignal, showSearch]);
 
   const closeSearchPopup = () => {
     setShowSearchPopup(false);
@@ -770,7 +783,9 @@ export default function DiningFiltersBar({
               setShowSort(false);
               setShowSearchPopup(true);
             }}
-            className="dining-search-trigger shrink-0 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer"
+            className={`dining-search-trigger shrink-0 h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer ${
+              searchButtonClassName || "inline-flex"
+            }`}
             aria-label="Search restaurants"
           >
             <Search size={18} strokeWidth={1.75} />

@@ -174,8 +174,12 @@ export default function HomeHeader() {
   const [customer, setCustomer] = useState<StoredCustomer | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/register";
-  /** Movie detail only (`/movies/:id`) — hide site header + subnav on mobile/tablet */
-  const isMovieDetailPage = Boolean(pathname?.match(/^\/movies\/[^/]+\/?$/));
+  /** Movie detail, showtimes, cinema detail — hide site header + subnav on mobile/tablet only */
+  const hideChromeOnMobileTablet = Boolean(
+    (pathname?.match(/^\/movies\/[^/]+\/?$/) && pathname !== "/movies/cinemas") ||
+      pathname?.match(/^\/movies\/[^/]+\/showtimes\/?$/) ||
+      pathname?.match(/^\/movies\/cinemas\/[^/]+\/?$/)
+  );
 
   useEffect(() => {
     const syncCity = () => setCity(readCity());
@@ -242,7 +246,7 @@ export default function HomeHeader() {
           ? `-translate-y-full pointer-events-none ${
               diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
             }`
-          : isMovieDetailPage
+          : hideChromeOnMobileTablet
             ? "max-lg:hidden"
             : "translate-y-0"
       }`}

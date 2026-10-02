@@ -5,8 +5,10 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   Car,
   ChevronDown,
+  ChevronRight,
   CloudMoon,
   Clock,
   Film,
@@ -19,6 +21,7 @@ import {
   Moon,
   Navigation,
   Search,
+  SlidersHorizontal,
   Smartphone,
   Sun,
   Sunset,
@@ -60,6 +63,7 @@ export type ShowtimeMovieMeta = {
   poster: string;
   languages: string[];
   genres: string[];
+  formats?: string[];
   duration?: string;
   certification?: string;
   releaseYear?: string;
@@ -512,6 +516,82 @@ function SortByDropdown({
   );
 }
 
+function MobileBottomSheet({
+  open,
+  onClose,
+  children,
+  className = "",
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [rendered, setRendered] = useState(false);
+  const [exiting, setExiting] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (open) {
+      setRendered(true);
+      setExiting(false);
+      return;
+    }
+    if (!rendered) return;
+    setExiting(true);
+    const t = window.setTimeout(() => {
+      setRendered(false);
+      setExiting(false);
+    }, 220);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to open/mounted; rendered gates exit start
+  }, [open, mounted]);
+
+  useEffect(() => {
+    if (!rendered || exiting) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [rendered, exiting, onClose]);
+
+  if (!mounted || !rendered) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[90] lg:hidden">
+      <button
+        type="button"
+        aria-label="Close"
+        className={`absolute inset-0 bg-black/45 cursor-pointer ${
+          exiting ? "mobile-filter-sheet-backdrop-out" : "mobile-filter-sheet-backdrop"
+        }`}
+        onClick={onClose}
+      />
+      <div
+        className={`absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl ${
+          exiting ? "mobile-filter-sheet-panel-out" : "mobile-filter-sheet-panel"
+        } ${className}`}
+        role="dialog"
+        aria-modal="true"
+      >
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function buildShowtimesTitle(title: string, year?: string, language?: string) {
   let base = title.trim();
   // Avoid "Title (2026) (2026)" when API title already includes the year
@@ -738,6 +818,9 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   const [languageFilters, setLanguageFilters] = useState<string[]>(() =>
     parseCsvParam(searchParams.get("language"))
   );
+  const [formatFilters, setFormatFilters] = useState<string[]>(() =>
+    parseCsvParam(searchParams.get("format"))
+  );
   const [priceFilters, setPriceFilters] = useState<string[]>(() =>
     parseCsvParam(searchParams.get("price"))
   );
@@ -749,6 +832,11 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     return s === "popularity" || s === "distance" || s === "relevance" ? s : "relevance";
   });
   const [openFilter, setOpenFilter] = useState<"language" | "price" | "time" | "sort" | null>(null);
+  const [mobileSheet, setMobileSheet] = useState<"filters" | "langFormat" | "sort" | null>(null);
+  const [draftPriceFilters, setDraftPriceFilters] = useState<string[]>([]);
+  const [draftTimeFilters, setDraftTimeFilters] = useState<string[]>([]);
+  const [draftFormatFilters, setDraftFormatFilters] = useState<string[]>([]);
+  const [draftLanguageFilters, setDraftLanguageFilters] = useState<string[]>([]);
   const [favoritedIds, setFavoritedIds] = useState<Record<string, boolean>>({});
   const [infoOpenId, setInfoOpenId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
@@ -769,6 +857,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   useEffect(() => {
     const dateFromUrl = searchParams.get("date") || "";
     const languagesFromUrl = parseCsvParam(searchParams.get("language"));
+    const formatsFromUrl = parseCsvParam(searchParams.get("format"));
     const priceFromUrl = parseCsvParam(searchParams.get("price"));
     const timeFromUrl = parseCsvParam(searchParams.get("time"));
     const sortFromUrl = searchParams.get("sort");
@@ -781,6 +870,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     setLanguageFilters((prev) =>
       sameStringList(prev, languagesFromUrl) ? prev : languagesFromUrl
     );
+    setFormatFilters((prev) => (sameStringList(prev, formatsFromUrl) ? prev : formatsFromUrl));
     setPriceFilters((prev) => (sameStringList(prev, priceFromUrl) ? prev : priceFromUrl));
     setTimeFilters((prev) => (sameStringList(prev, timeFromUrl) ? prev : timeFromUrl));
     if (sortFromUrl === "popularity" || sortFromUrl === "distance" || sortFromUrl === "relevance") {
@@ -798,6 +888,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     const params = new URLSearchParams();
     setOrDeleteParam(params, "date", selectedDate);
     setOrDeleteCsvParam(params, "language", languageFilters);
+    setOrDeleteCsvParam(params, "format", formatFilters);
     setOrDeleteCsvParam(params, "price", priceFilters);
     setOrDeleteCsvParam(params, "time", timeFilters);
     if (sortBy && sortBy !== "relevance") setOrDeleteParam(params, "sort", sortBy);
@@ -810,6 +901,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   }, [
     selectedDate,
     languageFilters,
+    formatFilters,
     priceFilters,
     timeFilters,
     sortBy,
@@ -862,6 +954,20 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
       .map((v) => ({ value: v, label: v }));
   }, [cinemas, movie.languages]);
 
+  const formatOptions = useMemo(() => {
+    const set = new Set<string>();
+    (movie.formats || []).forEach((f) => f && set.add(f));
+    cinemas.forEach((c) =>
+      c.showtimes.forEach((st) => {
+        const f = (st.format || st.screen_type || "").trim();
+        if (f) set.add(f);
+      })
+    );
+    return Array.from(set)
+      .sort()
+      .map((v) => ({ value: v, label: v }));
+  }, [cinemas, movie.formats]);
+
   const filteredCinemas = useMemo(() => {
     const q = cinemaSearch.trim().toLowerCase();
     let rows = cinemas
@@ -869,6 +975,12 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
         let showtimes = cinema.showtimes;
         if (languageFilters.length) {
           showtimes = showtimes.filter((st) => languageFilters.includes(st.language));
+        }
+        if (formatFilters.length) {
+          showtimes = showtimes.filter((st) => {
+            const f = (st.format || st.screen_type || "").trim();
+            return f && formatFilters.includes(f);
+          });
         }
         if (priceFilters.length) {
           showtimes = showtimes.filter((st) => {
@@ -898,7 +1010,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     }
 
     return rows;
-  }, [cinemas, languageFilters, priceFilters, timeFilters, cinemaSearch, sortBy]);
+  }, [cinemas, languageFilters, formatFilters, priceFilters, timeFilters, cinemaSearch, sortBy]);
 
   const [seatQtyModal, setSeatQtyModal] = useState<{
     showtime: PublicMovieShowtimeItem;
@@ -927,10 +1039,254 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
   const languageLine = movie.languages.map((l) => l.toUpperCase()).join(", ");
   const backHref = `/movies/${movie.slug || movie.id}`;
   const languageLabel = languageFilters.length === 1 ? languageFilters[0] : null;
+  const displayLanguage =
+    languageFilters.length > 0
+      ? languageFilters.join(", ")
+      : movie.languages[0] || "Language";
+  const displayFormat =
+    formatFilters.length > 0
+      ? formatFilters.join(", ")
+      : formatOptions[0]?.label || "2D";
+
+  const openAllFiltersSheet = () => {
+    setDraftPriceFilters([...priceFilters]);
+    setDraftTimeFilters([...timeFilters]);
+    setDraftFormatFilters([...formatFilters]);
+    setDraftLanguageFilters([...languageFilters]);
+    setShowSearch(false);
+    setOpenFilter(null);
+    setMobileSheet("filters");
+  };
+
+  const openLangFormatSheet = () => {
+    setDraftLanguageFilters([...languageFilters]);
+    setDraftFormatFilters([...formatFilters]);
+    setMobileSheet("langFormat");
+  };
+
+  const toggleDraftValue = (
+    values: string[],
+    setValues: (next: string[]) => void,
+    value: string
+  ) => {
+    setValues(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  };
+
+  const mobilePillClass = (active: boolean) =>
+    `shrink-0 h-9 px-3 inline-flex items-center gap-1.5 rounded-full border text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+      active
+        ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
+        : "border-[#E5E5E5] text-[#333333] bg-white"
+    }`;
+
+  const filterChipClass = (active: boolean) =>
+    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold cursor-pointer transition-colors ${
+      active
+        ? "border-[#6900AA] bg-[#6900AA] text-white"
+        : "border-[#6900AA]/55 bg-white text-[#6900AA]"
+    }`;
 
   return (
     <div className="w-full space-y-4">
-      <section className="bg-white border border-[#E8E8E8] rounded-md overflow-visible shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      {/* ── Mobile / tablet chrome (BookMyShow-style) ── */}
+      <div className="lg:hidden sticky top-0 z-30 -mx-3 sm:-mx-6 bg-white border-b border-[#E8E8E8] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5">
+          <Link
+            href={backHref}
+            aria-label="Back to movie"
+            className="shrink-0 p-1.5 -ml-1 text-[#111111] hover:text-[#6900AA] cursor-pointer"
+          >
+            <ArrowLeft size={22} strokeWidth={2.25} />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[15px] sm:text-base font-extrabold text-[#111111] leading-tight truncate">
+              {movie.title}
+            </h1>
+            {movie.duration ? (
+              <p className="mt-0.5 text-[11px] sm:text-xs text-[#6B7280] font-medium truncate">
+                Movie runtime: {movie.duration}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            aria-label="Search cinemas"
+            onClick={() => {
+              setOpenFilter(null);
+              setShowSearch((v) => !v);
+            }}
+            className="shrink-0 p-2 text-[#333333] hover:text-[#6900AA] cursor-pointer"
+          >
+            <Search size={20} />
+          </button>
+          <button
+            type="button"
+            aria-label="Open filters"
+            onClick={openAllFiltersSheet}
+            className="shrink-0 p-2 text-[#333333] hover:text-[#6900AA] cursor-pointer"
+          >
+            <SlidersHorizontal size={20} />
+          </button>
+        </div>
+
+        {showSearch ? (
+          <div className="px-3 sm:px-4 pb-2.5">
+            <div className="flex h-10 items-center gap-2 rounded-xl border border-[#E5E5E5] bg-white pl-3 pr-1">
+              <Search size={16} className="shrink-0 text-[#9CA3AF]" />
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={cinemaSearch}
+                onChange={(e) => setCinemaSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") closeSearch();
+                }}
+                placeholder="Search for cinemas"
+                className="h-full w-full bg-transparent text-[13px] text-[#333333] placeholder:text-[#9CA3AF] focus:outline-none"
+                aria-label="Search cinemas"
+              />
+              <button
+                type="button"
+                onClick={closeSearch}
+                className="h-8 w-8 shrink-0 flex items-center justify-center text-[#6B7280] hover:text-[#6900AA] cursor-pointer"
+                aria-label="Close search"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex items-end gap-2.5 overflow-x-auto px-3 sm:px-4 pt-2 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {dateOptions.map((opt) => {
+            const active = opt.dateStr === selectedDate;
+            const hasShows = availableDates.includes(opt.dateStr);
+            return (
+              <button
+                key={opt.dateStr}
+                type="button"
+                onClick={() => setSelectedDate(opt.dateStr)}
+                className={`relative shrink-0 text-center cursor-pointer ${
+                  active ? "w-[3.35rem] pt-2.5" : "w-[3.15rem] py-1.5"
+                }`}
+              >
+                {active ? (
+                  <span className="relative block w-full">
+                    <span
+                      className="pointer-events-none absolute left-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
+                      aria-hidden
+                    />
+                    <span
+                      className="pointer-events-none absolute right-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
+                      aria-hidden
+                    />
+                    <span
+                      className="relative z-[1] flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] px-1.5 py-[0.65rem] text-white"
+                      style={{
+                        background: DATE_ACTIVE_GRADIENT,
+                        boxShadow: "0 6px 14px rgba(76,29,149,0.25)",
+                      }}
+                    >
+                      <span className="block text-[9px] font-bold tracking-[0.08em] leading-none">
+                        {opt.weekdayShort}
+                      </span>
+                      <span className="block text-[1.2rem] font-extrabold leading-none">
+                        {opt.dayNumber}
+                      </span>
+                      <span className="block text-[9px] font-bold tracking-[0.08em] leading-none">
+                        {opt.monthName}
+                      </span>
+                    </span>
+                  </span>
+                ) : (
+                  <>
+                    {hasShows ? (
+                      <span
+                        className="absolute top-0.5 right-1 h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: BRAND }}
+                      />
+                    ) : null}
+                    <span className="block text-[9px] font-bold tracking-wide text-[#333333]">
+                      {opt.weekdayShort}
+                    </span>
+                    <span className="mt-0.5 block text-base font-extrabold leading-none text-[#222222]">
+                      {opt.dayNumber}
+                    </span>
+                    <span className="mt-0.5 block text-[9px] font-semibold tracking-wide text-[#9CA3AF]">
+                      {opt.monthName}
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 border-t border-[#F0F0F0]">
+          <p className="min-w-0 text-[13px] font-bold text-[#111111] truncate">
+            {displayLanguage}
+            <span className="mx-1.5 text-[#9CA3AF] font-semibold">•</span>
+            {displayFormat}
+          </p>
+          <button
+            type="button"
+            onClick={openLangFormatSheet}
+            className="shrink-0 inline-flex items-center gap-0.5 text-[13px] font-bold text-[#6900AA] cursor-pointer"
+          >
+            Change
+            <ChevronRight size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-t border-[#F0F0F0]">
+          <button
+            type="button"
+            onClick={() => setMobileSheet("sort")}
+            className={mobilePillClass(sortBy !== "relevance" || mobileSheet === "sort")}
+          >
+            <ListFilter size={14} />
+            Sort by
+            <ChevronDown size={14} className="opacity-70" />
+          </button>
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              type="button"
+              onClick={openLangFormatSheet}
+              className={mobilePillClass(formatFilters.length > 0)}
+            >
+              Special Formats
+              <ChevronDown size={14} className="opacity-70" />
+            </button>
+            <button
+              type="button"
+              onClick={openAllFiltersSheet}
+              className={mobilePillClass(priceFilters.length > 0)}
+            >
+              Price Range
+              <ChevronDown size={14} className="opacity-70" />
+            </button>
+            <button
+              type="button"
+              onClick={openAllFiltersSheet}
+              className={mobilePillClass(timeFilters.length > 0)}
+            >
+              Preferred Time
+              <ChevronDown size={14} className="opacity-70" />
+            </button>
+            <button
+              type="button"
+              onClick={openAllFiltersSheet}
+              className={mobilePillClass(languageFilters.length > 0)}
+            >
+              Language
+              <ChevronDown size={14} className="opacity-70" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop movie header (unchanged) ── */}
+      <section className="hidden lg:block bg-white border border-[#E8E8E8] rounded-md overflow-visible shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         {/* Dynamic movie header (same fields as movie detail, + poster) */}
         <div className="bg-[#F5F5F5] px-4 sm:px-5 py-4 sm:py-5 relative">
           <Link
@@ -991,9 +1347,9 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
         </div>
       </section>
 
-      {/* Sticky date + filters (image-2 UI) */}
+      {/* Sticky date + filters — desktop only */}
       <div
-        className="sticky z-30 bg-white border border-[#E8E8E8] rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-visible"
+        className="hidden lg:block sticky z-30 bg-white border border-[#E8E8E8] rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] overflow-visible"
         style={{ top: headerOffset || undefined }}
       >
         <div className="px-3 sm:px-4 py-3 sm:py-3.5">
@@ -1209,17 +1565,22 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               No shows available for {selectedCity || selectedDate}
             </h3>
             <p className="text-xs text-[#6B7280] max-w-md mx-auto">
-              {languageFilters.length || priceFilters.length || timeFilters.length || cinemaSearch
+              {languageFilters.length || priceFilters.length || timeFilters.length || formatFilters.length || cinemaSearch
                 ? "No showtimes match your filters or search. Try clearing filters."
                 : selectedCity
                   ? `No cinemas in ${selectedCity} have scheduled showtimes for ${selectedDate}.`
                   : `Cinemas haven't published showtimes for ${selectedDate} yet.`}
             </p>
-            {(languageFilters.length > 0 || priceFilters.length > 0 || timeFilters.length > 0 || Boolean(cinemaSearch)) ? (
+            {(languageFilters.length > 0 ||
+            priceFilters.length > 0 ||
+            timeFilters.length > 0 ||
+            formatFilters.length > 0 ||
+            Boolean(cinemaSearch)) ? (
               <button
                 type="button"
                 onClick={() => {
                   setLanguageFilters([]);
+                  setFormatFilters([]);
                   setPriceFilters([]);
                   setTimeFilters([]);
                   setCinemaSearch("");
@@ -1268,7 +1629,18 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   >
                     <div className="flex flex-col gap-4">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 flex items-start gap-3">
+                          {cinema.image ? (
+                            <div className="lg:hidden shrink-0 size-10 sm:size-11 overflow-hidden rounded-md border border-[#E8E8E8] bg-[#F5F5F5]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={cinema.image}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ) : null}
+                          <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap min-w-0">
                             <button
                               type="button"
@@ -1292,6 +1664,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                               <Ticket size={12} className="text-[#9CA3AF]" />
                               M-Ticket Available
                             </span>
+                          </div>
                           </div>
                         </div>
 
@@ -1426,6 +1799,227 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           </>
         )}
       </div>
+
+      {/* Mobile: all filters sheet */}
+      <MobileBottomSheet open={mobileSheet === "filters"} onClose={() => setMobileSheet(null)}>
+        <div className="px-4 pt-4 pb-3">
+          <h2 className="text-lg font-extrabold text-[#111111]">Filters</h2>
+        </div>
+        <div className="pb-24">
+          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+            Price Range
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {PRICE_BAND_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() =>
+                  toggleDraftValue(draftPriceFilters, setDraftPriceFilters, opt.value)
+                }
+                className={filterChipClass(draftPriceFilters.includes(opt.value))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+            Special Formats
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {formatOptions.length === 0 ? (
+              <p className="text-[12px] text-[#9CA3AF]">No formats available</p>
+            ) : (
+              formatOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() =>
+                    toggleDraftValue(draftFormatFilters, setDraftFormatFilters, opt.value)
+                  }
+                  className={filterChipClass(draftFormatFilters.includes(opt.value))}
+                >
+                  {opt.label}
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+            Language
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {languageOptions.length === 0 ? (
+              <p className="text-[12px] text-[#9CA3AF]">No languages available</p>
+            ) : (
+              languageOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() =>
+                    toggleDraftValue(draftLanguageFilters, setDraftLanguageFilters, opt.value)
+                  }
+                  className={filterChipClass(draftLanguageFilters.includes(opt.value))}
+                >
+                  {opt.label}
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+            Preferred Time
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {PREFERRED_TIME_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value)}
+                className={filterChipClass(draftTimeFilters.includes(opt.value))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sticky bottom-0 inset-x-0 flex gap-3 border-t border-[#E8E8E8] bg-white px-4 py-3 safe-area-pb">
+          <button
+            type="button"
+            onClick={() => {
+              setDraftPriceFilters([]);
+              setDraftTimeFilters([]);
+              setDraftFormatFilters([]);
+              setDraftLanguageFilters([]);
+            }}
+            className="flex-1 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold cursor-pointer"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPriceFilters(draftPriceFilters);
+              setTimeFilters(draftTimeFilters);
+              setFormatFilters(draftFormatFilters);
+              setLanguageFilters(draftLanguageFilters);
+              setMobileSheet(null);
+            }}
+            className="flex-[1.4] h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold cursor-pointer"
+          >
+            Apply Filters
+          </button>
+        </div>
+      </MobileBottomSheet>
+
+      {/* Mobile: language + format sheet */}
+      <MobileBottomSheet open={mobileSheet === "langFormat"} onClose={() => setMobileSheet(null)}>
+        <div className="px-4 pt-4 pb-2">
+          <p className="text-[11px] font-semibold text-[#9CA3AF] truncate">{movie.title}</p>
+          <h2 className="mt-1 text-lg font-extrabold text-[#111111]">Select language and format</h2>
+        </div>
+        <div className="pb-24">
+          {languageOptions.map((lang) => (
+            <div key={lang.value}>
+              <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+                {lang.label}
+              </div>
+              <div className="flex flex-wrap gap-2 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    toggleDraftValue(draftLanguageFilters, setDraftLanguageFilters, lang.value)
+                  }
+                  className={filterChipClass(draftLanguageFilters.includes(lang.value))}
+                >
+                  {lang.label}
+                </button>
+                {formatOptions.map((fmt) => (
+                  <button
+                    key={`${lang.value}-${fmt.value}`}
+                    type="button"
+                    onClick={() => {
+                      if (!draftLanguageFilters.includes(lang.value)) {
+                        setDraftLanguageFilters([...draftLanguageFilters, lang.value]);
+                      }
+                      toggleDraftValue(draftFormatFilters, setDraftFormatFilters, fmt.value);
+                    }}
+                    className={filterChipClass(draftFormatFilters.includes(fmt.value))}
+                  >
+                    {fmt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {languageOptions.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-[#9CA3AF]">No languages available for this date.</p>
+          ) : null}
+        </div>
+        <div className="sticky bottom-0 inset-x-0 flex gap-3 border-t border-[#E8E8E8] bg-white px-4 py-3 safe-area-pb">
+          <button
+            type="button"
+            onClick={() => {
+              setDraftLanguageFilters([]);
+              setDraftFormatFilters([]);
+            }}
+            className="flex-1 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold cursor-pointer"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLanguageFilters(draftLanguageFilters);
+              setFormatFilters(draftFormatFilters);
+              setMobileSheet(null);
+            }}
+            className="flex-[1.4] h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold cursor-pointer"
+          >
+            Apply
+          </button>
+        </div>
+      </MobileBottomSheet>
+
+      {/* Mobile: sort sheet */}
+      <MobileBottomSheet open={mobileSheet === "sort"} onClose={() => setMobileSheet(null)}>
+        <div className="px-4 pt-4 pb-2">
+          <h2 className="text-lg font-extrabold text-[#111111]">Sort by</h2>
+        </div>
+        <ul className="pb-6">
+          {SORT_OPTIONS.map((opt, idx) => {
+            const selected = sortBy === opt.value;
+            return (
+              <li key={opt.value}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy(opt.value);
+                    setMobileSheet(null);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer ${
+                    idx > 0 ? "border-t border-[#F0F0F0]" : ""
+                  }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-bold text-[#111111]">{opt.label}</span>
+                    <span className="mt-0.5 block text-[12px] text-[#9CA3AF]">{opt.hint}</span>
+                  </span>
+                  <span
+                    className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      selected ? "border-[#6900AA]" : "border-[#D1D5DB]"
+                    }`}
+                    aria-hidden
+                  >
+                    {selected ? <span className="size-2.5 rounded-full bg-[#6900AA]" /> : null}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </MobileBottomSheet>
     </div>
   );
 }

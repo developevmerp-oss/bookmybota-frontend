@@ -8,7 +8,18 @@ export const store = configureStore({
     auth: authReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(api.middleware),
+    getDefaultMiddleware({
+      // RTK Query caches a large amount of API data; deep immutable/serializable
+      // checks on that tree are slow in development and trip the default 32ms warn.
+      immutableCheck: {
+        ignoredPaths: [api.reducerPath],
+        warnAfter: 128,
+      },
+      serializableCheck: {
+        ignoredPaths: [api.reducerPath],
+        warnAfter: 128,
+      },
+    }).concat(api.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

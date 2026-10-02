@@ -1,12 +1,15 @@
 .top-artists-rail {
+  --artists-visible: 2.2;
+  --artists-gap: 1rem;
   display: flex;
   width: 100%;
-  gap: 1rem;
+  gap: var(--artists-gap);
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   padding-bottom: 0.5rem;
+  padding-right: 1.25rem;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
@@ -17,12 +20,19 @@
 
 .top-artists-slot {
   scroll-snap-align: start;
+  flex: 0 0
+    calc(
+      (100% - (var(--artists-visible) - 1) * var(--artists-gap)) /
+        var(--artists-visible)
+    );
+  min-width: 0;
 }
 
 .top-artists-slot-link {
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+  width: 100%;
 }
 
 .top-artists-slot-link:hover .top-artists-photo {
@@ -32,6 +42,10 @@
 .top-artists-avatar {
   flex-shrink: 0;
   box-sizing: border-box;
+  width: 100%;
+  max-width: 148px;
+  aspect-ratio: 1;
+  height: auto;
 }
 
 .top-artists-photo {
@@ -40,10 +54,24 @@
 
 .top-artists-name {
   margin: 0;
+  width: 100%;
 }
 
 @media (min-width: 640px) {
   .top-artists-rail {
-    gap: 1.25rem;
+    --artists-visible: 3.2;
+    --artists-gap: 1.25rem;
+    padding-right: 0;
+  }
+
+  .top-artists-avatar {
+    max-width: 190px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .top-artists-rail {
+    --artists-visible: 6;
+    --artists-gap: 1.25rem;
   }
 }

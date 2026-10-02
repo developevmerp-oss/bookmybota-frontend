@@ -21,7 +21,7 @@ function CollectionCardOption2({
   return (
     <Link
       href={href}
-      className="relative shrink-0 snap-start block overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer group h-[248px] w-[calc((100vw-2.5rem)/2.35)] sm:h-[280px] sm:w-[calc((100vw-5rem)/2.6)] md:h-[300px] md:w-[calc((100vw-5rem)/3.35)] lg:h-[320px] lg:w-auto lg:flex-[0_0_calc((100%-3rem)/4)] xl:h-[330px]"
+      className="relative shrink-0 snap-start block overflow-hidden rounded-2xl shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer group h-[248px] w-[calc((100vw-2.5rem)/1.38)] sm:h-[280px] sm:w-[calc((100vw-5rem)/2.2)] md:h-[300px] md:w-[calc((100vw-5rem)/3.35)] lg:h-[320px] lg:w-auto lg:flex-[0_0_calc((100%-3rem)/4)] xl:h-[330px]"
     >
       <img
         src={
@@ -47,7 +47,7 @@ function CollectionCardOption2({
 
 /**
  * Dining homepage Collections — image + title only.
- * Mobile/tablet: peek next card (no pager). Desktop: exactly 4 full cards + pager nav.
+ * Mobile: one roomy card + peek. Desktop: exactly 4 full cards + pager nav.
  */
 export default function DiningCollectionsOption2({
   collections,

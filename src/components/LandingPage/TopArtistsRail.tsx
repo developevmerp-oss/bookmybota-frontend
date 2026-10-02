@@ -39,11 +39,10 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
   return (
     <Link
       href={artist.href}
-      className="top-artists-slot top-artists-slot-link shrink-0 w-[120px] sm:w-[190px] snap-start flex flex-col items-center gap-2.5 text-center"
+      className="top-artists-slot top-artists-slot-link snap-start flex flex-col items-center gap-2.5 text-center"
       title={`View ${artist.name}`}
     >
-      {/* Same size as event-listing ArtistChip */}
-      <div className="top-artists-avatar relative h-[120px] w-[120px] sm:h-[190px] sm:w-[190px] rounded-full overflow-hidden bg-[#F7E9FF] ring-2 ring-white shadow-sm">
+      <div className="top-artists-avatar relative rounded-full overflow-hidden bg-[#F7E9FF] ring-2 ring-white shadow-sm">
         <SafeCoverImage
           src={artist.image}
           alt=""
@@ -52,7 +51,7 @@ function ArtistCard({ artist }: { artist: RailArtistCard }) {
           fallback={<ArtistImageFallback size={40} />}
         />
       </div>
-      <p className="top-artists-name text-base tracking-wide sm:text-lg font-bold  text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug  transition-colors">
+      <p className="top-artists-name text-sm sm:text-base lg:text-lg font-bold text-[#1C1C1C] truncate min-w-0 leading-snug transition-colors">
         {artist.name}
       </p>
     </Link>
@@ -91,22 +90,23 @@ export default function TopArtistsRail() {
               <div
                 ref={scrollerRef}
                 className="top-artists-rail"
-                style={{ ["--artists-visible" as string]: VISIBLE }}
               >
                 {items.map((artist) => (
                   <ArtistCard key={artist.id} artist={artist} />
                 ))}
               </div>
 
-              <RailPagerNav
-                canPrev={edges.left}
-                canNext={edges.right}
-                pageCount={edges.pageCount}
-                activePage={edges.activePage}
-                onPrev={() => scrollBy("left")}
-                onNext={() => scrollBy("right")}
-                label="artists"
-              />
+              <div className="hidden lg:block">
+                <RailPagerNav
+                  canPrev={edges.left}
+                  canNext={edges.right}
+                  pageCount={edges.pageCount}
+                  activePage={edges.activePage}
+                  onPrev={() => scrollBy("left")}
+                  onNext={() => scrollBy("right")}
+                  label="artists"
+                />
+              </div>
             </>
           )}
         </div>

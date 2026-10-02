@@ -189,25 +189,24 @@ function EditorialBody({
   onOpenGallery,
 }: EditorialBodyProps) {
   return (
-    <div className="flex flex-col gap-2.5 px-3.5 pt-3.5 pb-3.5 min-w-0 bg-white">
+    <div className="flex flex-col gap-2.5 px-3.5 pt-3 pb-3.5 sm:gap-2.5 sm:px-3.5 sm:pt-3.5 sm:pb-3.5 min-w-0 bg-white">
       <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] leading-snug truncate">
+          <h3 className="text-[15px] sm:text-base lg:text-lg font-bold text-[#1C1C1C] leading-snug tracking-tight truncate">
             {name}
           </h3>
-          <p className="mt-1 inline-flex items-center gap-1.5 min-w-0 max-w-full text-sm tracking-wide text-gray-600">
-            <MapPin size={14} className="shrink-0 text-gray-500" strokeWidth={2} />
+          <p className="mt-1.5 inline-flex items-center gap-1.5 min-w-0 max-w-full text-[12px] sm:text-sm text-gray-600">
+            <MapPin size={13} className="shrink-0 text-gray-500" strokeWidth={2} />
             <span className="truncate">
               {locationLine || "Addis Ababa"}
-              <span className="text-gray-400"> • </span>
-              {distance}
+              <span className="hidden sm:inline text-gray-400"> • {distance}</span>
             </span>
           </p>
         </div>
 
         {thumbs.length > 0 ? (
           <div
-            className={`relative shrink-0 h-11 ${thumbs.length > 1 ? "w-[4.25rem]" : "w-11"}`}
+            className={`relative shrink-0 hidden sm:block h-11 ${thumbs.length > 1 ? "w-[4.25rem]" : "w-11"}`}
           >
             {thumbs.map((src, idx) => {
               const galleryIndex = Math.max(0, gallery.indexOf(src));
@@ -233,12 +232,12 @@ function EditorialBody({
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between gap-2 min-w-0 pt-0.5">
+      <div className="flex items-center justify-between gap-3 min-w-0 pt-0.5">
         <p className="min-w-0 truncate text-[11px] sm:text-xs font-semibold tracking-[0.06em] uppercase text-gray-500">
-          {tags.join(" • ")}
+          {tags[0] || "DINING"}
         </p>
-        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#2A2A2A] px-3 py-1.5 text-[12px] font-semibold tracking-wide text-white group-hover:bg-[#1C1C1C] transition-colors">
-          Book a Table
+        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#2A2A2A] px-3 py-1.5 text-[11px] sm:text-[12px] font-semibold tracking-wide text-white group-hover:bg-[#1C1C1C] transition-colors">
+          Book
           <ArrowRight size={13} strokeWidth={2.25} className="shrink-0" />
         </span>
       </div>

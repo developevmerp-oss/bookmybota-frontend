@@ -103,7 +103,8 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+          {/* Mobile / tablet / desktop: search first, then city (reference order) */}
+          <div className="mt-6 flex flex-col lg:flex-row gap-3">
             <div className="relative flex-1">
               <Search
                 size={16}
@@ -116,7 +117,7 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-[#6900AA]/40"
               />
             </div>
-            <div className="relative sm:w-56">
+            <div className="relative lg:w-56">
               <input
                 value={city}
                 onChange={(e) => setCity(e.target.value)}

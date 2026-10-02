@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   ArrowRight,
   Car,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Coins,
   ExternalLink,
@@ -18,8 +17,10 @@ import {
   Loader2,
   MapPin,
   Moon,
+  Navigation,
   Smartphone,
   Search,
+  SlidersHorizontal,
   Sun,
   Sunset,
   CloudMoon,
@@ -500,6 +501,80 @@ function TicketShowtimeButton({
   );
 }
 
+function MobileBottomSheet({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [rendered, setRendered] = useState(false);
+  const [exiting, setExiting] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (open) {
+      setRendered(true);
+      setExiting(false);
+      return;
+    }
+    if (!rendered) return;
+    setExiting(true);
+    const t = window.setTimeout(() => {
+      setRendered(false);
+      setExiting(false);
+    }, 220);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to open/mounted; rendered gates exit start
+  }, [open, mounted]);
+
+  useEffect(() => {
+    if (!rendered || exiting) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [rendered, exiting, onClose]);
+
+  if (!mounted || !rendered) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[90] lg:hidden">
+      <button
+        type="button"
+        aria-label="Close"
+        className={`absolute inset-0 bg-black/45 cursor-pointer ${
+          exiting ? "mobile-filter-sheet-backdrop-out" : "mobile-filter-sheet-backdrop"
+        }`}
+        onClick={onClose}
+      />
+      <div
+        className={`absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl ${
+          exiting ? "mobile-filter-sheet-panel-out" : "mobile-filter-sheet-panel"
+        }`}
+        role="dialog"
+        aria-modal="true"
+      >
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   const router = useRouter();
   const dateOptions = useMemo(() => generateDateOptions(7), []);
@@ -513,10 +588,14 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   const [selectedShowtimeId, setSelectedShowtimeId] = useState<string | null>(null);
   const [movieSearch, setMovieSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [draftLanguageFilters, setDraftLanguageFilters] = useState<string[]>([]);
+  const [draftTimeFilters, setDraftTimeFilters] = useState<string[]>([]);
+  const [draftPriceFilters, setDraftPriceFilters] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const dateStripRef = useRef<HTMLDivElement>(null);
+  const mobileDateStripRef = useRef<HTMLDivElement>(null);
   const [city, setCity] = useState("");
   const [rows, setRows] = useState<CinemaMovieRow[]>([]);
   const [loadingShows, setLoadingShows] = useState(false);
@@ -529,8 +608,11 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   });
   const [fetchShowtimes] = useLazyGetPublicMovieShowtimesQuery();
 
-  const apiCinema = venues.find((v) => v.id === cinemaId);
-  const showcase = SHOWCASE_BY_ID[cinemaId];
+  const apiCinema = venues.find(
+    (v) => v.id === cinemaId || (v.slug != null && v.slug === cinemaId)
+  );
+  const resolvedCinemaId = apiCinema?.id || cinemaId;
+  const showcase = SHOWCASE_BY_ID[cinemaId] || SHOWCASE_BY_ID[resolvedCinemaId];
 
   const cinemaName = apiCinema?.name || showcase?.name || "Cinema";
   const cinemaAddress =
@@ -542,7 +624,10 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   useEffect(() => {
     if (!showSearch) return;
     setOpenFilter(null);
-    const t = window.setTimeout(() => searchInputRef.current?.focus(), 280);
+    const t = window.setTimeout(() => {
+      const desktop = window.matchMedia("(min-width: 1024px)").matches;
+      (desktop ? searchInputRef : mobileSearchInputRef).current?.focus();
+    }, 280);
     return () => window.clearTimeout(t);
   }, [showSearch]);
 
@@ -551,42 +636,14 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     setMovieSearch("");
   };
 
-  const updateDateScrollState = () => {
-    const el = dateStripRef.current;
-    if (!el) return;
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    setCanScrollLeft(el.scrollLeft > 2);
-    setCanScrollRight(maxScroll > 2 && el.scrollLeft < maxScroll - 2);
-  };
-
   useEffect(() => {
-    const el = dateStripRef.current;
-    if (!el) return;
-    updateDateScrollState();
-    const onScroll = () => updateDateScrollState();
-    el.addEventListener("scroll", onScroll, { passive: true });
-    const ro = new ResizeObserver(() => updateDateScrollState());
-    ro.observe(el);
-    window.addEventListener("resize", updateDateScrollState);
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      ro.disconnect();
-      window.removeEventListener("resize", updateDateScrollState);
+    const scrollActive = (el: HTMLDivElement | null) => {
+      if (!el || !selectedDate) return;
+      const activeBtn = el.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`);
+      activeBtn?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
     };
-  }, [dateOptions]);
-
-  const scrollDates = (dir: -1 | 1) => {
-    const el = dateStripRef.current;
-    if (!el) return;
-    const step = Math.max(120, Math.round(el.clientWidth * 0.55));
-    el.scrollBy({ left: dir * step, behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    const el = dateStripRef.current;
-    if (!el || !selectedDate) return;
-    const activeBtn = el.querySelector<HTMLElement>(`[data-date="${selectedDate}"]`);
-    activeBtn?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    scrollActive(dateStripRef.current);
+    scrollActive(mobileDateStripRef.current);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -647,7 +704,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
               date: selectedDate,
               city_slug: city || undefined,
             }).unwrap();
-            const group = (res.cinemas || []).find((c) => c.id === cinemaId);
+            const group = (res.cinemas || []).find((c) => c.id === resolvedCinemaId);
             if (!group?.showtimes?.length) return null;
             return {
               movie,
@@ -668,7 +725,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [apiCinema, cinemaId, selectedDate, city, moviesPage?.items, loadingMovies, fetchShowtimes]);
+  }, [apiCinema, resolvedCinemaId, selectedDate, city, moviesPage?.items, loadingMovies, fetchShowtimes]);
 
   const languageOptions = useMemo(() => {
     const set = new Set<string>();
@@ -715,10 +772,105 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     `${cinemaName} ${cinemaAddress}`
   )}`;
 
+  const openMobileFilters = () => {
+    setDraftLanguageFilters([...languageFilters]);
+    setDraftTimeFilters([...timeFilters]);
+    setDraftPriceFilters([...priceFilters]);
+    setShowSearch(false);
+    setOpenFilter(null);
+    setMobileFiltersOpen(true);
+  };
+
+  const toggleDraftValue = (
+    values: string[],
+    setValues: (next: string[]) => void,
+    value: string
+  ) => {
+    setValues(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  };
+
+  const filterChipClass = (active: boolean) =>
+    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold cursor-pointer transition-colors ${
+      active
+        ? "border-[#6900AA] bg-[#6900AA] text-white"
+        : "border-[#6900AA]/55 bg-white text-[#6900AA]"
+    }`;
+
+  const mobilePillClass = (active: boolean) =>
+    `shrink-0 h-9 px-3 inline-flex items-center gap-1.5 rounded-full border text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+      active
+        ? "border-[#6900AA] text-[#6900AA] bg-[#F7E9FF]"
+        : "border-[#E5E5E5] text-[#333333] bg-white"
+    }`;
+
   const handleShowtimeClick = (id: string) => {
     setSelectedShowtimeId(id);
     router.push(`/movies/book/${id}`);
   };
+
+  const dateButtons = (stripRef: RefObject<HTMLDivElement | null>) => (
+    <div
+      ref={stripRef}
+      className="flex items-end gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth pt-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 w-full"
+    >
+      {dateOptions.map((opt) => {
+        const active = opt.dateStr === selectedDate;
+        return (
+          <button
+            key={opt.dateStr}
+            type="button"
+            data-date={opt.dateStr}
+            onClick={() => setSelectedDate(opt.dateStr)}
+            className={`relative shrink-0 text-center cursor-pointer transition-transform ${
+              active ? "w-[3.35rem] sm:w-[3.75rem] pt-2.5" : "w-[3.15rem] sm:w-[3.5rem]"
+            }`}
+          >
+            {active ? (
+              <span className="relative block w-full">
+                <span
+                  className="pointer-events-none absolute left-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
+                  aria-hidden
+                />
+                <span
+                  className="pointer-events-none absolute right-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
+                  aria-hidden
+                />
+                <span
+                  className="relative z-[1] flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] px-1.5 py-[0.65rem] text-white"
+                  style={{
+                    background: DATE_ACTIVE_GRADIENT,
+                    boxShadow: "0 6px 14px rgba(76,29,149,0.25)",
+                  }}
+                >
+                  <span className="block text-[9px] sm:text-[10px] font-bold tracking-[0.08em] text-white leading-none">
+                    {opt.weekdayShort}
+                  </span>
+                  <span className="block text-[1.2rem] sm:text-[1.4rem] font-extrabold leading-none text-white">
+                    {opt.dayNumber}
+                  </span>
+                  <span className="block text-[9px] sm:text-[10px] font-bold tracking-[0.08em] text-white leading-none">
+                    {opt.monthName}
+                  </span>
+                </span>
+              </span>
+            ) : (
+              <span className="flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] bg-transparent px-1.5 py-[0.65rem]">
+                <span className="block text-[9px] sm:text-[10px] font-bold tracking-wide text-[#6B7280] leading-none">
+                  {opt.weekdayShort}
+                </span>
+                <span className="block text-[1.15rem] sm:text-[1.3rem] font-extrabold leading-none text-[#222222]">
+                  {opt.dayNumber}
+                </span>
+                <span className="block text-[9px] sm:text-[10px] font-semibold tracking-wide text-[#9CA3AF] leading-none">
+                  {opt.monthName}
+                </span>
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   if (loadingCinema && !apiCinema && !showcase) {
     return <CustomerFullscreenShimmer label="Loading cinema" />;
@@ -740,9 +892,181 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAGE_BG }}>
-      <div className="container mx-auto px-4 sm:px-8 lg:px-10 2xl:px-0 py-5 sm:py-7 space-y-5">
-        {/* Header */}
-        <div className="rounded-2xl border border-[#E8E2F2] bg-white/90 p-4 sm:p-5 shadow-sm backdrop-blur-sm">
+      {/* ── Mobile / tablet chrome ── */}
+      <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-[#E8E8E8] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5">
+          <Link
+            href="/movies/cinemas"
+            aria-label="Back to cinemas"
+            className="shrink-0 p-1.5 -ml-1 text-[#111111] hover:text-[#6900AA] cursor-pointer"
+          >
+            <ArrowLeft size={22} strokeWidth={2.25} />
+          </Link>
+          <h1 className="min-w-0 flex-1 text-[15px] sm:text-base font-extrabold text-[#111111] leading-tight truncate">
+            {cinemaName}
+          </h1>
+          <button
+            type="button"
+            aria-label="Search movies"
+            onClick={() => {
+              setOpenFilter(null);
+              setShowSearch((v) => !v);
+            }}
+            className="shrink-0 p-2 text-[#333333] hover:text-[#6900AA] cursor-pointer"
+          >
+            <Search size={20} />
+          </button>
+          <button
+            type="button"
+            aria-label="Open filters"
+            onClick={openMobileFilters}
+            className="shrink-0 p-2 text-[#333333] hover:text-[#6900AA] cursor-pointer"
+          >
+            <SlidersHorizontal size={20} />
+          </button>
+        </div>
+
+        {showSearch ? (
+          <div className="px-3 sm:px-4 pb-2.5">
+            <div className="flex h-10 items-center gap-2 rounded-xl border border-[#E5E5E5] bg-white pl-3 pr-1">
+              <Search size={16} className="shrink-0 text-[#9CA3AF]" />
+              <input
+                ref={mobileSearchInputRef}
+                type="search"
+                value={movieSearch}
+                onChange={(e) => setMovieSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") closeSearch();
+                }}
+                placeholder="Search for movies"
+                className="h-full w-full bg-transparent text-[13px] text-[#333333] placeholder:text-[#9CA3AF] focus:outline-none"
+                aria-label="Search movies"
+              />
+              <button
+                type="button"
+                onClick={closeSearch}
+                className="h-8 w-8 shrink-0 flex items-center justify-center text-[#6B7280] hover:text-[#6900AA] cursor-pointer"
+                aria-label="Close search"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-t border-[#F0F0F0]">
+          <MapPin size={14} className="shrink-0 text-[#6900AA]" />
+          <p className="min-w-0 flex-1 text-[12px] sm:text-[13px] text-[#4B5563] truncate">
+            {cinemaAddress}
+          </p>
+          <a
+            href={mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Directions"
+            className="shrink-0 p-1.5 text-[#6900AA] hover:opacity-80 cursor-pointer"
+          >
+            <Navigation size={16} />
+          </a>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((v) => !v)}
+            className="shrink-0 inline-flex items-center gap-0.5 text-[13px] font-bold text-[#6900AA] cursor-pointer"
+          >
+            Details
+            <ChevronDown
+              size={16}
+              className={`transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                detailsOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </div>
+
+        <div
+          className={`cinema-details-expand bg-white ${
+            detailsOpen ? "is-open border-t border-[#F0F0F0]" : ""
+          }`}
+          aria-hidden={!detailsOpen}
+        >
+          <div className="cinema-details-expand__inner">
+            <div className="cinema-details-expand__content px-3 sm:px-4 pb-3">
+              <button
+                type="button"
+                onClick={toggleFavorite}
+                className="w-full flex items-center gap-2.5 py-3 text-left cursor-pointer border-b border-[#F0F0F0]"
+                tabIndex={detailsOpen ? 0 : -1}
+              >
+                <Heart
+                  size={18}
+                  className={
+                    favorited ? "fill-[#6900AA] text-[#6900AA]" : "text-[#9CA3AF]"
+                  }
+                />
+                <span className="text-[13px] text-[#4B5563]">
+                  {favorited
+                    ? "Added to your favorite cinemas"
+                    : "Tap to add to your favorite cinemas"}
+                </span>
+              </button>
+              <h2 className="mt-3 text-[12px] font-bold uppercase tracking-wide text-[#6B7280]">
+                Available Facilities
+              </h2>
+              <div className="mt-3 flex flex-wrap items-start gap-x-5 gap-y-3">
+                {CINEMA_FACILITIES.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.label}
+                      className="flex w-[4.5rem] flex-col items-center text-center gap-1.5"
+                    >
+                      <Icon size={24} strokeWidth={1.5} className="text-[#4B5563]" />
+                      <span className="text-[10px] font-medium text-[#4B5563] leading-snug">
+                        {item.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-3 sm:px-4 pb-2 border-t border-[#F0F0F0]">
+          {dateButtons(mobileDateStripRef)}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border-t border-[#F0F0F0] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button
+            type="button"
+            onClick={openMobileFilters}
+            className={mobilePillClass(languageFilters.length > 0)}
+          >
+            Language
+            <ChevronDown size={14} className="opacity-70" />
+          </button>
+          <button
+            type="button"
+            onClick={openMobileFilters}
+            className={mobilePillClass(timeFilters.length > 0)}
+          >
+            Preferred Time
+            <ChevronDown size={14} className="opacity-70" />
+          </button>
+          <button
+            type="button"
+            onClick={openMobileFilters}
+            className={mobilePillClass(priceFilters.length > 0)}
+          >
+            Price Range
+            <ChevronDown size={14} className="opacity-70" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-6 lg:container lg:px-10 2xl:px-0 py-0 lg:py-7 space-y-4 lg:space-y-5">
+        {/* Desktop header */}
+        <div className="hidden lg:block rounded-2xl border border-[#E8E2F2] bg-white/90 p-4 sm:p-5 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3 sm:gap-4 min-w-0">
               <div className="relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-xl bg-[#EDE4F7] border border-[#E5E0EF]">
@@ -830,103 +1154,15 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
           ) : null}
         </div>
 
-        {/* Date + filters */}
-        <div className="rounded-2xl border border-[#E8E2F2] bg-white p-3 sm:p-4 shadow-sm sticky top-2 z-20 overflow-visible">
-          <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:gap-5">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <button
-                type="button"
-                disabled={!canScrollLeft}
-                onClick={() => scrollDates(-1)}
-                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
-                aria-label="Previous dates"
-              >
-                <ChevronLeft size={16} />
-              </button>
+        {/* Desktop date + filters — no side arrows */}
+        <div className="hidden lg:block rounded-2xl border border-[#E8E2F2] bg-white p-3 sm:p-4 shadow-sm sticky top-2 z-20 overflow-visible">
+          <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:gap-6">
+            <div className="min-w-0 flex-1">{dateButtons(dateStripRef)}</div>
 
-              <div
-                ref={dateStripRef}
-                className="flex items-end gap-2 sm:gap-2.5 overflow-x-auto scroll-smooth pt-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1 min-w-0"
-              >
-                {dateOptions.map((opt) => {
-                  const active = opt.dateStr === selectedDate;
-                  return (
-                    <button
-                      key={opt.dateStr}
-                      type="button"
-                      data-date={opt.dateStr}
-                      onClick={() => setSelectedDate(opt.dateStr)}
-                      className={`relative shrink-0 text-center cursor-pointer transition-transform ${
-                        active
-                          ? "w-[3.35rem] sm:w-[3.75rem] pt-2.5"
-                          : "w-[3.15rem] sm:w-[3.5rem]"
-                      }`}
-                    >
-                      {active ? (
-                        <span className="relative block w-full">
-                          <span
-                            className="pointer-events-none absolute left-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
-                            aria-hidden
-                          />
-                          <span
-                            className="pointer-events-none absolute right-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
-                            aria-hidden
-                          />
-                          <span
-                            className="relative z-[1] flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] px-1.5 py-[0.65rem] text-white"
-                            style={{
-                              background: DATE_ACTIVE_GRADIENT,
-                              boxShadow: "0 6px 14px rgba(76,29,149,0.25)",
-                            }}
-                          >
-                            <span className="block text-[9px] sm:text-[10px] font-bold tracking-[0.08em] text-white leading-none">
-                              {opt.weekdayShort}
-                            </span>
-                            <span className="block text-[1.2rem] sm:text-[1.4rem] font-extrabold leading-none text-white">
-                              {opt.dayNumber}
-                            </span>
-                            <span className="block text-[9px] sm:text-[10px] font-bold tracking-[0.08em] text-white leading-none">
-                              {opt.monthName}
-                            </span>
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="flex aspect-square w-full flex-col items-center justify-between rounded-[1.15rem] bg-transparent px-1.5 py-[0.65rem]">
-                          <span className="block text-[9px] sm:text-[10px] font-bold tracking-wide text-[#6B7280] leading-none">
-                            {opt.weekdayShort}
-                          </span>
-                          <span
-                            className={`block text-[1.15rem] sm:text-[1.3rem] font-extrabold leading-none ${
-                              "text-[#222222]"
-                            }`}
-                          >
-                            {opt.dayNumber}
-                          </span>
-                          <span className="block text-[9px] sm:text-[10px] font-semibold tracking-wide text-[#9CA3AF] leading-none">
-                            {opt.monthName}
-                          </span>
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                disabled={!canScrollRight}
-                onClick={() => scrollDates(1)}
-                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-full border border-[#E5E0EF] bg-white flex items-center justify-center text-[#6B7280] disabled:opacity-30 cursor-pointer hover:border-[#6900AA]/40"
-                aria-label="Next dates"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 w-full xl:w-[38rem] xl:max-w-[38rem] xl:shrink-0 min-w-0">
-              <div className="flex-1 min-w-0 flex items-center gap-2">
+            <div className="flex items-center gap-3 w-full xl:w-auto xl:shrink-0 min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5 min-w-0 flex-1 xl:flex-initial">
                 {showSearch ? (
-                  <div className="flex h-10 w-full items-center gap-2 rounded-full border border-[#E8E0F2] bg-white pl-3 pr-3">
+                  <div className="flex h-10 w-full min-w-[14rem] xl:w-[18rem] items-center gap-2 rounded-full border border-[#E8E0F2] bg-white pl-3 pr-3">
                     <Search size={16} className="shrink-0 text-[#9CA3AF]" />
                     <input
                       ref={searchInputRef}
@@ -985,7 +1221,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                   setOpenFilter(null);
                   setShowSearch(true);
                 }}
-                className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm"
+                className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white cursor-pointer shadow-sm ml-1"
                 style={{ backgroundColor: BRAND }}
                 aria-label={showSearch ? "Close search" : "Search movies"}
               >
@@ -1017,7 +1253,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
         </div>
 
         {/* Movie cards */}
-        <div className="space-y-4 min-h-[280px]">
+        <div className="space-y-4 min-h-[280px] pt-3 lg:pt-0">
           {!apiCinema ? (
             <div className="rounded-2xl border border-[#E8E2F2] bg-white px-5 py-16 text-center text-sm text-[#6B7280]">
               Showtimes will appear here when this cinema is live with scheduled movies.
@@ -1138,6 +1374,96 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
           )}
         </div>
       </div>
+
+      <MobileBottomSheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)}>
+        <div className="px-4 pt-4 pb-3">
+          <h2 className="text-lg font-extrabold text-[#111111]">Filters</h2>
+        </div>
+        <div className="pb-24">
+          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+            Language
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {languageOptions.length === 0 ? (
+              <p className="text-[12px] text-[#9CA3AF]">No languages available</p>
+            ) : (
+              languageOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() =>
+                    toggleDraftValue(draftLanguageFilters, setDraftLanguageFilters, opt.value)
+                  }
+                  className={filterChipClass(draftLanguageFilters.includes(opt.value))}
+                >
+                  {opt.label}
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+            Preferred Time
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {TIMING_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() =>
+                  toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value)
+                }
+                className={filterChipClass(draftTimeFilters.includes(opt.value))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">
+            Price Range
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {PRICE_BAND_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() =>
+                  toggleDraftValue(draftPriceFilters, setDraftPriceFilters, opt.value)
+                }
+                className={filterChipClass(draftPriceFilters.includes(opt.value))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sticky bottom-0 inset-x-0 flex gap-3 border-t border-[#E8E8E8] bg-white px-4 py-3 safe-area-pb">
+          <button
+            type="button"
+            onClick={() => {
+              setDraftLanguageFilters([]);
+              setDraftTimeFilters([]);
+              setDraftPriceFilters([]);
+            }}
+            className="flex-1 h-11 rounded-xl border border-[#6900AA] text-[#6900AA] text-sm font-bold cursor-pointer"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLanguageFilters(draftLanguageFilters);
+              setTimeFilters(draftTimeFilters);
+              setPriceFilters(draftPriceFilters);
+              setMobileFiltersOpen(false);
+            }}
+            className="flex-[1.4] h-11 rounded-xl bg-[#6900AA] text-white text-sm font-bold cursor-pointer"
+          >
+            Apply Filters
+          </button>
+        </div>
+      </MobileBottomSheet>
     </div>
   );
 }

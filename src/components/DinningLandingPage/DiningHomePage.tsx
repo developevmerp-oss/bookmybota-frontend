@@ -1027,6 +1027,7 @@ export default function Home() {
   const offersRef = useRef<HTMLDivElement>(null);
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
+  const [diningSearchOpenSignal, setDiningSearchOpenSignal] = useState(0);
 
   const scrollCuisines = (direction: "left" | "right") => {
     const el = cuisinesRef.current;
@@ -2145,7 +2146,7 @@ export default function Home() {
         {/* ── 4. Filter Section (full-bleed sticky bar; chips stay content-width) ─ */}
         <section
           id="dining-filters-bar"
-          className="sticky z-30 w-full"
+          className="sticky z-30 w-full bg-transparent"
           style={{
             top: siteHeaderHeight,
             scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8,
@@ -2174,6 +2175,8 @@ export default function Home() {
                   scrollToDiningBrowseViewport();
                 }}
                 showSearch
+                searchButtonClassName="hidden lg:inline-flex"
+                openSearchSignal={diningSearchOpenSignal}
                 searchValue={searchInput}
                 onSearchChange={setSearchInput}
                 onSearchSubmit={(value) => {
@@ -2281,30 +2284,40 @@ export default function Home() {
 
           {/* ── 6. Restaurant section ───────────────────────────────────────── */}
           <section id="restaurant-listings" className={`pb-3 ${showHomeExtras ? "" : "pt-0"}`}>
-          <div className="pt-1 pb-4">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
-              {getFilteredSectionTitle()}
-            </h2>
-            {usingDiningFallback ||
-            (hasSelectedCity &&
-              !cityBusinessesLoading &&
-              citySectionBusinesses.length === 0) ? (
-              <CitySectionEmptyNotice message="No dining options available in your city yet." />
-            ) : (
-              <p className="text-sm text-slate-500 mt-0.5">
-                {locationLoading ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader2 size={12} className="animate-spin" /> Locating restaurants…
-                  </span>
-                ) : (
-                  <>
-                    <span className="font-semibold text-slate-700">{cityDisplay}</span>
-                    {" · "}
-                    {restaurantCountLabel} to explore
-                  </>
-                )}
-              </p>
-            )}
+          <div className="pt-1 pb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
+                {getFilteredSectionTitle()}
+              </h2>
+              {usingDiningFallback ||
+              (hasSelectedCity &&
+                !cityBusinessesLoading &&
+                citySectionBusinesses.length === 0) ? (
+                <CitySectionEmptyNotice message="No dining options available in your city yet." />
+              ) : (
+                <p className="text-sm text-slate-500 mt-0.5">
+                  {locationLoading ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 size={12} className="animate-spin" /> Locating restaurants…
+                    </span>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-slate-700">{cityDisplay}</span>
+                      {" · "}
+                      {restaurantCountLabel} to explore
+                    </>
+                  )}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDiningSearchOpenSignal((n) => n + 1)}
+              className="dining-search-trigger lg:hidden shrink-0 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer mt-0.5"
+              aria-label="Search restaurants"
+            >
+              <Search size={18} strokeWidth={1.75} />
+            </button>
           </div>
 
           {businessesLoading && loadedRestaurants.length === 0 ? (

@@ -133,12 +133,24 @@ export default function ArtistStageSection({
                         : `Play spotlight video ${idx + 1}`
                     }
                   >
-                    <div className="relative aspect-[3/4] bg-black sm:aspect-[4/5]">
+                    <div className="relative aspect-[3/4] bg-[#111111] sm:aspect-[4/5]">
                       <video
-                        src={resolveMediaUrl(clip.url)}
+                        src={`${resolveMediaUrl(clip.url)}#t=0.1`}
                         muted
                         playsInline
                         preload="metadata"
+                        onLoadedMetadata={(e) => {
+                          const v = e.currentTarget;
+                          // Seek past first frame — browsers often paint a green/blank
+                          // decoder frame at t=0 for muted preview thumbnails.
+                          if (v.duration && Number.isFinite(v.duration) && v.duration > 0.2) {
+                            try {
+                              v.currentTime = Math.min(0.25, v.duration * 0.05);
+                            } catch {
+                              /* ignore seek errors */
+                            }
+                          }
+                        }}
                         className="absolute inset-0 h-full w-full object-cover pointer-events-none"
                       />
                       {showMoreOverlay ? (

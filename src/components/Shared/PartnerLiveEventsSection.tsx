@@ -240,9 +240,18 @@ export default function PartnerLiveEventsSection({
 
   return (
     <section>
-      <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
-        Live Events
-      </h2>
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
+          Live Events
+        </h2>
+        <button
+          type="button"
+          onClick={onSeeMore}
+          className="lg:hidden shrink-0 text-sm font-bold text-[#6900AA] cursor-pointer hover:underline pb-0.5"
+        >
+          See more
+        </button>
+      </div>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
         {previewLive.map((event) => (
           <EventPosterCard key={event.id} event={event} />
@@ -250,7 +259,9 @@ export default function PartnerLiveEventsSection({
         {previewPast.map((event) => (
           <EventPosterCard key={event.id} event={event} disabled />
         ))}
-        <SeeMoreCard coverSrc={seeMoreCover} onClick={onSeeMore} />
+        <div className="hidden lg:block">
+          <SeeMoreCard coverSrc={seeMoreCover} onClick={onSeeMore} />
+        </div>
       </div>
     </section>
   );

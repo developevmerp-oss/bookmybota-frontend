@@ -347,6 +347,7 @@ export function EventReviewsShimmer() {
 }
 
 /** Dining home restaurant listing cards — matches DiningPosterCard listing layout */
+/** Matches DiningRestaurantCardOption2 listing card layout. */
 export function DiningHomeRestaurantShimmer({ count = 6 }: { count?: number }) {
   return (
     <Wrap>
@@ -356,19 +357,28 @@ export function DiningHomeRestaurantShimmer({ count = 6 }: { count?: number }) {
         aria-label="Loading restaurants"
       >
         {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="flex w-full flex-col rounded-2xl p-2">
-            <div className="aspect-[5/4] w-full overflow-hidden rounded-2xl">
-              <Skeleton className="!block !h-full !w-full !rounded-2xl" height="100%" />
+          <div
+            key={i}
+            className="flex w-full flex-col overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)]"
+          >
+            <div className="relative aspect-[5/4] w-full overflow-hidden bg-[#F3F4F6]">
+              <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-none" height="100%" />
             </div>
-            <div className="flex flex-col gap-1 pt-2.5 pb-1 min-w-0">
-              <div className="flex items-center justify-between gap-3">
-                <Skeleton width="70%" height={18} />
-                <Skeleton width={44} height={22} borderRadius={4} />
+            <div className="flex flex-col gap-2 px-4 pt-3 pb-3.5 min-w-0">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <Skeleton width="68%" height={20} />
+                <Skeleton width={40} height={18} borderRadius={4} />
               </div>
-              <Skeleton width="85%" height={14} />
-              <div className="flex items-center justify-between gap-3 pt-0.5">
-                <Skeleton width="45%" height={14} />
-                <Skeleton width={52} height={14} />
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <Skeleton width="58%" height={14} />
+                <Skeleton width={48} height={14} />
+              </div>
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <Skeleton width="42%" height={14} />
+                <div className="relative flex h-10 w-[3.25rem] items-center">
+                  <Skeleton circle width={36} height={36} className="!absolute left-0" />
+                  <Skeleton circle width={36} height={36} className="!absolute left-3.5" />
+                </div>
               </div>
             </div>
           </div>
@@ -614,44 +624,127 @@ export function PromoBannerShimmer() {
 }
 
 /** Restaurant / venue detail page */
+/** Matches RestaurantDetailPage layout: gallery mosaic + book sidebar + tabs/content. */
 export function RestaurantDetailShimmer() {
   return (
     <Wrap>
-      <div className="min-h-screen bg-white" aria-busy="true" aria-label="Loading restaurant">
-        <div className="w-full aspect-[21/9] min-h-[200px] sm:min-h-[280px] overflow-hidden">
-          <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+      <div className="min-h-screen bg-white text-slate-700" aria-busy="true" aria-label="Loading restaurant">
+        {/* Breadcrumb — tablet/desktop */}
+        <div className="hidden md:block bg-white pt-9">
+          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 flex items-center gap-1.5">
+            <Skeleton width={40} height={12} />
+            <Skeleton width={8} height={10} />
+            <Skeleton width={48} height={12} />
+            <Skeleton width={8} height={10} />
+            <Skeleton width={140} height={12} />
+          </div>
         </div>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="flex-1 space-y-2">
-              <Skeleton width="55%" height={32} />
-              <Skeleton width="40%" height={16} />
-              <Skeleton width="70%" height={14} />
-            </div>
-            <div className="flex items-center gap-3">
-              <Skeleton width={64} height={48} borderRadius={8} />
-              <div className="space-y-1">
-                <Skeleton width={90} height={12} />
-                <Skeleton width={70} height={12} />
+
+        <div className="container mx-auto max-md:px-0 max-md:pt-0 px-5 sm:px-10 lg:px-10 2xl:px-0 py-5 pb-24 md:pb-16">
+          {/* Title row — tablet/desktop (matches page h1 + actions + rating) */}
+          <div className="hidden md:block bg-white pt-2 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="min-w-0 flex-1 w-full">
+                <Skeleton
+                  height={36}
+                  borderRadius={8}
+                  className="!block !w-[min(100%,22rem)] sm:!h-10 lg:!h-8"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 self-start">
+                <Skeleton circle width={36} height={36} />
+                <Skeleton circle width={36} height={36} />
+                <Skeleton circle width={36} height={36} />
+                <div className="flex items-center gap-1.5 pl-2 sm:pl-3">
+                  <Skeleton width={18} height={18} borderRadius={4} />
+                  <Skeleton width={36} height={18} />
+                  <Skeleton width={40} height={14} />
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex gap-2 overflow-hidden">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} width={88} height={36} borderRadius={999} />
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-            <div className="space-y-4">
-              <Skeleton width={140} height={22} />
-              <Skeleton count={4} />
-              <Skeleton height={180} borderRadius={16} />
+
+          <div className="grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="min-w-0 order-1">
+              {/* Mobile hero */}
+              <div className="md:hidden relative w-full h-[62vw] min-h-[280px] max-h-[440px] overflow-hidden bg-[#F3F4F6]">
+                <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-none" height="100%" />
+              </div>
+
+              {/* Tablet/desktop mosaic gallery */}
+              <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2 h-[260px] md:h-[380px] rounded-2xl overflow-hidden border border-slate-100 bg-[#F3F4F6]">
+                <div className="col-span-2 row-span-2 overflow-hidden">
+                  <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+                </div>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="overflow-hidden">
+                    <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Mobile title + meta under gallery (matches District-style title block) */}
+              <div className="md:hidden mt-4 space-y-3 px-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Skeleton
+                      height={28}
+                      borderRadius={8}
+                      className="!block !w-[85%] !max-w-[18rem]"
+                    />
+                  </div>
+                  <Skeleton width={56} height={28} borderRadius={6} className="shrink-0" />
+                </div>
+                <Skeleton width="70%" height={14} />
+                <Skeleton width="40%" height={14} />
+                <Skeleton width="55%" height={14} />
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  <Skeleton width={110} height={36} borderRadius={999} />
+                  <Skeleton width={88} height={36} borderRadius={999} />
+                  <Skeleton width={96} height={36} borderRadius={999} />
+                </div>
+              </div>
+
+              {/* Status bar under gallery — tablet/desktop */}
+              <div className="relative mt-3 space-y-2 px-0.5 hidden md:block">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <Skeleton width={120} height={14} />
+                  <Skeleton width={8} height={12} />
+                  <Skeleton width={180} height={14} />
+                </div>
+              </div>
+
+              {/* Section tabs */}
+              <div className="mt-5 flex gap-4 overflow-hidden border-b border-slate-100 pb-3 px-5 md:px-0">
+                {[90, 70, 78, 84].map((w, i) => (
+                  <Skeleton key={i} width={w} height={18} />
+                ))}
+              </div>
+
+              {/* Content blocks */}
+              <div className="mt-5 space-y-4 px-5 md:px-0">
+                <Skeleton width={140} height={22} />
+                <Skeleton count={3} />
+                <Skeleton height={160} borderRadius={16} />
+              </div>
             </div>
-            <div className="space-y-3">
-              <Skeleton height={200} borderRadius={16} />
-              <Skeleton height={48} borderRadius={12} />
-            </div>
+
+            {/* Book a table sidebar */}
+            <aside className="hidden md:block order-2 min-w-0">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] space-y-3">
+                <Skeleton width={120} height={22} />
+                <Skeleton height={42} borderRadius={12} />
+                <Skeleton height={42} borderRadius={12} />
+                <Skeleton height={42} borderRadius={12} />
+                <Skeleton height={48} borderRadius={12} />
+              </div>
+            </aside>
           </div>
+        </div>
+
+        {/* Mobile sticky book CTA */}
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-4 py-3">
+          <Skeleton height={48} borderRadius={12} />
         </div>
       </div>
     </Wrap>

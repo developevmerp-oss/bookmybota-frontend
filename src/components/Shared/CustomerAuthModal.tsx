@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Mail, X } from "lucide-react";
-import { FaApple, FaGoogle } from "react-icons/fa";
+import { ArrowLeft, /* Mail, */ X } from "lucide-react";
+// import { FaApple, FaGoogle } from "react-icons/fa";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import {
   type OtpVerifyValues,
   type CustomerRegisterValues,
 } from "@/lib/loginFormSchema";
+import images from "@/Images";
 
 type Step = "start" | "otp" | "register";
 
@@ -34,9 +35,14 @@ type Props = {
   onSuccess?: () => void;
 };
 
-const BRAND = "#6900AA";
 const DIAL_CODE = "+251";
 const RESEND_SECONDS = 30;
+const BTN_BLACK = "#111111";
+
+const logoSrc =
+  typeof images.logoOnDark === "string"
+    ? images.logoOnDark
+    : images.logoOnDark.src;
 
 export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
   const dispatch = useAppDispatch();
@@ -121,9 +127,10 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
     onClose();
   };
 
-  const onComingSoon = (provider: string) => {
-    toast.info(`${provider} sign-in is coming soon. Please use phone number for now.`);
-  };
+  // Social providers temporarily hidden — keep for restore
+  // const onComingSoon = (provider: string) => {
+  //   toast.info(`${provider} sign-in is coming soon. Please use phone number for now.`);
+  // };
 
   const requestOtp = async (phone: string) => {
     const data = await sendOtp({ phone }).unwrap();
@@ -200,9 +207,12 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
 
   if (!open) return null;
 
+  const primaryBtnClass =
+    "w-full rounded-lg py-3 sm:py-3.5 text-[14px] sm:text-[15px] font-bold text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+
   const modal = (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[2px] p-0 sm:p-4"
       data-scroll-lock-container
       onClick={onClose}
       role="presentation"
@@ -211,31 +221,60 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="customer-auth-title"
-        className="relative w-full sm:max-w-[420px] 2xl:max-w-[440px] max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
+        className="relative w-full sm:max-w-[400px] md:max-w-[420px] max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          className="absolute top-3.5 right-3.5 z-10 h-8 w-8 rounded-full text-slate-500 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+        {/* Brand header — purple gradient like reference */}
+        <div
+          className="relative px-5 sm:px-6 pt-8 sm:pt-10 pb-7 sm:pb-8 text-center overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(145deg, #8B2FD6 0%, #6900AA 42%, #4A0080 78%, #2D0055 100%)",
+          }}
         >
-          <X size={18} />
-        </button>
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.18]"
+            style={{
+              backgroundImage:
+                "linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.25) 40%, rgba(255,255,255,0.25) 42%, transparent 42%), linear-gradient(45deg, transparent 55%, rgba(255,255,255,0.12) 55%, rgba(255,255,255,0.12) 58%, transparent 58%)",
+            }}
+            aria-hidden
+          />
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="absolute top-3.5 right-3.5 z-10 h-8 w-8 rounded-full text-white/90 hover:bg-white/15 flex items-center justify-center cursor-pointer"
+          >
+            <X size={18} />
+          </button>
 
-        <div className="px-5 sm:px-7 pt-6 sm:pt-7 pb-7 sm:pb-8">
+          <div className="relative z-[1] flex flex-col items-center">
+            <img
+              src={logoSrc}
+              alt="Book My Bota"
+              className="h-10 sm:h-12 w-auto object-contain"
+            />
+            <p className="mt-2.5 sm:mt-3 text-[12px] sm:text-[13px] text-white/90 font-medium leading-snug max-w-[16rem] sm:max-w-[18rem]">
+              Experience the best in Dining, Movies, and Events
+            </p>
+          </div>
+        </div>
+
+        <div className="px-5 sm:px-7 pt-5 sm:pt-6 pb-6 sm:pb-7">
           {step === "start" && (
             <>
               <h2
                 id="customer-auth-title"
-                className="text-center text-[22px] sm:text-[24px] font-extrabold text-[#1A1A1A] mb-2"
+                className="text-center text-[20px] sm:text-[22px] font-bold text-[#1A1A1A] mb-1.5"
               >
-                Get Started
+                Enter your mobile number
               </h2>
-              <p className="text-center text-sm text-slate-500 mb-5 sm:mb-6">
-                Enter your mobile number. We&apos;ll send an OTP to sign in or create an account.
+              <p className="text-center text-[13px] sm:text-sm text-slate-500 mb-5 sm:mb-6">
+                If you don&apos;t have an account yet, we&apos;ll create one for you.
               </p>
 
+              {/* Social login — temporarily commented (restore when ready)
               <div className="space-y-2.5 sm:space-y-3">
                 <button
                   type="button"
@@ -270,10 +309,11 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 </span>
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
+              */}
 
               <form onSubmit={onSendOtp} noValidate>
-                <div className="flex items-end gap-3 border-b border-[#6900AA]/pb-2">
-                  <div className="flex items-center gap-1.5 shrink-0 pb-0.5 text-[14px] font-semibold text-[#1A1A1A]">
+                <div className="flex items-stretch gap-2.5 sm:gap-3">
+                  <div className="flex items-center gap-1.5 shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 sm:px-3 py-2.5 sm:py-3 text-[13px] sm:text-[14px] font-semibold text-[#1A1A1A]">
                     <span aria-hidden className="text-base leading-none">
                       🇪🇹
                     </span>
@@ -283,9 +323,9 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                     type="tel"
                     inputMode="numeric"
                     maxLength={12}
-                    placeholder="Mobile number"
+                    placeholder="Enter mobile number"
                     autoFocus
-                    className="min-w-0 flex-1 bg-transparent border-0 outline-none text-[15px] sm:text-[16px] font-semibold text-[#1A1A1A] py-0.5"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 sm:px-3.5 py-2.5 sm:py-3 outline-none text-[14px] sm:text-[15px] font-medium text-[#1A1A1A] placeholder:text-slate-400 focus:border-slate-400"
                     {...phoneForm.register("phone", {
                       onChange: (e) => {
                         e.target.value = sanitizePhoneInput(e.target.value);
@@ -302,16 +342,21 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 <button
                   type="submit"
                   disabled={!canContinuePhone || isSendingOtp}
-                  className={`mt-5 sm:mt-6 w-full rounded-xl py-3 sm:py-3.5 text-[14px] sm:text-[15px] font-bold text-white transition-colors ${
-                    canContinuePhone && !isSendingOtp
-                      ? "cursor-pointer"
-                      : "bg-slate-300 cursor-not-allowed"
-                  }`}
-                  style={canContinuePhone && !isSendingOtp ? { backgroundColor: BRAND } : undefined}
+                  className={`${primaryBtnClass} mt-4 sm:mt-5`}
+                  style={{
+                    backgroundColor:
+                      canContinuePhone && !isSendingOtp ? BTN_BLACK : "#C8C8C8",
+                  }}
                 >
                   {isSendingOtp ? "Sending OTP..." : "Continue"}
                 </button>
               </form>
+
+              <p className="mt-4 sm:mt-5 text-center text-[11px] sm:text-[12px] text-slate-500 leading-relaxed">
+                By continuing, you agree to our{" "}
+                <span className="underline underline-offset-2">Terms of Service</span>{" "}
+                <span className="underline underline-offset-2">Privacy Policy</span>.
+              </p>
             </>
           )}
 
@@ -326,11 +371,11 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
               </button>
               <h2
                 id="customer-auth-title"
-                className="text-center text-[22px] sm:text-[24px] font-extrabold text-[#1A1A1A] mb-2"
+                className="text-center text-[20px] sm:text-[22px] font-bold text-[#1A1A1A] mb-1.5"
               >
                 Enter OTP
               </h2>
-              <p className="text-center text-sm text-slate-500 mb-1">
+              <p className="text-center text-[13px] sm:text-sm text-slate-500 mb-1">
                 Sent to{" "}
                 <span className="font-bold text-slate-700">
                   {DIAL_CODE} {verifiedPhone}
@@ -349,7 +394,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                   maxLength={6}
                   autoFocus
                   placeholder="••••••"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-center text-xl tracking-[0.45em] font-extrabold text-slate-800 focus:outline-none focus:border-[#6900AA] focus:bg-white"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3.5 text-center text-xl tracking-[0.45em] font-extrabold text-slate-800 focus:outline-none focus:border-slate-400"
                   {...otpForm.register("otp", {
                     onChange: (e) => {
                       e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
@@ -364,8 +409,8 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 <button
                   type="submit"
                   disabled={isVerifyingOtp}
-                  className="w-full rounded-xl py-3.5 text-[15px] font-bold text-white cursor-pointer disabled:opacity-60"
-                  style={{ backgroundColor: BRAND }}
+                  className={primaryBtnClass}
+                  style={{ backgroundColor: BTN_BLACK }}
                 >
                   {isVerifyingOtp ? "Verifying..." : "Verify & Continue"}
                 </button>
@@ -398,11 +443,11 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
               </button>
               <h2
                 id="customer-auth-title"
-                className="text-center text-[22px] sm:text-[24px] font-extrabold text-[#1A1A1A] mb-2"
+                className="text-center text-[20px] sm:text-[22px] font-bold text-[#1A1A1A] mb-1.5"
               >
                 Create Account
               </h2>
-              <p className="text-center text-sm text-slate-500 mb-5">
+              <p className="text-center text-[13px] sm:text-sm text-slate-500 mb-5">
                 Finish signup for{" "}
                 <span className="font-bold text-slate-700">
                   {DIAL_CODE} {verifiedPhone}
@@ -414,7 +459,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                     type="text"
                     placeholder="Full name"
                     autoFocus
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#6900AA] focus:bg-white"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-slate-400"
                     {...registerForm.register("name")}
                   />
                   {registerForm.formState.errors.name && (
@@ -427,7 +472,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                   <input
                     type="email"
                     placeholder="Email"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#6900AA] focus:bg-white"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-slate-400"
                     {...registerForm.register("email")}
                   />
                   {registerForm.formState.errors.email && (
@@ -440,8 +485,8 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 <button
                   type="submit"
                   disabled={isRegistering}
-                  className="w-full rounded-xl py-3.5 text-[15px] font-bold text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: BRAND }}
+                  className={primaryBtnClass}
+                  style={{ backgroundColor: BTN_BLACK }}
                 >
                   {isRegistering ? "Creating..." : "Create account"}
                 </button>

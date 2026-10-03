@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Globe,
@@ -624,10 +625,41 @@ export default function PublicEventDetailPage({
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Mobile/tablet: back + title + share (site header hidden) */}
+      <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-200">
+        <div className="flex items-center gap-2 px-3 sm:px-4 h-12 sm:h-14">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/events");
+              }
+            }}
+            className="shrink-0 h-9 w-9 -ml-1 rounded-full flex items-center justify-center text-[#111111] hover:bg-slate-50 cursor-pointer"
+            aria-label="Back"
+          >
+            <ChevronLeft size={22} strokeWidth={2.25} />
+          </button>
+          <h1 className="min-w-0 flex-1 truncate text-[0.9375rem] sm:text-base font-semibold text-[#111111]">
+            {event.name}
+          </h1>
+          <button
+            type="button"
+            aria-label="Share"
+            onClick={() => setShareOpen(true)}
+            className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-[#111111] hover:bg-slate-50 cursor-pointer"
+          >
+            <Share2 size={18} />
+          </button>
+        </div>
+      </div>
+
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
         <nav
           aria-label="Breadcrumb"
-          className="mb-3 sm:mb-4 text-[0.8125rem] sm:text-[0.875rem] text-[#8A8A8A] break-words leading-relaxed"
+          className="hidden lg:block mb-3 sm:mb-4 text-[0.8125rem] sm:text-[0.875rem] text-[#8A8A8A] break-words leading-relaxed"
         >
           <Link href="/" className="hover:underline">
             Home
@@ -651,7 +683,7 @@ export default function PublicEventDetailPage({
           <span className="text-[#555]">{event.name}</span>
         </nav>
 
-        <div className="flex items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-5">
+        <div className="hidden lg:flex items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-5">
           <h1 className="min-w-0 text-[1.75rem] sm:text-[2rem] lg:text-[2.25rem] 2xl:text-[2.5rem] font-extrabold text-[#1A1A1A] leading-tight tracking-tight break-words">
             {event.name}
             {/* {event.is_promoted ? (

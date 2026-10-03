@@ -26,6 +26,7 @@ import ListingPromoSlider, {
   diningToListingSlide,
 } from "@/components/LandingPage/ListingPromoSlider";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
+import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -1026,7 +1027,7 @@ export default function Home() {
   const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
   const offersRef = useRef<HTMLDivElement>(null);
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
-  const [siteHeaderHeight, setSiteHeaderHeight] = useState(0);
+  const siteHeaderHeight = useStickyHeaderOffset();
   const [diningSearchOpenSignal, setDiningSearchOpenSignal] = useState(0);
 
   const scrollCuisines = (direction: "left" | "right") => {
@@ -1556,6 +1557,11 @@ export default function Home() {
   const hasMoreRestaurants =
     !diningFilters.offerBucket && Boolean(businessesData?.meta?.has_next);
   const loadingMore = businessesFetching && currentPage > 1;
+  /** Initial load + filter/search refetch while list is empty — card-matched shimmer. */
+  const showRestaurantShimmer =
+    loadedRestaurants.length === 0 &&
+    currentPage <= 1 &&
+    (businessesLoading || businessesFetching);
 
   const hasActiveFilters =
     Boolean(searchQuery) ||
@@ -1603,16 +1609,6 @@ export default function Home() {
     homeOfferCards.length,
     showHomeExtras,
   ]);
-
-  useEffect(() => {
-    const measureHeader = () => {
-      const header = document.querySelector("header");
-      setSiteHeaderHeight(header?.getBoundingClientRect().height ?? 0);
-    };
-    measureHeader();
-    window.addEventListener("resize", measureHeader);
-    return () => window.removeEventListener("resize", measureHeader);
-  }, []);
 
   useEffect(() => {
     const sentinel = filtersStickySentinelRef.current;
@@ -2320,8 +2316,8 @@ export default function Home() {
             </button>
           </div>
 
-          {businessesLoading && loadedRestaurants.length === 0 ? (
-            <DiningHomeRestaurantShimmer count={6} />
+          {showRestaurantShimmer ? (
+            <DiningHomeRestaurantShimmer count={8} />
           ) : useStaticDining ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-5 w-full">
               {staticDiningCards.map((place) => (

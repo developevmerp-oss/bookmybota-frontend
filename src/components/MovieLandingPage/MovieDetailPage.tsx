@@ -20,6 +20,7 @@ import {
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import { MovieDetailShimmer } from "@/components/Shared/Shimmer";
+import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 
 function mapPlatformOffersToMovieOffers(
   offers: Array<{
@@ -358,6 +359,7 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 export default function MovieDetailPage() {
   const params = useParams();
   const idOrSlug = String(params?.id || "");
+  const headerOffset = useStickyHeaderOffset();
 
   const { data: apiMovie, isLoading, isError } = useGetPublicMovieQuery(idOrSlug, {
     skip: !idOrSlug,
@@ -406,7 +408,30 @@ export default function MovieDetailPage() {
     <div className="min-h-screen bg-white pb-24 lg:pb-0">
       <MovieDetailBanner movie={movie} />
 
-      
+      {/* Desktop — sticky title + Book tickets (below hero, under site header) */}
+      <div
+        className="hidden lg:block sticky z-30 w-full border-b border-slate-200 bg-white"
+        style={{ top: headerOffset }}
+      >
+        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 flex items-center justify-between gap-4 py-3.5">
+          <h2 className="min-w-0 truncate text-lg xl:text-xl font-bold text-[#111111]">
+            {movie.title}
+          </h2>
+          {movie.comingSoon ? (
+            <span className="shrink-0 inline-flex items-center justify-center rounded-md bg-[#F84464]/80 px-5 py-2.5 text-sm font-bold text-white">
+              Coming Soon
+            </span>
+          ) : (
+            <Link
+              href={bookHref}
+              className="shrink-0 inline-flex items-center justify-center rounded-md bg-[#F84464] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#E03858] transition-colors"
+            >
+              Book tickets
+            </Link>
+          )}
+        </div>
+      </div>
+
       <MovieDetailSections movie={movie} idOrSlug={idOrSlug} />
 
       {/* Sticky Book Tickets — mobile / tablet */}

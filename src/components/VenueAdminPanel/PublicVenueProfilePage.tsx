@@ -416,7 +416,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                 />
               ) : null}
 
-              <section className="w-full max-w-md mx-auto sm:max-w-lg lg:mx-0 lg:max-w-lg">
+              <section className="w-full max-w-md sm:max-w-lg lg:max-w-lg">
                 <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
                   Booking Availability
                 </h2>
@@ -442,7 +442,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
               </section>
             </div>
 
-          <aside className="w-full shrink-0 order-2 mx-auto max-w-xl lg:mx-0 lg:max-w-none lg:w-[min(100%,32rem)]">
+          <aside className="w-full shrink-0 order-2 max-w-xl lg:max-w-none lg:w-[min(100%,32rem)]">
             <form
               id="venue-inquiry"
               onSubmit={onSubmit}

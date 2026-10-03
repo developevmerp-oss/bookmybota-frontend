@@ -1,4 +1,5 @@
 import logo from "./LandingPage/logo.png";
+import logoOnDark from "./LandingPage/logo-on-dark.png";
 import comedyCard from "./LandingPage/comedy-card.png";
 import musicCard from "./LandingPage/music-card.png";
 import concertCard from "./LandingPage/concert-card.png";
@@ -44,6 +45,7 @@ import musicDj from "./Music/music-dj.jpg";
 
 const images = {
   logo,
+  logoOnDark,
   comedyCard,
   musicCard,
   concertCard,

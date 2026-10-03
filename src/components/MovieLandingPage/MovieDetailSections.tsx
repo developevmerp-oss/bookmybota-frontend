@@ -48,7 +48,7 @@ function SectionShell({
   muted?: boolean;
 }) {
   return (
-    <section className={`py-8 sm:py-10 lg:py-12 ${muted ? "bg-slate-50" : "bg-white"} ${className}`}>
+    <section className={`py-8 sm:py-10 lg:py-10 ${muted ? "bg-slate-50" : "bg-white"} ${className}`}>
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">{children}</div>
     </section>
   );
@@ -456,7 +456,7 @@ function CastSection({ cast }: { cast: MoviePerson[] }) {
   if (!cast.length) return null;
   return (
     <>
-      <HeaderCarouselSection title="Cast" muted itemCount={cast.length}>
+      <HeaderCarouselSection title="Cast" itemCount={cast.length}>
         {cast.map((person) => (
           <button
             key={`${person.name}-${person.role}`}
@@ -627,7 +627,7 @@ function YouMightAlsoLike({ idOrSlug, currentId }: { idOrSlug: string; currentId
       <SectionHeading title="You might also like" action={<ViewAllButton label="View all" href="/movies" />} />
       <HScroll
         trackClassName="movies-rail"
-        trackStyle={{ ["--movies-visible" as string]: 6 } as CSSProperties}
+        trackStyle={{ ["--movies-visible" as string]: 5 } as CSSProperties}
       >
         {list.map((m) => (
           <RelatedMovieCard key={m.id} movie={m} />

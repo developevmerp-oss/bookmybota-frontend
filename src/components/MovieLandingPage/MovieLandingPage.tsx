@@ -12,15 +12,17 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   Clapperboard,
   Crown,
+  SlidersHorizontal,
   Star,
   ThumbsUp,
   Ticket,
+  X,
 } from "lucide-react";
-import { FaChevronDown, FaSlidersH } from "react-icons/fa";
 import {
   api,
   useGetPublicMoviesQuery,
@@ -55,11 +57,14 @@ import {
 } from "@/data/showcaseMovieCards";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
 import { getEmbedVideoUrl } from "@/components/MovieLandingPage/MovieTrailerModal";
+import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 import "./MovieLandingPage.css";
 import "@/components/LandingPage/RecommendedMoviesRail.css";
+import "@/components/DinningLandingPage/DiningHomePage.css";
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
-const MOVIES_VISIBLE = 6;
+/** Match Only in Theatres grid density (5 across on desktop). */
+const MOVIES_VISIBLE = 5;
 const CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
 const EMPTY_MOVIES: Movie[] = [];
 const EMPTY_HERO_EXTRAS: Record<string, string> = {};
@@ -89,10 +94,10 @@ function ChipButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 shrink-0 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium border cursor-pointer transition-colors whitespace-nowrap ${
+      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] sm:text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
         active
-          ? "bg-[#EDE7F6] border-[#7C3AED] text-slate-900"
-          : "bg-white border-slate-300 text-slate-800 hover:border-slate-400"
+          ? "bg-slate-100 border-slate-400 text-slate-800"
+          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
       }`}
     >
       {icon}
@@ -106,33 +111,47 @@ function SelectionMark({ selected, multi }: { selected: boolean; multi?: boolean
   if (multi) {
     return (
       <span
-        className={`flex size-4 shrink-0 items-center justify-center rounded-[3px] border ${
-          selected ? "border-[#7C3AED] bg-[#7C3AED] text-white" : "border-slate-700 bg-white"
+        className={`w-5 h-5 rounded-[4px] border flex items-center justify-center shrink-0 ${
+          selected ? "border-[#6900AA] bg-[#6900AA]" : "border-slate-300 bg-white"
         }`}
       >
-        {selected ? (
-          <svg viewBox="0 0 12 12" className="size-2.5" aria-hidden>
-            <path
-              d="M2.5 6.2 4.8 8.5 9.5 3.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ) : null}
+        {selected ? <Check size={13} strokeWidth={3} className="text-white" /> : null}
       </span>
     );
   }
   return (
     <span
-      className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-        selected ? "border-[#7C3AED] bg-[#7C3AED]" : "border-slate-700"
+      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+        selected ? "border-[#6900AA]" : "border-slate-300"
       }`}
     >
-      {selected ? <span className="size-1.5 rounded-full bg-white" /> : null}
+      {selected ? <span className="w-2.5 h-2.5 rounded-full bg-[#6900AA]" /> : null}
     </span>
+  );
+}
+
+function FilterOptionRow({
+  label,
+  selected,
+  multi,
+  onSelect,
+}: {
+  label: string;
+  selected: boolean;
+  multi?: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full min-w-0 flex items-center justify-between gap-2 py-3 text-left cursor-pointer"
+    >
+      <span className={`text-base truncate ${selected ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+        {label}
+      </span>
+      <SelectionMark selected={selected} multi={multi} />
+    </button>
   );
 }
 
@@ -494,7 +513,7 @@ function HScroll({ children }: { children: ReactNode }) {
     <div className="relative">
       <div
         ref={ref}
-        className="movies-rail movie-page-rail"
+        className="movies-rail"
         style={{ ["--movies-visible" as string]: MOVIES_VISIBLE }}
       >
         {children}
@@ -526,7 +545,9 @@ function MovieRail({
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
-        <h2 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900">{title}</h2>
+        <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
+          {title}
+        </h2>
         <button
           type="button"
           onClick={onSeeAll}
@@ -572,7 +593,7 @@ function MovieReleasesGrid({
   return (
     <section className="bg-white pt-6 sm:pt-8 pb-2">
       <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
-        <h2 className="mb-3 text-lg font-extrabold text-slate-900 sm:mb-4 sm:text-xl md:text-2xl">
+        <h2 className="mb-3 text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight sm:mb-4">
           {title}
         </h2>
         <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
@@ -622,6 +643,7 @@ export default function MovieLandingPage() {
   const searchParamsKey = searchParams.toString();
   const mobilePromoTrackRef = useRef<HTMLDivElement>(null);
   const moviesListingRef = useRef<HTMLElement>(null);
+  const filtersStickySentinelRef = useRef<HTMLDivElement>(null);
   const [city, setCity] = useState(() => {
     const cityParam = searchParams.get("city");
     if (cityParam) return cityParam === "All Cities" ? "" : cityParam;
@@ -642,7 +664,8 @@ export default function MovieLandingPage() {
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterModalTab, setFilterModalTab] = useState<MovieFilterModalTab>("language");
-  const [headerOffset, setHeaderOffset] = useState(112);
+  const headerOffset = useStickyHeaderOffset();
+  const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [viewAll, setViewAll] = useState<ViewAllKey>(null);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   const [heroSlideTransition, setHeroSlideTransition] = useState(true);
@@ -650,17 +673,6 @@ export default function MovieLandingPage() {
   const [promoDesktopAutoplay, setPromoDesktopAutoplay] = useState(false);
   const [heroAboutById, setHeroAboutById] = useState<Record<string, string>>({});
   const [heroTrailerById, setHeroTrailerById] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const measure = () => {
-      const header = document.querySelector("header.sticky");
-      const h = header instanceof HTMLElement ? header.getBoundingClientRect().height : 112;
-      setHeaderOffset(Math.max(64, Math.round(h)));
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
 
   const scrollToMoviesListing = useCallback(() => {
     window.setTimeout(() => {
@@ -672,6 +684,27 @@ export default function MovieLandingPage() {
     setFiltersOpen(false);
     scrollToMoviesListing();
   }, [scrollToMoviesListing]);
+
+  useEffect(() => {
+    const sentinel = filtersStickySentinelRef.current;
+    if (!sentinel) {
+      setIsFiltersStuck(false);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const next = !entry.isIntersecting;
+        setIsFiltersStuck((prev) => (prev === next ? prev : next));
+      },
+      {
+        root: null,
+        threshold: 0,
+        rootMargin: `-${Math.max(headerOffset, 1)}px 0px 0px 0px`,
+      }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [headerOffset]);
 
   useEffect(() => {
     const applyCity = () => {
@@ -961,11 +994,6 @@ export default function MovieLandingPage() {
     ];
   }, [languageOptions, genreOptions, formatOptions]);
 
-  const quickOutsideKeys = useMemo(
-    () => new Set(quickOutsideChips.map((chip) => `${chip.type}:${chip.value}`)),
-    [quickOutsideChips]
-  );
-
   const nowShowingSource = useMemo(
     () => catalogMovies.filter((movie) => movie.status === "now_showing").map(mapCatalogMovieToCard),
     [catalogMovies]
@@ -1029,6 +1057,38 @@ export default function MovieLandingPage() {
     setSelectedFormats([]);
   };
 
+  const selectedMovieFilterChips = useMemo(
+    () => [
+      ...selectedLanguages.map((lang) => ({
+        key: `lang-${lang}`,
+        label: lang,
+        onClear: () => {
+          toggleLanguage(lang);
+          scrollToMoviesListing();
+        },
+      })),
+      ...selectedGenres.map((genre) => ({
+        key: `genre-${genre}`,
+        label: genre,
+        onClear: () => {
+          toggleGenre(genre);
+          scrollToMoviesListing();
+        },
+      })),
+      ...selectedFormats.map((format) => ({
+        key: `format-${format}`,
+        label: format,
+        onClear: () => {
+          toggleFormat(format);
+          scrollToMoviesListing();
+        },
+      })),
+    ],
+    // toggle helpers are stable inline setters; listing scroll is memoized
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedLanguages, selectedGenres, selectedFormats, scrollToMoviesListing]
+  );
+
   const openViewAll = (key: Exclude<ViewAllKey, null>) => {
     setViewAll(key);
     scrollToMoviesListing();
@@ -1052,94 +1112,82 @@ export default function MovieLandingPage() {
           ? topRatedMovies
           : [];
 
-  const tabHasSelection = (tab: MovieFilterModalTab) => {
-    if (tab === "language") return selectedLanguages.length > 0;
-    if (tab === "genre") return selectedGenres.length > 0;
-    if (tab === "format") return selectedFormats.length > 0;
-    return false;
-  };
-
   const districtFilterModalBody = (
-    <div className="flex min-h-[280px] overflow-hidden rounded-xl bg-[#F3F3F3]">
-      <div className="w-[34%] sm:w-[38%] shrink-0 bg-white py-2">
-        {MOVIE_FILTER_MODAL_TABS.map((tab) => {
-          const active = filterModalTab === tab.id;
-          const hasValue = tabHasSelection(tab.id);
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setFilterModalTab(tab.id)}
-              className={`flex w-full items-center justify-between px-3 sm:px-4 py-3 text-left text-sm cursor-pointer transition-colors ${
-                active
-                  ? "bg-[#EDE9FE] font-semibold text-[#5B21B6]"
-                  : hasValue
-                    ? "font-semibold text-[#6900AA] hover:bg-slate-50"
-                    : "font-medium text-slate-800 hover:bg-slate-50"
-              }`}
-            >
-              <span>{tab.label}</span>
-              {hasValue ? <span className="size-1.5 rounded-full bg-[#6900AA]" /> : null}
-            </button>
-          );
-        })}
+    <div className="flex flex-col sm:flex-row min-h-0 flex-1 overflow-hidden">
+      <div className="sm:w-[34%] bg-slate-100 border-b sm:border-b-0 sm:border-r border-slate-200 overflow-x-auto sm:overflow-y-auto shrink-0 sm:h-full">
+        <div className="flex sm:flex-col">
+          {MOVIE_FILTER_MODAL_TABS.map((tab) => {
+            const active = filterModalTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilterModalTab(tab.id)}
+                className={`relative shrink-0 text-left px-4 py-3.5 text-base whitespace-nowrap transition-colors cursor-pointer ${
+                  active
+                    ? "font-semibold text-slate-900 bg-white"
+                    : "font-medium text-slate-600 bg-transparent hover:bg-slate-50/80"
+                }`}
+              >
+                {active ? (
+                  <span className="absolute left-0 top-0 bottom-0 w-[3px] hidden sm:block bg-[#6900AA]" />
+                ) : null}
+                <span className="block">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+      <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-4 min-h-0 h-full bg-white">
         {filterModalTab === "language" ? (
-          <div className="space-y-1">
-            {languageOptions.map((lang) => {
-              const selected = selectedLanguages.includes(lang);
-              return (
-                <button
+          <div>
+            <p className="text-lg font-bold text-slate-900 mb-2">Language</p>
+            <div className="grid grid-cols-2 gap-x-4">
+              {languageOptions.map((lang) => (
+                <FilterOptionRow
                   key={lang}
-                  type="button"
-                  onClick={() => toggleLanguage(lang)}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-slate-800 cursor-pointer hover:bg-white/70"
-                >
-                  <SelectionMark selected={selected} multi />
-                  {lang}
-                </button>
-              );
-            })}
+                  label={lang}
+                  selected={selectedLanguages.includes(lang)}
+                  multi
+                  onSelect={() => toggleLanguage(lang)}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
 
         {filterModalTab === "genre" ? (
-          <div className="space-y-1">
-            {genreOptions.map((genre) => {
-              const selected = selectedGenres.includes(genre);
-              return (
-                <button
+          <div>
+            <p className="text-lg font-bold text-slate-900 mb-2">Genre</p>
+            <div className="grid grid-cols-2 gap-x-4">
+              {genreOptions.map((genre) => (
+                <FilterOptionRow
                   key={genre}
-                  type="button"
-                  onClick={() => toggleGenre(genre)}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-slate-800 cursor-pointer hover:bg-white/70"
-                >
-                  <SelectionMark selected={selected} multi />
-                  {genre}
-                </button>
-              );
-            })}
+                  label={genre}
+                  selected={selectedGenres.includes(genre)}
+                  multi
+                  onSelect={() => toggleGenre(genre)}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
 
         {filterModalTab === "format" ? (
-          <div className="space-y-1">
-            {formatOptions.map((format) => {
-              const selected = selectedFormats.includes(format);
-              return (
-                <button
+          <div>
+            <p className="text-lg font-bold text-slate-900 mb-2">Format</p>
+            <div className="grid grid-cols-2 gap-x-4">
+              {formatOptions.map((format) => (
+                <FilterOptionRow
                   key={format}
-                  type="button"
-                  onClick={() => toggleFormat(format)}
-                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-slate-800 cursor-pointer hover:bg-white/70"
-                >
-                  <SelectionMark selected={selected} multi />
-                  {format}
-                </button>
-              );
-            })}
+                  label={format}
+                  selected={selectedFormats.includes(format)}
+                  multi
+                  onSelect={() => toggleFormat(format)}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
       </div>
@@ -1344,7 +1392,7 @@ export default function MovieLandingPage() {
         <div className={CONTAINER}>
           <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-              <h2 className="text-lg font-extrabold text-slate-900 sm:text-xl md:text-2xl lg:text-3xl">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight">
                 Only in Theatres
               </h2>
               {hasCity && !isLoading && cityMovieItems.length === 0 ? (
@@ -1361,83 +1409,93 @@ export default function MovieLandingPage() {
           </div>
         </div>
 
-        <div
-          className="sticky z-40 w-full border-b border-slate-100 bg-white/95 backdrop-blur-sm shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
-          style={{ top: headerOffset }}
-        >
-          <div
-            className={`${CONTAINER} flex gap-2 overflow-x-auto py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
-          >
-            <ChipButton
-              label={hasActiveFilters ? "Filters · On" : "Filters"}
-              active={filtersOpen || hasActiveFilters}
-              onClick={() => {
-                setFilterModalTab("language");
-                setFiltersOpen(true);
-              }}
-              icon={<FaSlidersH size={12} />}
-              trailing={<FaChevronDown size={10} className="opacity-60" />}
-            />
-            {quickOutsideChips.map((chip) => (
-              <ChipButton
-                key={`${chip.type}-chip-${chip.value}`}
-                label={chip.value}
-                active={
-                  chip.type === "language"
-                    ? selectedLanguages.includes(chip.value)
-                    : chip.type === "genre"
-                      ? selectedGenres.includes(chip.value)
-                      : selectedFormats.includes(chip.value)
-                }
-                onClick={() => {
-                  if (chip.type === "language") toggleLanguage(chip.value);
-                  else if (chip.type === "genre") toggleGenre(chip.value);
-                  else toggleFormat(chip.value);
-                  scrollToMoviesListing();
-                }}
-              />
-            ))}
-            {selectedLanguages
-              .filter((lang) => !quickOutsideKeys.has(`language:${lang}`))
-              .map((lang) => (
-                <ChipButton
-                  key={`lang-selected-${lang}`}
-                  label={lang}
-                  active
-                  onClick={() => {
-                    toggleLanguage(lang);
-                    scrollToMoviesListing();
-                  }}
-                />
-              ))}
-            {selectedFormats
-              .filter((format) => !quickOutsideKeys.has(`format:${format}`))
-              .map((format) => (
-                <ChipButton
-                  key={`format-selected-${format}`}
-                  label={format}
-                  active
-                  onClick={() => {
-                    toggleFormat(format);
-                    scrollToMoviesListing();
-                  }}
-                />
-              ))}
-            {selectedGenres
-              .filter((genre) => !quickOutsideKeys.has(`genre:${genre}`))
-              .map((genre) => (
-                <ChipButton
-                  key={`genre-chip-${genre}`}
-                  label={genre}
-                  active
-                  onClick={() => {
-                    toggleGenre(genre);
-                    scrollToMoviesListing();
-                  }}
-                />
-              ))}
+        <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
+        <section className="sticky z-30 w-full bg-transparent" style={{ top: headerOffset }}>
+          <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
+            <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-4 pb-1">
+              <div className="mb-2">
+                <div className="flex items-center gap-2 pb-1 -mx-1 px-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterModalTab("language");
+                        setFiltersOpen(true);
+                      }}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] sm:text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                        selectedMovieFilterChips.length > 0 || filtersOpen
+                          ? "bg-slate-100 border-slate-400 text-slate-800"
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      {selectedMovieFilterChips.length > 0 ? (
+                        <span className="w-4 h-4 rounded-full text-[0.7rem] font-bold text-white flex items-center justify-center bg-[#6900AA]">
+                          {selectedMovieFilterChips.length}
+                        </span>
+                      ) : null}
+                      Filter
+                      <SlidersHorizontal size={14} className="text-slate-500" />
+                    </button>
+
+                    {selectedMovieFilterChips.map((chip) => (
+                      <span
+                        key={chip.key}
+                        className="shrink-0 inline-flex items-center gap-1.5 bg-[#f7e9ff] border border-[#e3bcff] text-[#6900AA] rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap"
+                      >
+                        {chip.label}
+                        <button
+                          type="button"
+                          onClick={chip.onClear}
+                          className="hover:bg-[#efd7ff] rounded-full p-0.5 transition-colors cursor-pointer"
+                          aria-label={`Remove ${chip.label}`}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+
+                    {quickOutsideChips
+                      .filter((chip) => {
+                        if (chip.type === "language") {
+                          return !selectedLanguages.includes(chip.value);
+                        }
+                        if (chip.type === "genre") {
+                          return !selectedGenres.includes(chip.value);
+                        }
+                        return !selectedFormats.includes(chip.value);
+                      })
+                      .map((chip) => (
+                        <ChipButton
+                          key={`${chip.type}-chip-${chip.value}`}
+                          label={chip.value}
+                          active={false}
+                          onClick={() => {
+                            if (chip.type === "language") toggleLanguage(chip.value);
+                            else if (chip.type === "genre") toggleGenre(chip.value);
+                            else toggleFormat(chip.value);
+                            scrollToMoviesListing();
+                          }}
+                        />
+                      ))}
+
+                    {hasActiveFilters ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearAll();
+                          scrollToMoviesListing();
+                        }}
+                        className="shrink-0 text-xs font-bold px-2 py-1.5 text-[#6900AA] transition-colors cursor-pointer hover:underline whitespace-nowrap"
+                      >
+                        Clear All
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
         <div className={`${CONTAINER} pt-5`}>
           {viewAll ? (
@@ -1450,7 +1508,7 @@ export default function MovieLandingPage() {
                 <ChevronLeft className="size-4" />
                 Back
               </button>
-              <h3 className="mb-4 text-lg font-extrabold text-slate-900 sm:mb-5 sm:text-xl md:text-2xl">
+              <h3 className="mb-4 text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight sm:mb-5">
                 {viewAllTitle}
               </h3>
               {viewAllMovies.length === 0 ? (
@@ -1542,32 +1600,40 @@ export default function MovieLandingPage() {
       </section>
 
       {filtersOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <button
             type="button"
             aria-label="Close filters"
             className="absolute inset-0 cursor-pointer bg-black/40"
             onClick={() => setFiltersOpen(false)}
           />
-          <div className="relative z-10 flex max-h-[88vh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl">
-            <div className="px-4 pb-3 pt-4">
-              <h3 className="text-lg font-bold text-slate-900">Filter by</h3>
+          <div className="relative w-full sm:w-[min(92vw,720px)] h-[min(88vh,540px)] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="text-xl font-bold text-slate-900">Filter</h3>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                className="p-1 rounded-full hover:bg-slate-100 cursor-pointer"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 pb-3">{districtFilterModalBody}</div>
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+            {districtFilterModalBody}
+            <div className="flex items-center justify-end gap-6 px-5 py-3.5 border-t border-slate-100 shrink-0">
               <button
                 type="button"
                 onClick={clearAll}
-                className="cursor-pointer text-sm font-medium text-slate-800 underline underline-offset-2"
+                className="text-base font-bold text-[#6900AA] cursor-pointer"
               >
-                Clear filters
+                Reset
               </button>
               <button
                 type="button"
                 onClick={applyFiltersAndClose}
-                className="cursor-pointer rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-900"
+                className="text-base font-bold text-[#6900AA] cursor-pointer"
               >
-                Apply Filters
+                Apply
               </button>
             </div>
           </div>

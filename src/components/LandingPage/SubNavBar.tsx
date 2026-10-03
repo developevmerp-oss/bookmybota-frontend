@@ -13,6 +13,7 @@ import {
   Ticket,
   Trophy,
   UtensilsCrossed,
+  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 import { HiArrowRight } from "react-icons/hi";
@@ -32,6 +33,14 @@ type SubNavTab = {
   match?: string;
   key?: string;
   variant?: "link" | "cta";
+};
+
+/** Mobile/tablet only — first tab, links to landing page (desktop unchanged). */
+const FOR_YOU_TAB: SubNavTab = {
+  label: "For you",
+  href: "/",
+  match: "home",
+  Icon: WandSparkles,
 };
 
 const TABS: SubNavTab[] = [
@@ -110,7 +119,7 @@ function ListYourShowCta({
   );
 }
 
-/** Landing scroll: hide after this Y; show only after returning near top (hysteresis). */
+/** Desktop landing scroll: hide after this Y; show only after returning near top (hysteresis). */
 const LANDING_HIDE_AFTER_Y = 140;
 const LANDING_SHOW_BELOW_Y = 56;
 
@@ -151,20 +160,26 @@ export default function SubNavBar() {
     };
 
     const syncFromScroll = () => {
+      // Mobile/tablet keep categories sticky with search (reference). Desktop landing can collapse.
+      if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+        applyHidden(false);
+        return;
+      }
       const y = window.scrollY;
       if (y <= LANDING_SHOW_BELOW_Y) {
         applyHidden(false);
       } else if (y >= LANDING_HIDE_AFTER_Y) {
         applyHidden(true);
       }
-      // Between thresholds: keep current state (hysteresis / no blink).
     };
 
     const frame = requestAnimationFrame(syncFromScroll);
     window.addEventListener("scroll", syncFromScroll, { passive: true });
+    window.addEventListener("resize", syncFromScroll, { passive: true });
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", syncFromScroll);
+      window.removeEventListener("resize", syncFromScroll);
     };
   }, [isLandingPage]);
 
@@ -175,6 +190,7 @@ export default function SubNavBar() {
   const ctaTab = TABS.find((t) => t.variant === "cta");
 
   const isTabActive = (item: SubNavTab) => {
+    if (item.match === "home") return isLandingPage;
     if (item.match === "dining") return onDining;
     if (item.match === "movie") return onMovies;
     if (item.match === "venues") return onVenues;
@@ -207,39 +223,86 @@ export default function SubNavBar() {
   };
 
   const collapsed = isLandingPage && hideOnScroll;
+  /** Mobile/tablet compact: titles only (icons hide) while sticky search+subnav stay. */
+  const [compactMobile, setCompactMobile] = useState(false);
+
+  useEffect(() => {
+    const COMPACT_AFTER_Y = 72;
+    const EXPAND_BELOW_Y = 24;
+    let compact = false;
+    const sync = () => {
+      const isMobileTablet =
+        typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+      if (!isMobileTablet) {
+        if (compact) {
+          compact = false;
+          setCompactMobile(false);
+        }
+        return;
+      }
+      const y = window.scrollY;
+      let next = compact;
+      if (y >= COMPACT_AFTER_Y) next = true;
+      else if (y <= EXPAND_BELOW_Y) next = false;
+      if (next === compact) return;
+      compact = next;
+      setCompactMobile(next);
+    };
+    sync();
+    window.addEventListener("scroll", sync, { passive: true });
+    window.addEventListener("resize", sync, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, [pathname]);
+
+  const renderTabLink = (item: SubNavTab, classNameExtra = "") => {
+    const { label, Icon } = item;
+    const active = isTabActive(item);
+    const href = tabHref(item, diningHref, categories);
+    return (
+      <Link
+        key={label}
+        href={href}
+        tabIndex={collapsed ? -1 : undefined}
+        className={`shrink-0 transition-colors whitespace-nowrap flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem] sm:min-w-[5.25rem] md:min-w-[5.75rem] h-full px-3 sm:px-3.5 rounded-xl text-[12px] sm:text-[13px] md:text-[14px] font-semibold tracking-wide lg:inline-flex lg:flex-row lg:items-center lg:gap-1.5 lg:h-8 lg:min-w-0 lg:rounded-full lg:px-2.5 lg:text-[12px] xl:text-[13px] lg:uppercase ${
+          active
+            ? "bg-[#6900AA] text-white shadow-sm"
+            : "text-[#57008E] hover:bg-[#EFD7FF] hover:text-[#6900AA]"
+        } ${classNameExtra}`}
+      >
+        <Icon
+          size={18}
+          strokeWidth={2.25}
+          className={`shrink-0 lg:!block lg:w-4 lg:h-4 transition-opacity duration-200 ${
+            compactMobile ? "hidden" : "block"
+          }`}
+          aria-hidden
+        />
+        <span className="leading-tight">{label}</span>
+      </Link>
+    );
+  };
 
   return (
     <nav
       aria-label="Browse categories"
       aria-hidden={collapsed}
-      className={`border-t bg-[#F7E9FF] overflow-hidden transition-[max-height,opacity,border-color] duration-300 ease-in-out ${
+      data-subnav-compact={compactMobile ? "1" : "0"}
+      className={`border-t bg-[#F7E9FF] overflow-hidden sticky top-0 z-[1] transition-[max-height,opacity,border-color,height] duration-300 ease-in-out ${
         collapsed
-          ? "max-h-0 opacity-0 border-transparent pointer-events-none"
-          : "max-h-12 h-12 opacity-100 border-[#E3BCFF]"
+          ? "max-h-0 opacity-0 border-transparent pointer-events-none lg:max-h-0"
+          : compactMobile
+            ? "max-h-11 h-11 opacity-100 border-[#E3BCFF] lg:max-h-12 lg:h-12"
+            : "max-h-[4.75rem] h-[4.75rem] opacity-100 border-[#E3BCFF] lg:max-h-12 lg:h-12"
       }`}
     >
-      <div className="container mx-auto px-4 md:px-5 lg:px-8 h-full flex items-center justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
-          {linkTabs.map((item) => {
-            const { label, Icon } = item;
-            const active = isTabActive(item);
-            const href = tabHref(item, diningHref, categories);
-            return (
-              <Link
-                key={label}
-                href={href}
-                tabIndex={collapsed ? -1 : undefined}
-                className={`inline-flex items-center gap-1.5 shrink-0 h-8 px-2.5 sm:px-3 rounded-full text-[12px] sm:text-[13px] font-semibold uppercase tracking-wide whitespace-nowrap transition-colors ${
-                  active
-                    ? "bg-[#6900AA] text-white shadow-sm"
-                    : "text-[#57008E] hover:bg-[#EFD7FF] hover:text-[#6900AA]"
-                }`}
-              >
-                <Icon size={16} strokeWidth={2.25} className="shrink-0" aria-hidden />
-                {label}
-              </Link>
-            );
-          })}
+      <div className="container mx-auto px-3 sm:px-4 md:px-5 lg:px-8 h-full flex items-center justify-between gap-2 sm:gap-3 lg:gap-4">
+        <div className="flex items-stretch gap-1.5 sm:gap-2 lg:gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden h-full py-1.5 lg:py-0 lg:items-center">
+          {/* Mobile/tablet only — wrapper wins over lg:inline-flex on the link */}
+          <span className="contents lg:hidden">{renderTabLink(FOR_YOU_TAB)}</span>
+          {linkTabs.map((item) => renderTabLink(item))}
         </div>
 
         {ctaTab ? (

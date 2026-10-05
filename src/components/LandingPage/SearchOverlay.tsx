@@ -387,7 +387,11 @@ export default function SearchOverlay({ open, city, onClose }: SearchOverlayProp
           </div>
         </div>
 
-        <div className="dining-search-popup__results border-t border-slate-100 max-h-[min(55vh,420px)] overflow-y-auto">
+        <div
+          data-scroll-lock-container
+          className="dining-search-popup__results border-t border-slate-100 max-h-[min(55vh,420px)] overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           <div className="px-4 sm:px-5 pt-4 pb-5">
             <p className="text-[15px] sm:text-base font-bold text-[#111111] mb-3">{listTitle}</p>
             {isLoadingEvents && query.trim() ? (

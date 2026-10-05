@@ -40,6 +40,7 @@ import {
 } from "@/lib/filterUrlSync";
 import { hasCityFilter, preferCityOrAll, shouldShowShowcaseCards } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
+import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
 import ListingPromoSlider, {
   useListingPromoCampaigns,
 } from "@/components/LandingPage/ListingPromoSlider";
@@ -1196,13 +1197,17 @@ export default function MovieLandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Landing-aligned marketing slider when paid MOVIES campaigns exist */}
-      {hasMoviePromoCampaigns ? (
-        <ListingPromoSlider category="MOVIES" city={city} moviesById={moviesById} />
-      ) : null}
+      {/* Top promo — same marketing + city logic / banner UI as dining & landing */}
+      <ListingPromoSlider category="MOVIES" city={city} moviesById={moviesById} />
+      <CategoryPromoBanners
+        category="MOVIES"
+        city={city || ""}
+        className="container mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+      />
 
-      {/* Native spotlight hero when no paid slider campaigns (keeps existing movies UI) */}
-      {!hasMoviePromoCampaigns && activeHeroSlide ? (
+      {/* District / native spotlight hero — disabled (Dining parity). Restore: remove `false &&`. */}
+      {false && (
+        !hasMoviePromoCampaigns && activeHeroSlide ? (
         <>
           {/* Mobile + tablet — featured cards (centered active + side peeks) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
@@ -1379,7 +1384,8 @@ export default function MovieLandingPage() {
             ) : null}
           </section>
         </>
-      ) : null}
+      ) : null
+      )}
 
       <MovieReleasesGrid title="Coming to the Screen" movies={comingSoonMovies} />
 

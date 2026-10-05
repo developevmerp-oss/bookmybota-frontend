@@ -28,6 +28,7 @@ import {
   useGetPublicEventFiltersQuery,
   useGetPublicEventsQuery,
   useGetPublicRegisteredArtistsQuery,
+  type MarketingCampaign,
   type PublicEvent,
   type PublicEventsQuery,
   type PublicRegisteredPartner,
@@ -54,6 +55,8 @@ import {
   preferCityOrAll,
 } from "@/components/LandingPage/homeUtils";
 import CitySectionEmptyNotice from "@/components/LandingPage/CitySectionEmptyNotice";
+import CategoryPromoBanners from "@/components/LandingPage/CategoryPromoBanners";
+import ListingPromoSlider from "@/components/LandingPage/ListingPromoSlider";
 import { RailPagerNav } from "@/components/LandingPage/RailChrome";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
@@ -65,6 +68,7 @@ import {
   resolveCategoryKeyFromSlug,
   type EventCategoryKey,
 } from "@/lib/eventCategories";
+import type { ListingPromoCategory } from "@/lib/listingPromoLogic";
 import { SHOWCASE_EVENT_CARDS, showcaseCardsForCategories } from "@/data/showcaseEventCards";
 import {
   setOrDeleteCsvParam,
@@ -93,6 +97,12 @@ const SORT_OPTIONS: Array<{ id: string; label: string }> = [
 ];
 const EVENT_RECENT_SEARCHES_KEY = "events_recent_searches";
 const MAX_RECENT_SEARCHES = 6;
+/** Must match backend `event.controller` date_presets labels (hydration-safe). */
+const DEFAULT_DATE_PRESETS = [
+  { id: "today", label: "Today" },
+  { id: "tomorrow", label: "Tomorrow" },
+  { id: "weekend", label: "This weekend" },
+] as const;
 
 function readEventRecentSearches(): string[] {
   if (typeof window === "undefined") return [];
@@ -1280,13 +1290,14 @@ export default function PublicEventsPage() {
 
   const cityOptions = useMemo(() => filterOptions?.cities ?? [], [filterOptions?.cities]);
 
-  const datePresets = filterOptions?.date_presets?.length
-    ? filterOptions.date_presets
-    : [
-        { id: "today", label: "Today" },
-        { id: "tomorrow", label: "Tomorrow" },
-        { id: "weekend", label: "This Weekend" },
-      ];
+  const datePresets = useMemo(() => {
+    const fromApi = filterOptions?.date_presets;
+    if (!fromApi?.length) return [...DEFAULT_DATE_PRESETS];
+    return fromApi.map((d) => {
+      const known = DEFAULT_DATE_PRESETS.find((x) => x.id === d.id);
+      return known ? { ...d, label: known.label } : d;
+    });
+  }, [filterOptions?.date_presets]);
   const moreOptions = filterOptions?.more?.length ? filterOptions.more : [];
 
   const activeCategoryKey = useMemo(() => {
@@ -1475,6 +1486,36 @@ export default function PublicEventsPage() {
 
   /** Selected city has zero events — show under event section titles (listing + category browse). */
   const cityHasNoEvents = hasCity && !catalogPending && events.length === 0;
+
+  /** Link context for listing promo CTAs (dining parity). */
+  const eventsById = useMemo(() => {
+    const map = new Map<string, PublicEvent>();
+    for (const event of [
+      ...listingEvents,
+      ...exploreEventPool,
+      ...offerHeroEvents,
+      ...posterFallbackEvents,
+    ]) {
+      if (event?.id) map.set(String(event.id), event);
+    }
+    return map;
+  }, [listingEvents, exploreEventPool, offerHeroEvents, posterFallbackEvents]);
+
+  /** Slider always queries EVENTS; sports/concert/etc. are filtered client-side by linked event. */
+  const listingPromoCategory: ListingPromoCategory = "EVENTS";
+  const listingPromoRailCategory = activeCategoryKey === "sports" ? "SPORTS" : "EVENTS";
+
+  const filterListingPromoCampaign = useCallback(
+    (campaign: MarketingCampaign) => {
+      if (!activeCategoryKey) return true;
+      const tid = String(campaign.target_id || "").trim();
+      if (!tid) return false;
+      const event = eventsById.get(tid);
+      if (!event) return false;
+      return eventMatchesCategoryKey(event, activeCategoryKey, categoryPool);
+    },
+    [activeCategoryKey, eventsById, categoryPool]
+  );
 
   /** District-style hero: city-scoped is_promoted first (landing parity — no cross-city filler). */
   const promoEvents = useMemo(() => {
@@ -2384,8 +2425,22 @@ export default function PublicEventsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Movie-style native hero (mobile feature cards + desktop blur banner) */}
-      {catalogPending && !activeHeroEvent ? (
+      {/* Top promo — same marketing + city logic / banner UI as dining & landing */}
+      <ListingPromoSlider
+        category={listingPromoCategory}
+        city={city || ""}
+        eventsById={eventsById}
+        filterCampaign={activeCategoryKey ? filterListingPromoCampaign : undefined}
+      />
+      <CategoryPromoBanners
+        category={listingPromoRailCategory}
+        city={city || ""}
+        className="container mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+      />
+
+      {/* District / native spotlight hero — disabled (Dining parity). Restore: remove `false &&`. */}
+      {false && (
+        catalogPending && !activeHeroEvent ? (
         <EventHeroShimmer />
       ) : activeHeroEvent ? (
         <>
@@ -2567,7 +2622,8 @@ export default function PublicEventsPage() {
             ) : null}
           </section>
         </>
-      ) : null}
+      ) : null
+      )}
 
       {!isCategoryBrowse ? (
         <>

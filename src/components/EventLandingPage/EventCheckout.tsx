@@ -2640,22 +2640,22 @@ export default function EventCheckout({
   const checkoutModals = (
     <>
       {isMapFullscreen && desiredSeatQty != null && (
-        <div className="fixed inset-0 z-[100] bg-[#F5F5F5] flex flex-col overflow-hidden">
-          <header className="shrink-0 bg-white border-b border-slate-200 shadow-sm">
-            <div className="px-3 sm:px-5 py-3 flex items-center gap-3">
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col overflow-hidden">
+          <header className="shrink-0 bg-white border-b border-slate-200">
+            <div className="px-3 sm:px-4 py-1.5 flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsMapFullscreen(false)}
-                className="h-10 w-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-700 cursor-pointer hover:bg-slate-50 shrink-0"
+                className="h-8 w-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-700 cursor-pointer hover:bg-slate-50 shrink-0"
                 aria-label="Back from seating map"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={16} />
               </button>
               <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-[1.0625rem] sm:text-[1.1875rem] text-slate-900 truncate">
+                <h3 className="font-bold text-[0.9375rem] text-slate-900 truncate leading-tight">
                   {event.name}
                 </h3>
-                <p className="text-[0.8125rem] sm:text-[0.875rem] text-slate-500 truncate">
+                <p className="text-[0.6875rem] text-slate-500 truncate leading-tight">
                   {[
                     selectedShowtime?.venue_name,
                     selectedShowtime?.starts_at
@@ -2666,93 +2666,87 @@ export default function EventCheckout({
                     .join(" · ")}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setDesiredSeatQty(null);
-                  setSelectedSeats([]);
-                  setIsMapFullscreen(false);
-                }}
-                className="hidden sm:inline-flex text-[0.8125rem] font-semibold text-[#6900AA] hover:underline cursor-pointer shrink-0"
-              >
-                Change count
-              </button>
-            </div>
-            <div className="px-3 sm:px-5 pb-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-2 shrink-0">
+                {!isStadiumLayout && (
+                  <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-md border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setSeatViewMode("canvas")}
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        seatViewMode === "canvas"
+                          ? "bg-[#6900AA] text-white shadow-sm"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      <MapIcon className="size-3" />
+                      <span className="hidden sm:inline">Map</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSeatViewMode("grid")}
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        seatViewMode === "grid"
+                          ? "bg-[#6900AA] text-white shadow-sm"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      <LayoutGrid className="size-3" />
+                      <span className="hidden sm:inline">Grid</span>
+                    </button>
+                  </div>
+                )}
+                <p className="text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
+                  {selectedSeats.length}/{desiredSeatQty}
+                </p>
                 <button
                   type="button"
-                  onClick={() => setSeatViewMode("canvas")}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    seatViewMode === "canvas"
-                      ? "bg-[#6900AA] text-white shadow-sm"
-                      : "text-slate-500 hover:text-slate-900 hover:bg-white"
-                  }`}
+                  onClick={() => {
+                    setDesiredSeatQty(null);
+                    setSelectedSeats([]);
+                    setIsMapFullscreen(false);
+                  }}
+                  className="hidden sm:inline-flex text-[0.6875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                 >
-                  <MapIcon className="size-3.5" />
-                  <span>Map</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSeatViewMode("grid")}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    seatViewMode === "grid"
-                      ? "bg-[#6900AA] text-white shadow-sm"
-                      : "text-slate-500 hover:text-slate-900 hover:bg-white"
-                  }`}
-                >
-                  <LayoutGrid className="size-3.5" />
-                  <span>Grid View</span>
+                  Change
                 </button>
               </div>
-              <p className="text-[0.8125rem] sm:text-[0.875rem] text-slate-600 font-medium">
-                Select exactly{" "}
-                <span className="text-slate-900 font-extrabold">{desiredSeatQty}</span> seat
-                {desiredSeatQty === 1 ? "" : "s"}
-                <span className="text-[#6900AA] font-bold">
-                  {" "}
-                  · {selectedSeats.length}/{desiredSeatQty}
-                </span>
-              </p>
             </div>
           </header>
 
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            {seatViewMode === "canvas" ? (
-              <div className="flex-1 min-h-0 p-2 sm:p-4">
-                <div className="h-full w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
-                  {isStadiumLayout ? (
-                    // Sports stadium: 3-level hierarchical drill-down viewer
-                    <StadiumLayoutViewer
-                      eventId={event.id}
-                      ticketTypes={ticketTypes.map((t: any) => ({
-                        id: t.ticket_type_id ?? t.id,
-                        name: t.ticket_type ?? t.name,
-                        price: t.price,
-                      }))}
-                      onSeatsSelected={handleMapSeatsSelected}
-                      initialSelectedSeats={selectedSeats}
-                      maxSelectable={desiredSeatQty}
-                    />
-                  ) : (
-                    // All other events: flat canvas viewer (cinema, theatre, venue)
-                    <VenueLayoutViewer
-                      layoutData={activeLayoutData}
-                      ticketTypes={ticketTypes}
-                      onSeatsSelected={handleMapSeatsSelected}
-                      initialSelectedSeats={selectedSeats}
-                      maxSelectable={desiredSeatQty}
-                      cinemaMode
-                      mapTitle="Event seating map"
-                      mapDescription={`Live seating layout for this event. Pick up to ${desiredSeatQty} seats directly on the map.`}
-                      customLegend={ticketTypes.map((t) => ({
-                        name: t.ticket_type,
-                        color: "#6900AA",
-                        price: Number(t.price) || 0,
-                      }))}
-                    />
-                  )}
-                </div>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#F8FAFC]">
+            {seatViewMode === "canvas" || isStadiumLayout ? (
+              <div className="flex-1 min-h-0">
+                {isStadiumLayout ? (
+                  <StadiumLayoutViewer
+                    eventId={event.id}
+                    ticketTypes={ticketTypes.map((t: any) => ({
+                      id: t.ticket_type_id ?? t.id,
+                      name: t.ticket_type ?? t.name,
+                      price: t.price,
+                    }))}
+                    onSeatsSelected={handleMapSeatsSelected}
+                    initialSelectedSeats={selectedSeats}
+                    maxSelectable={desiredSeatQty}
+                    hideBookingBar
+                  />
+                ) : (
+                  <VenueLayoutViewer
+                    layoutData={activeLayoutData}
+                    ticketTypes={ticketTypes}
+                    onSeatsSelected={handleMapSeatsSelected}
+                    initialSelectedSeats={selectedSeats}
+                    maxSelectable={desiredSeatQty}
+                    cinemaMode
+                    hideSidePanel
+                    mapTitle="Event seating map"
+                    mapDescription={`Live seating layout for this event. Pick up to ${desiredSeatQty} seats directly on the map.`}
+                    customLegend={ticketTypes.map((t) => ({
+                      name: t.ticket_type,
+                      color: "#6900AA",
+                      price: Number(t.price) || 0,
+                    }))}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-5 py-4">
@@ -2889,14 +2883,23 @@ export default function EventCheckout({
             )}
           </div>
 
-          <footer className="shrink-0 bg-white border-t border-slate-200 px-4 sm:px-6 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(15,23,42,0.08)]">
+          <footer className="shrink-0 bg-white border-t border-slate-200 px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.1)]">
             <div className="max-w-5xl mx-auto flex items-center gap-3 sm:gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-[0.875rem] text-slate-500">
-                  {selectedSeats.length}/{desiredSeatQty} seat
-                  {desiredSeatQty === 1 ? "" : "s"} selected
+                <p className="text-[0.75rem] sm:text-[0.8125rem] text-slate-500 font-medium">
+                  {selectedSeats.length === 0
+                    ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
+                    : `${selectedSeats.length}/${desiredSeatQty} selected`}
                 </p>
-                <p className="text-[1.25rem] sm:text-[1.375rem] font-extrabold text-slate-900 leading-tight">
+                {selectedSeats.length > 0 && (
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {selectedSeats
+                      .map((s: any) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`)
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+                <p className="text-[1.25rem] sm:text-[1.375rem] font-extrabold text-slate-900 leading-tight mt-0.5">
                   {formatMoney(ticketAmount, { compact: true })}
                 </p>
               </div>
@@ -2915,7 +2918,7 @@ export default function EventCheckout({
                 }}
                 className={`min-w-[9.5rem] sm:min-w-[12rem] px-5 py-3.5 ${accentBtn} text-white font-bold text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-[#E3BCFF] disabled:cursor-not-allowed`}
               >
-                Continue
+                {selectedSeats.length === desiredSeatQty ? "Continue" : "Select seats"}
               </button>
             </div>
           </footer>

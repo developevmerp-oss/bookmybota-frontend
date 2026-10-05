@@ -1,6 +1,6 @@
 /* Landing promo carousel — height for layout; width locks to partner crop aspect (3:1) */
 .promo-banner-swiper {
-  --promo-h: 250px;
+  --promo-h: 200px; /* mobile only — slightly shorter than before */
   --promo-aspect: 3; /* must match LANDING_PROMO_BANNER_ASPECT / partner crop */
   --promo-slide-w: min(92%, calc(var(--promo-h) * var(--promo-aspect)));
   --promo-peek-gap: 0.5rem;
@@ -51,44 +51,41 @@
   }
 }
 
-/* MacBook / short laptop viewports — free space for “The Best of Live Events” */
-@media (min-width: 1024px) and (max-height: 900px) {
-  .promo-banner-swiper {
-    --promo-h: 320px;
-  }
-}
+/*
+ * Laptop / desktop keep the main --promo-h values above (380 / 400 / 440).
+ * Do not shrink by viewport height — that made MacBook/laptop shorter than before.
+ */
 
-@media (min-width: 1280px) and (max-height: 900px) {
-  .promo-banner-swiper {
-    --promo-h: 340px;
-  }
-}
-
-@media (min-width: 1536px) and (max-height: 900px) {
-  .promo-banner-swiper {
-    --promo-h: 360px;
-  }
-}
-
-/* One slide: keep the same 3:1 frame, pad page edges */
+/*
+ * One slide: fill the content row (same horizontal inset as site container).
+ * Do NOT cap width at height×aspect — that left large empty side gaps on tablet/desktop.
+ */
 .promo-banner-swiper.is-single {
-  --promo-slide-w: min(100%, calc(var(--promo-h) * var(--promo-aspect)));
-  padding-left: 1rem;
-  padding-right: 1rem;
+  --promo-slide-w: 100%;
+  padding-left: 1.25rem; /* px-5 */
+  padding-right: 1.25rem;
   box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
   .promo-banner-swiper.is-single {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    padding-left: 2.5rem; /* sm:px-10 */
+    padding-right: 2.5rem;
   }
 }
 
 @media (min-width: 1024px) {
   .promo-banner-swiper.is-single {
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-left: 2.5rem; /* lg:px-10 */
+    padding-right: 2.5rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .promo-banner-swiper.is-single {
+    /* Match container mx-auto feel on ultra-wide without looking skinny */
+    padding-left: max(2.5rem, calc((100% - 80rem) / 2));
+    padding-right: max(2.5rem, calc((100% - 80rem) / 2));
   }
 }
 
@@ -97,9 +94,10 @@
   max-width: none;
   margin-left: 0;
   margin-right: 0;
-  display: flex;
-  justify-content: center;
+  display: block;
 }
+
+/* Single slide keeps the same --promo-h breakpoints as multi / Dining listing. */
 
 .promo-banner-frame {
   overflow: visible;

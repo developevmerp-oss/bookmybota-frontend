@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type TransitionEvent,
 } from "react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";

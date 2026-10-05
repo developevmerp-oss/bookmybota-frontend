@@ -455,8 +455,8 @@ export default function CinemaScreensPage() {
         </h2>
         <p className="text-sm text-zinc-400 mt-1">
           Create screens with Regular / Recliner / Couple seat counts, request a seat layout once, then
-          track progress. After Super Admin publishes a map, you can approve it, set movie seat prices,
-          and block seats — layout geometry stays locked.
+          track progress. After Super Admin publishes a map, you can review, approve, and manage physical seats —
+          ticket prices are configured showtime-wise when scheduling movies.
         </p>
       </div>
 

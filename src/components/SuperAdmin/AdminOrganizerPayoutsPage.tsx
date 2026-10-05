@@ -25,6 +25,11 @@ import {
   useGetAdminCinemaSettlementsPendingQuery,
   useGetAdminCinemaSettlementsQuery,
   useGetAdminDiningGiftCardRedemptionsQuery,
+  useGetAdminDiningSettlementsQuery,
+  useGetAdminDiningPendingSettlementsQuery,
+  useGenerateAdminDiningSettlementMutation,
+  useGetAdminDiningSettlementDetailQuery,
+  usePatchAdminDiningSettlementRunMutation,
   useGetOrganizerPayoutsQuery,
   useGetOrganizerSettlementQuery,
   useGetOrganizerSettlementsQuery,
@@ -34,6 +39,8 @@ import {
   usePatchOrganizerSettlementMutation,
   type DiningGiftCardRedemptionRow,
   type OrganizerSettlementRun,
+  type DiningSettlementRun,
+  type DiningSettlementLine,
 } from "@/services/api";
 import { formatDate, formatDateTime12h, toDateOnlyParam } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
@@ -128,6 +135,16 @@ const cinemaGenerateSchema = yup.object({
 });
 
 type CinemaGenerateValues = yup.InferType<typeof cinemaGenerateSchema>;
+
+const diningGenerateSchema = yup.object({
+  business_id: yup.string().required("Select a restaurant"),
+  period_from: yup.string().optional(),
+  period_to: yup.string().optional(),
+  commission_percent: yup.number().min(0).max(100).default(5.0),
+  notes: yup.string().max(500).optional(),
+});
+
+type DiningGenerateValues = yup.InferType<typeof diningGenerateSchema>;
 
 const EMPTY_MANUAL: AdminPayoutValues = {
   business_id: "",
@@ -742,6 +759,222 @@ function CinemaSettlementDetailPanel({
   );
 }
 
+function DiningSettlementDetailPanel({
+  runId,
+  onClose,
+}: {
+  runId: string;
+  onClose: () => void;
+}) {
+  const { data: detailData, isLoading } = useGetAdminDiningSettlementDetailQuery(runId);
+  const run = detailData?.data;
+  const [patchSettlement, { isLoading: patching }] =
+    usePatchAdminDiningSettlementRunMutation();
+  const [paymentRef, setPaymentRef] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    setNotes(run?.notes || "");
+    setPaymentRef(run?.payment_reference || "");
+  }, [run?.notes, run?.payment_reference, runId]);
+
+  const act = async (status: "APPROVED" | "PAID" | "CANCELLED") => {
+    if (status === "PAID" && !paymentRef.trim()) {
+      toast.error("Add a payment reference before marking paid");
+      return;
+    }
+    if (status === "CANCELLED") {
+      const ok = window.confirm(
+        "Cancel this dining settlement? Redemptions will become unsettled and can enter a new run."
+      );
+      if (!ok) return;
+    }
+    try {
+      const res = await patchSettlement({
+        id: runId,
+        status,
+        notes: notes.trim() || undefined,
+        payment_reference: paymentRef.trim() || undefined,
+      }).unwrap();
+      toast.success(res.message || "Dining settlement updated");
+      if (status === "CANCELLED" || status === "PAID") onClose();
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to update dining settlement"));
+    }
+  };
+
+  const status = (run?.status || "").toUpperCase();
+  const canAct = status === "DRAFT" || status === "APPROVED";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-[2px]">
+      <div className="glass-panel rounded-t-2xl sm:rounded-2xl border border-white/10 w-full max-w-4xl max-h-[92vh] overflow-y-auto p-5 space-y-4 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Dining Gift-Card Settlement Run</h3>
+            <p className="text-xs text-zinc-400 mt-1">
+              Automated platform commission, 15% VAT on commission, and 2% statutory Withholding Tax (WHT) deduction to Ethiopian MOR.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-semibold text-zinc-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+
+        {isLoading || !run ? (
+          <div className="flex items-center gap-2 py-10 text-zinc-400 justify-center">
+            <Loader2 className="animate-spin" size={18} /> Loading…
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+              <div className="flex items-center gap-2">
+                {statusBadge(run.status)}
+                <span className="text-sm text-white font-semibold">{run.restaurant_name}</span>
+                {run.legal_business_name && run.legal_business_name !== run.restaurant_name && (
+                  <span className="text-xs text-zinc-400">({run.legal_business_name})</span>
+                )}
+                {run.tin_number && (
+                  <span className="text-xs font-mono text-zinc-400 bg-white/5 px-2 py-0.5 rounded">TIN: {run.tin_number}</span>
+                )}
+              </div>
+              <span className="text-xs text-zinc-400">
+                Period: {formatDate(run.period_from)} – {formatDate(run.period_to)}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <StatCard
+                label="Gross Redemptions"
+                value={money(run.gross_dining)}
+                hint={`${run.redemptions_count} gift cards`}
+                accent="text-white"
+              />
+              <StatCard
+                label="Platform Comm Base"
+                value={`−${money(run.commission_total)}`}
+                hint="Platform service fee"
+                accent="text-amber-400"
+              />
+              <StatCard
+                label="Comm VAT (15%)"
+                value={`−${money(run.commission_vat)}`}
+                hint="Output VAT to MOR"
+                accent="text-rose-400"
+              />
+              <StatCard
+                label="WHT Withheld (2%)"
+                value={`−${money(run.wht_total)}`}
+                hint="Remitted on behalf of biz"
+                accent="text-sky-400"
+              />
+              <StatCard
+                label="Net Paid to Restaurant"
+                value={money(run.restaurant_payable)}
+                hint="Bank disbursement"
+                accent="text-emerald-400"
+              />
+            </div>
+
+            {canAct && (
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-end p-3 bg-zinc-900/60 border border-white/10 rounded-xl">
+                <div className="flex-1">
+                  <label className="block text-xs text-zinc-400 mb-1">
+                    Bank payment reference (required for Mark paid)
+                  </label>
+                  <input
+                    value={paymentRef}
+                    onChange={(e) => setPaymentRef(e.target.value)}
+                    placeholder="e.g. CBE-TX-9912048 or Telebirr ref"
+                    className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {status === "DRAFT" && (
+                    <button
+                      type="button"
+                      disabled={patching}
+                      onClick={() => void act("APPROVED")}
+                      className="px-3.5 py-2 rounded-lg text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50 cursor-pointer"
+                    >
+                      Approve Run
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={patching}
+                    onClick={() => void act("PAID")}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 cursor-pointer"
+                  >
+                    {patching ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                    Mark Paid &amp; Issue MOR Invoice
+                  </button>
+                  <button
+                    type="button"
+                    disabled={patching}
+                    onClick={() => void act("CANCELLED")}
+                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 cursor-pointer"
+                  >
+                    Cancel Run
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {status === "PAID" && (
+              <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 flex flex-wrap items-center justify-between gap-2">
+                <span>Disbursed Ref: <strong className="font-mono text-white">{run.payment_reference || "N/A"}</strong></span>
+                <span>Paid At: {formatDateTime12h(run.paid_at || run.updated_at)}</span>
+              </div>
+            )}
+
+            <div className="overflow-x-auto rounded-xl border border-white/5">
+              <table className="w-full text-left text-sm min-w-[720px]">
+                <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                  <tr>
+                    <th className="px-3 py-2.5 font-semibold">Gift Card / Guest</th>
+                    <th className="px-3 py-2.5 font-semibold">Bill Amount</th>
+                    <th className="px-3 py-2.5 font-semibold">Redeemed GC</th>
+                    <th className="px-3 py-2.5 font-semibold">Comm Base</th>
+                    <th className="px-3 py-2.5 font-semibold">Restaurant Share</th>
+                    <th className="px-3 py-2.5 font-semibold">Redeemed At</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {(run.lines || []).map((line: DiningSettlementLine) => (
+                    <tr key={line.id}>
+                      <td className="px-3 py-2.5">
+                        <p className="text-white font-mono text-xs">****{line.code_last4}</p>
+                        <p className="text-xs text-zinc-400">{line.guest_name || line.product_name || "Gift Card"}</p>
+                      </td>
+                      <td className="px-3 py-2.5 text-zinc-300">{money(line.bill_amount)}</td>
+                      <td className="px-3 py-2.5 font-semibold text-white">{money(line.gift_card_amount)}</td>
+                      <td className="px-3 py-2.5 text-amber-400">−{money(line.commission_total)}</td>
+                      <td className="px-3 py-2.5 font-semibold text-emerald-400">{money(line.restaurant_payout)}</td>
+                      <td className="px-3 py-2.5 text-xs text-zinc-500">{formatDate(line.redemption_created_at || line.redeemed_at)}</td>
+                    </tr>
+                  ))}
+                  {(run.lines || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-zinc-500 text-sm">
+                        No redemption lines on this run.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function parseTab(raw: string | null): PageTab {
   if (raw === "dining" || raw === "history" || raw === "events" || raw === "movies") return raw;
   if (raw === "settlements") return "events";
@@ -773,6 +1006,14 @@ export default function AdminOrganizerPayoutsPage() {
   const [selectedCinemaRunId, setSelectedCinemaRunId] = useState<string | null>(null);
   const [settlingCinemaId, setSettlingCinemaId] = useState<string | null>(null);
   const [showCinemaGenerate, setShowCinemaGenerate] = useState(false);
+
+  type DiningWorkspace = "runs" | "queue" | "redemptions";
+  const [diningWorkspace, setDiningWorkspace] = useState<DiningWorkspace>("runs");
+  const [diningRestaurantFilter, setDiningRestaurantFilter] = useState("");
+  const [diningRunStatusFilter, setDiningRunStatusFilter] = useState("ALL");
+  const [selectedDiningRunId, setSelectedDiningRunId] = useState<string | null>(null);
+  const [settlingDiningId, setSettlingDiningId] = useState<string | null>(null);
+  const [showDiningGenerate, setShowDiningGenerate] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit] = useState(PAGE_SIZE);
@@ -885,6 +1126,36 @@ export default function AdminOrganizerPayoutsPage() {
       { skip: pageTab !== "dining" }
     );
 
+  const {
+    data: diningPendingData,
+    isLoading: diningPendingLoading,
+    isError: diningPendingError,
+    refetch: refetchDiningPending,
+  } = useGetAdminDiningPendingSettlementsQuery(
+    diningRestaurantFilter ? { business_id: diningRestaurantFilter } : undefined,
+    { skip: pageTab !== "dining" }
+  );
+
+  const {
+    data: diningSettlementsData,
+    isLoading: diningSettlementsLoading,
+    isFetching: diningSettlementsFetching,
+    refetch: refetchDiningSettlements,
+  } = useGetAdminDiningSettlementsQuery(
+    {
+      page,
+      limit,
+      ...(diningRestaurantFilter ? { business_id: diningRestaurantFilter } : {}),
+      ...(diningRunStatusFilter !== "ALL" ? { status: diningRunStatusFilter } : {}),
+    },
+    { skip: pageTab !== "dining" }
+  );
+
+  const { data: diningPaidRunsData } = useGetAdminDiningSettlementsQuery(
+    { status: "PAID" },
+    { skip: pageTab !== "history" }
+  );
+
   const { data: diningPaidHistory } = useGetAdminDiningGiftCardRedemptionsQuery(
     { page: 1, limit: 20, status: "PAID" },
     { skip: pageTab !== "history" }
@@ -901,6 +1172,10 @@ export default function AdminOrganizerPayoutsPage() {
   const diningMeta = diningData?.meta;
   const diningSummary = diningData?.summary;
   const diningPaidRows = diningPaidHistory?.items ?? [];
+  const diningRuns = diningSettlementsData?.items ?? [];
+  const diningRunsMeta = diningSettlementsData?.meta;
+  const diningPendingList = diningPendingData?.by_restaurant ?? [];
+  const diningPaidRuns = diningPaidRunsData?.items ?? [];
   const cinemaPending = cinemaPendingData as CinemaPendingRow[];
   const cinemaSettlements = cinemaSettlementsData as CinemaSettlementRun[];
   const cinemaPaidHistory = cinemaPaidHistoryData as CinemaSettlementRun[];
@@ -909,6 +1184,8 @@ export default function AdminOrganizerPayoutsPage() {
     useGenerateOrganizerSettlementMutation();
   const [generateCinemaSettlement, { isLoading: generatingCinema }] =
     useGenerateAdminCinemaSettlementMutation();
+  const [generateDiningSettlement, { isLoading: generatingDining }] =
+    useGenerateAdminDiningSettlementMutation();
   const [createPayout, { isLoading: savingManual }] = useCreateOrganizerPayoutMutation();
   const [patchDiningSettlement] = usePatchAdminDiningGiftCardSettlementMutation();
   const [settlingBizId, setSettlingBizId] = useState<string | null>(null);
@@ -935,6 +1212,18 @@ export default function AdminOrganizerPayoutsPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: yupResolver(cinemaGenerateSchema) as any,
     defaultValues: { business_id: "", period_from: "", period_to: "", notes: "" },
+  });
+
+  const {
+    register: registerDiningGen,
+    handleSubmit: handleDiningGenerate,
+    reset: resetDiningGen,
+    setValue: setDiningGenValue,
+    formState: { errors: diningGenErrors },
+  } = useForm<DiningGenerateValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: yupResolver(diningGenerateSchema) as any,
+    defaultValues: { business_id: "", period_from: "", period_to: "", commission_percent: 5.0, notes: "" },
   });
 
   const {
@@ -1135,12 +1424,64 @@ export default function AdminOrganizerPayoutsPage() {
     }
   };
 
+  const onDiningGenerate = async (values: DiningGenerateValues) => {
+    try {
+      const res = await generateDiningSettlement({
+        business_id: values.business_id,
+        ...(values.period_from?.trim() ? { period_from: values.period_from.trim() } : {}),
+        ...(values.period_to?.trim() ? { period_to: values.period_to.trim() } : {}),
+        commission_percent: values.commission_percent,
+        notes: values.notes?.trim() || undefined,
+      }).unwrap();
+      toast.success(res.message || "Dining settlement created");
+      setSelectedDiningRunId(res.data?.id || null);
+      setShowDiningGenerate(false);
+      resetDiningGen({ business_id: values.business_id, period_from: "", period_to: "", commission_percent: 5.0, notes: "" });
+      setDiningWorkspace("runs");
+      await Promise.all([refetchDiningPending(), refetchDiningSettlements()]);
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to generate dining settlement"));
+    }
+  };
+
+  const settleDiningNow = async (row: { business_id: string; period_from?: string; period_to?: string }) => {
+    setSettlingDiningId(row.business_id);
+    try {
+      const res = await generateDiningSettlement({
+        business_id: row.business_id,
+        ...(row.period_from ? { period_from: toDateOnlyParam(row.period_from) || undefined } : {}),
+        ...(row.period_to ? { period_to: toDateOnlyParam(row.period_to) || undefined } : {}),
+      }).unwrap();
+      toast.success(res.message || "Dining settlement created");
+      setDiningWorkspace("runs");
+      setSelectedDiningRunId(res.data?.id || null);
+      setShowDiningGenerate(false);
+      await Promise.all([refetchDiningPending(), refetchDiningSettlements()]);
+    } catch (err) {
+      toast.error(extractApiError(err, "Failed to generate dining settlement"));
+    } finally {
+      setSettlingDiningId(null);
+    }
+  };
+
+  const prefillDiningGenerate = (row: { business_id: string; period_from?: string; period_to?: string }) => {
+    setDiningWorkspace("runs");
+    setShowDiningGenerate(true);
+    setDiningGenValue("business_id", row.business_id);
+    setDiningGenValue("period_from", toDateOnlyParam(row.period_from) || "");
+    setDiningGenValue("period_to", toDateOnlyParam(row.period_to) || "");
+    setDiningGenValue("commission_percent", 5.0);
+    setDiningGenValue("notes", "");
+  };
+
   const switchTab = (tab: PageTab) => {
     setPageTab(tab);
     setPage(1);
     setSelectedRunId(null);
     setSelectedCinemaRunId(null);
     setShowCinemaGenerate(false);
+    setSelectedDiningRunId(null);
+    setShowDiningGenerate(false);
     router.replace(`/admin/organizer-payouts?tab=${tab}`, { scroll: false });
   };
 
@@ -1937,196 +2278,515 @@ export default function AdminOrganizerPayoutsPage() {
 
       {pageTab === "dining" && (
         <>
-          <AdminCallout tone="amber">
-            Restaurant payable = gift card amount redeemed at POS.{" "}
-            <span className="font-semibold">Pending → Approve → Mark paid</span>. Cancel
-            restores the guest balance.
-          </AdminCallout>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              label="Pending payable"
-              value={money(diningSummary?.pending_amount || 0)}
-              hint={`${diningSummary?.pending_count || 0} redemptions`}
-              accent="text-emerald-600"
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <AdminSegmentedTabs
+              size="sm"
+              tabs={[
+                {
+                  key: "runs",
+                  label: "Settlement runs",
+                  count: diningRuns.length,
+                },
+                {
+                  key: "queue",
+                  label: "To settle",
+                  count: diningPendingList.length,
+                },
+                {
+                  key: "redemptions",
+                  label: "Redemptions queue",
+                  count: diningSummary?.pending_count,
+                },
+              ]}
+              active={diningWorkspace}
+              onChange={(key) => {
+                setDiningWorkspace(key as DiningWorkspace);
+                if (key !== "runs") setShowDiningGenerate(false);
+              }}
             />
-            <StatCard
-              label="Approved"
-              value={money(diningSummary?.approved_amount || 0)}
-              hint={`${diningSummary?.approved_count || 0} ready to pay`}
-              accent="text-emerald-600"
-            />
-            <StatCard
-              label="Paid to restaurants"
-              value={money(diningSummary?.paid_amount || 0)}
-              hint={`${diningSummary?.paid_count || 0} settled`}
-              accent="text-emerald-600"
-            />
-            <StatCard
-              label="Cancelled"
-              value={String(diningSummary?.cancelled_count || 0)}
-              hint="Balance restored to guests"
-              accent="text-rose-300"
-            />
-          </div>
-
-          <AdminSegmentedTabs
-            size="sm"
-            tabs={DINING_STATUS_TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              count:
-                t.key === "PENDING"
-                  ? diningSummary?.pending_count
-                  : t.key === "APPROVED"
-                    ? diningSummary?.approved_count
-                    : t.key === "PAID"
-                      ? diningSummary?.paid_count
-                      : t.key === "CANCELLED"
-                        ? diningSummary?.cancelled_count
-                        : undefined,
-            }))}
-            active={diningStatus}
-            onChange={(key) => {
-              setDiningStatus(key);
-              setPage(1);
-            }}
-          />
-
-          <AdminFilterBar>
-              <div className="flex-1">
-                <SearchInput
-                  value={diningQ}
-                  onChange={(v) => {
-                    setDiningQ(v);
-                    setPage(1);
-                  }}
-                  placeholder="Search restaurant, guest, last4…"
-                />
-              </div>
-              <select
-                value={diningBusinessId}
-                onChange={(e) => {
-                  setDiningBusinessId(e.target.value);
-                  setPage(1);
-                }}
-                className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white min-w-[220px]"
+            {diningWorkspace === "runs" && (
+              <button
+                type="button"
+                onClick={() => setShowDiningGenerate((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm shadow-rose-900/30 transition-all self-start sm:self-auto cursor-pointer"
               >
-                <option value="">All restaurants</option>
-                {restaurantOptions.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="date"
-                value={diningFrom}
-                onChange={(e) => {
-                  setDiningFrom(e.target.value);
-                  setPage(1);
-                }}
-                className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
-                aria-label="From date"
-              />
-              <input
-                type="date"
-                value={diningTo}
-                onChange={(e) => {
-                  setDiningTo(e.target.value);
-                  setPage(1);
-                }}
-                className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
-                aria-label="To date"
-              />
-          </AdminFilterBar>
-
-          <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
-            {diningLoading ? (
-              <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
-                <Loader2 className="animate-spin" size={18} /> Loading dining payables…
-              </div>
-            ) : diningError ? (
-              <p className="text-center text-rose-400 py-16">Could not load dining settlements.</p>
-            ) : diningRows.length === 0 ? (
-              <AdminEmptyState
-                icon={Store}
-                title="No redemptions match these filters"
-                description="Redeem a gift card at dining POS to create a payable here."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">Restaurant</th>
-                      <th className="px-4 py-3 font-semibold">Gift card</th>
-                      <th className="px-4 py-3 font-semibold">Bill / GC / Guest pays</th>
-                      <th className="px-4 py-3 font-semibold">Payable</th>
-                      <th className="px-4 py-3 font-semibold">Status</th>
-                      <th className="px-4 py-3 font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {diningRows.map((row) => {
-                      const busy = busyDiningId === row.id;
-                      return (
-                        <tr key={row.id} className="hover:bg-white/[0.02]">
-                          <td className="px-4 py-3 align-top">
-                            <p className="font-semibold text-white">{row.business_name || "—"}</p>
-                            <p className="text-xs text-zinc-500 mt-0.5">
-                              {row.redeemed_at
-                                ? formatDateTime12h(row.redeemed_at)
-                                : "—"}
-                            </p>
-                            {(row.guest_name || row.guest_phone) && (
-                              <p className="text-xs text-zinc-400 mt-1">
-                                {[row.guest_name, row.guest_phone].filter(Boolean).join(" · ")}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <p className="text-white font-mono text-xs">****{row.code_last4}</p>
-                            <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">
-                              {row.product_name || "Gift Card"}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 align-top text-xs text-emerald-600 space-y-0.5">
-                            <p>Bill {money(row.bill_amount)}</p>
-                            <p>
-                              GC −{money(row.gift_card_amount)}
-                            </p>
-                            <p>Guest {money(row.customer_payable)}</p>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            <p className="font-bold text-emerald-600">
-                              {money(row.settlement_amount ?? row.gift_card_amount)}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 align-top">
-                            {statusBadge(row.settlement_status)}
-                            {row.settled_at && (
-                              <p className="text-[10px] text-zinc-500 mt-1">
-                                {formatDate(row.settled_at)}
-                              </p>
-                            )}
-                          </td>
-                          <DiningSettlementRowActions
-                            key={`${row.id}-${row.settlement_status}-${row.settlement_notes || ""}-${row.payment_reference || ""}`}
-                            row={row}
-                            busy={busy}
-                            onUpdate={updateDiningStatus}
-                          />
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                <Plus size={14} />
+                {showDiningGenerate ? "Hide generate" : "Generate settlement"}
+              </button>
             )}
           </div>
 
-          {diningMeta && <Pagination meta={diningMeta} onPageChange={setPage} />}
+          {diningWorkspace === "queue" && (
+            <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/5">
+                <h3 className="text-sm font-bold text-white">Pending by restaurant</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Dining POS gift-card redemptions that have not yet been batched into a settlement run.
+                </p>
+              </div>
+              {diningPendingLoading ? (
+                <div className="flex items-center justify-center gap-2 py-10 text-zinc-400">
+                  <Loader2 className="animate-spin" size={16} /> Loading pending…
+                </div>
+              ) : diningPendingList.length === 0 ? (
+                <p className="px-4 py-8 text-center text-zinc-500 text-sm">
+                  No unsettled dining gift-card redemptions.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm min-w-[820px]">
+                    <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Restaurant</th>
+                        <th className="px-4 py-3 font-semibold">Redemptions</th>
+                        <th className="px-4 py-3 font-semibold">Gross dining</th>
+                        <th className="px-4 py-3 font-semibold">Period</th>
+                        <th className="px-4 py-3 font-semibold text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {diningPendingList.map((row: any) => (
+                        <tr key={row.business_id} className="hover:bg-white/[0.02]">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-white">{row.restaurant_name || "—"}</p>
+                            {row.tin_number && (
+                              <p className="text-xs font-mono text-zinc-500 mt-0.5">TIN: {row.tin_number}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-300 font-mono">{row.redemptions_count || 0}</td>
+                          <td className="px-4 py-3 font-bold text-emerald-600 tabular-nums">
+                            {money(row.gross_dining)}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-zinc-500">
+                            {formatDate(row.period_from)} – {formatDate(row.period_to)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex flex-wrap gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => prefillDiningGenerate(row)}
+                                className="text-xs font-semibold text-zinc-300 hover:text-white cursor-pointer"
+                              >
+                                Edit dates
+                              </button>
+                              <button
+                                type="button"
+                                disabled={settlingDiningId === row.business_id || generatingDining}
+                                onClick={() => void settleDiningNow(row)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 cursor-pointer"
+                              >
+                                {settlingDiningId === row.business_id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <Plus size={12} />
+                                )}
+                                Create draft run
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {diningWorkspace === "runs" && (
+            <>
+              {showDiningGenerate && (
+                <form
+                  onSubmit={handleDiningGenerate(onDiningGenerate)}
+                  className="glass-panel rounded-2xl border border-white/10 p-4 space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Generate dining settlement run</h3>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Aggregates gift-card redemptions for a restaurant, applies platform commission (15% VAT on fee) and 2% WHT withholding.
+                    </p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Restaurant</label>
+                      <select
+                        {...registerDiningGen("business_id")}
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      >
+                        <option value="">Select restaurant</option>
+                        {restaurantOptions.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                      {diningGenErrors.business_id && (
+                        <p className={fieldErrorClass}>{diningGenErrors.business_id.message}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Period from</label>
+                      <input
+                        type="date"
+                        {...registerDiningGen("period_from")}
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Period to</label>
+                      <input
+                        type="date"
+                        {...registerDiningGen("period_to")}
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Commission % (Platform Fee)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        {...registerDiningGen("commission_percent")}
+                        className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Notes (optional)</label>
+                    <input
+                      {...registerDiningGen("notes")}
+                      placeholder="e.g. Monthly dining gift-card clearance"
+                      className="w-full bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={generatingDining}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 cursor-pointer"
+                    >
+                      {generatingDining ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                      Create draft run
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiningGenerate(false)}
+                      className="px-3 py-2 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <AdminFilterBar>
+                <div className="min-w-[12rem]">
+                  <label className="block text-[11px] text-zinc-500 mb-1 font-medium">Restaurant</label>
+                  <select
+                    value={diningRestaurantFilter}
+                    onChange={(e) => setDiningRestaurantFilter(e.target.value)}
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm"
+                  >
+                    <option value="">All restaurants</option>
+                    {restaurantOptions.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-[10rem]">
+                  <label className="block text-[11px] text-zinc-500 mb-1 font-medium">Status</label>
+                  <select
+                    value={diningRunStatusFilter}
+                    onChange={(e) => setDiningRunStatusFilter(e.target.value)}
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm"
+                  >
+                    <option value="ALL">All statuses</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="PAID">Paid</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
+              </AdminFilterBar>
+
+              <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Dining settlement runs</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Batch disbursements to restaurants with automated VAT &amp; WHT deductions.
+                    </p>
+                  </div>
+                  <span className="text-xs text-zinc-500">{diningRuns.length} runs</span>
+                </div>
+                {diningSettlementsLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-12 text-zinc-400">
+                    <Loader2 className="animate-spin" size={16} /> Loading runs…
+                  </div>
+                ) : diningRuns.length === 0 ? (
+                  <p className="px-4 py-12 text-center text-zinc-500 text-sm">
+                    No dining settlement runs found matching filters.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[900px]">
+                      <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Restaurant</th>
+                          <th className="px-4 py-3 font-semibold">Period</th>
+                          <th className="px-4 py-3 font-semibold">Gross / Redemptions</th>
+                          <th className="px-4 py-3 font-semibold">Comm &amp; Tax</th>
+                          <th className="px-4 py-3 font-semibold">Restaurant Net Payout</th>
+                          <th className="px-4 py-3 font-semibold">Status</th>
+                          <th className="px-4 py-3 font-semibold text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {diningRuns.map((run: any) => (
+                          <tr key={run.id} className="hover:bg-white/[0.02]">
+                            <td className="px-4 py-3 font-semibold text-white">
+                              {run.restaurant_name || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-zinc-400">
+                              {formatDate(run.period_from)} – {formatDate(run.period_to)}
+                            </td>
+                            <td className="px-4 py-3 text-xs space-y-0.5">
+                              <p className="text-white font-medium">{money(run.gross_dining)}</p>
+                              <p className="text-zinc-500">{run.redemptions_count || 0} redemptions</p>
+                            </td>
+                            <td className="px-4 py-3 text-xs space-y-0.5">
+                              <p className="text-amber-400">Comm: −{money(run.commission_total)}</p>
+                              <p className="text-rose-400">VAT (15%): −{money(run.commission_vat)}</p>
+                              <p className="text-sky-400">WHT (2%): −{money(run.wht_total)}</p>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-emerald-400 text-sm">
+                              {money(run.restaurant_payable)}
+                            </td>
+                            <td className="px-4 py-3">{statusBadge(run.status)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDiningRunId(run.id)}
+                                className="text-xs font-semibold text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
+                              >
+                                Review &amp; Pay →
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {selectedDiningRunId && (
+                <DiningSettlementDetailPanel
+                  runId={selectedDiningRunId}
+                  onClose={() => {
+                    setSelectedDiningRunId(null);
+                    refetchDiningSettlements();
+                  }}
+                />
+              )}
+            </>
+          )}
+
+          {diningWorkspace === "redemptions" && (
+            <>
+              <AdminCallout tone="amber">
+                Restaurant payable = gift card amount redeemed at POS.{" "}
+                <span className="font-semibold">Pending → Approve → Mark paid</span>. Cancel
+                restores the guest balance.
+              </AdminCallout>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                  label="Pending payable"
+                  value={money(diningSummary?.pending_amount || 0)}
+                  hint={`${diningSummary?.pending_count || 0} redemptions`}
+                  accent="text-emerald-600"
+                />
+                <StatCard
+                  label="Approved"
+                  value={money(diningSummary?.approved_amount || 0)}
+                  hint={`${diningSummary?.approved_count || 0} ready to pay`}
+                  accent="text-emerald-600"
+                />
+                <StatCard
+                  label="Paid to restaurants"
+                  value={money(diningSummary?.paid_amount || 0)}
+                  hint={`${diningSummary?.paid_count || 0} settled`}
+                  accent="text-emerald-600"
+                />
+                <StatCard
+                  label="Cancelled"
+                  value={String(diningSummary?.cancelled_count || 0)}
+                  hint="Balance restored to guests"
+                  accent="text-rose-300"
+                />
+              </div>
+
+              <AdminSegmentedTabs
+                size="sm"
+                tabs={DINING_STATUS_TABS.map((t) => ({
+                  key: t.key,
+                  label: t.label,
+                  count:
+                    t.key === "PENDING"
+                      ? diningSummary?.pending_count
+                      : t.key === "APPROVED"
+                        ? diningSummary?.approved_count
+                        : t.key === "PAID"
+                          ? diningSummary?.paid_count
+                          : t.key === "CANCELLED"
+                            ? diningSummary?.cancelled_count
+                            : undefined,
+                }))}
+                active={diningStatus}
+                onChange={(key) => {
+                  setDiningStatus(key);
+                  setPage(1);
+                }}
+              />
+
+              <AdminFilterBar>
+                <div className="flex-1">
+                  <SearchInput
+                    value={diningQ}
+                    onChange={(v) => {
+                      setDiningQ(v);
+                      setPage(1);
+                    }}
+                    placeholder="Search restaurant, guest, last4…"
+                  />
+                </div>
+                <select
+                  value={diningBusinessId}
+                  onChange={(e) => {
+                    setDiningBusinessId(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white min-w-[220px]"
+                >
+                  <option value="">All restaurants</option>
+                  {restaurantOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={diningFrom}
+                  onChange={(e) => {
+                    setDiningFrom(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
+                  aria-label="From date"
+                />
+                <input
+                  type="date"
+                  value={diningTo}
+                  onChange={(e) => {
+                    setDiningTo(e.target.value);
+                    setPage(1);
+                  }}
+                  className="bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white"
+                  aria-label="To date"
+                />
+              </AdminFilterBar>
+
+              <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
+                {diningLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
+                    <Loader2 className="animate-spin" size={18} /> Loading dining payables…
+                  </div>
+                ) : diningError ? (
+                  <p className="text-center text-rose-400 py-16">Could not load dining settlements.</p>
+                ) : diningRows.length === 0 ? (
+                  <AdminEmptyState
+                    icon={Store}
+                    title="No redemptions match these filters"
+                    description="Redeem a gift card at dining POS to create a payable here."
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-[11px] uppercase tracking-wider text-zinc-500 border-b border-white/5 bg-white/[0.02]">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Restaurant</th>
+                          <th className="px-4 py-3 font-semibold">Gift card</th>
+                          <th className="px-4 py-3 font-semibold">Bill / GC / Guest pays</th>
+                          <th className="px-4 py-3 font-semibold">Payable</th>
+                          <th className="px-4 py-3 font-semibold">Status</th>
+                          <th className="px-4 py-3 font-semibold">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {diningRows.map((row) => {
+                          const busy = busyDiningId === row.id;
+                          return (
+                            <tr key={row.id} className="hover:bg-white/[0.02]">
+                              <td className="px-4 py-3 align-top">
+                                <p className="font-semibold text-white">{row.business_name || "—"}</p>
+                                <p className="text-xs text-zinc-500 mt-0.5">
+                                  {row.redeemed_at
+                                    ? formatDateTime12h(row.redeemed_at)
+                                    : "—"}
+                                </p>
+                                {(row.guest_name || row.guest_phone) && (
+                                  <p className="text-xs text-zinc-400 mt-1">
+                                    {[row.guest_name, row.guest_phone].filter(Boolean).join(" · ")}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <p className="text-white font-mono text-xs">****{row.code_last4}</p>
+                                <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">
+                                  {row.product_name || "Gift Card"}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 align-top text-xs text-emerald-600 space-y-0.5">
+                                <p>Bill {money(row.bill_amount)}</p>
+                                <p>
+                                  GC −{money(row.gift_card_amount)}
+                                </p>
+                                <p>Guest {money(row.customer_payable)}</p>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <p className="font-bold text-emerald-600">
+                                  {money(row.settlement_amount ?? row.gift_card_amount)}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                {statusBadge(row.settlement_status)}
+                                {row.settled_at && (
+                                  <p className="text-[10px] text-zinc-500 mt-1">
+                                    {formatDate(row.settled_at)}
+                                  </p>
+                                )}
+                              </td>
+                              <DiningSettlementRowActions
+                                key={`${row.id}-${row.settlement_status}-${row.settlement_notes || ""}-${row.payment_reference || ""}`}
+                                row={row}
+                                busy={busy}
+                                onUpdate={updateDiningStatus}
+                              />
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {diningMeta && <Pagination meta={diningMeta} onPageChange={setPage} />}
+            </>
+          )}
         </>
       )}
 

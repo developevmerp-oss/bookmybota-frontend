@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "clean": "node -e \"try { require('fs').rmSync('.next', { recursive: true, force: true }); console.log('.next cache cleared.'); } catch(e) { console.error(e); }\"",
+    "dev:clean": "npm run clean && next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -11,6 +13,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
     "@reduxjs/toolkit": "^2.12.0",
+    "framer-motion": "^13.4.6",
     "fuse.js": "^7.5.0",
     "html2pdf.js": "^0.14.0",
     "html5-qrcode": "^2.3.8",

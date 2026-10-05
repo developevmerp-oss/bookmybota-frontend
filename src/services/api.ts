@@ -8869,3 +8869,270 @@ export const {
   useGetEventInterestCountQuery,
   useToggleEventInterestMutation,
 } = eventInterestApi;
+
+/** Accounting & Taxation API endpoints */
+export const accountingApi = api.injectEndpoints({
+  overrideExisting: true,
+  endpoints: (builder) => ({
+    getAccountingTrialBalance: builder.query<
+      { success: boolean; data: { accounts: any[]; grandTotalDebit: number; grandTotalCredit: number; isBalanced: boolean } },
+      { business_id?: string; from?: string; to?: string } | void
+    >({
+      query: (params) => ({
+        url: '/accounting/trial-balance',
+        params: params || {},
+      }),
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getAccountingPAndL: builder.query<
+      { success: boolean; data: { revenues: any[]; expenses: any[]; totalRevenue: number; totalExpense: number; netProfit: number } },
+      { business_id?: string; from?: string; to?: string } | void
+    >({
+      query: (params) => ({
+        url: '/accounting/p-and-l',
+        params: params || {},
+      }),
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getAccountingBalanceSheet: builder.query<
+      { success: boolean; data: { assets: any[]; liabilities: any[]; equity: any[]; currentPeriodNetProfit: number; totalAssets: number; totalLiabilities: number; totalEquity: number; totalLiabilitiesAndEquity: number; isBalanced: boolean } },
+      { business_id?: string; as_of?: string } | void
+    >({
+      query: (params) => ({
+        url: '/accounting/balance-sheet',
+        params: params || {},
+      }),
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getAccountingLedger: builder.query<
+      { success: boolean; entries: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } },
+      { business_id?: string; account_code?: string; from?: string; to?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) => ({
+        url: '/accounting/ledger',
+        params: params || {},
+      }),
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getAccountingTaxSummary: builder.query<
+      { success: boolean; data: { currency: string; tax_authority: string; output_vat_rate: number; standard_wht_rate: number; taxable_convenience_fee_base: number; taxable_commission_base: number; total_taxable_supplies: number; output_vat_payable: number; withholding_tax_payable: number; total_tax_liability_to_mor: number } },
+      { from?: string; to?: string } | void
+    >({
+      query: (params) => ({
+        url: '/accounting/tax-summary',
+        params: params || {},
+      }),
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getAccountingInvoices: builder.query<
+      { success: boolean; invoices: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } },
+      { business_id?: string; type?: string; search?: string; from?: string; to?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) => ({
+        url: '/accounting/invoices',
+        params: params || {},
+      }),
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getTaxConfigs: builder.query<{ success: boolean; data: any[] }, void>({
+      query: () => '/accounting/tax-configs',
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    updateTaxConfig: builder.mutation<any, any>({
+      query: (body) => ({
+        url: '/accounting/tax-configs',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['OrganizerLedger'],
+    }),
+
+    getChartOfAccounts: builder.query<{ success: boolean; data: any[] }, void>({
+      query: () => '/accounting/chart-of-accounts',
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    getGiftCardBreakagePreview: builder.query<
+      {
+        success: boolean;
+        data: {
+          summary: {
+            pendingBreakageAmount: number;
+            pendingBreakageCount: number;
+            activeUnearnedLiability: number;
+            activeCardsCount: number;
+            totalRecognizedBreakage: number;
+          };
+          pendingCards: any[];
+          recognizedHistory: any[];
+        };
+      },
+      void
+    >({
+      query: () => '/accounting/gift-cards/breakage/preview',
+      providesTags: ['OrganizerLedger'],
+    }),
+
+    executeGiftCardBreakageRun: builder.mutation<
+      {
+        success: boolean;
+        message: string;
+        data: {
+          processedCount: number;
+          totalRecognizedAmount: number;
+          journalEntries: string[];
+        };
+      },
+      void
+    >({
+      query: () => ({
+        url: '/accounting/gift-cards/breakage/run',
+        method: 'POST',
+      }),
+      invalidatesTags: ['OrganizerLedger'],
+    }),
+  }),
+});
+
+export const {
+  useGetAccountingTrialBalanceQuery,
+  useGetAccountingPAndLQuery,
+  useGetAccountingBalanceSheetQuery,
+  useGetAccountingLedgerQuery,
+  useGetAccountingTaxSummaryQuery,
+  useGetAccountingInvoicesQuery,
+  useGetTaxConfigsQuery,
+  useUpdateTaxConfigMutation,
+  useGetChartOfAccountsQuery,
+  useGetGiftCardBreakagePreviewQuery,
+  useExecuteGiftCardBreakageRunMutation,
+} = accountingApi;
+
+export interface DiningSettlementRun {
+  id: string;
+  business_id: string;
+  restaurant_name?: string;
+  legal_business_name?: string;
+  tin_number?: string;
+  vat_registration_number?: string;
+  business_address?: string;
+  business_phone?: string;
+  period_from: string;
+  period_to: string;
+  status: 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED';
+  gross_dining: number;
+  commission_total: number;
+  commission_vat: number;
+  wht_total: number;
+  restaurant_payable: number;
+  redemptions_count: number;
+  payment_reference?: string;
+  notes?: string;
+  created_by_email?: string;
+  approved_at?: string;
+  paid_at?: string;
+  created_at: string;
+  updated_at: string;
+  lines?: DiningSettlementLine[];
+}
+
+export interface DiningSettlementLine {
+  id: string;
+  run_id: string;
+  redemption_id: string;
+  gift_card_amount: number;
+  commission_total: number;
+  restaurant_payout: number;
+  code_last4?: string;
+  bill_amount?: number;
+  customer_payable?: number;
+  guest_name?: string;
+  guest_phone?: string;
+  redeemed_at?: string;
+  settlement_status?: string;
+  product_name?: string;
+}
+
+export const diningSettlementApi = api.injectEndpoints({
+  overrideExisting: true,
+  endpoints: (builder) => ({
+    getAdminDiningSettlements: builder.query<
+      { items: DiningSettlementRun[]; meta: any },
+      { business_id?: string; status?: string; page?: number; limit?: number } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.page) sp.set('page', String(params.page));
+        if (params?.limit) sp.set('limit', String(params.limit));
+        if (params?.business_id) sp.set('business_id', params.business_id);
+        if (params?.status) sp.set('status', params.status);
+        const qs = sp.toString();
+        return `/admin/dining-settlements${qs ? `?${qs}` : ''}`;
+      },
+      transformResponse: (res: any) => ({
+        items: res.items || res.data || [],
+        meta: res.meta || { page: 1, limit: 20, total: 0, total_pages: 0 },
+      }),
+      providesTags: ['AdminDiningGiftCardSettlements'],
+    }),
+
+    getAdminDiningPendingSettlements: builder.query<
+      { by_restaurant: any[]; summary: any; items: any[] },
+      { business_id?: string } | void
+    >({
+      query: (params) => {
+        const sp = new URLSearchParams();
+        if (params?.business_id) sp.set('business_id', params.business_id);
+        const qs = sp.toString();
+        return `/admin/dining-settlements/pending${qs ? `?${qs}` : ''}`;
+      },
+      providesTags: ['AdminDiningGiftCardSettlements'],
+    }),
+
+    generateAdminDiningSettlement: builder.mutation<
+      { message: string; data: DiningSettlementRun },
+      { business_id: string; period_from?: string; period_to?: string; commission_percent?: number; notes?: string }
+    >({
+      query: (body) => ({
+        url: '/admin/dining-settlements',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['AdminDiningGiftCardSettlements', 'DiningGiftCardRedemptions', 'OrganizerLedger'],
+    }),
+
+    getAdminDiningSettlementDetail: builder.query<{ data: DiningSettlementRun }, string>({
+      query: (id) => `/admin/dining-settlements/${id}`,
+      providesTags: (_res, _err, id) => [{ type: 'AdminDiningGiftCardSettlements', id }],
+    }),
+
+    patchAdminDiningSettlementRun: builder.mutation<
+      { message: string; data: DiningSettlementRun },
+      { id: string; status: 'APPROVED' | 'PAID' | 'CANCELLED'; payment_reference?: string; notes?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/admin/dining-settlements/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['AdminDiningGiftCardSettlements', 'DiningGiftCardRedemptions', 'OrganizerLedger'],
+    }),
+  }),
+});
+
+export const {
+  useGetAdminDiningSettlementsQuery,
+  useGetAdminDiningPendingSettlementsQuery,
+  useGenerateAdminDiningSettlementMutation,
+  useGetAdminDiningSettlementDetailQuery,
+  usePatchAdminDiningSettlementRunMutation,
+} = diningSettlementApi;
+
+

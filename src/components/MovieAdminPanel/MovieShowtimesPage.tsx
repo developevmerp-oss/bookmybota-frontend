@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -22,6 +22,7 @@ import {
   Sparkles,
   AlertCircle,
   FileSignature,
+  RefreshCw,
 } from "lucide-react";
 import { useAppSelector } from "@/lib/hooks";
 import {
@@ -43,7 +44,11 @@ import {
   movieShowtimeFormSchema,
   type MovieShowtimeFormValues,
 } from "@/lib/moviePartnerFormSchemas";
-import { PRICE_DURATION_OPTIONS } from "@/lib/cinemaSeatTypes";
+import {
+  PRICE_DURATION_OPTIONS,
+  buildScreenTierPricing,
+  extractScreenTierNames,
+} from "@/lib/cinemaSeatTypes";
 
 const FORMAT_OPTIONS = ["2D", "3D", "IMAX 2D", "IMAX 3D", "4DX", "Dolby Cinema", "ScreenX"];
 
@@ -151,6 +156,7 @@ export default function MovieShowtimesPage() {
     reset,
     watch,
     setValue,
+    getValues,
     control,
     formState: { errors },
   } = useForm<MovieShowtimeFormValues>({
@@ -167,15 +173,41 @@ export default function MovieShowtimesPage() {
 
   const formMovieId = watch("movie_id");
   const formScreenId = watch("cinema_screen_id");
+  const lastSyncedScreenIdRef = useRef<string>("");
+
+  const handleSyncScreenTiers = (screenId?: string) => {
+    const targetScreenId = screenId || formScreenId;
+    const targetScreen = screens.find((s) => s.id === targetScreenId);
+    if (!targetScreen) return;
+    const tiers = buildScreenTierPricing(targetScreen, getValues("tier_pricing"));
+    setValue("tier_pricing", tiers, { shouldValidate: true });
+    lastSyncedScreenIdRef.current = targetScreenId;
+  };
+
+  // When cinema admin changes screen in create mode, auto-populate exact seat tiers from that screen
+  useEffect(() => {
+    if (!formScreenId || editingShowtime) return;
+    if (lastSyncedScreenIdRef.current === formScreenId) return;
+    const targetScreen = screens.find((s) => s.id === formScreenId);
+    if (targetScreen) {
+      const tiers = buildScreenTierPricing(targetScreen, getValues("tier_pricing"));
+      setValue("tier_pricing", tiers, { shouldValidate: true });
+      lastSyncedScreenIdRef.current = formScreenId;
+    }
+  }, [formScreenId, screens, editingShowtime, setValue, getValues]);
 
   useEffect(() => {
     const pMovieId = searchParams.get("movie_id");
     if (pMovieId && !editingShowtime && !urlMovieHandled) {
+      const initialScreen = screens[0];
+      const initialTiers = buildScreenTierPricing(initialScreen);
+      lastSyncedScreenIdRef.current = initialScreen?.id || "";
       reset(
         emptyMovieShowtimeFormValues({
           movie_id: pMovieId,
-          cinema_screen_id: screens[0]?.id || "",
+          cinema_screen_id: initialScreen?.id || "",
           show_date: selectedDate || todayStr,
+          tier_pricing: initialTiers,
         })
       );
       setModalOpen(true);
@@ -203,19 +235,18 @@ export default function MovieShowtimesPage() {
       return;
     }
     setEditingShowtime(null);
+    const initialScreen = screens[0];
+    const initialTiers = buildScreenTierPricing(initialScreen);
+    lastSyncedScreenIdRef.current = initialScreen?.id || "";
     reset(
       emptyMovieShowtimeFormValues({
         movie_id: catalogMovies[0]?.id || "",
-        cinema_screen_id: screens[0]?.id || "",
+        cinema_screen_id: initialScreen?.id || "",
         show_date: selectedDate || todayStr,
         start_time: "14:00",
         language: "English",
         format: "2D",
-        tier_pricing: [
-          { tier_name: "Regular", price: 200 },
-          { tier_name: "Recliner", price: 350 },
-          { tier_name: "Couple", price: 500 },
-        ],
+        tier_pricing: initialTiers,
         price_duration: "showtime",
       })
     );
@@ -224,6 +255,7 @@ export default function MovieShowtimesPage() {
 
   const openEditModal = (st: MovieShowtime) => {
     setEditingShowtime(st);
+    lastSyncedScreenIdRef.current = st.cinema_screen_id || "";
     const parsed = parseIsoDateAndHours(st.starts_at);
     reset({
       movie_id: st.movie_id,
@@ -743,23 +775,53 @@ export default function MovieShowtimesPage() {
               </div>
 
               <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-4 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <label className="block text-xs font-bold text-zinc-200">
                       Seat Tier Ticket Pricing (ETB) <RequiredMark />
                     </label>
                     <p className="text-[11px] text-zinc-400">
-                      Price Regular / Recliner / Couple seats for this movie. Layout seats stay fixed — only prices change.
+                      Exact seat tiers auto-loaded from screen layout. Customize ETB prices showtime-wise.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => append({ tier_name: "Regular", price: 250 })}
-                    className="text-xs text-rose-400 hover:text-rose-300 font-semibold inline-flex items-center gap-1"
-                  >
-                    <Plus size={14} /> Add Tier
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {activeScreenForForm && (
+                      <button
+                        type="button"
+                        onClick={() => handleSyncScreenTiers()}
+                        className="text-xs text-sky-400 hover:text-sky-300 font-semibold inline-flex items-center gap-1 transition-colors"
+                        title="Reload tiers from selected screen layout"
+                      >
+                        <RefreshCw size={13} /> Reload Screen Tiers
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => append({ tier_name: "VIP", price: 300 })}
+                      className="text-xs text-rose-400 hover:text-rose-300 font-semibold inline-flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Add Tier
+                    </button>
+                  </div>
                 </div>
+
+                {activeScreenForForm && (
+                  <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg bg-white/5 border border-white/5 text-[11px]">
+                    <span className="text-rose-400 font-semibold flex items-center gap-1">
+                      <Sparkles size={12} /> Auditorium Tiers:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {extractScreenTierNames(activeScreenForForm).map((tn) => (
+                        <span key={tn} className="px-2 py-0.5 rounded-md bg-white/10 text-white font-medium">
+                          {tn}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="text-zinc-500 ml-auto text-[10px]">
+                      (Set prices for this specific show)
+                    </span>
+                  </div>
+                )}
 
                 {!editingShowtime && (
                   <div>

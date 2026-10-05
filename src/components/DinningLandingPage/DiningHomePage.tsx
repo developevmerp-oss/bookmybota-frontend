@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import {
   Search,
   MapPin,

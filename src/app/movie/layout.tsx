@@ -9,6 +9,7 @@ import { useGetBusinessSettingsQuery, useGetCinemaContractQuery } from "@/servic
 import SessionGuard from "@/components/Shared/SessionGuard";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
 import {
+  BarChart3,
   Clapperboard,
   Film,
   KeyRound,
@@ -56,6 +57,7 @@ function MovieShell({ children }: { children: React.ReactNode }) {
     { name: "Showtimes", href: "/movie/showtimes", icon: Clapperboard },
     { name: "Bookings", href: "/movie/bookings", icon: Ticket },
     { name: "Revenue & Payouts", href: "/movie/settlements", icon: Wallet },
+    { name: "Accounting & Taxes", href: "/movie/accounting", icon: BarChart3 },
     { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
     { name: "Profile", href: "/movie/profile", icon: User },
     { name: "Change Password", href: "/movie/change-password", icon: KeyRound },

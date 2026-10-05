@@ -99,6 +99,7 @@ const navigation: NavItem[] = [
     ],
   },
   { type: "link", name: "BookMyBota Revenue", href: "/admin/revenue", icon: Percent },
+  { type: "link", name: "Accounting & Taxation", href: "/admin/accounting", icon: FileText },
   { type: "link", name: "Partner Payouts", href: "/admin/organizer-payouts", icon: Wallet },
   { type: "link", name: "Subscription & Billing", href: "/admin/billing", icon: CreditCard },
   { type: "link", name: "Marketing Plans", href: "/admin/marketing", icon: Megaphone },

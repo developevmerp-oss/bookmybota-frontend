@@ -35,12 +35,17 @@ const navigation = [
   { name: "Offers", href: "/organizer/offers", icon: Tag },
   { name: "Promotions", href: "/organizer/promotions", icon: Megaphone },
   { name: "Revenue & Payouts", href: "/organizer/ledger", icon: Wallet },
+  { name: "Accounting & Taxes", href: "/organizer/accounting", icon: BarChart3 },
 ];
 
 const pageMeta: Record<string, { title: string; subtitle: string }> = {
   "/organizer": {
     title: "Dashboard",
     subtitle: "Overview of your events, bookings, and account activity.",
+  },
+  "/organizer/accounting": {
+    title: "Accounting & Tax Statements",
+    subtitle: "Trial Balance, Balance Sheet, P&L, Ledger, and Ethiopian Tax Compliance.",
   },
   "/organizer/events": {
     title: "My events",

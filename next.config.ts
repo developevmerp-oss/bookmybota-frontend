@@ -33,6 +33,17 @@ const nextConfig: NextConfig = {
   // Next 16 defaults to Turbopack; empty block silences the webpack/turbopack mismatch
   // when tooling inspects this file without the --webpack flag.
   turbopack: {},
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "react-icons",
+      "recharts",
+      "framer-motion",
+      "motion",
+      "swiper",
+      "sonner",
+    ],
+  },
   async rewrites() {
     if (!uploadOrigin) return [];
     return [

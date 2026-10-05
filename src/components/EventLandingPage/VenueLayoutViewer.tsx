@@ -376,10 +376,14 @@ export default function VenueLayoutViewer({
 
   if (seats.length === 0) return null;
 
-  const shellClass = cinemaMode
+  const shellClass = hideSidePanel
+    ? "flex flex-col h-full w-full bg-[#F8FAFC] text-slate-900 overflow-hidden"
+    : cinemaMode
     ? "flex flex-col md:flex-row h-full w-full bg-white text-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-200"
     : "flex flex-col md:flex-row h-full w-full bg-slate-900 text-white rounded-2xl overflow-hidden shadow-2xl border border-slate-800";
-  const canvasClass = cinemaMode
+  const canvasClass = hideSidePanel
+    ? "flex-1 min-h-0 overflow-auto p-3 sm:p-5 cursor-grab flex justify-center items-center relative bg-[#EEF2F7]"
+    : cinemaMode
     ? "flex-1 overflow-auto p-4 cursor-grab flex justify-center items-center relative bg-[#F5F5F7]"
     : "flex-1 overflow-auto p-4 cursor-grab flex justify-center items-center relative bg-slate-950";
   const zoomBarClass = cinemaMode

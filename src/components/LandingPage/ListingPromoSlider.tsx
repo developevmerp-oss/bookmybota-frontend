@@ -7,7 +7,12 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Navigation } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
-import type { Business, MarketingCampaign, Movie, PublicEvent } from "@/services/api";
+import type {
+  Business,
+  MarketingCampaign,
+  Movie,
+  PublicEvent,
+} from "@/services/api";
 import { useGetActiveMarketingPromotionsQuery } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
@@ -412,7 +417,8 @@ type ListingPromoSliderProps = {
   eventsById?: Map<string, PublicEvent>;
   moviesById?: Map<string, Movie>;
   diningById?: Map<string, Business>;
-  /** When true, parent keeps its own hero and only needs campaign presence — still renders slider. */
+  /** Optional post-fetch filter (e.g. concert/comedy/music/sports browse). */
+  filterCampaign?: (campaign: MarketingCampaign) => boolean;
   className?: string;
 };
 
@@ -427,6 +433,7 @@ export default function ListingPromoSlider({
   eventsById,
   moviesById,
   diningById,
+  filterCampaign,
   className = "",
 }: ListingPromoSliderProps) {
   const hasCity = hasCityFilter(city);
@@ -451,8 +458,12 @@ export default function ListingPromoSlider({
       });
     };
 
+    const scoped = filterCampaign
+      ? campaignsWithBanner(promotions).filter(filterCampaign)
+      : campaignsWithBanner(promotions);
+
     const fromCampaigns = dedupeByImage(
-      campaignsWithBanner(promotions)
+      scoped
         .slice(0, 10)
         .map((p) => campaignToListingSlide(p, linkCtx))
         .filter((s): s is ListingPromoSlide => Boolean(s?.image?.trim() && s?.title?.trim()))
@@ -463,7 +474,7 @@ export default function ListingPromoSlider({
         .filter((s) => Boolean(s.image?.trim()) && Boolean(s.title?.trim()))
         .slice(0, 8)
     );
-  }, [promotions, fallbackSlides, city, eventsById, moviesById, diningById]);
+  }, [promotions, fallbackSlides, city, eventsById, moviesById, diningById, filterCampaign]);
 
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
@@ -566,7 +577,8 @@ export default function ListingPromoSlider({
                 aria-label={`${slide.title}${slide.year ? ` ${slide.year}` : ""}`}
                 className="promo-banner-card group relative flex h-full w-full overflow-hidden rounded-2xl sm:rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-[#6900AA] focus-visible:ring-offset-2"
               >
-                <SlideCard slide={slide} plainImage={category === "DINING"} />
+                {/* Same as Dining listing: banner creative only (no title/CTA overlay). */}
+                <SlideCard slide={slide} plainImage />
               </Link>
             </SwiperSlide>
           ))}

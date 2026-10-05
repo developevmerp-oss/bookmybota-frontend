@@ -12,11 +12,21 @@ import {
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
+function formatReviewsCount(count: number) {
+  if (count >= 1000) {
+    const k = count / 1000;
+    const label = Number.isInteger(k) ? `${k}k` : `${k.toFixed(1)}k`;
+    return `(${label})`;
+  }
+  return `(${count})`;
+}
+
 /** Detail-style Must-Watch movie card (wishlist, status, rating/format, book CTA). */
 export function MovieDetailCard({ movie }: { movie: MustWatchMovieCard }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showPoster = Boolean(movie.poster) && !imgFailed;
   const meta = movieDetailMeta(movie);
+  const reviewsCount = Math.max(0, Number(movie.reviewsCount) || 0);
   const showRatingBadge = meta.rating != null && !movie.comingSoon;
 
   return (
@@ -57,13 +67,21 @@ export function MovieDetailCard({ movie }: { movie: MustWatchMovieCard }) {
             className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
           />
 
-          {/* Rating — bottom left (now showing only) */}
+          {/* Rating once — dining-style ★ + review count */}
           {showRatingBadge ? (
-            <span className="absolute bottom-3 left-3 z-[2] inline-flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-1 text-white backdrop-blur-[2px]">
-              <Star size={11} className="fill-[#F5C518] text-[#F5C518]" strokeWidth={0} />
-              <span className="text-[12px] font-bold tabular-nums leading-none">
+            <span className="absolute bottom-3 left-3 z-[2] inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-white backdrop-blur-[2px]">
+              <Star size={12} className="fill-[#F5C518] text-[#F5C518]" strokeWidth={0} />
+              <span className="text-sm font-bold tabular-nums leading-none">
                 {meta.rating!.toFixed(1)}
               </span>
+              {reviewsCount > 0 ? (
+                <>
+                  <span className="h-3 w-px bg-white/35" aria-hidden />
+                  <span className="text-sm font-medium text-white/90 leading-none">
+                    {formatReviewsCount(reviewsCount)}
+                  </span>
+                </>
+              ) : null}
             </span>
           ) : null}
 
@@ -80,22 +98,9 @@ export function MovieDetailCard({ movie }: { movie: MustWatchMovieCard }) {
             {movie.title}
           </h3>
 
-          {meta.metaLine ? (
-            <p className="inline-flex items-center gap-1.5 min-w-0 text-sm tracking-wide text-gray-600 truncate">
-              {meta.rating != null && !movie.comingSoon ? (
-                <>
-                  <Star size={12} className="shrink-0 fill-[#F5C518] text-[#F5C518]" strokeWidth={0} />
-                  <span className="font-semibold text-[#1C1C1C] tabular-nums">
-                    {meta.rating.toFixed(1)}
-                  </span>
-                  {(meta.duration || meta.format) ? (
-                    <span className="text-gray-400">·</span>
-                  ) : null}
-                </>
-              ) : null}
-              <span className="truncate">
-                {[meta.duration, meta.format].filter(Boolean).join(" · ")}
-              </span>
+          {meta.duration || meta.format ? (
+            <p className="min-w-0 text-sm tracking-wide text-gray-600 truncate">
+              {[meta.duration, meta.format].filter(Boolean).join(" · ")}
             </p>
           ) : null}
 

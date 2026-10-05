@@ -40,9 +40,7 @@ const RESEND_SECONDS = 30;
 const BTN_BLACK = "#111111";
 
 const logoSrc =
-  typeof images.logoOnDark === "string"
-    ? images.logoOnDark
-    : images.logoOnDark.src;
+  typeof images.logo === "string" ? images.logo : images.logo.src;
 
 export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
   const dispatch = useAppDispatch();
@@ -208,11 +206,14 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
   if (!open) return null;
 
   const primaryBtnClass =
-    "w-full rounded-lg py-3 sm:py-3.5 text-[14px] sm:text-[15px] font-bold text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+    "w-full rounded-xl py-3.5 sm:py-4 text-[15px] sm:text-[16px] font-bold text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+
+  const fieldClass =
+    "rounded-xl border border-slate-300 bg-white outline-none text-[#1A1A1A] placeholder:text-slate-400 focus:border-brand-4 focus:ring-2 focus:ring-brand-100";
 
   const modal = (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[2px] p-0 sm:p-4"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-[3px] p-0 sm:p-5"
       data-scroll-lock-container
       onClick={onClose}
       role="presentation"
@@ -221,56 +222,52 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="customer-auth-title"
-        className="relative w-full sm:max-w-[400px] md:max-w-[420px] max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,0.35)]"
+        className="relative w-full sm:max-w-[460px] md:max-w-[500px] max-h-[94vh] overflow-y-auto rounded-t-[28px] sm:rounded-[28px] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Brand header — purple gradient like reference */}
-        <div
-          className="relative px-5 sm:px-6 pt-8 sm:pt-10 pb-7 sm:pb-8 text-center overflow-hidden"
-          style={{
-            background:
-              "linear-gradient(145deg, #8B2FD6 0%, #6900AA 42%, #4A0080 78%, #2D0055 100%)",
-          }}
-        >
+        {/* Brand header — white so the official logo (black + colorful “my”) reads correctly */}
+        <div className="relative overflow-hidden rounded-t-[28px]">
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.18]"
+            className="h-1.5 w-full"
             style={{
-              backgroundImage:
-                "linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.25) 40%, rgba(255,255,255,0.25) 42%, transparent 42%), linear-gradient(45deg, transparent 55%, rgba(255,255,255,0.12) 55%, rgba(255,255,255,0.12) 58%, transparent 58%)",
+              background:
+                "linear-gradient(90deg, #2563EB 0%, #7C3AED 45%, #DB2777 100%)",
             }}
             aria-hidden
           />
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="absolute top-3.5 right-3.5 z-10 h-8 w-8 rounded-full text-white/90 hover:bg-white/15 flex items-center justify-center cursor-pointer"
-          >
-            <X size={18} />
-          </button>
+          <div className="relative px-6 sm:px-8 pt-10 sm:pt-12 pb-6 sm:pb-7 text-center bg-white">
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={onClose}
+              className="absolute top-3.5 right-3.5 z-10 h-9 w-9 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+            >
+              <X size={20} />
+            </button>
 
-          <div className="relative z-[1] flex flex-col items-center">
-            <img
-              src={logoSrc}
-              alt="Book My Bota"
-              className="h-10 sm:h-12 w-auto object-contain"
-            />
-            <p className="mt-2.5 sm:mt-3 text-[12px] sm:text-[13px] text-white/90 font-medium leading-snug max-w-[16rem] sm:max-w-[18rem]">
-              Experience the best in Dining, Movies, and Events
-            </p>
+            <div className="flex flex-col items-center">
+              <img
+                src={logoSrc}
+                alt="Book My Bota"
+                className="h-14 sm:h-16 w-auto max-w-[280px] sm:max-w-[320px] object-contain"
+              />
+              <p className="mt-3 sm:mt-3.5 text-[13px] sm:text-[14px] text-[#1A1A1A] font-medium leading-snug max-w-[18rem] sm:max-w-[20rem]">
+                Experience the best in Dining, Movies, and Events
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="px-5 sm:px-7 pt-5 sm:pt-6 pb-6 sm:pb-7">
+        <div className="px-6 sm:px-9 pt-7 sm:pt-8 pb-8 sm:pb-10">
           {step === "start" && (
             <>
               <h2
                 id="customer-auth-title"
-                className="text-center text-[20px] sm:text-[22px] font-bold text-[#1A1A1A] mb-1.5"
+                className="text-center text-[22px] sm:text-[24px] font-bold text-[#1A1A1A] mb-2"
               >
                 Enter your mobile number
               </h2>
-              <p className="text-center text-[13px] sm:text-sm text-slate-500 mb-5 sm:mb-6">
+              <p className="text-center text-[13px] sm:text-[15px] text-slate-500 mb-6 sm:mb-7">
                 If you don&apos;t have an account yet, we&apos;ll create one for you.
               </p>
 
@@ -313,8 +310,10 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
 
               <form onSubmit={onSendOtp} noValidate>
                 <div className="flex items-stretch gap-2.5 sm:gap-3">
-                  <div className="flex items-center gap-1.5 shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 sm:px-3 py-2.5 sm:py-3 text-[13px] sm:text-[14px] font-semibold text-[#1A1A1A]">
-                    <span aria-hidden className="text-base leading-none">
+                  <div
+                    className={`flex items-center gap-1.5 shrink-0 px-3 sm:px-3.5 py-3 sm:py-3.5 text-[14px] sm:text-[15px] font-semibold ${fieldClass}`}
+                  >
+                    <span aria-hidden className="text-lg leading-none">
                       🇪🇹
                     </span>
                     <span>{DIAL_CODE}</span>
@@ -325,7 +324,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                     maxLength={12}
                     placeholder="Enter mobile number"
                     autoFocus
-                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 sm:px-3.5 py-2.5 sm:py-3 outline-none text-[14px] sm:text-[15px] font-medium text-[#1A1A1A] placeholder:text-slate-400 focus:border-slate-400"
+                    className={`min-w-0 flex-1 px-3.5 sm:px-4 py-3 sm:py-3.5 text-[14px] sm:text-[15px] font-medium ${fieldClass}`}
                     {...phoneForm.register("phone", {
                       onChange: (e) => {
                         e.target.value = sanitizePhoneInput(e.target.value);
@@ -342,7 +341,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                 <button
                   type="submit"
                   disabled={!canContinuePhone || isSendingOtp}
-                  className={`${primaryBtnClass} mt-4 sm:mt-5`}
+                  className={`${primaryBtnClass} mt-5 sm:mt-6`}
                   style={{
                     backgroundColor:
                       canContinuePhone && !isSendingOtp ? BTN_BLACK : "#C8C8C8",
@@ -351,12 +350,6 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                   {isSendingOtp ? "Sending OTP..." : "Continue"}
                 </button>
               </form>
-
-              <p className="mt-4 sm:mt-5 text-center text-[11px] sm:text-[12px] text-slate-500 leading-relaxed">
-                By continuing, you agree to our{" "}
-                <span className="underline underline-offset-2">Terms of Service</span>{" "}
-                <span className="underline underline-offset-2">Privacy Policy</span>.
-              </p>
             </>
           )}
 
@@ -371,11 +364,11 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
               </button>
               <h2
                 id="customer-auth-title"
-                className="text-center text-[20px] sm:text-[22px] font-bold text-[#1A1A1A] mb-1.5"
+                className="text-center text-[22px] sm:text-[24px] font-bold text-[#1A1A1A] mb-2"
               >
                 Enter OTP
               </h2>
-              <p className="text-center text-[13px] sm:text-sm text-slate-500 mb-1">
+              <p className="text-center text-[13px] sm:text-[15px] text-slate-500 mb-1">
                 Sent to{" "}
                 <span className="font-bold text-slate-700">
                   {DIAL_CODE} {verifiedPhone}
@@ -394,7 +387,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                   maxLength={6}
                   autoFocus
                   placeholder="••••••"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3.5 text-center text-xl tracking-[0.45em] font-extrabold text-slate-800 focus:outline-none focus:border-slate-400"
+                  className={`w-full px-4 py-3.5 text-center text-xl tracking-[0.45em] font-extrabold ${fieldClass}`}
                   {...otpForm.register("otp", {
                     onChange: (e) => {
                       e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
@@ -422,7 +415,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                       type="button"
                       onClick={onResendOtp}
                       disabled={isSendingOtp}
-                      className="font-bold text-[#6900AA] hover:underline cursor-pointer disabled:opacity-50"
+                      className="font-bold text-brand-4 hover:underline cursor-pointer disabled:opacity-50"
                     >
                       Resend OTP
                     </button>
@@ -443,11 +436,11 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
               </button>
               <h2
                 id="customer-auth-title"
-                className="text-center text-[20px] sm:text-[22px] font-bold text-[#1A1A1A] mb-1.5"
+                className="text-center text-[22px] sm:text-[24px] font-bold text-[#1A1A1A] mb-2"
               >
                 Create Account
               </h2>
-              <p className="text-center text-[13px] sm:text-sm text-slate-500 mb-5">
+              <p className="text-center text-[13px] sm:text-[15px] text-slate-500 mb-5">
                 Finish signup for{" "}
                 <span className="font-bold text-slate-700">
                   {DIAL_CODE} {verifiedPhone}
@@ -459,7 +452,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                     type="text"
                     placeholder="Full name"
                     autoFocus
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-slate-400"
+                    className={`w-full px-4 py-3.5 text-sm font-semibold ${fieldClass}`}
                     {...registerForm.register("name")}
                   />
                   {registerForm.formState.errors.name && (
@@ -472,7 +465,7 @@ export default function CustomerAuthModal({ open, onClose, onSuccess }: Props) {
                   <input
                     type="email"
                     placeholder="Email"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:border-slate-400"
+                    className={`w-full px-4 py-3.5 text-sm font-semibold ${fieldClass}`}
                     {...registerForm.register("email")}
                   />
                   {registerForm.formState.errors.email && (

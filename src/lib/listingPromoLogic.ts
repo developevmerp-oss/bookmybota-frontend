@@ -1,8 +1,9 @@
-import type { MarketingCampaign } from "@/services/api";
+import type { MarketingCampaign, PublicEvent } from "@/services/api";
 import { hasCityFilter } from "@/components/LandingPage/homeUtils";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import type { EventCategoryKey } from "@/lib/eventCategories";
 
-export type ListingPromoCategory = "DINING" | "MOVIES" | "EVENTS";
+export type ListingPromoCategory = "DINING" | "MOVIES" | "EVENTS" | "SPORTS";
 
 /** Same city gating as landing PromoBannerCarousel / CategoryPromoBanners. */
 export function listingPromoQueryArgs(
@@ -57,4 +58,35 @@ export function duplicateSlidesForPeek<T extends { id: string }>(slides: T[], mi
     copy += 1;
   }
   return out;
+}
+
+type EventCategoryMatcher = (
+  event: PublicEvent,
+  key: EventCategoryKey,
+  categories: Array<{ slug: string; name: string }>
+) => boolean;
+
+/**
+ * On concert/comedy/music/sports browse pages, keep only campaigns linked to a
+ * matching event. Unscoped campaigns (no target_id) stay on the general Events page.
+ */
+export function filterCampaignsForEventCategory(
+  campaigns: MarketingCampaign[],
+  opts: {
+    categoryKey: EventCategoryKey | null;
+    eventsById: Map<string, PublicEvent>;
+    categories: Array<{ slug: string; name: string }>;
+    matches: EventCategoryMatcher;
+  }
+): MarketingCampaign[] {
+  const { categoryKey, eventsById, categories, matches } = opts;
+  if (!categoryKey) return campaigns;
+
+  return campaigns.filter((campaign) => {
+    const tid = String(campaign.target_id || "").trim();
+    if (!tid) return false;
+    const event = eventsById.get(tid);
+    if (!event) return false;
+    return matches(event, categoryKey, categories);
+  });
 }

@@ -22,6 +22,8 @@ export type MustWatchMovieCard = {
   formats: string[];
   durationMinutes?: number | null;
   rating?: number | null;
+  /** Review / vote count for dining-style ★ 4.0 | (n) badge. */
+  reviewsCount?: number;
   releaseDate?: string | null;
   comingSoon?: boolean;
   promoted?: boolean;
@@ -65,6 +67,7 @@ function mapApiMovie(movie: Movie): MustWatchMovieCard {
     formats: (movie.formats || []).map((f) => String(f).trim()).filter(Boolean),
     durationMinutes: movie.duration_minutes,
     rating: parseRating(movie.rating),
+    reviewsCount: Math.max(0, Number(movie.reviews_count) || 0),
     releaseDate: movie.release_date || null,
     comingSoon: movie.status === "coming_soon",
     promoted: isMoviePromoted(movie.is_promoted),
@@ -91,6 +94,7 @@ function mapShowcaseMovie(movie: ShowcaseMovieCard): MustWatchMovieCard {
     formats: [idHash % 3 === 0 ? "3D" : "2D"],
     durationMinutes: [138, 124, 102, 125][idHash % 4],
     rating: [8.6, 7.9, 8.2, 8.1][idHash % 4],
+    reviewsCount: [128, 86, 240, 54][idHash % 4],
     releaseDate: movie.year ? `${movie.year}-10-24` : "2026-10-24",
     comingSoon: movie.comingSoon,
     promoted: Boolean(movie.promoted),

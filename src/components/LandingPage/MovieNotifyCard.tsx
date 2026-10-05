@@ -15,8 +15,18 @@ const ACCENT = "#B08D57";
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
 
+function formatReviewsCount(count: number) {
+  if (count >= 1000) {
+    const k = count / 1000;
+    const label = Number.isInteger(k) ? `${k}k` : `${k.toFixed(1)}k`;
+    return `(${label})`;
+  }
+  return `(${count})`;
+}
+
 /**
- * Must-Watch movie card — status + rating on poster, genre meta, release date, CTA.
+ * Must-Watch movie card — status on poster; rating on title row (right);
+ * genre meta, release date, CTA below.
  */
 export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -26,11 +36,11 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
   const comingSoon = Boolean(movie.comingSoon);
   const promoted = Boolean(movie.promoted);
   const rating = meta.rating;
-  const showRating = rating != null;
+  const reviewsCount = Math.max(0, Number(movie.reviewsCount) || 0);
+  const showRating = rating != null && !comingSoon;
   const ctaClass =
     "shrink-0 inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-[12px] font-semibold tracking-wide text-[#1C1C1C] shadow-sm transition-colors border-[#D4C4A8] group-hover:border-[#B08D57]";
 
-  // Genre · Language · Format
   const detailParts = [meta.genres, meta.language, meta.format].filter(Boolean);
 
   return (
@@ -75,47 +85,43 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
             tone="onLight"
             className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
           />
-
-          {/* Rating — bottom right on poster */}
-          {showRating ? (
-            <span className="absolute bottom-3 right-3 z-[2] inline-flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-1 text-white backdrop-blur-[2px]">
-              <Star
-                size={11}
-                className="fill-[#F5C518] text-[#F5C518]"
-                strokeWidth={0}
-              />
-              <span className="text-[12px] font-bold tabular-nums leading-none">
-                {rating.toFixed(1)}
-              </span>
-            </span>
-          ) : null}
         </div>
 
         <div className="flex flex-col gap-1 px-3.5 pt-3 pb-3.5 min-w-0">
-          <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate leading-snug">
-            {movie.title}
-          </h3>
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <h3 className="min-w-0 flex-1 text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate leading-snug">
+              {movie.title}
+            </h3>
+            {showRating ? (
+              <span
+                className="shrink-0 inline-flex items-center gap-1 pt-0.5"
+                aria-label={`Rated ${rating.toFixed(1)}${reviewsCount > 0 ? ` from ${reviewsCount} reviews` : ""}`}
+              >
+                <Star
+                  size={13}
+                  className="fill-[#F5C518] text-[#F5C518]"
+                  strokeWidth={0}
+                />
+                <span className="text-sm font-bold tabular-nums text-[#1C1C1C] leading-none">
+                  {rating.toFixed(1)}
+                </span>
+                {reviewsCount > 0 ? (
+                  <>
+                    <span className="text-gray-300 leading-none" aria-hidden>
+                      |
+                    </span>
+                    <span className="text-sm font-medium tabular-nums text-gray-500 leading-none">
+                      {formatReviewsCount(reviewsCount)}
+                    </span>
+                  </>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
 
-          {showRating || detailParts.length > 0 ? (
-            <p className="inline-flex items-center gap-1.5 min-w-0 text-sm tracking-wide text-gray-600 truncate leading-snug">
-              {showRating ? (
-                <>
-                  <Star
-                    size={12}
-                    className="shrink-0 fill-[#F5C518] text-[#F5C518]"
-                    strokeWidth={0}
-                  />
-                  <span className="font-semibold text-[#1C1C1C] tabular-nums">
-                    {rating.toFixed(1)}
-                  </span>
-                  {detailParts.length > 0 ? (
-                    <span className="text-gray-400">·</span>
-                  ) : null}
-                </>
-              ) : null}
-              {detailParts.length > 0 ? (
-                <span className="truncate">{detailParts.join(" · ")}</span>
-              ) : null}
+          {detailParts.length > 0 ? (
+            <p className="min-w-0 text-sm tracking-wide text-gray-600 truncate leading-snug">
+              {detailParts.join(" · ")}
             </p>
           ) : null}
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Calendar,
+  ChevronRight,
   Gift,
   HelpCircle,
   Lock,
@@ -13,7 +14,7 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAppDispatch } from "@/lib/hooks";
+import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { logoutCustomer } from "@/lib/authSession";
 
 const NAV = [
@@ -27,9 +28,21 @@ const NAV = [
   { href: "/customer/offers", icon: Tag, label: "Offers" },
 ];
 
-export default function CustomerAccountLayout({ children }: { children: React.ReactNode }) {
+export default function CustomerAccountLayout({
+  children,
+  hideSidebarBelowLg = false,
+}: {
+  children: React.ReactNode;
+  /** Hide left account nav below lg (used by mobile-native profile UI). */
+  hideSidebarBelowLg?: boolean;
+}) {
   const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+
+  const displayName =
+    user?.name?.trim() || user?.email?.split("@")[0] || "Guest";
+  const displayEmail = user?.email || "";
 
   const handleLogout = () => {
     logoutCustomer(dispatch, { pathname: pathname || "/" });
@@ -40,10 +53,28 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
     <div className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] py-4 sm:py-6 lg:py-8">
       <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
-          <aside className="w-full lg:w-[240px] shrink-0">
+          <aside
+            className={`w-full lg:w-[260px] shrink-0${
+              hideSidebarBelowLg ? " hidden lg:block" : ""
+            }`}
+          >
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-col h-fit">
-              <h1 className="px-3 pt-2 pb-3 text-2xl sm:text-3xl border-b border-slate-200 mb-3 font-extrabold text-[#111111]">My Account</h1>
-              <nav className="flex flex-col gap-1">
+              {/* Profile header — desktop left UI */}
+              <div className="flex items-center gap-3 px-2 py-3 mb-2">
+                <div className="w-12 h-12 rounded-full bg-[#F7E9FF] text-[#6900AA] flex items-center justify-center text-xl font-bold shrink-0">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-bold text-black truncate leading-tight">
+                    {displayName}
+                  </p>
+                  {displayEmail ? (
+                    <p className="text-xs text-slate-400 truncate mt-0.5">{displayEmail}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <nav className="flex flex-col gap-0.5">
                 {NAV.map((item) => {
                   const active =
                     !item.soon &&
@@ -63,16 +94,18 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                         active
                           ? "bg-[#F7E9FF] text-[#6900AA]"
-                          : "text-slate-700 hover:bg-slate-50"
+                          : "text-[#111111] hover:bg-slate-50"
                       }${item.mobileOnly ? " lg:hidden" : ""}`}
                     >
                       <Icon size={18} className={active ? "text-[#6900AA]" : "text-slate-500"} />
                       <span className="flex-1">{item.label}</span>
-                      {item.soon && (
+                      {item.soon ? (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F7E9FF] text-[#6900AA]">
                           Soon
                         </span>
-                      )}
+                      ) : active ? (
+                        <ChevronRight size={16} className="text-[#6900AA] shrink-0" />
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -81,7 +114,7 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 cursor-pointer"
+                className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 cursor-pointer"
               >
                 <LogOut size={18} />
                 Log out
@@ -95,3 +128,5 @@ export default function CustomerAccountLayout({ children }: { children: React.Re
     </div>
   );
 }
+
+export { NAV as CUSTOMER_ACCOUNT_NAV };

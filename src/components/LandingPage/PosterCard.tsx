@@ -73,52 +73,6 @@ function OfferPercentSeal({ className = "" }: { className?: string }) {
 const LISTING_OFFER_RIBBON_BG =
   "linear-gradient(90deg, #7B5DFA 0%, rgba(123,93,250,0.96) 36%, rgba(162,139,250,0.75) 66%, rgba(196,181,253,0.16) 100%)";
 
-function normalizeGalleryList(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.map(String).map((s) => s.trim()).filter(Boolean);
-  if (typeof raw === "string" && raw.trim()) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed.map(String).map((s) => s.trim()).filter(Boolean);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  return [];
-}
-
-function resolveGalleryUrls(urls: string[]): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const u of urls) {
-    const resolved = resolveMediaUrl(u)?.trim();
-    if (!resolved || seen.has(resolved)) continue;
-    seen.add(resolved);
-    out.push(resolved);
-  }
-  return out;
-}
-
-/** Up to 2 overlapping gallery thumbs for listing cards (cover excluded when possible). */
-function listingGalleryPreviews(place: Business): string[] {
-  const cover = place.cover_image_url?.trim() || "";
-  const gallery = normalizeGalleryList(place.gallery_images);
-  const galleryOnly = gallery.filter((img) => img !== cover);
-  const pool = galleryOnly.length > 0 ? galleryOnly : gallery;
-  if (pool.length === 0) return [];
-  const resolvedPool = resolveGalleryUrls(pool);
-  if (resolvedPool.length >= 2) return resolvedPool.slice(0, 2);
-  if (resolvedPool.length === 1) {
-    const coverResolved = cover ? resolveMediaUrl(cover)?.trim() : "";
-    if (coverResolved && coverResolved !== resolvedPool[0]) {
-      return [resolvedPool[0], coverResolved];
-    }
-    return resolvedPool;
-  }
-  return [];
-}
-
 function listingDateLine(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -404,7 +358,15 @@ export function DiningPosterCard({
   const offerLabel = listingOfferBannerLabel(place.dining_offers);
   /** Shorter than full address — locality / first segment only. */
   const addressLine = locality || place.city_name?.trim() || "";
-  const galleryPreviews = isListing ? listingGalleryPreviews(place) : [];
+  const cuisineLine = (() => {
+    const raw = place.cuisine || place.type_name || "";
+    const tags = raw
+      .split(/[,·|/]/)
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    return tags.length ? tags.join(", ") : "Dining";
+  })();
 
   return (
     <Link
@@ -477,36 +439,25 @@ export function DiningPosterCard({
 
         {isListing ? (
           <>
-            <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center justify-between gap-5 sm:gap-6 min-w-0">
+              <p className="min-w-0 flex-1 truncate text-sm tracking-wide text-gray-600 font-normal leading-snug">
+                {cuisineLine}
+              </p>
+              <span className="shrink-0 whitespace-nowrap text-sm tracking-wide text-gray-600 font-normal leading-snug">
+                {priceForTwo}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-5 sm:gap-6 min-w-0">
               {addressLine ? (
-                <p className="text-sm tracking-wide text-gray-600 truncate leading-snug min-w-0 flex-1 pr-1">
+                <p className="min-w-0 flex-1 truncate text-sm tracking-wide text-gray-600 font-normal leading-snug">
                   {addressLine}
                 </p>
               ) : (
                 <span className="min-w-0 flex-1" />
               )}
-              {galleryPreviews.length > 0 ? (
-                <span
-                  className="relative shrink-0 flex items-center h-10 sm:h-11 pointer-events-none"
-                  style={{ width: galleryPreviews.length > 1 ? "3.25rem" : "2.25rem" }}
-                  aria-hidden
-                >
-                  {galleryPreviews.map((url, i) => (
-                    <span
-                      key={`${place.id}-lg-${i}`}
-                      className="absolute top-0 size-9 sm:size-10 rounded-full overflow-hidden border-[2.5px] border-white bg-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
-                      style={{ left: i * 14, zIndex: galleryPreviews.length - i }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="h-full w-full object-cover" />
-                    </span>
-                  ))}
-                </span>
-              ) : null}
-            </div>
-            <div className="flex items-center justify-between gap-4 min-w-0 pt-0.5 text-sm tracking-wide text-gray-600 truncate leading-snug">
-              <span className="min-w-0 truncate">{priceForTwo}</span>
-              <span className="shrink-0 whitespace-nowrap">{distance}</span>
+              <span className="shrink-0 whitespace-nowrap text-sm tracking-wide font-bold text-[#1C1C1C] leading-snug">
+                {distance}
+              </span>
             </div>
           </>
         ) : locality ? (
@@ -523,7 +474,7 @@ export function ShowcaseDiningPosterCard({
   image,
   rating,
   locality,
-  cuisine: _cuisine,
+  cuisine,
   href,
   className = "",
   listingMeta = false,
@@ -535,7 +486,7 @@ export function ShowcaseDiningPosterCard({
   cuisine?: string;
   href?: string;
   className?: string;
-  /** Dining-home static cards: address + cost + distance under the title. */
+  /** Dining-home static cards: cuisine · price · location · distance under the title. */
   listingMeta?: boolean;
 }) {
   const adaptive = useAdaptiveCard();
@@ -548,10 +499,22 @@ export function ShowcaseDiningPosterCard({
     compact: true,
   })} for two`;
   const distance = `${[4.9, 3.5, 5.0, 2.8, 6.2][idHash % 5]} km`;
+  const cuisineLine = (() => {
+    const tags = (cuisine || "")
+      .split(/[,·|/]/)
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    return tags.length ? tags.join(", ") : "Dining";
+  })();
 
   const body = (
     <>
-      <div className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7] rounded-2xl`}>
+      <div
+        className={`relative ${DINING_MEDIA} overflow-hidden bg-[#F7F7F7] ${
+          listingMeta ? "" : "rounded-2xl"
+        }`}
+      >
         <CoverImage
           src={image}
           alt={name}
@@ -560,7 +523,13 @@ export function ShowcaseDiningPosterCard({
           hoverScaleClass="group-hover:scale-[1.04]"
         />
       </div>
-      <div className={diningCardBody}>
+      <div
+        className={
+          listingMeta
+            ? "px-4 pt-3.5 pb-4 flex flex-col gap-1.5 min-w-0"
+            : diningCardBody
+        }
+      >
         <div className="flex items-center justify-between gap-5 sm:gap-6 min-w-0">
           <h3 className="text-base tracking-wide sm:text-lg font-bold text-[#1C1C1C] truncate min-w-0 flex-1 leading-snug pr-1">
             {name}
@@ -579,14 +548,25 @@ export function ShowcaseDiningPosterCard({
 
         {listingMeta ? (
           <>
-            {locality ? (
-              <p className="text-sm tracking-wide text-gray-600 truncate leading-snug max-w-[88%]">
-                {locality}
+            <div className="flex items-center justify-between gap-5 sm:gap-6 min-w-0">
+              <p className="min-w-0 flex-1 truncate text-sm tracking-wide text-gray-600 font-normal leading-snug">
+                {cuisineLine}
               </p>
-            ) : null}
-            <div className="flex items-center justify-between gap-4 min-w-0 pt-0.5 text-sm text-gray-700 font-semibold">
-              <span className="min-w-0 truncate">{priceForTwo}</span>
-              <span className="shrink-0 whitespace-nowrap">{distance}</span>
+              <span className="shrink-0 whitespace-nowrap text-sm tracking-wide text-gray-600 font-normal leading-snug">
+                {priceForTwo}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-5 sm:gap-6 min-w-0">
+              {locality ? (
+                <p className="min-w-0 flex-1 truncate text-sm tracking-wide text-gray-600 font-normal leading-snug">
+                  {locality}
+                </p>
+              ) : (
+                <span className="min-w-0 flex-1" />
+              )}
+              <span className="shrink-0 whitespace-nowrap text-sm tracking-wide font-bold text-[#1C1C1C] leading-snug">
+                {distance}
+              </span>
             </div>
           </>
         ) : locality ? (
@@ -596,16 +576,20 @@ export function ShowcaseDiningPosterCard({
     </>
   );
 
+  const shell = listingMeta
+    ? "overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300"
+    : diningCardShell;
+
   if (!href) {
     return (
-      <div className={`${widthClass} group block ${diningCardShell} ${className} select-none`}>
+      <div className={`${widthClass} group block ${shell} ${className} select-none`}>
         {body}
       </div>
     );
   }
 
   return (
-    <Link href={href} className={`${widthClass} group block ${diningCardShell} ${className}`}>
+    <Link href={href} className={`${widthClass} group block ${shell} ${className}`}>
       {body}
     </Link>
   );

@@ -114,7 +114,7 @@ export default function ChangePasswordForm({ variant = "light", className = "" }
       <button
         type="submit"
         disabled={isLoading}
-        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 text-white text-sm font-medium hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#111111] text-white text-sm font-medium hover:bg-[#222222] disabled:opacity-50 cursor-pointer"
       >
         {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
         Update password

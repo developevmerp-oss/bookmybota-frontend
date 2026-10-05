@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Clapperboard, Crown, Star } from "lucide-react";
+import { Clapperboard, Crown, Star } from "lucide-react";
+// import { ArrowRight } from "lucide-react"; // used by commented Book Now / View Details CTA
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
+import { formatMovieCardMeta } from "@/lib/movieDisplay";
 import {
-  formatMovieReleaseLabel,
+  // formatMovieReleaseLabel, // used by commented release date row
   movieDetailMeta,
   type MustWatchMovieCard,
 } from "./useMustWatchMoviesCatalog";
 
-const ACCENT = "#B08D57";
+// const ACCENT = "#B08D57"; // used by commented release date row
 
 const cardShell =
   "bg-white border border-[#EAEAEA] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(17,17,17,0.06)] hover:shadow-[0_8px_24px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300";
@@ -32,16 +34,16 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showPoster = Boolean(movie.poster) && !imgFailed;
   const meta = movieDetailMeta(movie);
-  const releaseLabel = formatMovieReleaseLabel(movie.releaseDate);
+  // const releaseLabel = formatMovieReleaseLabel(movie.releaseDate);
   const comingSoon = Boolean(movie.comingSoon);
   const promoted = Boolean(movie.promoted);
   const rating = meta.rating;
   const reviewsCount = Math.max(0, Number(movie.reviewsCount) || 0);
   const showRating = rating != null && !comingSoon;
-  const ctaClass =
-    "shrink-0 inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-[12px] font-semibold tracking-wide text-[#1C1C1C] shadow-sm transition-colors border-[#D4C4A8] group-hover:border-[#B08D57]";
+  // const ctaClass =
+  //   "shrink-0 inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-[12px] font-semibold tracking-wide text-[#1C1C1C] shadow-sm transition-colors border-[#D4C4A8] group-hover:border-[#B08D57]";
 
-  const detailParts = [meta.genres, meta.language, meta.format].filter(Boolean);
+  const metaLine = formatMovieCardMeta(movie.certification, movie.languages);
 
   return (
     <Link href={movie.href} className={`group block h-full w-full ${cardShell}`}>
@@ -119,12 +121,13 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
             ) : null}
           </div>
 
-          {detailParts.length > 0 ? (
+          {metaLine ? (
             <p className="min-w-0 text-sm tracking-wide text-gray-600 truncate leading-snug">
-              {detailParts.join(" · ")}
+              {metaLine}
             </p>
           ) : null}
 
+          {/* Date + Book Now / View Details — hidden on landing movie cards
           <div className="flex items-center justify-between gap-2 pt-1.5 min-w-0">
             {releaseLabel ? (
               <p
@@ -149,6 +152,7 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
               </span>
             )}
           </div>
+          */}
         </div>
       </article>
     </Link>

@@ -115,9 +115,9 @@ function formatLongDate(value?: string) {
 function MetaRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   if (!children) return null;
   return (
-    <div className="flex items-start gap-2.5 sm:gap-3 py-2 sm:py-2.5">
-      <span className="mt-0.5 w-5 shrink-0 text-[#9AA0A6] flex justify-center">{icon}</span>
-      <div className="min-w-0 text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] font-medium text-[#1A1A1A] leading-snug break-words">
+    <div className="flex items-start gap-2.5 sm:gap-3 py-2 sm:py-2.2">
+      <span className="mt-0.5 w-5 shrink-0 text-gray-800 flex justify-center">{icon}</span>
+      <div className="min-w-0 text-[1rem] sm:text-[1.0625rem] lg:text-[1rem]  text-gray-600 leading-snug break-words">
         {children}
       </div>
     </div>
@@ -592,11 +592,14 @@ export default function PublicEventDetailPage({
         </div>
       )}
 
-      <div className="border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 sm:gap-4">
+      <div className="border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 sm:gap-4 min-w-0">
         <div className="min-w-0 flex-1">
           {minPrice != null && Number.isFinite(minPrice) && (
-            <p className="text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] font-extrabold text-[#1A1A1A] leading-tight">
-              {formatMoney(minPrice, { compact: true })} onwards
+            <p className="text-[0.9375rem] sm:text-[1rem] lg:text-[1rem] leading-tight whitespace-nowrap">
+              <span className="font-bold text-[#1A1A1A]">
+                {formatMoney(minPrice, { compact: true })}
+              </span>{" "}
+              <span className="font-semibold text-gray-400">onwards</span>
             </p>
           )}
           {fillingFast && (
@@ -612,15 +615,15 @@ export default function PublicEventDetailPage({
           type="button"
           disabled={!canBook}
           onClick={() => openCheckout()}
-          className={`shrink-0 min-w-[7.5rem] sm:min-w-[8.75rem] px-4 sm:px-5 py-2.5 sm:py-3 rounded-[0.5rem] font-bold text-[0.9375rem] sm:text-[1rem] ${
+          className={`shrink-0 px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-[0.5rem] font-bold text-[0.875rem] sm:text-[0.9375rem] ${
             canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
           }`}
-          style={canBook ? { backgroundColor: BRAND } : undefined}
-        >
+          style={canBook ? { backgroundColor: "#111111" } : undefined}
+          >
           {bookLabel}
         </button>
-              </div>
-              </div>
+      </div>
+    </div>
   );
 
   return (
@@ -683,27 +686,27 @@ export default function PublicEventDetailPage({
           <span className="text-[#555]">{event.name}</span>
         </nav>
 
-        <div className="hidden lg:flex items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-5">
-          <h1 className="min-w-0 text-[1.75rem] sm:text-[2rem] lg:text-[2.25rem] 2xl:text-[2.5rem] font-extrabold text-[#1A1A1A] leading-tight tracking-tight break-words">
-            {event.name}
-            {/* {event.is_promoted ? (
-              <span className="ml-2 align-middle inline-flex items-center rounded-full bg-[#6900AA]/10 text-[#6900AA] border border-[#6900AA]/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                Promoted
-              </span>
-            ) : null} */}
-          </h1>
-          <button
-            type="button"
-            aria-label="Share"
-            onClick={() => setShareOpen(true)}
-            className="mt-0.5 sm:mt-1.5 shrink-0 h-9 w-9 sm:h-10 sm:w-10 rounded-full border border-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-50 cursor-pointer"
-          >
-            <Share2 size={18} />
-          </button>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-x-5 sm:gap-x-6 lg:gap-x-8 2xl:gap-x-10 gap-y-5 sm:gap-y-6 lg:gap-y-0">
+          <div className="hidden lg:flex items-center justify-between gap-3 mb-3 sm:mb-4 lg:mb-5 lg:col-start-1">
+            <h1 className="min-w-0 flex-1 text-[1.75rem] sm:text-[2rem] lg:text-[2.2rem] 2xl:text-[2.2rem] font-bold text-[#1A1A1A] leading-tight tracking-tight break-words">
+              {event.name}
+              {/* {event.is_promoted ? (
+                <span className="ml-2 align-middle inline-flex items-center rounded-full bg-[#6900AA]/10 text-[#6900AA] border border-[#6900AA]/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  Promoted
+                </span>
+              ) : null} */}
+            </h1>
+            <button
+              type="button"
+              aria-label="Share"
+              onClick={() => setShareOpen(true)}
+              className="shrink-0 h-9 w-9 sm:h-10 sm:w-10 rounded-full border border-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-50 cursor-pointer"
+            >
+              <Share2 size={18} />
+            </button>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px] gap-5 sm:gap-6 lg:gap-8 2xl:gap-10">
-          <div className="min-w-0">
+          <div className="min-w-0 lg:col-start-1">
             <EventMediaSlider
               eventName={event.name}
               posterHorizontal={resolveMediaUrl(event.poster_horizontal_url)}
@@ -715,7 +718,7 @@ export default function PublicEventDetailPage({
                 {categoryBadges.map((badge) => (
                   <span
                     key={badge}
-                    className="inline-flex items-center rounded-full bg-[#1B365D] text-white text-[0.875rem] sm:text-[1rem] font-semibold px-3 sm:px-3.5 py-1.5"
+                    className="inline-flex items-center rounded-2xl border border-gray-300 bg-white text-gray-800 text-[0.875rem] sm:text-[0.9375rem] font-semibold px-3 sm:px-3.5 py-1.5"
                   >
                     {badge}
                   </span>
@@ -760,8 +763,8 @@ export default function PublicEventDetailPage({
                       disabled={isTogglingInterest}
                       className="rounded-lg border px-3.5 sm:px-4 py-2 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer disabled:opacity-60"
                       style={{
-                        color: BRAND,
-                        borderColor: BRAND,
+                        color: "#B59B2A",
+                        borderColor: "#B59B2A",
                         backgroundColor: "transparent",
                       }}
                     >
@@ -776,10 +779,10 @@ export default function PublicEventDetailPage({
 
             {aboutText && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                   About The Event
                 </h2>
-                <p className="text-[1rem] sm:text-[1.0625rem] lg:text-[1.125rem] leading-7 sm:leading-[1.7] lg:leading-8 text-[#5A5A5A] whitespace-pre-wrap">
+                <p className="text-[1rem] sm:text-[1.0625rem] lg:text-[1rem] leading-7 sm:leading-[1.7] lg:leading-6 text-[#5A5A5A] whitespace-pre-wrap">
                   {displayAbout}
                   {aboutLong && (
                     <>
@@ -800,7 +803,7 @@ export default function PublicEventDetailPage({
 
             {ticketTypesDisplay.length > 0 && (
               <section className="mt-6 sm:mt-8 lg:mt-9">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                   Tickets
                 </h2>
                 <ul className="divide-y divide-[#EEE] rounded-xl border border-[#E8E8E8] overflow-hidden">
@@ -817,7 +820,7 @@ export default function PublicEventDetailPage({
                           Max {t.max_per_order} per order
                         </p>
                       </div>
-                      <p className="shrink-0 font-extrabold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem]">
+                      <p className="shrink-0 font-semibold text-[#1A1A1A] text-[1rem] sm:text-[1.0625rem]">
                         {formatMoney(t.price, { compact: true })}
                       </p>
                     </li>
@@ -828,7 +831,7 @@ export default function PublicEventDetailPage({
 
             {displayArtists.length > 0 && (
             <section className="mt-6 sm:mt-8 lg:mt-9">
-              <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A] mb-2.5 sm:mb-3">
+              <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                 Artists
               </h2>
               <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pb-1 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -915,7 +918,7 @@ export default function PublicEventDetailPage({
 
             {related.length > 0 && (
               <section className="mt-8 sm:mt-10 pt-5 sm:pt-6 border-t border-slate-200">
-                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-bold text-[#1A1A1A]">
+                <h2 className="text-[1.25rem] sm:text-[1.375rem] lg:text-[1.4rem] font-semibold text-[#1A1A1A] mb-2.5 sm:mb-2">
                   You May Also Like
                 </h2>
                 <p className="text-[1rem] sm:text-[1.0625rem] text-[#6B6B6B] mt-1 mb-3 sm:mb-4">
@@ -946,17 +949,20 @@ export default function PublicEventDetailPage({
 
           </div>
 
-          <aside className="hidden lg:block lg:sticky lg:top-[140px] 2xl:top-[148px] lg:self-start lg:z-30">
+          <aside className="hidden lg:block lg:sticky lg:top-[140px] 2xl:top-[148px] lg:self-start lg:z-30 lg:col-start-2 lg:row-start-2">
             {cloneElement(bookingCard)}
           </aside>
         </div>
       </div>
 
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-200 px-3 sm:px-4 pt-2.5 sm:pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-4">
+        <div className="min-w-0 flex-1 overflow-hidden">
           {minPrice != null && Number.isFinite(minPrice) && (
-            <p className="text-[1rem] sm:text-[1.0625rem] font-extrabold text-[#1A1A1A] leading-tight truncate">
-              {formatMoney(minPrice, { compact: true })} onwards
+            <p className="text-[0.9375rem] sm:text-[1rem] leading-tight whitespace-nowrap">
+              <span className="font-bold text-[#1A1A1A]">
+                {formatMoney(minPrice, { compact: true })}
+              </span>{" "}
+              <span className="font-semibold text-gray-400">onwards</span>
             </p>
           )}
           {fillingFast && (
@@ -970,7 +976,7 @@ export default function PublicEventDetailPage({
           className={`shrink-0 min-w-[7.5rem] px-5 sm:px-6 py-2.5 rounded-[0.5rem] font-bold text-[0.9375rem] sm:text-[1rem] ${
             canBook ? "text-white cursor-pointer" : "bg-slate-200 text-slate-500 cursor-not-allowed"
           }`}
-          style={canBook ? { backgroundColor: BRAND } : undefined}
+          style={canBook ? { backgroundColor: "#111111" } : undefined}
         >
           {bookLabel}
         </button>

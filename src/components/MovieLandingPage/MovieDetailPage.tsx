@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, ChevronRight, Play, Share2, Star, ThumbsUp } from "lucide-react";
@@ -21,6 +21,10 @@ import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSectio
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import { MovieDetailShimmer } from "@/components/Shared/Shimmer";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
+
+/** Matches MovieDetailBanner desktop Book Tickets CTA */
+const HERO_BOOK_BTN_CLASS =
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity";
 
 function mapPlatformOffersToMovieOffers(
   offers: Array<{
@@ -360,6 +364,8 @@ export default function MovieDetailPage() {
   const params = useParams();
   const idOrSlug = String(params?.id || "");
   const headerOffset = useStickyHeaderOffset();
+  const heroEndRef = useRef<HTMLDivElement>(null);
+  const [showStickyBar, setShowStickyBar] = useState(false);
 
   const { data: apiMovie, isLoading, isError } = useGetPublicMovieQuery(idOrSlug, {
     skip: !idOrSlug,
@@ -387,6 +393,25 @@ export default function MovieDetailPage() {
     );
   }, [apiMovie, cinemaOffers]);
 
+  useEffect(() => {
+    const el = heroEndRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyBar(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0,
+        rootMargin: `-${Math.max(headerOffset, 0)}px 0px 0px 0px`,
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [headerOffset, movie?.id]);
+
   if (isLoading) {
     return <MovieDetailShimmer />;
   }
@@ -407,24 +432,31 @@ export default function MovieDetailPage() {
   return (
     <div className="min-h-screen bg-white pb-24 lg:pb-0">
       <MovieDetailBanner movie={movie} />
+      {/* Sentinel: sticky bar appears only after hero fully scrolls past */}
+      <div ref={heroEndRef} className="h-px w-full" aria-hidden />
 
-      {/* Desktop — sticky title + Book tickets (below hero, under site header) */}
+      {/* Sticky title + Book tickets — shows after hero is done */}
       <div
-        className="hidden lg:block sticky z-30 w-full border-b border-slate-200 bg-white"
+        className={`fixed left-0 right-0 z-30 w-full border-b border-slate-200 bg-white transition-transform duration-200 ${
+          showStickyBar ? "translate-y-0" : "-translate-y-full pointer-events-none"
+        }`}
         style={{ top: headerOffset }}
+        aria-hidden={!showStickyBar}
       >
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 flex items-center justify-between gap-4 py-3.5">
-          <h2 className="min-w-0 truncate text-lg xl:text-xl font-bold text-[#111111]">
+        <div className="container mx-auto px-4 sm:px-10 lg:px-10 2xl:px-0 flex items-center justify-between gap-3 py-3 sm:py-3.5">
+          <h2 className="min-w-0 truncate text-base sm:text-lg xl:text-xl font-bold text-[#111111]">
             {movie.title}
           </h2>
           {movie.comingSoon ? (
-            <span className="shrink-0 inline-flex items-center justify-center rounded-md bg-[#F84464]/80 px-5 py-2.5 text-sm font-bold text-white">
+            <span
+              className={`${HERO_BOOK_BTN_CLASS} shrink-0 opacity-80 cursor-default rounded-md text-xs sm:text-sm px-4 sm:px-5`}
+            >
               Coming Soon
             </span>
           ) : (
             <Link
               href={bookHref}
-              className="shrink-0 inline-flex items-center justify-center rounded-md bg-[#F84464] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#E03858] transition-colors"
+              className={`${HERO_BOOK_BTN_CLASS} shrink-0 rounded-md text-xs sm:text-sm px-4 sm:px-5`}
             >
               Book tickets
             </Link>
@@ -434,18 +466,19 @@ export default function MovieDetailPage() {
 
       <MovieDetailSections movie={movie} idOrSlug={idOrSlug} />
 
-      {/* Sticky Book Tickets — mobile / tablet */}
+      {/* Sticky Book Tickets — mobile / tablet bottom (hero button color) */}
       <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-4 py-3 safe-area-pb">
         {movie.comingSoon ? (
-          <span className="flex w-full items-center justify-center rounded-xl bg-[#111111] px-5 py-3.5 text-base font-bold text-white opacity-80">
+          <span className="flex w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-3.5 text-base font-bold text-white opacity-80">
             Coming Soon
           </span>
         ) : (
           <Link
             href={bookHref}
-            className="flex w-full items-center justify-center rounded-xl bg-[#111111] px-5 py-3.5 text-base font-bold text-white hover:bg-zinc-900 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity"
           >
             Book Tickets
+            <ArrowRight className="size-5" strokeWidth={2.25} />
           </Link>
         )}
       </div>

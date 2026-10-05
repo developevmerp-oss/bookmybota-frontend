@@ -18,6 +18,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatMoney } from "@/lib/currencyFormat";
 import {
   useGetPublicStadiumBlocksQuery,
   useGetStadiumBlockSeatsQuery,
@@ -55,6 +56,8 @@ export type StadiumBlock = {
   available: number;
   booked: number;
   tiers: StadiumTier[];
+  /** From stadium seating_config when API spreads block */
+  price?: number;
 };
 
 export type TierSeat = {
@@ -125,7 +128,7 @@ export default function StadiumLayoutViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [containerSize, setContainerSize] = useState({ width: 900, height: 560 });
-  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomScale, setZoomScale] = useState<number | null>(null);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
   // Measure the actual map pane so the stadium fits the visible area (not a capped 65vh)
@@ -154,57 +157,147 @@ export default function StadiumLayoutViewer({
   const pitchH = (data as any)?.ground?.height ?? canvasHeight * 0.56;
   const pitchRot = (data as any)?.ground?.rotation ?? 0;
 
-  // Fit full stadium into the map pane with comfortable padding
+  // Fit full stadium into the map pane with comfortable padding on all sides
   const baseScale = useMemo(() => {
-    const pad = 48;
-    return Math.min(
-      (containerSize.width - pad) / canvasWidth,
-      (containerSize.height - pad) / canvasHeight
-    );
+    const pad = 64;
+    const availW = Math.max(120, containerSize.width - pad * 2);
+    const availH = Math.max(120, containerSize.height - pad * 2);
+    return Math.min(availW / canvasWidth, availH / canvasHeight);
   }, [containerSize, canvasWidth, canvasHeight]);
+
+  const fitStagePos = useMemo(
+    () => ({
+      x: (containerSize.width - canvasWidth * baseScale) / 2,
+      y: (containerSize.height - canvasHeight * baseScale) / 2,
+    }),
+    [containerSize, canvasWidth, canvasHeight, baseScale]
+  );
 
   const selectedBlock = useMemo(() => {
     return data?.blocks.find((b) => b.block_id === selectedBlockId) || null;
   }, [data?.blocks, selectedBlockId]);
 
   // Fetch all seats for the selected block
-  const { data: blockSeatsData, isLoading: seatsLoading } = useGetStadiumBlockSeatsQuery(
+  const {
+    data: blockSeatsData,
+    isLoading: seatsLoading,
+    isFetching: seatsFetching,
+    isError: seatsError,
+  } = useGetStadiumBlockSeatsQuery(
     { eventId, blockId: selectedBlockId || "" },
     { skip: !selectedBlockId }
   );
 
   const rawSeats = blockSeatsData?.seats || [];
+  // Show loading from stand select until seat payload arrives (avoids empty map flash)
+  const seatsPending =
+    Boolean(selectedBlockId) &&
+    !seatsError &&
+    (seatsLoading || seatsFetching || !blockSeatsData);
+
+  const formatPrice = useCallback((val: number) => formatMoney(val, { compact: true }), []);
+
+  const ticketPriceById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const tt of ticketTypes) {
+      const id = String(tt.id ?? "").trim();
+      if (!id) continue;
+      map.set(id, Number(tt.price) || 0);
+    }
+    return map;
+  }, [ticketTypes]);
+
+  const lookupTicketPrice = useCallback(
+    (ticketTypeId: string | null | undefined) => {
+      const id = String(ticketTypeId ?? "").trim();
+      if (!id) return null;
+      if (!ticketPriceById.has(id)) return null;
+      const n = ticketPriceById.get(id)!;
+      return n > 0 ? n : null;
+    },
+    [ticketPriceById]
+  );
+
+  // Same ticket price used when a seat is selected on the map
+  const getTierPrice = useCallback(
+    (tier: StadiumTier) => {
+      const fromTicket = lookupTicketPrice(tier.ticket_type_id);
+      if (fromTicket != null) return fromTicket;
+      if (tier.price != null && !Number.isNaN(Number(tier.price))) {
+        const n = Number(tier.price);
+        if (n > 0) return n;
+      }
+      return null;
+    },
+    [lookupTicketPrice]
+  );
+
+  const getBlockMinPrice = useCallback(
+    (block: StadiumBlock) => {
+      const prices: number[] = [];
+      const blockLevel = Number(block.price);
+      if (Number.isFinite(blockLevel) && blockLevel > 0) prices.push(blockLevel);
+      for (const t of block.tiers) {
+        const p = getTierPrice(t);
+        if (p != null) prices.push(p);
+      }
+      if (prices.length === 0) return null;
+      return Math.min(...prices);
+    },
+    [getTierPrice]
+  );
+
+  const standPriceAndLeftLabel = useCallback(
+    (block: StadiumBlock, minPrice: number | null) => {
+      const isSoldOut = block.available === 0 && block.total > 0;
+      if (isSoldOut) return "Sold out";
+      const left = `${block.available} left`;
+      if (minPrice != null && minPrice > 0) {
+        return `${formatPrice(minPrice)} · ${left}`;
+      }
+      return left;
+    },
+    [formatPrice]
+  );
+
+  const tierPriceAndLeftLabel = useCallback(
+    (tier: StadiumTier, tierPrice: number | null) => {
+      const isSoldOut = tier.available === 0 && tier.total > 0;
+      if (isSoldOut) return "SOLD OUT";
+      const left = `${tier.available} left`;
+      if (tierPrice != null && tierPrice > 0) {
+        return `${formatPrice(tierPrice)} · ${left}`;
+      }
+      return left;
+    },
+    [formatPrice]
+  );
 
   // Map price to seats based on ticketTypes
   const blockSeats: TierSeat[] = useMemo(() => {
     return rawSeats.map((s) => {
-      const tt = ticketTypes.find((t) => t.id === s.ticket_type_id);
+      const fromTicket = lookupTicketPrice(s.ticket_type_id);
       return {
         ...s,
-        price: tt ? Number(tt.price) : 0,
+        price: fromTicket ?? 0,
       };
     });
-  }, [rawSeats, ticketTypes]);
+  }, [rawSeats, lookupTicketPrice]);
 
-  // Initial centering of the full stadium
+  // Keep overview instantly fitted so the whole stadium is visible on first paint
   useEffect(() => {
-    if (!selectedBlockId) {
-      const centerX = (containerSize.width - canvasWidth * baseScale) / 2;
-      const centerY = (containerSize.height - canvasHeight * baseScale) / 2;
-      setZoomScale(baseScale);
-      setStagePos({ x: centerX, y: centerY });
-      if (stageRef.current) {
-        stageRef.current.to({
-          x: centerX,
-          y: centerY,
-          scaleX: baseScale,
-          scaleY: baseScale,
-          duration: 0.35,
-          easing: Konva.Easings.EaseInOut,
-        });
-      }
-    }
-  }, [baseScale, canvasWidth, canvasHeight, containerSize, selectedBlockId]);
+    if (selectedBlockId) return;
+    setZoomScale(baseScale);
+    setStagePos(fitStagePos);
+    const stage = stageRef.current;
+    if (!stage) return;
+    stage.scale({ x: baseScale, y: baseScale });
+    stage.position(fitStagePos);
+    stage.batchDraw();
+  }, [baseScale, fitStagePos, selectedBlockId]);
+
+  const activeZoomScale = zoomScale ?? baseScale;
+  const activeStagePos = zoomScale == null ? fitStagePos : stagePos;
 
   // Handle Block Click — BookMyShow smooth zoom into block + show seats on canvas
   const handleBlockClick = useCallback(
@@ -314,19 +407,19 @@ export default function StadiumLayoutViewer({
     setShowTierPicker(false);
     setSelectedRow(null);
     setHoveredSeat(null);
-    const cx = (containerSize.width - canvasWidth * baseScale) / 2;
-    const cy = (containerSize.height - canvasHeight * baseScale) / 2;
     setZoomScale(baseScale);
-    setStagePos({ x: cx, y: cy });
+    setStagePos(fitStagePos);
     if (stageRef.current) {
       stageRef.current.to({
-        x: cx, y: cy,
-        scaleX: baseScale, scaleY: baseScale,
+        x: fitStagePos.x,
+        y: fitStagePos.y,
+        scaleX: baseScale,
+        scaleY: baseScale,
         duration: 0.42,
         easing: Konva.Easings.EaseInOut,
       });
     }
-  }, [baseScale, canvasWidth, canvasHeight, containerSize]);
+  }, [baseScale, fitStagePos]);
 
   // Cursor-centered mouse-wheel zoom (BookMyShow style)
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -356,7 +449,8 @@ export default function StadiumLayoutViewer({
 
   // Handle manual zoom buttons
   const handleZoomChange = (delta: number) => {
-    const newScale = Math.max(0.3, Math.min(5, zoomScale + delta));
+    const current = zoomScale ?? baseScale;
+    const newScale = Math.max(0.3, Math.min(5, current + delta));
     setZoomScale(newScale);
     if (stageRef.current) {
       stageRef.current.to({
@@ -366,6 +460,21 @@ export default function StadiumLayoutViewer({
       });
     }
   };
+
+  const handleFitStadium = useCallback(() => {
+    setZoomScale(baseScale);
+    setStagePos(fitStagePos);
+    if (stageRef.current) {
+      stageRef.current.to({
+        x: fitStagePos.x,
+        y: fitStagePos.y,
+        scaleX: baseScale,
+        scaleY: baseScale,
+        duration: 0.35,
+        easing: Konva.Easings.EaseInOut,
+      });
+    }
+  }, [baseScale, fitStagePos]);
 
   // Seat toggle selection
   const handleSeatClick = useCallback(
@@ -392,29 +501,6 @@ export default function StadiumLayoutViewer({
       onSeatsSelected(next);
     },
     [selectedSeats, maxSelectable, onSeatsSelected]
-  );
-
-  // Price helper for a block
-  const getBlockMinPrice = useCallback(
-    (block: StadiumBlock) => {
-      const prices = block.tiers
-        .map((t) => {
-          const match = ticketTypes.find((tt) => tt.id === t.ticket_type_id);
-          return match ? Number(match.price) : null;
-        })
-        .filter((p): p is number => p !== null);
-      if (prices.length === 0) return null;
-      return Math.min(...prices);
-    },
-    [ticketTypes]
-  );
-
-  const formatPrice = useCallback(
-    (val: number) => {
-      const curr = (ticketTypes[0] as any)?.currency || "";
-      return `${curr} ${val.toLocaleString()}`.trim();
-    },
-    [ticketTypes]
   );
 
   // Filtered blocks if category filter is active
@@ -769,7 +855,7 @@ export default function StadiumLayoutViewer({
         </div>
 
         <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center gap-2.5 bg-[#F8FAFC]">
-          {seatsLoading ? (
+          {seatsPending ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
               <Loader2 className="w-8 h-8 text-[#6900AA] animate-spin" />
               <p className="text-xs font-medium">Loading block seats…</p>
@@ -851,7 +937,7 @@ export default function StadiumLayoutViewer({
                 {selectedBlock && (
                   <div className="flex items-center gap-1 text-[11px] min-w-0">
                     <span className="font-bold text-slate-800 truncate">{selectedBlock.name}</span>
-                    {seatsLoading && <Loader2 className="w-3 h-3 text-[#6900AA] animate-spin shrink-0" />}
+                    {seatsPending && <Loader2 className="w-3 h-3 text-[#6900AA] animate-spin shrink-0" />}
                   </div>
                 )}
               </div>
@@ -860,7 +946,7 @@ export default function StadiumLayoutViewer({
                 <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#6900AA] bg-[#F7E9FF] px-1.5 py-0.5 rounded border border-[#E3BCFF] shrink-0">
                   Stadium
                 </span>
-                <h2 className="text-[12px] font-bold text-slate-900 truncate">
+                <h2 className="text-[0.8125rem] sm:text-[0.875rem] font-semibold text-gray-800 truncate">
                   {data.stadium_name || "Stadium Ground"}
                 </h2>
               </div>
@@ -893,18 +979,6 @@ export default function StadiumLayoutViewer({
                 </button>
               </div>
             )}
-
-            <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md border border-slate-200">
-              <button onClick={() => handleZoomChange(0.25)} className="p-1 text-slate-500 hover:text-slate-900 rounded hover:bg-white" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
-              <button onClick={() => handleZoomChange(-0.25)} className="p-1 text-slate-500 hover:text-slate-900 rounded hover:bg-white" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
-              <button onClick={() => {
-                const centerX = (containerSize.width - canvasWidth * baseScale) / 2;
-                const centerY = (containerSize.height - canvasHeight * baseScale) / 2;
-                setZoomScale(baseScale);
-                setStagePos({ x: centerX, y: centerY });
-                if (stageRef.current) stageRef.current.to({ x: centerX, y: centerY, scaleX: baseScale, scaleY: baseScale, duration: 0.35, easing: Konva.Easings.EaseInOut });
-              }} className="p-1 text-slate-500 hover:text-slate-900 rounded hover:bg-white" title="Fit stadium"><RotateCcw className="w-3.5 h-3.5" /></button>
-            </div>
           </div>
         </div>
 
@@ -944,51 +1018,6 @@ export default function StadiumLayoutViewer({
           </div>
         )}
 
-        {!selectedBlockId && data.blocks.length > 0 && (
-          <div className="flex items-center gap-1.5 px-2.5 sm:px-3 pb-2 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
-            <button
-              onClick={() => setSelectedCategoryFilter(null)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-all whitespace-nowrap ${
-                selectedCategoryFilter === null
-                  ? "bg-[#6900AA] text-white border-[#6900AA] shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#6900AA]/40 hover:text-slate-900"
-              }`}
-            >
-              All stands
-            </button>
-            {data.blocks.map((block) => {
-              const isSoldOut = block.available === 0 && block.total > 0;
-              const minPrice = getBlockMinPrice(block);
-              const isActive = selectedCategoryFilter != null && block.tiers.some((t) => t.ticket_type_id === selectedCategoryFilter);
-              return (
-                <button
-                  key={block.block_id}
-                  onClick={() => {
-                    setSelectedCategoryFilter(block.tiers[0]?.ticket_type_id ?? null);
-                    if (!isSoldOut) handleBlockClick(block);
-                  }}
-                  disabled={isSoldOut}
-                  title={isSoldOut ? `${block.name} — Sold Out` : `Open ${block.name}`}
-                  className={`shrink-0 px-3 py-1.5 rounded-xl border transition-all text-left whitespace-nowrap ${
-                    isSoldOut
-                      ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-                      : isActive
-                      ? "bg-[#F7E9FF] border-[#6900AA]/40 text-slate-900"
-                      : "bg-white border-slate-200 text-slate-700 hover:border-[#6900AA]/40"
-                  }`}
-                >
-                  <span className="block text-[12px] font-extrabold leading-tight truncate max-w-[160px]">
-                    {block.name}
-                  </span>
-                  <span className="block text-[11px] text-[#6900AA] font-semibold leading-tight mt-0.5">
-                    {isSoldOut ? "Sold out" : minPrice !== null ? `From ETB ${minPrice.toLocaleString()}` : `${block.available} left`}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {selectedBlock && selectedBlock.tiers.length > 1 && !showTierPicker && (
           <div className="flex items-center gap-1 px-2.5 sm:px-3 pb-1.5 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
             <button
@@ -1022,15 +1051,72 @@ export default function StadiumLayoutViewer({
         )}
       </div>
 
-      {/* ── Interactive Konva Canvas (Zoomable Pitch + Stands + Seats) ── */}
-      <div
-        ref={containerRef}
-        className="flex-1 min-h-0 w-full bg-[#EEF2F7] relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
-      >
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Stands list — vertical column on the left */}
+        {!selectedBlockId && data.blocks.length > 0 && (
+          <aside className="w-[14.5rem] sm:w-[17rem] shrink-0 border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden z-10">
+            <div className="flex flex-col gap-1.5 p-2 sm:p-2.5">
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryFilter(null)}
+                className={`w-full px-3 py-2 rounded-full text-[0.875rem] sm:text-[0.9375rem] font-semibold border transition-all text-center ${
+                  selectedCategoryFilter === null
+                    ? "bg-[#6900AA] text-white border-[#6900AA] shadow-sm"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-[#6900AA]/40 hover:text-slate-900"
+                }`}
+              >
+                All stands
+              </button>
+              {data.blocks.map((block) => {
+                const isSoldOut = block.available === 0 && block.total > 0;
+                const minPrice = getBlockMinPrice(block);
+                const isActive =
+                  selectedCategoryFilter != null &&
+                  block.tiers.some((t) => t.ticket_type_id === selectedCategoryFilter);
+                return (
+                  <button
+                    key={block.block_id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategoryFilter(block.tiers[0]?.ticket_type_id ?? null);
+                      if (!isSoldOut) handleBlockClick(block);
+                    }}
+                    disabled={isSoldOut}
+                    title={isSoldOut ? `${block.name} — Sold Out` : `Open ${block.name}`}
+                    className={`w-full px-2.5 py-2 rounded-xl border transition-all text-left ${
+                      isSoldOut
+                        ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
+                        : isActive
+                        ? "bg-[#F7E9FF] border-[#6900AA]/40 text-slate-900"
+                        : "bg-white border-slate-200 text-slate-700 hover:border-[#6900AA]/40"
+                    }`}
+                  >
+                    <span className="block text-[0.8125rem] sm:text-[0.875rem] font-semibold text-gray-800 leading-tight line-clamp-2">
+                      {block.name}
+                    </span>
+                    <span className="block text-[0.75rem] sm:text-[0.8125rem] text-[#6900AA] font-semibold leading-tight mt-0.5">
+                      {standPriceAndLeftLabel(block, minPrice)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+        )}
+
+        {/* ── Interactive Konva Canvas (Zoomable Pitch + Stands + Seats) ── */}
+        <div
+          ref={containerRef}
+          className="flex-1 min-h-0 w-full bg-[#EEF2F7] relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
+        >
         <Stage
           ref={stageRef}
           width={containerSize.width}
           height={containerSize.height}
+          scaleX={activeZoomScale}
+          scaleY={activeZoomScale}
+          x={activeStagePos.x}
+          y={activeStagePos.y}
           draggable
           onWheel={handleWheel}
           onDragEnd={(e) => {
@@ -1536,7 +1622,7 @@ export default function StadiumLayoutViewer({
                           const midR = (tierInR + tierOutR) / 2;
                           const tierLabelX = sCenterX + Math.cos(midAngleRad) * midR;
                           const tierLabelY = sCenterY + Math.sin(midAngleRad) * midR;
-                          const assigned = ticketTypes.find((tt) => tt.id === tier.ticket_type_id);
+                          const tierPrice = getTierPrice(tier);
 
                           return (
                             <Group key={tier.tier_id || `arc-tier-${tIdx}`}>
@@ -1592,36 +1678,33 @@ export default function StadiumLayoutViewer({
                                 <Group x={tierLabelX} y={tierLabelY}>
                                   <Text
                                     text={tier.name.toUpperCase()}
-                                    x={-60}
-                                    y={-10}
-                                    width={120}
+                                    x={-70}
+                                    y={-12}
+                                    width={140}
                                     align="center"
-                                    fontSize={9}
+                                    fontSize={11}
                                     fontStyle="bold"
                                     fill={isTierSoldOut ? "#94a3b8" : "#ffffff"}
                                     shadowColor="#000000"
-                                    shadowBlur={3}
+                                    shadowBlur={5}
+                                    shadowOpacity={0.55}
                                     listening={false}
                                     wrap="none"
                                     ellipsis={true}
                                   />
                                   <Text
                                     text={
-                                      isTierSoldOut
-                                        ? "SOLD OUT"
-                                        : assigned?.price !== undefined
-                                        ? `${formatPrice(assigned.price)} · ${tier.available} left`
-                                        : `${tier.available} seats`
+                                      tierPriceAndLeftLabel(tier, tierPrice)
                                     }
-                                    x={-60}
+                                    x={-70}
                                     y={2}
-                                    width={120}
+                                    width={140}
                                     align="center"
-                                    fontSize={8}
+                                    fontSize={10}
                                     fontStyle="bold"
-                                    fill={isTierSoldOut ? "#ef4444" : "#fde047"}
+                                    fill={isTierSoldOut ? "#ef4444" : "#FEF08A"}
                                     shadowColor="#000000"
-                                    shadowBlur={3}
+                                    shadowBlur={4}
                                     listening={false}
                                     wrap="none"
                                     ellipsis={true}
@@ -1635,31 +1718,46 @@ export default function StadiumLayoutViewer({
                         {!isSelected && (
                           <Group x={labelX} y={labelY}>
                             <Rect
-                              x={-55}
-                              y={-10}
-                              width={110}
-                              height={20}
+                              x={-72}
+                              y={!isSoldOut ? -16 : -12}
+                              width={144}
+                              height={!isSoldOut ? 36 : 24}
                               cornerRadius={10}
                               fill="#FFFFFF"
                               stroke={isHovered ? "#6900AA" : "#CBD5E1"}
-                              strokeWidth={1}
+                              strokeWidth={1.25}
                               shadowColor="#0f172a"
-                              shadowBlur={4}
-                              shadowOpacity={0.12}
+                              shadowBlur={6}
+                              shadowOpacity={0.16}
                             />
                             <Text
                               text={block.name.toUpperCase()}
-                              x={-55}
-                              y={-5}
-                              width={110}
+                              x={-72}
+                              y={!isSoldOut ? -10 : -6}
+                              width={144}
                               align="center"
-                              fontSize={9.5}
+                              fontSize={12}
                               fontStyle="bold"
-                              fill="#1E293B"
+                              fill="#1F2937"
                               listening={false}
                               wrap="none"
                               ellipsis={true}
                             />
+                            {!isSoldOut && (
+                              <Text
+                                text={standPriceAndLeftLabel(block, minPrice)}
+                                x={-72}
+                                y={6}
+                                width={144}
+                                align="center"
+                                fontSize={10}
+                                fontStyle="bold"
+                                fill="#6900AA"
+                                listening={false}
+                                wrap="none"
+                                ellipsis={true}
+                              />
+                            )}
                           </Group>
                         )}
                       </>
@@ -1700,58 +1798,56 @@ export default function StadiumLayoutViewer({
 
                         {!isSelected && (
                           <Group x={labelX} y={labelY}>
+                            <Rect
+                              x={-80}
+                              y={-20}
+                              width={160}
+                              height={!isSoldOut ? 42 : 26}
+                              cornerRadius={10}
+                              fill="#FFFFFF"
+                              opacity={0.97}
+                              stroke={isHovered ? "#6900AA" : "#CBD5E1"}
+                              strokeWidth={1.25}
+                              shadowColor="#0f172a"
+                              shadowBlur={6}
+                              shadowOpacity={0.16}
+                            />
                             <Text
                               text={block.name.toUpperCase()}
-                              x={-75}
-                              y={-18}
-                              width={150}
+                              x={-80}
+                              y={-12}
+                              width={160}
                               align="center"
-                              fontSize={10}
+                              fontSize={12}
                               fontStyle="bold"
-                              fill={isSoldOut ? "#64748B" : "#1E293B"}
-                              shadowColor="#FFFFFF"
-                              shadowBlur={3}
+                              fill={isSoldOut ? "#64748B" : "#1F2937"}
                               listening={false}
                               wrap="none"
                               ellipsis={true}
                             />
-                            {minPrice !== null && !isSoldOut && (
-                              <Group y={0}>
-                                <Rect
-                                  x={-36}
-                                  y={0}
-                                  width={72}
-                                  height={18}
-                                  cornerRadius={9}
-                                  fill="#FFFFFF"
-                                  opacity={0.96}
-                                  stroke={isHovered ? "#6900AA" : "#CBD5E1"}
-                                  strokeWidth={1}
-                                  shadowColor="#0f172a"
-                                  shadowBlur={4}
-                                  shadowOpacity={0.1}
-                                />
-                                <Text
-                                  text={formatPrice(minPrice)}
-                                  x={-36}
-                                  y={3}
-                                  width={72}
-                                  align="center"
-                                  fontSize={10}
-                                  fontStyle="bold"
-                                  fill="#6900AA"
-                                  listening={false}
-                                />
-                              </Group>
+                            {!isSoldOut && (
+                              <Text
+                                text={standPriceAndLeftLabel(block, minPrice)}
+                                x={-80}
+                                y={6}
+                                width={160}
+                                align="center"
+                                fontSize={10}
+                                fontStyle="bold"
+                                fill="#6900AA"
+                                listening={false}
+                                wrap="none"
+                                ellipsis={true}
+                              />
                             )}
                             {isSoldOut && (
                               <Text
                                 text="SOLD OUT"
-                                x={-40}
-                                y={2}
-                                width={80}
+                                x={-80}
+                                y={6}
+                                width={160}
                                 align="center"
-                                fontSize={9}
+                                fontSize={10}
                                 fontStyle="bold"
                                 fill="#ef4444"
                                 listening={false}
@@ -1852,7 +1948,7 @@ export default function StadiumLayoutViewer({
                         const isTierSoldOut = tier.available === 0 && tier.total > 0;
                         const isFirst = tIdx === 0;
                         const isLast = tIdx === numTiers - 1;
-                        const assigned = ticketTypes.find((tt) => tt.id === tier.ticket_type_id);
+                        const assignedPrice = getTierPrice(tier);
 
                         return (
                           <Group key={tier.tier_id || `tier-slice-${tIdx}`}>
@@ -1909,33 +2005,28 @@ export default function StadiumLayoutViewer({
                                   y={tierY + Math.max(3, tierH * 0.15)}
                                   width={block.width - 12}
                                   align="center"
-                                  fontSize={Math.max(10, Math.min(block.width * 0.05, tierH * 0.32))}
+                                  fontSize={Math.max(12, Math.min(block.width * 0.06, tierH * 0.36))}
                                   fontStyle="bold"
                                   fill={isTierSoldOut ? "#94a3b8" : "#ffffff"}
                                   shadowColor="#000000"
-                                  shadowBlur={4}
+                                  shadowBlur={5}
+                                  shadowOpacity={0.55}
                                   listening={false}
                                   wrap="none"
                                   ellipsis={true}
                                   perfectDrawEnabled={false}
                                 />
                                 <Text
-                                  text={
-                                    isTierSoldOut
-                                      ? "SOLD OUT"
-                                      : assigned?.price !== undefined
-                                      ? `${formatPrice(assigned.price)} · ${tier.available} left`
-                                      : `${tier.available} seats avail`
-                                  }
+                                  text={tierPriceAndLeftLabel(tier, assignedPrice)}
                                   x={6}
-                                  y={tierY + Math.max(16, tierH * 0.55)}
+                                  y={tierY + Math.max(18, tierH * 0.55)}
                                   width={block.width - 12}
                                   align="center"
-                                  fontSize={Math.max(9, Math.min(block.width * 0.038, tierH * 0.24))}
+                                  fontSize={Math.max(10, Math.min(block.width * 0.045, tierH * 0.28))}
                                   fontStyle="bold"
-                                  fill={isTierSoldOut ? "#ef4444" : "#fde047"}
+                                  fill={isTierSoldOut ? "#ef4444" : "#FEF08A"}
                                   shadowColor="#000000"
-                                  shadowBlur={3}
+                                  shadowBlur={4}
                                   listening={false}
                                   wrap="none"
                                   ellipsis={true}
@@ -1949,29 +2040,29 @@ export default function StadiumLayoutViewer({
 
                       {/* Stand Name Header Pill on top */}
                       {!isSelected && (
-                        <Group x={block.width / 2} y={-8}>
+                        <Group x={block.width / 2} y={-10}>
                           <Rect
-                            x={-Math.min(75, block.width * 0.45)}
-                            y={-9}
-                            width={Math.min(150, block.width * 0.9)}
-                            height={18}
-                            cornerRadius={9}
+                            x={-Math.min(90, block.width * 0.48)}
+                            y={-11}
+                            width={Math.min(180, block.width * 0.96)}
+                            height={22}
+                            cornerRadius={11}
                             fill="#FFFFFF"
                             stroke={isHovered ? "#6900AA" : "#CBD5E1"}
-                            strokeWidth={1}
+                            strokeWidth={1.25}
                             shadowColor="#0f172a"
-                            shadowBlur={4}
-                            shadowOpacity={0.1}
+                            shadowBlur={5}
+                            shadowOpacity={0.14}
                           />
                           <Text
                             text={block.name.toUpperCase()}
-                            x={-Math.min(75, block.width * 0.45)}
+                            x={-Math.min(90, block.width * 0.48)}
                             y={-5}
-                            width={Math.min(150, block.width * 0.9)}
+                            width={Math.min(180, block.width * 0.96)}
                             align="center"
-                            fontSize={9.5}
+                            fontSize={12}
                             fontStyle="bold"
-                            fill="#1E293B"
+                            fill="#1F2937"
                             listening={false}
                             wrap="none"
                             ellipsis={true}
@@ -2034,11 +2125,12 @@ export default function StadiumLayoutViewer({
                             y={Math.max(6, block.height * 0.12)}
                             width={block.width}
                             align="center"
-                            fontSize={Math.max(13, Math.min(block.width, block.height) * 0.14)}
+                            fontSize={Math.max(15, Math.min(block.width, block.height) * 0.16)}
                             fontStyle="bold"
                             fill={isSoldOut ? "#94a3b8" : "#ffffff"}
                             shadowColor="#000000"
-                            shadowBlur={4}
+                            shadowBlur={6}
+                            shadowOpacity={0.6}
                             listening={false}
                             wrap="none"
                             ellipsis={true}
@@ -2047,22 +2139,16 @@ export default function StadiumLayoutViewer({
 
                           {block.total > 0 && (
                             <Text
-                              text={
-                                isSoldOut
-                                  ? "SOLD OUT"
-                                  : minPrice !== null
-                                  ? `ETB ${minPrice.toLocaleString()} · ${block.available} seats`
-                                  : `${block.available} seats avail`
-                              }
+                              text={standPriceAndLeftLabel(block, minPrice)}
                               x={0}
-                              y={Math.max(26, block.height * 0.52)}
+                              y={Math.max(28, block.height * 0.52)}
                               width={block.width}
                               align="center"
-                              fontSize={Math.max(10, Math.min(block.width, block.height) * 0.1)}
+                              fontSize={Math.max(11, Math.min(block.width, block.height) * 0.11)}
                               fontStyle="bold"
-                              fill={isSoldOut ? "#ef4444" : "#fde047"}
+                              fill={isSoldOut ? "#ef4444" : "#FEF08A"}
                               shadowColor="#000000"
-                              shadowBlur={3}
+                              shadowBlur={4}
                               listening={false}
                               perfectDrawEnabled={false}
                             />
@@ -2194,7 +2280,7 @@ export default function StadiumLayoutViewer({
                       perfectDrawEnabled={false}
                     />
 
-                    {(zoomScale > 1.2 || isHovered || isSelected || selectedRow !== null) && (
+                    {(activeZoomScale > 1.2 || isHovered || isSelected || selectedRow !== null) && (
                       <Text
                         text={seat.seat_label}
                         x={-seatR}
@@ -2347,6 +2433,14 @@ export default function StadiumLayoutViewer({
           </div>
         )}
 
+        {/* Seats fetch loading — map view until seat data arrives */}
+        {seatsPending && !showTierPicker && viewMode === "canvas" && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#EEF2F7]/90 backdrop-blur-[3px] pointer-events-none">
+            <Loader2 className="w-10 h-10 text-[#6900AA] animate-spin" />
+            <p className="text-sm font-semibold text-gray-800">Loading seats…</p>
+          </div>
+        )}
+
         {/* Overview hint — sits above the map bottom edge */}
         {!selectedBlockId && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 max-w-[min(92%,28rem)] bg-white text-slate-700 px-3.5 py-2 rounded-full border border-slate-200 shadow-lg text-[11px] sm:text-xs font-medium flex items-center gap-2 pointer-events-none">
@@ -2354,6 +2448,35 @@ export default function StadiumLayoutViewer({
             <span>Tap a stand on the map to pick seats</span>
           </div>
         )}
+
+        {/* Zoom controls — map bottom-right */}
+        <div className="absolute bottom-3 right-3 z-20 flex items-center gap-0.5 bg-white/95 p-1 rounded-xl border border-slate-200 shadow-md">
+          <button
+            type="button"
+            onClick={() => handleZoomChange(0.25)}
+            className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 cursor-pointer"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleZoomChange(-0.25)}
+            className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 cursor-pointer"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleFitStadium}
+            className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 cursor-pointer"
+            title="Fit stadium"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+        </div>
+        </div>
       </div>
 
       {!hideBookingBar && (

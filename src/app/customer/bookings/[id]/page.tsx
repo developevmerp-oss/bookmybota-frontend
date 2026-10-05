@@ -287,7 +287,7 @@ export default function BookingDetailPage({
               </div>
 
               {/* DATE / TIME / GUESTS / TABLE */}
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-0 border border-slate-100 rounded-xl overflow-hidden">
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-0 border border-slate-100 rounded-xl overflow-hidden">
                 <div className="p-3.5 sm:p-4 border-b xl:border-b-0 xl:border-r border-slate-100">
                   <div className="flex items-center gap-2 mb-2">
                     <Calendar size={15} style={{ color: ACCENT }} />
@@ -314,7 +314,7 @@ export default function BookingDetailPage({
                     {booking.end_time ? ` – ${formatTime12h(booking.end_time)}` : ""}
                   </p>
                 </div>
-                <div className="p-3.5 sm:p-4 border-r border-slate-100 xl:border-r">
+                <div className="p-3.5 sm:p-4 col-span-2 xl:col-span-1">
                   <div className="flex items-center gap-2 mb-2">
                     <Users size={15} style={{ color: ACCENT }} />
                     <span className="text-xs sm:text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -325,6 +325,7 @@ export default function BookingDetailPage({
                     {booking.guests != null ? `${booking.guests}` : "—"}
                   </p>
                 </div>
+                {/* Table — hidden on reservation pass
                 <div className="p-3.5 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <UtensilsCrossed size={15} style={{ color: ACCENT }} />
@@ -336,6 +337,7 @@ export default function BookingDetailPage({
                     {booking.table_number ? `Table ${booking.table_number}` : "Assigned at venue"}
                   </p>
                 </div>
+                */}
               </div>
 
               <div className="my-5 border-t border-dashed border-slate-200" />

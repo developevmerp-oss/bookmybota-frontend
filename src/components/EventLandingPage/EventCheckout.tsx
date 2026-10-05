@@ -219,6 +219,7 @@ export default function EventCheckout({
   const [holding, setHolding] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [desiredSeatQty, setDesiredSeatQty] = useState<number | null>(null);
+  const [seatCountPick, setSeatCountPick] = useState<number | null>(null);
   const [seatViewMode, setSeatViewMode] = useState<"canvas" | "grid">("canvas");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [expandedCity, setExpandedCity] = useState<string>("");
@@ -1107,9 +1108,16 @@ export default function EventCheckout({
 
   if (!open) return null;
 
-  const accentBtn = "bg-[#6900AA] hover:bg-[#57008E]";
+  const isSingleCitySingleVenue =
+    cityVenueGroups.length === 1 && (cityVenueGroups[0]?.venues.length ?? 0) === 1;
+  const showStepHeader =
+    step !== 1 || !isSingleCitySingleVenue;
+
+  const accentBtn = "bg-[#111111] hover:bg-black";
   const accentIcon = "text-[#6900AA]";
   const accentFocus = "focus:border-[#6900AA]";
+  const seatCountActiveGradient =
+    "linear-gradient(180deg, #A78BFA 0%, #8B5CF6 38%, #6D28D9 72%, #4C1D95 100%)";
   const durationLabel = formatDuration(event.duration_minutes);
   const poster = event.poster_horizontal_url || event.poster_vertical_url;
   const languageLabel = parseEventLanguages(event.language).join(", ") || event.language || "";
@@ -1424,7 +1432,7 @@ export default function EventCheckout({
                     {done ? <Check size={12} strokeWidth={3} /> : s.n}
                   </span>
                   <span
-                    className={`whitespace-nowrap text-[0.6875rem] sm:text-[0.8125rem] md:text-[0.875rem] font-semibold leading-tight ${
+                    className={`whitespace-nowrap text-[0.625rem] md:text-[0.8125rem] font-normal leading-tight ${
                       active || done ? "text-slate-900" : "text-slate-400"
                     }`}
                   >
@@ -1583,7 +1591,7 @@ export default function EventCheckout({
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <p className="min-w-0 max-w-[calc(100%-5.5rem)] text-[1.0625rem] sm:text-[1.1875rem] font-bold text-slate-900 truncate text-center px-1">
+                <p className="min-w-0 max-w-[calc(100%-5.5rem)] text-[1rem] md:text-[1.1875rem] font-semibold text-slate-900 truncate text-center px-1">
                   {event.name}
                 </p>
               </div>
@@ -1598,7 +1606,7 @@ export default function EventCheckout({
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <p className="min-w-0 flex-1 text-[1.0625rem] sm:text-[1.1875rem] font-bold text-slate-900 truncate text-left">
+                <p className="min-w-0 flex-1 text-[1rem] md:text-[1.1875rem] font-semibold text-slate-900 truncate text-left">
                   {event.name}
                 </p>
               </div>
@@ -1666,7 +1674,7 @@ export default function EventCheckout({
                       {done ? <Check size={14} strokeWidth={3} /> : s.n}
                     </span>
                     <span
-                      className={`mt-1.5 text-[0.75rem] font-semibold text-center leading-tight ${
+                      className={`mt-1.5 text-[0.625rem] md:text-[0.6875rem] font-normal text-center leading-tight ${
                         active || done ? "text-slate-900" : "text-slate-400"
                       }`}
                     >
@@ -1687,14 +1695,16 @@ export default function EventCheckout({
               : `flex-1 min-h-0 overflow-y-auto checkout-scrollbar${checkoutScrollActive ? " checkout-scrollbar-active" : ""} px-5 py-5 bg-white`
           }
         >
-          <div className="mb-5">
-              <h3 className="text-[1.4375rem] sm:text-[1.6875rem] font-bold text-slate-900 tracking-tight">
+          {showStepHeader && (
+            <div className="mb-5">
+              <h3 className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800 tracking-tight">
                 {stepTitle}
               </h3>
-              <p className="text-[1rem] sm:text-[1.0625rem] text-slate-500 mt-1.5 leading-relaxed">
+              <p className="text-[0.9375rem] md:text-[1.0625rem] text-slate-500 mt-1.5 leading-relaxed">
                 {stepSubtitle}
               </p>
             </div>
+          )}
 
           {step === 1 && (
             <div className="space-y-3">
@@ -1715,7 +1725,7 @@ export default function EventCheckout({
                         onClick={() => setExpandedCity(openCity ? "" : city)}
                         className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50"
                       >
-                        <span className="text-[1.125rem] font-bold text-slate-900">{city}</span>
+                        <span className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">{city}</span>
                         {openCity ? (
                           <ChevronUp size={18} className="text-slate-500 shrink-0" />
                         ) : (
@@ -1741,7 +1751,7 @@ export default function EventCheckout({
                                   }`}
                                 >
                                   <div className="flex items-start justify-between gap-2">
-                                    <p className="text-[1.0625rem] font-bold text-slate-900">
+                                    <p className="text-[0.9375rem] md:text-[1.0625rem] font-semibold text-gray-800">
                                       {venue.venueName}
                                     </p>
                                     {active && (
@@ -1790,10 +1800,10 @@ export default function EventCheckout({
                       <span className="w-10 h-10 rounded-full bg-[#F7E9FF] text-[#6900AA] flex items-center justify-center">
                         <item.icon size={16} />
                       </span>
-                      <p className="text-[0.875rem] sm:text-[0.9375rem] font-bold text-slate-900 leading-tight px-0.5">
+                      <p className="text-[0.8125rem] md:text-[0.9375rem] font-bold text-gray-800 leading-tight px-0.5">
                         {item.value}
                       </p>
-                      <p className="text-[0.75rem] sm:text-[0.8125rem] text-slate-400">{item.label}</p>
+                      <p className="text-[0.6875rem] md:text-[0.8125rem] text-slate-400">{item.label}</p>
                     </div>
                   ))}
                 </div>
@@ -1819,10 +1829,10 @@ export default function EventCheckout({
                   {desiredSeatQty == null ? (
                     <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-5">
                       <div className="text-center">
-                        <h4 className="text-[1.1875rem] font-extrabold text-slate-900">
+                        <h4 className="text-[1.0625rem] md:text-[1.1875rem] font-semibold text-gray-800">
                           How many seats?
                         </h4>
-                        <p className="mt-1 text-[0.9375rem] text-slate-500">
+                        <p className="mt-1 text-[0.875rem] md:text-[0.9375rem] text-slate-500">
                           Pick a count, then choose your seats on the full seating map
                         </p>
                       </div>
@@ -1833,11 +1843,21 @@ export default function EventCheckout({
                             type="button"
                             onClick={() => {
                               setDesiredSeatQty(n);
+                              setSeatCountPick(n);
                               setSelectedSeats([]);
                               setSeatViewMode("canvas");
                               setIsMapFullscreen(true);
                             }}
-                            className="h-12 rounded-xl text-sm font-bold cursor-pointer transition bg-[#F5F5F5] text-[#333] hover:bg-[#6900AA] hover:text-white"
+                            className={`h-12 rounded-xl text-sm font-semibold cursor-pointer transition ${
+                              seatCountPick === n
+                                ? "text-white shadow-sm"
+                                : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7]"
+                            }`}
+                            style={
+                              seatCountPick === n
+                                ? { background: seatCountActiveGradient }
+                                : undefined
+                            }
                           >
                             {n}
                           </button>
@@ -1867,6 +1887,7 @@ export default function EventCheckout({
                           type="button"
                           onClick={() => {
                             setDesiredSeatQty(null);
+                            setSeatCountPick(null);
                             setSelectedSeats([]);
                             setIsMapFullscreen(false);
                           }}
@@ -1978,7 +1999,7 @@ export default function EventCheckout({
           {step === 3 && (
             <div className="space-y-4 pb-2">
               <div>
-                <p className="text-[0.9375rem] font-bold text-slate-900 mb-1">
+                <p className="text-[0.9375rem] font-semibold text-gray-800 mb-1">
                   How do you want your tickets?
                 </p>
                 {availableTicketModes.length === 1 && (
@@ -2547,7 +2568,7 @@ export default function EventCheckout({
                   type="button"
                   disabled={!seatsReady}
                   onClick={proceedFromTickets}
-                  className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-[#E3BCFF] disabled:text-white disabled:hover:bg-[#E3BCFF] text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
+                  className={`flex-1 py-3 rounded-xl ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-1 cursor-pointer disabled:cursor-not-allowed`}
                 >
                   Continue
                   <ChevronRight size={16} />
@@ -2705,7 +2726,7 @@ export default function EventCheckout({
                     setSelectedSeats([]);
                     setIsMapFullscreen(false);
                   }}
-                  className="hidden sm:inline-flex text-[0.6875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                  className="text-[0.6875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                 >
                   Change
                 </button>
@@ -2719,11 +2740,26 @@ export default function EventCheckout({
                 {isStadiumLayout ? (
                   <StadiumLayoutViewer
                     eventId={event.id}
-                    ticketTypes={ticketTypes.map((t: any) => ({
-                      id: t.ticket_type_id ?? t.id,
-                      name: t.ticket_type ?? t.name,
-                      price: t.price,
-                    }))}
+                    ticketTypes={Array.from(
+                      new Map(
+                        [...ticketTypes, ...allTicketTypes, ...pricingTicketPool]
+                          .map((t: any) => {
+                            const id = String(t?.ticket_type_id ?? t?.id ?? "").trim();
+                            if (!id) return null;
+                            return [
+                              id,
+                              {
+                                id,
+                                name: String(t?.ticket_type ?? t?.name ?? "Ticket"),
+                                price: Number(t?.price) || 0,
+                              },
+                            ] as const;
+                          })
+                          .filter(Boolean) as Array<
+                          readonly [string, { id: string; name: string; price: number }]
+                        >
+                      ).values()
+                    )}
                     onSeatsSelected={handleMapSeatsSelected}
                     initialSelectedSeats={selectedSeats}
                     maxSelectable={desiredSeatQty}
@@ -2916,7 +2952,7 @@ export default function EventCheckout({
                   setIsMapFullscreen(false);
                   proceedFromTickets();
                 }}
-                className={`min-w-[9.5rem] sm:min-w-[12rem] px-5 py-3.5 ${accentBtn} text-white font-bold text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-[#E3BCFF] disabled:cursor-not-allowed`}
+                className={`min-w-[9.5rem] sm:min-w-[12rem] px-5 py-3.5 ${accentBtn} text-white font-bold text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed`}
               >
                 {selectedSeats.length === desiredSeatQty ? "Continue" : "Select seats"}
               </button>

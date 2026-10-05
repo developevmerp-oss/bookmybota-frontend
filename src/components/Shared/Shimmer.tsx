@@ -848,24 +848,42 @@ export function CollectionsShimmer({ count = 6 }: { count?: number }) {
   );
 }
 
-/** Search / filter restaurant list */
+/** Search / collection restaurant list — matches DiningSearchPage RestaurantCard grid. */
 export function DiningSearchShimmer({ count = 6 }: { count?: number }) {
   return (
     <Wrap>
-      <div className="space-y-4" aria-busy="true" aria-label="Loading restaurants">
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+        aria-busy="true"
+        aria-label="Loading restaurants"
+      >
         {Array.from({ length: count }).map((_, i) => (
           <div
             key={i}
-            className="flex gap-3 rounded-2xl border border-slate-100 bg-white overflow-hidden"
+            className="flex h-full flex-col bg-[#F5F5F5] rounded-2xl border border-[#E5E5E5] shadow-sm p-3"
           >
-            <Skeleton width={120} height={120} className="!rounded-none shrink-0 sm:!w-[140px] sm:!h-[140px]" />
-            <div className="flex-1 py-3 pr-3 space-y-2 min-w-0">
-              <div className="flex justify-between gap-2">
-                <Skeleton width="60%" height={18} />
-                <Skeleton width={40} height={22} borderRadius={6} />
+            <div className="relative h-52 sm:h-56 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
+              <Skeleton
+                className="!absolute !inset-0 !block !h-full !w-full !rounded-2xl"
+                height="100%"
+              />
+            </div>
+            <div className="flex flex-col flex-1 px-0.5 pt-3.5 pb-1 min-w-0">
+              <div className="flex justify-between items-start gap-2 mb-2">
+                <Skeleton width="68%" height={22} className="sm:!h-6" />
+                <Skeleton width={44} height={22} borderRadius={6} />
               </div>
-              <Skeleton width="75%" height={14} />
-              <Skeleton width="45%" height={12} />
+              <div className="space-y-1.5">
+                <Skeleton width="72%" height={14} />
+                <div className="flex items-center justify-between gap-2">
+                  <Skeleton width="55%" height={14} />
+                  <Skeleton width={72} height={14} />
+                </div>
+                <Skeleton width="48%" height={14} />
+              </div>
+              <div className="mt-auto pt-7 w-full">
+                <Skeleton height={42} borderRadius={12} />
+              </div>
             </div>
           </div>
         ))}

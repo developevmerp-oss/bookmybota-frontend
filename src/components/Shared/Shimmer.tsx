@@ -19,7 +19,7 @@ export function EventDetailShimmer() {
   return (
     <Wrap>
       <div className="min-h-screen bg-white" aria-busy="true" aria-label="Loading event">
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
           {/* Breadcrumb */}
           <div className="mb-3 sm:mb-4 flex items-center gap-2">
             <Skeleton width={40} height={12} />
@@ -291,7 +291,7 @@ export function EventHeroShimmer() {
           </div>
         </div>
         <div className="hidden lg:block">
-          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-10 xl:py-12">
+          <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-10 xl:py-12">
             <div className="flex items-center gap-8">
               <div className="min-w-0 flex-1 space-y-3">
                 <Skeleton width={88} height={22} borderRadius={6} />
@@ -631,7 +631,7 @@ export function RestaurantDetailShimmer() {
       <div className="min-h-screen bg-white text-slate-700" aria-busy="true" aria-label="Loading restaurant">
         {/* Breadcrumb — tablet/desktop */}
         <div className="hidden md:block bg-white pt-9">
-          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 flex items-center gap-1.5">
+          <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 flex items-center gap-1.5">
             <Skeleton width={40} height={12} />
             <Skeleton width={8} height={10} />
             <Skeleton width={48} height={12} />
@@ -640,7 +640,7 @@ export function RestaurantDetailShimmer() {
           </div>
         </div>
 
-        <div className="container mx-auto max-md:px-0 max-md:pt-0 px-5 sm:px-10 lg:px-10 2xl:px-0 py-5 pb-24 md:pb-16">
+        <div className="container mx-auto max-md:px-0 max-md:pt-0 px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-5 pb-24 md:pb-16">
           {/* Title row — tablet/desktop (matches page h1 + actions + rating) */}
           <div className="hidden md:block bg-white pt-2 mb-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -759,7 +759,7 @@ export function MovieDetailShimmer() {
         <div className="w-full aspect-[2.4/1] min-h-[220px] overflow-hidden">
           <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
         </div>
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-6 space-y-5">
+        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 space-y-5">
           <div className="flex gap-4 sm:gap-6">
             <Skeleton width={140} height={210} borderRadius={12} className="shrink-0 sm:!w-[180px] sm:!h-[270px]" />
             <div className="flex-1 space-y-3 pt-1">

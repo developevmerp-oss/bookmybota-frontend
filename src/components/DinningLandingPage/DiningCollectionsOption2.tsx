@@ -64,10 +64,10 @@ export default function DiningCollectionsOption2({
   return (
     <div className="mt-5">
       {/* Full-bleed peek on mobile/tablet; desktop clips to exactly 4 cards */}
-      <div className="lg:mx-0 -mx-5 sm:-mx-10 px-5 sm:px-10 lg:px-0">
+      <div className="lg:mx-0 -mx-4 sm:-mx-5 md:-mx-6 px-4 sm:px-5 md:px-6 lg:px-0">
         <div
           ref={scrollerRef}
-          className="flex gap-3 sm:gap-4 overflow-x-auto pt-1 pb-1 scrollbar-hide scroll-smooth snap-x snap-mandatory pr-5 sm:pr-10 lg:pr-0 lg:gap-4"
+          className="flex gap-3 sm:gap-4 overflow-x-auto pt-1 pb-1 scrollbar-hide scroll-smooth snap-x snap-mandatory pr-4 sm:pr-5 md:pr-6 lg:pr-0 lg:gap-4"
         >
           {collections.map((col) => (
             <CollectionCardOption2 key={col.id} collection={col} city={city} />

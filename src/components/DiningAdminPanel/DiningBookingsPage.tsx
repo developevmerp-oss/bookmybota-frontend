@@ -35,7 +35,7 @@ import {
   emptyDiningWalkInFormValues,
   type DiningWalkInFormValues,
 } from "@/lib/diningPartnerFormSchemas";
-import { formatDate, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
 import { formatDiningOfferDiscount } from "@/lib/diningOffers";
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
@@ -262,12 +262,22 @@ export default function BookingsManager() {
                       ) : null}
                     </td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
-                      <div className="text-xs font-semibold text-slate-800">
-                        {formatDate(booking.booking_time)}
+                      <div className="text-xs font-bold text-slate-900">
+                        {formatDateCustomer(booking.booking_time)}
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      {formatWeekdayCustomer(booking.booking_time) ? (
+                        <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+                          {formatWeekdayCustomer(booking.booking_time)}
+                        </div>
+                      ) : null}
+                      <div className="text-xs font-semibold text-slate-800 mt-1">
                         {formatTime12h(booking.booking_time)}
                       </div>
+                      {booking.end_time ? (
+                        <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+                          Arrive by {formatTime12h(booking.end_time)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="py-2.5 px-3">
                       <span

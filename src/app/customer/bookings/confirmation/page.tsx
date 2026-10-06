@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useGetBookingByIdQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
 
 function IconBox({ children }: { children: ReactNode }) {
   return (
@@ -160,6 +160,11 @@ function ConfirmationContent() {
                     <p className="text-sm font-bold text-slate-900 break-words">
                       {formatDateCustomer(booking.booking_time)}
                     </p>
+                    {formatWeekdayCustomer(booking.booking_time) ? (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {formatWeekdayCustomer(booking.booking_time)}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex items-start gap-2.5 min-w-0">
@@ -171,6 +176,11 @@ function ConfirmationContent() {
                     <p className="text-sm font-bold text-slate-900">
                       {formatTime12h(booking.booking_time)}
                     </p>
+                    {booking.end_time ? (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Arrive by {formatTime12h(booking.end_time)}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>

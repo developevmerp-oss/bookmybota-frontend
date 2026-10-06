@@ -8,7 +8,7 @@ export default function DiningPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-white container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-10">
+        <div className="min-h-screen bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-10">
           <DiningHomeRestaurantShimmer />
         </div>
       }

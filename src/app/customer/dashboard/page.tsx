@@ -38,7 +38,7 @@ import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
 
 const DEFAULT_DINING_IMAGE =
   "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=500&q=80";
@@ -55,6 +55,7 @@ type UnifiedBooking = {
   id: string;
   title: string;
   when: string;
+  endTime?: string | null;
   status: string;
   href: string;
   address?: string;
@@ -70,7 +71,9 @@ function diningUpcoming(b: Booking) {
 }
 
 function eventUpcoming(b: EventBooking) {
-  return !!b.starts_at && new Date(b.starts_at) > new Date() && b.status === "CONFIRMED";
+  if (!b.starts_at || b.status !== "CONFIRMED") return false;
+  const starts = new Date(String(b.starts_at).replace(" ", "T"));
+  return !Number.isNaN(starts.getTime()) && starts > new Date();
 }
 
 function movieUpcoming(b: MovieBookingDetail) {
@@ -94,16 +97,7 @@ function formatTimeLine(iso: string) {
 }
 
 function formatWeekday(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", { weekday: "long" });
-}
-
-function formatDateWithWeekday(iso: string) {
-  const date = formatDateLine(iso);
-  const weekday = formatWeekday(iso);
-  if (!date) return "";
-  return weekday ? `${date}, ${weekday}` : date;
+  return formatWeekdayCustomer(iso);
 }
 
 function formatPartyLine(b: UnifiedBooking) {
@@ -177,6 +171,7 @@ export default function CustomerDashboard() {
       id: b.id,
       title: b.business_name || "Restaurant",
       when: b.booking_time,
+      endTime: b.end_time || null,
       status: b.status,
       href: `/customer/bookings/${b.id}`,
       address: b.business_address,
@@ -189,7 +184,7 @@ export default function CustomerDashboard() {
       kind: "event",
       id: b.id,
       title: b.event_name || "Event",
-      when: b.starts_at || b.created_at || "",
+      when: String(b.starts_at || b.created_at || "").replace(" ", "T"),
       status: b.status,
       href: `/customer/event-bookings/${b.id}`,
       address: [b.venue_name, b.venue_address].filter(Boolean).join(", ") || undefined,
@@ -442,21 +437,35 @@ export default function CustomerDashboard() {
                         </p>
                       )}
 
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
                         {b.when && (
                           <div className="flex items-start gap-2 min-w-0">
                             <Calendar size={16} className="text-[#6900AA] mt-0.5 shrink-0" />
-                            <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
-                              {formatDateWithWeekday(b.when)}
-                            </p>
+                            <div className="min-w-0">
+                              <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
+                                {formatDateLine(b.when)}
+                              </p>
+                              {formatWeekday(b.when) ? (
+                                <p className="text-xs sm:text-sm lg:text-xs font-medium text-slate-500 leading-snug mt-0.5">
+                                  {formatWeekday(b.when)}
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
                         )}
                         {b.when && (
                           <div className="flex items-start gap-2 min-w-0">
                             <Clock size={16} className="text-[#6900AA] mt-0.5 shrink-0" />
-                            <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
-                              {formatTimeLine(b.when)}
-                            </p>
+                            <div className="min-w-0">
+                              <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
+                                {formatTimeLine(b.when)}
+                              </p>
+                              {b.kind === "dining" && b.endTime ? (
+                                <p className="text-xs sm:text-sm lg:text-xs font-medium text-slate-500 leading-snug mt-0.5">
+                                  Arrive by {formatTimeLine(b.endTime)}
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
                         )}
                         <div className="flex items-start gap-2 min-w-0">

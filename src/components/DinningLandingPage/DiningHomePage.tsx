@@ -27,6 +27,7 @@ import ListingPromoSlider, {
 } from "@/components/LandingPage/ListingPromoSlider";
 import { useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
+import { coordsForCityName, writeStoredUserGeo, USER_GEO_STORAGE_KEY } from "@/lib/geoDistance";
 import { IoRestaurantOutline } from "react-icons/io5";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import {
@@ -822,13 +823,20 @@ async function reverseGeocode(lat: number, lon: number): Promise<string> {
 }
 
 // IP-based geolocation fallback — works without GPS permission, always returns city name
-async function getLocationByIP(): Promise<string> {
+async function getLocationByIP(): Promise<{ city: string; lat?: number; lng?: number }> {
   const res = await fetch("https://ipapi.co/json/", {
     headers: { "Accept": "application/json" },
   });
   if (!res.ok) throw new Error("IP geolocation failed");
   const data = await res.json();
-  return data?.city || data?.region || "Your Location";
+  const city = data?.city || data?.region || "Your Location";
+  const lat = Number(data?.latitude);
+  const lng = Number(data?.longitude);
+  return {
+    city,
+    lat: Number.isFinite(lat) ? lat : undefined,
+    lng: Number.isFinite(lng) ? lng : undefined,
+  };
 }
 
 async function searchLocations(query: string): Promise<NominatimResult[]> {
@@ -1346,13 +1354,31 @@ export default function Home() {
       setLocationError(false);
       localStorage.setItem('selected_city', city);
       window.dispatchEvent(new Event('selected_city_changed'));
+      const coords = coordsForCityName(city);
+      if (coords) {
+        writeStoredUserGeo({
+          ...coords,
+          source: "city",
+          city,
+          updatedAt: Date.now(),
+        });
+      }
     };
 
     // If browser doesn't support geolocation → fall back to IP immediately
     if (!navigator.geolocation) {
       try {
-        const city = await getLocationByIP();
-        applyCity(city);
+        const ip = await getLocationByIP();
+        applyCity(ip.city);
+        if (ip.lat != null && ip.lng != null) {
+          writeStoredUserGeo({
+            lat: ip.lat,
+            lng: ip.lng,
+            source: "ip",
+            city: ip.city,
+            updatedAt: Date.now(),
+          });
+        }
       } catch {
         setLocationLabel("Select Location");
         setLocationError(true);
@@ -1364,6 +1390,12 @@ export default function Home() {
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        writeStoredUserGeo({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          source: "gps",
+          updatedAt: Date.now(),
+        });
         // GPS success → reverse geocode with Nominatim
         try {
           const city = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
@@ -1371,8 +1403,8 @@ export default function Home() {
         } catch {
           // Nominatim failed → fall back to IP geolocation
           try {
-            const city = await getLocationByIP();
-            applyCity(city);
+            const ip = await getLocationByIP();
+            applyCity(ip.city);
           } catch {
             setLocationLabel("Select Location");
             setLocationError(true);
@@ -1384,8 +1416,17 @@ export default function Home() {
       async () => {
         // GPS denied → fall back to IP geolocation silently
         try {
-          const city = await getLocationByIP();
-          applyCity(city);
+          const ip = await getLocationByIP();
+          applyCity(ip.city);
+          if (ip.lat != null && ip.lng != null) {
+            writeStoredUserGeo({
+              lat: ip.lat,
+              lng: ip.lng,
+              source: "ip",
+              city: ip.city,
+              updatedAt: Date.now(),
+            });
+          }
         } catch {
           setLocationLabel("Select Location");
           setLocationError(true);
@@ -1715,7 +1756,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/30 via-slate-900/45 to-slate-900/65" />
         </div>
 
-        <div className="relative z-10 w-full mx-auto container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 min-h-[340px] sm:min-h-[380px] lg:min-h-[400px] flex flex-col items-start justify-end pt-10 sm:pt-12 pb-6 sm:pb-7 text-left">
+        <div className="relative z-10 w-full mx-auto container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 min-h-[340px] sm:min-h-[380px] lg:min-h-[400px] flex flex-col items-start justify-end pt-10 sm:pt-12 pb-6 sm:pb-7 text-left">
           <div className="w-full max-w-3xl dining-hero-fade-up">
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.12] tracking-tight">
               What are you in the{" "}
@@ -1814,6 +1855,15 @@ export default function Home() {
                     setLocationCity(city);
                     localStorage.setItem("selected_city", city);
                     window.dispatchEvent(new Event("selected_city_changed"));
+                    const coords = coordsForCityName(city);
+                    if (coords) {
+                      writeStoredUserGeo({
+                        ...coords,
+                        source: "city",
+                        city,
+                        updatedAt: Date.now(),
+                      });
+                    }
                   }}
                   onDetect={() => {
                     setShowLocationDropdown(false);
@@ -1869,7 +1919,7 @@ export default function Home() {
         className="w-full bg-white"
         style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
       >
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-8 sm:pt-10 pb-3">
+        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-8 sm:pt-10 pb-3">
           <motion.h2
             className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 mb-2 sm:mb-3 tracking-tight"
             initial={{ opacity: 0, y: 12 }}
@@ -2017,7 +2067,7 @@ export default function Home() {
         className="w-full bg-white"
         style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
       >
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-2 sm:pt-3 pb-3">
+        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-2 sm:pt-3 pb-3">
           <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 mb-3 sm:mb-4 tracking-tight">
             Explore Dining
           </h2>
@@ -2054,7 +2104,7 @@ export default function Home() {
       {/* Explore Cuisines — only after Restaurant is selected in Explore Dining */}
       {exploreCardId === "restaurant" && cuisineCards.length > 0 && (
         <div className="w-full bg-white border-b border-slate-100">
-          <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-5 sm:py-6">
+          <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-5 sm:py-6">
             <section id="explore-cuisines" className="scroll-mt-24">
               <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight min-w-0 truncate">
@@ -2345,7 +2395,13 @@ export default function Home() {
                     setLocationCity("");
                     setLocationLabel("All Cities");
                     localStorage.removeItem("selected_city");
+                    try {
+                      sessionStorage.removeItem(USER_GEO_STORAGE_KEY);
+                    } catch {
+                      /* ignore */
+                    }
                     window.dispatchEvent(new Event("selected_city_changed"));
+                    window.dispatchEvent(new Event("bmb_user_geo_changed"));
                     setCurrentPage(1);
                     setLoadedRestaurants([]);
                   }}

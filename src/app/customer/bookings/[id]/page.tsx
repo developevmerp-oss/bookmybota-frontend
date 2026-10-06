@@ -26,7 +26,7 @@ import { useGetBookingByIdQuery, useCancelBookingMutation } from "@/services/api
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
-import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatDateTimeCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 
@@ -66,11 +66,11 @@ function statusBadge(status: string) {
 
 function formatTicketDate(value?: string | null) {
   if (!value) return { date: "—", weekday: "" };
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return { date: "—", weekday: "" };
+  const date = formatDateCustomer(value);
+  if (date === "—") return { date: "—", weekday: "" };
   return {
-    date: formatDateCustomer(d),
-    weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
+    date,
+    weekday: formatWeekdayCustomer(value),
   };
 }
 
@@ -164,7 +164,7 @@ export default function BookingDetailPage({
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] pt-8 sm:pt-10 pb-12 sm:pb-16">
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
+      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
         <Link
           href="/customer/dashboard"
           className="inline-flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-500 hover:text-slate-800 mb-5 sm:mb-6 transition-colors"
@@ -296,7 +296,7 @@ export default function BookingDetailPage({
                     </span>
                   </div>
                   <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
-                    {formatDateTimeCustomer(booking.booking_time)}
+                    {formatDateCustomer(booking.booking_time)}
                   </p>
                   {ticketDate.weekday && (
                     <p className="text-sm sm:text-base lg:text-xs text-slate-500 mt-0.5">{ticketDate.weekday}</p>
@@ -311,8 +311,12 @@ export default function BookingDetailPage({
                   </div>
                   <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
                     {formatTime12h(booking.booking_time)}
-                    {booking.end_time ? ` – ${formatTime12h(booking.end_time)}` : ""}
                   </p>
+                  {booking.end_time ? (
+                    <p className="text-sm sm:text-base lg:text-xs text-slate-500 mt-0.5">
+                      Arrive by {formatTime12h(booking.end_time)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="p-3.5 sm:p-4 col-span-2 xl:col-span-1">
                   <div className="flex items-center gap-2 mb-2">

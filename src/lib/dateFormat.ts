@@ -1,7 +1,7 @@
 /**
  * Project-wide date/time display helpers.
- * - Admin / partner: MM-DD-YYYY via formatDate / formatDateTime12h
- * - Customer: "23 Apr 2014" via formatDateCustomer / formatDateTimeCustomer
+ * - Reservation / customer-facing: "5 Oct 2026" + "5:00 PM" via formatDateCustomer / formatTime12h
+ * - Compact admin lists (non-reservation): MM-DD-YYYY via formatDate / formatDateTime12h
  * Storage/API continues to use ISO 8601.
  */
 
@@ -31,6 +31,11 @@ function parseCalendarParts(value: string | Date): { y: number; m: number; d: nu
       if (!yyyy || !mm || !dd) return null;
       return { y: yyyy, m: mm, d: dd };
     }
+    // Naive SQL datetime — use calendar digits (no TZ shift).
+    const wall = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[ T]\d{2}:\d{2}/);
+    if (wall) {
+      return { y: Number(wall[1]), m: Number(wall[2]), d: Number(wall[3]) };
+    }
   }
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
@@ -43,7 +48,7 @@ function formatPartsCustomer(y: number, m: number, d: number): string {
   return `${d} ${month} ${y}`;
 }
 
-/** MM-DD-YYYY (admin / partner panels) */
+/** MM-DD-YYYY (compact admin / partner lists) */
 export function formatDate(value?: string | Date | null): string {
   if (!value) return '—';
   const parts = parseCalendarParts(value);
@@ -53,7 +58,7 @@ export function formatDate(value?: string | Date | null): string {
   return `${mm}-${dd}-${parts.y}`;
 }
 
-/** Customer panel: "23 Apr 2014" */
+/** Reservation / customer panel: "5 Oct 2026" */
 export function formatDateCustomer(value?: string | Date | null): string {
   if (!value) return '—';
   const parts = parseCalendarParts(value);
@@ -72,6 +77,37 @@ export function formatDateCustomerUtc(value?: string | Date | null): string {
   return formatPartsCustomer(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 }
 
+/** Full weekday name matching the displayed calendar date, e.g. "Monday" */
+export function formatWeekdayCustomer(value?: string | Date | null): string {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const wall = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?$/);
+    if (wall) {
+      const d = new Date(Number(wall[1]), Number(wall[2]) - 1, Number(wall[3]));
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleDateString(DISPLAY_LOCALE, { weekday: 'long' });
+      }
+    }
+  }
+  const parts = parseCalendarParts(value);
+  if (!parts) return '';
+  const d = new Date(parts.y, parts.m - 1, parts.d);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(DISPLAY_LOCALE, { weekday: 'long' });
+}
+
+/** Date + weekday for reservation cards (matches booking detail layout). */
+export function formatBookingDateParts(value?: string | Date | null): {
+  date: string;
+  weekday: string;
+} {
+  return {
+    date: formatDateCustomer(value),
+    weekday: formatWeekdayCustomer(value),
+  };
+}
+
 /** MM-DD-YYYY, h:mm AM/PM (admin / partner) */
 export function formatDateTime12h(value?: string | Date | null): string {
   if (!value) return '—';
@@ -85,17 +121,44 @@ export function formatDateTime12h(value?: string | Date | null): string {
   return `${formatDate(d)}, ${time}`;
 }
 
-/** Customer panel: "23 Apr 2014, 12:00 AM" */
+/** Reservation / customer: "5 Oct 2026, 5:00 PM" */
 export function formatDateTimeCustomer(value?: string | Date | null): string {
   if (!value) return '—';
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return `${formatDateCustomer(d)}, ${formatTime12h(d)}`;
+  const date = formatDateCustomer(value);
+  const time = formatTime12h(value);
+  if (date === '—' && time === '—') return '—';
+  if (date === '—') return time;
+  if (time === '—') return date;
+  return `${date}, ${time}`;
 }
 
-/** h:mm AM/PM only */
+/** h:mm AM/PM only — wall-clock safe for PG `timestamp::text` (no Z) and ISO values */
 export function formatTime12h(value?: string | Date | null): string {
   if (!value) return '—';
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    // "2026-10-10 14:30:00" or "2026-10-10T14:30:00" (no timezone) → treat as wall clock
+    const wall = trimmed.match(
+      /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/
+    );
+    if (wall) {
+      const hours = Number(wall[4]);
+      const minutes = Number(wall[5]);
+      if (
+        hours >= 0 &&
+        hours <= 23 &&
+        minutes >= 0 &&
+        minutes <= 59
+      ) {
+        const d = new Date(2000, 0, 1, hours, minutes);
+        return d.toLocaleTimeString(DISPLAY_LOCALE, {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+      }
+    }
+  }
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleTimeString(DISPLAY_LOCALE, {

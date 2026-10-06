@@ -36,6 +36,7 @@ import {
   useGetBusinessPublicQuery,
   useCreateBookingMutation,
   useLazyCheckAvailabilityQuery,
+  useGetAvailableDiningSlotsQuery,
   useSendCustomerOtpMutation,
   useVerifyCustomerOtpMutation,
   useRegisterCustomerMutation,
@@ -351,10 +352,17 @@ function toLocalDateKey(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
+const normalizeSlotInterval = (value: unknown): 15 | 30 | 60 => {
+  const n = Number(value);
+  if (n === 15 || n === 60) return n;
+  return 30;
+};
+
 const generateTimeSlotsFromDay = (
   selectedDateIndex: number,
   day: BusinessOperatingDate | null | undefined,
-  selectedDate?: Date
+  selectedDate?: Date,
+  slotIntervalMinutes: 15 | 30 | 60 = 30
 ) => {
   const slots: string[] = [];
   const now = new Date();
@@ -375,25 +383,25 @@ const generateTimeSlotsFromDay = (
   const [closeH, closeM] = closeTime.split(':').map(Number);
   const openVal = openH * 60 + openM;
   const closeVal = closeH * 60 + closeM;
+  const step = slotIntervalMinutes;
 
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const slotVal = h * 60 + m;
-      let inWindow = false;
-      if (closeVal >= openVal) {
-        inWindow = slotVal >= openVal && slotVal <= closeVal;
-      } else {
-        inWindow = slotVal >= openVal || slotVal <= closeVal;
-      }
-      if (!inWindow) continue;
-      if (selectedDateIndex === 0) {
-        const slotDate = new Date(targetDate);
-        slotDate.setHours(h, m, 0, 0);
-        const bufferNow = new Date(now.getTime() + 30 * 60 * 1000);
-        if (slotDate <= bufferNow) continue;
-      }
-      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  const pushIfValid = (slotVal: number) => {
+    const h = Math.floor(slotVal / 60) % 24;
+    const m = slotVal % 60;
+    if (selectedDateIndex === 0) {
+      const slotDate = new Date(targetDate!);
+      slotDate.setHours(h, m, 0, 0);
+      const bufferNow = new Date(now.getTime() + 30 * 60 * 1000);
+      if (slotDate <= bufferNow) return;
     }
+    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  };
+
+  if (closeVal >= openVal) {
+    for (let mins = openVal; mins <= closeVal; mins += step) pushIfValid(mins);
+  } else {
+    for (let mins = openVal; mins < 24 * 60; mins += step) pushIfValid(mins);
+    for (let mins = 0; mins <= closeVal; mins += step) pushIfValid(mins);
   }
   return slots;
 };
@@ -422,12 +430,12 @@ const isSlotInPeriod = (slot: string, openTime: string, closeTime: string) => {
 };
 
 // Generates slots directly from a meal period's own open/close window.
-// This is independent of the restaurant's daily operating bounds so that
-// e.g. breakfast (07:00–10:30) shows even when the venue opens at 11:00.
+// Excludes times where grace would run past venue close (same-day schedules).
 const generateSlotsForMeal = (
   mealOpen: string,
   mealClose: string,
-  isToday: boolean
+  isToday: boolean,
+  options?: { graceMinutes?: number; dayCloseHm?: string | null; slotIntervalMinutes?: 15 | 30 | 60 }
 ): string[] => {
   const slots: string[] = [];
   const now = new Date();
@@ -435,27 +443,33 @@ const generateSlotsForMeal = (
   const [closeH, closeM] = mealClose.split(':').map(Number);
   const openVal = openH * 60 + openM;
   const closeVal = closeH * 60 + closeM;
+  const grace = Math.max(0, options?.graceMinutes ?? 0);
+  const step = options?.slotIntervalMinutes ?? 30;
+  const dayClose = (options?.dayCloseHm || '').slice(0, 5);
+  const dayCloseVal =
+    dayClose && dayClose > mealOpen.slice(0, 5) ? (() => {
+      const [h, m] = dayClose.split(':').map(Number);
+      return h * 60 + m;
+    })() : null;
 
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const slotVal = h * 60 + m;
-      let inWindow = false;
-      if (closeVal >= openVal) {
-        inWindow = slotVal >= openVal && slotVal <= closeVal;
-      } else {
-        inWindow = slotVal >= openVal || slotVal <= closeVal;
-      }
-      if (!inWindow) continue;
-      if (isToday) {
-        const slotDate = new Date();
-        slotDate.setHours(h, m, 0, 0);
-        const bufferNow = new Date(now.getTime() + 30 * 60 * 1000);
-        if (slotDate <= bufferNow) continue;
-      }
-      const hour = h.toString().padStart(2, '0');
-      const min = m.toString().padStart(2, '0');
-      slots.push(`${hour}:${min}`);
+  const pushIfValid = (slotVal: number) => {
+    if (dayCloseVal != null && slotVal + grace > dayCloseVal) return;
+    const h = Math.floor(slotVal / 60) % 24;
+    const m = slotVal % 60;
+    if (isToday) {
+      const slotDate = new Date();
+      slotDate.setHours(h, m, 0, 0);
+      const bufferNow = new Date(now.getTime() + 30 * 60 * 1000);
+      if (slotDate <= bufferNow) return;
     }
+    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+  };
+
+  if (closeVal >= openVal) {
+    for (let mins = openVal; mins <= closeVal; mins += step) pushIfValid(mins);
+  } else {
+    for (let mins = openVal; mins < 24 * 60; mins += step) pushIfValid(mins);
+    for (let mins = 0; mins <= closeVal; mins += step) pushIfValid(mins);
   }
   return slots;
 };
@@ -548,7 +562,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
     return map;
   }, [operatingDates]);
-  const [createBooking] = useCreateBookingMutation();
+  const [createBooking, { isLoading: isCreatingBooking }] = useCreateBookingMutation();
   const [checkAvailabilityQuery] = useLazyCheckAvailabilityQuery();
   const {
     data: reviewsData,
@@ -966,22 +980,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     return readSessionForRole('customer')?.user ?? null;
   };
 
-  const proceedToBooking = () => {
-    dispatch(loadFromStorage());
-    const session = readSessionForRole('customer');
-    const customer = session?.user || (authUser?.role === 'customer' ? authUser : null);
-    if (!customer) {
-      pendingProceedAfterAuth.current = true;
-      setAuthModalOpen(true);
-      return;
-    }
-    if (session) {
-      dispatch(setCredentials({ user: session.user, token: session.token }));
-    }
-    setDrawerStep(3);
-    setName(customer.name || '');
-    setPhone(customer.phone || '');
-  };
+  const [proceedChecking, setProceedChecking] = useState(false);
 
   const [sendCustomerOtp, { isLoading: isSendingOtp }] = useSendCustomerOtpMutation();
   const [verifyCustomerOtp, { isLoading: isVerifyingOtp }] = useVerifyCustomerOtpMutation();
@@ -1047,15 +1046,16 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       setPhone(authUser.phone || '');
       if (pendingProceedAfterAuth.current) {
         pendingProceedAfterAuth.current = false;
-        setDrawerStep(3);
+        void proceedToBooking();
       }
     }
-  }, [authUser]);
+  }, [authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (drawerStep !== 2) return;
     const customer = getLoggedInCustomer();
     if (customer) {
+      setAvailabilityStatus('available');
       setDrawerStep(3);
       setName(customer.name || '');
       setPhone(customer.phone || '');
@@ -1146,6 +1146,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         window.dispatchEvent(new Event('auth_changed'));
         setName(data.user.name || '');
         setPhone(data.user.phone || loginPhone);
+        setAvailabilityStatus('available');
         setDrawerStep(3);
         return;
       }
@@ -1186,6 +1187,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       window.dispatchEvent(new Event('auth_changed'));
       setName(regName);
       setPhone(cleanPhone);
+      setAvailabilityStatus('available');
       setDrawerStep(3);
     } catch (err: unknown) {
       const msg = (err as { data?: { error?: string } })?.data?.error;
@@ -1193,12 +1195,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  // Automatically check availability on Summary step (Book a Table tab)
-  useEffect(() => {
-    if (activeTab === "Book a Table" && drawerStep === 3 && selectedTime && bizId) {
-      checkAvailability();
-    }
-  }, [activeTab, drawerStep, selectedTime, guests, bizId]);
+  // Availability for slots is checked on step 1 (disabled slots + Proceed).
+  // Do not block the confirmation page with another full-page seat check.
 
   // Mount target for inline Book a Table booking UI
   const [bookTableSlot, setBookTableSlot] = useState<HTMLDivElement | null>(null);
@@ -1263,11 +1261,102 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const selectedOpDay = operatingByDate.get(toLocalDateKey(bookingDates[selectedDateIndex]));
   const isSelectedDayClosed = !selectedOpDay || selectedOpDay.is_open === false;
 
+  const selectedDateKey = toLocalDateKey(bookingDates[selectedDateIndex]);
+  const {
+    data: availableSlotsData,
+    isLoading: availableSlotsLoading,
+    refetch: refetchAvailableSlots,
+  } = useGetAvailableDiningSlotsQuery(
+    {
+      business_id: bizId,
+      date: selectedDateKey,
+      guests: Number(guests) || 2,
+    },
+    { skip: !bizId || !profile?.id || !selectedDateKey || isSelectedDayClosed }
+  );
+
+  const slotInterval = normalizeSlotInterval(
+    availableSlotsData?.slot_interval_minutes ?? profile?.slot_interval_minutes
+  );
+
   const timeSlots = generateTimeSlotsFromDay(
     selectedDateIndex,
     selectedOpDay,
-    bookingDates[selectedDateIndex]
+    bookingDates[selectedDateIndex],
+    slotInterval
   );
+
+  // Only block slot picking on the first load — keep grid visible during background refetch
+  const slotsInitialLoading = availableSlotsLoading && !availableSlotsData;
+
+  const availableSlotSet = useMemo(() => {
+    const list = availableSlotsData?.slots || [];
+    return new Set(list);
+  }, [availableSlotsData?.slots]);
+
+  const availableByMeal = availableSlotsData?.by_meal;
+
+  const selectedSlotIsAvailable =
+    Boolean(selectedTime) &&
+    (!availableSlotsData || availableSlotSet.has(selectedTime));
+
+  const proceedToBooking = async () => {
+    if (!selectedTime) {
+      toast.error('Please select a time slot first.');
+      return;
+    }
+    if (slotsInitialLoading) {
+      toast.message('Checking available times… please wait.');
+      return;
+    }
+    if (availableSlotsData && !availableSlotSet.has(selectedTime)) {
+      toast.error('This time slot is no longer available. Please choose another.');
+      setSelectedTime('');
+      return;
+    }
+
+    setProceedChecking(true);
+    try {
+      const bookingDateTime = getBookingISO();
+      const data = await checkAvailabilityQuery({
+        business_id: bizId,
+        date: bookingDateTime,
+        guests: String(guests),
+      }).unwrap();
+      if (!data.available) {
+        toast.error(
+          (data as { reason?: string }).reason ||
+            'This time slot is not available. Please choose another time.'
+        );
+        setAvailabilityStatus('unavailable');
+        setSelectedTime('');
+        void refetchAvailableSlots();
+        return;
+      }
+      setAvailabilityStatus('available');
+    } catch {
+      toast.error('Could not verify availability. Please try again.');
+      setAvailabilityStatus('error');
+      return;
+    } finally {
+      setProceedChecking(false);
+    }
+
+    dispatch(loadFromStorage());
+    const session = readSessionForRole('customer');
+    const customer = session?.user || (authUser?.role === 'customer' ? authUser : null);
+    if (!customer) {
+      pendingProceedAfterAuth.current = true;
+      setAuthModalOpen(true);
+      return;
+    }
+    if (session) {
+      dispatch(setCredentials({ user: session.user, token: session.token }));
+    }
+    setDrawerStep(3);
+    setName(customer.name || '');
+    setPhone(customer.phone || '');
+  };
 
   const handleDateSelect = (idx: number) => {
     setSelectedDateIndex(idx);
@@ -1280,40 +1369,32 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setAvailabilityStatus(null);
   };
 
+  useEffect(() => {
+    if (!selectedTime) return;
+    if (!availableSlotsData) return;
+    if (!availableSlotSet.has(selectedTime)) {
+      setSelectedTime('');
+      setAvailabilityStatus(null);
+    }
+  }, [selectedTime, availableSlotsData, availableSlotSet]);
+
   const getBookingISO = () => {
-    const d = bookingDates[selectedDateIndex];
-    const [h, m] = selectedTime.split(':').map(Number);
-    const dt = new Date(d);
-    dt.setHours(h, m, 0, 0);
-    return dt.toISOString();
+    // Match backend venue wall-clock (Africa/Addis_Ababa = UTC+03:00, no DST)
+    const dateKey = toLocalDateKey(bookingDates[selectedDateIndex]);
+    const hm = selectedTime.slice(0, 5);
+    return new Date(`${dateKey}T${hm}:00+03:00`).toISOString();
   };
 
   // Reviews use RHF (see reviewForm above)
   const bookingWidgetRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
-  const checkAvailability = async () => {
+  const submitBooking = async (customerName: string, customerPhone: string, approxArrival: string) => {
     if (!selectedTime) {
-      toast.error("Please select a time slot first.");
+      toast.error('Please select a time slot first.');
+      setDrawerStep(1);
       return;
     }
-    if (!guests) return;
-    setAvailabilityStatus('loading');
-    try {
-      const bookingDateTime = getBookingISO();
-      const data = await checkAvailabilityQuery({
-        business_id: bizId,
-        date: bookingDateTime,
-        guests: String(guests),
-      }).unwrap();
-      setAvailabilityStatus(data.available === true ? 'available' : 'unavailable');
-    } catch {
-      setAvailabilityStatus('error');
-    }
-  };
-
-  const submitBooking = async (customerName: string, customerPhone: string, approxArrival: string) => {
-    if (availabilityStatus !== 'available') return;
     if (!authUser || authUser.role !== 'customer' || !authUser.customer_id) {
       toast.error('Please sign in to complete your booking.');
       pendingProceedAfterAuth.current = true;
@@ -1326,7 +1407,27 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       return;
     }
     try {
+      // Final soft check right before create (slot grid already filtered)
       const bookingDateTime = getBookingISO();
+      try {
+        const avail = await checkAvailabilityQuery({
+          business_id: bizId,
+          date: bookingDateTime,
+          guests: String(guests),
+        }).unwrap();
+        if (!avail.available) {
+          toast.error(
+            avail.reason || 'This time slot is no longer available. Please choose another time.'
+          );
+          setAvailabilityStatus('unavailable');
+          setSelectedTime('');
+          void refetchAvailableSlots();
+          setDrawerStep(1);
+          return;
+        }
+      } catch {
+        // If the check fails, still allow create — server will reject if full
+      }
 
       // Only pass customer_id if the current user is a registered customer.
       // Prevent business_admin / super_admin sessions from polluting the booking's customer link.
@@ -1637,7 +1738,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               : "hidden md:block"
         }`}
       >
-        <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
+        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
           <Link href="/" className="hover:text-rose-600 transition-colors">
             Home
           </Link>
@@ -1653,8 +1754,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       <div
         className={`container mx-auto lg:px-10 2xl:px-0 pb-24 md:pb-16 ${
           isBookTableFlow
-            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 px-5 sm:px-10 py-5 lg:pt-4"
-            : "max-md:px-0 max-md:pt-0 px-5 sm:px-10 py-5"
+            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 px-4 sm:px-5 md:px-6 py-5 lg:pt-4"
+            : "max-md:px-0 max-md:pt-0 px-4 sm:px-5 md:px-6 py-5"
         }`}
       >
         {/* ── Header: title + icon actions + rating (hidden on booking success) ── */}
@@ -2712,7 +2813,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </button>
 
             {/* Image stage */}
-            <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-10 relative">
+            <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-0 sm:px-5 md:px-6 relative">
               {lightboxItems.length > 1 ? (
                 <button
                   type="button"
@@ -2862,24 +2963,66 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 const dinnerWindow = mealsConfig.dinner?.active
                   ? clipMeal(mealsConfig.dinner.open, mealsConfig.dinner.close)
                   : null;
-                const breakfastSlots =
+                const breakfastSlotsRaw =
                   !dayClosed && breakfastWindow
-                  ? generateSlotsForMeal(breakfastWindow.open, breakfastWindow.close, isToday)
+                  ? generateSlotsForMeal(breakfastWindow.open, breakfastWindow.close, isToday, {
+                      graceMinutes: Number(profile?.grace_time_minutes) || 0,
+                      dayCloseHm: dayCloseHm,
+                      slotIntervalMinutes: slotInterval,
+                    })
                   : [];
-                const lunchSlots =
+                const lunchSlotsRaw =
                   !dayClosed && lunchWindow
-                  ? generateSlotsForMeal(lunchWindow.open, lunchWindow.close, isToday)
+                  ? generateSlotsForMeal(lunchWindow.open, lunchWindow.close, isToday, {
+                      graceMinutes: Number(profile?.grace_time_minutes) || 0,
+                      dayCloseHm: dayCloseHm,
+                      slotIntervalMinutes: slotInterval,
+                    })
                   : [];
-                const dinnerSlots =
+                const dinnerSlotsRaw =
                   !dayClosed && dinnerWindow
-                  ? generateSlotsForMeal(dinnerWindow.open, dinnerWindow.close, isToday)
+                  ? generateSlotsForMeal(dinnerWindow.open, dinnerWindow.close, isToday, {
+                      graceMinutes: Number(profile?.grace_time_minutes) || 0,
+                      dayCloseHm: dayCloseHm,
+                      slotIntervalMinutes: slotInterval,
+                    })
                   : [];
+
+                // Keep full meal grids visible; mark each slot available/unavailable.
+                // Until the availability API returns, treat slots as unavailable (disabled).
+                const withAvailability = (raw: string[], mealKey: 'breakfast' | 'lunch' | 'dinner') => {
+                  const apiMeal = availableByMeal?.[mealKey];
+                  const apiReady = Boolean(availableSlotsData);
+                  return raw.map((slot) => {
+                    let available = false;
+                    if (apiReady) {
+                      if (apiMeal) available = apiMeal.includes(slot);
+                      else available = availableSlotSet.has(slot);
+                    }
+                    return { slot, available };
+                  });
+                };
 
                 const mealOptions = (
                   [
-                    { id: 'breakfast' as const, label: 'Breakfast', slots: breakfastSlots, active: !!mealsConfig.breakfast?.active && (!isToday || breakfastSlots.length > 0) },
-                    { id: 'lunch' as const, label: 'Lunch', slots: lunchSlots, active: !!mealsConfig.lunch?.active && (!isToday || lunchSlots.length > 0) },
-                    { id: 'dinner' as const, label: 'Dinner', slots: dinnerSlots, active: !!mealsConfig.dinner?.active && (!isToday || dinnerSlots.length > 0) },
+                    {
+                      id: 'breakfast' as const,
+                      label: 'Breakfast',
+                      slots: withAvailability(breakfastSlotsRaw, 'breakfast'),
+                      active: !!mealsConfig.breakfast?.active && breakfastSlotsRaw.length > 0,
+                    },
+                    {
+                      id: 'lunch' as const,
+                      label: 'Lunch',
+                      slots: withAvailability(lunchSlotsRaw, 'lunch'),
+                      active: !!mealsConfig.lunch?.active && lunchSlotsRaw.length > 0,
+                    },
+                    {
+                      id: 'dinner' as const,
+                      label: 'Dinner',
+                      slots: withAvailability(dinnerSlotsRaw, 'dinner'),
+                      active: !!mealsConfig.dinner?.active && dinnerSlotsRaw.length > 0,
+                    },
                   ]
                 ).filter((m) => m.active);
 
@@ -2893,6 +3036,75 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   const cfg = mealsConfig[id];
                   if (!cfg?.open || !cfg?.close) return '';
                   return `${formatSlotLabel(cfg.open)} to ${formatSlotLabel(cfg.close)}`;
+                };
+
+                const renderSlotButton = (
+                  slot: string,
+                  available: boolean,
+                  mealId: 'breakfast' | 'lunch' | 'dinner',
+                  variant: 'mobile' | 'desktop'
+                ) => {
+                  const isSelected = selectedTime === slot && available;
+                  const promoText = available ? offerChipLabel : 'Unavailable';
+                  const base =
+                    variant === 'mobile'
+                      ? 'min-h-[56px] px-2 py-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center'
+                      : 'min-h-[52px] px-2 py-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center';
+                  if (!available) {
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        title="This time is not available"
+                        className={`${base} border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70`}
+                      >
+                        <span className="text-sm font-semibold leading-none line-through decoration-slate-300">
+                          {formatSlotLabel(slot)}
+                        </span>
+                        <span className="text-[0.625rem] font-bold text-slate-400 mt-1.5 leading-none">
+                          {promoText}
+                        </span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => {
+                        setActiveMealSection(mealId);
+                        handleTimeSelect(slot);
+                      }}
+                      className={`${base} cursor-pointer ${
+                        isSelected
+                          ? variant === 'mobile'
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
+                          : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`text-sm ${variant === 'mobile' ? 'font-bold' : 'font-semibold'} leading-none`}
+                      >
+                        {formatSlotLabel(slot)}
+                      </span>
+                      {promoText ? (
+                        <span
+                          className={`text-[0.625rem] font-bold mt-1.5 leading-none ${
+                            isSelected && variant === 'mobile'
+                              ? 'text-white/80'
+                              : variant === 'mobile'
+                                ? 'text-[#6900AA]'
+                                : 'text-[#2563EB]'
+                          }`}
+                        >
+                          {promoText}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
                 };
 
                 // Keep accordion open on a valid meal; null means all collapsed
@@ -3024,6 +3236,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         Select the time of day to see the offers
                       </p>
 
+                      {slotsInitialLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-slate-500 py-3">
+                          <Loader2 size={16} className="animate-spin shrink-0" />
+                          Checking available times…
+                        </div>
+                      ) : null}
+
+                      {!slotsInitialLoading && !isSelectedDayClosed && mealOptions.length === 0 ? (
+                        <p className="text-xs text-slate-400 font-medium py-2">
+                          No time slots for this date.
+                        </p>
+                      ) : null}
+
                       {/* Mobile meal chips */}
                       {!isSelectedDayClosed && mealOptions.length > 0 ? (
                         <div className="md:hidden flex flex-wrap gap-2 mb-1">
@@ -3072,40 +3297,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                 if (meal.slots.length === 0) {
                                   return (
                                     <p className="text-xs text-slate-400 font-medium py-3 text-center">
-                                      No slots available in this period.
+                                      No slots in this period.
                                     </p>
                                   );
                                 }
                                 return (
                                   <div className="grid grid-cols-2 gap-2.5">
-                                    {meal.slots.map((slot) => {
-                                      const isSelected = selectedTime === slot;
-                                      const promoText = offerChipLabel;
-                                      return (
-                                        <button
-                                          key={slot}
-                                          type="button"
-                                          onClick={() => {
-                                            setActiveMealSection(meal.id);
-                                            handleTimeSelect(slot);
-                                          }}
-                                          className={`min-h-[56px] px-2 py-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
-                                            isSelected
-                                              ? "border-slate-900 bg-slate-900 text-white"
-                                              : "border-slate-200 bg-white text-slate-800"
-                                          }`}
-                                        >
-                                          <span className="text-sm font-bold leading-none">
-                                            {formatSlotLabel(slot)}
-                                          </span>
-                                          {promoText ? (
-                                            <span className={`text-[0.65rem] font-bold mt-1.5 leading-none ${isSelected ? "text-white/80" : "text-[#6900AA]"}`}>
-                                              {promoText}
-                                            </span>
-                                          ) : null}
-                                        </button>
-                                      );
-                                    })}
+                                    {meal.slots.map(({ slot, available }) =>
+                                      renderSlotButton(slot, available, meal.id, 'mobile')
+                                    )}
                                   </div>
                                 );
                               })()}
@@ -3153,38 +3353,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                                   <div className="px-4 pb-4">
                                     {meal.slots.length === 0 ? (
                                       <p className="text-xs text-slate-400 font-medium py-3 text-center">
-                                        No slots available in this period.
+                                        No slots in this period.
                                       </p>
                                     ) : (
                                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                        {meal.slots.map((slot) => {
-                                    const isSelected = selectedTime === slot;
-                            const promoText = offerChipLabel;
-                                    return (
-                                      <button
-                                        key={slot}
-                                        type="button"
-                                              onClick={() => {
-                                                setActiveMealSection(meal.id);
-                                                handleTimeSelect(slot);
-                                              }}
-                                              className={`min-h-[52px] px-2 py-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
-                                  isSelected
-                                                  ? 'border border-[#6900AA] bg-[#f7e9ff] text-slate-900'
-                                                  : 'border border-slate-200 bg-white text-slate-800 hover:border-slate-300'
-                                }`}
-                              >
-                                <span className="text-sm font-semibold leading-none">
-                                  {formatSlotLabel(slot)}
-                                </span>
-                                {promoText ? (
-                                                <span className="text-[0.625rem] font-bold text-[#2563EB] mt-1.5 leading-none">
-                                    {promoText}
-                                  </span>
-                                ) : null}
-                                      </button>
-                                          );
-                                        })}
+                                        {meal.slots.map(({ slot, available }) =>
+                                          renderSlotButton(slot, available, meal.id, 'desktop')
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -3465,12 +3640,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
               {drawerStep === 3 && (
                 <div className="space-y-5">
-                  {availabilityStatus === 'loading' && (
-                    <div className="flex items-center gap-2.5 bg-amber-50 text-amber-700 px-4 py-3 rounded-xl text-sm font-semibold border border-amber-100">
-                      <Loader2 size={16} className="animate-spin shrink-0" /> Checking seat availability…
-                  </div>
-                  )}
-                  {availabilityStatus === 'unavailable' && (
+                  {availabilityStatus === 'unavailable' ? (
                     <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center space-y-3 max-w-xl mx-auto">
                       <p className="text-xs text-rose-600 font-bold">Sorry, no tables are available for this slot.</p>
                       <button
@@ -3481,14 +3651,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         Choose another time
                       </button>
                     </div>
-                  )}
-                  {availabilityStatus === 'error' && (
-                    <div className="flex items-center gap-2.5 bg-orange-50 text-orange-600 px-4 py-3 rounded-xl text-sm font-semibold border border-orange-100">
-                      <AlertCircle size={16} className="shrink-0" /> Could not check availability. Please try again.
-                    </div>
-                  )}
-
-                  {availabilityStatus === 'available' && (
+                  ) : (
                     <form
                       onSubmit={handleConfirmSubmit(onConfirmBooking, (formErrors) => {
                         if (formErrors.name) setConfirmFocus('name');
@@ -3733,9 +3896,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <div className="flex flex-col items-start gap-3">
                           <button
                             type="submit"
-                            className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-[#111111] hover:bg-black text-white text-sm font-bold transition-colors cursor-pointer shadow-sm"
+                            disabled={isCreatingBooking}
+                            aria-busy={isCreatingBooking || undefined}
+                            className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-[#111111] hover:bg-black text-white text-sm font-bold transition-colors cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                           >
-                            Confirm Booking
+                            {isCreatingBooking ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Confirming…
+                              </>
+                            ) : (
+                              "Confirm Booking"
+                            )}
                           </button>
                           <button
                             type="button"
@@ -4118,14 +4290,32 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
                   <button
                     type="button"
-                    disabled={!selectedTime || !acceptedTerms}
-                    onClick={proceedToBooking}
-                  className={`w-full md:max-w-sm lg:max-w-md md:self-start px-6 sm:px-8 py-3.5 rounded-xl text-base font-semibold transition-all flex items-center justify-center ${selectedTime && acceptedTerms
-                    ? 'bg-[#111111] hover:bg-black text-white cursor-pointer'
-                    : 'bg-[#cfcfcf] text-white cursor-not-allowed'
+                    disabled={
+                      !selectedTime ||
+                      !acceptedTerms ||
+                      !selectedSlotIsAvailable ||
+                      slotsInitialLoading ||
+                      proceedChecking
+                    }
+                    onClick={() => void proceedToBooking()}
+                    className={`w-full md:max-w-sm lg:max-w-md md:self-start px-6 sm:px-8 py-3.5 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2 ${
+                      selectedTime &&
+                      acceptedTerms &&
+                      selectedSlotIsAvailable &&
+                      !slotsInitialLoading &&
+                      !proceedChecking
+                        ? 'bg-[#111111] hover:bg-black text-white cursor-pointer'
+                        : 'bg-[#cfcfcf] text-white cursor-not-allowed'
                     }`}
-                >
-                  Proceed to book
+                  >
+                    {proceedChecking ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Checking availability…
+                      </>
+                    ) : (
+                      'Proceed to book'
+                    )}
                   </button>
               </div>
             )}
@@ -4154,10 +4344,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             setAuthModalOpen(false);
             if (pendingProceedAfterAuth.current) {
               pendingProceedAfterAuth.current = false;
-              const customer = readSessionForRole('customer')?.user;
-              setDrawerStep(3);
-              setName(customer?.name || '');
-              setPhone(customer?.phone || '');
+              void proceedToBooking();
             }
           }}
         />
@@ -4177,7 +4364,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               aria-hidden={!restaurantStickyVisible || isLightboxOpen}
             >
               <div className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-[0_4px_18px_rgba(15,23,42,0.06)]">
-                <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-1.5">
+                <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-1.5">
                   <div className="flex items-center gap-3 py-1.5 min-w-0">
                     <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-slate-100 shrink-0">
                       {stickyThumb ? (

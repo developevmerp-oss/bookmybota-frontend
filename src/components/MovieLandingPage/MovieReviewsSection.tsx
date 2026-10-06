@@ -192,7 +192,7 @@ export default function MovieReviewsSection({ movieId, movieRating, reviewsCount
 
   return (
     <section className="py-8 sm:py-10 lg:py-0 bg-white">
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
+      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
       <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
         <div>
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">Top reviews</h2>

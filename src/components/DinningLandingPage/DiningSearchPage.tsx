@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useGetBusinessesPagedQuery, useGetCollectionsQuery, useGetMoodsQuery, Business } from "@/services/api";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferLabel } from "@/lib/diningOffers";
 import {
@@ -80,11 +81,6 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
         const bases = [1200, 1500, 2000, 2400, 1800];
         return `${formatMoney(bases[idHash % bases.length], { compact: true })} for two`;
       })();
-
-  const distance = (() => {
-    const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
-    return `${dists[idHash % dists.length]} km away`;
-  })();
 
   const isPromoted = !!restaurant.is_promoted;
   const offerLabel = listingOfferLabel(restaurant.dining_offers);
@@ -160,7 +156,13 @@ function RestaurantCard({ restaurant }: { restaurant: Business }) {
               <MapPin size={14} className="shrink-0 text-[#6900AA]" />
               <span className="truncate font-medium">{getLocality(restaurant.address)}</span>
             </p>
-            <span className="shrink-0 font-medium whitespace-nowrap text-[#292929]">{distance}</span>
+            <DiningDistanceLabel
+              latitude={restaurant.latitude}
+              longitude={restaurant.longitude}
+              placeCity={restaurant.city_name}
+              suffix=" away"
+              className="shrink-0 font-medium whitespace-nowrap text-[#292929]"
+            />
           </div>
           <p className="flex items-center gap-1.5 min-w-0">
             <Users size={14} className="shrink-0 text-[#6900AA]" />

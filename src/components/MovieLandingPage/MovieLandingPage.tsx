@@ -66,7 +66,7 @@ import "@/components/DinningLandingPage/DiningHomePage.css";
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
 /** Match Only in Theatres grid density (5 across on desktop). */
 const MOVIES_VISIBLE = 5;
-const CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+const CONTAINER = "container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0";
 const EMPTY_MOVIES: Movie[] = [];
 const EMPTY_HERO_EXTRAS: Record<string, string> = {};
 
@@ -593,7 +593,7 @@ function MovieReleasesGrid({
 
   return (
     <section className="bg-white pt-6 sm:pt-8 pb-2">
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0">
+      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
         <h2 className="mb-3 text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight sm:mb-4">
           {title}
         </h2>
@@ -1211,7 +1211,7 @@ export default function MovieLandingPage() {
         <>
           {/* Mobile + tablet — featured cards (centered active + side peeks) */}
           <section className="lg:hidden bg-white pt-3 pb-5 sm:pt-4 sm:pb-6 md:pt-5 md:pb-8">
-            <div className="mb-3 px-5 sm:px-8 md:mb-4">
+            <div className="mb-3 px-4 sm:px-5 md:px-6 md:mb-4">
               <h2 className="text-lg font-extrabold text-[#111111] sm:text-xl">
                 {heroSlides.some((s) => s.promoted) ? "Promoted movies" : "In the Spotlight"}
               </h2>
@@ -1221,7 +1221,7 @@ export default function MovieLandingPage() {
               className={`flex snap-x snap-mandatory items-center overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                 heroSlides.length > 1
                   ? "gap-3 md:gap-4 px-[max(0.75rem,calc((100%-min(72vw,18.5rem))/2))] md:px-[max(1.25rem,calc((100%-min(46vw,21rem))/2))]"
-                  : "justify-center px-5 sm:px-8"
+                  : "justify-center px-4 sm:px-5 md:px-6"
               }`}
               onScroll={heroSlides.length > 1 ? syncMobilePromoIndex : undefined}
             >

@@ -659,7 +659,7 @@ export default function PublicEventDetailPage({
         </div>
       </div>
 
-      <div className="container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
         <nav
           aria-label="Breadcrumb"
           className="hidden lg:block mb-3 sm:mb-4 text-[0.8125rem] sm:text-[0.875rem] text-[#8A8A8A] break-words leading-relaxed"

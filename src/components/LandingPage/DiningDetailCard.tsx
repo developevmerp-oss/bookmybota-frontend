@@ -7,6 +7,7 @@ import type { Business } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 import { localityFromAddress } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 
@@ -53,10 +54,6 @@ function cuisineLabel(place: Pick<Business, "cuisine" | "type_name">) {
   return tags.length ? tags.join(" • ") : "Dining";
 }
 
-function distanceLabel(idHash: number) {
-  return `${[0.6, 1.2, 2.1, 3.4, 4.8][idHash % 5]} km`;
-}
-
 function stableHash(value: string | number | undefined) {
   if (typeof value === "number") return value;
   return String(value || "")
@@ -69,7 +66,7 @@ type DetailBodyProps = {
   rating: number | null;
   reviewsCount: number;
   locationLine: string;
-  distance: string;
+  distance: ReactNode;
   cuisine: string;
 };
 
@@ -143,7 +140,6 @@ export function DiningDetailCard({
   const locality = localityFromAddress(place.address);
   const city = place.city_name?.trim() || "";
   const locationLine = [locality, city].filter(Boolean).join(", ") || locality || city;
-  const idHash = stableHash(place.id);
   const widthClass = adaptive ? "w-full" : CARD_WIDTH;
 
   return (
@@ -163,7 +159,14 @@ export function DiningDetailCard({
         rating={rating}
         reviewsCount={reviewsCount}
         locationLine={locationLine}
-        distance={distanceLabel(idHash)}
+        distance={
+          <DiningDistanceLabel
+            latitude={place.latitude}
+            longitude={place.longitude}
+            placeCity={place.city_name}
+            className="shrink-0 whitespace-nowrap text-sm tracking-wide font-semibold text-gray-600 leading-snug"
+          />
+        }
         cuisine={cuisineLabel(place)}
       />
     </Link>
@@ -205,7 +208,7 @@ export function ShowcaseDiningDetailCard({
         rating={hasRating ? parsedRating : null}
         reviewsCount={hasRating ? [86, 124, 156, 98][idHash % 4] : 0}
         locationLine={locality || "Addis Ababa"}
-        distance={distanceLabel(idHash)}
+        distance={null}
         cuisine={(cuisine || "Dining").replace(/[·|/]/g, "•")}
       />
     </>

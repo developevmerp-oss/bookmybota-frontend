@@ -10,7 +10,7 @@ import {
 import { useGetAnalyticsQuery, useGetBusinessBookingsQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDateTime12h } from "@/lib/dateFormat";
+import { formatDateTimeCustomer } from "@/lib/dateFormat";
 
 export default function AnalyticsPage() {
   const dispatch = useAppDispatch();
@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
                           {b.customer_name}
                         </h4>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {formatDateTime12h(b.booking_time)}
+                          {formatDateTimeCustomer(b.booking_time)}
                         </p>
                       </div>
                     </div>

@@ -603,20 +603,29 @@ export default function VenueLayoutViewer({
                 const isAvailable = seat.status === "AVAILABLE";
                 const categoryColor = getSeatColorBySection(seat.section_name);
                 
-                let fill = cinemaMode ? "#cbd5e1" : "#334155"; // Unavailable
+                let fill = cinemaMode ? "#ffffff" : "#334155"; // Unavailable / booked
                 let stroke = cinemaMode ? "#94a3b8" : "#475569";
                 let strokeWidth = 1;
-                let opacity = cinemaMode ? 0.7 : 0.4;
+                let opacity = cinemaMode ? 1 : 0.4;
+                let labelFill = cinemaMode ? "#94a3b8" : "#ffffff";
+                let labelText = seat.seat_label;
 
                 if (isSelected) {
-                  fill = "#f43f5e"; // Rose-500
-                  stroke = "#ffffff";
+                  fill = cinemaMode ? "#8B5CF6" : "#f43f5e";
+                  stroke = cinemaMode ? "#6D28D9" : "#ffffff";
                   strokeWidth = 2;
                   opacity = 1;
+                  labelFill = "#ffffff";
+                  labelText = seat.seat_label;
                 } else if (isAvailable) {
-                  fill = categoryColor;
-                  stroke = "#ffffff";
+                  fill = cinemaMode ? "#ffffff" : categoryColor;
+                  stroke = cinemaMode ? "#cfcfcf" : "#ffffff";
                   opacity = 1;
+                  labelFill = cinemaMode ? "#111111" : "#ffffff";
+                  labelText = seat.seat_label;
+                } else if (cinemaMode) {
+                  labelText = "×";
+                  labelFill = "#94a3b8";
                 }
 
                 return (
@@ -652,10 +661,10 @@ export default function VenueLayoutViewer({
                       x={-12}
                       y={-5}
                       width={24}
-                      text={seat.seat_label}
+                      text={labelText}
                       fontSize={10}
                       fontStyle="bold"
-                      fill="#ffffff"
+                      fill={labelFill}
                       align="center"
                       verticalAlign="middle"
                       listening={false}
@@ -794,8 +803,9 @@ export default function VenueLayoutViewer({
           {/* Legend */}
           {cinemaMode ? (
             <div className="border-t border-slate-200 pt-4 mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-rose-500" /> Selected</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-slate-300" /> Sold / Reserved</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-[#cfcfcf]" /> Available</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)]" /> Selected</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-slate-300 relative flex items-center justify-center"><span className="text-[8px] leading-none text-slate-400">×</span></div> Sold / Reserved</div>
             </div>
           ) : (
             <div className="border-t border-slate-800 pt-4 mt-4 flex flex-wrap gap-4 text-xs text-slate-400">

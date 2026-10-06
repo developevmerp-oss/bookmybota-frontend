@@ -6,9 +6,6 @@ import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-  ArrowLeft,
-  Calendar,
-  Clock,
   AlertCircle,
   Loader2,
   Armchair,
@@ -44,6 +41,7 @@ import {
   usePreviewGiftCardRedeemMutation,
   useGetShowtimeBeveragesQuery,
   useValidatePlatformPromoCodeMutation,
+  useGetPublicMovieShowtimesQuery,
   type MovieBookingSeatPayload,
   type GiftCardRedeemPreview,
   type CinemaBeverage,
@@ -65,6 +63,65 @@ import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
 import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
+import images from "@/Images";
+
+const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
+
+/** Seat map palette (layout unchanged) */
+const SEAT_AVAILABLE =
+  "bg-white text-slate-900 border border-[#cfcfcf] hover:border-slate-400 cursor-pointer";
+const SEAT_SELECTED =
+  "text-white border border-[#6D28D9] cursor-pointer bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)]";
+const SEAT_BOOKED =
+  "bg-white text-slate-400 border border-[#cfcfcf] cursor-not-allowed";
+const SEAT_SELECTED_MINI =
+  "border border-[#6D28D9] bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_50%,#6D28D9_100%)]";
+const SEAT_SELECTED_SWATCH =
+  "border border-[#6D28D9] bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)]";
+
+function formatSeatPageTime(startsAt: string): string {
+  try {
+    const raw = String(startsAt || "").trim();
+    const parts = raw.includes("T") ? raw.split("T") : raw.split(" ");
+    const timePart = (parts[1] || parts[0] || "").slice(0, 5);
+    const [hStr, mStr] = timePart.split(":");
+    let h = parseInt(hStr, 10);
+    if (!Number.isFinite(h)) return raw;
+    const m = mStr || "00";
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h.toString().padStart(2, "0")}:${m} ${ampm}`;
+  } catch {
+    return String(startsAt || "");
+  }
+}
+
+function showtimeDateKey(startsAt: string): string {
+  const raw = String(startsAt || "").trim().replace(" ", "T");
+  return raw.slice(0, 10);
+}
+
+function parseShowtimeDate(startsAt: string): Date | null {
+  const raw = String(startsAt || "").trim();
+  if (!raw) return null;
+  const d = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatSeatPageDateParts(startsAt: string): { weekday: string; dayMonth: string } {
+  const d = parseShowtimeDate(startsAt);
+  if (!d) return { weekday: "", dayMonth: "" };
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = d.toLocaleDateString("en-US", { month: "short" });
+  return { weekday, dayMonth: `${day} ${month}` };
+}
+
+function isShowtimePast(startsAt: string): boolean {
+  const d = parseShowtimeDate(startsAt);
+  if (!d) return false;
+  return d.getTime() < Date.now();
+}
 
 const HOLD_SESSION_KEY = "bmb_movie_hold_session";
 
@@ -201,6 +258,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     width: 1,
     canScroll: false,
   });
+  const [stickyRowLabels, setStickyRowLabels] = useState<
+    Array<{ key: string; label: string; top: number }>
+  >([]);
 
   const proceedRef = useRef<() => Promise<void>>(async () => { });
   const classicViewportRef = useRef<HTMLDivElement | null>(null);
@@ -218,6 +278,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const classicMinimapDragRef = useRef(false);
   const classicZoomRef = useRef(1.45);
   const isTouchClassicRef = useRef(false);
+  const lastClassicFitKeyRef = useRef("");
 
   useEffect(() => {
     dispatch(loadFromStorage());
@@ -251,6 +312,30 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   });
 
   const { data: showtimeBeverages = [] } = useGetShowtimeBeveragesQuery(showtimeId);
+
+  const movieKeyForShowtimes = layoutData?.movie?.slug || layoutData?.movie?.id || "";
+  const showtimeDateForSlots = layoutData?.showtime?.starts_at
+    ? showtimeDateKey(layoutData.showtime.starts_at)
+    : "";
+
+  const { data: publicShowtimesData } = useGetPublicMovieShowtimesQuery(
+    {
+      idOrSlug: movieKeyForShowtimes,
+      date: showtimeDateForSlots || undefined,
+      city_slug: selectedCity || undefined,
+    },
+    { skip: !movieKeyForShowtimes || !showtimeDateForSlots }
+  );
+
+  const theaterShowtimes = useMemo(() => {
+    const cinemaId = layoutData?.cinema?.id;
+    if (!cinemaId || !publicShowtimesData?.cinemas?.length) return [];
+    const group = publicShowtimesData.cinemas.find((c) => c.id === cinemaId);
+    if (!group?.showtimes?.length) return [];
+    return [...group.showtimes].sort((a, b) =>
+      String(a.starts_at).localeCompare(String(b.starts_at))
+    );
+  }, [publicShowtimesData, layoutData?.cinema?.id]);
 
   const {
     register,
@@ -450,7 +535,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           })
           .sort((a, b) => a.avgY - b.avgY);
 
-        for (const rowObj of sortedRows) {
+          for (const rowObj of sortedRows) {
           const rowSeats = rowObj.seats;
           const steps: number[] = [];
           for (let i = 0; i < rowSeats.length - 1; i++) {
@@ -460,12 +545,23 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           }
           const normalStep = steps.length > 0 ? Math.min(...steps) : 40;
 
+          const rowSeatLabels = rowSeats.map((s: any) =>
+            String(s.seat_label ?? "").trim()
+          );
+          // Same row can reuse 01–10 on both aisle sides — IDs must stay unique
+          const rowHasDuplicateLabels =
+            rowSeatLabels.some((l) => l) &&
+            new Set(rowSeatLabels.filter(Boolean)).size <
+              rowSeatLabels.filter(Boolean).length;
+
           const gridSeats: GridSeat[] = rowSeats.map((seat: any, seatIdx: number) => {
+            const displayNum = seatIdx + 1;
             const seatNum =
               seat.seat_label != null && String(seat.seat_label).trim() !== ""
                 ? String(seat.seat_label).trim()
-                : String(seatIdx + 1);
+                : String(displayNum);
             const labelId = `${rowObj.rowLabel}${seatNum}`;
+            const continuousId = `${rowObj.rowLabel}${String(displayNum).padStart(2, "0")}`;
             const isDupe =
               rawSeats!.filter(
                 (o: any) =>
@@ -473,7 +569,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   String(o.seat_label || "").trim() === seatNum
               ).length > 1;
             const friendlyId = isDupe && sec.secName ? `${sec.secName} ${labelId}` : labelId;
-            const seatId = friendlyId;
+            // Unique readable id (D01, D02… D11) — never use opaque internalId for UI labels
+            const seatId = rowHasDuplicateLabels ? continuousId : friendlyId;
             const nextSeat = rowSeats[seatIdx + 1];
             const isAisleGap = nextSeat
               ? Number(nextSeat.coordinate_x ?? 0) - Number(seat.coordinate_x ?? 0) > normalStep * 1.6
@@ -485,15 +582,17 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             const isBooked =
               bookedSet.has(seatId) ||
               bookedSet.has(labelId) ||
+              bookedSet.has(continuousId) ||
               bookedSet.has(friendlyId) ||
               bookedSet.has(`${rowObj.rowLabel}${Number(seatNum)}`) ||
-              (seat.internalId && bookedSet.has(seat.internalId)) ||
+              bookedSet.has(`${rowObj.rowLabel}${displayNum}`) ||
+              (seat.internalId && bookedSet.has(String(seat.internalId))) ||
               Boolean(isStatusUnavailable);
 
             return {
               id: seatId,
               row: rowObj.rowLabel,
-              number: seatNum,
+              number: displayNum,
               tierName: sec.secName,
               price,
               isBooked,
@@ -623,11 +722,34 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       return block.map((s) => ({
         seat_identifier: s.id,
         tier_name: s.tierName,
+        row_label: s.row,
+        seat_number: String(s.number).padStart(2, "0"),
         unit_price: s.price,
       }));
     },
     [findGridSeatContext]
   );
+
+  const formatSelectedSeatLabel = useCallback((s: MovieBookingSeatPayload) => {
+    const ctx = findGridSeatContext(s.seat_identifier);
+    const row = s.row_label || ctx?.seat?.row || "";
+    const numRaw = s.seat_number ?? (ctx?.seat != null ? String(ctx.seat.number) : "");
+    const num = String(numRaw).replace(/^0+/, "") || numRaw;
+    const tier = (s.tier_name || ctx?.seat?.tierName || "").trim();
+    // e.g. "Regular J7"
+    const seatPart = row && num ? `${row}${num}` : String(s.seat_identifier || "").trim();
+    if (tier) {
+      const tierWord = tier
+        .replace(/\s*TIER\s*$/i, "")
+        .replace(/\s*ROWS?\s*$/i, "")
+        .trim();
+      // Title-case first word style: Regular
+      const tierLabel =
+        tierWord.charAt(0).toUpperCase() + tierWord.slice(1).toLowerCase();
+      return `${tierLabel} ${seatPart}`.trim();
+    }
+    return seatPart;
+  }, [findGridSeatContext]);
 
   const applyMovieSeats = (next: MovieBookingSeatPayload[]) => {
     setSelectedSeats(next.slice(0, qty));
@@ -688,6 +810,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         return {
           seat_identifier: seatId,
           tier_name: fromGrid?.tierName || secName,
+          row_label: fromGrid?.row,
+          seat_number: fromGrid ? String(fromGrid.number).padStart(2, "0") : undefined,
           unit_price: price,
         };
       });
@@ -1089,6 +1213,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [gridRows]);
 
   const classicSeatTrackPx = Math.ceil(classicMaxSeatSlots * 30);
+  /** Fixed left alphabet column + gap before seat track (seat layout width unchanged) */
+  const classicRowLabelColPx = 20;
+  const classicRowLabelGapPx = 68;
+  const classicRowOuterPx = classicSeatTrackPx + classicRowLabelColPx + classicRowLabelGapPx;
 
   const canContinue = selectedSeats.length === qty && !holding;
 
@@ -1105,7 +1233,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     const viewport = classicViewportRef.current;
     const content = classicContentRef.current;
     if (!viewport || !content) return 1;
-    const pad = 24;
+    const pad = 8;
     const baseW = Math.max(content.offsetWidth, classicContentSize.w, 1);
     const baseH = Math.max(content.offsetHeight, classicContentSize.h, 1);
     const zw = (viewport.clientWidth - pad * 2) / baseW;
@@ -1113,9 +1241,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     return Math.min(1, Math.max(0.4, Math.min(zw, zh)));
   }, [classicContentSize.h, classicContentSize.w]);
 
-  /** Stay zoomed into a section so the top-right navigator red box is useful (all screen sizes). */
+  /** Desktop: allow full-hall fit so the map is visible without scroll. Mobile: keep section zoom. */
   const getClassicMinZoom = useCallback(() => {
-    return Math.max(1.15, getClassicFitZoom());
+    const fit = getClassicFitZoom();
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
+      return fit;
+    }
+    return Math.max(1.15, fit);
   }, [getClassicFitZoom]);
 
   const updateClassicViewport = useCallback(() => {
@@ -1132,13 +1264,42 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     });
   }, []);
 
+  const syncStickyRowLabels = useCallback(() => {
+    const viewport = classicViewportRef.current;
+    if (!viewport || viewMode !== "classic") {
+      setStickyRowLabels([]);
+      return;
+    }
+    const shell = viewport.parentElement;
+    if (!shell) {
+      setStickyRowLabels([]);
+      return;
+    }
+    const shellRect = shell.getBoundingClientRect();
+    const nodes = viewport.querySelectorAll<HTMLElement>("[data-classic-row-label]");
+    const next: Array<{ key: string; label: string; top: number }> = [];
+    nodes.forEach((node, i) => {
+      const label = node.dataset.classicRowLabel || "";
+      if (!label) return;
+      const r = node.getBoundingClientRect();
+      if (r.bottom < shellRect.top - 8 || r.top > shellRect.bottom + 8) return;
+      next.push({
+        key: node.dataset.classicRowKey || `${label}-${i}`,
+        label,
+        top: r.top - shellRect.top + r.height / 2,
+      });
+    });
+    setStickyRowLabels(next);
+  }, [viewMode]);
+
   const centerClassicScroll = useCallback(() => {
     const el = classicViewportRef.current;
     if (!el) return;
     el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
-    el.scrollTop = 0;
+    el.scrollTop = Math.max(0, (el.scrollHeight - el.clientHeight) / 2);
     updateClassicViewport();
-  }, [updateClassicViewport]);
+    requestAnimationFrame(() => syncStickyRowLabels());
+  }, [updateClassicViewport, syncStickyRowLabels]);
 
   useEffect(() => {
     if (viewMode !== "classic") return;
@@ -1180,24 +1341,47 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     if (!classicContentSize.w || !classicContentSize.h) return;
     const id = requestAnimationFrame(() => {
       updateClassicViewport();
+      syncStickyRowLabels();
     });
     return () => cancelAnimationFrame(id);
-  }, [classicContentSize, classicZoom, viewMode, updateClassicViewport]);
+  }, [classicContentSize, classicZoom, viewMode, updateClassicViewport, syncStickyRowLabels]);
 
   useEffect(() => {
     if (viewMode !== "classic") {
       setShowClassicMinimap(false);
+      setStickyRowLabels([]);
+      lastClassicFitKeyRef.current = "";
       return;
     }
-    // Same section zoom as mobile so top-right scroll navigator works
-    classicZoomRef.current = 1.45;
-    setClassicZoom(1.45);
+    if (!classicContentSize.w || !classicContentSize.h) return;
+
+    // Fit once per classic session / row set (after content is measured)
+    const fitKey = `${gridRows.length}:${classicSeatTrackPx}`;
+    if (lastClassicFitKeyRef.current === fitKey) return;
+    lastClassicFitKeyRef.current = fitKey;
+
+    const isDesktop =
+      typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+    const initialZoom = isDesktop ? getClassicFitZoom() : 1.45;
+    classicZoomRef.current = initialZoom;
+    setClassicZoom(initialZoom);
     const id = requestAnimationFrame(() => {
       centerClassicScroll();
       updateClassicViewport();
+      syncStickyRowLabels();
     });
     return () => cancelAnimationFrame(id);
-  }, [viewMode, gridRows, centerClassicScroll, updateClassicViewport]);
+  }, [
+    viewMode,
+    gridRows,
+    classicSeatTrackPx,
+    classicContentSize.w,
+    classicContentSize.h,
+    getClassicFitZoom,
+    centerClassicScroll,
+    updateClassicViewport,
+    syncStickyRowLabels,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1207,8 +1391,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   const handleClassicScroll = useCallback(() => {
     updateClassicViewport();
+    syncStickyRowLabels();
     revealClassicMinimap();
-  }, [revealClassicMinimap, updateClassicViewport]);
+  }, [revealClassicMinimap, updateClassicViewport, syncStickyRowLabels]);
 
   // Desktop mouse drag-to-scroll; touch uses native free scroll
   const handleClassicPointerDown = useCallback(
@@ -1252,9 +1437,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       el.scrollLeft = drag.originX - dx;
       el.scrollTop = drag.originY - dy;
       updateClassicViewport();
+      syncStickyRowLabels();
       revealClassicMinimap();
     },
-    [revealClassicMinimap, updateClassicViewport]
+    [revealClassicMinimap, updateClassicViewport, syncStickyRowLabels]
   );
 
   const handleClassicPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
@@ -1282,9 +1468,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         Math.min(el.scrollHeight - el.clientHeight, yRatio * el.scrollHeight - el.clientHeight / 2)
       );
       updateClassicViewport();
+      syncStickyRowLabels();
       revealClassicMinimap();
     },
-    [revealClassicMinimap, updateClassicViewport]
+    [revealClassicMinimap, updateClassicViewport, syncStickyRowLabels]
   );
 
   const handleMinimapPointerDown = useCallback(
@@ -1376,16 +1563,57 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [viewMode, setClassicZoomLevel, revealClassicMinimap]);
 
   const seatMapSection = (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 p-2.5 rounded-2xl shadow-sm">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+    <section className="space-y-2 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:space-y-2">
+      {(theaterShowtimes.length > 0 || showtime?.starts_at) && (
+        <div className="flex items-center gap-4 sm:gap-5 shrink-0 border-b border-slate-200 pb-3 mb-0.5">
+          {(() => {
+            const dateSrc = showtime?.starts_at || theaterShowtimes[0]?.starts_at || "";
+            const { weekday, dayMonth } = formatSeatPageDateParts(dateSrc);
+            return (
+              <div className="shrink-0 leading-tight min-w-[3.25rem]">
+                <p className="text-[11px] font-medium text-slate-400">{weekday}</p>
+                <p className="text-sm font-bold text-slate-900 tracking-tight">{dayMonth}</p>
+              </div>
+            );
+          })()}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1">
+            {theaterShowtimes.map((st) => {
+              const active = st.id === showtimeId;
+              const past = isShowtimePast(st.starts_at) && !active;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  disabled={past}
+                  onClick={() => {
+                    if (st.id === showtimeId || past) return;
+                    router.push(`/movies/book/${st.id}?qty=${qty}`);
+                  }}
+                  className={`shrink-0 min-w-[5.5rem] px-3 py-2 rounded-lg text-[12px] font-semibold transition-colors ${
+                    past
+                      ? "bg-white border border-slate-200 text-slate-300 cursor-not-allowed"
+                      : active
+                        ? "bg-slate-100 border-0 text-slate-900 cursor-default"
+                        : "bg-white border border-slate-200 text-slate-800 hover:border-slate-400 cursor-pointer"
+                  }`}
+                  title={[st.format, st.language, st.screen_name].filter(Boolean).join(" • ")}
+                >
+                  {formatSeatPageTime(st.starts_at)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-0.5 py-1 shrink-0">
+        <div className="flex items-center gap-1 p-0.5 bg-slate-50 rounded-lg">
           {hasCanvasLayout && (
             <button
               type="button"
               onClick={() => setViewMode("canvas")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "canvas"
-                  ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/20"
-                  : "text-slate-500 hover:text-slate-900 hover:bg-white"
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${viewMode === "canvas"
+                  ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                  : "text-slate-500 hover:text-slate-800"
                 }`}
             >
               <MapIcon className="size-3.5" />
@@ -1395,9 +1623,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           <button
             type="button"
             onClick={() => setViewMode("grid")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "grid" || (!hasCanvasLayout && viewMode === "canvas")
-                ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/20"
-                : "text-slate-500 hover:text-slate-900 hover:bg-white"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${viewMode === "grid" || (!hasCanvasLayout && viewMode === "canvas")
+                ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                : "text-slate-500 hover:text-slate-800"
               }`}
           >
             <LayoutGrid className="size-3.5" />
@@ -1406,9 +1634,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           <button
             type="button"
             onClick={() => setViewMode("classic")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === "classic"
-                ? "bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white shadow-md shadow-[#F84464]/20"
-                : "text-slate-500 hover:text-slate-900 hover:bg-white"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${viewMode === "classic"
+                ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                : "text-slate-500 hover:text-slate-800"
               }`}
           >
             <Rows3 className="size-3.5" />
@@ -1435,7 +1663,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       </div>
 
       {viewMode === "canvas" && hasCanvasLayout && canvasLayoutData ? (
-        <div className="relative rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm h-[min(62vh,620px)] sm:h-[min(68vh,680px)]">
+        <div className="relative rounded-xl border border-slate-100 bg-white overflow-hidden h-[min(62vh,620px)] sm:h-[min(68vh,680px)] lg:flex-1 lg:min-h-0 lg:h-auto">
           <VenueLayoutViewer
             layoutData={canvasLayoutData}
             ticketTypes={[]}
@@ -1453,7 +1681,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         </div>
       ) : viewMode === "classic" ? (
         <>
-          <div className="relative rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="relative bg-white overflow-hidden lg:flex-1 lg:min-h-0 lg:flex lg:flex-col">
+            <div className="relative h-[min(62vh,580px)] sm:h-[min(66vh,640px)] lg:flex-1 lg:min-h-0 lg:h-auto">
             <div
               ref={classicViewportRef}
               onScroll={handleClassicScroll}
@@ -1461,9 +1690,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               onPointerMove={handleClassicPointerMove}
               onPointerUp={handleClassicPointerUp}
               onPointerCancel={handleClassicPointerUp}
-              className="relative h-[min(62vh,580px)] sm:h-[min(66vh,640px)] lg:h-[min(70vh,700px)] overflow-auto overscroll-contain bg-white select-none [-webkit-overflow-scrolling:touch] touch-pan-x touch-pan-y"
+              className="absolute inset-0 overflow-auto overscroll-contain bg-white select-none [-webkit-overflow-scrolling:touch] touch-pan-x touch-pan-y scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              {/* Outer box uses scaled size so mobile can scroll to the last row + screen */}
+              {/* Centering shell: keeps the seat map in the middle when it fits */}
+              <div className="min-h-full min-w-full w-max flex items-center justify-center">
               <div
                 style={{
                   width: Math.max((classicContentSize.w || classicSeatTrackPx + 40) * classicZoom, 1),
@@ -1473,19 +1703,19 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               >
                 <div
                   ref={classicContentRef}
-                  className="absolute top-0 left-0 px-3 sm:px-6 pt-5 sm:pt-6 pb-24 sm:pb-20 w-max space-y-3"
+                  className="absolute top-0 left-0 px-3 sm:px-6 pt-3 sm:pt-4 pb-20 sm:pb-16 lg:pb-8 w-max space-y-2 lg:space-y-1.5"
                   style={{
                     transform: `scale(${classicZoom})`,
                     transformOrigin: "0 0",
                   }}
                 >
                 {screenPosition === "top" && (
-                  <div className="pb-4 pt-1 text-center space-y-2" style={{ width: classicSeatTrackPx + 28 }}>
+                  <div className="pb-3 pt-0.5 text-center space-y-1.5" style={{ width: classicRowOuterPx }}>
                     <p className="text-[11px] tracking-wide text-slate-500">
                       All eyes this way please
                     </p>
                     <div
-                      className="mx-auto h-3 w-[72%] max-w-md bg-gradient-to-b from-[#b8d4f0] to-[#8eb8e0]"
+                      className="mx-auto h-2.5 w-[72%] max-w-md bg-gradient-to-b from-[#d4c4f0] to-[#b8a0e8]"
                       style={{
                         clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)",
                       }}
@@ -1500,35 +1730,56 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   return (
                     <div
                       key={`classic-row-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
-                      className="space-y-2"
+                      className="space-y-1.5"
                     >
                       {isNewTier && (
                         <div
-                          className="flex items-center gap-3 pt-3 pb-1"
-                          style={{ width: classicSeatTrackPx + 28 }}
+                          className="flex items-center pt-2 pb-0.5"
+                          style={{ width: classicRowOuterPx }}
                         >
-                          <div className="h-px flex-1 bg-slate-200" />
-                          <span className="shrink-0 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                            {formatMoney(rowGroup.price, { compact: true })} {rowGroup.tierName}{" "}
-                            ROWS
-                          </span>
-                          <div className="h-px flex-1 bg-slate-200" />
+                          <span
+                            className="shrink-0"
+                            style={{ width: classicRowLabelColPx, marginRight: classicRowLabelGapPx }}
+                            aria-hidden
+                          />
+                          <div
+                            className="flex items-center gap-3"
+                            style={{ width: classicSeatTrackPx }}
+                          >
+                            <div className="h-px flex-1 bg-slate-100" />
+                            <span className="shrink-0 text-[10px] sm:text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+                              {formatMoney(rowGroup.price, { compact: true })} {rowGroup.tierName}{" "}
+                              ROWS
+                            </span>
+                            <div className="h-px flex-1 bg-slate-100" />
+                          </div>
                         </div>
                       )}
 
-                      {/* Previous style: row letter on both sides */}
-                      <div className="flex items-center justify-center gap-3">
-                        <span className="w-5 text-center text-[11px] font-semibold text-slate-500 shrink-0">
+                      {/* Alphabet spacer (sticky overlay renders visible letters) */}
+                      <div className="flex items-center" style={{ width: classicRowOuterPx }}>
+                        <span
+                          data-classic-row-label={rowGroup.rowLabel}
+                          data-classic-row-key={`classic-${idx}-${rowGroup.tierName}-${rowGroup.rowLabel}`}
+                          className="shrink-0 text-center text-sm font-semibold text-transparent leading-none select-none"
+                          style={{ width: classicRowLabelColPx, marginRight: classicRowLabelGapPx }}
+                          aria-hidden
+                        >
                           {rowGroup.rowLabel}
                         </span>
-                        <div className="flex items-center gap-1 sm:gap-1.5">
+                        <div
+                          className="flex items-center justify-center"
+                          style={{ width: classicSeatTrackPx }}
+                        >
+                          <div className="flex items-center gap-1 sm:gap-1.5">
                           {rowGroup.seats.map((seat, seatIdx) => {
                             const isSelected = selectedSeats.some(
                               (s) => s.seat_identifier === seat.id
                             );
                             const isAisleGap =
                               seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
-                            const seatLabel = String(seat.number).padStart(2, "0");
+                            // Continuous across aisle: 01…10 then 11… (no restart)
+                            const seatLabel = String(seatIdx + 1).padStart(2, "0");
 
                             return (
                               <div
@@ -1544,15 +1795,21 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                     handleSeatClick(seat);
                                   }}
                                   onPointerDown={(e) => e.stopPropagation()}
-                                  className={`size-6 sm:size-7 rounded-[3px] text-[10px] sm:text-[11px] font-semibold transition-colors duration-100 flex items-center justify-center select-none relative z-10 ${seat.isBooked
-                                      ? "bg-[#d3d3d3] text-transparent cursor-not-allowed border border-[#d3d3d3]"
+                                  className={`size-6 sm:size-7 rounded-[4px] text-[10px] sm:text-[11px] font-semibold transition-colors duration-100 flex items-center justify-center select-none relative z-10 ${seat.isBooked
+                                      ? SEAT_BOOKED
                                       : isSelected
-                                        ? "bg-[#F84464] text-white border border-[#F84464] cursor-pointer"
-                                        : "bg-white text-[#1ea83c] border border-[#1ea83c] hover:bg-[#e8f8ec] cursor-pointer"
+                                        ? SEAT_SELECTED
+                                        : SEAT_AVAILABLE
                                     }`}
                                   title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
                                 >
-                                  {seat.isBooked ? "" : seatLabel}
+                                  {seat.isBooked ? (
+                                    <span className="text-[11px] leading-none font-bold text-slate-400" aria-hidden>
+                                      ×
+                                    </span>
+                                  ) : (
+                                    seatLabel
+                                  )}
                                 </button>
                                 {isAisleGap && (
                                   <div className="w-3 sm:w-5" aria-hidden="true" />
@@ -1560,19 +1817,17 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                               </div>
                             );
                           })}
+                          </div>
                         </div>
-                        <span className="w-5 text-center text-[11px] font-semibold text-slate-500 shrink-0">
-                          {rowGroup.rowLabel}
-                        </span>
                       </div>
                     </div>
                   );
                 })}
 
                 {screenPosition === "bottom" && (
-                  <div className="pt-8 pb-6 text-center space-y-2" style={{ width: classicSeatTrackPx + 28 }}>
+                  <div className="pt-6 pb-4 text-center space-y-1.5" style={{ width: classicRowOuterPx }}>
                     <div
-                      className="mx-auto h-3 w-[72%] max-w-md bg-gradient-to-b from-[#b8d4f0] to-[#8eb8e0]"
+                      className="mx-auto h-2.5 w-[72%] max-w-md bg-gradient-to-b from-[#d4c4f0] to-[#b8a0e8]"
                       style={{
                         clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)",
                       }}
@@ -1583,14 +1838,33 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   </div>
                 )}
                 {/* Extra scroll room so last row clears zoom controls on mobile */}
-                <div className="h-8 sm:h-4" aria-hidden="true" />
+                <div className="h-8 sm:h-4 lg:h-1" aria-hidden="true" />
                 </div>
+              </div>
+              </div>
+            </div>
+
+              {/* Sticky alphabet bar — outside scroller so it stays put; translucent fade */}
+              <div
+                data-classic-sticky-labels
+                className="pointer-events-none absolute inset-y-0 left-0 z-20 w-11 sm:w-12 bg-gradient-to-r from-white via-white/90 to-transparent"
+                aria-hidden
+              >
+                {stickyRowLabels.map((item) => (
+                  <span
+                    key={item.key}
+                    className="absolute left-1.5 sm:left-2 -translate-y-1/2 text-sm sm:text-base font-bold text-slate-600 leading-none"
+                    style={{ top: item.top }}
+                  >
+                    {item.label}
+                  </span>
+                ))}
               </div>
             </div>
 
               {/* Top-right navigator: shows on scroll & zoom, then hides */}
               <div
-                className={`absolute top-3 right-3 z-30 transition-opacity duration-200 ${
+                className={`absolute top-2 right-0 sm:right-1 z-30 transition-opacity duration-200 ${
                   showClassicMinimap ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
                 aria-hidden={!showClassicMinimap}
@@ -1601,13 +1875,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   onPointerMove={handleMinimapPointerMove}
                   onPointerUp={handleMinimapPointerUp}
                   onPointerCancel={handleMinimapPointerUp}
-                  className="pointer-events-auto relative w-[96px] h-[210px] sm:w-[112px] sm:h-[248px] rounded-md bg-[#585858]/92 shadow-[0_2px_14px_rgba(0,0,0,0.32)] overflow-hidden cursor-crosshair touch-none"
+                  className="pointer-events-auto relative w-[140px] h-[280px] sm:w-[160px] sm:h-[320px] lg:w-[180px] lg:h-[360px] rounded-lg bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.10)] overflow-hidden cursor-crosshair touch-none"
                   title="Current visible section"
                 >
-                  <div className="absolute inset-[6px] flex flex-col">
+                  <div className="absolute inset-[8px] flex flex-col">
                     {screenPosition === "top" && (
-                      <div className="mb-1 flex flex-col items-center shrink-0">
-                        <div className="w-[70%] h-[3px] bg-[#8eb8e0]/70 rounded-[1px]" />
+                      <div className="mb-1.5 flex flex-col items-center shrink-0">
+                        <div className="w-[70%] h-[3px] bg-[#b8a0e8]/80 rounded-[1px]" />
                       </div>
                     )}
                     <div className="flex-1 min-h-0 flex flex-col justify-between relative">
@@ -1620,7 +1894,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                             className="w-full flex flex-col items-center"
                           >
                             {isNewTier && idx > 0 && (
-                              <div className="w-[80%] h-px bg-white/25 mb-[1px]" />
+                              <div className="w-[80%] h-px bg-slate-200 mb-[1px]" />
                             )}
                             <div className="flex items-center justify-center gap-px">
                               {rowGroup.seats.map((seat, seatIdx) => {
@@ -1635,15 +1909,24 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                     className="flex items-center"
                                   >
                                     <span
-                                      className={`block size-[3px] sm:size-[3.5px] rounded-[0.5px] ${
+                                      className={`relative flex items-center justify-center size-[4px] sm:size-[4.5px] lg:size-[5px] rounded-[0.5px] box-border ${
                                         seat.isBooked
-                                          ? "bg-[#8a8a8a]"
+                                          ? "bg-white border border-slate-400"
                                           : isSelected
-                                            ? "bg-[#F84464]"
-                                            : "bg-[#d6d6d6]"
+                                            ? SEAT_SELECTED_MINI
+                                            : "bg-white border border-[#111111]"
                                       }`}
-                                    />
-                                    {isAisleGap && <span className="w-[2px]" />}
+                                    >
+                                      {seat.isBooked && (
+                                        <span
+                                          className="absolute inset-0 flex items-center justify-center text-[5px] sm:text-[6px] leading-none font-bold text-slate-500"
+                                          aria-hidden
+                                        >
+                                          ×
+                                        </span>
+                                      )}
+                                    </span>
+                                    {isAisleGap && <span className="w-[2px] sm:w-[3px]" />}
                                   </div>
                                 );
                               })}
@@ -1653,14 +1936,14 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       })}
                     </div>
                     {screenPosition === "bottom" && (
-                      <div className="mt-1 flex flex-col items-center shrink-0">
-                        <div className="w-[70%] h-[3px] bg-[#8eb8e0]/70 rounded-[1px]" />
+                      <div className="mt-1.5 flex flex-col items-center shrink-0">
+                        <div className="w-[70%] h-[3px] bg-[#b8a0e8]/80 rounded-[1px]" />
                       </div>
                     )}
 
                     <div className="pointer-events-none absolute inset-0" aria-hidden="true">
                       <div
-                        className="absolute border-[1.5px] border-[#ff3b30] bg-[#ff3b30]/15"
+                        className="absolute border-[1.5px] border-[#ff3b30] bg-[#ff3b30]/12"
                         style={{
                           top: `${classicViewport.top * 100}%`,
                           left: `${classicViewport.left * 100}%`,
@@ -1703,17 +1986,19 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 border-t border-slate-200 bg-white py-3 px-4 text-xs text-slate-600">
+            <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 border-t border-slate-100 bg-white py-2.5 px-4 text-xs text-slate-600 shrink-0">
               <div className="flex items-center gap-2">
-                <div className="size-3.5 rounded-[2px] bg-white border border-[#1ea83c]" />
+                <div className="size-3.5 rounded-[2px] bg-white border border-[#cfcfcf]" />
                 <span>Available</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="size-3.5 rounded-[2px] bg-[#d3d3d3] border border-[#d3d3d3]" />
+                <div className="size-3.5 rounded-[2px] bg-white border border-[#cfcfcf] relative flex items-center justify-center">
+                  <span className="text-[9px] leading-none font-bold text-slate-400">×</span>
+                </div>
                 <span>Sold</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="size-3.5 rounded-[2px] bg-[#F84464] border border-[#F84464]" />
+                <div className={`size-3.5 rounded-[2px] ${SEAT_SELECTED_SWATCH}`} />
                 <span>Selected</span>
               </div>
             </div>
@@ -1721,26 +2006,26 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-center gap-6 py-2.5 px-4 rounded-2xl bg-white border border-slate-200 text-xs shadow-sm">
+          <div className="flex flex-wrap items-center justify-center gap-6 py-2 px-4 text-xs shrink-0">
             <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-white border border-slate-300" />
+              <div className="size-4 rounded-md bg-white border border-[#cfcfcf]" />
               <span className="text-slate-600">Available</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-[#F84464] border border-[#F84464] shadow shadow-[#F84464]/30" />
+              <div className={`size-4 rounded-md ${SEAT_SELECTED_SWATCH}`} />
               <span className="text-slate-900 font-bold">Selected</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-slate-200 border border-slate-300 opacity-80 relative">
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500">
-                  ✕
+              <div className="size-4 rounded-md bg-white border border-[#cfcfcf] relative">
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                  ×
                 </span>
               </div>
               <span className="text-slate-500">Sold / Held</span>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 overflow-x-auto space-y-8 shadow-sm">
+          <div className="bg-white p-4 sm:p-6 overflow-x-auto space-y-6 lg:flex-1 lg:min-h-0 lg:overflow-auto">
             {screenPosition === "top" && (
               <div className="pb-8 pt-2 text-center space-y-3">
                 <p className="text-xs uppercase tracking-widest font-extrabold text-slate-500 flex items-center justify-center gap-2">
@@ -1772,16 +2057,18 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                     </div>
                   )}
 
-                  <div className="flex items-center justify-center gap-3">
-                    <span className="w-5 text-center text-xs font-bold text-slate-500 shrink-0">
+                  <div className="flex items-center w-full relative">
+                    <span className="sticky left-0 z-10 w-8 shrink-0 text-center text-xs font-bold text-slate-500 leading-none py-1 mr-10 bg-gradient-to-r from-white via-white/95 to-transparent">
                       {rowGroup.rowLabel}
                     </span>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="flex-1 flex items-center justify-center min-w-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                       {rowGroup.seats.map((seat, seatIdx) => {
                         const isSelected = selectedSeats.some(
                           (s) => s.seat_identifier === seat.id
                         );
                         const isAisleGap = seat.isAisleGap ?? (seatIdx === 3 || seatIdx === 9);
+                        const seatLabel = String(seatIdx + 1).padStart(2, "0");
 
                         return (
                           <div
@@ -1793,23 +2080,27 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                               disabled={seat.isBooked}
                               onClick={() => handleSeatClick(seat)}
                               className={`size-7 sm:size-8 rounded-lg text-[11px] font-bold transition-all duration-150 flex items-center justify-center select-none ${seat.isBooked
-                                  ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed"
+                                  ? SEAT_BOOKED
                                   : isSelected
-                                    ? "bg-[#F84464] text-white border border-[#F84464] shadow-lg shadow-[#F84464]/25 scale-110 z-10"
-                                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:scale-105 cursor-pointer"
+                                    ? `${SEAT_SELECTED} z-10`
+                                    : `${SEAT_AVAILABLE} hover:scale-105`
                                 }`}
                               title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
                             >
-                              {seat.number}
+                              {seat.isBooked ? (
+                                <span className="text-xs leading-none font-bold text-slate-400" aria-hidden>
+                                  ×
+                                </span>
+                              ) : (
+                                seatLabel
+                              )}
                             </button>
                             {isAisleGap && <div className="w-3 sm:w-5" aria-hidden="true" />}
                           </div>
                         );
                       })}
+                      </div>
                     </div>
-                    <span className="w-5 text-center text-xs font-bold text-slate-500 shrink-0">
-                      {rowGroup.rowLabel}
-                    </span>
                   </div>
                 </div>
               );
@@ -1854,95 +2145,96 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }
 
   return (
-    <div className="h-[100dvh] min-h-screen bg-[#F5F5F7] text-slate-900 flex flex-col overflow-hidden">
-      <header className="shrink-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-3">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={() => {
-                if (step === "review") {
-                  setStep(showtimeBeverages.length > 0 ? "beverages" : "seats");
-                  return;
-                }
-                if (step === "beverages") {
-                  setStep("seats");
-                  return;
-                }
-                const movieKey = movie?.slug || movie?.id;
-                if (movieKey) {
-                  router.push(`/movies/${movieKey}/showtimes`);
-                  return;
-                }
-                router.push("/movies");
-              }}
-              className="p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 transition-colors cursor-pointer shrink-0"
-              title={step === "review" ? "Back to snacks" : step === "beverages" ? "Back to seats" : "Back to showtimes"}
-            >
-              <ArrowLeft className="size-5" />
-            </button>
+    <div className={`h-[100dvh] min-h-screen text-slate-900 flex flex-col overflow-hidden ${step === "seats" ? "bg-white" : "bg-[#F5F5F7]"}`}>
+      <header className="shrink-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-2.5">
+        <div className="max-w-7xl mx-auto relative flex items-center justify-between gap-3 min-h-[3.25rem]">
+          {/* Logo — left (back navigation preserved via click) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (step === "review") {
+                setStep(showtimeBeverages.length > 0 ? "beverages" : "seats");
+                return;
+              }
+              if (step === "beverages") {
+                setStep("seats");
+                return;
+              }
+              const movieKey = movie?.slug || movie?.id;
+              if (movieKey) {
+                router.push(`/movies/${movieKey}/showtimes`);
+                return;
+              }
+              router.push("/movies");
+            }}
+            className="shrink-0 flex items-center cursor-pointer"
+            title={
+              step === "review"
+                ? "Back to snacks"
+                : step === "beverages"
+                  ? "Back to seats"
+                  : "Back to showtimes"
+            }
+          >
+            <img
+              src={logoSrc}
+              alt="Book My Bota"
+              className="h-10 sm:h-12 w-auto max-w-[10rem] sm:max-w-[14rem] object-contain object-left"
+            />
+          </button>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight truncate">
-                  {movie?.title}
-                </h1>
-                {movie?.certificate && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                    {movie.certificate}
-                  </span>
-                )}
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-600 border border-rose-200">
-                  {showtime?.format || "2D"} • {showtime?.language || "English"}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-                <span className="text-slate-700 font-semibold">{cinema?.name}</span>
-                <span>•</span>
-                <span className="text-slate-700 font-medium">{screen?.name}</span>
-                <span>•</span>
-                <span className="inline-flex items-center gap-1 text-slate-700">
-                  <Calendar className="size-3 text-[#F84464]" /> {showDateFormatted}
-                </span>
-                <span>•</span>
-                <span className="inline-flex items-center gap-1 text-slate-700">
-                  <Clock className="size-3 text-[#F84464]" /> {showTimeFormatted}
-                </span>
-              </p>
-            </div>
+          {/* Mobile title between logo and profile */}
+          <div className="flex-1 min-w-0 md:hidden text-center px-2">
+            <h1 className="text-sm font-extrabold text-slate-900 leading-tight truncate">
+              {movie?.title}
+            </h1>
+            <p className="text-[10px] text-slate-500 truncate">
+              {[showDateFormatted, showTimeFormatted].filter(Boolean).join(" • ")}
+            </p>
           </div>
 
-          <div className="hidden lg:flex items-center gap-2 text-xs">
-            <span
-              className={`px-2.5 py-1 rounded-lg border font-bold ${step === "seats"
-                  ? "bg-rose-50 border-rose-200 text-[#F84464]"
-                  : "bg-slate-100 border-slate-200 text-slate-500"
-                }`}
-            >
-              1. Seats
-            </span>
-            {showtimeBeverages.length > 0 && (
-              <>
-                <span className="text-slate-300">→</span>
-                <span
-                  className={`px-2.5 py-1 rounded-lg border font-bold ${step === "beverages"
-                      ? "bg-amber-50 border-amber-200 text-amber-700"
-                      : "bg-slate-100 border-slate-200 text-slate-500"
-                    }`}
-                >
-                  2. Snacks
+          {/* Center title — desktop / tablet */}
+          <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center text-center max-w-[min(42vw,28rem)] pointer-events-none">
+            <h1 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight truncate w-full">
+              {movie?.title}
+            </h1>
+            <p className="text-[11px] text-slate-500 mt-0.5 truncate w-full">
+              {[showDateFormatted, showTimeFormatted].filter(Boolean).join(", ")}
+              {cinema?.name ? ` at ${cinema.name}` : ""}
+              {screen?.name ? ` • ${screen.name}` : ""}
+            </p>
+          </div>
+
+          {/* Profile — right */}
+          <div className="shrink-0 flex items-center justify-end">
+            {isCustomerLoggedIn ? (
+              <Link
+                href="/customer/profile"
+                className="inline-flex items-center gap-2 rounded-full"
+                title="My profile"
+              >
+                <span className="w-9 h-9 rounded-full bg-[#7A00C6] text-white text-sm font-bold flex items-center justify-center">
+                  {(
+                    authUser?.name ||
+                    authUser?.email ||
+                    "U"
+                  )
+                    .toString()
+                    .charAt(0)
+                    .toUpperCase()}
                 </span>
-              </>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center cursor-pointer"
+                title="Login"
+                aria-label="Login"
+              >
+                <User className="size-4" />
+              </button>
             )}
-            <span className="text-slate-300">→</span>
-            <span
-              className={`px-2.5 py-1 rounded-lg border font-bold ${step === "review"
-                  ? "bg-purple-50 border-purple-200 text-[#6900AA]"
-                  : "bg-slate-100 border-slate-200 text-slate-500"
-                }`}
-            >
-              {showtimeBeverages.length > 0 ? "3" : "2"}. Review
-            </span>
           </div>
         </div>
       </header>
@@ -1964,9 +2256,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         </div>
       )}
 
-      <main className="flex-1 min-h-0 overflow-y-auto">
+      <main className={`flex-1 min-h-0 ${step === "seats" ? "overflow-hidden lg:overflow-hidden" : "overflow-y-auto"}`}>
         {step === "seats" ? (
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 pb-36">{seatMapSection}</div>
+          <div className="max-w-7xl mx-auto w-full h-full px-4 sm:px-8 py-4 sm:py-5 lg:py-3 pb-4 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden">
+            {seatMapSection}
+          </div>
         ) : step === "beverages" ? (
           <div className="max-w-5xl mx-auto w-full px-4 sm:px-8 py-6 pb-36">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -2100,7 +2394,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                     <div className="flex flex-wrap gap-1.5">
                       {selectedSeats.map((s) => (
                         <span key={s.seat_identifier} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] font-bold text-slate-900">
-                          <Armchair className="size-3 text-rose-500" />{s.seat_identifier}
+                          <Armchair className="size-3 text-rose-500" />{formatSelectedSeatLabel(s)}
                         </span>
                       ))}
                     </div>
@@ -2381,7 +2675,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#F84464]/08 border border-[#F84464]/30 text-xs font-bold text-[#F84464]"
                         >
                           <Armchair className="size-3 text-[#F84464]" />
-                          {seat.seat_identifier}
+                          {formatSelectedSeatLabel(seat)}
                           <span className="text-[#F84464]/80 font-normal">
                             ({formatMoney(seat.unit_price, { compact: true })})
                           </span>
@@ -2496,9 +2790,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   {selectedSeats.map((s) => (
                     <span
                       key={s.seat_identifier}
-                      className="px-2 py-0.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] font-bold text-slate-900"
+                      className="px-2 py-0.5 rounded-lg bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white border border-[#6D28D9]/40 text-[11px] font-bold"
                     >
-                      {s.seat_identifier}
+                      {formatSelectedSeatLabel(s)}
                     </span>
                   ))}
                 </div>

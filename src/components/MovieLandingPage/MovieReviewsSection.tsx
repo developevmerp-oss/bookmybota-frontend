@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { ChevronRight, Loader2, Star } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronRight, Loader2, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateMovieReviewMutation,
@@ -123,6 +124,8 @@ export default function MovieReviewsSection({ movieId, movieRating, reviewsCount
   const reviews = data?.items ?? [];
   const meta = data?.meta;
   const [createReview, { isLoading: submitting }] = useCreateMovieReviewMutation();
+  const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
 
   const {
     register,
@@ -202,14 +205,16 @@ export default function MovieReviewsSection({ movieId, movieRating, reviewsCount
               : "Be the first to rate this movie after your show ends on BookMyBota."}
           </p>
         </div>
-        {displayCount > 0 && (
-          <span
-            className="inline-flex items-center gap-0.5 text-sm sm:text-base font-semibold shrink-0"
+        {reviews.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setReviewsModalOpen(true)}
+            className="inline-flex items-center gap-0.5 text-sm sm:text-base font-semibold shrink-0 cursor-pointer hover:underline"
             style={{ color: BRAND }}
           >
-            {countLabel}
+            View Review
             <ChevronRight className="size-4" />
-          </span>
+          </button>
         )}
       </div>
 
@@ -340,6 +345,97 @@ export default function MovieReviewsSection({ movieId, movieRating, reviewsCount
         </div>
       )}
       </div>
+
+      {typeof document !== "undefined" &&
+        reviewsModalOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="movie-reviews-modal-title"
+          >
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/45 cursor-pointer"
+              aria-label="Close reviews"
+              onClick={() => {
+                setReviewsModalOpen(false);
+                setExpandedReviewId(null);
+              }}
+            />
+            <div className="relative w-full sm:max-w-lg max-h-[85vh] sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
+                <h2
+                  id="movie-reviews-modal-title"
+                  className="text-lg font-bold text-[#111111]"
+                >
+                  Reviews and Rating
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReviewsModalOpen(false);
+                    setExpandedReviewId(null);
+                  }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7">
+                {reviews.map((review: MovieReview) => {
+                  const name = review.user_name || "Guest";
+                  const ratingNum = Number(review.rating) || 0;
+                  const text = (review.text || "").trim();
+                  const expanded = expandedReviewId === String(review.id);
+                  const needsMore = text.length > 180;
+                  return (
+                    <article
+                      key={review.id}
+                      className="py-4 border-b border-slate-100 last:border-b-0"
+                    >
+                      <div className="flex items-center gap-2.5 pr-1">
+                        <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
+                          {name.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1 text-sm font-semibold text-[#111111] truncate">
+                          {name}
+                        </span>
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none">
+                          <Star size={10} className="fill-white text-white" />
+                          {Math.round(ratingNum)}
+                        </span>
+                      </div>
+                      {text ? (
+                        <div className="mt-2.5 relative">
+                          <p
+                            className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${
+                              expanded || !needsMore ? "" : "line-clamp-4"
+                            }`}
+                          >
+                            {text}
+                          </p>
+                          {needsMore && !expanded ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedReviewId(String(review.id))}
+                              className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold text-rose-600 cursor-pointer"
+                            >
+                              Read More
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </section>
   );
 }

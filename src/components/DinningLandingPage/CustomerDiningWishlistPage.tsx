@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bookmark, Loader2, MapPin, UtensilsCrossed } from "lucide-react";
+import { Heart, Loader2, MapPin, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetDiningWishlistQuery,
@@ -70,9 +70,9 @@ function WishlistRestaurantCard({
           className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
         >
           {isLoading ? (
-            <Loader2 size={16} className="animate-spin text-[#6900AA]" />
+            <Loader2 size={16} className="animate-spin text-[#E11D48]" />
           ) : (
-            <Bookmark size={18} className="fill-[#6900AA] text-[#6900AA]" strokeWidth={2.25} />
+            <Heart size={18} className="fill-[#E11D48] text-[#E11D48]" strokeWidth={2.25} />
           )}
         </button>
         {offerLabel && (
@@ -152,11 +152,11 @@ export default function CustomerDiningWishlistPage() {
         ) : restaurants.length === 0 ? (
           <div className="text-center py-16 px-4">
             <div className="mx-auto w-14 h-14 rounded-full bg-[#F7E9FF] flex items-center justify-center text-[#6900AA] mb-4">
-              <Bookmark size={26} />
+              <Heart size={26} />
             </div>
             <h3 className="text-lg font-bold text-[#111111]">No restaurants saved yet</h3>
             <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-              Tap the bookmark icon on any dining listing card to add it here.
+              Tap the heart icon on any dining listing card to add it here.
             </p>
             <Link
               href="/dining"

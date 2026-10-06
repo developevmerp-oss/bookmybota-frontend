@@ -69,14 +69,28 @@
 
 @media (min-width: 640px) {
   .promo-banner-swiper.is-single {
-    padding-left: 2.5rem; /* sm:px-10 */
-    padding-right: 2.5rem;
+    padding-left: 1.25rem; /* sm:px-5 — tighter tablet gutters */
+    padding-right: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .promo-banner-swiper.is-single {
+    padding-left: 1.5rem; /* md:px-6 */
+    padding-right: 1.5rem;
   }
 }
 
 @media (min-width: 1024px) {
   .promo-banner-swiper.is-single {
-    padding-left: 2.5rem; /* lg:px-10 */
+    padding-left: 2rem; /* lg:px-8 */
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .promo-banner-swiper.is-single {
+    padding-left: 2.5rem; /* xl:px-10 */
     padding-right: 2.5rem;
   }
 }

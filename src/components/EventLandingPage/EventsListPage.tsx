@@ -130,7 +130,7 @@ function writeEventRecentSearches(items: string[]) {
   }
 }
 
-const CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+const CONTAINER = "container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0";
 
 const EXPLORE_EVENT_CATEGORIES = [
   {
@@ -2451,7 +2451,7 @@ export default function PublicEventsPage() {
               className={`flex snap-x snap-mandatory items-center overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                 promoEvents.length > 1
                   ? "gap-3 md:gap-4 px-[max(0.75rem,calc((100%-min(72vw,18.5rem))/2))] md:px-[max(1.25rem,calc((100%-min(46vw,21rem))/2))]"
-                  : "justify-center px-5 sm:px-8"
+                  : "justify-center px-4 sm:px-5 md:px-6"
               }`}
               onScroll={promoEvents.length > 1 ? syncMobilePromoIndex : undefined}
             >
@@ -2545,7 +2545,7 @@ export default function PublicEventsPage() {
                     </div>
 
                     <div
-                      className={`pointer-events-none relative mx-auto w-full container px-5 sm:px-10  lg:px-10  2xl:px-0 py-10 xl:py-12 ${
+                      className={`pointer-events-none relative mx-auto w-full container px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-10 xl:py-12 ${
                         promoEvents.length > 1
                           ? "px-14 2xl:px-0 pb-14"
                           : "2xl:px-0"

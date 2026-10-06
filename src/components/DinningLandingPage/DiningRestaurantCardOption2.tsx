@@ -10,6 +10,7 @@ import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferBannerLabel } from "@/lib/diningOffers";
 import { localityFromAddress } from "@/components/LandingPage/homeUtils";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 
 /** Purple → transparent fishtail ribbon (ref lavender offer gradient). */
 const OFFER_RIBBON_BG =
@@ -27,34 +28,20 @@ function OfferTagIcon({ className = "" }: { className?: string }) {
         className="block h-full w-full"
         focusable="false"
       >
-        <g transform="rotate(45 12 12)">
-          <path
-            fill="#FFFFFF"
-            d="M12 2.75 L19.25 10 V21.25 H4.75 V10 Z"
-          />
-          <circle cx="12" cy="8.85" r="1.7" fill="#111111" />
-        </g>
+        <path
+          fill="currentColor"
+          d="M21.41 11.58l-9-9A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 .59 1.42l9 9a2 2 0 0 0 2.82 0l7-7a2 2 0 0 0 0-2.84zM5.5 7A1.5 1.5 0 1 1 7 5.5 1.5 1.5 0 0 1 5.5 7z"
+        />
       </svg>
     </span>
   );
 }
 
-function cuisineLabel(place: Pick<Business, "cuisine" | "type_name">) {
-  const raw = place.cuisine || place.type_name || "";
-  const tags = raw
-    .split(/[,·|/]/)
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .slice(0, 3);
-  return tags.length ? tags.join(", ") : "Dining";
-}
-
 function CoverMedia({ src, alt }: { src: string; alt: string }) {
   const [failed, setFailed] = useState(false);
-  const url = (src || "").trim();
-  if (!url || failed) {
+  if (!src || failed) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-[#F3F4F6] text-slate-300">
+      <div className="absolute inset-0 flex items-center justify-center text-slate-300">
         <Utensils size={28} strokeWidth={1.5} />
       </div>
     );
@@ -62,14 +49,21 @@ function CoverMedia({ src, alt }: { src: string; alt: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={url}
+      src={src}
       alt={alt}
-      className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.04]"
+      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
       loading="lazy"
       draggable={false}
       onError={() => setFailed(true)}
     />
   );
+}
+
+function cuisineLabel(place: Business): string {
+  const raw = place.cuisine;
+  if (Array.isArray(raw) && raw.length) return raw.filter(Boolean).join(", ");
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  return "Dining";
 }
 
 /**
@@ -113,7 +107,6 @@ export default function DiningRestaurantCardOption2({
       ? formatMoney(costNum, { compact: true })
       : formatMoney([1200, 1500, 2000, 2400, 1800][idHash % 5], { compact: true })
   } for two`;
-  const distanceLabel = `${[4.9, 3.5, 5.0, 2.8, 6.2][idHash % 5]} km`;
   const cuisine = cuisineLabel(place);
 
   return (
@@ -185,9 +178,12 @@ export default function DiningRestaurantCardOption2({
           ) : (
             <span className="min-w-0 flex-1" />
           )}
-          <span className="shrink-0 whitespace-nowrap text-sm tracking-wide font-semibold text-gray-600 leading-snug">
-            {distanceLabel}
-          </span>
+          <DiningDistanceLabel
+            latitude={place.latitude}
+            longitude={place.longitude}
+            placeCity={place.city_name}
+            className="shrink-0 whitespace-nowrap text-sm tracking-wide font-bold text-gray-600 leading-snug"
+          />
         </div>
       </div>
     </Link>

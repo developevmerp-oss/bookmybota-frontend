@@ -1699,6 +1699,16 @@ html.admin-theme .admin-dashboard-layout table .portal-table-muted {
 }
 
 
+/*
+ * Customer site: on phone/tablet, don't let Tailwind `container` max-width
+ * create extra side gutters on top of page padding (big empty left/right).
+ */
+@media (max-width: 1023px) {
+  .customer-theme .container {
+    max-width: 100%;
+  }
+}
+
 /* Admin / partner sidebars: hidden scrollbar until sidebar hover; thin thumb */
 .admin-sidebar-nav {
   scrollbar-width: none;

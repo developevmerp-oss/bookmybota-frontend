@@ -8,6 +8,7 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 import { formatMoney } from "@/lib/currencyFormat";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 import { localityFromAddress } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 
@@ -57,10 +58,6 @@ function cuisineLabel(place: Pick<Business, "cuisine" | "type_name"> | string | 
   return tags.length ? tags.join(", ") : "Dining";
 }
 
-function distanceLabel(idHash: number) {
-  return `${[0.4, 0.8, 1.2, 2.1, 3.4][idHash % 5]} km`;
-}
-
 function priceForTwoLabel(idHash: number, averageCost?: number) {
   if (averageCost) {
     return `${formatMoney(averageCost, { compact: true })} for two`;
@@ -82,7 +79,7 @@ type EditorialBodyProps = {
   cuisine: string;
   priceForTwo: string;
   locationLine: string;
-  distance: string;
+  distance: ReactNode;
 };
 
 function EditorialBody({
@@ -177,7 +174,14 @@ export function DiningEditorialCard({
         cuisine={cuisineLabel(place)}
         priceForTwo={priceForTwoLabel(idHash, place.average_cost)}
         locationLine={locationLine}
-        distance={distanceLabel(idHash)}
+        distance={
+          <DiningDistanceLabel
+            latitude={place.latitude}
+            longitude={place.longitude}
+            placeCity={place.city_name}
+            className="shrink-0 whitespace-nowrap text-sm tracking-wide font-semibold text-gray-600 leading-snug"
+          />
+        }
       />
     </Link>
   );
@@ -219,7 +223,7 @@ export function ShowcaseDiningEditorialCard({
         cuisine={cuisineLabel(cuisine)}
         priceForTwo={priceForTwoLabel(idHash)}
         locationLine={locality || "Addis Ababa"}
-        distance={distanceLabel(idHash)}
+        distance={null}
       />
     </>
   );

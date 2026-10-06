@@ -322,7 +322,8 @@ export default function EventCheckout({
 
   const [createEventBooking] = useCreateEventBookingMutation();
   const [createEventSeatHold] = useCreateEventSeatHoldMutation();
-  const [releaseEventSeatHold] = useReleaseEventSeatHoldMutation();
+  const [releaseEventSeatHold, { isLoading: releasingHold }] =
+    useReleaseEventSeatHoldMutation();
   const [validatePromo, { isLoading: validatingPromo }] = useValidateEventPromoCodeMutation();
   const [previewGiftCard, { isLoading: validatingGiftCard }] = usePreviewGiftCardRedeemMutation();
 
@@ -671,9 +672,9 @@ export default function EventCheckout({
   };
 
   const confirmCancelTransaction = async () => {
-    setCancelTxnOpen(false);
     await releaseActiveHold();
     clearSeatHoldState();
+    setCancelTxnOpen(false);
     if (cancelTxnAction === "exit") {
       onClose();
       return;
@@ -2613,8 +2614,9 @@ export default function EventCheckout({
             <div className="flex gap-3">
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => requestLeaveConfirmStep("back")}
-                className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer ${
+                className={`px-4 py-3 border text-slate-700 font-semibold text-[1rem] inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isPage
                     ? "rounded-[0.5rem] border-slate-300 bg-white"
                     : "rounded-xl border-slate-200"
@@ -2625,15 +2627,18 @@ export default function EventCheckout({
               <button
                 type="submit"
                 form="event-checkout-form"
-                disabled={!canConfirm}
+                disabled={!canConfirm || submitting}
+                aria-busy={submitting || undefined}
                 className={`flex-1 py-3 ${accentBtn} disabled:bg-slate-300 disabled:text-white disabled:hover:bg-slate-300 disabled:opacity-100 text-white font-semibold text-[1.0625rem] inline-flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed ${
                   isPage ? "rounded-[0.5rem]" : "rounded-xl disabled:bg-[#E3BCFF] disabled:hover:bg-[#E3BCFF]"
                 }`}
               >
                 {submitting && <Loader2 size={16} className="animate-spin" />}
-                {isOrganizer
-                  ? `Confirm & Send · ${formatMoney(grandTotal)}`
-                  : `Confirm Booking · ${formatMoney(grandTotal)}`}
+                {submitting
+                  ? "Confirming…"
+                  : isOrganizer
+                    ? `Confirm & Send · ${formatMoney(grandTotal)}`
+                    : `Confirm Booking · ${formatMoney(grandTotal)}`}
               </button>
             </div>
           )}
@@ -3122,7 +3127,7 @@ export default function EventCheckout({
       {cancelTxnOpen && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center p-5 bg-black/45"
-          onClick={() => setCancelTxnOpen(false)}
+          onClick={() => !releasingHold && setCancelTxnOpen(false)}
           role="presentation"
         >
           <div
@@ -3146,15 +3151,23 @@ export default function EventCheckout({
             <div className="mt-6 grid grid-cols-2 gap-3">
             <button
                 type="button"
+                disabled={releasingHold}
                 onClick={() => void confirmCancelTransaction()}
-                className="py-2.5 rounded-[0.5rem] border border-[#6900AA] text-[#6900AA] text-[1.0625rem] font-bold cursor-pointer hover:bg-[#F7E9FF]"
+                className="py-2.5 rounded-[0.5rem] border border-[#6900AA] text-[#6900AA] text-[1.0625rem] font-bold cursor-pointer hover:bg-[#F7E9FF] disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
               >
-                Yes, Cancel
+                {releasingHold ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Cancelling…
+                  </>
+                ) : (
+                  "Yes, Cancel"
+                )}
             </button>
               <button
                 type="button"
+                disabled={releasingHold}
                 onClick={() => setCancelTxnOpen(false)}
-                className="py-2.5 rounded-[0.5rem] bg-[#6900AA] text-white text-[1.0625rem] font-bold cursor-pointer hover:bg-[#57008E]"
+                className="py-2.5 rounded-[0.5rem] bg-[#6900AA] text-white text-[1.0625rem] font-bold cursor-pointer hover:bg-[#57008E] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 No
               </button>
@@ -3173,10 +3186,17 @@ export default function EventCheckout({
             </p>
             <button
               type="button"
+              disabled={releasingHold}
               onClick={() => void resetToSeatsAfterTimeout()}
-              className="w-full py-3 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white text-sm font-extrabold cursor-pointer"
+              className="w-full py-3 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white text-sm font-extrabold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             >
-              Try Again
+              {releasingHold ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Please wait…
+                </>
+              ) : (
+                "Try Again"
+              )}
             </button>
           </div>
         </div>

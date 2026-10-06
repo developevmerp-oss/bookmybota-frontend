@@ -10,6 +10,7 @@ import { restaurantHref, venueHref } from "@/lib/businessPublicPath";
 import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferBannerLabel } from "@/lib/diningOffers";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
+import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 import {
   eventPortrait,
   eventPlaceLine,
@@ -350,10 +351,6 @@ export function DiningPosterCard({
         const bases = [1200, 1500, 2000, 2400, 1800];
         return `${formatMoney(bases[idHash % bases.length], { compact: true })} for two`;
       })();
-  const distance = (() => {
-    const dists = [4.9, 3.5, 5.0, 2.8, 6.2];
-    return `${dists[idHash % dists.length]} km`;
-  })();
   const isPromoted = Boolean(place.is_promoted);
   const offerLabel = listingOfferBannerLabel(place.dining_offers);
   /** Shorter than full address — locality / first segment only. */
@@ -455,9 +452,12 @@ export function DiningPosterCard({
               ) : (
                 <span className="min-w-0 flex-1" />
               )}
-              <span className="shrink-0 whitespace-nowrap text-sm tracking-wide font-bold text-[#1C1C1C] leading-snug">
-                {distance}
-              </span>
+              <DiningDistanceLabel
+                latitude={place.latitude}
+                longitude={place.longitude}
+                placeCity={place.city_name}
+                className="shrink-0 whitespace-nowrap text-sm tracking-wide font-bold text-[#1C1C1C] leading-snug"
+              />
             </div>
           </>
         ) : locality ? (
@@ -498,7 +498,6 @@ export function ShowcaseDiningPosterCard({
   const priceForTwo = `${formatMoney([1200, 1500, 2000, 2400, 1800][idHash % 5], {
     compact: true,
   })} for two`;
-  const distance = `${[4.9, 3.5, 5.0, 2.8, 6.2][idHash % 5]} km`;
   const cuisineLine = (() => {
     const tags = (cuisine || "")
       .split(/[,·|/]/)
@@ -564,9 +563,7 @@ export function ShowcaseDiningPosterCard({
               ) : (
                 <span className="min-w-0 flex-1" />
               )}
-              <span className="shrink-0 whitespace-nowrap text-sm tracking-wide font-bold text-[#1C1C1C] leading-snug">
-                {distance}
-              </span>
+              {/* Showcase cards have no real venue coords — omit fake distance */}
             </div>
           </>
         ) : locality ? (

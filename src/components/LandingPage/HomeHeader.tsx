@@ -13,6 +13,7 @@ import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import SubNavBar from "./SubNavBar";
 import { useAppDispatch } from "@/lib/hooks";
 import { logoutCustomer } from "@/lib/authSession";
+import { coordsForCityName, writeStoredUserGeo, USER_GEO_STORAGE_KEY } from "@/lib/geoDistance";
 
 
 type StoredCustomer = {
@@ -242,8 +243,27 @@ export default function HomeHeader() {
   const handleCityChange = (next: string) => {
     const value = next && next !== "All Cities" ? next : "";
     setCity(value);
-    if (value) localStorage.setItem("selected_city", value);
-    else localStorage.removeItem("selected_city");
+    if (value) {
+      localStorage.setItem("selected_city", value);
+      const coords = coordsForCityName(value);
+      if (coords) {
+        writeStoredUserGeo({
+          ...coords,
+          source: "city",
+          city: value,
+          updatedAt: Date.now(),
+        });
+      }
+    } else {
+      localStorage.removeItem("selected_city");
+      // Drop city pin so distance falls back to current GPS/IP
+      try {
+        sessionStorage.removeItem(USER_GEO_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      window.dispatchEvent(new Event("bmb_user_geo_changed"));
+    }
     window.dispatchEvent(new Event("selected_city_changed"));
   };
 

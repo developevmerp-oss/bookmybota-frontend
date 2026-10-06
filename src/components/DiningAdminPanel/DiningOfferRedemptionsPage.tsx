@@ -5,7 +5,7 @@ import { Loader2, Tag, Receipt } from "lucide-react";
 import { useGetMerchantOfferRedemptionsQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDate, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
@@ -132,8 +132,10 @@ export default function DiningOfferRedemptionsPage() {
                 items.map((row) => (
                   <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50/80">
                     <td className="p-4 text-sm text-slate-700">
-                      {formatDate(row.redeemed_at)}
-                      <span className="block text-xs text-slate-400">{formatTime12h(row.redeemed_at)}</span>
+                      {formatDateCustomer(row.redeemed_at)}
+                      <span className="block text-xs text-slate-500 font-medium mt-0.5">
+                        {formatTime12h(row.redeemed_at)}
+                      </span>
                     </td>
                     <td className="p-4">
                       <p className="font-mono text-sm text-[#e11d48]">{row.promo_code}</p>

@@ -221,7 +221,7 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/30" />
         </div>
 
-        <div className="relative container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-8 sm:py-10 lg:py-8">
+        <div className="relative container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10 lg:py-8">
           <button
             type="button"
             onClick={handleShare}
@@ -443,7 +443,7 @@ export default function MovieDetailPage() {
         style={{ top: headerOffset }}
         aria-hidden={!showStickyBar}
       >
-        <div className="container mx-auto px-4 sm:px-10 lg:px-10 2xl:px-0 flex items-center justify-between gap-3 py-3 sm:py-3.5">
+        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xlpx-10 2xl:px-0 flex items-center justify-between gap-4 py-3.5">
           <h2 className="min-w-0 truncate text-base sm:text-lg xl:text-xl font-bold text-[#111111]">
             {movie.title}
           </h2>

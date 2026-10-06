@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { FaFacebookF, FaInstagram } from "react-icons/fa";
 
-const CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+const CONTAINER = "container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0";
 
 const COLUMNS = [
   {

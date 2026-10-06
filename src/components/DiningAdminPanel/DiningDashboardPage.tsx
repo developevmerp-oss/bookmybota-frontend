@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -371,7 +372,10 @@ function BusinessDashboard() {
   const [mealPeriods, setMealPeriods] = useState<DiningMealsConfig>(DEFAULT_MEALS);
   const [selectedMeal, setSelectedMeal] = useState<(typeof MEAL_KEYS)[number]>("breakfast");
   const [graceTime, setGraceTime] = useState<number | "">(120);
+  const [slotInterval, setSlotInterval] = useState<15 | 30 | 60>(30);
   const [allocation, setAllocation] = useState<number | "">(50);
+  const [latitude, setLatitude] = useState<string>("");
+  const [longitude, setLongitude] = useState<string>("");
 
   const range = useMemo(() => monthBounds(calYear, calMonth), [calYear, calMonth]);
 
@@ -401,7 +405,19 @@ function BusinessDashboard() {
   useEffect(() => {
     if (settings) {
       setGraceTime(settings.grace_time_minutes ?? 120);
+      const interval = Number(settings.slot_interval_minutes);
+      setSlotInterval(interval === 15 || interval === 60 ? interval : 30);
       setAllocation(settings.online_allocation_percentage ?? 50);
+      setLatitude(
+        settings.latitude != null && settings.latitude !== ""
+          ? String(settings.latitude)
+          : ""
+      );
+      setLongitude(
+        settings.longitude != null && settings.longitude !== ""
+          ? String(settings.longitude)
+          : ""
+      );
     }
   }, [settings]);
 
@@ -468,7 +484,10 @@ function BusinessDashboard() {
         bizId,
         body: {
           grace_time_minutes: graceTime === "" ? 120 : graceTime,
+          slot_interval_minutes: slotInterval,
           online_allocation_percentage: allocation === "" ? 50 : allocation,
+          latitude: latitude.trim() === "" ? null : Number(latitude),
+          longitude: longitude.trim() === "" ? null : Number(longitude),
         },
       }).unwrap();
       toast.success("Global settings saved.");
@@ -705,6 +724,98 @@ function BusinessDashboard() {
             <span>
               Tables will be blocked for this duration automatically. Allows a buffer for guests to
               arrive before releasing tables.
+            </span>
+          </div>
+        </div>
+
+        {/* Slot interval */}
+        <div className="rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Clock size={18} className="text-rose-500" />
+              <label className="text-sm font-bold text-slate-800">
+                Booking Slot Interval
+              </label>
+            </div>
+            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-violet-50 text-violet-700 border border-violet-100 tabular-nums">
+              Every {slotInterval} mins
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {([15, 30, 60] as const).map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setSlotInterval(preset)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  slotInterval === preset
+                    ? "bg-rose-600 text-white border-rose-600 shadow-sm"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {preset}m
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-start gap-2.5 text-xs text-slate-600 border border-slate-200 p-3.5 rounded-xl">
+            <Info size={14} className="mt-0.5 text-rose-500 shrink-0" />
+            <span>
+              Controls customer booking times. Example: 15m shows 5:00, 5:15, 5:30; 30m shows 5:00,
+              5:30, 6:00.
+            </span>
+          </div>
+        </div>
+
+        {/* Map pin for customer distance */}
+        <div className="rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <MapPin size={18} className="text-rose-500" />
+              <label className="text-sm font-bold text-slate-800">
+                Restaurant map location
+              </label>
+            </div>
+            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-slate-50 text-slate-600 border border-slate-200">
+              Used for customer “km away”
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                Latitude
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="e.g. 7.0621"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                Longitude
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="e.g. 38.476"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 text-xs text-slate-600 border border-slate-200 p-3.5 rounded-xl">
+            <Info size={14} className="mt-0.5 text-rose-500 shrink-0" />
+            <span>
+              Set your pin for accurate distance on listing cards. If left empty, we try to geocode
+              from your restaurant address when you save.
             </span>
           </div>
         </div>

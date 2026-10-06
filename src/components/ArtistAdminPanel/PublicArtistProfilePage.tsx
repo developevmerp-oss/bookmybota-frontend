@@ -162,7 +162,7 @@ function NonRegisteredArtistView({
         </div>
       </header>
 
-      <div className="bg-white container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-8 sm:py-10">
+      <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
         {eventItems.length > 0 ? (
           showAllEvents ? (
             <PartnerAllEventsPanel
@@ -590,7 +590,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
       </header>
 
     
-        <div className="bg-white container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 py-8 sm:py-10">
+        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
           {showAllEvents && artistEventItems.length > 0 ? (
             <PartnerAllEventsPanel
               items={artistEventItems}

@@ -112,6 +112,10 @@ export interface Business {
   approval_status?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   approval_notes?: string | null;
   approved_at?: string | null;
+  grace_time_minutes?: number;
+  slot_interval_minutes?: number;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
 }
 
 export interface AdminCustomer {
@@ -191,7 +195,10 @@ export interface BusinessSettings {
   description?: string;
   cover_image_url?: string;
   grace_time_minutes?: number;
+  slot_interval_minutes?: number;
   online_allocation_percentage?: number;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   operating_hours?: Record<string, { open: string; close: string; closed: boolean }>;
   gallery_images?: string[];
   menu_images?: string[];
@@ -3733,11 +3740,37 @@ export const api = createApi({
     }),
 
     checkAvailability: builder.query<
-      { available: boolean },
+      { available: boolean; reason?: string | null; message?: string; available_tables?: number },
       { business_id: string; date: string; guests: string }
     >({
       query: ({ business_id, date, guests }) =>
         `/bookings/availability?business_id=${business_id}&date=${date}&guests=${guests}`,
+    }),
+
+    getAvailableDiningSlots: builder.query<
+      {
+        date: string;
+        slots: string[];
+        by_meal: { breakfast: string[]; lunch: string[]; dinner: string[] };
+        slot_interval_minutes?: number;
+      },
+      { business_id: string; date: string; guests: string | number }
+    >({
+      query: ({ business_id, date, guests }) =>
+        `/bookings/available-slots?business_id=${encodeURIComponent(business_id)}&date=${encodeURIComponent(date)}&guests=${encodeURIComponent(String(guests))}`,
+      transformResponse: (res: {
+        data?: {
+          date: string;
+          slots: string[];
+          by_meal: { breakfast: string[]; lunch: string[]; dinner: string[] };
+          slot_interval_minutes?: number;
+        };
+      }) =>
+        res.data || {
+          date: "",
+          slots: [],
+          by_meal: { breakfast: [], lunch: [], dinner: [] },
+        },
     }),
 
     createBooking: builder.mutation<
@@ -8450,6 +8483,7 @@ export const {
   useGetBookingByIdQuery,
   useCheckAvailabilityQuery,
   useLazyCheckAvailabilityQuery,
+  useGetAvailableDiningSlotsQuery,
   useCreateBookingMutation,
   usePhoneLoginMutation,
   useGetCustomerProfileQuery,

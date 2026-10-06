@@ -23,7 +23,7 @@ import {
 import { formatDiningOfferDiscount, calculateDiningOfferDiscountAmount } from "@/lib/diningOffers";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDate, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatDateTimeCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import {
@@ -781,8 +781,20 @@ export default function DiningScanPage() {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
             <span className="inline-flex items-center gap-1.5">
               <Clock size={13} className="text-slate-400" />
-              <span className="font-semibold text-slate-800">{formatDate(scanned.booking_time)}</span>
-              <span className="text-slate-500">{formatTime12h(scanned.booking_time)}</span>
+              <span className="font-semibold text-slate-800">
+                {formatDateCustomer(scanned.booking_time)}
+                {formatWeekdayCustomer(scanned.booking_time)
+                  ? `, ${formatWeekdayCustomer(scanned.booking_time)}`
+                  : ""}
+              </span>
+              <span className="font-semibold text-slate-800">
+                {formatTime12h(scanned.booking_time)}
+              </span>
+              {scanned.end_time ? (
+                <span className="text-slate-500">
+                  · Arrive by {formatTime12h(scanned.end_time)}
+                </span>
+              ) : null}
             </span>
             <span className="text-slate-300 hidden sm:inline">|</span>
             <span className="inline-flex items-center gap-1.5">
@@ -976,8 +988,7 @@ export default function DiningScanPage() {
             <div className="space-y-2 text-center">
               {scanned.checked_out_at && (
                 <p className="text-xs text-emerald-700">
-                  Checked out at {formatDate(scanned.checked_out_at)}{" "}
-                  {formatTime12h(scanned.checked_out_at)}
+                  Checked out at {formatDateTimeCustomer(scanned.checked_out_at)}
                 </p>
               )}
               {scanned.offer_redeemed_at ? (
@@ -987,7 +998,7 @@ export default function DiningScanPage() {
                   </p>
                   <p className="text-sm text-slate-800 mt-1">{offer?.title || "Merchant offer"}</p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {formatDate(scanned.offer_redeemed_at)} {formatTime12h(scanned.offer_redeemed_at)}
+                    {formatDateTimeCustomer(scanned.offer_redeemed_at)}
                   </p>
                   {scanned.bill_amount != null && Number(scanned.bill_amount) > 0 && (
                     <p className="text-xs text-slate-600 mt-0.5">
@@ -1235,7 +1246,7 @@ export default function DiningScanPage() {
               </p>
               <p className="text-xs text-slate-500">
                 Status: {gcVerified.status}
-                {gcVerified.expires_at ? ` · Expiry ${formatDate(gcVerified.expires_at)}` : ""}
+                {gcVerified.expires_at ? ` · Expiry ${formatDateCustomer(gcVerified.expires_at)}` : ""}
               </p>
             </div>
           )}
@@ -1309,7 +1320,7 @@ export default function DiningScanPage() {
                       <p className="text-slate-500">
                         Bill {formatMoney(row.bill_amount, { compact: true })} · Guest pays{" "}
                         {formatMoney(row.customer_payable, { compact: true })}
-                        {row.redeemed_at ? ` · ${formatDate(row.redeemed_at)}` : ""}
+                        {row.redeemed_at ? ` · ${formatDateCustomer(row.redeemed_at)}` : ""}
                       </p>
                     </div>
                     <span

@@ -49,6 +49,39 @@ export default function GiftCardDesignFace({
         aria-hidden
       />
 
+      {/* Right-side gift mark when design has no uploaded image — content text unchanged */}
+      {!img ? (
+        <svg
+          className="pointer-events-none absolute right-0 top-1/2 z-[1] h-[85%] w-auto -translate-y-1/2 -rotate-[10deg] opacity-40 sm:right-1 sm:h-[90%]"
+          viewBox="0 0 100 120"
+          fill="none"
+          aria-hidden
+        >
+          <path
+            d="M50 34c0-9 7-16 16-16 8 0 14 6 14 14 0 11-11 16-30 24C31 40 20 35 20 24c0-8 6-14 14-14 9 0 16 7 16 24Z"
+            stroke="white"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect
+            x="18"
+            y="52"
+            width="64"
+            height="52"
+            rx="5"
+            stroke="white"
+            strokeWidth="4.5"
+          />
+          <path
+            d="M18 72h64M50 52v52"
+            stroke="white"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      ) : null}
+
       <div className="relative z-[2] flex h-full min-h-0 flex-col p-3 sm:p-4">
         <div>
           <p

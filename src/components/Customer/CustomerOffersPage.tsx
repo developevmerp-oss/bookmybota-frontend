@@ -3,12 +3,10 @@
 import { useMemo, useState } from "react";
 import {
   Calendar,
-  Clapperboard,
   Copy,
   Flame,
   Sparkles,
   Tag,
-  UtensilsCrossed,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,33 +26,11 @@ type OfferCategoryTab = "ALL" | "MOVIES" | "DINING" | "EVENTS";
 const TABS: Array<{
   key: OfferCategoryTab;
   label: string;
-  hint: string;
-  icon: typeof Tag;
 }> = [
-  {
-    key: "ALL",
-    label: "Book My Bota Offers",
-    hint: "Platform-wide promos",
-    icon: Tag,
-  },
-  {
-    key: "MOVIES",
-    label: "Movie Offers",
-    hint: "Cinema & showtimes",
-    icon: Clapperboard,
-  },
-  {
-    key: "DINING",
-    label: "Dining Offers",
-    hint: "Restaurants & cafes",
-    icon: UtensilsCrossed,
-  },
-  {
-    key: "EVENTS",
-    label: "Event Offers",
-    hint: "Concerts & shows",
-    icon: Calendar,
-  },
+  { key: "ALL", label: "All Offers" },
+  { key: "MOVIES", label: "Movie" },
+  { key: "DINING", label: "Dining" },
+  { key: "EVENTS", label: "Events" },
 ];
 
 type OfferTheme = "magenta" | "violet" | "ocean" | "sunset" | "emerald";
@@ -131,7 +107,7 @@ function OfferCard({ offer, index }: { offer: PlatformOffer; index: number }) {
   };
 
   return (
-    <article className={`offer-card offer-card--${theme} w-full max-w-none`}>
+    <article className={`offer-card offer-card--${theme} w-full h-full`}>
       <div className="offer-card__left">
         <p className={`offer-card__badge offer-card__badge--${eligibility.tone}`}>
           {eligibility.tone === "new" ? (
@@ -209,112 +185,92 @@ export default function CustomerOffersPage() {
     [platformOffers]
   );
 
-  const counts = useMemo(() => {
-    const map: Record<OfferCategoryTab, number> = {
-      ALL: 0,
-      MOVIES: 0,
-      DINING: 0,
-      EVENTS: 0,
-    };
-    for (const o of activeOffers) {
-      const cat = (o.category || "ALL").toUpperCase() as OfferCategoryTab;
-      if (cat in map) map[cat] += 1;
-      else map.ALL += 1;
-    }
-    return map;
-  }, [activeOffers]);
+  const filtered = useMemo(() => {
+    if (tab === "ALL") return activeOffers;
+    return activeOffers.filter((o) => {
+      const cat = (o.category || "ALL").toUpperCase();
+      // Category tabs include platform-wide (ALL) offers too
+      return cat === tab || cat === "ALL";
+    });
+  }, [activeOffers, tab]);
 
-  const filtered = useMemo(
-    () => activeOffers.filter((o) => (o.category || "ALL").toUpperCase() === tab),
-    [activeOffers, tab]
-  );
-
-  const activeTab = TABS.find((t) => t.key === tab) || TABS[0];
+  const offerCount = filtered.length;
 
   return (
     <CustomerAccountLayout>
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 sm:px-6 py-5 border-b border-slate-100">
-          <h2 className="text-xl sm:text-2xl font-extrabold text-[#111111]">Offers</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Browse Book My Bota platform offers by category. Reveal a code and use it at checkout.
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 lg:p-8">
+        <div className="mb-5">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#111111] leading-tight">
+            Offers
+          </h2>
+          <p className="mt-1.5 text-sm sm:text-base text-slate-500">
+            Exclusive offers for movies, dining, events and more.
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row min-h-[420px]">
-          <aside className="md:w-[240px] shrink-0 border-b md:border-b-0 md:border-r border-slate-100 bg-[#fafafa] p-3">
-            <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-1 md:pb-0">
-              {TABS.map((item) => {
-                const Icon = item.icon;
-                const selected = tab === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setTab(item.key)}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors whitespace-nowrap md:whitespace-normal cursor-pointer ${
-                      selected
-                        ? "bg-[#F7E9FF] text-[#6900AA]"
-                        : "text-slate-700 hover:bg-white"
-                    }`}
-                  >
-                    <Icon
-                      size={18}
-                      className={selected ? "text-[#6900AA] shrink-0" : "text-slate-500 shrink-0"}
-                    />
-                    <span className="flex-1 min-w-0">
-                      <span className="block font-semibold leading-tight">{item.label}</span>
-                      <span className="hidden md:block text-[11px] font-normal text-slate-500 mt-0.5">
-                        {item.hint}
-                      </span>
-                    </span>
-                    <span
-                      className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-                        selected
-                          ? "bg-white text-[#6900AA]"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {counts[item.key]}
-                    </span>
-                  </button>
-                );
-              })}
-            </nav>
-          </aside>
-
-          <div className="flex-1 min-w-0 p-4 sm:p-6">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h3 className="text-lg font-bold text-[#111111]">{activeTab.label}</h3>
-                <p className="text-sm text-slate-500">{activeTab.hint}</p>
-              </div>
-              {city ? (
-                <p className="text-xs font-semibold text-slate-500">
-                  Showing for <span className="text-[#6900AA]">{city}</span>
-                </p>
-              ) : null}
-            </div>
-
-            {isLoading || (isFetching && activeOffers.length === 0) ? (
-              <OffersRailShimmer count={4} />
-            ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-14 text-center">
-                <Tag className="mx-auto text-slate-300 mb-3" size={28} />
-                <p className="font-semibold text-slate-700">No offers in this category</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Check back soon, or try another category on the left.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {filtered.map((offer, index) => (
-                  <OfferCard key={offer.id} offer={offer} index={index} />
-                ))}
-              </div>
-            )}
+        <div className="border-b border-slate-200 mb-5">
+          <div className="flex items-center gap-5 sm:gap-7 overflow-x-auto scrollbar-hide">
+            {TABS.map((item) => {
+              const selected = tab === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setTab(item.key)}
+                  className={`relative shrink-0 pb-3 text-sm sm:text-[15px] font-medium cursor-pointer transition-colors ${
+                    selected
+                      ? "text-[#6900AA]"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {item.label}
+                  {selected ? (
+                    <span className="absolute left-0 right-0 bottom-0 h-[2.5px] rounded-full bg-[#6900AA]" />
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
+
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-base sm:text-lg font-bold text-[#111111]">
+              {offerCount} Offer{offerCount === 1 ? "" : "s"}
+            </p>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Save more on your favourite experiences
+            </p>
+          </div>
+          {city ? (
+            <p className="text-sm font-medium text-slate-500">
+              Showing for <span className="font-bold text-[#6900AA]">{city}</span>
+            </p>
+          ) : null}
+        </div>
+
+        {isLoading || (isFetching && activeOffers.length === 0) ? (
+          <OffersRailShimmer count={4} />
+        ) : filtered.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-14 text-center">
+            <Tag className="mx-auto text-slate-300 mb-3" size={28} />
+            <p className="font-semibold text-slate-700">No offers in this category</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Check back soon, or try another category.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-4 sm:gap-5">
+            {filtered.map((offer, index) => (
+              <div
+                key={offer.id}
+                className="w-full max-w-[480px] sm:w-[min(100%,480px)]"
+              >
+                <OfferCard offer={offer} index={index} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </CustomerAccountLayout>
   );

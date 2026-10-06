@@ -1289,7 +1289,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
       {/* ── Desktop movie header (unchanged) ── */}
       <section className="hidden lg:block bg-white border border-[#E8E8E8] rounded-md overflow-visible shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         {/* Dynamic movie header (same fields as movie detail, + poster) */}
-        <div className="bg-[#F5F5F5] px-4 sm:px-5 py-4 sm:py-5 relative">
+        <div className="bg-white px-4 sm:px-5 py-4 sm:py-5 relative">
           <Link
             href={backHref}
             aria-label="Back to movie"

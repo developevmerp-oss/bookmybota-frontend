@@ -9,7 +9,7 @@ import {
   HelpCircle,
   Lock,
   LogOut,
-  Bookmark,
+  Heart,
   Tag,
   User,
 } from "lucide-react";
@@ -21,7 +21,7 @@ const NAV = [
   { href: "/customer/profile", icon: User, label: "My Profile" },
   { href: "/customer/change-password", icon: Lock, label: "Change Password" },
   { href: "/customer/dashboard", icon: Calendar, label: "My Orders / Reservations" },
-  { href: "/customer/favourite", icon: Bookmark, label: "My Favourite" },
+  { href: "/customer/favourite", icon: Heart, label: "My Favourite" },
   { href: "/customer/gift-cards", icon: Gift, label: "My Gift Cards" },
   { href: "/customer/help", icon: HelpCircle, label: "Help Centre" },
   { href: "#gift-cards", icon: Gift, label: "Gift Cards", soon: true, mobileOnly: true },
@@ -54,7 +54,7 @@ export default function CustomerAccountLayout({
       <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
           <aside
-            className={`w-full lg:w-[260px] shrink-0${
+            className={`w-full lg:w-[260px] shrink-0 lg:sticky lg:top-40 lg:self-start${
               hideSidebarBelowLg ? " hidden lg:block" : ""
             }`}
           >

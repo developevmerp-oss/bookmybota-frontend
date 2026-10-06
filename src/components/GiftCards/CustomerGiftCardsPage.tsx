@@ -243,7 +243,7 @@ export default function CustomerGiftCardsPage() {
           </div>
           <Link
             href="/gift-cards"
-            className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl bg-[#6900AA] text-white text-sm font-semibold hover:bg-[#57008E] transition-colors shrink-0 w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-semibold hover:bg-black transition-colors shrink-0 w-full sm:w-auto"
           >
             <Gift size={16} />
             Buy a gift card
@@ -253,7 +253,7 @@ export default function CustomerGiftCardsPage() {
         <form
           onSubmit={handleSubmit(onClaim)}
           noValidate
-          className="rounded-2xl border border-[#E8D5FF] bg-[#F9F5FF] p-3.5 sm:p-4 flex flex-col gap-2.5"
+          className="rounded-2xl border border-[#E5E5E5] bg-[#F5F5F5] p-3.5 sm:p-4 flex flex-col gap-2.5"
         >
           <p className="text-sm font-bold text-[#111827]">Claim a gift card code</p>
           <p className="text-[12px] text-slate-500 -mt-1">
@@ -266,7 +266,7 @@ export default function CustomerGiftCardsPage() {
           <div className="flex flex-col sm:flex-row gap-2.5">
             <input
               placeholder="Enter gift card code (e.g. BOTA-XXXX-XXXX-XXXX)"
-              className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white font-mono text-[13px] sm:text-sm text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#6900AA]/25 focus:border-[#6900AA]"
+              className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white font-mono text-[13px] sm:text-sm text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#111111]/20 focus:border-[#111111]"
               {...register("code", {
                 onChange: (e) => {
                   e.target.value = String(e.target.value || "").toUpperCase();
@@ -276,7 +276,7 @@ export default function CustomerGiftCardsPage() {
             <button
               type="submit"
               disabled={claiming}
-              className="h-11 px-5 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white text-sm font-semibold disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto"
+              className="h-11 px-5 rounded-xl bg-[#111111] hover:bg-black text-white text-sm font-semibold disabled:opacity-60 cursor-pointer inline-flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto"
             >
               {claiming ? <Loader2 className="animate-spin" size={16} /> : <Ticket size={16} />}
               Claim to wallet
@@ -299,7 +299,7 @@ export default function CustomerGiftCardsPage() {
             onClick={() => setTab("wallet")}
             className={`flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
               tab === "wallet"
-                ? "bg-white text-[#6900AA] shadow-sm"
+                ? "bg-white text-[#111111] shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
@@ -314,7 +314,7 @@ export default function CustomerGiftCardsPage() {
             onClick={() => setTab("sent")}
             className={`flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
               tab === "sent"
-                ? "bg-white text-[#6900AA] shadow-sm"
+                ? "bg-white text-[#111111] shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >

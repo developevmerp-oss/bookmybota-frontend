@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 import { useGetMovieBookingQuery } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
-import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
 import { buildMovieTicketPdf, downloadPdfBlob } from "@/lib/movieTicketPdf";
 import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
@@ -59,6 +59,12 @@ export default function MovieBookingConfirmationPage({
       return formatTime12h(booking.showtime_starts_at);
     }
   }, [booking?.showtime_starts_at]);
+
+  const bookedOnFormatted = useMemo(() => {
+    if (!booking?.created_at) return "";
+    const label = formatDateTimeCustomer(String(booking.created_at).replace(" ", "T"));
+    return label === "—" ? "" : label;
+  }, [booking?.created_at]);
 
   const qrValue = booking?.qr_code_token || booking?.booking_code || bookingId;
 
@@ -198,19 +204,27 @@ export default function MovieBookingConfirmationPage({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 border-y border-slate-100">
+          <div className="grid grid-cols-2 sm:grid-cols-3 border-y border-slate-100">
             <div className="px-4 sm:px-5 py-4 border-r border-slate-100">
               <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
                 <Calendar size={11} /> Date
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-900">{showDateFormatted}</p>
             </div>
-            <div className="px-4 sm:px-5 py-4">
+            <div className="px-4 sm:px-5 py-4 sm:border-r sm:border-slate-100">
               <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
                 <Clock size={11} /> Time
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-900">{showTimeFormatted}</p>
             </div>
+            {bookedOnFormatted ? (
+              <div className="px-4 sm:px-5 py-4 col-span-2 sm:col-span-1 border-t sm:border-t-0 border-slate-100">
+                <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
+                  <CheckCircle2 size={11} /> Booked on
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{bookedOnFormatted}</p>
+              </div>
+            ) : null}
           </div>
 
           <div className="px-4 sm:px-6 py-4 space-y-3">

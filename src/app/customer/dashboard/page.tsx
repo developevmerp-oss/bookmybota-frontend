@@ -5,21 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar,
-  Check,
-  ChevronRight,
-  Clock,
-  Copy,
-  CheckCheck,
-  Filter,
-  LayoutGrid,
   MapPin,
-  MoreVertical,
-  Pencil,
   Ticket,
   Users,
-  UtensilsCrossed,
-  Film,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,7 +18,6 @@ import {
   useCancelEventBookingMutation,
   Booking,
   EventBooking,
-  MovieBookingDetail,
 } from "@/services/api";
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -47,7 +34,7 @@ const DEFAULT_EVENT_IMAGE =
 const DEFAULT_MOVIE_IMAGE =
   "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&q=80";
 
-type KindTab = "all" | "dining" | "event" | "movie";
+type KindTab = "all" | "dining" | "event" | "movie" | "sports";
 type StatusTab = "all" | "upcoming" | "past" | "cancelled";
 
 type UnifiedBooking = {
@@ -76,51 +63,64 @@ function eventUpcoming(b: EventBooking) {
   return !Number.isNaN(starts.getTime()) && starts > new Date();
 }
 
-function movieUpcoming(b: MovieBookingDetail) {
-  const starts = (b as any).showtime_starts_at as string | undefined;
-  return !!starts && new Date(String(starts).replace(" ", "T")) > new Date() && b.status === "CONFIRMED";
-}
-
-function shortBookingCode(id: string) {
-  const compact = id.replace(/-/g, "").toUpperCase();
-  return `BMB-${compact.slice(0, 8)}-${compact.slice(8, 12)}`;
-}
-
-function formatDateLine(iso: string) {
-  const label = formatDateCustomer(iso);
-  return label === "—" ? "" : label;
-}
-
-function formatTimeLine(iso: string) {
-  const label = formatTime12h(iso);
-  return label === "—" ? "" : label;
-}
-
-function formatWeekday(iso: string) {
-  return formatWeekdayCustomer(iso);
+function formatDateTimeRow(iso: string) {
+  if (!iso) return "";
+  const weekday = formatWeekdayCustomer(iso);
+  const shortWeekday = weekday ? weekday.slice(0, 3) : "";
+  const date = formatDateCustomer(iso);
+  const time = formatTime12h(iso);
+  if ((!shortWeekday && date === "—") || (date === "—" && time === "—")) return "";
+  const datePart = [shortWeekday, date !== "—" ? date : ""].filter(Boolean).join(", ");
+  if (!datePart) return time !== "—" ? time : "";
+  if (time === "—") return datePart;
+  return `${datePart} • ${time}`;
 }
 
 function formatPartyLine(b: UnifiedBooking) {
-  if (b.kind === "event") {
+  if (b.kind === "event" || b.kind === "movie") {
     if (b.ticketQty != null) {
       return `${b.ticketQty} Ticket${b.ticketQty === 1 ? "" : "s"}`;
     }
     return b.extra || "—";
   }
   if (b.guests != null) {
-    return `${b.guests} Guests, Table for ${b.guests}`;
+    return `${b.guests} Guest${b.guests === 1 ? "" : "s"}`;
   }
   return b.extra || "—";
 }
 
-function statusStyles(status: string) {
+function kindBadgeStyles(kind: UnifiedBooking["kind"]) {
+  switch (kind) {
+    case "event":
+      return "bg-[#F3E8FF] text-[#7C3AED]";
+    case "dining":
+      return "bg-[#FFEDD5] text-[#EA580C]";
+    case "movie":
+      return "bg-[#E0F2FE] text-[#0284C7]";
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
+
+function statusBadgeStyles(status: string) {
   switch (status) {
     case "CONFIRMED":
-      return "bg-emerald-50 text-emerald-700 border-emerald-100";
+      return "bg-[#ECFDF5] text-[#047857]";
     case "CANCELLED":
-      return "bg-red-50 text-red-600 border-red-100";
+      return "bg-red-50 text-red-600";
     default:
-      return "bg-slate-100 text-slate-600 border-slate-200";
+      return "bg-slate-100 text-slate-600";
+  }
+}
+
+function statusDotStyles(status: string) {
+  switch (status) {
+    case "CONFIRMED":
+      return "bg-[#10B981]";
+    case "CANCELLED":
+      return "bg-red-500";
+    default:
+      return "bg-slate-400";
   }
 }
 
@@ -163,7 +163,6 @@ export default function CustomerDashboard() {
   const [cancelEvent] = useCancelEventBookingMutation();
   const [pendingCancel, setPendingCancel] = useState<UnifiedBooking | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const unified = useMemo<UnifiedBooking[]>(() => {
     const dining: UnifiedBooking[] = diningBookings.map((b) => ({
@@ -213,20 +212,11 @@ export default function CustomerDashboard() {
     );
   }, [diningBookings, eventBookings, movieBookings]);
 
-  const kindCounts = useMemo(
-    () => ({
-      all: unified.length,
-      dining: unified.filter((b) => b.kind === "dining").length,
-      event: unified.filter((b) => b.kind === "event").length,
-      movie: unified.filter((b) => b.kind === "movie").length,
-    }),
-    [unified]
-  );
-
   const byKind = useMemo(() => {
     if (kind === "dining") return unified.filter((b) => b.kind === "dining");
     if (kind === "event") return unified.filter((b) => b.kind === "event");
     if (kind === "movie") return unified.filter((b) => b.kind === "movie");
+    if (kind === "sports") return [];
     return unified;
   }, [unified, kind]);
 
@@ -254,17 +244,6 @@ export default function CustomerDashboard() {
     setPendingCancel(b);
   };
 
-  const copyBookingCode = async (id: string) => {
-    try {
-      await navigator.clipboard.writeText(shortBookingCode(id));
-      setCopiedId(id);
-      toast.success("Booking ID copied");
-      setTimeout(() => setCopiedId(null), 1600);
-    } catch {
-      toast.error("Could not copy Booking ID");
-    }
-  };
-
   if (diningLoading || eventsLoading || moviesLoading || !user) {
     return (
       <CustomerAccountLayout>
@@ -275,11 +254,12 @@ export default function CustomerDashboard() {
     );
   }
 
-  const kindTabs: { key: KindTab; label: string; count: number }[] = [
-    { key: "all", label: "All", count: kindCounts.all },
-    { key: "dining", label: "Dining", count: kindCounts.dining },
-    { key: "event", label: "Events", count: kindCounts.event },
-    { key: "movie", label: "Movies", count: kindCounts.movie },
+  const kindTabs: { key: KindTab; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "dining", label: "Dining" },
+    { key: "event", label: "Events" },
+    { key: "movie", label: "Movies" },
+    { key: "sports", label: "Sports" },
   ];
   const statusTabs: { key: StatusTab; label: string }[] = [
     { key: "all", label: "All" },
@@ -287,40 +267,23 @@ export default function CustomerDashboard() {
     { key: "past", label: "Past" },
     { key: "cancelled", label: "Cancelled" },
   ];
-  const welcomeName = user.name || user.email?.split("@")[0] || "there";
 
   return (
     <CustomerAccountLayout>
-      <div className="flex flex-col gap-5">
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_8px_30px_rgba(88,28,180,0.06)] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-3xl sm:text-4xl lg:text-2xl font-bold text-black leading-tight">
-              Welcome back, {welcomeName}! 👋
-            </h1>
-            <p className="text-slate-500 text-base sm:text-lg lg:text-sm mt-1">
-              Manage your dining, events, and movie bookings.
-            </p>
-          </div>
-          <Link
-            href="/customer/profile"
-            className="inline-flex items-center justify-center gap-2 text-base sm:text-lg lg:text-sm font-semibold px-4 py-2.5 rounded-full border border-[#6900AA] bg-white hover:bg-[#F7E9FF] text-[#6900AA] self-start sm:self-auto shrink-0"
-          >
-            <Pencil size={15} /> Edit Profile
-          </Link>
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgba(15,23,42,0.04)] p-5 sm:p-6 lg:p-8">
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#0F172A] leading-tight">
+            My Orders / Reservations
+          </h1>
+          <p className="text-slate-500 text-sm sm:text-base mt-1.5">
+            View and manage your bookings for events, movies, dining and more.
+          </p>
         </div>
 
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_8px_30px_rgba(88,28,180,0.06)] p-4 sm:p-5">
-          <div className="flex sm:grid sm:grid-cols-4 items-stretch gap-2 sm:gap-3 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="border-b border-slate-200 mb-4">
+          <div className="flex items-center gap-5 sm:gap-7 overflow-x-auto scrollbar-hide">
             {kindTabs.map((tab) => {
               const active = kind === tab.key;
-              const Icon =
-                tab.key === "dining"
-                  ? UtensilsCrossed
-                  : tab.key === "event"
-                    ? Ticket
-                    : tab.key === "movie"
-                      ? Film
-                      : LayoutGrid;
               return (
                 <button
                   key={tab.key}
@@ -329,210 +292,153 @@ export default function CustomerDashboard() {
                     setKind(tab.key);
                     if (tab.key === "all") setFilter("all");
                   }}
-                  className={`min-w-[148px] sm:min-w-0 flex items-center gap-3 px-3 py-3 sm:px-4 rounded-2xl text-left cursor-pointer border transition-colors ${
-                    active
-                      ? "bg-[#F7E9FF] text-[#6900AA] border-[#E3BCFF]"
-                      : "bg-[#f8f7fb] text-slate-600 border-slate-200 hover:border-[#E3BCFF] hover:bg-[#F7E9FF]/60"
+                  className={`relative shrink-0 pb-3 text-sm sm:text-[15px] font-medium cursor-pointer transition-colors ${
+                    active ? "text-[#0F172A]" : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <span className="w-10 h-10 rounded-xl bg-white/70 text-[#6900AA] flex items-center justify-center shrink-0">
-                    <Icon size={18} />
-                  </span>
-                  <span className="min-w-0 flex-1 flex items-center justify-between gap-2">
-                    <span className="text-base sm:text-lg lg:text-sm font-semibold truncate">{tab.label}</span>
-                    <span className="text-xl sm:text-2xl lg:text-xl font-extrabold leading-none shrink-0">{tab.count}</span>
-                  </span>
+                  {tab.label}
+                  {active ? (
+                    <span className="absolute left-0 right-0 bottom-0 h-[2.5px] rounded-full bg-[#7C3AED]" />
+                  ) : null}
                 </button>
               );
             })}
           </div>
-
-          <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 scrollbar-hide">
-            <span className="shrink-0 w-9 h-9 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-400">
-              <Filter size={15} />
-            </span>
-            {statusTabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setFilter(tab.key)}
-                className={`px-4 py-1.5 rounded-full text-base sm:text-lg lg:text-sm font-semibold whitespace-nowrap cursor-pointer border transition-colors ${
-                  filter === tab.key
-                    ? "bg-[#6900AA] text-white border-[#6900AA]"
-                    : "bg-white text-slate-500 border-slate-200 hover:border-[#E3BCFF] hover:text-[#6900AA]"
-                }`}
-              >
-                {tab.label} ({counts[tab.key]})
-              </button>
-            ))}
-          </div>
-
-          {filteredBookings.length === 0 ? (
-            <div className="p-8 rounded-2xl text-center border border-dashed border-slate-200 bg-[#fbfbfe]">
-              <Calendar className="mx-auto text-slate-400 mb-3" size={32} />
-              <p className="text-slate-500 mb-4">
-                {kind === "all" ? `No ${filter} bookings.` : `No ${filter} ${kind} bookings.`}
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push("/")}
-                  className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold"
-                >
-                  Find a Table
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push("/events")}
-                  className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold"
-                >
-                  Browse events
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {filteredBookings.map((b) => {
-                const isEvent = b.kind === "event";
-                const isMovie = b.kind === "movie";
-                const KindIcon = isMovie ? Film : isEvent ? Ticket : UtensilsCrossed;
-                const kindLabel = isMovie ? "Movie" : isEvent ? "Event" : "Dining";
-                const fallbackImage = isMovie
-                  ? DEFAULT_MOVIE_IMAGE
-                  : isEvent
-                    ? DEFAULT_EVENT_IMAGE
-                    : DEFAULT_DINING_IMAGE;
-                return (
-                  <div
-                    key={`${b.kind}-${b.id}`}
-                    className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-[0_4px_18px_rgba(15,23,42,0.04)] flex flex-col lg:flex-row gap-4"
-                  >
-                    <div className="relative w-full h-40 sm:h-44 lg:w-52 lg:h-40 xl:w-56 xl:h-44 shrink-0">
-                      <img
-                        src={resolveMediaUrl(b.image) || fallbackImage}
-                        alt={b.title}
-                        className="w-full h-full rounded-2xl object-cover bg-violet-50"
-                        onError={(e) => {
-                          const el = e.currentTarget;
-                          if (el.dataset.fallbackApplied === "1") return;
-                          el.dataset.fallbackApplied = "1";
-                          el.src = fallbackImage;
-                        }}
-                      />
-                      <span className="absolute bottom-2.5 left-2.5 w-8 h-8 rounded-lg bg-white/70 backdrop-blur-[2px] text-[#6900AA] flex items-center justify-center shadow-sm">
-                        <KindIcon size={15} />
-                      </span>
-                    </div>
-
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <span className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-md bg-[#F7E9FF] text-[#6900AA] text-[0.625rem] font-bold uppercase tracking-wider">
-                        <KindIcon size={11} />
-                        {kindLabel}
-                      </span>
-                      <h3 className="text-xl sm:text-2xl lg:text-xl font-extrabold text-black mt-1.5 truncate">{b.title}</h3>
-                      {b.address && (
-                        <p className="mt-1 text-base sm:text-lg lg:text-sm text-slate-500 flex items-start gap-1.5">
-                          <MapPin size={14} className="shrink-0 mt-0.5 text-[#6900AA]" />
-                          <span className="line-clamp-1">{b.address}</span>
-                        </p>
-                      )}
-
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
-                        {b.when && (
-                          <div className="flex items-start gap-2 min-w-0">
-                            <Calendar size={16} className="text-[#6900AA] mt-0.5 shrink-0" />
-                            <div className="min-w-0">
-                              <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
-                                {formatDateLine(b.when)}
-                              </p>
-                              {formatWeekday(b.when) ? (
-                                <p className="text-xs sm:text-sm lg:text-xs font-medium text-slate-500 leading-snug mt-0.5">
-                                  {formatWeekday(b.when)}
-                                </p>
-                              ) : null}
-                            </div>
-                          </div>
-                        )}
-                        {b.when && (
-                          <div className="flex items-start gap-2 min-w-0">
-                            <Clock size={16} className="text-[#6900AA] mt-0.5 shrink-0" />
-                            <div className="min-w-0">
-                              <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
-                                {formatTimeLine(b.when)}
-                              </p>
-                              {b.kind === "dining" && b.endTime ? (
-                                <p className="text-xs sm:text-sm lg:text-xs font-medium text-slate-500 leading-snug mt-0.5">
-                                  Arrive by {formatTimeLine(b.endTime)}
-                                </p>
-                              ) : null}
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex items-start gap-2 min-w-0">
-                          {isEvent ? (
-                            <Ticket size={16} className="text-[#6900AA] mt-0.5 shrink-0" />
-                          ) : (
-                            <Users size={16} className="text-[#6900AA] mt-0.5 shrink-0" />
-                          )}
-                          <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-900 leading-snug">
-                            {formatPartyLine(b)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="w-full lg:w-[250px] xl:w-[270px] shrink-0 lg:border-l lg:border-slate-100 lg:pl-5 flex flex-col justify-between gap-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sm:text-sm lg:text-xs font-bold uppercase border ${statusStyles(b.status)}`}>
-                          {b.status === "CONFIRMED" && <Check size={12} strokeWidth={3} />}
-                          {b.status}
-                        </span>
-                        <span className="text-slate-300 p-1" aria-hidden>
-                          <MoreVertical size={16} />
-                        </span>
-                      </div>
-
-                      <div>
-                        <p className="text-xs sm:text-sm lg:text-xs text-slate-400 font-medium">Booking ID</p>
-                        <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                          <p className="text-base sm:text-lg lg:text-sm font-bold text-slate-800 truncate">{shortBookingCode(b.id)}</p>
-                          <button
-                            type="button"
-                            onClick={() => copyBookingCode(b.id)}
-                            className="text-slate-400 hover:text-[#6900AA] cursor-pointer shrink-0"
-                            aria-label="Copy booking ID"
-                          >
-                            {copiedId === b.id ? <CheckCheck size={14} /> : <Copy size={14} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-auto">
-                        {b.canCancel && (
-                          <button
-                            type="button"
-                            onClick={() => handleCancel(b)}
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg border border-red-200 bg-white text-base sm:text-lg lg:text-sm font-semibold text-red-500 hover:bg-red-50 cursor-pointer"
-                          >
-                            <XCircle size={14} /> Cancel
-                          </button>
-                        )}
-                        <Link
-                          href={b.href}
-                          className="flex-1 inline-flex items-center justify-center gap-1 h-10 px-4 rounded-lg border border-[#6900AA] bg-white text-base sm:text-lg lg:text-sm font-semibold text-[#6900AA] hover:bg-[#F7E9FF] whitespace-nowrap"
-                        >
-                          View Details <ChevronRight size={14} />
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              <p className="text-center text-slate-400 text-base sm:text-lg lg:text-sm pt-2">That&apos;s all your bookings! 🎉</p>
-            </div>
-          )}
         </div>
+
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+          {statusTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setFilter(tab.key)}
+              className={`px-3.5 sm:px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                filter === tab.key
+                  ? "bg-[#0F172A] text-white"
+                  : "bg-[#F1F5F9] text-slate-700 hover:bg-slate-200/80"
+              }`}
+            >
+              {tab.label} ({counts[tab.key]})
+            </button>
+          ))}
+        </div>
+
+        {filteredBookings.length === 0 ? (
+          <div className="py-14 text-center">
+            <Calendar className="mx-auto text-slate-300 mb-3" size={32} />
+            <p className="text-slate-500 mb-4">
+              {kind === "sports"
+                ? "No sports bookings yet."
+                : kind === "all"
+                  ? `No ${filter} bookings.`
+                  : `No ${filter} ${kind} bookings.`}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#6900AA] text-white text-sm font-semibold cursor-pointer"
+              >
+                Find a Table
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/events")}
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold cursor-pointer"
+              >
+                Browse events
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {filteredBookings.map((b) => {
+              const isEvent = b.kind === "event";
+              const isMovie = b.kind === "movie";
+              const kindLabel = isMovie ? "MOVIE" : isEvent ? "EVENT" : "DINING";
+              const fallbackImage = isMovie
+                ? DEFAULT_MOVIE_IMAGE
+                : isEvent
+                  ? DEFAULT_EVENT_IMAGE
+                  : DEFAULT_DINING_IMAGE;
+              const dateTimeLine = formatDateTimeRow(b.when);
+              const QtyIcon = isEvent || isMovie ? Ticket : Users;
+
+              return (
+                <Link
+                  key={`${b.kind}-${b.id}`}
+                  href={b.href}
+                  className="group flex flex-col sm:flex-row sm:items-start gap-4 py-5 first:pt-2 last:pb-1 hover:bg-slate-50/70 -mx-2 px-2 sm:-mx-3 sm:px-3 rounded-xl transition-colors"
+                >
+                  <div className="w-full sm:w-[168px] lg:w-[188px] aspect-[16/10] sm:aspect-auto sm:h-[108px] lg:h-[118px] shrink-0 rounded-xl overflow-hidden bg-slate-100">
+                    <img
+                      src={resolveMediaUrl(b.image) || fallbackImage}
+                      alt={b.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        if (el.dataset.fallbackApplied === "1") return;
+                        el.dataset.fallbackApplied = "1";
+                        el.src = fallbackImage;
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${kindBadgeStyles(b.kind)}`}
+                    >
+                      {kindLabel}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-bold text-[#0F172A] mt-1.5 truncate group-hover:text-[#6900AA] transition-colors">
+                      {b.title}
+                    </h3>
+                    {b.address ? (
+                      <p className="mt-1.5 text-sm text-slate-500 flex items-start gap-1.5">
+                        <MapPin size={14} className="shrink-0 mt-0.5 text-slate-400" />
+                        <span className="line-clamp-1">{b.address}</span>
+                      </p>
+                    ) : null}
+                    {dateTimeLine ? (
+                      <p className="mt-1 text-sm text-slate-500 flex items-start gap-1.5">
+                        <Calendar size={14} className="shrink-0 mt-0.5 text-slate-400" />
+                        <span className="line-clamp-1">{dateTimeLine}</span>
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-sm text-slate-500 flex items-start gap-1.5">
+                      <QtyIcon size={14} className="shrink-0 mt-0.5 text-slate-400" />
+                      <span>{formatPartyLine(b)}</span>
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 sm:pt-0.5">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${statusBadgeStyles(b.status)}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusDotStyles(b.status)}`} />
+                      {b.status}
+                    </span>
+                    {b.canCancel ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleCancel(b);
+                        }}
+                        className="inline-flex items-center justify-center min-w-[88px] px-4 py-1.5 rounded-lg border border-red-300 bg-white text-sm font-semibold text-red-500 hover:bg-red-50 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
+
       <ConfirmDialog
         open={!!pendingCancel}
         title={pendingCancel?.kind === "event" ? "Cancel ticket booking?" : "Cancel reservation?"}

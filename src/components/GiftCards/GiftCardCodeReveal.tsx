@@ -31,11 +31,11 @@ export default function GiftCardCodeReveal({
   const textClass =
     tone === "light"
       ? "text-white/85"
-      : "text-[#6B7280]";
+      : "text-black";
   const btnClass =
     tone === "light"
       ? "text-white/80 hover:text-white hover:bg-white/15"
-      : "text-[#9CA3AF] hover:text-[#6900AA] hover:bg-[#F3E8FF]";
+      : "text-black/50 hover:text-black hover:bg-black/5";
 
   return (
     <span className={`inline-flex items-center gap-1.5 min-w-0 max-w-full ${className}`}>

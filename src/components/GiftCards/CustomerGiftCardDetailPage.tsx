@@ -34,11 +34,11 @@ function imgSrc(img: string | { src: string }) {
 
 function statusBadge(status?: string) {
   const s = (status || "").toUpperCase();
-  if (s === "ACTIVE") return "bg-[#14532D] text-[#86EFAC]";
-  if (s === "PARTIALLY_USED") return "bg-amber-900/80 text-amber-100";
-  if (s === "FULLY_USED") return "bg-slate-700 text-slate-200";
-  if (s === "EXPIRED" || s === "BLOCKED") return "bg-rose-900/80 text-rose-100";
-  return "bg-white/20 text-white";
+  if (s === "ACTIVE") return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+  if (s === "PARTIALLY_USED") return "bg-amber-50 text-amber-800 border border-amber-200";
+  if (s === "FULLY_USED") return "bg-slate-100 text-slate-600 border border-slate-200";
+  if (s === "EXPIRED" || s === "BLOCKED") return "bg-rose-50 text-rose-700 border border-rose-200";
+  return "bg-[#F7E9FF] text-[#6900AA] border border-[#E3BCFF]";
 }
 
 export default function CustomerGiftCardDetailPage() {
@@ -110,25 +110,17 @@ export default function CustomerGiftCardDetailPage() {
                 size="preview"
                 className="aspect-[16/9] w-full rounded-none!"
               />
-              <div className="relative bg-[#6900AA] text-white px-4 sm:px-6 py-4 sm:py-5">
-                <div
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-12 opacity-30"
-                  aria-hidden
-                  style={{
-                    backgroundImage:
-                      "radial-gradient(ellipse at 20% 100%, rgba(255,255,255,0.35) 0, transparent 55%), radial-gradient(ellipse at 70% 120%, rgba(255,255,255,0.25) 0, transparent 50%)",
-                  }}
-                />
+              <div className="relative bg-white border-t border-slate-100 px-4 sm:px-6 py-4 sm:py-5">
                 <div className="relative z-[1] flex flex-row items-center justify-between gap-3 sm:gap-4">
                   <div className="min-w-0 flex flex-col gap-2">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/75 font-semibold">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-black/70 font-semibold">
                       {isSent ? "Gift value / remaining" : "Available balance"}
                     </p>
-                    <p className="text-[1.75rem] sm:text-[2.35rem] font-bold leading-none tracking-tight">
+                    <p className="text-[1.75rem] sm:text-[2.35rem] font-bold leading-none tracking-tight text-black">
                       {formatMoney(Number(card.current_balance), { compact: true })}
                     </p>
                     {isSent ? (
-                      <p className="text-[12px] text-white/75">
+                      <p className="text-[12px] text-black/60">
                         Initial {formatMoney(Number(card.initial_balance), { compact: true })}
                       </p>
                     ) : null}
@@ -136,7 +128,7 @@ export default function CustomerGiftCardDetailPage() {
                       <GiftCardCodeReveal
                         code={card.code}
                         codeMasked={card.code_masked}
-                        tone="light"
+                        tone="dark"
                         className="min-w-0"
                       />
                     </div>
@@ -153,8 +145,8 @@ export default function CustomerGiftCardDetailPage() {
                           : card.status}
                       </span>
                       {card.expires_at ? (
-                        <span className="text-[11px] sm:text-[12px] text-white/80 inline-flex items-center gap-1">
-                          <CalendarDays size={12} />
+                        <span className="text-[11px] sm:text-[12px] text-black/60 inline-flex items-center gap-1">
+                          <CalendarDays size={12} className="text-black/60" />
                           Valid until {formatGiftCardExpiryDate(card.expires_at)}
                         </span>
                       ) : null}

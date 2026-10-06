@@ -3,10 +3,10 @@ import { useState, use, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   MapPin, Phone, CheckCircle, Calendar, Users, Clock,
-  Star, Share2, Compass, MessageSquare, Image as ImageIcon,
+  Star, Share, Compass, MessageSquare, Image as ImageIcon,
   BookOpen, AlertCircle, Sparkles, Copy, ChevronRight, Loader2,
   ChevronLeft, X, Navigation, User,
-  Send, ShieldCheck, ArrowRight, Check, ChevronDown, Tag, CheckCheck,
+  ShieldCheck, ArrowRight, Check, ChevronDown, Tag, CheckCheck,
   Sun, Moon, Sunrise, FileText, BadgeCheck, Utensils, Upload, PartyPopper,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -524,6 +524,46 @@ const StarRatingInput = ({ value, onChange }: { value: number, onChange: (val: n
   );
 };
 
+function reviewTimeAgo(iso?: string) {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+  const years = Math.floor(months / 12);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
+}
+
+/** Open Google Maps directions for a restaurant (coords preferred, then address). */
+function openRestaurantDirections(opts: {
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  address?: string | null;
+  name?: string | null;
+}): boolean {
+  const lat = Number(opts.latitude);
+  const lng = Number(opts.longitude);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+  const destination = hasCoords
+    ? `${lat},${lng}`
+    : (opts.address || opts.name || "").trim();
+  if (!destination) return false;
+  window.open(
+    `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`,
+    "_blank",
+    "noopener,noreferrer"
+  );
+  return true;
+}
+
 /** Sticky tabs that scroll to sections on the Overview page. */
 const DETAIL_SECTION_TABS = [
   { id: "Overview", sectionId: "section-overview" },
@@ -584,6 +624,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const similarRestaurants = similarBusinesses.filter((b) => b.id !== bizId && b.slug !== resolvedParams.id);
 
   const similarScrollerRef = useRef<HTMLDivElement>(null);
+  const reviewsScrollerRef = useRef<HTMLDivElement>(null);
 
   const scrollSimilar = (direction: 'left' | 'right') => {
     if (similarScrollerRef.current) {
@@ -595,10 +636,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const scrollReviews = (direction: 'left' | 'right') => {
+    if (reviewsScrollerRef.current) {
+      const scrollAmount = 304;
+      reviewsScrollerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
   // Load current auth user from localStorage — for customer_id linking only
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   useEffect(() => {
     const syncCustomerAuth = () => {
       dispatch(loadFromStorage());
@@ -1784,6 +1837,23 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               <button
                 type="button"
                 onClick={() => {
+                  const opened = openRestaurantDirections({
+                    latitude: profile.latitude,
+                    longitude: profile.longitude,
+                    address: profile.address,
+                    name: profile.name,
+                  });
+                  if (!opened) toast.error("Location not available");
+                }}
+                className="w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Directions"
+                title="Directions"
+              >
+                <Navigation size={17} className="text-[#292929]" strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   if (navigator.share) {
                     navigator.share({ title: profile.name, url: window.location.href });
                   } else {
@@ -1793,19 +1863,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 }}
                 className="w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
                 aria-label="Share"
+                title="Share"
               >
-                <Send size={17} className="text-[#292929]" strokeWidth={2.5} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  toast.success("Link copied to clipboard!");
-                }}
-                className="w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
-                aria-label="Copy link"
-              >
-                <Upload size={17} className="text-[#292929]" strokeWidth={2.5} />
+                <Share size={17} className="text-[#292929]" strokeWidth={2.5} />
               </button>
 
               {ratingValue ? (
@@ -2086,15 +2146,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               </button>
 
               <div className="flex flex-wrap gap-2.5 pt-1">
-                {profile.address?.trim() ? (
+                {profile.address?.trim() ||
+                (Number.isFinite(Number(profile.latitude)) &&
+                  Number.isFinite(Number(profile.longitude))) ? (
                   <button
                     type="button"
                     onClick={() => {
-                      window.open(
-                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address || "")}`,
-                        "_blank",
-                        "noopener,noreferrer"
-                      );
+                      const opened = openRestaurantDirections({
+                        latitude: profile.latitude,
+                        longitude: profile.longitude,
+                        address: profile.address,
+                        name: profile.name,
+                      });
+                      if (!opened) toast.error("Location not available");
                     }}
                     className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-800 cursor-pointer hover:bg-slate-50"
                   >
@@ -2140,6 +2204,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               }`}
               style={{ top: galleryStickyTop }}
             >
+              <div className="flex flex-col gap-3 sm:gap-4">
               {activeTab === "Book a Table" && drawerStep === 1 ? (
                 <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-sm">
                   <GuestTableAnimation count={Number(guests)} />
@@ -2298,6 +2363,49 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   </div>
                 </div>
               )}
+
+              {profile.address?.trim() ||
+              (Number.isFinite(Number(profile.latitude)) &&
+                Number.isFinite(Number(profile.longitude))) ? (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)] p-4 sm:p-5">
+                  <h3 className="text-xl sm:text-[1.3rem] font-semibold text-slate-900 tracking-tight leading-tight">
+                    Direction
+                  </h3>
+                  {profile.address?.trim() ? (
+                    <p className="mt-2.5 text-sm sm:text-[0.95rem] text-slate-500 leading-relaxed">
+                      {profile.address.trim()}
+                    </p>
+                  ) : null}
+                  <div className="mt-4 grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleCopyAddress}
+                      disabled={!profile.address?.trim()}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm sm:text-[1rem] font-bold text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {copied ? <Check size={16} strokeWidth={2.5} /> : <Copy size={16} strokeWidth={2.25} />}
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const opened = openRestaurantDirections({
+                          latitude: profile.latitude,
+                          longitude: profile.longitude,
+                          address: profile.address,
+                          name: profile.name,
+                        });
+                        if (!opened) toast.error("Location not available");
+                      }}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] px-3 py-3 text-sm sm:text-[1rem] font-bold text-white hover:bg-black transition-colors cursor-pointer"
+                    >
+                      <Navigation size={16} strokeWidth={2.5} />
+                      Direction
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              </div>
             </aside>
           ) : null}
 
@@ -2615,59 +2723,93 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   ) : null}
                 </section>
 
-                {/* Review Feed */}
-                <section className="bg-white p-0 sm:p-0 space-y-4 divide-y divide-slate-100">
-                  <h3 className="text-lg sm:text-xl lg:text-base font-bold text-slate-800 mb-2">User Reviews</h3>
-                  {reviews.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No reviews yet. Be the first to leave one after your visit!</p>}
-                  {reviews.map((rev: any, idx: number) => (
-                    <div key={rev.id} className={`${idx > 0 ? "pt-4" : ""} flex gap-3`}>
-                      <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0 text-slate-500 font-bold text-xs flex items-center justify-center border border-slate-200">
-                        {(rev.user_name || '?').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="text-baselg:text-xs font-bold text-slate-800">{rev.user_name}</p>
-                          <p className="text-[1rem] sm:text-[0.625rem] text-slate-400 font-medium">
-                            {formatDateCustomer(rev.created_at)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-md text-sm sm:text-base lg:text-[0.625rem] text-emerald-600 font-bold">
-                            <span>{rev.rating}</span>
-                            <Star size={8} className="fill-emerald-600" />
-                          </div>
-                          {rev.booked_on_platform ? (
-                            <span className="text-[0.625rem] sm:text-xs text-slate-400 font-medium">
-                              Booked on BookMyBota
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-base lg:text-xs text-slate-600 mt-2 leading-relaxed">
-                          {rev.text}
-                        </p>
+                {/* Ratings & reviews — review carousel */}
+                <section className="bg-white p-0 sm:p-0">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <h3 className="text-lg sm:text-xl lg:text-lg font-bold text-[#111111]">
+                      Ratings &amp; reviews
+                    </h3>
+                    {reviews.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setReviewsModalOpen(true)}
+                        className="inline-flex items-center gap-0.5 text-sm font-semibold text-[#6900AA] hover:underline cursor-pointer shrink-0"
+                      >
+                        View Review
+                        <ChevronRight size={16} />
+                      </button>
+                    ) : null}
+                  </div>
 
-                        {rev.replies && rev.replies.length > 0 && (
-                          <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100">
-                            {rev.replies.map((reply: any) => (
-                              <div key={reply.id} className={`p-3 rounded-xl text-base lg:text-xs ${reply.user_type === 'owner' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className={`font-bold ${reply.user_type === 'owner' ? 'text-rose-700' : 'text-slate-700'}`}>
-                                    {reply.user_name} {reply.user_type === 'owner' && <span className="ml-1 text-[1rem] lg:text-[0.5625rem] bg-rose-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Owner</span>}
-                                  </span>
-                                  <span className="text-[1rem] lg:text-[0.625rem] text-slate-400">
-                                    {new Date(reply.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                                  </span>
-                                </div>
-                                <p className={reply.user_type === 'owner' ? 'text-rose-900/80' : 'text-slate-600'}>
-                                  {reply.text}
-                                </p>
+                  {reviews.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-4">
+                      No reviews yet. Be the first to leave one after your visit!
+                    </p>
+                  ) : (
+                    <div className="relative">
+                      {reviews.length > 1 ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => scrollReviews("left")}
+                            className="absolute left-0 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center hover:bg-slate-50 cursor-pointer"
+                            aria-label="Previous reviews"
+                          >
+                            <ChevronLeft size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => scrollReviews("right")}
+                            className="absolute right-0 top-1/2 z-10 translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center hover:bg-slate-50 cursor-pointer"
+                            aria-label="Next reviews"
+                          >
+                            <ChevronRight size={18} />
+                          </button>
+                        </>
+                      ) : null}
+
+                      <div
+                        ref={reviewsScrollerRef}
+                        className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory scroll-smooth"
+                      >
+                        {reviews.map((rev: any) => {
+                          const ratingNum = Number(rev.rating) || 0;
+                          const name = rev.user_name || "Guest";
+                          const booked = Boolean(rev.booked_on_platform);
+                          return (
+                            <article
+                              key={rev.id}
+                              className="w-[260px] sm:w-[280px] shrink-0 snap-start rounded-2xl border border-slate-200 border-l-4 border-l-[#6900AA] bg-white p-4 flex flex-col shadow-sm"
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#F7E9FF] text-sm font-bold text-[#6900AA] shrink-0">
+                                  {String(name).slice(0, 1).toUpperCase()}
+                                </span>
+                                <span className="min-w-0 flex-1 text-sm font-bold text-[#111111] truncate">
+                                  {name}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-sm font-bold text-[#111111] shrink-0">
+                                  <Star size={14} className="fill-[#F84464] text-[#F84464]" />
+                                  {ratingNum.toFixed(1)}/5
+                                </span>
                               </div>
-                            ))}
-                          </div>
-                        )}
+                              <p className="text-xs text-slate-400 mb-2">
+                                {booked ? "Booked on BookMyBota" : "BookMyBota customer"}
+                              </p>
+                              {rev.text?.trim() ? (
+                                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap line-clamp-4 mb-2">
+                                  {rev.text.trim()}
+                                </p>
+                              ) : null}
+                              <p className="text-xs text-slate-400 mt-auto">
+                                {reviewTimeAgo(rev.created_at)}
+                              </p>
+                            </article>
+                          );
+                        })}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </section>
                 </div>
               </div>
@@ -4025,15 +4167,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (profile.address) {
-                                    window.open(
-                                      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.address)}`,
-                                      '_blank',
-                                      'noopener,noreferrer'
-                                    );
-                                  } else {
-                                    toast.error('Address not available');
-                                  }
+                                  const opened = openRestaurantDirections({
+                                    latitude: profile.latitude,
+                                    longitude: profile.longitude,
+                                    address: profile.address,
+                                    name: profile.name,
+                                  });
+                                  if (!opened) toast.error("Location not available");
                                 }}
                                 className="mt-0.5 text-[13px] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                               >
@@ -4452,6 +4592,97 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     {tab.id}
                   </button>
                 ))}
+              </div>
+            </div>,
+            document.body
+          )}
+
+        {typeof document !== "undefined" &&
+          reviewsModalOpen &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="dining-reviews-modal-title"
+            >
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/45 cursor-pointer"
+                aria-label="Close reviews"
+                onClick={() => {
+                  setReviewsModalOpen(false);
+                  setExpandedReviewId(null);
+                }}
+              />
+              <div className="relative w-full sm:max-w-lg max-h-[85vh] sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
+                  <h2
+                    id="dining-reviews-modal-title"
+                    className="text-lg font-bold text-[#111111]"
+                  >
+                    Reviews and Rating
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReviewsModalOpen(false);
+                      setExpandedReviewId(null);
+                    }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7">
+                  {reviews.map((rev: any) => {
+                    const ratingNum = Number(rev.rating) || 0;
+                    const name = rev.user_name || "Guest";
+                    const text = (rev.text || "").trim();
+                    const expanded = expandedReviewId === String(rev.id);
+                    const needsMore = text.length > 180;
+                    return (
+                      <article
+                        key={rev.id}
+                        className="py-4 border-b border-slate-100 last:border-b-0"
+                      >
+                        <div className="flex items-center gap-2.5 pr-1">
+                          <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
+                            {String(name).slice(0, 1).toUpperCase()}
+                          </span>
+                          <span className="min-w-0 flex-1 text-sm font-semibold text-[#111111] truncate">
+                            {name}
+                          </span>
+                          <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none">
+                            <Star size={10} className="fill-white text-white" />
+                            {Math.round(ratingNum)}
+                          </span>
+                        </div>
+                        {text ? (
+                          <div className="mt-2.5 relative">
+                            <p
+                              className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${
+                                expanded || !needsMore ? "" : "line-clamp-4"
+                              }`}
+                            >
+                              {text}
+                            </p>
+                            {needsMore && !expanded ? (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedReviewId(String(rev.id))}
+                                className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold text-rose-600 cursor-pointer"
+                              >
+                                Read More
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
               </div>
             </div>,
             document.body

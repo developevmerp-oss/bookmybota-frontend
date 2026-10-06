@@ -16,10 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
-  Crown,
   SlidersHorizontal,
-  Star,
-  ThumbsUp,
   Ticket,
   X,
 } from "lucide-react";
@@ -46,7 +43,6 @@ import ListingPromoSlider, {
 } from "@/components/LandingPage/ListingPromoSlider";
 import { MovieGridShimmer } from "@/components/Shared/Shimmer";
 import {
-  formatMovieCardMeta,
   formatMovieCardTitle,
   isMoviePromoted,
   parseLanguageList,
@@ -58,14 +54,13 @@ import {
 } from "@/data/showcaseMovieCards";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
 import { getEmbedVideoUrl } from "@/components/MovieLandingPage/MovieTrailerModal";
+import { MovieNotifyCard } from "@/components/LandingPage/MovieNotifyCard";
+import type { MustWatchMovieCard } from "@/components/LandingPage/useMustWatchMoviesCatalog";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 import "./MovieLandingPage.css";
-import "@/components/LandingPage/RecommendedMoviesRail.css";
 import "@/components/DinningLandingPage/DiningHomePage.css";
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
-/** Match Only in Theatres grid density (5 across on desktop). */
-const MOVIES_VISIBLE = 5;
 const CONTAINER = "container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0";
 const EMPTY_MOVIES: Movie[] = [];
 const EMPTY_HERO_EXTRAS: Record<string, string> = {};
@@ -393,144 +388,32 @@ function MoviePromoFeatureCard({
   );
 }
 
-function MovieCard({ movie }: { movie: MovieCardData }) {
-  const meta = formatMovieCardMeta(movie.certification, movie.languages);
-  const [imgFailed, setImgFailed] = useState(false);
-  const showPoster = Boolean(movie.poster) && !imgFailed;
-
-  const inner = (
-    <article className="flex h-full flex-col overflow-hidden rounded-[10px] bg-white border border-[#E5E5E5]">
-      <div className="relative shrink-0 overflow-hidden bg-[#F3F4F6]">
-        <div className="movie-listing-poster">
-          {showPoster ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={movie.poster}
-              alt={movie.title}
-              className="movie-listing-poster-img"
-              loading="lazy"
-              onError={() => setImgFailed(true)}
-            />
-          ) : (
-            <div className="movie-listing-poster-img flex items-center justify-center bg-[#F3F4F6] text-slate-300">
-              <Clapperboard size={32} strokeWidth={1.4} />
-            </div>
-          )}
-        </div>
-
-        {movie.comingSoon ? (
-          <span className="movie-listing-badge movie-listing-badge--soon">Coming Soon</span>
-        ) : movie.promoted ? (
-          <span className="movie-listing-badge movie-listing-badge--promoted">
-            <Crown size={11} className="shrink-0 text-[#FCD34D]" strokeWidth={2.25} fill="#FCD34D" />
-            Promoted
-          </span>
-        ) : null}
-
-        {(movie.likes || movie.rating) && (
-          <div className="absolute inset-x-0 bottom-0 z-[2] flex items-center gap-1.5 bg-black/45 backdrop-blur-[2px] px-2 py-1 text-white">
-            {movie.likes ? (
-              <>
-                <ThumbsUp className="size-3 shrink-0 text-[#22C55E]" fill="currentColor" />
-                <span className="text-[10px] font-medium truncate">{movie.likes}</span>
-              </>
-            ) : (
-              <>
-                <Star className="size-3 shrink-0 text-[#EF4444]" fill="currentColor" />
-                <span className="text-[10px] font-semibold shrink-0">{movie.rating}</span>
-                {movie.votes && (
-                  <span className="text-[10px] text-white/90 truncate">{movie.votes}</span>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-      <div className="movie-listing-meta shrink-0 px-3 pt-2.5 pb-3">
-        <h3 className="movie-listing-title text-[13px] sm:text-[14px] font-bold text-[#111111] leading-snug line-clamp-2 group-hover:text-[#6900AA] transition-colors">
-          {movie.title}
-        </h3>
-        <p className="movie-listing-subtitle mt-0.5 text-[11px] sm:text-[12px] text-[#6B7280] line-clamp-1 leading-snug">
-          {meta || "\u00A0"}
-        </p>
-      </div>
-    </article>
-  );
-
-  const href = movie.href || `/movies/${movie.id}`;
-
-  return (
-    <Link href={href} className="group block h-full w-full min-w-0">
-      {inner}
-    </Link>
-  );
+function toLandingMovieCard(movie: MovieCardData): MustWatchMovieCard {
+  const ratingNum = movie.rating != null ? Number(movie.rating) : NaN;
+  const reviewsCount = movie.votes
+    ? Number(String(movie.votes).replace(/[^\d]/g, "")) || 0
+    : 0;
+  return {
+    id: movie.id,
+    title: movie.title,
+    displayTitle: movie.title,
+    poster: movie.poster,
+    certification: movie.certification,
+    languages: movie.languages,
+    genres: movie.genres,
+    formats: movie.formats || [],
+    rating: Number.isFinite(ratingNum) && ratingNum > 0 ? ratingNum : null,
+    reviewsCount,
+    comingSoon: movie.comingSoon,
+    promoted: movie.promoted,
+    href: movie.href || `/movies/${movie.id}`,
+    fromPrice: null,
+  };
 }
 
-function HScroll({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [canScroll, setCanScroll] = useState({ left: false, right: false });
-
-  const updateScroll = useCallback(() => {
-    const el = ref.current;
-    if (!el) {
-      setCanScroll({ left: false, right: false });
-      return;
-    }
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    const canOverflow = maxScroll > 2;
-    setCanScroll({
-      left: canOverflow && el.scrollLeft > 2,
-      right: canOverflow && el.scrollLeft < maxScroll - 2,
-    });
-  }, []);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    updateScroll();
-    const t = window.setTimeout(updateScroll, 150);
-    el.addEventListener("scroll", updateScroll, { passive: true });
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateScroll) : null;
-    ro?.observe(el);
-    window.addEventListener("resize", updateScroll);
-    return () => {
-      window.clearTimeout(t);
-      el.removeEventListener("scroll", updateScroll);
-      ro?.disconnect();
-      window.removeEventListener("resize", updateScroll);
-    };
-  }, [updateScroll]);
-
-  const scrollBy = (dir: -1 | 1) => {
-    const el = ref.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.75, 360), behavior: "smooth" });
-  };
-
-  const btnClass =
-    "absolute z-20 top-1/3 -translate-y-1/2 hidden md:flex size-9 items-center justify-center rounded-full bg-white text-slate-900 shadow-md hover:bg-[#F7E9FF] cursor-pointer";
-
-  return (
-    <div className="relative">
-      <div
-        ref={ref}
-        className="movies-rail"
-        style={{ ["--movies-visible" as string]: MOVIES_VISIBLE }}
-      >
-        {children}
-      </div>
-      {canScroll.left && (
-        <button type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)} className={`${btnClass} -left-1 lg:-left-2`}>
-          <ChevronLeft className="size-4" />
-        </button>
-      )}
-      {canScroll.right && (
-        <button type="button" aria-label="Scroll right" onClick={() => scrollBy(1)} className={`${btnClass} -right-1 lg:-right-2`}>
-          <ChevronRight className="size-4" />
-        </button>
-      )}
-    </div>
-  );
+/** Same card UI as home landing Notify Movies section. */
+function MovieCard({ movie }: { movie: MovieCardData }) {
+  return <MovieNotifyCard movie={toLandingMovieCard(movie)} />;
 }
 
 function MovieRail({
@@ -543,6 +426,7 @@ function MovieRail({
   onSeeAll: () => void;
 }) {
   if (!movies.length) return null;
+  // Same grid as Only in Theatres so card width/height match exactly.
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
@@ -558,13 +442,13 @@ function MovieRail({
           <ChevronRight className="size-4" />
         </button>
       </div>
-      <HScroll>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
         {movies.map((movie) => (
-          <div key={movie.id} className="movies-rail-slot">
+          <div key={movie.id} className="min-w-0">
             <MovieCard movie={movie} />
           </div>
         ))}
-      </HScroll>
+      </div>
     </div>
   );
 }

@@ -126,7 +126,7 @@ function NonRegisteredArtistView({
         )}
         <div aria-hidden className="absolute inset-0 bg-white/78" />
 
-        <div className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:py-8 md:py-10">
+        <div className="relative z-10 container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
           <Link
             href="/artists"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B1B3A]/80 hover:text-[#6900AA]"
@@ -134,7 +134,7 @@ function NonRegisteredArtistView({
             <ArrowLeft size={16} /> All artists
           </Link>
 
-          <div className="mt-5 flex flex-col items-center gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-start md:gap-8 lg:gap-10">
+          <div className="mt-5 flex flex-col items-start gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-center md:gap-8 lg:gap-10">
             <div className="relative h-56 w-56 shrink-0 overflow-hidden rounded-2xl bg-[#F7E9FF] shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-100 lg:w-100">
               <SafeCoverImage
                 src={coverSrc}
@@ -145,7 +145,7 @@ function NonRegisteredArtistView({
               />
             </div>
 
-            <div className="min-w-0 flex-1 text-center md:text-left">
+            <div className="min-w-0 flex-1 text-left">
               {typeName ? (
                 <p className="text-sm font-semibold text-[#1B1B3A]">{typeName}</p>
               ) : null}
@@ -153,7 +153,7 @@ function NonRegisteredArtistView({
                 {name}
               </h1>
               {aboutText ? (
-                <p className="mt-3 max-w-xl text-sm leading-relaxed text-[#374151] sm:text-[15px] whitespace-pre-wrap md:mx-0 mx-auto">
+                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#374151] sm:text-[15px] whitespace-pre-wrap">
                   {aboutText}
                 </p>
               ) : null}
@@ -489,7 +489,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
         )}
         <div aria-hidden className="absolute inset-0 bg-white/78" />
 
-        <div className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:py-8 md:py-10">
+        <div className="relative z-10 container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
           <Link
             href="/artists"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B1B3A]/80 hover:text-[#6900AA]"
@@ -497,7 +497,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
             <ArrowLeft size={16} /> All artists
           </Link>
 
-          <div className="mt-5 flex flex-col items-center gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-start md:gap-8 lg:gap-10">
+          <div className="mt-5 flex flex-col items-start gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-center md:gap-8 lg:gap-10">
             <div className="relative h-56 w-56 shrink-0 overflow-hidden rounded-2xl bg-[#F7E9FF] shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-100 lg:w-100">
               <SafeCoverImage
                 src={coverSrc}
@@ -508,7 +508,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               />
             </div>
 
-            <div className="min-w-0 flex-1 text-center md:text-left">
+            <div className="min-w-0 flex-1 text-left">
               {metaParts.length > 0 ? (
                 <p className="text-sm font-semibold text-[#1B1B3A]">
                   {canInquire
@@ -522,7 +522,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                 {artist.name}
               </h1>
               {artist.description?.trim() ? (
-                <div className="mt-3 min-w-0 max-w-xl md:mx-0 mx-auto">
+                <div className="mt-3 max-w-3xl">
                   <p
                     ref={bioRef}
                     className="text-sm leading-relaxed text-[#374151] sm:text-[15px] line-clamp-4 whitespace-pre-wrap"
@@ -557,7 +557,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               ) : null}
 
               {canInquire && (instagramUrl || youtubeUrl) ? (
-                <div className="mt-5 flex flex-wrap items-center justify-center md:justify-start gap-3">
+                <div className="mt-5 flex flex-wrap items-center justify-start gap-3">
                   {instagramUrl ? (
                     <a
                       href={instagramUrl}

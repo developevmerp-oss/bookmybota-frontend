@@ -2724,6 +2724,18 @@ export default function EventCheckout({
                 <p className="text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
                   {selectedSeats.length}/{desiredSeatQty}
                 </p>
+                {selectedSeats.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSeats([]);
+                      toast.info("Cleared all selected seats");
+                    }}
+                    className="text-[0.6875rem] font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                  >
+                    Clear all
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -2927,11 +2939,25 @@ export default function EventCheckout({
           <footer className="shrink-0 bg-white border-t border-slate-200 px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.1)]">
             <div className="max-w-5xl mx-auto flex items-center gap-3 sm:gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-[0.75rem] sm:text-[0.8125rem] text-slate-500 font-medium">
-                  {selectedSeats.length === 0
-                    ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
-                    : `${selectedSeats.length}/${desiredSeatQty} selected`}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[0.75rem] sm:text-[0.8125rem] text-slate-500 font-medium">
+                    {selectedSeats.length === 0
+                      ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
+                      : `${selectedSeats.length}/${desiredSeatQty} selected`}
+                  </p>
+                  {selectedSeats.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSeats([]);
+                        toast.info("Cleared all selected seats");
+                      }}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
                 {selectedSeats.length > 0 && (
                   <p className="text-[11px] text-slate-400 truncate mt-0.5">
                     {selectedSeats

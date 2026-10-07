@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, Fragment } from "react";
 
 type SeatLike = {
   coordinate_x?: number;
@@ -352,21 +352,41 @@ export default function LayoutSeatPreview({
     const canvasH = Number(stadiumCfg.canvasHeight) || 1200;
 
     const totalCap = blocks.reduce((acc, b) => {
-      // Prefer tier-computed capacity (source of truth); fall back to b.capacity only when no tiers
-      if (Array.isArray(b.tiers) && b.tiers.length > 0) {
-        return (
-          acc +
-          b.tiers.reduce((tAcc: number, t) => {
-            const rStart = (t.row_start || "A").charCodeAt(0);
-            const rEnd = (t.row_end || "A").charCodeAt(0);
-            const rCount = Math.max(1, rEnd - rStart + 1);
-            const spr = Number(t.seats_per_row) || 0;
-            return tAcc + rCount * spr;
-          }, 0)
-        );
-      }
-      if (b.capacity && Number(b.capacity) > 0) return acc + Number(b.capacity);
-      return acc;
+      const isDirect = (b as any).seating_type === "direct" || !Array.isArray(b.tiers) || b.tiers.length === 0;
+      const targetTiers = !isDirect && Array.isArray(b.tiers) && b.tiers.length > 0
+        ? b.tiers
+        : [
+            (Array.isArray(b.tiers) && b.tiers[0]) || {
+              row_start: (b as any).row_start || "A",
+              row_end: (b as any).row_end || "J",
+              seats_per_row: (b as any).seats_per_row || 20,
+              row_seat_overrides: (b as any).row_seat_overrides,
+              excluded_seats: (b as any).excluded_seats,
+            },
+          ];
+
+      const blockSeats = targetTiers.reduce((tAcc: number, t: any) => {
+        const rStart = (t.row_start || "A").toUpperCase().charCodeAt(0);
+        const rEnd = (t.row_end || "A").toUpperCase().charCodeAt(0);
+        if (isNaN(rStart) || isNaN(rEnd) || rEnd < rStart) return tAcc;
+        const baseSpr = Number(t.seats_per_row) || 20;
+        const overrides: Record<string, number> = t.row_seat_overrides || (b as any).row_seat_overrides || {};
+        const excl = new Set(t.excluded_seats || (b as any).excluded_seats || []);
+
+        let activeCount = 0;
+        for (let c = rStart; c <= rEnd; c++) {
+          const rowLetter = String.fromCharCode(c);
+          const spr = overrides[rowLetter] != null ? Number(overrides[rowLetter]) : baseSpr;
+          for (let s = 1; s <= spr; s++) {
+            if (!excl.has(`${rowLetter}-${s}`) && !excl.has(`${rowLetter}${s}`)) {
+              activeCount++;
+            }
+          }
+        }
+        return tAcc + activeCount;
+      }, 0);
+
+      return acc + (blockSeats > 0 ? blockSeats : (Number(b.capacity) || 0));
     }, 0);
 
     const pitchX = ground.x != null ? Number(ground.x) : canvasW * 0.22;
@@ -437,19 +457,139 @@ export default function LayoutSeatPreview({
     };
 
     const selectedBlock = selectedBlockId ? blocks.find((b) => b.id === selectedBlockId) : null;
-    const selectedTier = selectedBlock && selectedTierId
-      ? (selectedBlock.tiers || []).find((t: any) => (t.id || t.name) === selectedTierId) || null
+    const isDirectBlock = Boolean(
+      selectedBlock && (
+        (selectedBlock as any).seating_type === "direct" ||
+        !selectedBlock.tiers ||
+        selectedBlock.tiers.length <= 1
+      )
+    );
+
+    const directVirtualTier = selectedBlock
+      ? (selectedBlock.tiers?.[0] || {
+          id: selectedBlock.id,
+          name: selectedBlock.name,
+          color: selectedBlock.color,
+          row_start: (selectedBlock as any).row_start || "A",
+          row_end: (selectedBlock as any).row_end || "J",
+          seats_per_row: (selectedBlock as any).seats_per_row || 20,
+          row_seat_overrides: (selectedBlock as any).row_seat_overrides,
+          row_gaps: (selectedBlock as any).row_gaps,
+          excluded_seats: (selectedBlock as any).excluded_seats,
+        })
       : null;
 
-    // ── LEVEL 3: Single-tier seat grid ───────────────────────────────────────
+    const selectedTier = selectedBlock
+      ? (isDirectBlock
+          ? directVirtualTier
+          : (selectedTierId
+              ? (selectedBlock.tiers || []).find((t: any) => (t.id || t.name) === selectedTierId) || null
+              : null))
+      : null;
+
+    // ── LEVEL 3: Standing / General Admission Zone (VIP Pit / Standing Area) ──
+    if (selectedBlock && (selectedBlock as any).stand_type === "standing") {
+      const standColor = selectedBlock.color || "#a855f7";
+      const totalCapacity = Number((selectedBlock as any).capacity) || 0;
+
+      return (
+        <div className={`relative w-full ${heightClass} rounded-xl overflow-hidden border border-slate-700 bg-slate-950 text-white flex flex-col ${className}`}>
+          {/* Header */}
+          <div className="shrink-0 flex items-center justify-between gap-3 px-3 py-2.5 bg-slate-900/95 border-b border-slate-800 z-10">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <button
+                type="button"
+                onClick={() => setSelectedBlockId(null)}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+              >
+                <span>←</span>
+                <span>Back to Stadium</span>
+              </button>
+              <div className="flex items-center gap-2 truncate">
+                <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: standColor }} />
+                <h3 className="text-sm font-bold truncate text-white">
+                  {selectedBlock.name}
+                </h3>
+                <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                  Standing / General Admission
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-purple-300 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20 shrink-0">
+              {totalCapacity.toLocaleString()} Passes
+            </span>
+          </div>
+
+          {/* Standing Zone Visual Area */}
+          <div className="flex-1 min-h-0 overflow-auto p-6 flex flex-col items-center justify-center text-center">
+            <div className="max-w-md w-full bg-slate-900/80 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center mx-auto text-3xl shadow-inner">
+                🧍
+              </div>
+
+              <div>
+                <h4 className="text-lg font-extrabold text-white tracking-wide">
+                  {selectedBlock.name}
+                </h4>
+                <p className="text-xs text-purple-300 font-semibold uppercase tracking-widest mt-1">
+                  General Admission · VIP Fan Pit Zone
+                </p>
+              </div>
+
+              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 grid grid-cols-2 gap-3 text-left">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                    Admission Type
+                  </span>
+                  <span className="text-xs font-extrabold text-emerald-400">
+                    Free Roam / Standing Pass
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                    Total Capacity
+                  </span>
+                  <span className="text-xs font-extrabold text-amber-400 font-mono">
+                    {totalCapacity.toLocaleString()} Passes
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                This area does not have numbered rows or individual seat chairs. Customers book passes directly by quantity.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── LEVEL 3: Single-tier or Direct-stand seat grid ──────────────────────────
     if (selectedBlock && selectedTier) {
       const tierColor = (selectedTier as any).color || selectedBlock.color || "#3b82f6";
       const rStart = ((selectedTier as any).row_start || "A").charCodeAt(0);
       const rEnd   = ((selectedTier as any).row_end   || "A").charCodeAt(0);
       const rCount = Math.max(1, rEnd - rStart + 1);
-      const spr    = Math.max(1, Number((selectedTier as any).seats_per_row) || 1);
-      const tierSeatsTotal = rCount * spr;
+      const baseSpr = Math.max(1, Number((selectedTier as any).seats_per_row) || 1);
+      const rowOverrides: Record<string, number> =
+        (selectedTier as any).row_seat_overrides || (selectedBlock as any).row_seat_overrides || {};
+      const rowGaps: string[] =
+        (selectedTier as any).row_gaps || (selectedBlock as any).row_gaps || [];
+      const excludedSeats: string[] =
+        (selectedTier as any).excluded_seats || (selectedBlock as any).excluded_seats || [];
+      const excludedSet = new Set(excludedSeats);
+
       const rows = Array.from({ length: rCount }, (_, i) => String.fromCharCode(rStart + i));
+
+      let tierSeatsTotal = 0;
+      rows.forEach((r) => {
+        const spr = rowOverrides[r] != null ? Math.max(1, Number(rowOverrides[r])) : baseSpr;
+        for (let s = 1; s <= spr; s++) {
+          if (!excludedSet.has(`${r}-${s}`) && !excludedSet.has(`${r}${s}`)) {
+            tierSeatsTotal++;
+          }
+        }
+      });
 
       return (
         <div className={`relative w-full ${heightClass} rounded-xl overflow-hidden border border-slate-700 bg-slate-950 text-white flex flex-col ${className}`}>
@@ -458,18 +598,31 @@ export default function LayoutSeatPreview({
             <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
-                onClick={() => setSelectedTierId(null)}
+                onClick={() => {
+                  if (isDirectBlock) {
+                    setSelectedBlockId(null);
+                  } else {
+                    setSelectedTierId(null);
+                  }
+                }}
                 className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
               >
                 <span>←</span>
-                <span>Back to {selectedBlock.name}</span>
+                <span>{isDirectBlock ? "Back to Stadium" : `Back to ${selectedBlock.name}`}</span>
               </button>
               <div className="flex items-center gap-2 truncate">
                 <span className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: tierColor }} />
-                <h3 className="text-sm font-bold truncate text-white">{(selectedTier as any).name || "Tier"}</h3>
+                <h3 className="text-sm font-bold truncate text-white">
+                  {isDirectBlock ? selectedBlock.name : ((selectedTier as any).name || "Tier")}
+                </h3>
                 <span className="text-xs text-slate-400 truncate">
                   Rows {(selectedTier as any).row_start}–{(selectedTier as any).row_end}
                 </span>
+                {isDirectBlock && (
+                  <span className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-semibold">
+                    Direct Stand
+                  </span>
+                )}
               </div>
             </div>
             <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20 shrink-0">
@@ -479,32 +632,65 @@ export default function LayoutSeatPreview({
 
           {/* Seat Grid */}
           <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col items-center justify-start space-y-1">
-            <div className="flex flex-col gap-1.5 items-center">
-              {rows.map((rowLetter) => (
-                <div key={rowLetter} className="flex items-center gap-1.5">
-                  <span className="w-5 text-right font-bold text-[10px] text-slate-400 select-none">{rowLetter}</span>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: spr }, (_, sIdx) => {
-                      const seatNum = sIdx + 1;
-                      return (
-                        <div
-                          key={seatNum}
-                          title={`${selectedBlock.name} · ${(selectedTier as any).name || "Tier"} · Row ${rowLetter} · Seat ${seatNum}`}
-                          className="w-4 h-4 rounded-sm text-[7px] font-semibold flex items-center justify-center border shadow-sm transition-transform hover:scale-125 cursor-pointer select-none"
-                          style={{
-                            backgroundColor: tierColor,
-                            borderColor: "rgba(255,255,255,0.35)",
-                            color: "#ffffff",
-                          }}
-                        >
-                          {seatNum <= 99 ? seatNum : ""}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <span className="w-5 text-left font-bold text-[10px] text-slate-400 select-none">{rowLetter}</span>
-                </div>
-              ))}
+            <div className="flex flex-col gap-1.5 items-center w-full">
+              {rows.map((rowLetter) => {
+                const spr = rowOverrides[rowLetter] != null
+                  ? Math.max(1, Number(rowOverrides[rowLetter]))
+                  : baseSpr;
+                const hasAisleAfter = rowGaps.includes(rowLetter);
+
+                return (
+                  <React.Fragment key={rowLetter}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-5 text-right font-bold text-[10px] text-slate-400 select-none">{rowLetter}</span>
+                      <div className="flex items-center gap-1 flex-wrap justify-center">
+                        {Array.from({ length: spr }, (_, sIdx) => {
+                          const seatNum = sIdx + 1;
+                          const isExcluded =
+                            excludedSet.has(`${rowLetter}-${seatNum}`) ||
+                            excludedSet.has(`${rowLetter}${seatNum}`);
+
+                          if (isExcluded) {
+                            return (
+                              <div
+                                key={seatNum}
+                                title={`Pillar / Void space (Seat ${rowLetter}-${seatNum} not available)`}
+                                className="w-4 h-4 rounded-sm border border-dashed border-slate-700/60 bg-slate-900/40 text-[7px] text-slate-600 flex items-center justify-center select-none"
+                              >
+                                ✕
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div
+                              key={seatNum}
+                              title={`${selectedBlock.name} · ${isDirectBlock ? "" : `${(selectedTier as any).name || "Tier"} · `}Row ${rowLetter} · Seat ${seatNum}`}
+                              className="w-4 h-4 rounded-sm text-[7px] font-semibold flex items-center justify-center border shadow-sm transition-transform hover:scale-125 cursor-pointer select-none"
+                              style={{
+                                backgroundColor: tierColor,
+                                borderColor: "rgba(255,255,255,0.35)",
+                                color: "#ffffff",
+                              }}
+                            >
+                              {seatNum <= 99 ? seatNum : ""}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <span className="w-5 text-left font-bold text-[10px] text-slate-400 select-none">{rowLetter}</span>
+                    </div>
+
+                    {hasAisleAfter && (
+                      <div className="w-full max-w-md my-1 py-1 px-3 flex items-center justify-center gap-2 border-y border-dashed border-slate-700/80 bg-slate-900/60 rounded text-[9px] font-bold uppercase tracking-wider text-slate-400 select-none">
+                        <span>🚶</span>
+                        <span>Walkway Aisle Gap</span>
+                        <span>🚶</span>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -807,9 +993,12 @@ export default function LayoutSeatPreview({
           {/* Stadium Stands / Blocks */}
           {(blocks as any[]).map((b) => {
             const bColor = b.color || "#3b82f6";
-            // Prefer tier-computed capacity (source of truth); fall back to b.capacity only when no tiers
+            const isStandingBlock = b.stand_type === "standing";
+            // Prefer tier-computed capacity for seated; use b.capacity for standing
             const bCap =
-              Array.isArray(b.tiers) && b.tiers.length > 0
+              isStandingBlock
+                ? Number(b.capacity) || 0
+                : Array.isArray(b.tiers) && b.tiers.length > 0
                 ? b.tiers.reduce((tAcc: number, t: any) => {
                     const rStart = (t.row_start || "A").charCodeAt(0);
                     const rEnd = (t.row_end || "A").charCodeAt(0);
@@ -839,7 +1028,7 @@ export default function LayoutSeatPreview({
                   className="cursor-pointer transition-transform hover:opacity-95 hover:filter hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]"
                   onClick={() => setSelectedBlockId(b.id)}
                 >
-                  <title>{`${b.name} · ${bCap.toLocaleString()} seats · Click to zoom in to seats`}</title>
+                  <title>{isStandingBlock ? `${b.name} · ${bCap.toLocaleString()} standing passes` : `${b.name} · ${bCap.toLocaleString()} seats · Click to zoom in to seats`}</title>
                   <path
                     d={d}
                     fill={bColor}
@@ -864,14 +1053,14 @@ export default function LayoutSeatPreview({
                     <text
                       x={labelPos.x}
                       y={labelPos.y + 11}
-                      fill="#fef08a"
+                      fill={isStandingBlock ? "#e9d5ff" : "#fef08a"}
                       fontSize={Math.max(8, Math.min(13, rDiff / 5.5))}
                       fontWeight="700"
                       textAnchor="middle"
                       dominantBaseline="middle"
                       style={{ textShadow: "0 1px 2px rgba(0,0,0,0.9)" }}
                     >
-                      {bCap.toLocaleString()} seats
+                      {isStandingBlock ? `🧍 ${bCap.toLocaleString()} passes` : `${bCap.toLocaleString()} seats`}
                     </text>
                   )}
                 </g>
@@ -891,7 +1080,7 @@ export default function LayoutSeatPreview({
                 className="cursor-pointer transition-transform hover:opacity-95 hover:filter hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]"
                 onClick={() => setSelectedBlockId(b.id)}
               >
-                <title>{`${b.name} · ${bCap.toLocaleString()} seats · Click to zoom in to seats`}</title>
+                <title>{isStandingBlock ? `${b.name} · ${bCap.toLocaleString()} standing passes` : `${b.name} · ${bCap.toLocaleString()} seats · Click to zoom in to seats`}</title>
                 <rect
                   x={bx}
                   y={by}
@@ -924,14 +1113,14 @@ export default function LayoutSeatPreview({
                   <text
                     x={bx + bw / 2}
                     y={by + bh / 2 + 12}
-                    fill="#fef08a"
+                    fill={isStandingBlock ? "#e9d5ff" : "#fef08a"}
                     fontSize={Math.max(9, Math.min(14, bw / 11))}
                     fontWeight="700"
                     textAnchor="middle"
                     dominantBaseline="middle"
                     style={{ textShadow: "0 1px 2px rgba(0,0,0,0.9)" }}
                   >
-                    {bCap.toLocaleString()} seats
+                    {isStandingBlock ? `🧍 ${bCap.toLocaleString()} passes` : `${bCap.toLocaleString()} seats`}
                   </text>
                 )}
               </g>

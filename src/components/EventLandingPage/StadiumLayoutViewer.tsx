@@ -34,6 +34,10 @@ export type StadiumTier = {
   available: number;
   color?: string | null;
   price?: number;
+  seats_per_row?: number;
+  row_seat_overrides?: Record<string, number>;
+  row_gaps?: string[];
+  excluded_seats?: string[];
 };
 
 export type StadiumBlock = {
@@ -46,6 +50,12 @@ export type StadiumBlock = {
   height: number;
   rotation?: number;
   shape?: "rectangle" | "pill" | "curved" | "oval" | "arc";
+  stand_type?: "seated" | "standing";
+  ticket_type_id?: string;
+  seats_per_row?: number;
+  row_seat_overrides?: Record<string, number>;
+  row_gaps?: string[];
+  excluded_seats?: string[];
   innerRadius?: number;
   outerRadius?: number;
   startAngle?: number;
@@ -107,9 +117,9 @@ export default function StadiumLayoutViewer({
   const [activeTierId, setActiveTierId] = useState<string | null>(null);
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"canvas" | "grid">("canvas");
   // Tier picker: shown when a multi-tier block is clicked — user must pick a tier before seeing seats
   const [showTierPicker, setShowTierPicker] = useState<boolean>(false);
+  const [standingQty, setStandingQty] = useState<number>(1);
 
   // Selected seats state
   const [selectedSeats, setSelectedSeats] = useState<TierSeat[]>(initialSelectedSeats);
@@ -177,6 +187,11 @@ export default function StadiumLayoutViewer({
     return data?.blocks.find((b) => b.block_id === selectedBlockId) || null;
   }, [data?.blocks, selectedBlockId]);
 
+  const activeTier = useMemo(() => {
+    if (!selectedBlock || !activeTierId) return null;
+    return selectedBlock.tiers?.find((t) => t.tier_id === activeTierId) || null;
+  }, [selectedBlock, activeTierId]);
+
   // Fetch all seats for the selected block
   const {
     data: blockSeatsData,
@@ -195,8 +210,14 @@ export default function StadiumLayoutViewer({
     !seatsError &&
     (seatsLoading || seatsFetching || !blockSeatsData);
 
-  const formatPrice = useCallback((val: number) => formatMoney(val, { compact: true }), []);
-
+  //  const formatPrice = useCallback((val: number) => formatMoney(val, { compact: true }), []);
+  const formatPrice = useCallback(
+    (val: number) => {
+      const curr = (ticketTypes[0] as any)?.currency || "";
+      return `${curr} ${val.toLocaleString()}`.trim();
+    },
+    [ticketTypes]
+  );
   const ticketPriceById = useMemo(() => {
     const map = new Map<string, number>();
     for (const tt of ticketTypes) {
@@ -230,21 +251,6 @@ export default function StadiumLayoutViewer({
       return null;
     },
     [lookupTicketPrice]
-  );
-
-  const getBlockMinPrice = useCallback(
-    (block: StadiumBlock) => {
-      const prices: number[] = [];
-      const blockLevel = Number(block.price);
-      if (Number.isFinite(blockLevel) && blockLevel > 0) prices.push(blockLevel);
-      for (const t of block.tiers) {
-        const p = getTierPrice(t);
-        if (p != null) prices.push(p);
-      }
-      if (prices.length === 0) return null;
-      return Math.min(...prices);
-    },
-    [getTierPrice]
   );
 
   const standPriceAndLeftLabel = useCallback(
@@ -299,9 +305,9 @@ export default function StadiumLayoutViewer({
   const activeZoomScale = zoomScale ?? baseScale;
   const activeStagePos = zoomScale == null ? fitStagePos : stagePos;
 
-  // Handle Block Click — BookMyShow smooth zoom into block + show seats on canvas
+  // Handle Block Click — BookMyShow block/tier selection with deep focus zoom
   const handleBlockClick = useCallback(
-    (block: StadiumBlock) => {
+    (block: StadiumBlock, tierId?: string) => {
       if (block.available === 0 && block.total > 0) {
         toast.info(`${block.name} is completely sold out.`);
         return;
@@ -310,18 +316,48 @@ export default function StadiumLayoutViewer({
       setSelectedRow(null);
       setHoveredSeat(null);
 
-      // If block has multiple tiers → show tier picker first (dynamic for any sport)
-      if (block.tiers.length > 1) {
+      let resolvedTierId = tierId;
+      // If standing block → prepare standing pass selection
+      if (block.stand_type === "standing") {
         setActiveTierId(null);
-        setShowTierPicker(true);
+        setShowTierPicker(false);
+        const existingForBlock = selectedSeats.filter(
+          (s) =>
+            s.section_name === block.name ||
+            s.id.startsWith(`standing-${block.block_id}-`)
+        );
+        if (existingForBlock.length > 0) {
+          setStandingQty(existingForBlock.length);
+        } else {
+          setStandingQty(
+            Math.max(
+              1,
+              Math.min(
+                maxSelectable < Number.MAX_SAFE_INTEGER ? maxSelectable : 1,
+                block.available || 1
+              )
+            )
+          );
+        }
       } else {
-        // Single tier or no tier → go straight to seats
-        setActiveTierId(block.tiers[0]?.tier_id || null);
+        // Resolve specific tier: passed tierId -> category matched tier -> first available tier -> first tier
+        if (!resolvedTierId && block.tiers && block.tiers.length > 0) {
+          if (selectedCategoryFilter) {
+            const matchingTier = block.tiers.find((t) => t.ticket_type_id === selectedCategoryFilter);
+            if (matchingTier) resolvedTierId = matchingTier.tier_id;
+          }
+          if (!resolvedTierId) {
+            const firstAvail = block.tiers.find((t) => t.available > 0) || block.tiers[0];
+            resolvedTierId = firstAvail ? firstAvail.tier_id : undefined;
+          }
+        }
+        setActiveTierId(resolvedTierId || null);
         setShowTierPicker(false);
       }
 
       if (!stageRef.current) return;
 
+      // Calculate bounds of this block / tier so it fully zooms in to fill the screen
       let bounds: { centerX: number; centerY: number; width: number; height: number };
 
       if (block.shape === "arc") {
@@ -332,20 +368,31 @@ export default function StadiumLayoutViewer({
         const startA = Number(block.startAngle) || 0;
         const sweepA = Number(block.sweepAngle) || 45;
         const endA = startA + sweepA;
+        const numTiers = Math.max(1, block.tiers?.length || 1);
 
-        // Sample points along the entire arc to get exact bounding box
+        let tInR = innerR;
+        let tOutR = outerR;
+        if (resolvedTierId && numTiers > 1) {
+          const tIdx = block.tiers.findIndex((t) => t.tier_id === resolvedTierId);
+          if (tIdx >= 0) {
+            const baseRadialSpan = (outerR - innerR) / numTiers;
+            tInR = innerR + tIdx * baseRadialSpan;
+            tOutR = tInR + baseRadialSpan;
+          }
+        }
+
         const xs: number[] = [];
         const ys: number[] = [];
-        for (let a = startA; a <= endA; a += 2) {
+        for (let a = startA; a <= endA; a += 1.5) {
           const rad = (a * Math.PI) / 180;
           const c = Math.cos(rad);
           const s = Math.sin(rad);
-          xs.push(sCX + innerR * c, sCX + outerR * c);
-          ys.push(sCY + innerR * s, sCY + outerR * s);
+          xs.push(sCX + tInR * c, sCX + tOutR * c);
+          ys.push(sCY + tInR * s, sCY + tOutR * s);
         }
         const endRad = (endA * Math.PI) / 180;
-        xs.push(sCX + innerR * Math.cos(endRad), sCX + outerR * Math.cos(endRad));
-        ys.push(sCY + innerR * Math.sin(endRad), sCY + outerR * Math.sin(endRad));
+        xs.push(sCX + tInR * Math.cos(endRad), sCX + tOutR * Math.cos(endRad));
+        ys.push(sCY + tInR * Math.sin(endRad), sCY + tOutR * Math.sin(endRad));
 
         const minX = Math.min(...xs);
         const maxX = Math.max(...xs);
@@ -355,24 +402,62 @@ export default function StadiumLayoutViewer({
         bounds = {
           centerX: (minX + maxX) / 2,
           centerY: (minY + maxY) / 2,
-          width: Math.max(60, maxX - minX),
-          height: Math.max(60, maxY - minY),
+          width: Math.max(40, maxX - minX),
+          height: Math.max(30, maxY - minY),
         };
       } else {
+        const bx = Number(block.x) || 0;
+        const by = Number(block.y) || 0;
+        const bw = Number(block.width) || 120;
+        const bh = Number(block.height) || 80;
+        const rotDeg = Number(block.rotation) || 0;
+        const rotRad = (rotDeg * Math.PI) / 180;
+        const cosRot = Math.cos(rotRad);
+        const sinRot = Math.sin(rotRad);
+        const cx = bx + bw / 2;
+        const cy = by + bh / 2;
+        const numTiers = Math.max(1, block.tiers?.length || 1);
+
+        let tierTop = 0;
+        let tierH = bh;
+        if (resolvedTierId && numTiers > 1) {
+          const tIdx = block.tiers.findIndex((t) => t.tier_id === resolvedTierId);
+          if (tIdx >= 0) {
+            const baseTierH = bh / numTiers;
+            tierTop = tIdx * baseTierH;
+            tierH = baseTierH;
+          }
+        }
+
+        const localY0 = tierTop - bh / 2;
+        const localY1 = tierTop + tierH - bh / 2;
+        const localX0 = -bw / 2;
+        const localX1 = bw / 2;
+
+        const corners = [
+          { x: cx + localX0 * cosRot - localY0 * sinRot, y: cy + localX0 * sinRot + localY0 * cosRot },
+          { x: cx + localX1 * cosRot - localY0 * sinRot, y: cy + localX1 * sinRot + localY0 * cosRot },
+          { x: cx + localX1 * cosRot - localY1 * sinRot, y: cy + localX1 * sinRot + localY1 * cosRot },
+          { x: cx + localX0 * cosRot - localY1 * sinRot, y: cy + localX0 * sinRot + localY1 * cosRot },
+        ];
+        const minX = Math.min(...corners.map((c) => c.x));
+        const maxX = Math.max(...corners.map((c) => c.x));
+        const minY = Math.min(...corners.map((c) => c.y));
+        const maxY = Math.max(...corners.map((c) => c.y));
+
         bounds = {
-          centerX: (Number(block.x) || 0) + (Number(block.width) || 120) / 2,
-          centerY: (Number(block.y) || 0) + (Number(block.height) || 80) / 2,
-          width: Number(block.width) || 120,
-          height: Number(block.height) || 80,
+          centerX: (minX + maxX) / 2,
+          centerY: (minY + maxY) / 2,
+          width: Math.max(40, maxX - minX),
+          height: Math.max(30, maxY - minY),
         };
       }
 
-      // Small margin so seats + nearby row labels stay in frame
-      const padW = bounds.width * 0.2;
-      const padH = bounds.height * 0.22;
-      const scaleX = (containerSize.width * 0.9) / (bounds.width + padW);
-      const scaleY = (containerSize.height * 0.86) / (bounds.height + padH);
-      const targetScale = Math.max(1.3, Math.min(5.0, Math.min(scaleX, scaleY)));
+      // Zoom so the block/tier fills the screen generously (92% width, 88% height)
+      const scaleX = (containerSize.width * 0.92) / bounds.width;
+      const scaleY = (containerSize.height * 0.88) / bounds.height;
+      let targetScale = Math.min(scaleX, scaleY);
+      targetScale = Math.max(2.8, Math.min(7.5, targetScale));
 
       const newX = containerSize.width / 2 - bounds.centerX * targetScale;
       const newY = containerSize.height / 2 - bounds.centerY * targetScale;
@@ -383,21 +468,25 @@ export default function StadiumLayoutViewer({
         y: newY,
         scaleX: targetScale,
         scaleY: targetScale,
-        duration: 0.48,
+        duration: 0.45,
         easing: Konva.Easings.EaseInOut,
       });
     },
-    [containerSize, canvasWidth, canvasHeight]
+    [containerSize, canvasWidth, canvasHeight, selectedCategoryFilter, selectedSeats, maxSelectable]
   );
 
-  // Select a tier from the picker → zoom into that tier's seats
+  // Select a tier from the picker → zoom straight into that tier's seats
   const handleTierSelect = useCallback(
     (tierId: string) => {
-      setActiveTierId(tierId);
-      setShowTierPicker(false);
-      setSelectedRow(null);
+      if (selectedBlock) {
+        handleBlockClick(selectedBlock, tierId);
+      } else {
+        setActiveTierId(tierId);
+        setShowTierPicker(false);
+        setSelectedRow(null);
+      }
     },
-    []
+    [selectedBlock, handleBlockClick]
   );
 
   // Zoom back out to full stadium overview
@@ -412,10 +501,12 @@ export default function StadiumLayoutViewer({
     if (stageRef.current) {
       stageRef.current.to({
         x: fitStagePos.x,
+
         y: fitStagePos.y,
         scaleX: baseScale,
+
         scaleY: baseScale,
-        duration: 0.42,
+        duration: 0.35,
         easing: Konva.Easings.EaseInOut,
       });
     }
@@ -447,17 +538,40 @@ export default function StadiumLayoutViewer({
     setStagePos(newPos);
   }, []);
 
-  // Handle manual zoom buttons
+  // Handle manual zoom buttons — works for block/tier when selected
   const handleZoomChange = (delta: number) => {
     const current = zoomScale ?? baseScale;
-    const newScale = Math.max(0.3, Math.min(5, current + delta));
+    const newScale = selectedBlockId
+      ? Math.max(1.8, Math.min(8.0, current + delta))
+      : Math.max(0.3, Math.min(5, current + delta));
     setZoomScale(newScale);
     if (stageRef.current) {
       stageRef.current.to({
         scaleX: newScale,
         scaleY: newScale,
-        duration: 0.25,
+        duration: 0.22,
       });
+    }
+  };
+
+  const handleResetZoom = () => {
+    if (selectedBlock) {
+      handleBlockClick(selectedBlock, activeTierId || undefined);
+    } else {
+      const centerX = (containerSize.width - canvasWidth * baseScale) / 2;
+      const centerY = (containerSize.height - canvasHeight * baseScale) / 2;
+      setZoomScale(baseScale);
+      setStagePos({ x: centerX, y: centerY });
+      if (stageRef.current) {
+        stageRef.current.to({
+          x: centerX,
+          y: centerY,
+          scaleX: baseScale,
+          scaleY: baseScale,
+          duration: 0.35,
+          easing: Konva.Easings.EaseInOut,
+        });
+      }
     }
   };
 
@@ -503,26 +617,54 @@ export default function StadiumLayoutViewer({
     [selectedSeats, maxSelectable, onSeatsSelected]
   );
 
+  // Price helper for a block
+  const getBlockMinPrice = useCallback(
+    (block: StadiumBlock) => {
+      if (block.stand_type === "standing") {
+        const targetId = block.ticket_type_id || block.tiers?.[0]?.ticket_type_id;
+        const match = ticketTypes.find((tt) => tt.id === targetId);
+        return match ? Number(match.price) : null;
+      }
+      const prices = block.tiers
+        .map((t) => {
+          const match = ticketTypes.find((tt) => tt.id === t.ticket_type_id);
+          return match ? Number(match.price) : null;
+        })
+        .filter((p): p is number => p !== null);
+      if (prices.length === 0) {
+        if (block.ticket_type_id) {
+          const match = ticketTypes.find((tt) => tt.id === block.ticket_type_id);
+          return match ? Number(match.price) : null;
+        }
+        return null;
+      }
+      return Math.min(...prices);
+    },
+    [ticketTypes]
+  );
+
+
+
   // Filtered blocks if category filter is active
   const filteredBlocks = useMemo(() => {
     if (!data?.blocks) return [];
     if (!selectedCategoryFilter) return data.blocks;
     return data.blocks.filter((b) =>
+      b.ticket_type_id === selectedCategoryFilter ||
       b.tiers.some((t) => t.ticket_type_id === selectedCategoryFilter)
     );
   }, [data?.blocks, selectedCategoryFilter]);
 
   const totalPrice = selectedSeats.reduce((sum, s) => sum + (s.price || 0), 0);
 
-  // ── Rendered Seats & Geometry Calculation for In-Canvas Interactive Layer ──
-  //
-  // NOTE: Stored coordinate_x / coordinate_y in the DB are generated for flat grid-view panels
-  // and do not match stadium canvas geometry. For the Konva canvas, we ALWAYS dynamically
-  // calculate seat positions directly from the block's physical dimensions, shape, rotation,
-  // and tier structure, guaranteeing 100% boundary safety and zero overlapping.
+  // ── Rendered Seats & Layout Calculation for In-Canvas Zoom Drill-down ──
   const renderedSeats = useMemo(() => {
     if (!selectedBlock || !blockSeats || blockSeats.length === 0) return [];
 
+    // If an active tier is selected, ONLY render seats belonging to that tier!
+    // If no active tier is selected, render all seats of the block.
+    // If an active tier is selected, ONLY render seats belonging to that tier!
+    // If no active tier is selected, render all seats of the block.
     const filtered = activeTierId
       ? blockSeats.filter((s) => s.tier_id === activeTierId)
       : blockSeats;
@@ -532,6 +674,7 @@ export default function StadiumLayoutViewer({
     const isArc = selectedBlock.shape === "arc";
     const sCX = selectedBlock.stadiumCenterX != null ? Number(selectedBlock.stadiumCenterX) : canvasWidth / 2;
     const sCY = selectedBlock.stadiumCenterY != null ? Number(selectedBlock.stadiumCenterY) : canvasHeight / 2;
+
     const innerR = Number(selectedBlock.innerRadius) || 260;
     const outerR = Number(selectedBlock.outerRadius) || 335;
     const startAngle = Number(selectedBlock.startAngle) || 0;
@@ -564,44 +707,92 @@ export default function StadiumLayoutViewer({
     const results: Array<TierSeat & { posX: number; posY: number; rotation: number }> = [];
 
     tierGroups.forEach((rowMap, tKey) => {
-      // Find tier index in selectedBlock.tiers
       const foundIdx = selectedBlock.tiers?.findIndex((t) => t.tier_id === tKey) ?? -1;
       const tIdx = foundIdx >= 0 ? foundIdx : 0;
+      const tierObj = selectedBlock.tiers?.[tIdx];
 
-      // Natural sort rows within this tier: A, B, C...
+      // Natural sort rows: A, B, C, D...
       const sortedRows = Array.from(rowMap.keys()).sort((a, b) =>
         a.localeCompare(b, undefined, { numeric: true })
       );
       const totalRows = Math.max(1, sortedRows.length);
 
+      // Row gaps / walkway aisles between rows if configured
+      const tierRowGaps = (selectedBlock as any).row_gaps || (tierObj as any)?.row_gaps || [];
+
       if (isArc) {
-        // Divide radial space between tiers if block has multiple tiers
         const tierRadialSpan = (outerR - innerR) / numTiers;
         const tierInnerR = innerR + tIdx * tierRadialSpan;
         const tierOuterR = tierInnerR + tierRadialSpan;
 
-        // Extra padding so seats + row labels stay readable (not congested)
-        const padR = Math.max(10, (tierOuterR - tierInnerR) * 0.14);
-        const padA = Math.max(2.5, sweepAngle * 0.08);
+        // Safe padding so seats never touch or bleed through borders
+        const padR = Math.max(5, (tierOuterR - tierInnerR) * 0.08);
+        const padA = Math.max(1.8, sweepAngle * 0.045);
         const usableInnerR = tierInnerR + padR;
         const usableOuterR = tierOuterR - padR;
-        const usableRadialSpan = Math.max(10, usableOuterR - usableInnerR);
+        const usableRadialSpan = Math.max(8, usableOuterR - usableInnerR);
         const usableStartA = startAngle + padA;
         const usableSweepA = Math.max(2, sweepAngle - padA * 2);
 
+        // Calculate weighted row positions respecting row_gaps (horizontal walkways)
+        const gapWeight = 1.2;
+        let totalExtraGaps = 0;
+        sortedRows.forEach((rLabel, rIdx) => {
+          if (rIdx < sortedRows.length - 1 && tierRowGaps.includes(rLabel)) {
+            totalExtraGaps += gapWeight;
+          }
+        });
+        const totalWeightedRows = totalRows + totalExtraGaps;
+
+        let extraGapsBefore = 0;
         sortedRows.forEach((rKey, rowIdx) => {
+          const rowFraction = (rowIdx + extraGapsBefore + 0.5) / Math.max(1, totalWeightedRows);
+          if (tierRowGaps.includes(rKey)) {
+            extraGapsBefore += gapWeight;
+          }
+
           const seatsInRow = rowMap.get(rKey)!;
+          // Sort seats by seat number
           seatsInRow.sort((a, b) => {
-            const numA = Number(a.seat_label);
-            const numB = Number(b.seat_label);
+            const numA = parseInt(String(a.seat_label).replace(/\D/g, ""), 10);
+            const numB = parseInt(String(b.seat_label).replace(/\D/g, ""), 10);
             if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
             return (a.seat_label || "").localeCompare(b.seat_label || "", undefined, { numeric: true });
           });
-          const totalSeatsInRow = Math.max(1, seatsInRow.length);
+
+          // Calculate columns PER ROW so wide rows don't compress standard rows
+          let maxSeatInRow = 0;
+          let minSeatInRow = Infinity;
+          seatsInRow.forEach((s) => {
+            const num = parseInt(String(s.seat_label).replace(/\D/g, ""), 10);
+            if (!isNaN(num) && num > 0) {
+              if (num > maxSeatInRow) maxSeatInRow = num;
+              if (num < minSeatInRow) minSeatInRow = num;
+            }
+          });
+          if (minSeatInRow === Infinity) minSeatInRow = 1;
+
+          const rowOverrideCount =
+            tierObj?.row_seat_overrides?.[rKey] || (selectedBlock as any)?.row_seat_overrides?.[rKey];
+          const baseSeats = tierObj?.seats_per_row || selectedBlock.seats_per_row || 0;
+          const totalRowSlots = Math.max(
+            1,
+            rowOverrideCount || 0,
+            baseSeats,
+            maxSeatInRow - minSeatInRow + 1,
+            seatsInRow.length
+          );
 
           seatsInRow.forEach((seat, seatIdx) => {
-            const r = usableInnerR + ((rowIdx + 0.5) / totalRows) * usableRadialSpan;
-            const angleDeg = usableStartA + ((seatIdx + 0.5) / totalSeatsInRow) * usableSweepA;
+            const parsedNum = parseInt(String(seat.seat_label).replace(/\D/g, ""), 10);
+            const slotIndex =
+              !isNaN(parsedNum) && parsedNum >= minSeatInRow
+                ? parsedNum - minSeatInRow
+                : seatIdx;
+
+            const colFraction = (slotIndex + 0.5) / totalRowSlots;
+            const r = usableInnerR + rowFraction * usableRadialSpan;
+            const angleDeg = usableStartA + colFraction * usableSweepA;
             const angleRad = (angleDeg * Math.PI) / 180;
             const posX = sCX + r * Math.cos(angleRad);
             const posY = sCY + r * Math.sin(angleRad);
@@ -615,24 +806,68 @@ export default function StadiumLayoutViewer({
         const tierH = bh / numTiers;
         const tierY = tIdx * tierH;
 
-        const padX = Math.max(16, bw * 0.12);
-        const padY = Math.max(12, tierH * 0.14);
+        const padX = Math.max(10, bw * 0.08);
+        const padY = Math.max(6, tierH * 0.08);
         const usableW = Math.max(20, bw - padX * 2);
         const usableH = Math.max(10, tierH - padY * 2);
 
+        // Row gaps calculation for rectangle
+        const gapWeight = 1.2;
+        let totalExtraGaps = 0;
+        sortedRows.forEach((rLabel, rIdx) => {
+          if (rIdx < sortedRows.length - 1 && tierRowGaps.includes(rLabel)) {
+            totalExtraGaps += gapWeight;
+          }
+        });
+        const totalWeightedRows = totalRows + totalExtraGaps;
+
+        let extraGapsBefore = 0;
         sortedRows.forEach((rKey, rowIdx) => {
+          const rowFraction = (rowIdx + extraGapsBefore + 0.5) / Math.max(1, totalWeightedRows);
+          if (tierRowGaps.includes(rKey)) {
+            extraGapsBefore += gapWeight;
+          }
+
           const seatsInRow = rowMap.get(rKey)!;
           seatsInRow.sort((a, b) => {
-            const numA = Number(a.seat_label);
-            const numB = Number(b.seat_label);
+            const numA = parseInt(String(a.seat_label).replace(/\D/g, ""), 10);
+            const numB = parseInt(String(b.seat_label).replace(/\D/g, ""), 10);
             if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
             return (a.seat_label || "").localeCompare(b.seat_label || "", undefined, { numeric: true });
           });
-          const totalSeatsInRow = Math.max(1, seatsInRow.length);
+
+          let maxSeatInRow = 0;
+          let minSeatInRow = Infinity;
+          seatsInRow.forEach((s) => {
+            const num = parseInt(String(s.seat_label).replace(/\D/g, ""), 10);
+            if (!isNaN(num) && num > 0) {
+              if (num > maxSeatInRow) maxSeatInRow = num;
+              if (num < minSeatInRow) minSeatInRow = num;
+            }
+          });
+          if (minSeatInRow === Infinity) minSeatInRow = 1;
+
+          const rowOverrideCount =
+            tierObj?.row_seat_overrides?.[rKey] || (selectedBlock as any)?.row_seat_overrides?.[rKey];
+          const baseSeats = tierObj?.seats_per_row || selectedBlock.seats_per_row || 0;
+          const totalRowSlots = Math.max(
+            1,
+            rowOverrideCount || 0,
+            baseSeats,
+            maxSeatInRow - minSeatInRow + 1,
+            seatsInRow.length
+          );
 
           seatsInRow.forEach((seat, seatIdx) => {
-            const localX = padX + ((seatIdx + 0.5) / totalSeatsInRow) * usableW;
-            const localY = tierY + padY + ((rowIdx + 0.5) / totalRows) * usableH;
+            const parsedNum = parseInt(String(seat.seat_label).replace(/\D/g, ""), 10);
+            const slotIndex =
+              !isNaN(parsedNum) && parsedNum >= minSeatInRow
+                ? parsedNum - minSeatInRow
+                : seatIdx;
+
+            const colFraction = (slotIndex + 0.5) / totalRowSlots;
+            const localX = padX + colFraction * usableW;
+            const localY = tierY + padY + rowFraction * usableH;
 
             const dx = localX - bw / 2;
             const dy = localY - bh / 2;
@@ -648,96 +883,241 @@ export default function StadiumLayoutViewer({
     return results;
   }, [selectedBlock, blockSeats, activeTierId, canvasWidth, canvasHeight]);
 
-  // Seat radius from row/seat gaps — keep seats readable without overlapping
-  const dynamicSeatRadius = useMemo(() => {
-    if (!selectedBlock || renderedSeats.length === 0) return 5;
-    const innerR = Number(selectedBlock.innerRadius) || 260;
-    const outerR = Number(selectedBlock.outerRadius) || 335;
-    const sweepA = Number(selectedBlock.sweepAngle) || 45;
-    const numTiers = Math.max(1, selectedBlock.tiers?.length || 1);
+  // Dynamic seat radius per row so dense rows (e.g. 40 seats in Row A) never shrink other rows
+  const { rowSeatRadii, dynamicSeatRadius } = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!selectedBlock || renderedSeats.length === 0) {
+      return { rowSeatRadii: map, dynamicSeatRadius: 6.0 };
+    }
 
-    const rowCounts = new Map<string, number>();
+    const rowMap = new Map<string, Array<{ posX: number; posY: number }>>();
     renderedSeats.forEach((s) => {
       const r = s.row_label || "A";
-      rowCounts.set(r, (rowCounts.get(r) || 0) + 1);
+      if (!rowMap.has(r)) rowMap.set(r, []);
+      rowMap.get(r)!.push({ posX: s.posX, posY: s.posY });
     });
-    const totalRows = Math.max(1, rowCounts.size);
-    const maxSeatsInRow = Math.max(1, ...Array.from(rowCounts.values()));
-    const effectiveRows = Math.max(1, totalRows / (activeTierId ? 1 : numTiers));
 
-    if (selectedBlock.shape === "arc") {
-      const tierRadialSpan = (outerR - innerR) / numTiers;
-      const radialGap = Math.max(8, tierRadialSpan * 0.72) / effectiveRows;
-      const midR = (innerR + outerR) / 2;
-      const usableSweepRad = (sweepA * 0.82 * Math.PI) / 180;
-      const angularGap = (midR * usableSweepRad) / maxSeatsInRow;
-      // Cap so circles leave ~35% gap between neighbors
-      return Math.max(3.2, Math.min(7.5, Math.min(radialGap, angularGap) * 0.36));
-    }
+    let overallMinDist = Infinity;
+    rowMap.forEach((seats, rLabel) => {
+      if (seats.length < 2) {
+        map.set(rLabel, 6.5);
+        return;
+      }
+      let minDist = Infinity;
+      for (let i = 0; i < seats.length - 1; i++) {
+        const d = Math.hypot(seats[i + 1].posX - seats[i].posX, seats[i + 1].posY - seats[i].posY);
+        if (d > 2 && d < minDist) minDist = d;
+      }
+      if (minDist !== Infinity && minDist < overallMinDist) {
+        overallMinDist = minDist;
+      }
+      // Guarantee comfortable 20% air margin between adjacent seats in this specific row
+      const r = Math.max(3.8, Math.min(9.5, minDist * 0.40));
+      map.set(rLabel, r);
+    });
 
-    const bw = Number(selectedBlock.width) || 120;
-    const bh = Number(selectedBlock.height) || 80;
-    const tierH = bh / numTiers;
-    const xGap = Math.max(8, bw * 0.76) / maxSeatsInRow;
-    const yGap = Math.max(8, tierH * 0.72) / effectiveRows;
-    return Math.max(3.2, Math.min(7.5, Math.min(xGap, yGap) * 0.36));
-  }, [selectedBlock, renderedSeats, activeTierId]);
+    const defaultRadius = overallMinDist !== Infinity ? Math.max(4.0, Math.min(8.5, overallMinDist * 0.38)) : 6.0;
+    return { rowSeatRadii: map, dynamicSeatRadius: defaultRadius };
+  }, [selectedBlock, renderedSeats]);
 
-  // Only one on-map row badge (active row) — full A–M list lives in the toolbar (no overlap)
-  const activeRowMarker = useMemo(() => {
-    if (!selectedBlock || !selectedRow || renderedSeats.length === 0) return null;
-    const pts = renderedSeats.filter((s) => s.row_label === selectedRow);
-    if (pts.length === 0) return null;
+  // ── Compute Visual Walkways (Horizontal Row Walkways from backend/database only) ──
+  const visualWalkways = useMemo(() => {
+    if (!selectedBlock || renderedSeats.length === 0) return { rowWalkways: [] };
 
-    const markerR = 7;
-    const edgeGap = dynamicSeatRadius + markerR + 4;
-    const isArc = selectedBlock.shape === "arc";
+    const rowMap = new Map<string, typeof renderedSeats>();
+    renderedSeats.forEach((s) => {
+      const r = s.row_label || "A";
+      if (!rowMap.has(r)) rowMap.set(r, []);
+      rowMap.get(r)!.push(s);
+    });
 
-    if (isArc) {
-      const sCX = selectedBlock.stadiumCenterX != null ? Number(selectedBlock.stadiumCenterX) : canvasWidth / 2;
-      const sCY = selectedBlock.stadiumCenterY != null ? Number(selectedBlock.stadiumCenterY) : canvasHeight / 2;
-      const startAngle = Number(selectedBlock.startAngle) || 0;
-      const startA = (startAngle * Math.PI) / 180;
-
-      let aisleSeat = pts[0];
-      let bestDist = Infinity;
-      pts.forEach((p) => {
-        const a = Math.atan2(p.posY - sCY, p.posX - sCX);
-        let d = Math.abs(a - startA);
-        d = Math.min(d, Math.PI * 2 - d);
-        if (d < bestDist) {
-          bestDist = d;
-          aisleSeat = p;
-        }
-      });
-
-      const r = Math.hypot(aisleSeat.posX - sCX, aisleSeat.posY - sCY);
-      const seatA = Math.atan2(aisleSeat.posY - sCY, aisleSeat.posX - sCX);
-      const angStep = edgeGap / Math.max(r, 1);
-      const labelA = seatA - angStep;
-      return {
-        label: selectedRow,
-        x: sCX + r * Math.cos(labelA),
-        y: sCY + r * Math.sin(labelA),
+    const rowWalkways: Array<{
+      id: string;
+      rowBefore: string;
+      rowAfter: string;
+      pathPoints?: number[];
+      arcProps?: {
+        cx: number;
+        cy: number;
+        radius: number;
+        startAngle: number;
+        endAngle: number;
       };
-    }
+      centerPos: { x: number; y: number };
+      label: string;
+    }> = [];
 
-    const rotDeg = Number(selectedBlock.rotation) || 0;
-    const rotRad = (rotDeg * Math.PI) / 180;
-    const cosRot = Math.cos(rotRad);
-    const sinRot = Math.sin(rotRad);
-    let left = pts[0];
-    pts.forEach((p) => {
-      const proj = p.posX * cosRot + p.posY * sinRot;
-      const leftProj = left.posX * cosRot + left.posY * sinRot;
-      if (proj < leftProj) left = p;
+    const rawGaps: string[] =
+      (selectedBlock as any).row_gaps ||
+      (activeTierId ? (selectedBlock.tiers?.find((t) => t.tier_id === activeTierId) as any)?.row_gaps : null) ||
+      [];
+
+    const sortedRows = Array.from(rowMap.keys()).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+
+    // Only show walkways that are explicitly configured in the backend/database
+    const effectiveGaps = rawGaps.filter(
+      (rLabel) => sortedRows.indexOf(rLabel) >= 0 && sortedRows.indexOf(rLabel) < sortedRows.length - 1
+    );
+
+    effectiveGaps.forEach((rLabel) => {
+      const rIdx = sortedRows.indexOf(rLabel);
+      if (rIdx >= 0 && rIdx < sortedRows.length - 1) {
+        const nextLabel = sortedRows[rIdx + 1];
+        const rowSeatsA = rowMap.get(rLabel)!;
+        const rowSeatsB = rowMap.get(nextLabel)!;
+        if (rowSeatsA.length > 0 && rowSeatsB.length > 0) {
+          const midA = rowSeatsA[Math.floor(rowSeatsA.length / 2)];
+          const midB = rowSeatsB[Math.floor(rowSeatsB.length / 2)];
+          const centerPos = {
+            x: (midA.posX + midB.posX) / 2,
+            y: (midA.posY + midB.posY) / 2,
+          };
+
+          if (selectedBlock.shape === "arc") {
+            const sCX = selectedBlock.stadiumCenterX != null ? Number(selectedBlock.stadiumCenterX) : canvasWidth / 2;
+            const sCY = selectedBlock.stadiumCenterY != null ? Number(selectedBlock.stadiumCenterY) : canvasHeight / 2;
+            const distA = Math.hypot(midA.posX - sCX, midA.posY - sCY);
+            const distB = Math.hypot(midB.posX - sCX, midB.posY - sCY);
+            const midR = (distA + distB) / 2;
+            const startA = Number(selectedBlock.startAngle) || 0;
+            const sweepA = Number(selectedBlock.sweepAngle) || 45;
+            rowWalkways.push({
+              id: `row-walkway-${rLabel}`,
+              rowBefore: rLabel,
+              rowAfter: nextLabel,
+              arcProps: {
+                cx: sCX,
+                cy: sCY,
+                radius: midR,
+                startAngle: startA,
+                endAngle: startA + sweepA,
+              },
+              centerPos,
+              label: "WALKWAY",
+            });
+          } else {
+            const firstA = rowSeatsA[0];
+            const firstB = rowSeatsB[0];
+            const lastA = rowSeatsA[rowSeatsA.length - 1];
+            const lastB = rowSeatsB[rowSeatsB.length - 1];
+            const p1 = { x: (firstA.posX + firstB.posX) / 2, y: (firstA.posY + firstB.posY) / 2 };
+            const p2 = { x: (lastA.posX + lastB.posX) / 2, y: (lastA.posY + lastB.posY) / 2 };
+            rowWalkways.push({
+              id: `row-walkway-${rLabel}`,
+              rowBefore: rLabel,
+              rowAfter: nextLabel,
+              pathPoints: [p1.x, p1.y, p2.x, p2.y],
+              centerPos,
+              label: "WALKWAY",
+            });
+          }
+        }
+      }
     });
-    return {
-      label: selectedRow,
-      x: left.posX - edgeGap * cosRot,
-      y: left.posY - edgeGap * sinRot,
-    };
-  }, [selectedBlock, selectedRow, renderedSeats, canvasWidth, canvasHeight, dynamicSeatRadius]);
+
+    return { rowWalkways };
+  }, [selectedBlock, renderedSeats, activeTierId, canvasWidth, canvasHeight]);
+
+  // Row letter badges along both sides — strictly clamped radius so rows NEVER collide
+  const rowMarkers = useMemo(() => {
+    if (!selectedBlock || renderedSeats.length === 0) return [];
+    const map = new Map<string, Array<{ posX: number; posY: number }>>();
+    renderedSeats.forEach((s) => {
+      const r = s.row_label || "A";
+      if (!map.has(r)) map.set(r, []);
+      map.get(r)!.push({ posX: s.posX, posY: s.posY });
+    });
+
+    const isArc = selectedBlock.shape === "arc";
+    const sCX = selectedBlock.stadiumCenterX != null ? Number(selectedBlock.stadiumCenterX) : canvasWidth / 2;
+    const sCY = selectedBlock.stadiumCenterY != null ? Number(selectedBlock.stadiumCenterY) : canvasHeight / 2;
+
+    const markers: Array<{ label: string; x: number; y: number; radius: number }> = [];
+
+    map.forEach((pts, rLabel) => {
+      if (pts.length === 0) return;
+      const rowR = rowSeatRadii.get(rLabel) || dynamicSeatRadius;
+
+      if (isArc) {
+        let firstSeat = pts[0];
+        let lastSeat = pts[0];
+        let minAngle = Infinity;
+        let maxAngle = -Infinity;
+        pts.forEach((p) => {
+          let a = Math.atan2(p.posY - sCY, p.posX - sCX);
+          if (a < 0) a += Math.PI * 2;
+          if (a < minAngle) {
+            minAngle = a;
+            firstSeat = p;
+          }
+          if (a > maxAngle) {
+            maxAngle = a;
+            lastSeat = p;
+          }
+        });
+        const r1 = Math.hypot(firstSeat.posX - sCX, firstSeat.posY - sCY);
+        const a1 = Math.atan2(firstSeat.posY - sCY, firstSeat.posX - sCX);
+        const angStep1 = (rowR * 2.8) / Math.max(r1, 1);
+        markers.push({
+          label: rLabel,
+          x: sCX + r1 * Math.cos(a1 - angStep1),
+          y: sCY + r1 * Math.sin(a1 - angStep1),
+          radius: Math.max(4.5, Math.min(8.0, rowR * 1.1)),
+        });
+
+        if (pts.length > 3) {
+          const r2 = Math.hypot(lastSeat.posX - sCX, lastSeat.posY - sCY);
+          const a2 = Math.atan2(lastSeat.posY - sCY, lastSeat.posX - sCX);
+          const angStep2 = (rowR * 2.8) / Math.max(r2, 1);
+          markers.push({
+            label: rLabel,
+            x: sCX + r2 * Math.cos(a2 + angStep2),
+            y: sCY + r2 * Math.sin(a2 + angStep2),
+            radius: Math.max(4.5, Math.min(8.0, rowR * 1.1)),
+          });
+        }
+      } else {
+        const rotDeg = Number(selectedBlock.rotation) || 0;
+        const rotRad = (rotDeg * Math.PI) / 180;
+        const cosRot = Math.cos(rotRad);
+        const sinRot = Math.sin(rotRad);
+        let left = pts[0];
+        let right = pts[0];
+        let minProj = Infinity;
+        let maxProj = -Infinity;
+        pts.forEach((p) => {
+          const proj = p.posX * cosRot + p.posY * sinRot;
+          if (proj < minProj) {
+            minProj = proj;
+            left = p;
+          }
+          if (proj > maxProj) {
+            maxProj = proj;
+            right = p;
+          }
+        });
+        markers.push({
+          label: rLabel,
+          x: left.posX - (rowR * 2.8) * cosRot,
+          y: left.posY - (rowR * 2.8) * sinRot,
+          radius: Math.max(4.5, Math.min(8.0, rowR * 1.1)),
+        });
+
+        if (pts.length > 3) {
+          markers.push({
+            label: rLabel,
+            x: right.posX + (rowR * 2.8) * cosRot,
+            y: right.posY + (rowR * 2.8) * sinRot,
+            radius: Math.max(4.5, Math.min(8.0, rowR * 1.1)),
+          });
+        }
+      }
+    });
+
+    return markers;
+  }, [selectedBlock, renderedSeats, canvasWidth, canvasHeight, rowSeatRadii, dynamicSeatRadius]);
 
   // Available row labels in natural alphabetical/numeric order
   const availableRows = useMemo(() => {
@@ -749,13 +1129,13 @@ export default function StadiumLayoutViewer({
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [renderedSeats]);
 
-  // Zoom directly into a specific row (e.g. A, B, C, D, E, F, G...)
+  // Zoom directly into a specific row (e.g. A, B, C...)
   const zoomToRow = useCallback(
     (rowLabel: string | null) => {
       if (!stageRef.current || !selectedBlock) return;
       if (!rowLabel) {
         setSelectedRow(null);
-        handleBlockClick(selectedBlock);
+        handleBlockClick(selectedBlock, activeTierId || undefined);
         return;
       }
 
@@ -776,7 +1156,6 @@ export default function StadiumLayoutViewer({
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
 
-      // Generous zoom into the specific row so tickets are large, spaced, and legible
       const scaleX = (containerSize.width * 0.82) / width;
       const scaleY = (containerSize.height * 0.44) / height;
       const targetScale = Math.max(2.8, Math.min(8.5, Math.min(scaleX, scaleY)));
@@ -795,7 +1174,7 @@ export default function StadiumLayoutViewer({
         easing: Konva.Easings.EaseInOut,
       });
     },
-    [renderedSeats, selectedBlock, containerSize, handleBlockClick]
+    [renderedSeats, selectedBlock, containerSize, handleBlockClick, activeTierId]
   );
 
   if (isLoading) {
@@ -816,95 +1195,6 @@ export default function StadiumLayoutViewer({
     );
   }
 
-  // Optional Grid View Panel
-  const renderBlockSeatPanel = () => {
-    if (!selectedBlock) return null;
-    const relevantSeats = activeTierId
-      ? blockSeats.filter((s) => s.tier_id === activeTierId)
-      : blockSeats;
-
-    const seatsByRow = new Map<string, TierSeat[]>();
-    relevantSeats.forEach((s) => {
-      const key = `${s.tier_id || "default"}__${s.row_label}`;
-      if (!seatsByRow.has(key)) seatsByRow.set(key, []);
-      seatsByRow.get(key)!.push(s);
-    });
-    const sortedRowKeys = Array.from(seatsByRow.keys()).sort();
-    const maxSeatsInRow = Math.max(1, ...Array.from(seatsByRow.values()).map((r) => r.length));
-
-    return (
-      <div
-        className="absolute inset-0 z-30 flex flex-col bg-white/95 backdrop-blur-md"
-        style={{
-          animation: "slideInFromRight 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards",
-        }}
-      >
-        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
-          <button
-            onClick={() => setViewMode("canvas")}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#6900AA] hover:bg-[#7a00c6] text-white text-xs font-bold transition-all active:scale-95"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Map</span>
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-900">{selectedBlock.name}</span>
-            <span className="text-[11px] text-slate-400">· Seat Grid</span>
-          </div>
-          <div className="w-16" />
-        </div>
-
-        <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center gap-2.5 bg-[#F8FAFC]">
-          {seatsPending ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
-              <Loader2 className="w-8 h-8 text-[#6900AA] animate-spin" />
-              <p className="text-xs font-medium">Loading block seats…</p>
-            </div>
-          ) : sortedRowKeys.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
-              <Info className="w-8 h-8 text-slate-400" />
-              <p className="text-xs font-medium">No seat layout configured for this stand.</p>
-            </div>
-          ) : (
-            sortedRowKeys.map((rowKey) => {
-              const rowSeats = seatsByRow.get(rowKey) || [];
-              const rowLabel = rowSeats[0]?.row_label || rowKey;
-              return (
-                <div key={rowKey} className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="w-6 text-center text-[10px] font-bold text-slate-500 shrink-0">{rowLabel}</span>
-                  {rowSeats.map((seat) => {
-                    const isSelected = selectedSeats.some((s) => s.id === seat.id);
-                    const isAvail = seat.status === "AVAILABLE";
-                    return (
-                      <button
-                        key={seat.id}
-                        title={`Row ${seat.row_label}, Seat ${seat.seat_label}${seat.price ? ` · ETB ${seat.price}` : ""}`}
-                        disabled={!isAvail && !isSelected}
-                        onClick={() => handleSeatClick(seat)}
-                        className={`relative flex items-center justify-center rounded-md text-[9px] sm:text-[10px] font-bold transition-all duration-150 focus:outline-none
-                          ${ maxSeatsInRow > 40 ? "w-5 h-5 sm:w-6 sm:h-6" : maxSeatsInRow > 25 ? "w-6 h-6 sm:w-7 sm:h-7" : "w-7 h-7 sm:w-8 sm:h-8" }
-                          ${
-                            isSelected
-                              ? "bg-[#6900AA] text-white shadow-md scale-105 ring-2 ring-[#E3BCFF]"
-                              : !isAvail
-                              ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                              : "bg-white text-slate-700 border border-slate-300 hover:border-[#6900AA] hover:bg-[#F7E9FF] hover:scale-105 cursor-pointer"
-                          }`}
-                      >
-                        {seat.seat_label}
-                      </button>
-                    );
-                  })}
-                  <span className="w-6 text-center text-[10px] font-bold text-slate-500 shrink-0">{rowLabel}</span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="flex flex-col h-full w-full bg-[#F8FAFC] text-slate-900 overflow-hidden relative select-none">
       {/* Compact chrome — keep map height maximized */}
@@ -920,23 +1210,33 @@ export default function StadiumLayoutViewer({
                   <ArrowLeft className="w-3 h-3" />
                   <span>Stands</span>
                 </button>
-                {selectedBlock && selectedBlock.tiers.length > 1 && !showTierPicker && activeTierId && (
-                  <button
-                    onClick={() => {
-                      setShowTierPicker(true);
-                      setActiveTierId(null);
-                      setSelectedRow(null);
-                      setViewMode("canvas");
-                    }}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold border border-slate-200 transition-all shrink-0"
-                  >
-                    <ArrowLeft className="w-3 h-3" />
-                    Tiers
-                  </button>
-                )}
                 {selectedBlock && (
-                  <div className="flex items-center gap-1 text-[11px] min-w-0">
+                  <div className="flex items-center gap-1.5 text-[11px] min-w-0">
                     <span className="font-bold text-slate-800 truncate">{selectedBlock.name}</span>
+                    {selectedBlock.tiers && selectedBlock.tiers.length > 1 ? (
+                      <div className="flex items-center gap-1 ml-1 bg-slate-100 p-0.5 rounded-full border border-slate-200 shrink-0">
+                        {selectedBlock.tiers.map((t) => {
+                          const isTierActive = activeTierId === t.tier_id;
+                          return (
+                            <button
+                              key={t.tier_id}
+                              type="button"
+                              onClick={() => handleTierSelect(t.tier_id)}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${isTierActive
+                                ? "bg-[#6900AA] text-white shadow-xs"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200"
+                                }`}
+                            >
+                              {t.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : activeTier ? (
+                      <span className="text-[10px] font-extrabold text-[#6900AA] bg-[#F7E9FF] px-2 py-0.5 rounded-full border border-[#E3BCFF] shrink-0">
+                        {activeTier.name}
+                      </span>
+                    ) : null}
                     {seatsPending && <Loader2 className="w-3 h-3 text-[#6900AA] animate-spin shrink-0" />}
                   </div>
                 )}
@@ -954,46 +1254,41 @@ export default function StadiumLayoutViewer({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {selectedBlock && (
-              <div className="hidden sm:flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md border border-slate-200">
-                <button
-                  onClick={() => setViewMode("canvas")}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                    viewMode === "canvas"
-                      ? "bg-[#6900AA] text-white"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Map
-                </button>
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-0.5 ${
-                    viewMode === "grid"
-                      ? "bg-[#6900AA] text-white"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <LayoutGrid className="w-3 h-3" />
-                  Grid
-                </button>
-              </div>
-            )}
+            {/* BMS Standard Legend */}
+            <div className="hidden md:flex items-center gap-2.5 text-[10px] font-bold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-white border-2 border-[#16A34A]" />
+                Available
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#6900AA]" />
+                Selected
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#E2E8F0] border border-[#CBD5E1]" />
+                Sold Out
+              </span>
+              {visualWalkways.rowWalkways.length > 0 && (
+                <span className="flex items-center gap-1 text-purple-700">
+                  <span className="w-3 h-0.5 border-b border-dashed border-purple-500" />
+                  Walkway
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Row letters — single slim scroll strip */}
-        {selectedBlock && viewMode === "canvas" && availableRows.length > 0 && (
+        {selectedBlock && availableRows.length > 0 && (
           <div className="flex items-center gap-1.5 px-2.5 sm:px-3 pb-1.5 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
             <span className="text-[11px] font-bold text-[#6900AA] shrink-0">Row</span>
             <button
               type="button"
               onClick={() => zoomToRow(null)}
-              className={`h-7 px-2.5 rounded-md text-[11px] font-bold transition-all border shrink-0 ${
-                selectedRow === null
-                  ? "bg-[#6900AA] text-white border-[#6900AA]"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#6900AA]/40"
-              }`}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-bold transition-all border shrink-0 ${selectedRow === null
+                ? "bg-[#6900AA] text-white border-[#6900AA]"
+                : "bg-white text-slate-600 border-slate-200 hover:border-[#6900AA]/40"
+                }`}
             >
               All
             </button>
@@ -1004,11 +1299,10 @@ export default function StadiumLayoutViewer({
                   key={r}
                   type="button"
                   onClick={() => zoomToRow(isSelected ? null : r)}
-                  className={`h-7 min-w-7 px-1.5 rounded-md flex items-center justify-center text-[12px] font-extrabold transition-all border shrink-0 ${
-                    isSelected
-                      ? "bg-[#6900AA] text-white border-[#6900AA]"
-                      : "bg-white text-slate-700 border-slate-200 hover:border-[#6900AA]/50 hover:text-[#6900AA]"
-                  }`}
+                  className={`h-7 min-w-7 px-1.5 rounded-md flex items-center justify-center text-[12px] font-extrabold transition-all border shrink-0 ${isSelected
+                    ? "bg-[#6900AA] text-white border-[#6900AA]"
+                    : "bg-white text-slate-700 border-slate-200 hover:border-[#6900AA]/50 hover:text-[#6900AA]"
+                    }`}
                   title={`Focus row ${r}`}
                 >
                   {r}
@@ -1022,11 +1316,10 @@ export default function StadiumLayoutViewer({
           <div className="flex items-center gap-1 px-2.5 sm:px-3 pb-1.5 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
             <button
               onClick={() => setActiveTierId(null)}
-              className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all border ${
-                activeTierId === null
-                  ? "bg-[#6900AA] text-white border-[#6900AA]"
-                  : "bg-white text-slate-600 border-slate-200"
-              }`}
+              className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all border ${activeTierId === null
+                ? "bg-[#6900AA] text-white border-[#6900AA]"
+                : "bg-white text-slate-600 border-slate-200"
+                }`}
             >
               All tiers
             </button>
@@ -1036,11 +1329,10 @@ export default function StadiumLayoutViewer({
                 <button
                   key={t.tier_id}
                   onClick={() => setActiveTierId(t.tier_id)}
-                  className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 border ${
-                    activeTierId === t.tier_id
-                      ? "bg-[#6900AA] text-white border-[#6900AA]"
-                      : "bg-white text-slate-600 border-slate-200 hover:text-slate-900"
-                  }`}
+                  className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 border ${activeTierId === t.tier_id
+                    ? "bg-[#6900AA] text-white border-[#6900AA]"
+                    : "bg-white text-slate-600 border-slate-200 hover:text-slate-900"
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tierColor }} />
                   {t.name}
@@ -1054,61 +1346,87 @@ export default function StadiumLayoutViewer({
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Stands list — vertical column on the left */}
         {!selectedBlockId && data.blocks.length > 0 && (
-          <aside className="w-[14.5rem] sm:w-[17rem] shrink-0 border-r border-slate-200 bg-white overflow-y-auto overflow-x-hidden z-10">
-            <div className="flex flex-col gap-1.5 p-2 sm:p-2.5">
-              <button
-                type="button"
-                onClick={() => setSelectedCategoryFilter(null)}
-                className={`w-full px-3 py-2 rounded-full text-[0.875rem] sm:text-[0.9375rem] font-semibold border transition-all text-center ${
-                  selectedCategoryFilter === null
-                    ? "bg-[#6900AA] text-white border-[#6900AA] shadow-sm"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-[#6900AA]/40 hover:text-slate-900"
+          <div className="flex items-center gap-1.5 px-2.5 sm:px-3 pb-2 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setSelectedCategoryFilter(null)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-all whitespace-nowrap ${selectedCategoryFilter === null
+                ? "bg-[#6900AA] text-white border-[#6900AA] shadow-sm"
+                : "bg-white text-slate-600 border-slate-200 hover:border-[#6900AA]/40 hover:text-slate-900"
                 }`}
-              >
-                All stands
-              </button>
-              {data.blocks.map((block) => {
-                const isSoldOut = block.available === 0 && block.total > 0;
-                const minPrice = getBlockMinPrice(block);
-                const isActive =
-                  selectedCategoryFilter != null &&
-                  block.tiers.some((t) => t.ticket_type_id === selectedCategoryFilter);
-                return (
-                  <button
-                    key={block.block_id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategoryFilter(block.tiers[0]?.ticket_type_id ?? null);
-                      if (!isSoldOut) handleBlockClick(block);
-                    }}
-                    disabled={isSoldOut}
-                    title={isSoldOut ? `${block.name} — Sold Out` : `Open ${block.name}`}
-                    className={`w-full px-2.5 py-2 rounded-xl border transition-all text-left ${
-                      isSoldOut
-                        ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-                        : isActive
-                        ? "bg-[#F7E9FF] border-[#6900AA]/40 text-slate-900"
-                        : "bg-white border-slate-200 text-slate-700 hover:border-[#6900AA]/40"
+            >
+              All stands
+            </button>
+            {data.blocks.map((block) => {
+              const isSoldOut = block.available === 0 && block.total > 0;
+              const minPrice = getBlockMinPrice(block);
+              const isActive = selectedCategoryFilter != null && block.tiers.some((t) => t.ticket_type_id === selectedCategoryFilter);
+              return (
+                <button
+                  key={block.block_id}
+                  onClick={() => {
+                    const matchingTier = selectedCategoryFilter
+                      ? block.tiers.find((t) => t.ticket_type_id === selectedCategoryFilter)
+                      : null;
+                    setSelectedCategoryFilter(block.ticket_type_id ?? block.tiers[0]?.ticket_type_id ?? null);
+                    if (!isSoldOut) handleBlockClick(block, matchingTier?.tier_id);
+                  }}
+                  disabled={isSoldOut}
+                  title={isSoldOut ? `${block.name} — Sold Out` : `Open ${block.name}`}
+                  className={`shrink-0 px-3 py-1.5 rounded-xl border transition-all text-left whitespace-nowrap ${isSoldOut
+                    ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
+                    : isActive
+                      ? "bg-[#F7E9FF] border-[#6900AA]/40 text-slate-900"
+                      : "bg-white border-slate-200 text-slate-700 hover:border-[#6900AA]/40"
                     }`}
-                  >
-                    <span className="block text-[0.8125rem] sm:text-[0.875rem] font-semibold text-gray-800 leading-tight line-clamp-2">
-                      {block.name}
-                    </span>
-                    <span className="block text-[0.75rem] sm:text-[0.8125rem] text-[#6900AA] font-semibold leading-tight mt-0.5">
-                      {standPriceAndLeftLabel(block, minPrice)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
+                >
+                  <span className="block text-[12px] font-extrabold leading-tight truncate max-w-[160px]">
+                    {block.stand_type === "standing" ? `🧍 ${block.name}` : block.name}
+                  </span>
+                  <span className="block text-[11px] text-[#6900AA] font-semibold leading-tight mt-0.5">
+                    {isSoldOut ? "Sold out" : minPrice !== null ? `From ETB ${minPrice.toLocaleString()}` : `${block.available} ${block.stand_type === "standing" ? "passes" : "left"}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         )}
 
-        {/* ── Interactive Konva Canvas (Zoomable Pitch + Stands + Seats) ── */}
-        <div
-          ref={containerRef}
-          className="flex-1 min-h-0 w-full bg-[#EEF2F7] relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
-        >
+        {selectedBlock && selectedBlock.tiers.length > 1 && !showTierPicker && (
+          <div className="flex items-center gap-1 px-2.5 sm:px-3 pb-1.5 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setActiveTierId(null)}
+              className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all border ${activeTierId === null
+                ? "bg-[#6900AA] text-white border-[#6900AA]"
+                : "bg-white text-slate-600 border-slate-200"
+                }`}
+            >
+              All tiers
+            </button>
+            {selectedBlock.tiers.map((t, tIdx) => {
+              const tierColor = t.color || (tIdx === 0 ? "#f59e0b" : "#10b981");
+              return (
+                <button
+                  key={t.tier_id}
+                  onClick={() => setActiveTierId(t.tier_id)}
+                  className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 border ${activeTierId === t.tier_id
+                    ? "bg-[#6900AA] text-white border-[#6900AA]"
+                    : "bg-white text-slate-600 border-slate-200 hover:text-slate-900"
+                    }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tierColor }} />
+                  {t.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Interactive Konva Canvas (Zoomable Pitch + Stands + Seats) ── */}
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 w-full bg-[#EEF2F7] relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
+      >
         <Stage
           ref={stageRef}
           width={containerSize.width}
@@ -1156,12 +1474,12 @@ export default function StadiumLayoutViewer({
                   ((data as any)?.ground?.sport_type === "cricket"
                     ? "#052e16"
                     : (data as any)?.ground?.sport_type === "basketball"
-                    ? "#0f172a"
-                    : (data as any)?.ground?.sport_type === "tennis"
-                    ? "#0c4a6e"
-                    : (data as any)?.ground?.sport_type === "concert"
-                    ? "#030712"
-                    : "#7f1d1d")
+                      ? "#0f172a"
+                      : (data as any)?.ground?.sport_type === "tennis"
+                        ? "#0c4a6e"
+                        : (data as any)?.ground?.sport_type === "concert"
+                          ? "#030712"
+                          : "#7f1d1d")
                 }
                 stroke="rgba(255,255,255,0.15)"
                 strokeWidth={1.5}
@@ -1576,6 +1894,7 @@ export default function StadiumLayoutViewer({
               const isHovered = hoveredBlockId === block.block_id;
               const isSoldOut = block.available === 0 && block.total > 0;
               const minPrice = getBlockMinPrice(block);
+              const isStanding = block.stand_type === "standing";
 
               const cx = block.x + block.width / 2;
               const cy = block.y + block.height / 2;
@@ -1583,6 +1902,7 @@ export default function StadiumLayoutViewer({
               // If a category filter is applied, dim non-matching blocks
               const isCategoryMatch =
                 !selectedCategoryFilter ||
+                (isStanding && block.ticket_type_id === selectedCategoryFilter) ||
                 block.tiers.some((t) => t.ticket_type_id === selectedCategoryFilter);
 
               if (block.shape === "arc") {
@@ -1607,8 +1927,8 @@ export default function StadiumLayoutViewer({
                       if (!isSoldOut) setHoveredBlockId(block.block_id);
                     }}
                     onMouseLeave={() => setHoveredBlockId(null)}
-                    onClick={() => handleBlockClick(block)}
-                    onTap={() => handleBlockClick(block)}
+                    onClick={() => handleBlockClick(block, isSelected ? activeTierId || undefined : undefined)}
+                    onTap={() => handleBlockClick(block, isSelected ? activeTierId || undefined : undefined)}
                   >
                     {block.tiers && block.tiers.length > 1 ? (
                       <>
@@ -1625,7 +1945,21 @@ export default function StadiumLayoutViewer({
                           const tierPrice = getTierPrice(tier);
 
                           return (
-                            <Group key={tier.tier_id || `arc-tier-${tIdx}`}>
+                            <Group
+                              key={tier.tier_id || `arc-tier-${tIdx}`}
+                              onClick={(e) => {
+                                e.cancelBubble = true;
+                                if (!isTierSoldOut) {
+                                  handleBlockClick(block, tier.tier_id);
+                                }
+                              }}
+                              onTap={(e) => {
+                                e.cancelBubble = true;
+                                if (!isTierSoldOut) {
+                                  handleBlockClick(block, tier.tier_id);
+                                }
+                              }}
+                            >
                               <Arc
                                 x={sCenterX}
                                 y={sCenterY}
@@ -1635,39 +1969,37 @@ export default function StadiumLayoutViewer({
                                 rotation={startA}
                                 fill={
                                   isSelected
-                                    ? isTierSoldOut
-                                      ? "#E2E8F0"
-                                      : "#F3E8FF"
+                                    ? activeTierId === tier.tier_id
+                                      ? "#FAF5FF"
+                                      : "#F1F5F9"
                                     : isTierSoldOut
-                                    ? "#94A3B8"
-                                    : tierColor
+                                      ? "#94A3B8"
+                                      : tierColor
                                 }
                                 opacity={
                                   isSelected
-                                    ? activeTierId
-                                      ? activeTierId === tier.tier_id
-                                        ? 0.92
-                                        : 0.55
-                                      : 0.88
+                                    ? activeTierId === tier.tier_id
+                                      ? 0.96
+                                      : 0.35
                                     : 0.95
                                 }
                                 stroke={
                                   isSelected
                                     ? activeTierId === tier.tier_id
                                       ? "#6900AA"
-                                      : "#C4B5FD"
+                                      : "#CBD5E1"
                                     : isHovered
-                                    ? "#6900AA"
-                                    : "rgba(15,23,42,0.18)"
+                                      ? "#6900AA"
+                                      : "rgba(15,23,42,0.18)"
                                 }
                                 strokeWidth={
                                   isSelected
                                     ? activeTierId === tier.tier_id
-                                      ? 3.5
-                                      : 1.5
+                                      ? 3
+                                      : 1
                                     : isHovered
-                                    ? 2.5
-                                    : 1.25
+                                      ? 2.5
+                                      : 1.25
                                 }
                                 shadowColor="#0f172a"
                                 shadowBlur={isHovered || isSelected ? 10 : 4}
@@ -1776,18 +2108,18 @@ export default function StadiumLayoutViewer({
                                 ? "#E2E8F0"
                                 : "#F3E8FF"
                               : isSoldOut
-                              ? "#94A3B8"
-                              : block.color || "#2563eb"
+                                ? "#94A3B8"
+                                : block.color || "#2563eb"
                           }
                           opacity={isSelected ? 0.9 : 0.95}
                           stroke={
                             isSelected
                               ? "#6900AA"
                               : isHovered
-                              ? "#6900AA"
-                              : isSoldOut
-                              ? "#94A3B8"
-                              : "rgba(15,23,42,0.18)"
+                                ? "#6900AA"
+                                : isSoldOut
+                                  ? "#94A3B8"
+                                  : "rgba(15,23,42,0.18)"
                           }
                           strokeWidth={isSelected ? 4 : isHovered ? 3 : 1.5}
                           shadowColor="#0f172a"
@@ -1813,7 +2145,7 @@ export default function StadiumLayoutViewer({
                               shadowOpacity={0.16}
                             />
                             <Text
-                              text={block.name.toUpperCase()}
+                              text={isStanding ? `🧍 ${block.name.toUpperCase()}` : block.name.toUpperCase()}
                               x={-80}
                               y={-12}
                               width={160}
@@ -1874,8 +2206,8 @@ export default function StadiumLayoutViewer({
                     if (!isSoldOut) setHoveredBlockId(block.block_id);
                   }}
                   onMouseLeave={() => setHoveredBlockId(null)}
-                  onClick={() => handleBlockClick(block)}
-                  onTap={() => handleBlockClick(block)}
+                  onClick={() => handleBlockClick(block, isSelected ? activeTierId || undefined : undefined)}
+                  onTap={() => handleBlockClick(block, isSelected ? activeTierId || undefined : undefined)}
                 >
                   {/* Stand Shadow & 3D bevel */}
                   <Rect
@@ -1901,10 +2233,10 @@ export default function StadiumLayoutViewer({
                         isSelected
                           ? "#f59e0b"
                           : isHovered
-                          ? "#ffffff"
-                          : isSoldOut
-                          ? "#475569"
-                          : "rgba(255,255,255,0.25)"
+                            ? "#ffffff"
+                            : isSoldOut
+                              ? "#475569"
+                              : "rgba(255,255,255,0.25)"
                       }
                       strokeWidth={isSelected ? 5 : isHovered ? 3.5 : 1.5}
                       shadowColor={isHovered ? "#ffffff" : "#000000"}
@@ -1926,10 +2258,10 @@ export default function StadiumLayoutViewer({
                           isSelected
                             ? "#6900AA"
                             : isHovered
-                            ? "#6900AA"
-                            : isSoldOut
-                            ? "#94A3B8"
-                            : "rgba(15,23,42,0.18)"
+                              ? "#6900AA"
+                              : isSoldOut
+                                ? "#94A3B8"
+                                : "rgba(15,23,42,0.18)"
                         }
                         strokeWidth={isSelected ? 4.5 : isHovered ? 3 : 1.5}
                         cornerRadius={14}
@@ -1939,11 +2271,11 @@ export default function StadiumLayoutViewer({
                         perfectDrawEnabled={false}
                       />
 
-                      {/* Render each tier as its own slice */}
                       {block.tiers.map((tier, tIdx) => {
                         const numTiers = block.tiers.length;
-                        const tierH = block.height / numTiers;
-                        const tierY = tIdx * tierH;
+                        const baseTierH = block.height / numTiers;
+                        const tierY = tIdx * baseTierH;
+                        const tierH = baseTierH;
                         const tierColor = tier.color || (tIdx === 0 ? "#f59e0b" : "#10b981");
                         const isTierSoldOut = tier.available === 0 && tier.total > 0;
                         const isFirst = tIdx === 0;
@@ -1951,7 +2283,21 @@ export default function StadiumLayoutViewer({
                         const assignedPrice = getTierPrice(tier);
 
                         return (
-                          <Group key={tier.tier_id || `tier-slice-${tIdx}`}>
+                          <Group
+                            key={tier.tier_id || `tier-slice-${tIdx}`}
+                            onClick={(e) => {
+                              e.cancelBubble = true;
+                              if (!isTierSoldOut) {
+                                handleBlockClick(block, tier.tier_id);
+                              }
+                            }}
+                            onTap={(e) => {
+                              e.cancelBubble = true;
+                              if (!isTierSoldOut) {
+                                handleBlockClick(block, tier.tier_id);
+                              }
+                            }}
+                          >
                             <Rect
                               x={0}
                               y={tierY}
@@ -1959,30 +2305,34 @@ export default function StadiumLayoutViewer({
                               height={tierH}
                               fill={
                                 isSelected
-                                  ? isTierSoldOut
-                                    ? "#E2E8F0"
-                                    : "#F3E8FF"
+                                  ? activeTierId === tier.tier_id
+                                    ? "#FAF5FF"
+                                    : "#F1F5F9"
                                   : isTierSoldOut
-                                  ? "#94A3B8"
-                                  : tierColor
+                                    ? "#94A3B8"
+                                    : tierColor
                               }
                               opacity={
                                 isSelected
-                                  ? activeTierId
-                                    ? activeTierId === tier.tier_id
-                                      ? 0.95
-                                      : 0.55
-                                    : 0.9
+                                  ? activeTierId === tier.tier_id
+                                    ? 0.96
+                                    : 0.35
                                   : 0.95
                               }
+                              stroke={
+                                isSelected && activeTierId === tier.tier_id
+                                  ? "#6900AA"
+                                  : undefined
+                              }
+                              strokeWidth={isSelected && activeTierId === tier.tier_id ? 2 : 0}
                               cornerRadius={
                                 isFirst && isLast
                                   ? 14
                                   : isFirst
-                                  ? [14, 14, 0, 0]
-                                  : isLast
-                                  ? [0, 0, 14, 14]
-                                  : 0
+                                    ? [14, 14, 0, 0]
+                                    : isLast
+                                      ? [0, 0, 14, 14]
+                                      : 0
                               }
                               perfectDrawEnabled={false}
                             />
@@ -2084,31 +2434,31 @@ export default function StadiumLayoutViewer({
                               ? "#E2E8F0"
                               : "#F3E8FF"
                             : isSoldOut
-                            ? "#94A3B8"
-                            : block.color || "#2563eb"
+                              ? "#94A3B8"
+                              : block.color || "#2563eb"
                         }
                         opacity={isSelected ? 0.92 : 0.95}
                         stroke={
                           isSelected
                             ? "#6900AA"
                             : isHovered
-                            ? "#6900AA"
-                            : isSoldOut
-                            ? "#94A3B8"
-                            : "rgba(15,23,42,0.18)"
+                              ? "#6900AA"
+                              : isSoldOut
+                                ? "#94A3B8"
+                                : "rgba(15,23,42,0.18)"
                         }
                         strokeWidth={isSelected ? 4 : isHovered ? 3 : 1.5}
                         cornerRadius={
                           (block as any).shape === "pill"
                             ? Math.min(block.width, block.height) / 2
                             : (block as any).shape === "curved"
-                            ? [
+                              ? [
                                 Math.min(block.width, block.height) * 0.45,
                                 Math.min(block.width, block.height) * 0.45,
                                 12,
                                 12,
                               ]
-                            : 12
+                              : 12
                         }
                         shadowColor="#0f172a"
                         shadowBlur={isHovered || isSelected ? 10 : 4}
@@ -2120,7 +2470,7 @@ export default function StadiumLayoutViewer({
                       {!isSelected && (
                         <>
                           <Text
-                            text={block.name.toUpperCase()}
+                            text={isStanding ? `🧍 ${block.name.toUpperCase()}` : block.name.toUpperCase()}
                             x={0}
                             y={Math.max(6, block.height * 0.12)}
                             width={block.width}
@@ -2139,7 +2489,17 @@ export default function StadiumLayoutViewer({
 
                           {block.total > 0 && (
                             <Text
-                              text={standPriceAndLeftLabel(block, minPrice)}
+                              text={
+                                isSoldOut
+                                  ? "SOLD OUT"
+                                  : isStanding
+                                    ? minPrice !== null
+                                      ? `ETB ${minPrice.toLocaleString()} · ${block.available} passes`
+                                      : `${block.available} passes avail`
+                                    : minPrice !== null
+                                      ? `ETB ${minPrice.toLocaleString()} · ${block.available} seats`
+                                      : `${block.available} seats avail`
+                              }
                               x={0}
                               y={Math.max(28, block.height * 0.52)}
                               width={block.width}
@@ -2158,10 +2518,10 @@ export default function StadiumLayoutViewer({
                     </>
                   )}
 
-                  {/* Click to Zoom In Hint on Hover */}
+                  {/* Click to Zoom In / Pick Passes Hint on Hover */}
                   {isHovered && !selectedBlockId && !isSoldOut && (
                     <Text
-                      text="🔍 Click to Zoom In"
+                      text={isStanding ? "🧍 Click to Pick Passes" : "🔍 Click to Zoom In"}
                       x={0}
                       y={block.height - 20}
                       width={block.width}
@@ -2178,58 +2538,258 @@ export default function StadiumLayoutViewer({
             })}
           </Layer>
 
-          {/* 3. Interactive In-Canvas Seats Layer (BookMyShow Block Drill-down) */}
-          {selectedBlock && renderedSeats.length > 0 && viewMode === "canvas" && (
+          {/* 3. Interactive In-Canvas Seats Layer (Block/Tier Zoom Drill-down) */}
+          {selectedBlock && selectedBlock.stand_type !== "standing" && renderedSeats.length > 0 && (
             <Layer>
-              {/* Single active-row badge only — full alphabet is in the toolbar */}
-              {activeRowMarker && (
-                <Group x={activeRowMarker.x} y={activeRowMarker.y} listening={false}>
-                  <Circle
-                    radius={8}
-                    fill="#6900AA"
-                    stroke="#FFFFFF"
-                    strokeWidth={1.5}
-                    shadowColor="#6900AA"
-                    shadowBlur={8}
-                    shadowOpacity={0.35}
-                  />
-                  <Text
-                    text={activeRowMarker.label}
-                    x={-8}
-                    y={-8}
-                    width={16}
-                    height={16}
-                    align="center"
-                    verticalAlign="middle"
-                    fontSize={9}
-                    fontStyle="bold"
-                    fill="#FFFFFF"
-                    listening={false}
-                  />
+              {/* Row Walkways (horizontal pathways between rows) */}
+              {visualWalkways.rowWalkways.map((w) => (
+                <Group key={w.id} listening={false}>
+                  {w.pathPoints && (
+                    <Line
+                      points={w.pathPoints}
+                      stroke="#A855F7"
+                      strokeWidth={2}
+                      dash={[6, 4]}
+                      opacity={0.65}
+                      listening={false}
+                    />
+                  )}
+                  {w.arcProps && (
+                    <Arc
+                      x={w.arcProps.cx}
+                      y={w.arcProps.cy}
+                      innerRadius={w.arcProps.radius - 1}
+                      outerRadius={w.arcProps.radius + 1}
+                      angle={w.arcProps.endAngle - w.arcProps.startAngle}
+                      rotation={w.arcProps.startAngle}
+                      fill="#A855F7"
+                      opacity={0.65}
+                      listening={false}
+                    />
+                  )}
+                  {/* Subtle Walkway pill badge */}
+                  <Group x={w.centerPos.x} y={w.centerPos.y} listening={false}>
+                    <Rect
+                      x={-38}
+                      y={-7}
+                      width={76}
+                      height={14}
+                      cornerRadius={7}
+                      fill="#FAF5FF"
+                      stroke="#D8B4FE"
+                      strokeWidth={1}
+                      opacity={0.9}
+                    />
+                    <Text
+                      text="WALKWAY"
+                      x={-38}
+                      y={-5}
+                      width={76}
+                      align="center"
+                      fontSize={7.5}
+                      fontStyle="bold"
+                      fill="#7E22CE"
+                      listening={false}
+                    />
+                  </Group>
                 </Group>
-              )}
+              ))}
+
+              {/* In-Canvas Ground / Pitch Orientation Indicator */}
+              {(() => {
+                const sportType = (data as any)?.ground?.sport_type || "football";
+                let pitchText = "⚽ PITCH THIS WAY";
+                if (sportType === "cricket") pitchText = "🏏 PITCH THIS WAY";
+                else if (sportType === "concert") pitchText = "🎤 STAGE THIS WAY";
+                else if (sportType === "basketball") pitchText = "🏀 COURT THIS WAY";
+
+                if (selectedBlock.shape === "arc") {
+                  const sCX = selectedBlock.stadiumCenterX != null ? Number(selectedBlock.stadiumCenterX) : canvasWidth / 2;
+                  const sCY = selectedBlock.stadiumCenterY != null ? Number(selectedBlock.stadiumCenterY) : canvasHeight / 2;
+                  const innerR = Number(selectedBlock.innerRadius) || 260;
+                  const startA = Number(selectedBlock.startAngle) || 0;
+                  const sweepA = Number(selectedBlock.sweepAngle) || 45;
+                  const pitchIndicatorR = Math.max(20, innerR - 16);
+                  const midAngleRad = ((startA + sweepA / 2) * Math.PI) / 180;
+                  const labelX = sCX + pitchIndicatorR * Math.cos(midAngleRad);
+                  const labelY = sCY + pitchIndicatorR * Math.sin(midAngleRad);
+                  const rotDeg = startA + sweepA / 2 + 90;
+
+                  return (
+                    <Group listening={false}>
+                      <Arc
+                        x={sCX}
+                        y={sCY}
+                        innerRadius={pitchIndicatorR - 3}
+                        outerRadius={pitchIndicatorR + 3}
+                        angle={sweepA * 0.8}
+                        rotation={startA + sweepA * 0.1}
+                        fill="#10B981"
+                        opacity={0.18}
+                        stroke="#059669"
+                        strokeWidth={1}
+                        dash={[4, 4]}
+                      />
+                      <Group x={labelX} y={labelY} rotation={rotDeg}>
+                        <Rect
+                          x={-58}
+                          y={-8.5}
+                          width={116}
+                          height={17}
+                          cornerRadius={8.5}
+                          fill="#ECFDF5"
+                          stroke="#059669"
+                          strokeWidth={1.2}
+                          shadowColor="#0f172a"
+                          shadowBlur={4}
+                          shadowOpacity={0.15}
+                        />
+                        <Text
+                          text={pitchText}
+                          x={-58}
+                          y={-4.5}
+                          width={116}
+                          align="center"
+                          fontSize={8}
+                          fontStyle="bold"
+                          fill="#065F46"
+                        />
+                      </Group>
+                    </Group>
+                  );
+                } else {
+                  const bx = Number(selectedBlock.x) || 0;
+                  const by = Number(selectedBlock.y) || 0;
+                  const bw = Number(selectedBlock.width) || 120;
+                  const bh = Number(selectedBlock.height) || 80;
+                  const rotDeg = Number(selectedBlock.rotation) || 0;
+                  const rotRad = (rotDeg * Math.PI) / 180;
+                  const cx = bx + bw / 2;
+                  const cy = by + bh / 2;
+                  const topEdgeY = -bh / 2 - 14;
+                  const posX = cx - topEdgeY * Math.sin(rotRad);
+                  const posY = cy + topEdgeY * Math.cos(rotRad);
+
+                  return (
+                    <Group x={posX} y={posY} rotation={rotDeg} listening={false}>
+                      <Rect
+                        x={-58}
+                        y={-8.5}
+                        width={116}
+                        height={17}
+                        cornerRadius={8.5}
+                        fill="#ECFDF5"
+                        stroke="#059669"
+                        strokeWidth={1.2}
+                        shadowColor="#0f172a"
+                        shadowBlur={4}
+                        shadowOpacity={0.15}
+                      />
+                      <Text
+                        text={pitchText}
+                        x={-58}
+                        y={-4.5}
+                        width={116}
+                        align="center"
+                        fontSize={8}
+                        fontStyle="bold"
+                        fill="#065F46"
+                      />
+                    </Group>
+                  );
+                }
+              })()}
+
+              {/* Row letter badges along the side — clicking/tapping toggles row filter */}
+              {rowMarkers.map((m) => {
+                const isCurrentRow = selectedRow === m.label;
+                const markerR = isCurrentRow ? m.radius * 1.15 : m.radius;
+                return (
+                  <Group
+                    key={`row-marker-${m.label}`}
+                    x={m.x}
+                    y={m.y}
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      setSelectedRow((prev) => (prev === m.label ? null : m.label));
+                    }}
+                    onTap={(e) => {
+                      e.cancelBubble = true;
+                      setSelectedRow((prev) => (prev === m.label ? null : m.label));
+                    }}
+                    onMouseEnter={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container) container.style.cursor = "pointer";
+                    }}
+                    onMouseLeave={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container) container.style.cursor = "default";
+                    }}
+                  >
+                    <Circle
+                      radius={markerR}
+                      fill={isCurrentRow ? "#6900AA" : "#FFFFFF"}
+                      stroke={isCurrentRow ? "#FFFFFF" : "#6900AA"}
+                      strokeWidth={1.3}
+                      shadowColor="#0f172a"
+                      shadowBlur={isCurrentRow ? 6 : 3}
+                      shadowOpacity={0.25}
+                    />
+                    <Text
+                      text={m.label}
+                      x={-markerR}
+                      y={-markerR}
+                      width={markerR * 2}
+                      height={markerR * 2}
+                      align="center"
+                      verticalAlign="middle"
+                      fontSize={Math.max(6.5, markerR * 0.95)}
+                      fontStyle="bold"
+                      fill={isCurrentRow ? "#FFFFFF" : "#6900AA"}
+                      listening={false}
+                    />
+                  </Group>
+                );
+              })}
 
               {/* Individual Interactive Seats */}
               {renderedSeats.map((seat) => {
                 const isSelected = selectedSeats.some((s) => s.id === seat.id);
                 const isAvail = seat.status === "AVAILABLE";
                 const isHovered = hoveredSeat?.id === seat.id;
-                const isInSelectedRow = selectedRow !== null && seat.row_label === selectedRow;
+                const isInSelectedRow = selectedRow === null || seat.row_label === selectedRow;
 
-                let seatFill = "#22C55E"; // Available
-                if (!isAvail) seatFill = "#CBD5E1"; // Booked
-                if (isSelected) seatFill = "#6900AA"; // Selected brand
-                else if (isHovered) seatFill = "#7C3AED"; // Hover
+                let seatFill = "#FFFFFF"; // Available clean white
+                let strokeColor = "#16A34A"; // Crisp green border
+                let strokeW = 1.1;
+                let textColor = "#15803D"; // Crisp readable green number
 
-                const opacity = selectedRow === null || isInSelectedRow ? 1 : 0.28;
-                const seatR = isSelected || isHovered ? dynamicSeatRadius * 1.12 : dynamicSeatRadius;
+                if (!isAvail) {
+                  seatFill = "#E2E8F0"; // Booked soft slate
+                  strokeColor = "#CBD5E1";
+                  strokeW = 0.8;
+                  textColor = "#94A3B8";
+                } else if (isSelected) {
+                  seatFill = "#6900AA"; // Selected brand purple
+                  strokeColor = "#FFFFFF";
+                  strokeW = 1.5;
+                  textColor = "#FFFFFF";
+                } else if (isHovered) {
+                  seatFill = "#F3E8FF"; // Hover light purple
+                  strokeColor = "#6900AA";
+                  strokeW = 1.3;
+                  textColor = "#6900AA";
+                }
+
+                const opacity = isInSelectedRow ? 1 : 0.28;
+                const baseR = rowSeatRadii.get(seat.row_label) || dynamicSeatRadius;
+                const seatR = isSelected || isHovered ? baseR * 1.15 : baseR;
 
                 return (
                   <Group
                     key={seat.id}
                     x={seat.posX}
                     y={seat.posY}
-                    rotation={0}
                     opacity={opacity}
                     onClick={(e) => {
                       e.cancelBubble = true;
@@ -2252,35 +2812,27 @@ export default function StadiumLayoutViewer({
                   >
                     {isSelected && (
                       <Circle
-                        radius={seatR + 1.6}
+                        radius={seatR + 2.4}
                         stroke="#6900AA"
-                        strokeWidth={1.1}
+                        strokeWidth={1.8}
                         shadowColor="#6900AA"
-                        shadowBlur={5}
-                        shadowOpacity={0.35}
+                        shadowBlur={6}
+                        shadowOpacity={0.4}
                       />
                     )}
 
                     <Circle
                       radius={seatR}
                       fill={seatFill}
-                      stroke={
-                        isSelected
-                          ? "#FFFFFF"
-                          : isHovered
-                          ? "#FFFFFF"
-                          : !isAvail
-                          ? "#94A3B8"
-                          : "#16A34A"
-                      }
-                      strokeWidth={isSelected || isHovered ? 1.1 : 0.7}
+                      stroke={strokeColor}
+                      strokeWidth={isSelected || isHovered ? strokeW + 0.3 : strokeW}
                       shadowColor="#0f172a"
-                      shadowBlur={isSelected || isHovered ? 3 : 1}
-                      shadowOpacity={0.12}
+                      shadowBlur={isSelected || isHovered ? 4 : 1}
+                      shadowOpacity={0.15}
                       perfectDrawEnabled={false}
                     />
 
-                    {(activeZoomScale > 1.2 || isHovered || isSelected || selectedRow !== null) && (
+                    {(activeZoomScale > 1.8 || isHovered || isSelected) && (
                       <Text
                         text={seat.seat_label}
                         x={-seatR}
@@ -2290,15 +2842,15 @@ export default function StadiumLayoutViewer({
                         align="center"
                         verticalAlign="middle"
                         fontSize={Math.max(
-                          3,
+                          4.5,
                           seat.seat_label.length > 2
-                            ? seatR * 0.7
+                            ? seatR * 0.72
                             : seat.seat_label.length > 1
-                            ? seatR * 0.85
-                            : seatR * 1.0
+                              ? seatR * 0.88
+                              : seatR * 1.05
                         )}
                         fontStyle="bold"
-                        fill={!isAvail ? "#64748B" : "#FFFFFF"}
+                        fill={textColor}
                         listening={false}
                         perfectDrawEnabled={false}
                       />
@@ -2309,6 +2861,248 @@ export default function StadiumLayoutViewer({
             </Layer>
           )}
         </Stage>
+
+        {/* ── Standing Pass Selector Overlay (shown when a standing block is clicked) ── */}
+        {selectedBlock && selectedBlock.stand_type === "standing" && (
+          <div
+            className="absolute inset-0 z-30 flex flex-col bg-[#F8FAFC]/97 backdrop-blur-md"
+            style={{ animation: "fadeIn 0.22s ease-out forwards" }}
+          >
+            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0 shadow-sm">
+              <button
+                onClick={handleBackToStadium}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#6900AA] hover:bg-[#7a00c6] text-white text-xs font-bold transition-all active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Stadium Map</span>
+              </button>
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-extrabold text-slate-900">{selectedBlock.name}</span>
+                <span className="text-[11px] text-purple-700 font-semibold mt-0.5">General Admission · Standing Area</span>
+              </div>
+              <div className="w-24" />
+            </div>
+
+            <div className="flex-1 overflow-auto flex items-center justify-center p-4 sm:p-8">
+              <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-white shadow-md"
+                    style={{ backgroundColor: selectedBlock.color || "#6900AA" }}
+                  >
+                    🧍
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-extrabold text-slate-900 truncate">
+                        {selectedBlock.name}
+                      </h3>
+                      <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full border border-purple-200">
+                        STANDING PASS
+                      </span>
+                    </div>
+                    {(() => {
+                      const matchedTicketId = selectedBlock.ticket_type_id || selectedBlock.tiers[0]?.ticket_type_id || "";
+                      const tt = ticketTypes.find((t) => t.id === matchedTicketId);
+                      const unitPrice = tt ? Number(tt.price) : 0;
+                      return (
+                        <p className="text-sm font-extrabold text-emerald-600 mt-0.5">
+                          ETB {unitPrice.toLocaleString()}{" "}
+                          <span className="text-xs text-slate-400 font-normal">/ pass</span>
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Availability</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedBlock.available > 0
+                        ? `${selectedBlock.available.toLocaleString()} passes left`
+                        : "Sold out"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Seating</span>
+                    <span className="font-bold text-purple-700">General Admission (No reserved seats)</span>
+                  </div>
+                </div>
+
+                {/* Quantity Selector */}
+                {(() => {
+                  const existingForBlock = selectedSeats.filter(
+                    (s) =>
+                      s.section_name === selectedBlock.name ||
+                      s.id.startsWith(`standing-${selectedBlock.block_id}-`)
+                  );
+                  const existingForBlockCount = existingForBlock.length;
+
+                  return (
+                    <>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                            Select Number of Passes
+                          </label>
+                          {existingForBlockCount > 0 && (
+                            <span className="text-[11px] font-bold text-[#6900AA] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                              {existingForBlockCount} currently selected
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between gap-4 p-3 bg-slate-100 rounded-2xl border border-slate-200">
+                          <button
+                            type="button"
+                            disabled={standingQty <= 0}
+                            onClick={() => setStandingQty((q) => Math.max(0, q - 1))}
+                            className="w-10 h-10 rounded-xl bg-white border border-slate-300 hover:border-slate-400 text-slate-800 font-extrabold text-lg flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm cursor-pointer"
+                            title={standingQty === 1 ? "Reduce to 0 to clear" : "Decrease passes"}
+                          >
+                            −
+                          </button>
+                          <div className="text-center">
+                            <span
+                              className={`text-xl font-extrabold font-mono ${standingQty === 0 ? "text-slate-400" : "text-slate-900"
+                                }`}
+                            >
+                              {standingQty}
+                            </span>
+                            <span className="text-[11px] text-slate-500 block">
+                              {standingQty === 0 ? "passes (clear)" : `pass${standingQty > 1 ? "es" : ""}`}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={
+                              standingQty >=
+                              Math.min(
+                                maxSelectable < Number.MAX_SAFE_INTEGER ? maxSelectable : 10,
+                                selectedBlock.available || 1
+                              )
+                            }
+                            onClick={() =>
+                              setStandingQty((q) =>
+                                Math.min(
+                                  maxSelectable < Number.MAX_SAFE_INTEGER ? maxSelectable : 10,
+                                  selectedBlock.available || 1,
+                                  q + 1
+                                )
+                              )
+                            }
+                            className="w-10 h-10 rounded-xl bg-white border border-slate-300 hover:border-slate-400 text-slate-800 font-extrabold text-lg flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons: Confirm or Clear */}
+                      <div className="space-y-2.5 pt-1">
+                        {standingQty === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = selectedSeats.filter(
+                                (s) =>
+                                  !(
+                                    s.section_name === selectedBlock.name ||
+                                    s.id.startsWith(`standing-${selectedBlock.block_id}-`)
+                                  )
+                              );
+                              setSelectedSeats(remaining);
+                              onSeatsSelected(remaining);
+                              toast.info(`Cleared standing passes for ${selectedBlock.name}`);
+                              handleBackToStadium();
+                            }}
+                            className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+                          >
+                            <span>Clear All Passes for {selectedBlock.name}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={selectedBlock.available === 0}
+                            onClick={() => {
+                              const matchedTicketId =
+                                selectedBlock.ticket_type_id || selectedBlock.tiers[0]?.ticket_type_id || "";
+                              const tt = ticketTypes.find((t) => t.id === matchedTicketId);
+                              const unitPrice = tt ? Number(tt.price) : 0;
+
+                              const otherSeats = selectedSeats.filter(
+                                (s) =>
+                                  !(
+                                    s.section_name === selectedBlock.name ||
+                                    s.id.startsWith(`standing-${selectedBlock.block_id}-`)
+                                  )
+                              );
+
+                              const virtualSeats: TierSeat[] = Array.from(
+                                { length: standingQty },
+                                (_, idx) => ({
+                                  id: `standing-${selectedBlock.block_id}-${Date.now()}-${idx + 1}`,
+                                  row_label: "Standing",
+                                  seat_label: `Pass #${idx + 1}`,
+                                  coordinate_x: selectedBlock.x + selectedBlock.width / 2,
+                                  coordinate_y: selectedBlock.y + selectedBlock.height / 2,
+                                  status: "AVAILABLE",
+                                  ticket_type_id: matchedTicketId,
+                                  section_name: selectedBlock.name,
+                                  price: unitPrice,
+                                })
+                              );
+
+                              const combined = [...otherSeats, ...virtualSeats];
+                              setSelectedSeats(combined);
+                              onSeatsSelected(combined);
+                              toast.success(
+                                `${standingQty} Standing pass${standingQty > 1 ? "es" : ""} selected for ${selectedBlock.name}!`
+                              );
+                              handleBackToStadium();
+                            }}
+                            className="w-full py-3 px-4 rounded-xl bg-[#6900AA] hover:bg-[#57008E] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>Confirm {standingQty} Standing Pass{standingQty > 1 ? "es" : ""}</span>
+                          </button>
+                        )}
+
+                        {/* Dedicated 1-Click Clear Button if tickets currently selected */}
+                        {(existingForBlockCount > 0 || selectedSeats.length > 0) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = selectedSeats.filter(
+                                (s) =>
+                                  !(
+                                    s.section_name === selectedBlock.name ||
+                                    s.id.startsWith(`standing-${selectedBlock.block_id}-`)
+                                  )
+                              );
+                              setSelectedSeats(remaining);
+                              onSeatsSelected(remaining);
+                              setStandingQty(0);
+                              toast.info(
+                                existingForBlockCount > 0
+                                  ? `Cleared ${existingForBlockCount} passes for ${selectedBlock.name}`
+                                  : "Cleared selected passes"
+                              );
+                              handleBackToStadium();
+                            }}
+                            className="w-full py-2.5 px-3 rounded-xl border border-rose-200 bg-rose-50/90 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
+                          >
+                            <span>✕ Clear All Selected Passes ({existingForBlockCount > 0 ? existingForBlockCount : selectedSeats.length})</span>
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Tier Picker Overlay (Level 2: shown when a multi-tier block is clicked) ── */}
         {selectedBlock && showTierPicker && (
@@ -2345,22 +3139,21 @@ export default function StadiumLayoutViewer({
                     const badgeColor =
                       isSoldOut ? "text-red-600 bg-red-50 border-red-200"
                         : pct < 0.15 ? "text-orange-600 bg-orange-50 border-orange-200"
-                        : pct < 0.4 ? "text-amber-700 bg-amber-50 border-amber-200"
-                        : "text-emerald-700 bg-emerald-50 border-emerald-200";
+                          : pct < 0.4 ? "text-amber-700 bg-amber-50 border-amber-200"
+                            : "text-emerald-700 bg-emerald-50 border-emerald-200";
                     const badgeLabel = isSoldOut ? "Sold Out"
                       : pct < 0.15 ? "Almost Full"
-                      : pct < 0.4 ? "Filling Fast"
-                      : `${tier.available} Available`;
+                        : pct < 0.4 ? "Filling Fast"
+                          : `${tier.available} Available`;
                     return (
                       <button
                         key={tier.tier_id}
                         disabled={isSoldOut}
                         onClick={() => handleTierSelect(tier.tier_id)}
-                        className={`group relative flex flex-col gap-3 text-left rounded-2xl border p-4 transition-all duration-200 ${
-                          isSoldOut
-                            ? "border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed"
-                            : "border-slate-200 bg-white hover:border-[#6900AA] hover:shadow-lg hover:shadow-[#6900AA]/10 active:scale-[0.98] cursor-pointer"
-                        }`}
+                        className={`group relative flex flex-col gap-3 text-left rounded-2xl border p-4 transition-all duration-200 ${isSoldOut
+                          ? "border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed"
+                          : "border-slate-200 bg-white hover:border-[#6900AA] hover:shadow-lg hover:shadow-[#6900AA]/10 active:scale-[0.98] cursor-pointer"
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <div
@@ -2409,7 +3202,6 @@ export default function StadiumLayoutViewer({
           </div>
         )}
 
-        {selectedBlock && viewMode === "grid" && renderBlockSeatPanel()}
 
         {hoveredSeat && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-white text-slate-800 px-4 py-2 rounded-xl border border-slate-200 shadow-xl flex items-center gap-3 pointer-events-none">
@@ -2433,8 +3225,68 @@ export default function StadiumLayoutViewer({
           </div>
         )}
 
+        {/* Floating Zoom Controls (+ / − / ⟲) */}
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex flex-col gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 shadow-xl">
+          <button
+            type="button"
+            onClick={() => handleZoomChange(0.35)}
+            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-[#F7E9FF] hover:text-[#6900AA] text-slate-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer font-extrabold shadow-xs"
+            title="Zoom In (+)"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleZoomChange(-0.35)}
+            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-[#F7E9FF] hover:text-[#6900AA] text-slate-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer font-extrabold shadow-xs"
+            title="Zoom Out (−)"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleResetZoom}
+            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-[#F7E9FF] hover:text-[#6900AA] text-slate-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-xs"
+            title={selectedBlock ? "Fit Block / Tier (⟲)" : "Fit Stadium (⟲)"}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Row selection pills floating at top-left when zoomed into a seated block */}
+        {selectedBlock && selectedBlock.stand_type !== "standing" && availableRows.length > 1 && (
+          <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 max-w-[calc(100%-80px)] overflow-x-auto scrollbar-none flex items-center gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 shadow-lg">
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-1.5 shrink-0">
+              Row:
+            </span>
+            <button
+              type="button"
+              onClick={() => zoomToRow(null)}
+              className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer ${selectedRow === null
+                ? "bg-[#6900AA] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+            >
+              All
+            </button>
+            {availableRows.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => zoomToRow(r === selectedRow ? null : r)}
+                className={`w-6 h-6 rounded-lg text-[11px] font-bold transition-all shrink-0 flex items-center justify-center cursor-pointer ${selectedRow === r
+                  ? "bg-[#6900AA] text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Seats fetch loading — map view until seat data arrives */}
-        {seatsPending && !showTierPicker && viewMode === "canvas" && (
+        {seatsPending && !showTierPicker && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#EEF2F7]/90 backdrop-blur-[3px] pointer-events-none">
             <Loader2 className="w-10 h-10 text-[#6900AA] animate-spin" />
             <p className="text-sm font-semibold text-gray-800">Loading seats…</p>
@@ -2475,7 +3327,6 @@ export default function StadiumLayoutViewer({
           >
             <RotateCcw className="w-5 h-5" />
           </button>
-        </div>
         </div>
       </div>
 

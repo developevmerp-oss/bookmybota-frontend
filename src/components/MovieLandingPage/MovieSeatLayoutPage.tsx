@@ -752,8 +752,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }, [findGridSeatContext]);
 
   const applyMovieSeats = (next: MovieBookingSeatPayload[]) => {
-    setSelectedSeats(next.slice(0, qty));
-    resetSeatPromos();
+    const sliced = next.slice(0, qty);
+    queueMicrotask(() => {
+      setSelectedSeats(sliced);
+      resetSeatPromos();
+    });
   };
 
   const handleSeatClick = (seat: GridSeat) => {

@@ -464,6 +464,11 @@ export default function VenueLayoutRequestsPage() {
                               const blocks = Array.isArray(rawCfg?.blocks) ? rawCfg.blocks : [];
                               const computedCap = blocks.reduce((acc: number, b: any) => {
                                 if (b.capacity && Number(b.capacity) > 0) return acc + Number(b.capacity);
+                                const isDirect = b.seating_type === 'direct' || !Array.isArray(b.tiers) || b.tiers.length <= 1;
+                                if (isDirect && b.row_start && b.row_end) {
+                                  const rCount = Math.max(1, (b.row_end || "A").charCodeAt(0) - (b.row_start || "A").charCodeAt(0) + 1);
+                                  return acc + rCount * (Number(b.seats_per_row) || 20);
+                                }
                                 if (Array.isArray(b.tiers)) {
                                   return (
                                     acc +
@@ -719,6 +724,11 @@ export default function VenueLayoutRequestsPage() {
                     const blocks = Array.isArray(rawCfg?.blocks) ? rawCfg.blocks : [];
                     const computedCap = blocks.reduce((acc: number, b: any) => {
                       if (b.capacity && Number(b.capacity) > 0) return acc + Number(b.capacity);
+                      const isDirect = b.seating_type === 'direct' || !Array.isArray(b.tiers) || b.tiers.length <= 1;
+                      if (isDirect && b.row_start && b.row_end) {
+                        const rCount = Math.max(1, (b.row_end || "A").charCodeAt(0) - (b.row_start || "A").charCodeAt(0) + 1);
+                        return acc + rCount * (Number(b.seats_per_row) || 20);
+                      }
                       if (Array.isArray(b.tiers)) {
                         return (
                           acc +

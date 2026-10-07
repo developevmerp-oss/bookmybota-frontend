@@ -71,6 +71,9 @@ export interface StadiumTierDef {
   row_end: string;
   seats_per_row: number;
   price?: number;
+  row_seat_overrides?: Record<string, number>;
+  row_gaps?: string[];
+  excluded_seats?: string[];
 }
 
 export interface StadiumBlockDef {
@@ -93,6 +96,17 @@ export interface StadiumBlockDef {
   sweepAngle?: number;
   stadiumCenterX?: number;
   stadiumCenterY?: number;
+  // Admission Type: "seated" (Numbered seats) vs "standing" (General admission / Standing pass / VIP Fan Pit)
+  stand_type?: "seated" | "standing";
+  // Dynamic Structure: "direct" (Single-Level Direct Seats) vs "tiered" (Multi-Tier Stand)
+  seating_type?: "direct" | "tiered";
+  ticket_type_id?: string;
+  row_start?: string;
+  row_end?: string;
+  seats_per_row?: number;
+  row_seat_overrides?: Record<string, number>;
+  row_gaps?: string[];
+  excluded_seats?: string[];
   tiers: StadiumTierDef[];
 }
 
@@ -286,6 +300,496 @@ export function autoFitRowsAndSeats(targetSeats: number): {
   };
 }
 
+export function computeTierSeatCount(tier: {
+  row_start?: string;
+  row_end?: string;
+  seats_per_row?: number;
+  row_seat_overrides?: Record<string, number>;
+  excluded_seats?: string[];
+}): number {
+  const start = (tier.row_start || "A").toUpperCase().charCodeAt(0);
+  const end = (tier.row_end || "A").toUpperCase().charCodeAt(0);
+  if (isNaN(start) || isNaN(end) || end < start) return 0;
+  const baseSpr = Math.max(1, tier.seats_per_row || 20);
+  const overrides = tier.row_seat_overrides || {};
+  const excluded = new Set(tier.excluded_seats || []);
+
+  let total = 0;
+  for (let c = start; c <= end; c++) {
+    const rowLetter = String.fromCharCode(c);
+    const rowSeats = overrides[rowLetter] != null ? Math.max(1, overrides[rowLetter]) : baseSpr;
+    for (let s = 1; s <= rowSeats; s++) {
+      if (!excluded.has(`${rowLetter}-${s}`) && !excluded.has(`${rowLetter}${s}`)) {
+        total++;
+      }
+    }
+  }
+  return total;
+}
+
+export function computeBlockSeatCount(block: StadiumBlockDef): number {
+  if (block.stand_type === "standing") {
+    return Number(block.capacity) || 0;
+  }
+  const isDirect = block.seating_type === "direct" || !Array.isArray(block.tiers) || block.tiers.length <= 1;
+  if (isDirect) {
+    if (block.row_start && block.row_end) {
+      return computeTierSeatCount(block as any);
+    }
+    if (block.tiers && block.tiers.length > 0) {
+      return computeTierSeatCount(block.tiers[0]);
+    }
+    return Number(block.capacity) || 0;
+  }
+  return block.tiers.reduce((acc, t) => acc + computeTierSeatCount(t), 0);
+}
+
+/**
+ * calculateOptimalBlockDimensions
+ * --------------------------------
+ * Dynamically calculates proportional width & height (or radial depth & sweep angle)
+ * for a stand based on its seat capacity, row count, and seats-per-row.
+ * If a block has 50 seats, it auto-sizes compactly (~180x75px).
+ * If a block has 500+ seats, it scales proportionally up to pitch dimensions.
+ */
+export function calculateOptimalBlockDimensions(
+  block: StadiumBlockDef,
+  pitchW = CANVAS_W * 0.56,
+  pitchH = CANVAS_H * 0.56
+): {
+  width: number;
+  height: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  sweepAngle?: number;
+} {
+  const isDirect = block.seating_type === "direct" || !Array.isArray(block.tiers) || block.tiers.length <= 1;
+  let rowCount = 0;
+  let maxSeatsPerRow = 20;
+
+  if (isDirect) {
+    const start = (block.row_start || block.tiers?.[0]?.row_start || "A").charCodeAt(0);
+    const end = (block.row_end || block.tiers?.[0]?.row_end || "J").charCodeAt(0);
+    rowCount = Math.max(1, end - start + 1);
+    maxSeatsPerRow = Math.max(1, block.seats_per_row || block.tiers?.[0]?.seats_per_row || 20);
+    if (block.row_seat_overrides) {
+      const overrideVals = Object.values(block.row_seat_overrides);
+      if (overrideVals.length > 0) {
+        maxSeatsPerRow = Math.max(...overrideVals, maxSeatsPerRow);
+      }
+    }
+  } else {
+    rowCount = (block.tiers || []).reduce((acc, t) => {
+      const s = (t.row_start || "A").charCodeAt(0);
+      const e = (t.row_end || "J").charCodeAt(0);
+      return acc + Math.max(1, e - s + 1);
+    }, 0);
+    maxSeatsPerRow = Math.max(
+      ...((block.tiers || []).map((t) => {
+        let maxSpr = t.seats_per_row || 20;
+        if (t.row_seat_overrides) {
+          const ovs = Object.values(t.row_seat_overrides);
+          if (ovs.length > 0) maxSpr = Math.max(...ovs, maxSpr);
+        }
+        return maxSpr;
+      })),
+      10
+    );
+  }
+
+  // If Arc Stand (Radial ring arc)
+  if (block.shape === "arc") {
+    const radialDepth = Math.max(50, Math.min(240, 40 + rowCount * 8));
+    const inR = block.innerRadius || 260;
+    const outR = inR + radialDepth;
+    const sweepA = Math.max(15, Math.min(85, Math.round(maxSeatsPerRow * 1.8)));
+    return {
+      width: outR * 2,
+      height: outR * 2,
+      innerRadius: inR,
+      outerRadius: outR,
+      sweepAngle: sweepA,
+    };
+  }
+
+  // Rectangular / pill / curved / oval stand
+  const isHorizontal = block.width >= block.height;
+
+  if (isHorizontal) {
+    // Horizontal stand (North/South): width follows seatsPerRow, height follows rowCount
+    const autoW = Math.max(110, Math.min(pitchW, Math.round(maxSeatsPerRow * 14 + 50)));
+    const autoH = Math.max(50, Math.min(250, Math.round(rowCount * 11 + 30)));
+    return { width: autoW, height: autoH };
+  } else {
+    // Vertical stand (East/West): height follows seatsPerRow, width follows rowCount
+    const autoH = Math.max(110, Math.min(pitchH, Math.round(maxSeatsPerRow * 14 + 50)));
+    const autoW = Math.max(50, Math.min(250, Math.round(rowCount * 11 + 30)));
+    return { width: autoW, height: autoH };
+  }
+}
+
+// ─── Interactive Row, Aisle & Seat Customizer Modal ──────────────────────────
+
+interface RowSeatCustomizerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  color?: string;
+  rowStart: string;
+  rowEnd: string;
+  baseSeatsPerRow: number;
+  initialOverrides?: Record<string, number>;
+  initialGaps?: string[];
+  initialExcluded?: string[];
+  onApply: (data: {
+    rowSeatOverrides: Record<string, number>;
+    rowGaps: string[];
+    excludedSeats: string[];
+  }) => void;
+}
+
+function RowSeatCustomizerModal({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
+  color = "#f59e0b",
+  rowStart,
+  rowEnd,
+  baseSeatsPerRow,
+  initialOverrides,
+  initialGaps,
+  initialExcluded,
+  onApply,
+}: RowSeatCustomizerModalProps) {
+  const [overrides, setOverrides] = useState<Record<string, number>>(() => initialOverrides || {});
+  const [gaps, setGaps] = useState<string[]>(() => initialGaps || []);
+  const [excluded, setExcluded] = useState<string[]>(() => initialExcluded || []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setOverrides(initialOverrides || {});
+      setGaps(initialGaps || []);
+      setExcluded(initialExcluded || []);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const startCharCode = (rowStart || "A").toUpperCase().charCodeAt(0);
+  const endCharCode = (rowEnd || "A").toUpperCase().charCodeAt(0);
+  const rows: string[] = [];
+  if (!isNaN(startCharCode) && !isNaN(endCharCode) && endCharCode >= startCharCode) {
+    for (let c = startCharCode; c <= endCharCode; c++) {
+      rows.push(String.fromCharCode(c));
+    }
+  }
+
+  const excludedSet = new Set(excluded);
+
+  const getRowSeats = (row: string) => {
+    return overrides[row] != null ? Math.max(1, overrides[row]) : Math.max(1, baseSeatsPerRow || 20);
+  };
+
+  const setRowSeats = (row: string, count: number) => {
+    const val = Math.max(1, Math.min(150, count));
+    setOverrides((prev) => ({ ...prev, [row]: val }));
+  };
+
+  const toggleGap = (row: string) => {
+    setGaps((prev) =>
+      prev.includes(row) ? prev.filter((r) => r !== row) : [...prev, row]
+    );
+  };
+
+  const toggleSeat = (row: string, seatNum: number) => {
+    const key1 = `${row}-${seatNum}`;
+    const key2 = `${row}${seatNum}`;
+    setExcluded((prev) => {
+      if (prev.includes(key1) || prev.includes(key2)) {
+        return prev.filter((k) => k !== key1 && k !== key2);
+      } else {
+        return [...prev, key1];
+      }
+    });
+  };
+
+  // Quick helper: Taper stand rows (+1, +2 per row from front to back)
+  const quickTaper = (step: number) => {
+    const newOverrides: Record<string, number> = {};
+    rows.forEach((r, idx) => {
+      newOverrides[r] = Math.max(1, baseSeatsPerRow + idx * step);
+    });
+    setOverrides(newOverrides);
+    toast.success(`Applied ${step > 0 ? `+${step}` : step} seats/row taper across ${rows.length} rows!`);
+  };
+
+  const resetOverrides = () => {
+    setOverrides({});
+    toast.info("Reset all rows to base capacity.");
+  };
+
+  const clearExcluded = () => {
+    setExcluded([]);
+    toast.success("Restored all voided seats!");
+  };
+
+  // Live total calculations
+  let totalActiveSeats = 0;
+  let totalExcludedCount = 0;
+  rows.forEach((r) => {
+    const spr = getRowSeats(r);
+    for (let s = 1; s <= spr; s++) {
+      if (excludedSet.has(`${r}-${s}`) || excludedSet.has(`${r}${s}`)) {
+        totalExcludedCount++;
+      } else {
+        totalActiveSeats++;
+      }
+    }
+  });
+
+  const handleSave = () => {
+    onApply({
+      rowSeatOverrides: overrides,
+      rowGaps: gaps,
+      excludedSeats: excluded,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 select-none animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden text-white">
+        {/* Header */}
+        <div className="px-5 py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="w-4 h-4 rounded-full ring-2 ring-white/30 shrink-0"
+              style={{ backgroundColor: color }}
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-extrabold text-white truncate">{title}</h3>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  Fully Dynamic Layout
+                </span>
+              </div>
+              {subtitle && (
+                <p className="text-xs text-slate-400 truncate mt-0.5 font-medium">{subtitle}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                🟢 {totalActiveSeats.toLocaleString()} Active Seats
+              </span>
+              {totalExcludedCount > 0 && (
+                <span className="text-xs font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                  ✕ {totalExcludedCount} Voided
+                </span>
+              )}
+              {gaps.length > 0 && (
+                <span className="text-xs font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2.5 py-1 rounded-lg">
+                  🚶 {gaps.length} Aisles
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Close without applying"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Toolbar */}
+        <div className="px-5 py-2.5 bg-slate-950/60 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-slate-400 font-semibold text-[11px] mr-1">Quick Tools:</span>
+            <button
+              type="button"
+              onClick={() => quickTaper(1)}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-medium text-[11px] transition-all active:scale-95"
+              title="Add 1 seat progressively on each row from front to back"
+            >
+              📐 Taper Stand (+1 / Row)
+            </button>
+            <button
+              type="button"
+              onClick={() => quickTaper(2)}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-medium text-[11px] transition-all active:scale-95"
+              title="Add 2 seats progressively on each row"
+            >
+              📐 Taper Stand (+2 / Row)
+            </button>
+            <button
+              type="button"
+              onClick={resetOverrides}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-medium text-[11px] transition-all active:scale-95"
+            >
+              🔄 Equalize All Rows
+            </button>
+            {totalExcludedCount > 0 && (
+              <button
+                type="button"
+                onClick={clearExcluded}
+                className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-medium text-[11px] transition-all active:scale-95"
+              >
+                🧹 Restore All Voided Seats
+              </button>
+            )}
+          </div>
+
+          <div className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5">
+            <span>💡 Click any seat to void for pillars/exits</span>
+          </div>
+        </div>
+
+        {/* Scrollable Rows Grid */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-3 bg-slate-950/40">
+          {rows.map((rowLetter, rIdx) => {
+            const rowSeats = getRowSeats(rowLetter);
+            const isGapAfter = gaps.includes(rowLetter);
+            const isLastRow = rIdx === rows.length - 1;
+
+            return (
+              <div key={rowLetter} className="space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800/90 hover:border-slate-700 transition-colors">
+                  {/* Left: Row Stepper */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="w-14 text-center py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs font-extrabold text-amber-400">
+                      Row {rowLetter}
+                    </span>
+
+                    <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-1 border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setRowSeats(rowLetter, rowSeats - 1)}
+                        className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-xs transition-colors active:scale-95"
+                        title="Decrease seat count for this row"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        max={150}
+                        value={rowSeats}
+                        onChange={(e) => setRowSeats(rowLetter, parseInt(e.target.value) || 1)}
+                        className="w-12 text-center text-xs font-mono font-bold bg-transparent text-white focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRowSeats(rowLetter, rowSeats + 1)}
+                        className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-xs transition-colors active:scale-95"
+                        title="Increase seat count for this row"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {rowSeats} seats
+                    </span>
+                  </div>
+
+                  {/* Right: Seat Chips Grid */}
+                  <div className="flex-1 flex flex-wrap items-center gap-1.5 min-w-0 pt-1 sm:pt-0">
+                    {Array.from({ length: rowSeats }, (_, sIdx) => {
+                      const seatNum = sIdx + 1;
+                      const isVoided =
+                        excludedSet.has(`${rowLetter}-${seatNum}`) ||
+                        excludedSet.has(`${rowLetter}${seatNum}`);
+
+                      return (
+                        <button
+                          key={seatNum}
+                          type="button"
+                          onClick={() => toggleSeat(rowLetter, seatNum)}
+                          title={
+                            isVoided
+                              ? `Seat ${rowLetter}-${seatNum} is VOIDED (Click to restore)`
+                              : `Seat ${rowLetter}-${seatNum} is ACTIVE (Click to delete/void for pillar/stairs)`
+                          }
+                          className={`w-7 h-7 rounded-lg text-[9px] font-mono font-extrabold flex items-center justify-center transition-all select-none ${
+                            isVoided
+                              ? "border border-dashed border-rose-500/60 bg-rose-950/30 text-rose-400 opacity-60 hover:opacity-100 hover:scale-105"
+                              : "border shadow-sm hover:scale-110 active:scale-95 text-slate-950"
+                          }`}
+                          style={{
+                            backgroundColor: isVoided ? undefined : color,
+                            borderColor: isVoided ? undefined : "rgba(255,255,255,0.4)",
+                          }}
+                        >
+                          {isVoided ? "✕" : seatNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Walkway Aisle Gap Divider between rows */}
+                {!isLastRow && (
+                  <div className="relative py-1 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className={`w-full border-t ${isGapAfter ? "border-amber-400/50 border-dashed" : "border-slate-800 border-dashed"}`} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleGap(rowLetter)}
+                      className={`relative z-10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
+                        isGapAfter
+                          ? "bg-amber-500 text-slate-950 ring-2 ring-amber-400/30 font-extrabold"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700"
+                      }`}
+                    >
+                      <span>🚶</span>
+                      <span>{isGapAfter ? `Walkway Aisle after Row ${rowLetter} (Click to remove)` : `+ Add Walkway Aisle Gap after Row ${rowLetter}`}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <div className="text-xs text-slate-400">
+            Configuring <strong className="text-white">{rows.length} rows</strong> · <strong className="text-emerald-400">{totalActiveSeats} active seats</strong>
+            {totalExcludedCount > 0 && <span> · <strong className="text-rose-400">{totalExcludedCount} voided</strong></span>}
+            {gaps.length > 0 && <span> · <strong className="text-sky-400">{gaps.length} walkway aisles</strong></span>}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-5 py-2 rounded-xl text-xs font-extrabold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 transition-all shadow-md active:scale-95"
+            >
+              Apply Custom Rows & Seats
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Tier Editor ─────────────────────────────────────────────────────────────
 
 function TierEditor({
@@ -299,11 +803,12 @@ function TierEditor({
   onChange: (updated: StadiumTierDef) => void;
   onDelete: () => void;
 }) {
+  const [showCustomizer, setShowCustomizer] = useState(false);
   const rowCount = Math.max(
     0,
     tier.row_end.charCodeAt(0) - tier.row_start.charCodeAt(0) + 1
   );
-  const tierSeatTotal = rowCount * (tier.seats_per_row || 0);
+  const tierSeatTotal = computeTierSeatCount(tier);
 
   const matchedTicket = ticketTypes.find((tt) => tt.id === tier.ticket_type_id);
   const targetCapacity = matchedTicket ? Number(matchedTicket.total_count) || 0 : null;
@@ -521,6 +1026,43 @@ function TierEditor({
           </div>
         )}
       </div>
+
+      {/* Dynamic Row, Aisle & Seat Customizer Button */}
+      <button
+        type="button"
+        onClick={() => setShowCustomizer(true)}
+        className="w-full mt-2 flex items-center justify-between text-xs font-bold text-slate-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 py-2 px-3 rounded-xl transition-all shadow-sm active:scale-95"
+      >
+        <div className="flex items-center gap-2">
+          <Sliders className="w-3.5 h-3.5 text-amber-600" />
+          <span>Customise Rows, Aisles & Seats</span>
+        </div>
+        <span className="text-[10px] font-mono bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md font-bold">
+          {tierSeatTotal.toLocaleString()} seats
+        </span>
+      </button>
+
+      <RowSeatCustomizerModal
+        isOpen={showCustomizer}
+        onClose={() => setShowCustomizer(false)}
+        title={`Customise ${tier.name}`}
+        subtitle={`Rows ${tier.row_start}–${tier.row_end} · Base ${tier.seats_per_row} seats/row`}
+        color={tierColor}
+        rowStart={tier.row_start}
+        rowEnd={tier.row_end}
+        baseSeatsPerRow={tier.seats_per_row}
+        initialOverrides={tier.row_seat_overrides}
+        initialGaps={tier.row_gaps}
+        initialExcluded={tier.excluded_seats}
+        onApply={({ rowSeatOverrides, rowGaps, excludedSeats }) => {
+          onChange({
+            ...tier,
+            row_seat_overrides: rowSeatOverrides,
+            row_gaps: rowGaps,
+            excluded_seats: excludedSeats,
+          });
+        }}
+      />
     </div>
   );
 }
@@ -531,6 +1073,8 @@ function BlockPanel({
   block,
   isSelected,
   ticketTypes,
+  pitchW = CANVAS_W * 0.56,
+  pitchH = CANVAS_H * 0.56,
   onUpdate,
   onDelete,
   onSelect,
@@ -538,61 +1082,112 @@ function BlockPanel({
   block: StadiumBlockDef;
   isSelected: boolean;
   ticketTypes: any[];
+  pitchW?: number;
+  pitchH?: number;
   onUpdate: (b: StadiumBlockDef) => void;
   onDelete: () => void;
   onSelect: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const [showDirectCustomizer, setShowDirectCustomizer] = useState(false);
 
-  const totalSeats = block.tiers.reduce((acc, t) => {
-    const rows = Math.max(
-      0,
-      t.row_end.charCodeAt(0) - t.row_start.charCodeAt(0) + 1
-    );
-    return acc + rows * (t.seats_per_row || 0);
-  }, 0);
+  const isStanding = block.stand_type === "standing";
+  const isDirect = (block.seating_type || (block.tiers.length <= 1 ? "direct" : "tiered")) === "direct";
+  const totalSeats = computeBlockSeatCount(block);
 
-  const unassignedCount = block.tiers.filter((t) => !t.ticket_type_id).length;
+  const directTicketId = block.ticket_type_id || block.tiers[0]?.ticket_type_id || "";
+  const matchedDirectTicket = ticketTypes.find((tt) => tt.id === directTicketId);
+  const directTargetCapacity = matchedDirectTicket ? Number(matchedDirectTicket.total_count) || 0 : null;
 
-  const assignedTicketNames = block.tiers
-    .map((t) => {
-      const tt = ticketTypes.find((item) => item.id === t.ticket_type_id);
-      return tt ? tt.name || tt.ticket_type : null;
-    })
-    .filter(Boolean);
+  const directRowStart = block.row_start || block.tiers[0]?.row_start || "A";
+  const directRowEnd = block.row_end || block.tiers[0]?.row_end || "J";
+  const directSeatsPerRow = block.seats_per_row || block.tiers[0]?.seats_per_row || 25;
+
+  const standingTicketId = block.ticket_type_id || block.tiers?.[0]?.ticket_type_id || "";
+  const matchedStandingTicket = ticketTypes.find((tt) => tt.id === standingTicketId);
+  const standingTargetCapacity = matchedStandingTicket ? Number(matchedStandingTicket.total_count) || 0 : null;
+
+  const unassignedCount = isStanding
+    ? (standingTicketId ? 0 : 1)
+    : isDirect
+    ? (directTicketId ? 0 : 1)
+    : block.tiers.filter((t) => !t.ticket_type_id).length;
+
+  const assignedTicketNames = isStanding
+    ? (matchedStandingTicket ? [matchedStandingTicket.name || matchedStandingTicket.ticket_type] : [])
+    : isDirect
+    ? (matchedDirectTicket ? [matchedDirectTicket.name || matchedDirectTicket.ticket_type] : [])
+    : block.tiers
+        .map((t) => {
+          const tt = ticketTypes.find((item) => item.id === t.ticket_type_id);
+          return tt ? tt.name || tt.ticket_type : null;
+        })
+        .filter(Boolean);
 
   const handleStandSeatCountChange = (targetCount: number) => {
     if (targetCount <= 0) return;
-    if (!block.tiers || block.tiers.length === 0) {
-      const fitted = autoFitRowsAndSeats(targetCount);
+    if (isStanding) {
       onUpdate({
         ...block,
-        tiers: [
-          {
-            id: `t-${Date.now()}`,
-            name: "Tier 1",
-            row_start: fitted.rowStart,
-            row_end: fitted.rowEnd,
-            seats_per_row: fitted.seatsPerRow,
-            ticket_type_id: ticketTypes[0]?.id || "",
-          },
-        ],
+        capacity: targetCount,
+      });
+      return;
+    }
+    const fitted = autoFitRowsAndSeats(targetCount);
+    if (isDirect) {
+      const updatedFirstTier: StadiumTierDef = {
+        id: block.tiers[0]?.id || `t-${Date.now()}`,
+        name: block.tiers[0]?.name || block.name,
+        color: block.tiers[0]?.color || block.color,
+        ticket_type_id: directTicketId,
+        row_start: fitted.rowStart,
+        row_end: fitted.rowEnd,
+        seats_per_row: fitted.seatsPerRow,
+        price: block.price,
+      };
+      const updatedBlock: StadiumBlockDef = {
+        ...block,
+        seating_type: "direct",
+        row_start: fitted.rowStart,
+        row_end: fitted.rowEnd,
+        seats_per_row: fitted.seatsPerRow,
+        row_seat_overrides: undefined,
+        excluded_seats: undefined,
+        tiers: [updatedFirstTier],
+      };
+      const dims = calculateOptimalBlockDimensions(updatedBlock, pitchW, pitchH);
+      onUpdate({
+        ...updatedBlock,
+        width: dims.width,
+        height: dims.height,
+        innerRadius: dims.innerRadius ?? block.innerRadius,
+        outerRadius: dims.outerRadius ?? block.outerRadius,
+        sweepAngle: dims.sweepAngle ?? block.sweepAngle,
       });
       return;
     }
 
-    if (block.tiers.length === 1) {
-      const fitted = autoFitRowsAndSeats(targetCount);
+    if (!block.tiers || block.tiers.length <= 1) {
+      const newTiers = [
+        {
+          id: block.tiers?.[0]?.id || `t-${Date.now()}`,
+          name: block.tiers?.[0]?.name || "Tier 1",
+          color: block.tiers?.[0]?.color || block.color,
+          row_start: fitted.rowStart,
+          row_end: fitted.rowEnd,
+          seats_per_row: fitted.seatsPerRow,
+          ticket_type_id: block.tiers?.[0]?.ticket_type_id || ticketTypes[0]?.id || "",
+        },
+      ];
+      const updatedBlock = { ...block, tiers: newTiers };
+      const dims = calculateOptimalBlockDimensions(updatedBlock, pitchW, pitchH);
       onUpdate({
-        ...block,
-        tiers: [
-          {
-            ...block.tiers[0],
-            row_start: fitted.rowStart,
-            row_end: fitted.rowEnd,
-            seats_per_row: fitted.seatsPerRow,
-          },
-        ],
+        ...updatedBlock,
+        width: dims.width,
+        height: dims.height,
+        innerRadius: dims.innerRadius ?? block.innerRadius,
+        outerRadius: dims.outerRadius ?? block.outerRadius,
+        sweepAngle: dims.sweepAngle ?? block.sweepAngle,
       });
       return;
     }
@@ -600,22 +1195,30 @@ function BlockPanel({
     const currentTotal = totalSeats || 1;
     let remaining = targetCount;
     const newTiers = block.tiers.map((t, idx) => {
-      const rows = Math.max(0, t.row_end.charCodeAt(0) - t.row_start.charCodeAt(0) + 1);
-      const tierCurr = rows * (t.seats_per_row || 0);
+      const tierCurr = computeTierSeatCount(t);
       const share =
         idx === block.tiers.length - 1
           ? remaining
           : Math.round((tierCurr / currentTotal) * targetCount);
       remaining -= share;
-      const fitted = autoFitRowsAndSeats(Math.max(1, share));
+      const f = autoFitRowsAndSeats(Math.max(1, share));
       return {
         ...t,
-        row_start: fitted.rowStart,
-        row_end: fitted.rowEnd,
-        seats_per_row: fitted.seatsPerRow,
+        row_start: f.rowStart,
+        row_end: f.rowEnd,
+        seats_per_row: f.seatsPerRow,
       };
     });
-    onUpdate({ ...block, tiers: newTiers });
+    const updatedBlock = { ...block, tiers: newTiers };
+    const dims = calculateOptimalBlockDimensions(updatedBlock, pitchW, pitchH);
+    onUpdate({
+      ...updatedBlock,
+      width: dims.width,
+      height: dims.height,
+      innerRadius: dims.innerRadius ?? block.innerRadius,
+      outerRadius: dims.outerRadius ?? block.outerRadius,
+      sweepAngle: dims.sweepAngle ?? block.sweepAngle,
+    });
   };
 
   return (
@@ -644,8 +1247,14 @@ function BlockPanel({
               {block.name}
             </h4>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                {totalSeats.toLocaleString()} seats
+              <span
+                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${
+                  isStanding
+                    ? "text-purple-800 bg-purple-50 border-purple-200"
+                    : "text-amber-800 bg-amber-50 border-amber-200"
+                }`}
+              >
+                {isStanding ? `🧍 ${totalSeats.toLocaleString()} passes` : `${totalSeats.toLocaleString()} seats`}
               </span>
               {unassignedCount > 0 ? (
                 <span className="text-[9px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
@@ -696,54 +1305,56 @@ function BlockPanel({
             </div>
           </div>
 
-          {/* Stand Capacity & Price (Two Column Card) */}
-          <div className="grid grid-cols-2 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] uppercase font-bold text-amber-700 flex items-center gap-1">
-                  <Ticket className="w-3 h-3 text-amber-600" /> Seats
-                </label>
-                <span className="text-[9px] text-slate-500 font-medium">Auto-fits</span>
+          {/* Stand Capacity & Price (Two Column Card - Seated mode) */}
+          {!isStanding && (
+            <div className="grid grid-cols-2 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase font-bold text-amber-700 flex items-center gap-1">
+                    <Ticket className="w-3 h-3 text-amber-600" /> Seats
+                  </label>
+                  <span className="text-[9px] text-slate-500 font-medium">Auto-fits</span>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={99999}
+                  value={totalSeats}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    if (val > 0) handleStandSeatCountChange(val);
+                  }}
+                  className="w-full text-xs font-mono font-bold bg-white border border-slate-300 text-slate-900 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 shadow-sm"
+                  placeholder="Seats"
+                />
               </div>
-              <input
-                type="number"
-                min={1}
-                max={99999}
-                value={totalSeats}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value) || 0;
-                  if (val > 0) handleStandSeatCountChange(val);
-                }}
-                className="w-full text-xs font-mono font-bold bg-white border border-slate-300 text-slate-900 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 shadow-sm"
-                placeholder="Seats"
-              />
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] uppercase font-bold text-emerald-700 flex items-center gap-1">
-                  Price
-                </label>
-                <span className="text-[9px] text-slate-500 font-medium">ETB / Seat</span>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase font-bold text-emerald-700 flex items-center gap-1">
+                    Price
+                  </label>
+                  <span className="text-[9px] text-slate-500 font-medium">ETB / Seat</span>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={block.price ?? 500}
+                  onChange={(e) => {
+                    const val = Math.max(0, parseFloat(e.target.value) || 0);
+                    onUpdate({
+                      ...block,
+                      price: val,
+                      tiers: block.tiers.map((t) => ({ ...t, price: val })),
+                    });
+                  }}
+                  className="w-full text-xs font-mono font-bold bg-white border border-slate-300 text-slate-900 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-sm"
+                  placeholder="500"
+                />
               </div>
-              <input
-                type="number"
-                min={0}
-                step="1"
-                value={block.price ?? 500}
-                onChange={(e) => {
-                  const val = Math.max(0, parseFloat(e.target.value) || 0);
-                  onUpdate({
-                    ...block,
-                    price: val,
-                    tiers: block.tiers.map((t) => ({ ...t, price: val })),
-                  });
-                }}
-                className="w-full text-xs font-mono font-bold bg-white border border-slate-300 text-slate-900 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-sm"
-                placeholder="500"
-              />
             </div>
-          </div>
+          )}
 
           {/* Stand Geometric Shape Selector */}
           <div className="space-y-1.5">
@@ -920,54 +1531,493 @@ function BlockPanel({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-1.5 text-xs text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200 font-mono font-semibold text-center">
-              <span>X: {Math.round(block.x)}</span>
-              <span>Y: {Math.round(block.y)}</span>
-              <span>W: {Math.round(block.width)}</span>
-              <span>H: {Math.round(block.height)}</span>
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 grid grid-cols-4 gap-1 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200 font-mono font-semibold text-center">
+                <span>X: {Math.round(block.x)}</span>
+                <span>Y: {Math.round(block.y)}</span>
+                <span>W: {Math.round(block.width)}</span>
+                <span>H: {Math.round(block.height)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const dims = calculateOptimalBlockDimensions(block, pitchW, pitchH);
+                  onUpdate({
+                    ...block,
+                    width: dims.width,
+                    height: dims.height,
+                    innerRadius: dims.innerRadius ?? block.innerRadius,
+                    outerRadius: dims.outerRadius ?? block.outerRadius,
+                    sweepAngle: dims.sweepAngle ?? block.sweepAngle,
+                  });
+                  toast.success(`Auto-adjusted ${block.name} size to fit ${totalSeats} seats!`);
+                }}
+                className="py-2 px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold flex items-center gap-1 shadow-sm shrink-0 transition-colors"
+                title="Auto-calculate and set optimal width and height for this stand based on its seats & rows"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-amber-600" />
+                <span>Auto-Fit Size</span>
+              </button>
             </div>
           )}
 
-          {/* Tiers in this Stand */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-700">
-                Seating Tiers ({block.tiers.length})
-              </span>
+          {/* Stand Admission Type Selector: Seated vs Standing */}
+          <div className="space-y-1.5 pt-1 border-t border-slate-200">
+            <label className="text-[10px] uppercase font-bold text-slate-600 tracking-wider block">
+              Admission Type
+            </label>
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
               <button
                 type="button"
-                onClick={() =>
-                  onUpdate({ ...block, tiers: [...block.tiers, defaultTier()] })
-                }
-                className="text-xs text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 transition-all active:scale-95"
+                onClick={() => {
+                  onUpdate({
+                    ...block,
+                    stand_type: "seated",
+                  });
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  !isStanding
+                    ? "bg-amber-500 text-slate-950 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
               >
-                <Plus className="w-3.5 h-3.5" /> Add Tier
+                <span>💺 Numbered Seating</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const defaultTicket = block.ticket_type_id || block.tiers?.[0]?.ticket_type_id || ticketTypes[0]?.id || "";
+                  const matched = ticketTypes.find((t) => t.id === defaultTicket);
+                  const passCap = matched && Number(matched.total_count) > 0 ? Number(matched.total_count) : (block.capacity || 1000);
+                  const passPrice = matched && Number(matched.price) > 0 ? Number(matched.price) : (block.price ?? 500);
+                  onUpdate({
+                    ...block,
+                    stand_type: "standing",
+                    capacity: passCap,
+                    price: passPrice,
+                    ticket_type_id: defaultTicket,
+                  });
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  isStanding
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>🧍 Standing / VIP Pit</span>
               </button>
             </div>
+          </div>
 
-            {block.tiers.map((tier, ti) => (
-              <TierEditor
-                key={tier.id}
-                tier={tier}
-                ticketTypes={ticketTypes}
-                onChange={(updated) => {
-                  const tiers = [...block.tiers];
-                  tiers[ti] = updated;
-                  onUpdate({ ...block, tiers });
+          {isStanding ? (
+            /* Standing / General Admission Zone Configuration */
+            <div className="rounded-xl border border-purple-300 bg-purple-50/40 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-purple-900 flex items-center gap-1.5">
+                  <span>🧍</span> Standing / VIP Fan Pit Zone
+                </span>
+                <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded border border-purple-200">
+                  NO CHAIRS / PASS CAPACITY
+                </span>
+              </div>
+
+              {/* Linked Ticket Type */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase font-extrabold text-slate-600 tracking-wider">
+                    Ticket Category
+                  </label>
+                  {standingTargetCapacity !== null && (
+                    <span className="text-[10px] font-mono font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                      Target: {standingTargetCapacity.toLocaleString()} passes
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={standingTicketId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    const matched = ticketTypes.find((t) => t.id === nextId);
+                    onUpdate({
+                      ...block,
+                      ticket_type_id: nextId,
+                      price: matched ? Number(matched.price) : block.price,
+                      capacity: matched && Number(matched.total_count) > 0 ? Number(matched.total_count) : block.capacity,
+                      tiers: block.tiers.map((t) => ({ ...t, ticket_type_id: nextId })),
+                    });
+                  }}
+                  className={`w-full text-xs font-bold bg-white border rounded-lg px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-purple-500 shadow-sm ${
+                    !standingTicketId
+                      ? "border-rose-400 bg-rose-50/50 text-rose-800"
+                      : "border-slate-300"
+                  }`}
+                >
+                  <option value="">-- Select Event Ticket Type --</option>
+                  {ticketTypes.map((tt) => (
+                    <option key={tt.id} value={tt.id}>
+                      {tt.name || tt.ticket_type} (ETB {Number(tt.price).toLocaleString()} · Cap: {Number(tt.total_count).toLocaleString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Standing Capacity & Price */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-purple-800 block mb-1">
+                    Standing Capacity
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={block.capacity || 1000}
+                    onChange={(e) => {
+                      const cap = Math.max(1, parseInt(e.target.value) || 0);
+                      onUpdate({
+                        ...block,
+                        capacity: cap,
+                      });
+                    }}
+                    className="w-full text-xs font-mono font-bold bg-white border border-purple-200 text-slate-900 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-purple-500 shadow-sm"
+                    placeholder="1000"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-emerald-700 block mb-1">
+                    Price (ETB / Pass)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={block.price ?? 500}
+                    onChange={(e) => {
+                      const p = Math.max(0, parseFloat(e.target.value) || 0);
+                      onUpdate({
+                        ...block,
+                        price: p,
+                        tiers: block.tiers.map((t) => ({ ...t, price: p })),
+                      });
+                    }}
+                    className="w-full text-xs font-mono font-bold bg-white border border-slate-300 text-slate-900 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-emerald-500 shadow-sm"
+                    placeholder="500"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-purple-700/90 leading-tight">
+                General Admission zone. Customers select ticket quantities directly without row or seat dots.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Stand Seating Structure Mode Selector */}
+          <div className="space-y-1.5 pt-1 border-t border-slate-200">
+            <label className="text-[10px] uppercase font-bold text-slate-600 tracking-wider block">
+              Stand Seating Structure
+            </label>
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  const firstTier = block.tiers[0];
+                  onUpdate({
+                    ...block,
+                    seating_type: "direct",
+                    ticket_type_id: block.ticket_type_id || firstTier?.ticket_type_id || ticketTypes[0]?.id || "",
+                    row_start: block.row_start || firstTier?.row_start || "A",
+                    row_end: block.row_end || firstTier?.row_end || "J",
+                    seats_per_row: block.seats_per_row || firstTier?.seats_per_row || 25,
+                    row_seat_overrides: block.row_seat_overrides || firstTier?.row_seat_overrides,
+                    row_gaps: block.row_gaps || firstTier?.row_gaps,
+                    excluded_seats: block.excluded_seats || firstTier?.excluded_seats,
+                    tiers: block.tiers.length > 0 ? [block.tiers[0]] : [defaultTier()],
+                  });
                 }}
-                onDelete={() => {
-                  const tiers = block.tiers.filter((_, i) => i !== ti);
-                  onUpdate({ ...block, tiers });
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${isDirect
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>🎯 Direct Seats</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdate({
+                    ...block,
+                    seating_type: "tiered",
+                    tiers: block.tiers.length > 0 ? block.tiers : [defaultTier()],
+                  });
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${!isDirect
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>🥞 Multi-Tier Stand</span>
+                <span className="text-[10px] opacity-80">({block.tiers.length})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* If Direct Seating: Single Level configuration */}
+          {isDirect ? (
+            <div className="rounded-xl border border-amber-300/80 bg-amber-50/20 p-3 space-y-3">
+              {/* Ticket Type Assignment */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase font-extrabold text-slate-600 tracking-wider">
+                    Stand Ticket Type
+                  </label>
+                  {matchedDirectTicket && directTargetCapacity !== null && (
+                    <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                      Target: {directTargetCapacity.toLocaleString()} seats
+                    </span>
+                  )}
+                </div>
+                <select
+                  className={`w-full text-xs font-semibold bg-white border rounded-lg px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-amber-500 shadow-sm transition-all ${
+                    !directTicketId
+                      ? "border-rose-400 bg-rose-50/50 text-rose-800"
+                      : "border-slate-300"
+                  }`}
+                  value={directTicketId}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    const updatedTiers = block.tiers.map((t) => ({ ...t, ticket_type_id: newId }));
+                    onUpdate({
+                      ...block,
+                      ticket_type_id: newId,
+                      tiers: updatedTiers.length > 0 ? updatedTiers : [{ ...defaultTier(), ticket_type_id: newId }],
+                    });
+                  }}
+                >
+                  <option value="">-- Choose Organizer Ticket Type --</option>
+                  {ticketTypes.map((tt: any) => (
+                    <option key={tt.id} value={tt.id}>
+                      {tt.name || tt.ticket_type || "Ticket"} · Capacity: {tt.total_count || 0}
+                      {tt.price != null ? ` · ETB ${tt.price}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {!directTicketId && (
+                  <p className="text-[10px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Ticket type required for buyer bookings
+                  </p>
+                )}
+              </div>
+
+              {/* Row Configuration Grid */}
+              <div className="grid grid-cols-3 gap-1.5">
+                <div className="bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
+                  <label className="text-[9px] uppercase font-extrabold text-slate-500 block mb-0.5">
+                    Start Row
+                  </label>
+                  <select
+                    className="w-full text-xs font-bold bg-white border border-slate-300 rounded px-1.5 py-1 text-slate-900 focus:outline-none focus:border-amber-500 shadow-sm"
+                    value={directRowStart}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      const updatedTiers = block.tiers.map((t) => ({ ...t, row_start: newStart }));
+                      onUpdate({
+                        ...block,
+                        row_start: newStart,
+                        tiers: updatedTiers.length > 0 ? updatedTiers : [{ ...defaultTier(), row_start: newStart }],
+                      });
+                    }}
+                  >
+                    {ROW_LETTERS.map((r) => (
+                      <option key={r} value={r}>
+                        Row {r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
+                  <label className="text-[9px] uppercase font-extrabold text-slate-500 block mb-0.5">
+                    End Row
+                  </label>
+                  <select
+                    className="w-full text-xs font-bold bg-white border border-slate-300 rounded px-1.5 py-1 text-slate-900 focus:outline-none focus:border-amber-500 shadow-sm"
+                    value={directRowEnd}
+                    onChange={(e) => {
+                      const newEnd = e.target.value;
+                      const updatedTiers = block.tiers.map((t) => ({ ...t, row_end: newEnd }));
+                      onUpdate({
+                        ...block,
+                        row_end: newEnd,
+                        tiers: updatedTiers.length > 0 ? updatedTiers : [{ ...defaultTier(), row_end: newEnd }],
+                      });
+                    }}
+                  >
+                    {ROW_LETTERS.map((r) => (
+                      <option key={r} value={r}>
+                        Row {r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
+                  <label className="text-[9px] uppercase font-extrabold text-slate-500 block mb-0.5">
+                    Seats / Row
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={150}
+                    className="w-full text-xs font-bold bg-white border border-slate-300 rounded px-1.5 py-1 text-slate-900 focus:outline-none focus:border-amber-500 shadow-sm"
+                    value={directSeatsPerRow}
+                    onChange={(e) => {
+                      const newSpr = parseInt(e.target.value) || 1;
+                      const updatedTiers = block.tiers.map((t) => ({ ...t, seats_per_row: newSpr }));
+                      onUpdate({
+                        ...block,
+                        seats_per_row: newSpr,
+                        tiers: updatedTiers.length > 0 ? updatedTiers : [{ ...defaultTier(), seats_per_row: newSpr }],
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Match Banner */}
+              <div className="bg-white p-2 rounded-lg border border-slate-200 text-xs flex flex-col gap-1 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-600 font-medium">
+                    Rows {directRowStart}–{directRowEnd} (Base: {directSeatsPerRow}/row):
+                  </span>
+                  <strong className="text-amber-700 font-mono text-xs font-extrabold">
+                    {totalSeats.toLocaleString()} seats
+                  </strong>
+                </div>
+
+                {matchedDirectTicket && directTargetCapacity !== null && (
+                  <div className="pt-1.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-600">
+                      Target: <strong className="text-slate-900 font-mono font-bold">{directTargetCapacity}</strong>
+                    </span>
+
+                    {totalSeats === directTargetCapacity ? (
+                      <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> 100% Matched
+                      </span>
+                    ) : totalSeats < directTargetCapacity ? (
+                      <span className="text-[10px] text-amber-700 font-bold">
+                        -{directTargetCapacity - totalSeats} short
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-rose-700 font-bold">
+                        +{totalSeats - directTargetCapacity} over
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Customise Rows, Aisles & Seats Button for Direct Stand */}
+              <button
+                type="button"
+                onClick={() => setShowDirectCustomizer(true)}
+                className="w-full flex items-center justify-between text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 py-2.5 px-3 rounded-xl transition-all shadow-md active:scale-95"
+              >
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-slate-950" />
+                  <span>Customise Rows, Aisles & Seats</span>
+                </div>
+                <span className="text-[10px] font-mono bg-slate-950 text-amber-300 px-2 py-0.5 rounded-md font-bold">
+                  {totalSeats.toLocaleString()} seats
+                </span>
+              </button>
+
+              <RowSeatCustomizerModal
+                isOpen={showDirectCustomizer}
+                onClose={() => setShowDirectCustomizer(false)}
+                title={`Customise ${block.name} (Direct Seating)`}
+                subtitle={`Rows ${directRowStart}–${directRowEnd} · Base ${directSeatsPerRow} seats/row`}
+                color={block.color}
+                rowStart={directRowStart}
+                rowEnd={directRowEnd}
+                baseSeatsPerRow={directSeatsPerRow}
+                initialOverrides={block.row_seat_overrides || block.tiers[0]?.row_seat_overrides}
+                initialGaps={block.row_gaps || block.tiers[0]?.row_gaps}
+                initialExcluded={block.excluded_seats || block.tiers[0]?.excluded_seats}
+                onApply={({ rowSeatOverrides, rowGaps, excludedSeats }) => {
+                  const updatedTier: StadiumTierDef = {
+                    ...(block.tiers[0] || defaultTier()),
+                    ticket_type_id: directTicketId,
+                    row_start: directRowStart,
+                    row_end: directRowEnd,
+                    seats_per_row: directSeatsPerRow,
+                    row_seat_overrides: rowSeatOverrides,
+                    row_gaps: rowGaps,
+                    excluded_seats: excludedSeats,
+                  };
+                  const updatedBlock: StadiumBlockDef = {
+                    ...block,
+                    row_seat_overrides: rowSeatOverrides,
+                    row_gaps: rowGaps,
+                    excluded_seats: excludedSeats,
+                    tiers: [updatedTier],
+                  };
+                  const dims = calculateOptimalBlockDimensions(updatedBlock, pitchW, pitchH);
+                  onUpdate({
+                    ...updatedBlock,
+                    width: dims.width,
+                    height: dims.height,
+                    innerRadius: dims.innerRadius ?? block.innerRadius,
+                    outerRadius: dims.outerRadius ?? block.outerRadius,
+                    sweepAngle: dims.sweepAngle ?? block.sweepAngle,
+                  });
                 }}
               />
-            ))}
-
-            {block.tiers.length === 0 && (
-              <div className="text-xs text-rose-700 font-medium text-center py-3 bg-rose-50 rounded-xl border border-rose-200">
-                ⚠️ This stand has no tiers. Click &ldquo;Add Tier&rdquo; to define seats.
+            </div>
+          ) : (
+            /* Multi-Tier Stand: List of Tiers */
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-700">
+                  Seating Tiers ({block.tiers.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdate({ ...block, tiers: [...block.tiers, defaultTier()] })
+                  }
+                  className="text-xs text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 transition-all active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Tier
+                </button>
               </div>
-            )}
-          </div>
+
+              {block.tiers.map((tier, ti) => (
+                <TierEditor
+                  key={tier.id}
+                  tier={tier}
+                  ticketTypes={ticketTypes}
+                  onChange={(updated) => {
+                    const tiers = [...block.tiers];
+                    tiers[ti] = updated;
+                    onUpdate({ ...block, tiers });
+                  }}
+                  onDelete={() => {
+                    const tiers = block.tiers.filter((_, i) => i !== ti);
+                    onUpdate({ ...block, tiers });
+                  }}
+                />
+              ))}
+
+              {block.tiers.length === 0 && (
+                <div className="text-xs text-rose-700 font-medium text-center py-3 bg-rose-50 rounded-xl border border-rose-200">
+                  ⚠️ This stand has no tiers. Click &ldquo;Add Tier&rdquo; to define seats.
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
           <button
             type="button"
@@ -1341,15 +2391,19 @@ export default function StadiumBlockBuilder({
       let layoutSeats = 0;
 
       blocks.forEach((b) => {
-        b.tiers.forEach((t) => {
-          if (t.ticket_type_id === tt.id) {
-            const rowCount = Math.max(
-              0,
-              t.row_end.charCodeAt(0) - t.row_start.charCodeAt(0) + 1
-            );
-            layoutSeats += rowCount * (t.seats_per_row || 0);
+        const isDirect = b.seating_type === "direct" || !b.tiers || b.tiers.length <= 1;
+        if (isDirect) {
+          const directTicket = b.ticket_type_id || b.tiers?.[0]?.ticket_type_id;
+          if (directTicket === tt.id) {
+            layoutSeats += computeBlockSeatCount(b);
           }
-        });
+        } else {
+          b.tiers.forEach((t) => {
+            if (t.ticket_type_id === tt.id) {
+              layoutSeats += computeTierSeatCount(t);
+            }
+          });
+        }
       });
 
       return {
@@ -1372,25 +2426,17 @@ export default function StadiumBlockBuilder({
   }, [ticketTypes]);
 
   const totalEstSeats = useMemo(() => {
-    return blocks.reduce((acc, b) => {
-      return (
-        acc +
-        b.tiers.reduce((ta, t) => {
-          const rows = Math.max(
-            0,
-            t.row_end.charCodeAt(0) - t.row_start.charCodeAt(0) + 1
-          );
-          return ta + rows * (t.seats_per_row || 0);
-        }, 0)
-      );
-    }, 0);
+    return blocks.reduce((acc, b) => acc + computeBlockSeatCount(b), 0);
   }, [blocks]);
 
   const unassignedTiersCount = useMemo(() => {
-    return blocks.reduce(
-      (acc, b) => acc + b.tiers.filter((t) => !t.ticket_type_id).length,
-      0
-    );
+    return blocks.reduce((acc, b) => {
+      const isDirect = b.seating_type === "direct" || !b.tiers || b.tiers.length <= 1;
+      if (isDirect) {
+        return acc + (b.ticket_type_id || b.tiers?.[0]?.ticket_type_id ? 0 : 1);
+      }
+      return acc + b.tiers.filter((t) => !t.ticket_type_id).length;
+    }, 0);
   }, [blocks]);
 
   // ── Auto-Build Layout directly from Organizer Ticket Types ──
@@ -1415,7 +2461,7 @@ export default function StadiumBlockBuilder({
       const pos = positions[idx % positions.length];
       const color = BLOCK_COLORS[idx % BLOCK_COLORS.length];
 
-      generatedBlocks.push({
+      const initialBlock: StadiumBlockDef = {
         id: `stand-${tt.id.slice(0, 6)}`,
         name: tt.name || tt.ticket_type || pos.name,
         color,
@@ -1425,6 +2471,11 @@ export default function StadiumBlockBuilder({
         height: pos.h,
         rotation: 0,
         capacity: target,
+        seating_type: "direct",
+        ticket_type_id: tt.id,
+        row_start: fitted.rowStart,
+        row_end: fitted.rowEnd,
+        seats_per_row: fitted.seatsPerRow,
         tiers: [
           {
             id: makeId(),
@@ -1435,12 +2486,96 @@ export default function StadiumBlockBuilder({
             seats_per_row: fitted.seatsPerRow,
           },
         ],
+      };
+
+      const dims = calculateOptimalBlockDimensions(initialBlock, pitchW, pitchH);
+      let posX = pos.x;
+      let posY = pos.y;
+
+      if (pos.id === "north-stand") {
+        posX = pitchX + (pitchW - dims.width) / 2;
+        posY = Math.max(20, pitchY - dims.height - 20);
+      } else if (pos.id === "south-stand") {
+        posX = pitchX + (pitchW - dims.width) / 2;
+        posY = pitchY + pitchH + 20;
+      } else if (pos.id === "east-stand") {
+        posX = pitchX + pitchW + 20;
+        posY = pitchY + (pitchH - dims.height) / 2;
+      } else if (pos.id === "west-stand") {
+        posX = Math.max(20, pitchX - dims.width - 20);
+        posY = pitchY + (pitchH - dims.height) / 2;
+      } else if (pos.id === "vip-box") {
+        posX = pitchX + (pitchW - dims.width) / 2;
+        posY = pitchY + 30;
+      }
+
+      generatedBlocks.push({
+        ...initialBlock,
+        x: Math.max(10, Math.min(CANVAS_W - dims.width - 10, Math.round(posX))),
+        y: Math.max(10, Math.min(CANVAS_H - dims.height - 10, Math.round(posY))),
+        width: dims.width,
+        height: dims.height,
       });
     });
 
     setBlocks(generatedBlocks);
     setSelectedId(null);
-    toast.success(`🎉 Auto-generated ${generatedBlocks.length} stands matching organizer ticket capacities!`);
+    toast.success(`🎉 Auto-generated ${generatedBlocks.length} stands with auto-fitted dimensions!`);
+  };
+
+  // ── Auto-Adjust All Stand Sizes to match seat capacities ──
+  const handleAutoAdjustAllStandSizes = () => {
+    if (blocks.length === 0) {
+      toast.error("No stands on canvas to adjust.");
+      return;
+    }
+
+    setBlocks((prev) =>
+      prev.map((b) => {
+        const dims = calculateOptimalBlockDimensions(b, pitchW, pitchH);
+        let newX = b.x;
+        let newY = b.y;
+
+        if (b.shape !== "arc") {
+          // If stand is above pitch
+          if (b.y < pitchY && b.y + b.height <= pitchY + 30) {
+            newX = pitchX + (pitchW - dims.width) / 2;
+            newY = Math.max(20, pitchY - dims.height - 20);
+          }
+          // If stand is below pitch
+          else if (b.y >= pitchY + pitchH - 30) {
+            newX = pitchX + (pitchW - dims.width) / 2;
+            newY = pitchY + pitchH + 20;
+          }
+          // If stand is left of pitch
+          else if (b.x < pitchX && b.x + b.width <= pitchX + 30) {
+            newX = Math.max(20, pitchX - dims.width - 20);
+            newY = pitchY + (pitchH - dims.height) / 2;
+          }
+          // If stand is right of pitch
+          else if (b.x >= pitchX + pitchW - 30) {
+            newX = pitchX + pitchW + 20;
+            newY = pitchY + (pitchH - dims.height) / 2;
+          } else {
+            // General: keep centered on current position
+            newX = Math.round(b.x + (b.width - dims.width) / 2);
+            newY = Math.round(b.y + (b.height - dims.height) / 2);
+          }
+        }
+
+        return {
+          ...b,
+          x: Math.max(10, Math.min(CANVAS_W - dims.width - 10, newX)),
+          y: Math.max(10, Math.min(CANVAS_H - dims.height - 10, newY)),
+          width: dims.width,
+          height: dims.height,
+          innerRadius: dims.innerRadius ?? b.innerRadius,
+          outerRadius: dims.outerRadius ?? b.outerRadius,
+          sweepAngle: dims.sweepAngle ?? b.sweepAngle,
+        };
+      })
+    );
+    toast.success("⚡ All stand dimensions auto-adjusted proportionally to seat capacities!");
   };
 
   // Auto-fit all tiers
@@ -1562,25 +2697,36 @@ export default function StadiumBlockBuilder({
     }
 
     blocks.forEach((b) => {
-      if (b.tiers.length === 0) {
-        errors.push(`Stand "${b.name}" has no tiers. Add at least one tier to define seats.`);
+      const isDirect = b.seating_type === "direct" || !b.tiers || b.tiers.length <= 1;
+      if (isDirect) {
+        const ticketId = b.ticket_type_id || b.tiers?.[0]?.ticket_type_id;
+        if (!ticketId) {
+          errors.push(
+            `Stand "${b.name}" has NO ticket type assigned. Please choose an organizer ticket type.`
+          );
+        }
+        const seatCount = computeBlockSeatCount(b);
+        if (seatCount <= 0) {
+          errors.push(`Stand "${b.name}" has an invalid configuration (0 seats).`);
+        }
+      } else {
+        if (b.tiers.length === 0) {
+          errors.push(`Stand "${b.name}" has no tiers. Add at least one tier to define seats.`);
+        }
+        b.tiers.forEach((t) => {
+          if (!t.ticket_type_id) {
+            errors.push(
+              `Tier "${t.name}" in Stand "${b.name}" has NO ticket type assigned. Please link it to an organizer ticket type.`
+            );
+          }
+          const tSeats = computeTierSeatCount(t);
+          if (tSeats <= 0) {
+            errors.push(
+              `Tier "${t.name}" in Stand "${b.name}" has an invalid configuration (0 seats).`
+            );
+          }
+        });
       }
-      b.tiers.forEach((t) => {
-        if (!t.ticket_type_id) {
-          errors.push(
-            `Tier "${t.name}" in Stand "${b.name}" has NO ticket type assigned. Please link it to an organizer ticket type.`
-          );
-        }
-        const rowCount = Math.max(
-          0,
-          t.row_end.charCodeAt(0) - t.row_start.charCodeAt(0) + 1
-        );
-        if (rowCount <= 0 || (t.seats_per_row || 0) <= 0) {
-          errors.push(
-            `Tier "${t.name}" in Stand "${b.name}" has an invalid row or seat configuration (${rowCount} rows, ${t.seats_per_row} seats/row).`
-          );
-        }
-      });
     });
 
     ticketTypes.forEach((tt) => {
@@ -1588,20 +2734,24 @@ export default function StadiumBlockBuilder({
       if (target > 0) {
         let layoutSeats = 0;
         blocks.forEach((b) => {
-          b.tiers.forEach((t) => {
-            if (t.ticket_type_id === tt.id) {
-              const rowCount = Math.max(
-                0,
-                t.row_end.charCodeAt(0) - t.row_start.charCodeAt(0) + 1
-              );
-              layoutSeats += rowCount * (t.seats_per_row || 0);
+          const isDirect = b.seating_type === "direct" || !b.tiers || b.tiers.length <= 1;
+          if (isDirect) {
+            const ticketId = b.ticket_type_id || b.tiers?.[0]?.ticket_type_id;
+            if (ticketId === tt.id) {
+              layoutSeats += computeBlockSeatCount(b);
             }
-          });
+          } else {
+            b.tiers.forEach((t) => {
+              if (t.ticket_type_id === tt.id) {
+                layoutSeats += computeTierSeatCount(t);
+              }
+            });
+          }
         });
 
         if (layoutSeats === 0) {
           errors.push(
-            `Ticket Type "${tt.name || tt.ticket_type}" (Capacity: ${target}) has 0 seats in the layout. Please assign it to a stand tier.`
+            `Ticket Type "${tt.name || tt.ticket_type}" (Capacity: ${target}) has 0 seats in the layout. Please assign it to a stand or tier.`
           );
         } else if (layoutSeats !== target) {
           const diff = layoutSeats - target;
@@ -1775,6 +2925,18 @@ export default function StadiumBlockBuilder({
             >
               <Wand2 className="w-4 h-4" />
               <span>Auto-Build from Tickets</span>
+            </button>
+          )}
+
+          {blocks.length > 0 && (
+            <button
+              type="button"
+              onClick={handleAutoAdjustAllStandSizes}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md shadow-amber-500/20 active:scale-95"
+              title="Automatically adjusts width & height of all stands proportionally based on their seats and rows!"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>Auto-Adjust Sizes</span>
             </button>
           )}
 
@@ -2422,17 +3584,14 @@ export default function StadiumBlockBuilder({
               {/* ── Stands (Blocks) ── */}
               {blocks.map((block) => {
                 const isSelected = selectedId === block.id;
-                const totalSeats = block.tiers.reduce((acc, t) => {
-                  const rows = Math.max(
-                    0,
-                    t.row_end.charCodeAt(0) - t.row_start.charCodeAt(0) + 1
-                  );
-                  return acc + rows * (t.seats_per_row || 0);
-                }, 0);
+                const totalSeats = computeBlockSeatCount(block);
 
                 const assignedTicket = ticketTypes.find(
-                  (tt) => tt.id === block.tiers[0]?.ticket_type_id
+                  (tt) => tt.id === (block.ticket_type_id || block.tiers?.[0]?.ticket_type_id)
                 );
+                const isTiered =
+                  (block.seating_type === "tiered" || (!block.seating_type && (block.tiers?.length ?? 0) > 1)) &&
+                  (block.tiers?.length ?? 0) > 1;
 
                 if (block.shape === "arc") {
                   const sCenterX = block.stadiumCenterX ?? CANVAS_W / 2;
@@ -2463,7 +3622,7 @@ export default function StadiumBlockBuilder({
                         setActiveSidebarTab("stands");
                       }}
                     >
-                      {block.tiers && block.tiers.length > 1 ? (
+                      {isTiered ? (
                         <>
                           {block.tiers.map((tier, tIdx) => {
                             const numTiers = block.tiers.length;
@@ -2474,11 +3633,7 @@ export default function StadiumBlockBuilder({
                             const midR = (tierInR + tierOutR) / 2;
                             const tierLabelX = sCenterX + Math.cos(midAngleRad) * midR;
                             const tierLabelY = sCenterY + Math.sin(midAngleRad) * midR;
-                            const rowCount = Math.max(
-                              0,
-                              tier.row_end.charCodeAt(0) - tier.row_start.charCodeAt(0) + 1
-                            );
-                            const tierSeats = rowCount * (tier.seats_per_row || 0);
+                            const tierSeats = computeTierSeatCount(tier);
 
                             return (
                               <Group key={tier.id || `arc-tier-${tIdx}`}>
@@ -2578,7 +3733,9 @@ export default function StadiumBlockBuilder({
                             />
                             <Text
                               text={
-                                assignedTicket
+                                block.stand_type === "standing"
+                                  ? `🧍 STANDING · ${totalSeats.toLocaleString()} passes`
+                                  : assignedTicket
                                   ? `${assignedTicket.name || assignedTicket.ticket_type} · ${totalSeats} seats`
                                   : `${totalSeats} seats`
                               }
@@ -2588,7 +3745,7 @@ export default function StadiumBlockBuilder({
                               align="center"
                               fontSize={9}
                               fontStyle="bold"
-                              fill="#fde047"
+                              fill={block.stand_type === "standing" ? "#e9d5ff" : "#fde047"}
                               shadowColor="#000000"
                               shadowBlur={3}
                               listening={false}
@@ -2661,7 +3818,7 @@ export default function StadiumBlockBuilder({
                         shadowBlur={isSelected ? 18 : 8}
                         shadowOpacity={isSelected ? 0.9 : 0.4}
                       />
-                    ) : block.tiers && block.tiers.length > 1 ? (
+                    ) : isTiered && block.tiers ? (
                       // ── Multi-Tier Stand: render divided tier slices with their distinct colors ──
                       <>
                         {/* Stand container background with shadow and selection outline */}
@@ -2687,11 +3844,7 @@ export default function StadiumBlockBuilder({
                           const tierColor = tier.color || (tIdx === 0 ? "#f59e0b" : "#10b981");
                           const isFirst = tIdx === 0;
                           const isLast = tIdx === numTiers - 1;
-                          const rowCount = Math.max(
-                            0,
-                            tier.row_end.charCodeAt(0) - tier.row_start.charCodeAt(0) + 1
-                          );
-                          const tierSeats = rowCount * (tier.seats_per_row || 0);
+                          const tierSeats = computeTierSeatCount(tier);
                           const assigned = ticketTypes.find((tt) => tt.id === tier.ticket_type_id);
 
                           return (
@@ -2830,7 +3983,9 @@ export default function StadiumBlockBuilder({
                         />
                         <Text
                           text={
-                            assignedTicket
+                            block.stand_type === "standing"
+                              ? `🧍 STANDING · ${totalSeats.toLocaleString()} passes`
+                              : assignedTicket
                               ? `${assignedTicket.name || assignedTicket.ticket_type} · ${totalSeats} seats`
                               : `${totalSeats} seats`
                           }
@@ -2840,7 +3995,7 @@ export default function StadiumBlockBuilder({
                           align="center"
                           fontSize={Math.max(11, Math.min(block.width, block.height) * 0.12)}
                           fontStyle="bold"
-                          fill="#fde047"
+                          fill={block.stand_type === "standing" ? "#e9d5ff" : "#fde047"}
                           shadowColor="#000000"
                           shadowBlur={3}
                           listening={false}
@@ -2965,13 +4120,26 @@ export default function StadiumBlockBuilder({
                   <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
                     Stands & Seating Tiers
                   </span>
-                  <button
-                    type="button"
-                    onClick={addBlock}
-                    className="flex items-center gap-1 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Stand
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {blocks.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleAutoAdjustAllStandSizes}
+                        className="flex items-center gap-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1.5 rounded-xl shadow-sm transition-all active:scale-95"
+                        title="Auto-adjust all stand dimensions proportionally based on their seat capacities"
+                      >
+                        <Maximize2 className="w-3 h-3 text-amber-600" />
+                        <span>Auto-Size All</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={addBlock}
+                      className="flex items-center gap-1 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Stand
+                    </button>
+                  </div>
                 </div>
 
                 {blocks.map((block) => (
@@ -2980,6 +4148,8 @@ export default function StadiumBlockBuilder({
                     block={block}
                     isSelected={selectedId === block.id}
                     ticketTypes={ticketTypes}
+                    pitchW={pitchW}
+                    pitchH={pitchH}
                     onUpdate={updateBlock}
                     onDelete={() => deleteBlock(block.id)}
                     onSelect={() => {

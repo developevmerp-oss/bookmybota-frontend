@@ -955,7 +955,7 @@ function DiningSettlementDetailPanel({
                       <td className="px-3 py-2.5 font-semibold text-white">{money(line.gift_card_amount)}</td>
                       <td className="px-3 py-2.5 text-amber-400">−{money(line.commission_total)}</td>
                       <td className="px-3 py-2.5 font-semibold text-emerald-400">{money(line.restaurant_payout)}</td>
-                      <td className="px-3 py-2.5 text-xs text-zinc-500">{formatDate(line.redemption_created_at || line.redeemed_at)}</td>
+                      <td className="px-3 py-2.5 text-xs text-zinc-500">{formatDate((line as any).redemption_created_at || line.redeemed_at)}</td>
                     </tr>
                   ))}
                   {(run.lines || []).length === 0 ? (

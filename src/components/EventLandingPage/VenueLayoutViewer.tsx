@@ -254,23 +254,21 @@ export default function VenueLayoutViewer({
   const handleSeatClick = (seat: Seat) => {
     if (seat.status !== "AVAILABLE") return;
 
-    setSelectedSeatIds((prev) => {
-      const isSelected = prev.includes(seat.id);
-      let newSelection: string[] = [];
-      if (isSelected) {
-        newSelection = prev.filter((id) => id !== seat.id);
-      } else if (prev.length >= maxSelectable) {
-        // BMS: qty already filled — start a fresh pick from the tapped seat
-        // (parent auto-expands contiguous neighbors via onSeatsSelected).
-        newSelection = [seat.id];
-      } else {
-        newSelection = [...prev, seat.id];
-      }
+    const isSelected = selectedSeatIds.includes(seat.id);
+    let newSelection: string[] = [];
+    if (isSelected) {
+      newSelection = selectedSeatIds.filter((id) => id !== seat.id);
+    } else if (selectedSeatIds.length >= maxSelectable) {
+      // BMS: qty already filled — start a fresh pick from the tapped seat
+      // (parent auto-expands contiguous neighbors via onSeatsSelected).
+      newSelection = [seat.id];
+    } else {
+      newSelection = [...selectedSeatIds, seat.id];
+    }
 
-      const selectedSeats = seats.filter((s) => newSelection.includes(s.id));
-      onSeatsSelected(selectedSeats);
-      return newSelection;
-    });
+    setSelectedSeatIds(newSelection);
+    const selectedSeats = seats.filter((s) => newSelection.includes(s.id));
+    onSeatsSelected(selectedSeats);
   };
 
   const handleShapeClick = (shape: Shape) => {
@@ -294,16 +292,12 @@ export default function VenueLayoutViewer({
       status: "AVAILABLE",
     };
 
-    setSeats(prev => {
-      const newSeats = [...prev, dummySeat];
-      setSelectedSeatIds(prevIds => {
-        const newIds = [...prevIds, dummyId];
-        const selectedObjects = newSeats.filter(s => newIds.includes(s.id));
-        onSeatsSelected(selectedObjects);
-        return newIds;
-      });
-      return newSeats;
-    });
+    const newSeats = [...seats, dummySeat];
+    const newIds = [...selectedSeatIds, dummyId];
+    setSeats(newSeats);
+    setSelectedSeatIds(newIds);
+    const selectedObjects = newSeats.filter((s) => newIds.includes(s.id));
+    onSeatsSelected(selectedObjects);
   };
 
   const handleToggleZoomOnSection = (seat: Seat) => {

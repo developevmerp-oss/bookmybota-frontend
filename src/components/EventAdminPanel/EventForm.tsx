@@ -875,9 +875,11 @@ function generateTicketTypesFromLayout(
   if (isStadium && Array.isArray(cfg.blocks) && cfg.blocks.length > 0) {
     const blocks = cfg.blocks as any[];
     return blocks.map((b: any, idx: number) => {
-      // Prefer tier-computed capacity (source of truth); fall back to b.capacity only when no tiers
+      // Prefer standing capacity if stand_type is standing, else tier-computed capacity
       let cap = 0;
-      if (Array.isArray(b.tiers) && b.tiers.length > 0) {
+      if (b.stand_type === "standing") {
+        cap = Number(b.capacity) || 0;
+      } else if (Array.isArray(b.tiers) && b.tiers.length > 0) {
         cap = b.tiers.reduce((sum: number, t: any) => {
           const rCount = Math.max(
             1,
@@ -885,6 +887,13 @@ function generateTicketTypesFromLayout(
           );
           return sum + rCount * (Number(t.seats_per_row) || 0);
         }, 0);
+      }
+      if (cap <= 0 && b.row_start && b.row_end && b.seats_per_row) {
+        const rCount = Math.max(
+          1,
+          String(b.row_end).charCodeAt(0) - String(b.row_start).charCodeAt(0) + 1
+        );
+        cap = rCount * (Number(b.seats_per_row) || 0);
       }
       if (cap <= 0) {
         cap = Number(b.capacity) || 0;

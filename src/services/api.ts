@@ -6721,6 +6721,12 @@ export const api = createApi({
           height: number;
           rotation?: number;
           shape?: 'rectangle' | 'pill' | 'curved' | 'oval' | 'arc';
+          stand_type?: 'seated' | 'standing';
+          ticket_type_id?: string;
+          seats_per_row?: number;
+          row_seat_overrides?: Record<string, number>;
+          row_gaps?: string[];
+          excluded_seats?: string[];
           innerRadius?: number;
           outerRadius?: number;
           startAngle?: number;
@@ -6738,6 +6744,10 @@ export const api = createApi({
             available: number;
             color?: string | null;
             price?: number;
+            seats_per_row?: number;
+            row_seat_overrides?: Record<string, number>;
+            row_gaps?: string[];
+            excluded_seats?: string[];
           }>;
         }>;
       },

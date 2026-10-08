@@ -29,6 +29,10 @@ import PartnerLiveEventsSection, {
 } from "@/components/Shared/PartnerLiveEventsSection";
 import PartnerPublicGallery from "@/components/Shared/PartnerPublicGallery";
 import {
+  PartnerEventsSectionShimmer,
+  VenueDetailShimmer,
+} from "@/components/Shared/Shimmer";
+import {
   isEventLiveFromDetail,
   mergePartnerEventItems,
   type PartnerEventWithMeta,
@@ -79,12 +83,33 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [aboutOverflows, setAboutOverflows] = useState(false);
   const [venueEvents, setVenueEvents] = useState<PartnerEventWithMeta[]>(EMPTY_EVENT_ITEMS);
+  const [eventsReady, setEventsReady] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
+  const [inquiryFormEl, setInquiryFormEl] = useState<HTMLFormElement | null>(null);
+  const [inquiryFormInView, setInquiryFormInView] = useState(false);
   const aboutTextRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     setShowAllEvents(false);
+    setEventsReady(false);
+    setInquiryFormInView(false);
   }, [venueId]);
+
+  useEffect(() => {
+    if (!inquiryFormEl || showAllEvents) {
+      setInquiryFormInView(false);
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setInquiryFormInView(Boolean(entries[0]?.isIntersecting));
+      },
+      { threshold: 0.2, rootMargin: "0px 0px -12% 0px" }
+    );
+    observer.observe(inquiryFormEl);
+    return () => observer.disconnect();
+  }, [inquiryFormEl, showAllEvents]);
 
   const freeDates = useMemo(
     () => (venue?.slots || []).map((s) => s.slot_date),
@@ -170,14 +195,70 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
     const events = publicEventsData ?? EMPTY_EVENTS;
     if (!venueId) {
       setVenueEvents(EMPTY_EVENT_ITEMS);
+      setEventsReady(true);
       return;
     }
+    // Wait for venue profile so we can match UUID id (URL may be a slug)
+    if (!venue?.id && !venue?.name) {
+      setEventsReady(false);
+      return;
+    }
+
+    const partnerKey = String(venue?.id || venueId).trim();
+    const idCandidates = new Set(
+      [venue?.id, venue?.slug, venueId]
+        .map((v) => String(v || "").trim())
+        .filter(Boolean)
+    );
+
+    const normVenueLabel = (value?: string | null) =>
+      String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+
+    /** "Addis Ababa Stadium: Bole" ↔ "Addis Ababa Stadium" */
+    const venueLabelsMatch = (a?: string | null, b?: string | null) => {
+      const left = normVenueLabel(a);
+      const right = normVenueLabel(b);
+      if (!left || !right) return false;
+      if (left === right) return true;
+      const leftCore = left.split(":")[0].trim();
+      const rightCore = right.split(":")[0].trim();
+      if (leftCore && rightCore && leftCore === rightCore) return true;
+      if (leftCore.length >= 4 && rightCore.length >= 4) {
+        if (leftCore.includes(rightCore) || rightCore.includes(leftCore)) return true;
+      }
+      return false;
+    };
+
+    const venueName = String(venue?.name || "").trim();
+
+    const showtimeAtThisVenue = (row: {
+      venue_business_id?: string | null;
+      venue_name?: string | null;
+      venue_business_name?: string | null;
+    }) => {
+      const bid = String(row.venue_business_id || "").trim();
+      if (bid && idCandidates.has(bid)) return true;
+      if (venueLabelsMatch(venueName, row.venue_name)) return true;
+      if (venueLabelsMatch(venueName, row.venue_business_name)) return true;
+      return false;
+    };
+
+    if (publicEventsData === undefined) {
+      setEventsReady(false);
+      return;
+    }
+
     if (events.length === 0) {
-      setVenueEvents(mergePartnerEventItems("venue", venueId, EMPTY_EVENT_ITEMS));
+      setVenueEvents(mergePartnerEventItems("venue", partnerKey, EMPTY_EVENT_ITEMS));
+      setEventsReady(true);
       return;
     }
 
     let cancelled = false;
+    setEventsReady(false);
     (async () => {
       const matched: PartnerEventWithMeta[] = [];
       const chunkSize = 8;
@@ -186,15 +267,16 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
         const chunk = events.slice(i, i + chunkSize);
         await Promise.all(
           chunk.map(async (event) => {
+            // Fast path: public list already has venue_name
+            const listNameHit = venueLabelsMatch(venueName, event.venue_name);
+
             try {
               const detail = await dispatch(
                 api.endpoints.getPublicEvent.initiate(event.id, { forceRefetch: false })
               ).unwrap();
-              const atVenue = (detail.showtimes || []).some(
-                (row) =>
-                  row.venue_business_id != null &&
-                  String(row.venue_business_id) === String(venueId)
-              );
+              const showtimes = detail.showtimes || [];
+              const atVenue =
+                showtimes.some((row) => showtimeAtThisVenue(row)) || listNameHit;
               if (atVenue) {
                 matched.push({
                   event,
@@ -202,7 +284,13 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                 });
               }
             } catch {
-              // skip events that fail to load
+              // Detail can 404 for ended events; still keep list-name matches as past
+              if (listNameHit) {
+                matched.push({
+                  event,
+                  live: false,
+                });
+              }
             }
           })
         );
@@ -220,16 +308,17 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
       setVenueEvents(
         mergePartnerEventItems(
           "venue",
-          venueId,
+          partnerKey,
           matched.length ? matched : EMPTY_EVENT_ITEMS
         )
       );
+      setEventsReady(true);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [venueId, dispatch, publicEventsData, publicEventsKey]);
+  }, [venueId, venue?.id, venue?.slug, venue?.name, dispatch, publicEventsData, publicEventsKey]);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -269,11 +358,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
   });
 
   if (isLoading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center text-slate-500">
-        Loading venue…
-      </div>
-    );
+    return <VenueDetailShimmer />;
   }
 
   if (isError || !venue) {
@@ -298,8 +383,27 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
     (u): u is string => typeof u === "string" && !!u.trim()
   );
 
+  if (showAllEvents && venueEvents.length > 0) {
+    return (
+      <div className="min-h-screen bg-white overflow-x-hidden">
+        <div className="bg-white container mx-auto px-4 sm:px-6 lg:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+          <PartnerAllEventsPanel
+            items={venueEvents}
+            onBack={() => setShowAllEvents(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const showStickyInquiry = !inquiryFormInView;
+
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden">
+    <div
+      className={`min-h-screen bg-white overflow-x-hidden ${
+        showStickyInquiry ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-0" : ""
+      }`}
+    >
       <div className="mx-auto container px-4 sm:px-6 lg:px-10 2xl:px-0 pt-5 sm:pt-6">
         <Link
           href="/venues"
@@ -355,7 +459,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                     .getElementById("venue-inquiry")
                     ?.scrollIntoView({ behavior: "smooth", block: "start" })
                 }
-                className="mt-5 inline-flex h-11 w-full sm:w-auto items-center justify-center rounded-xl bg-white px-7 text-sm font-bold text-[#111111] transition-colors hover:bg-black cursor-pointer"
+                className="mt-5 hidden lg:inline-flex h-11 items-center justify-center rounded-xl bg-white px-7 text-sm font-bold text-[#111111] transition-colors hover:bg-black cursor-pointer"
               >
                 Send inquiry
               </button>
@@ -365,12 +469,6 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
       </header>
 
       <div className="bg-white container mx-auto px-4 sm:px-6 lg:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
-        {showAllEvents && venueEvents.length > 0 ? (
-          <PartnerAllEventsPanel
-            items={venueEvents}
-            onBack={() => setShowAllEvents(false)}
-          />
-        ) : (
         <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-5">
           <div className="min-w-0 flex-1 order-1 space-y-8 sm:space-y-10">
               {aboutText ? (
@@ -400,19 +498,26 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
                 </section>
               ) : null}
 
+              {!eventsReady ? (
+                <PartnerEventsSectionShimmer count={3} />
+              ) : venueEvents.length > 0 ? (
+                <PartnerLiveEventsSection
+                  items={venueEvents}
+                  coverSrc={coverSrc}
+                  onSeeMore={() => {
+                    setShowAllEvents(true);
+                    if (typeof window !== "undefined") {
+                      window.scrollTo({ top: 0, behavior: "auto" });
+                    }
+                  }}
+                />
+              ) : null}
+
               {galleryImages.length > 0 ? (
                 <PartnerPublicGallery
                   images={galleryImages}
                   label={`${venue.name} gallery`}
                   dense
-                />
-              ) : null}
-
-              {venueEvents.length > 0 ? (
-                <PartnerLiveEventsSection
-                  items={venueEvents}
-                  coverSrc={coverSrc}
-                  onSeeMore={() => setShowAllEvents(true)}
                 />
               ) : null}
 
@@ -445,6 +550,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
           <aside className="w-full shrink-0 order-2 max-w-xl lg:max-w-none lg:w-[min(100%,32rem)]">
             <form
               id="venue-inquiry"
+              ref={setInquiryFormEl}
               onSubmit={onSubmit}
               className="relative w-full rounded-[1.25rem] sm:rounded-[1.5rem] border border-[#F0EAF7] bg-white p-4 sm:p-5 md:p-6 space-y-4 shadow-[0_10px_30px_rgba(105,0,170,0.07)] scroll-mt-24 sm:scroll-mt-28 lg:sticky lg:top-24"
               noValidate
@@ -575,8 +681,23 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
             </form>
           </aside>
         </div>
-        )}
       </div>
+
+      {showStickyInquiry ? (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={() =>
+              document
+                .getElementById("venue-inquiry")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+            className="w-full rounded-xl bg-[#111111] text-white py-3.5 text-base font-bold cursor-pointer hover:bg-black"
+          >
+            Send inquiry
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

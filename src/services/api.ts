@@ -709,6 +709,9 @@ export interface AdminEvent {
   is_visible: boolean;
   convenience_fee_percent: number | string;
   commission_percent: number | string;
+  /** Current event contract (list/detail when joined). */
+  contract_id?: string | null;
+  contract_status?: string | null;
   organizer_name?: string;
   organizer_phone?: string;
   organizer_address?: string;

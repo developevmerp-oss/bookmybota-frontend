@@ -39,6 +39,7 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { artistHref } from "@/lib/businessPublicPath";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
+import ExploreEventOption2 from "@/components/EventLandingPage/ExploreEventOption2";
 import {
   ArtistRailShimmer,
   CustomerRailShimmer,
@@ -141,6 +142,8 @@ const EXPLORE_EVENT_CATEGORIES = [
       "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.88) 0%, transparent 72%), linear-gradient(165deg, #F8F7FF 0%, #E4DFFF 48%, #CDC6F5 100%)",
     border: "#C8C0E8",
     shadow: "0 8px 22px rgba(140, 120, 210, 0.16)",
+    /** ExploreEventOption2 pastel fill */
+    background: "#F3EEFF",
   },
   {
     key: "concert" as const,
@@ -150,6 +153,7 @@ const EXPLORE_EVENT_CATEGORIES = [
       "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.85) 0%, transparent 72%), linear-gradient(165deg, #FFFCF5 0%, #FFF0C8 48%, #FFE29A 100%)",
     border: "#E5D0A0",
     shadow: "0 8px 22px rgba(212, 168, 64, 0.16)",
+    background: "#FFF6E0",
   },
   {
     key: "comedy" as const,
@@ -159,6 +163,7 @@ const EXPLORE_EVENT_CATEGORIES = [
       "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.88) 0%, transparent 72%), linear-gradient(165deg, #F5FFF8 0%, #D8F5E2 48%, #B8EBC8 100%)",
     border: "#A8D8B8",
     shadow: "0 8px 22px rgba(90, 180, 120, 0.15)",
+    background: "#E8F8EE",
   },
   {
     key: "sports" as const,
@@ -168,6 +173,7 @@ const EXPLORE_EVENT_CATEGORIES = [
       "radial-gradient(ellipse 85% 70% at 50% 58%, rgba(255,255,255,0.85) 0%, transparent 72%), linear-gradient(165deg, #FFF8F4 0%, #FFE0CE 48%, #FFC4A6 100%)",
     border: "#E8BFA8",
     shadow: "0 8px 22px rgba(232, 130, 90, 0.16)",
+    background: "#FFEFEA",
   },
 ];
 
@@ -2627,7 +2633,36 @@ export default function PublicEventsPage() {
 
       {!isCategoryBrowse ? (
         <>
-          {/* 2) Explore Events — polished pastel category cards */}
+          {/* 2) Explore Events — option 2 horizontal pastel cards */}
+          {catalogPending ? (
+            <section className="pt-8 sm:pt-10 pb-3 bg-white">
+              <div className={CONTAINER}>
+                <div className="min-w-0 pb-4">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">
+                    Explore Events
+                  </h2>
+                </div>
+                <EventExploreShimmer count={6} />
+              </div>
+            </section>
+          ) : exploreCategoriesWithEvents.length > 0 ? (
+            <ExploreEventOption2
+              categories={exploreCategoriesWithEvents.map((cat) => ({
+                key: cat.key,
+                label: cat.label,
+                image: cat.image,
+                background: cat.background,
+              }))}
+              onCategoryClick={onExploreCategory}
+              emptyNotice={
+                cityHasNoEvents ? (
+                  <CitySectionEmptyNotice message="No events available in your city yet." />
+                ) : null
+              }
+            />
+          ) : null}
+
+          {/* Previous Explore Events — vertical icon cards (kept for easy restore)
           {catalogPending ? (
             <section className="pt-8 sm:pt-10 pb-3 bg-white">
               <div className={CONTAINER}>
@@ -2711,37 +2746,12 @@ export default function PublicEventsPage() {
                           {cat.label}
                         </span>
                         <span className="flex min-h-0 w-full flex-1 items-center justify-center px-2.5 pb-3.5 pt-1.5">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <motion.img
                             src={cat.image}
                             alt=""
                             aria-hidden
                             className="h-full w-full max-h-[118px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.14)]"
                             draggable={false}
-                            variants={{
-                              hidden: { opacity: 0, y: 12, scale: 0.86 },
-                              show: {
-                                opacity: 1,
-                                y: 0,
-                                scale: 1,
-                                transition: {
-                                  type: "spring",
-                                  stiffness: 280,
-                                  damping: 18,
-                                  delay: 0.05,
-                                },
-                              },
-                              hover: {
-                                y: -6,
-                                rotate: -2,
-                                scale: 1.06,
-                                transition: {
-                                  type: "spring",
-                                  stiffness: 340,
-                                  damping: 14,
-                                },
-                              },
-                            }}
                           />
                         </span>
                       </span>
@@ -2751,6 +2761,7 @@ export default function PublicEventsPage() {
               </div>
             </section>
           ) : null}
+          */}
 
           {/* 3) Top recommendations — temporarily hidden
           <section className="pt-8 sm:pt-10 pb-2 bg-white">

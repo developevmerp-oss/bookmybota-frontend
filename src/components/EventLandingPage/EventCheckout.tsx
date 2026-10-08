@@ -2668,20 +2668,20 @@ export default function EventCheckout({
       {isMapFullscreen && desiredSeatQty != null && (
         <div className="fixed inset-0 z-[100] bg-white flex flex-col overflow-hidden">
           <header className="shrink-0 bg-white border-b border-slate-200">
-            <div className="px-3 sm:px-4 py-1.5 flex items-center gap-2.5">
+            <div className="px-3 sm:px-4 py-1.5 md:max-lg:py-2.5 flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsMapFullscreen(false)}
-                className="h-8 w-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-700 cursor-pointer hover:bg-slate-50 shrink-0"
+                className="h-8 w-8 md:max-lg:h-9 md:max-lg:w-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-700 cursor-pointer hover:bg-slate-50 shrink-0"
                 aria-label="Back from seating map"
               >
                 <ArrowLeft size={16} />
               </button>
               <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-[0.9375rem] text-slate-900 truncate leading-tight">
+                <h3 className="font-bold text-[0.9375rem] md:max-lg:text-[1.125rem] lg:text-[0.9375rem] text-slate-900 truncate leading-tight">
                   {event.name}
                 </h3>
-                <p className="text-[0.6875rem] text-slate-500 truncate leading-tight">
+                <p className="text-[0.6875rem] md:max-lg:text-[0.8125rem] lg:text-[0.6875rem] text-slate-500 truncate leading-tight">
                   {[
                     selectedShowtime?.venue_name,
                     selectedShowtime?.starts_at
@@ -2698,7 +2698,7 @@ export default function EventCheckout({
                     <button
                       type="button"
                       onClick={() => setSeatViewMode("canvas")}
-                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${
                         seatViewMode === "canvas"
                           ? "bg-[#6900AA] text-white shadow-sm"
                           : "text-slate-500 hover:text-slate-900"
@@ -2710,7 +2710,7 @@ export default function EventCheckout({
                     <button
                       type="button"
                       onClick={() => setSeatViewMode("grid")}
-                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] md:max-lg:text-[12px] lg:text-[10px] font-bold transition-all cursor-pointer ${
                         seatViewMode === "grid"
                           ? "bg-[#6900AA] text-white shadow-sm"
                           : "text-slate-500 hover:text-slate-900"
@@ -2721,7 +2721,7 @@ export default function EventCheckout({
                     </button>
                   </div>
                 )}
-                <p className="text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
+                <p className="text-[0.8125rem] md:max-lg:text-[1rem] lg:text-[0.8125rem] font-extrabold text-[#6900AA] tabular-nums">
                   {selectedSeats.length}/{desiredSeatQty}
                 </p>
                 {selectedSeats.length > 0 && (
@@ -2731,7 +2731,7 @@ export default function EventCheckout({
                       setSelectedSeats([]);
                       toast.info("Cleared all selected seats");
                     }}
-                    className="text-[0.6875rem] font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                    className="text-[0.6875rem] md:max-lg:text-[0.8125rem] lg:text-[0.6875rem] font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
                   >
                     Clear all
                   </button>
@@ -2743,7 +2743,7 @@ export default function EventCheckout({
                     setSelectedSeats([]);
                     setIsMapFullscreen(false);
                   }}
-                  className="text-[0.6875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
+                  className="text-[0.6875rem] md:max-lg:text-[0.8125rem] lg:text-[0.6875rem] font-semibold text-[#6900AA] hover:underline cursor-pointer"
                 >
                   Change
                 </button>
@@ -2751,9 +2751,9 @@ export default function EventCheckout({
             </div>
           </header>
 
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#F8FAFC]">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white">
             {seatViewMode === "canvas" || isStadiumLayout ? (
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 h-full w-full">
                 {isStadiumLayout ? (
                   <StadiumLayoutViewer
                     eventId={event.id}
@@ -2936,11 +2936,11 @@ export default function EventCheckout({
             )}
           </div>
 
-          <footer className="shrink-0 bg-white border-t border-slate-200 px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.1)]">
-            <div className="max-w-5xl mx-auto flex items-center gap-3 sm:gap-4">
+          <footer className="shrink-0 bg-white border-t border-slate-200 px-3 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.1)]">
+            <div className="max-w-5xl mx-auto flex items-center gap-2.5 sm:gap-4">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-[0.75rem] sm:text-[0.8125rem] text-slate-500 font-medium">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[0.75rem] sm:text-[0.8125rem] md:max-lg:text-[0.9375rem] lg:text-[0.8125rem] text-slate-500 font-medium">
                     {selectedSeats.length === 0
                       ? `Select ${desiredSeatQty} seat${desiredSeatQty === 1 ? "" : "s"}`
                       : `${selectedSeats.length}/${desiredSeatQty} selected`}
@@ -2952,21 +2952,21 @@ export default function EventCheckout({
                         setSelectedSeats([]);
                         toast.info("Cleared all selected seats");
                       }}
-                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                      className="text-[11px] md:max-lg:text-[13px] lg:text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
                     >
                       Clear all
                     </button>
                   )}
                 </div>
                 {selectedSeats.length > 0 && (
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                  <p className="text-[11px] md:max-lg:text-[13px] lg:text-[11px] text-slate-400 truncate mt-0.5 hidden sm:block">
                     {selectedSeats
                       .map((s: any) => `${s.row_label || s.row || ""}${s.seat_label || s.number || ""}`)
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
                 )}
-                <p className="text-[1.25rem] sm:text-[1.375rem] font-extrabold text-slate-900 leading-tight mt-0.5">
+                <p className="text-[1.125rem] sm:text-[1.375rem] md:max-lg:text-[1.5rem] lg:text-[1.375rem] font-extrabold text-slate-900 leading-tight mt-0.5">
                   {formatMoney(ticketAmount, { compact: true })}
                 </p>
               </div>
@@ -2983,7 +2983,7 @@ export default function EventCheckout({
                   setIsMapFullscreen(false);
                   proceedFromTickets();
                 }}
-                className={`min-w-[9.5rem] sm:min-w-[12rem] px-5 py-3.5 ${accentBtn} text-white font-bold text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed`}
+                className={`shrink-0 min-w-[7.5rem] sm:min-w-[12rem] px-4 sm:px-5 py-3 sm:py-3.5 ${accentBtn} text-white font-bold text-[0.9375rem] sm:text-[1.0625rem] md:max-lg:text-[1.125rem] lg:text-[1.0625rem] rounded-xl cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed`}
               >
                 {selectedSeats.length === desiredSeatQty ? "Continue" : "Select seats"}
               </button>

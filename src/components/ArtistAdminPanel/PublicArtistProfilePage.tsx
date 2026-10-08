@@ -53,6 +53,10 @@ import PartnerLiveEventsSection, {
 } from "@/components/Shared/PartnerLiveEventsSection";
 import PartnerPublicGallery from "@/components/Shared/PartnerPublicGallery";
 import {
+  ArtistDetailShimmer,
+  PartnerEventsSectionShimmer,
+} from "@/components/Shared/Shimmer";
+import {
   isEventLiveFromDetail,
   isPublicEventLive,
   mergePartnerEventItems,
@@ -111,6 +115,19 @@ function NonRegisteredArtistView({
   const aboutText = about?.trim() || "";
   const [showAllEvents, setShowAllEvents] = useState(false);
 
+  if (showAllEvents && eventItems.length > 0) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+          <PartnerAllEventsPanel
+            items={eventItems}
+            onBack={() => setShowAllEvents(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <header className="relative w-full overflow-hidden">
@@ -134,7 +151,7 @@ function NonRegisteredArtistView({
             <ArrowLeft size={16} /> All artists
           </Link>
 
-          <div className="mt-5 flex flex-col items-start gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-center md:gap-8 lg:gap-10">
+          <div className="mt-5 flex flex-col items-center gap-6 sm:gap-8 lg:mt-7 lg:flex-row lg:items-center lg:gap-8 xl:gap-10">
             <div className="relative h-56 w-56 shrink-0 overflow-hidden rounded-2xl bg-[#F7E9FF] shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-100 lg:w-100">
               <SafeCoverImage
                 src={coverSrc}
@@ -145,7 +162,7 @@ function NonRegisteredArtistView({
               />
             </div>
 
-            <div className="min-w-0 flex-1 text-left">
+            <div className="min-w-0 flex-1 text-center lg:text-left">
               {typeName ? (
                 <p className="text-sm font-semibold text-[#1B1B3A]">{typeName}</p>
               ) : null}
@@ -153,7 +170,7 @@ function NonRegisteredArtistView({
                 {name}
               </h1>
               {aboutText ? (
-                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[#374151] sm:text-[15px] whitespace-pre-wrap">
+                <p className="mt-3 max-w-3xl mx-auto lg:mx-0 text-sm leading-relaxed text-[#374151] sm:text-[15px] whitespace-pre-wrap">
                   {aboutText}
                 </p>
               ) : null}
@@ -164,18 +181,16 @@ function NonRegisteredArtistView({
 
       <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
         {eventItems.length > 0 ? (
-          showAllEvents ? (
-            <PartnerAllEventsPanel
-              items={eventItems}
-              onBack={() => setShowAllEvents(false)}
-            />
-          ) : (
-            <PartnerLiveEventsSection
-              items={eventItems}
-              coverSrc={coverSrc}
-              onSeeMore={() => setShowAllEvents(true)}
-            />
-          )
+          <PartnerLiveEventsSection
+            items={eventItems}
+            coverSrc={coverSrc}
+            onSeeMore={() => {
+              setShowAllEvents(true);
+              if (typeof window !== "undefined") {
+                window.scrollTo({ top: 0, behavior: "auto" });
+              }
+            }}
+          />
         ) : (
           <p className="text-sm text-[#6B6B6B]">No events for this artist right now.</p>
         )}
@@ -207,12 +222,33 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   const [aboutOpen, setAboutOpen] = useState(false);
   const [bioOverflows, setBioOverflows] = useState(false);
   const [lineupEvents, setLineupEvents] = useState<PartnerEventWithMeta[]>(EMPTY_EVENT_ITEMS);
+  const [eventsReady, setEventsReady] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
+  const [inquiryFormEl, setInquiryFormEl] = useState<HTMLFormElement | null>(null);
+  const [inquiryFormInView, setInquiryFormInView] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     setShowAllEvents(false);
+    setEventsReady(false);
+    setInquiryFormInView(false);
   }, [artistId]);
+
+  useEffect(() => {
+    if (!inquiryFormEl || showAllEvents) {
+      setInquiryFormInView(false);
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setInquiryFormInView(Boolean(entries[0]?.isIntersecting));
+      },
+      { threshold: 0.2, rootMargin: "0px 0px -12% 0px" }
+    );
+    observer.observe(inquiryFormEl);
+    return () => observer.disconnect();
+  }, [inquiryFormEl, showAllEvents]);
 
   const form = useForm<ArtistInquiryFormValues>({
     resolver: yupResolver(artistInquiryFormSchema),
@@ -274,14 +310,21 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
     const artistName = artist?.name || eventProfile?.name || "";
     if (!artistId) {
       setLineupEvents(EMPTY_EVENT_ITEMS);
+      setEventsReady(true);
+      return;
+    }
+    if (publicEventsData === undefined) {
+      setEventsReady(false);
       return;
     }
     if (events.length === 0) {
       setLineupEvents(mergePartnerEventItems("artist", artistId, EMPTY_EVENT_ITEMS));
+      setEventsReady(true);
       return;
     }
 
     let cancelled = false;
+    setEventsReady(false);
     (async () => {
       const matched: PartnerEventWithMeta[] = [];
       const chunkSize = 8;
@@ -326,6 +369,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
           matched.length ? matched : EMPTY_EVENT_ITEMS
         )
       );
+      setEventsReady(true);
     })();
 
     return () => {
@@ -369,11 +413,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   });
 
   if ((!skipPublicArtist && isLoading) || (catalogLoading && !artist && !eventProfile)) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center text-slate-500">
-        Loading artist…
-      </div>
-    );
+    return <ArtistDetailShimmer />;
   }
 
   const canInquire = Boolean(artist && isBookMyBotaRegisteredArtist(artist));
@@ -472,10 +512,44 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   const showStage = hasMedia;
   const showGallery = galleryImages.length > 0;
   const showHeaderSeeMore = Boolean(artist.description?.trim()) && bioOverflows;
-  const showLeftColumn = showStage || artistEventItems.length > 0 || showGallery;
+  const showLeftColumn =
+    showStage || artistEventItems.length > 0 || showGallery || !eventsReady;
+
+  if (showAllEvents && artistEventItems.length > 0) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+          <PartnerAllEventsPanel
+            items={artistEventItems}
+            onBack={() => setShowAllEvents(false)}
+          />
+        </div>
+        <AboutArtistModal
+          open={aboutOpen}
+          onClose={() => setAboutOpen(false)}
+          name={artist.name}
+          typeName={artist.type_name}
+          coverSrc={coverSrc}
+          description={artist.description}
+          instagramUrl={instagramUrl}
+          youtubeUrl={youtubeUrl}
+          instagramFollowers={instagramFollowers}
+          youtubeFollowers={youtubeFollowers}
+          audioClips={audioClips}
+          spotlightVideos={spotlightVideos}
+        />
+      </div>
+    );
+  }
+
+  const showStickyInquiry = canInquire && !inquiryFormInView;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div
+      className={`min-h-screen bg-white ${
+        showStickyInquiry ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-0" : ""
+      }`}
+    >
       <header className="relative w-full overflow-hidden">
         {coverSrc ? (
           <img
@@ -497,7 +571,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
             <ArrowLeft size={16} /> All artists
           </Link>
 
-          <div className="mt-5 flex flex-col items-start gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-center md:gap-8 lg:gap-10">
+          <div className="mt-5 flex flex-col items-center gap-6 sm:gap-8 lg:mt-7 lg:flex-row lg:items-center lg:gap-8 xl:gap-10">
             <div className="relative h-56 w-56 shrink-0 overflow-hidden rounded-2xl bg-[#F7E9FF] shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-100 lg:w-100">
               <SafeCoverImage
                 src={coverSrc}
@@ -508,7 +582,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
               />
             </div>
 
-            <div className="min-w-0 flex-1 text-left">
+            <div className="min-w-0 flex-1 text-center lg:text-left">
               {metaParts.length > 0 ? (
                 <p className="text-sm font-semibold text-[#1B1B3A]">
                   {canInquire
@@ -522,7 +596,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                 {artist.name}
               </h1>
               {artist.description?.trim() ? (
-                <div className="mt-3 max-w-3xl">
+                <div className="mt-3 max-w-3xl mx-auto lg:mx-0">
                   <p
                     ref={bioRef}
                     className="text-sm leading-relaxed text-[#374151] sm:text-[15px] line-clamp-4 whitespace-pre-wrap"
@@ -550,14 +624,14 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                       .getElementById("artist-inquiry")
                       ?.scrollIntoView({ behavior: "smooth", block: "start" })
                   }
-                  className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#111111] px-7 text-sm font-bold text-white transition-colors hover:bg-black cursor-pointer"
+                  className="mt-5 hidden lg:inline-flex h-11 items-center justify-center rounded-xl bg-[#111111] px-7 text-sm font-bold text-white transition-colors hover:bg-black cursor-pointer"
                 >
                   Send inquiry
                 </button>
               ) : null}
 
               {canInquire && (instagramUrl || youtubeUrl) ? (
-                <div className="mt-5 flex flex-wrap items-center justify-start gap-3">
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
                   {instagramUrl ? (
                     <a
                       href={instagramUrl}
@@ -589,14 +663,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
         </div>
       </header>
 
-    
         <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
-          {showAllEvents && artistEventItems.length > 0 ? (
-            <PartnerAllEventsPanel
-              items={artistEventItems}
-              onBack={() => setShowAllEvents(false)}
-            />
-          ) : (
           <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-10">
             {showLeftColumn ? (
               <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">
@@ -611,11 +678,18 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
                   />
                 ) : null}
 
-                {artistEventItems.length > 0 ? (
+                {!eventsReady ? (
+                  <PartnerEventsSectionShimmer count={3} />
+                ) : artistEventItems.length > 0 ? (
                   <PartnerLiveEventsSection
                     items={artistEventItems}
                     coverSrc={coverSrc}
-                    onSeeMore={() => setShowAllEvents(true)}
+                    onSeeMore={() => {
+                      setShowAllEvents(true);
+                      if (typeof window !== "undefined") {
+                        window.scrollTo({ top: 0, behavior: "auto" });
+                      }
+                    }}
                   />
                 ) : null}
 
@@ -632,6 +706,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
             <aside className="w-full shrink-0 lg:w-[24.5rem]">
               <form
                 id="artist-inquiry"
+                ref={setInquiryFormEl}
                 onSubmit={onSubmit}
                 className="relative w-full rounded-[1.5rem] border border-[#F0EAF7] bg-white p-5 sm:p-6 space-y-4 shadow-[0_10px_30px_rgba(105,0,170,0.07)] scroll-mt-28 lg:sticky lg:top-24"
                 noValidate
@@ -756,9 +831,24 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
           </aside>
             ) : null}
         </div>
-          )}
         </div>
-     
+
+      {showStickyInquiry ? (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 bg-white px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={() =>
+              document
+                .getElementById("artist-inquiry")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+            className="w-full rounded-xl bg-[#111111] text-white py-3.5 text-base font-bold cursor-pointer hover:bg-black"
+          >
+            Send inquiry
+          </button>
+        </div>
+      ) : null}
+
       <AboutArtistModal
         open={aboutOpen}
         onClose={() => setAboutOpen(false)}

@@ -38,6 +38,19 @@ function parseStatus(raw: string | null) {
   return allowed.has(raw) ? raw : "PENDING_APPROVAL";
 }
 
+/** Match event detail: Create only when no contract or rejected. */
+function canCreateContract(event: {
+  status: string;
+  contract_status?: string | null;
+}) {
+  if (event.status !== "PENDING_APPROVAL" && event.status !== "APPROVED") return false;
+  return !event.contract_status || event.contract_status === "REJECTED";
+}
+
+function canViewContract(event: { contract_status?: string | null }) {
+  return Boolean(event.contract_status && event.contract_status !== "REJECTED");
+}
+
 export default function AdminEventsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -188,14 +201,21 @@ export default function AdminEventsPage() {
                   >
                     Details
                   </Link>
-                  {(event.status === "PENDING_APPROVAL" || event.status === "APPROVED") && (
+                  {canCreateContract(event) ? (
                     <Link
                       href={`/admin/event-contracts/create?eventId=${event.id}`}
                       className="text-sm font-medium text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1 px-2 py-1"
                     >
                       <FileSignature size={14} /> Create contract
                     </Link>
-                  )}
+                  ) : canViewContract(event) ? (
+                    <Link
+                      href={`/admin/event-contracts/${event.id}`}
+                      className="text-sm font-medium text-zinc-600 hover:text-rose-600 inline-flex items-center gap-1 px-2 py-1"
+                    >
+                      <FileSignature size={14} /> View contract
+                    </Link>
+                  ) : null}
                 </div>
               </article>
             ))}
@@ -268,14 +288,21 @@ export default function AdminEventsPage() {
                         >
                           Details
                         </Link>
-                        {(event.status === "PENDING_APPROVAL" || event.status === "APPROVED") && (
+                        {canCreateContract(event) ? (
                           <Link
                             href={`/admin/event-contracts/create?eventId=${event.id}`}
                             className="text-emerald-400 hover:text-emerald-300 text-sm font-medium inline-flex items-center gap-1"
                           >
                             <FileSignature size={14} /> Create contract
                           </Link>
-                        )}
+                        ) : canViewContract(event) ? (
+                          <Link
+                            href={`/admin/event-contracts/${event.id}`}
+                            className="text-zinc-400 hover:text-white text-sm font-medium inline-flex items-center gap-1"
+                          >
+                            <FileSignature size={14} /> View contract
+                          </Link>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

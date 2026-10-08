@@ -437,6 +437,35 @@ export default function PublicEventDetailPage({
     router.push(`/events/${id}/book${qs}`);
   };
 
+  /** Mobile/tablet header back — router.back() often no-ops on cold open; fall back to /events */
+  const handleMobileBack = () => {
+    if (typeof window === "undefined") {
+      router.push("/events");
+      return;
+    }
+    const startedPath = window.location.pathname;
+    let navigated = false;
+    try {
+      const ref = document.referrer;
+      const sameOrigin = Boolean(ref) && new URL(ref).origin === window.location.origin;
+      if (sameOrigin && window.history.length > 1) {
+        router.back();
+        navigated = true;
+      }
+    } catch {
+      /* ignore referrer parse errors */
+    }
+    if (!navigated) {
+      router.push("/events");
+      return;
+    }
+    window.setTimeout(() => {
+      if (window.location.pathname === startedPath) {
+        router.push("/events");
+      }
+    }, 200);
+  };
+
   if (isLoading) {
     return <EventDetailShimmer />;
   }
@@ -592,7 +621,8 @@ export default function PublicEventDetailPage({
         </div>
       )}
 
-      <div className="border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 sm:gap-4 min-w-0">
+      {/* Price + Book Now: desktop card only — mobile/tablet use the fixed bottom bar */}
+      <div className="hidden lg:flex border-t border-[#EEE] px-3.5 sm:px-5 py-3.5 sm:py-4 items-center gap-3 sm:gap-4 min-w-0">
         <div className="min-w-0 flex-1">
           {minPrice != null && Number.isFinite(minPrice) && (
             <p className="text-[0.9375rem] sm:text-[1rem] lg:text-[1rem] leading-tight whitespace-nowrap">
@@ -629,18 +659,12 @@ export default function PublicEventDetailPage({
   return (
     <div className="min-h-screen bg-white">
       {/* Mobile/tablet: back + title + share (site header hidden) */}
-      <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-200">
-        <div className="flex items-center gap-2 px-3 sm:px-4 h-12 sm:h-14">
+      <div className="lg:hidden sticky top-0 z-[60] bg-white border-b border-slate-200 pointer-events-auto">
+        <div className="relative z-[61] flex items-center gap-2 px-3 sm:px-4 h-12 sm:h-14">
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== "undefined" && window.history.length > 1) {
-                router.back();
-              } else {
-                router.push("/events");
-              }
-            }}
-            className="shrink-0 h-9 w-9 -ml-1 rounded-full flex items-center justify-center text-[#111111] hover:bg-slate-50 cursor-pointer"
+            onClick={handleMobileBack}
+            className="relative z-[62] shrink-0 h-10 w-10 -ml-1 rounded-full flex items-center justify-center text-[#111111] hover:bg-slate-50 active:bg-slate-100 cursor-pointer touch-manipulation"
             aria-label="Back"
           >
             <ChevronLeft size={22} strokeWidth={2.25} />
@@ -713,18 +737,26 @@ export default function PublicEventDetailPage({
               youtubeUrl={event.youtube_url}
             />
 
-            <div className="mt-3 sm:mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+            <div className="mt-3 sm:mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+              <div
+                className={`flex min-w-0 flex-nowrap items-center gap-2 sm:gap-3 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden `}
+                //   ${
+                //   saved
+                //     ? "md:max-w-[min(100%,28rem)] xl:max-w-[52rem] 2xl:max-w-[36rem]"
+                //     : "md:max-w-[min(100%,34rem)] xl:max-w-[60rem] 2xl:max-w-[44rem]"
+                // }
+                
+              >
                 {categoryBadges.map((badge) => (
                   <span
                     key={badge}
-                    className="inline-flex items-center rounded-2xl border border-gray-300 bg-white text-gray-800 text-[0.875rem] sm:text-[0.9375rem] font-semibold px-3 sm:px-3.5 py-1.5"
+                    className="inline-flex shrink-0 items-center rounded-2xl border border-gray-300 bg-white text-gray-800 text-[0.875rem] sm:text-[0.9375rem] font-semibold px-3 sm:px-3.5 py-1.5"
                   >
                     {badge}
                   </span>
                 ))}
               </div>
-              <div className="flex items-center gap-3 sm:gap-4 sm:ml-auto shrink-0 min-w-0">
+              <div className="flex items-center gap-3 sm:gap-4 shrink-0 min-w-0 lg:ml-auto">
                 {saved ? (
                   <div className="flex items-center gap-3 sm:gap-5 min-w-0">
                     <span className="inline-flex items-center gap-2 text-[1rem] sm:text-[1.0625rem] font-medium text-[#333333] min-w-0">
@@ -739,16 +771,16 @@ export default function PublicEventDetailPage({
                       type="button"
                       onClick={undoInterest}
                       disabled={isTogglingInterest}
-                      className="shrink-0 rounded-lg border px-3.5 sm:px-4 py-1.5 sm:py-2 text-[0.9375rem] sm:text-[1rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#F6EBFF] transition-colors"
+                      className="shrink-0 rounded-lg border px-3.5 sm:px-4 py-1.5 sm:py-2 text-[0.9375rem] sm:text-[1rem] font-semibold cursor-pointer disabled:opacity-60 hover:bg-[#FBF6E8] transition-colors"
                       style={{
-                        color: BRAND,
-                        borderColor: BRAND,
+                        color: "#B59B2A",
+                        borderColor: "#B59B2A",
                         backgroundColor: "transparent",
                       }}
                     >
                       Undo
                     </button>
-                        </div>
+                  </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                     {interestCount > 0 && (
@@ -757,8 +789,8 @@ export default function PublicEventDetailPage({
                         {interestCountLabel} interested
                       </span>
                     )}
-                            <button
-                              type="button"
+                    <button
+                      type="button"
                       onClick={toggleSave}
                       disabled={isTogglingInterest}
                       className="rounded-lg border px-3.5 sm:px-4 py-2 text-[1rem] sm:text-[1.0625rem] font-semibold cursor-pointer disabled:opacity-60"
@@ -769,11 +801,11 @@ export default function PublicEventDetailPage({
                       }}
                     >
                       I&apos;m Interested
-                            </button>
+                    </button>
                   </div>
-                          )}
-                        </div>
-                      </div>
+                )}
+              </div>
+            </div>
 
             <div className="lg:hidden mt-4 sm:mt-5">{bookingCard}</div>
 

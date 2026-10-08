@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import type { PublicEvent } from "@/services/api";
-import { resolveMediaUrl } from "@/lib/mediaUrl";
 import SafeCoverImage, {
   EventImageFallback,
 } from "@/components/Shared/SafeCoverImage";
@@ -47,7 +46,7 @@ function EventPosterCard({
 
   const body = (
     <>
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden bg-slate-100">
         <SafeCoverImage
           src={portrait}
           alt={event.name}
@@ -55,13 +54,13 @@ function EventPosterCard({
             disabled ? "grayscale" : "transition-transform duration-300 group-hover:scale-[1.02]"
           }`}
           fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#F3F4F6] text-slate-300"
-          fallback={<EventImageFallback size={32} />}
+          fallback={<EventImageFallback size={28} />}
         />
         {disabled ? (
           <span className="absolute inset-0 bg-white/45" aria-hidden />
         ) : null}
       </div>
-      <div className="space-y-1 px-3 py-3 sm:px-3.5 sm:py-3.5">
+      <div className="flex flex-1 flex-col space-y-1 px-2.5 py-2.5 sm:px-3 sm:py-3 lg:min-h-[8.25rem]">
         {dateLine ? (
           <p
             className={`text-xs font-semibold sm:text-sm ${
@@ -72,7 +71,7 @@ function EventPosterCard({
           </p>
         ) : null}
         <h3
-          className={`text-sm font-bold leading-snug line-clamp-2 sm:text-base ${
+          className={`text-sm font-bold leading-snug line-clamp-2 sm:text-base lg:min-h-[3rem] ${
             disabled ? "text-black/45" : "text-black"
           }`}
         >
@@ -89,7 +88,7 @@ function EventPosterCard({
         ) : null}
         {price ? (
           <p
-            className={`text-xs font-medium sm:text-sm ${
+            className={`text-xs font-medium line-clamp-1 sm:text-sm ${
               disabled ? "text-[#6B6B6B]/45" : "text-[#6B6B6B]"
             }`}
           >
@@ -97,16 +96,19 @@ function EventPosterCard({
           </p>
         ) : null}
         {disabled ? (
-          <p className="text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF]">Past event</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">Past event</p>
         ) : null}
       </div>
     </>
   );
 
+  const cardClass =
+    "flex h-full min-w-0 w-full flex-col overflow-hidden rounded-xl border border-[#E5E5E5] bg-white sm:rounded-2xl";
+
   if (disabled) {
     return (
       <div
-        className="block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white opacity-70 pointer-events-none select-none"
+        className={`${cardClass} opacity-70 pointer-events-none select-none`}
         aria-disabled
       >
         {body}
@@ -115,48 +117,16 @@ function EventPosterCard({
   }
 
   return (
-    <Link
-      href={`/events/${event.id}`}
-      className="group block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-white"
-    >
+    <Link href={`/events/${event.id}`} className={`group ${cardClass}`}>
       {body}
     </Link>
   );
 }
 
-function SeeMoreCard({
-  coverSrc,
-  onClick,
-}: {
-  coverSrc: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group relative block min-w-0 w-full overflow-hidden rounded-2xl border border-[#E5E5E5] bg-[#111111] cursor-pointer text-left"
-    >
-      <div className="relative aspect-[3/4] w-full overflow-hidden">
-        {coverSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={coverSrc}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-55 group-hover:opacity-45 transition-opacity"
-            aria-hidden
-          />
-        ) : (
-          <div className="absolute inset-0 bg-[#2a2a2a]" aria-hidden />
-        )}
-        <span className="absolute inset-0 bg-black/50" />
-        <span className="absolute inset-0 flex items-center justify-center px-3 text-center text-white font-bold text-sm sm:text-base leading-snug">
-          See more
-        </span>
-      </div>
-    </button>
-  );
-}
+const eventsGridClass =
+  "mt-4 grid grid-cols-2 gap-3 sm:mt-5 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 lg:gap-5";
+
+const PREVIEW_COUNT = 3;
 
 /** Full live + past events list (used when profile body is swapped to All Events). */
 export function PartnerAllEventsPanel({
@@ -180,14 +150,14 @@ export function PartnerAllEventsPanel({
         </button>
       ) : null}
 
-      <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">All Events</h2>
+      <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">See all events</h2>
 
       {live.length > 0 ? (
         <div className="mt-5">
           <p className="text-xs font-bold uppercase tracking-wide text-[#6900AA] mb-3">
             Live events
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <div className={eventsGridClass}>
             {live.map((event) => (
               <EventPosterCard key={event.id} event={event} />
             ))}
@@ -200,7 +170,7 @@ export function PartnerAllEventsPanel({
           <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF] mb-3">
             Past events
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <div className={eventsGridClass}>
             {past.map((event) => (
               <EventPosterCard key={event.id} event={event} disabled />
             ))}
@@ -215,13 +185,14 @@ export function PartnerAllEventsPanel({
   );
 }
 
-/** Preview: up to 2 live (or past if none live) + See more card. */
+/** Preview: 2 cards on mobile, 3 on md+; "See more" when more than visible. */
 export default function PartnerLiveEventsSection({
   items,
-  coverSrc,
+  coverSrc: _coverSrc,
   onSeeMore,
 }: {
   items: PartnerEventWithMeta[];
+  /** Kept for callers; overlay See more card removed. */
   coverSrc: string;
   onSeeMore: () => void;
 }) {
@@ -229,40 +200,73 @@ export default function PartnerLiveEventsSection({
 
   if (live.length === 0 && past.length === 0) return null;
 
-  const previewLive = live.slice(0, 2);
-  const previewPast = live.length === 0 ? past.slice(0, 2) : [];
-  const seeMoreCover =
-    resolveMediaUrl(
-      (live[2] || past[0] || live[0])?.poster_vertical_url ||
-        (live[2] || past[0] || live[0])?.poster_horizontal_url ||
-        coverSrc
-    ) || coverSrc;
+  const previewLive = live.slice(0, PREVIEW_COUNT);
+  const previewPast = past.slice(0, PREVIEW_COUNT);
+  /** Mobile: >2; tablet/desktop: >3 */
+  const showLiveSeeMore = live.length > 2;
+  const showPastSeeMore = past.length > 2;
+  const seeMoreOnlyMobile = (count: number) =>
+    count > PREVIEW_COUNT ? "" : "md:hidden";
 
   return (
-    <section>
-      <div className="flex items-end justify-between gap-3">
-        <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
-          Live Events
-        </h2>
-        <button
-          type="button"
-          onClick={onSeeMore}
-          className="lg:hidden shrink-0 text-sm font-bold text-[#6900AA] cursor-pointer hover:underline pb-0.5"
-        >
-          See more
-        </button>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
-        {previewLive.map((event) => (
-          <EventPosterCard key={event.id} event={event} />
-        ))}
-        {previewPast.map((event) => (
-          <EventPosterCard key={event.id} event={event} disabled />
-        ))}
-        <div className="hidden lg:block">
-          <SeeMoreCard coverSrc={seeMoreCover} onClick={onSeeMore} />
-        </div>
-      </div>
-    </section>
+    <div className="space-y-8 sm:space-y-10">
+      {live.length > 0 ? (
+        <section>
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
+              Live Events
+            </h2>
+            {showLiveSeeMore ? (
+              <button
+                type="button"
+                onClick={onSeeMore}
+                className={`shrink-0 text-sm font-bold text-[#6900AA] cursor-pointer hover:underline pb-0.5 ${seeMoreOnlyMobile(live.length)}`}
+              >
+                See more
+              </button>
+            ) : null}
+          </div>
+          <div className={eventsGridClass}>
+            {previewLive.map((event, index) => (
+              <div
+                key={event.id}
+                className={`min-w-0 h-full ${index >= 2 ? "hidden md:block" : ""}`}
+              >
+                <EventPosterCard event={event} />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {past.length > 0 ? (
+        <section>
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="text-xl font-bold tracking-tight text-[#111111] sm:text-2xl">
+              Past Events
+            </h2>
+            {showPastSeeMore ? (
+              <button
+                type="button"
+                onClick={onSeeMore}
+                className={`shrink-0 text-sm font-bold text-[#6900AA] cursor-pointer hover:underline pb-0.5 ${seeMoreOnlyMobile(past.length)}`}
+              >
+                See more
+              </button>
+            ) : null}
+          </div>
+          <div className={eventsGridClass}>
+            {previewPast.map((event, index) => (
+              <div
+                key={event.id}
+                className={`min-w-0 h-full ${index >= 2 ? "hidden md:block" : ""}`}
+              >
+                <EventPosterCard event={event} disabled />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
   );
 }

@@ -27,7 +27,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-concert-2",
       title: "Sunset Arena Concert",
-      image: "https://images.unsplash.com/photo-1540037873-006683e40f3e?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/sunset-arena-concert.jpg",
       showDate: "2026-11-08T18:30:00",
       place: "Friendship Park: Addis Ababa",
       eventType: "Concert · Arena",
@@ -39,7 +39,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-comedy-1",
       title: "Addis Stand-Up Comedy Night",
-      image: "https://images.unsplash.com/photo-1527224857830-43a7bb10870c?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/addis-stand-up-comedy-night.jpg",
       showDate: "2026-10-25T20:00:00",
       place: "Jazzamba Lounge: Addis Ababa",
       eventType: "Comedy · Stand-Up",
@@ -49,7 +49,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-comedy-2",
       title: "Laugh Factory Live",
-      image: "https://images.unsplash.com/photo-1585699324551-c6dc3dc0f9ed?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/laugh-factory-live.jpg",
       showDate: "2026-11-15T19:30:00",
       place: "Kazanchis Social House: Addis Ababa",
       eventType: "Comedy · Open Mic",
@@ -61,7 +61,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-music-1",
       title: "Ethiopian Jazz Festival",
-      image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/ethiopian-jazz-festival.jpg",
       showDate: "2026-12-01T17:00:00",
       place: "National Theatre: Addis Ababa",
       eventType: "Music · Jazz",
@@ -71,7 +71,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-music-2",
       title: "Habesha Music Live",
-      image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/habesha-music-live.jpg",
       showDate: "2026-12-20T18:00:00",
       place: "Skylight Hotel: Addis Ababa",
       eventType: "Music · Traditional",
@@ -83,7 +83,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-sports-1",
       title: "Great Ethiopian Run 10K",
-      image: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/great-ethiopian-run-10k.jpg",
       showDate: "2026-11-20T09:00:00",
       place: "Meskel Square: Addis Ababa",
       eventType: "Sports · Running",
@@ -93,7 +93,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-sports-2",
       title: "Ethiopian Premier League Final",
-      image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/ethiopian-premier-league-final.jpg",
       showDate: "2026-12-05T16:00:00",
       place: "Addis Ababa Stadium: Addis Ababa",
       eventType: "Sports · Football",
@@ -103,7 +103,7 @@ export const SHOWCASE_EVENT_CARDS_BY_CATEGORY: Record<EventCategoryKey, Showcase
     {
       id: "showcase-sports-3",
       title: "National Wrestling Cup",
-      image: "https://images.unsplash.com/photo-1555597673-b21d5c935865?w=500&h=750&fit=crop&q=80",
+      image: "/images/events/showcase/national-wrestling-cup.jpg",
       showDate: "2026-12-12T14:00:00",
       place: "Dire Dawa Arena: Dire Dawa",
       eventType: "Sports · Wrestling",

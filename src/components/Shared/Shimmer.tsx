@@ -913,6 +913,145 @@ export function CustomerPageShimmer({ rows = 4 }: { rows?: number }) {
   );
 }
 
+/** Partner live/past event poster cards — matches PartnerLiveEventsSection grid */
+export function PartnerEventsSectionShimmer({ count = 3 }: { count?: number }) {
+  return (
+    <Wrap>
+      <div className="space-y-8 sm:space-y-10" aria-busy="true" aria-label="Loading events">
+        <section>
+          <Skeleton width="8rem" height={28} className="sm:!h-8 sm:!w-40" />
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:mt-5 sm:gap-4 md:grid-cols-3 lg:grid-cols-3 lg:gap-5">
+            {Array.from({ length: count }).map((_, i) => (
+              <div
+                key={i}
+                className="min-w-0 flex h-full w-full flex-col overflow-hidden rounded-xl border border-[#E5E5E5] bg-white sm:rounded-2xl"
+              >
+                <div className="aspect-[3/4] w-full overflow-hidden">
+                  <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
+                </div>
+                <div className="space-y-2 px-2.5 py-2.5 sm:px-3 sm:py-3">
+                  <Skeleton width="55%" height={12} />
+                  <Skeleton width="90%" height={16} />
+                  <Skeleton width="70%" height={12} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Public artist detail page — matches PublicArtistProfilePage hero + body */
+export function ArtistDetailShimmer() {
+  return (
+    <Wrap>
+      <div className="min-h-screen bg-white" aria-busy="true" aria-label="Loading artist">
+        <header className="relative w-full overflow-hidden bg-[#EDE4F7]/40">
+          <div className="relative z-10 container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+            <Skeleton width="6rem" height={16} />
+            <div className="mt-5 flex flex-col items-start gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-center md:gap-8 lg:gap-10">
+              <div className="h-56 w-56 shrink-0 overflow-hidden rounded-2xl sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-100 lg:w-100">
+                <Skeleton className="!block !h-full !w-full !rounded-2xl" height="100%" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-3 w-full">
+                <Skeleton width="8rem" height={14} />
+                <Skeleton width="60%" height={40} className="!max-w-md sm:!h-12" />
+                <Skeleton count={3} />
+                <Skeleton width="70%" />
+                <Skeleton width="8rem" height={44} borderRadius={12} className="mt-2" />
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+          <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-10">
+            <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">
+              <PartnerEventsSectionShimmer count={3} />
+              <div>
+                <Skeleton width="6rem" height={28} className="mb-4" />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="aspect-square overflow-hidden rounded-xl">
+                      <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <aside className="w-full shrink-0 lg:w-[24.5rem]">
+              <div className="rounded-[1.5rem] border border-[#F0EAF7] bg-white p-5 sm:p-6 space-y-4 shadow-[0_10px_30px_rgba(105,0,170,0.07)]">
+                <Skeleton width="9rem" height={22} />
+                <Skeleton width="90%" height={14} />
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} height={42} borderRadius={12} />
+                ))}
+                <Skeleton height={48} borderRadius={12} />
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Public venue detail page — matches PublicVenueProfilePage hero + body */
+export function VenueDetailShimmer() {
+  return (
+    <Wrap>
+      <div className="min-h-screen bg-white overflow-x-hidden" aria-busy="true" aria-label="Loading venue">
+        <div className="mx-auto container px-4 sm:px-6 lg:px-10 2xl:px-0 pt-5 sm:pt-6">
+          <Skeleton width="6.5rem" height={16} />
+        </div>
+        <header className="mx-auto container px-4 sm:px-6 lg:px-10 2xl:px-0 pt-4 pb-2 sm:pt-5 sm:pb-3">
+          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl min-h-[220px] sm:min-h-[280px] md:min-h-[320px] lg:min-h-[360px] bg-slate-200">
+            <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-2xl sm:!rounded-3xl" height="100%" />
+          </div>
+        </header>
+        <div className="bg-white container mx-auto px-4 sm:px-6 lg:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+          <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-5">
+            <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">
+              <div className="space-y-3">
+                <Skeleton width="9rem" height={28} />
+                <Skeleton count={4} />
+                <Skeleton width="75%" />
+              </div>
+              <PartnerEventsSectionShimmer count={3} />
+              <div>
+                <Skeleton width="5rem" height={28} className="mb-4" />
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="aspect-[4/3] overflow-hidden rounded-xl">
+                      <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="w-full max-w-md sm:max-w-lg space-y-3">
+                <Skeleton width="12rem" height={28} />
+                <Skeleton width="80%" height={14} />
+                <Skeleton height={280} borderRadius={16} />
+              </div>
+            </div>
+            <aside className="w-full shrink-0 max-w-xl lg:max-w-none lg:w-[min(100%,32rem)]">
+              <div className="rounded-[1.25rem] sm:rounded-[1.5rem] border border-[#F0EAF7] bg-white p-4 sm:p-5 md:p-6 space-y-4 shadow-[0_10px_30px_rgba(105,0,170,0.07)]">
+                <Skeleton width="11rem" height={22} />
+                <Skeleton width="90%" height={14} />
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} height={42} borderRadius={12} />
+                ))}
+                <Skeleton height={48} borderRadius={12} />
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
 /** Centered page shell for showtimes / seats / booking (structure shimmer) */
 export function CustomerFullscreenShimmer({ label = "Loading" }: { label?: string }) {
   return (

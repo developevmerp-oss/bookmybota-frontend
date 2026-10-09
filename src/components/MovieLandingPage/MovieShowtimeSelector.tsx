@@ -44,8 +44,10 @@ import {
   setOrDeleteParam,
   stableSearchParamsString,
 } from "@/lib/filterUrlSync";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
   formatDateCustomer,
+  isMovieShowEnded,
   isVenueWallTimeReached,
   venueDateStr,
 } from "@/lib/dateFormat";
@@ -230,9 +232,20 @@ function showtimePrice(st: PublicMovieShowtimeItem) {
   return st.min_price ?? st.tier_pricing?.[0]?.price ?? null;
 }
 
+function isShowEnded(st: PublicMovieShowtimeItem): boolean {
+  return isMovieShowEnded({
+    starts_at: st.starts_at,
+    ends_at: st.ends_at,
+    booking_state: st.booking_state,
+    is_ended: st.is_ended,
+  });
+}
+
 function isShowStarted(st: PublicMovieShowtimeItem): boolean {
+  // Ended shows must never look like late-entry "STARTED".
+  if (isShowEnded(st)) return false;
   if (st.booking_state === "STARTED" || st.has_started) return true;
-  if (st.booking_state === "UPCOMING" || st.booking_state === "ENDED") return false;
+  if (st.booking_state === "UPCOMING") return false;
   if (!st.starts_at) return false;
   return isVenueWallTimeReached(st.starts_at);
 }
@@ -240,6 +253,7 @@ function isShowStarted(st: PublicMovieShowtimeItem): boolean {
 type ChipFillStatus = "available" | "filling" | "started" | "soldout";
 
 function fillStatus(st: PublicMovieShowtimeItem): ChipFillStatus {
+  if (isShowEnded(st)) return "soldout";
   if (st.fill_status === "STARTED" || isShowStarted(st)) return "started";
   if (st.fill_status === "SOLD_OUT") return "soldout";
   if (st.fill_status === "FILLING_FAST") return "filling";
@@ -707,14 +721,25 @@ function MobileBottomSheet({
   );
 }
 
-function buildShowtimesTitle(title: string, year?: string, language?: string) {
+/** BMS-style: "Difret (2014) - Amharic" / "Difret (2014) - Hindi (IMAX 2D)" */
+function buildShowtimesTitle(
+  title: string,
+  year?: string,
+  language?: string | null,
+  format?: string | null
+) {
   let base = title.trim();
   // Avoid "Title (2026) (2026)" when API title already includes the year
   while (/\(\d{4}\)\s*$/.test(base)) {
     base = base.replace(/\s*\(\d{4}\)\s*$/, "").trim();
   }
   if (year) base = `${base} (${year})`;
-  if (language) return `${base} - (${language})`;
+
+  const lang = language?.trim() || "";
+  const fmt = format?.trim() || "";
+  if (lang && fmt) return `${base} - ${lang} (${fmt})`;
+  if (lang) return `${base} - ${lang}`;
+  if (fmt) return `${base} - ${fmt}`;
   return base;
 }
 
@@ -754,6 +779,66 @@ function cinemaMapsQuery(cinema: PublicMovieCinemaGroup) {
   return [cinema.name, cinema.address].filter(Boolean).join(", ") || cinema.name;
 }
 
+/** BMS-style phone + ticket glyph for M-Ticket chip. */
+function MTicketGlyph({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.85"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect x="6" y="2.5" width="10" height="19" rx="2" />
+      <path d="M9 5.5h4" />
+      <path d="M9 18.5h4" />
+      <path d="M15.5 9.2h3.2a1.2 1.2 0 0 1 0 2.4h-.5a1 1 0 0 0 0 2h.5a1.2 1.2 0 0 1 0 2.4H15.5" />
+    </svg>
+  );
+}
+
+/** BMS-style amenity chips: F&B (label always) + M-Ticket (icon only; label on hover). */
+function CinemaAmenityBadges({
+  hasFnb,
+  mTicket = true,
+}: {
+  hasFnb?: boolean;
+  mTicket?: boolean;
+}) {
+  if (!hasFnb && !mTicket) return null;
+  return (
+    <div className="-mt-1 flex flex-wrap items-center gap-2">
+      {hasFnb ? (
+        <span
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#FFF1E0] px-2.5 text-xs font-semibold text-[#E67E22]"
+          title="Food & beverages available with booking"
+        >
+          <UtensilsCrossed size={16} strokeWidth={2.25} className="shrink-0" />
+          F&B
+        </span>
+      ) : null}
+      {mTicket ? (
+        <span
+          tabIndex={0}
+          className="group/mticket inline-flex h-8 items-center justify-center gap-0 rounded-md bg-[#E8F5E9] px-2 text-xs font-semibold text-[#2E7D32] outline-none transition-[gap,padding] duration-200 ease-out hover:gap-1.5 hover:pr-2.5 focus-visible:gap-1.5 focus-visible:pr-2.5"
+          title="M-Ticket"
+          aria-label="M-Ticket available"
+        >
+          <MTicketGlyph className="shrink-0" />
+          <span className="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 ease-out group-hover/mticket:max-w-[4.5rem] group-hover/mticket:opacity-100 group-focus-visible/mticket:max-w-[4.5rem] group-focus-visible/mticket:opacity-100">
+            M-Ticket
+          </span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function CinemaInfoModal({
   cinema,
   favorited,
@@ -771,6 +856,7 @@ function CinemaInfoModal({
   const mapQuery = cinemaMapsQuery(cinema);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
   const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=15&output=embed`;
+  const logoSrc = resolveMediaUrl(cinema.logo || "");
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -800,12 +886,20 @@ function CinemaInfoModal({
       />
       <div className="relative z-10 w-full sm:max-w-[28rem] max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 bg-white px-4 pt-4 pb-3 sm:px-5">
-          <h2
-            id="cinema-info-title"
-            className="text-[16px] sm:text-[17px] font-bold text-[#333333] leading-snug pr-2"
-          >
-            {cinema.name}
-          </h2>
+          <div className="flex items-start gap-3 min-w-0 pr-2">
+            {logoSrc ? (
+              <div className="shrink-0 size-11 overflow-hidden rounded-md border border-[#E5E7EB] bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoSrc} alt="" className="h-full w-full object-contain p-0.5" />
+              </div>
+            ) : null}
+            <h2
+              id="cinema-info-title"
+              className="text-[16px] sm:text-[17px] font-bold text-[#333333] leading-snug"
+            >
+              {cinema.name}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -860,7 +954,16 @@ function CinemaInfoModal({
           <div className="pt-4">
             <h3 className="text-[14px] font-bold text-[#333333]">Available Facilities</h3>
             <div className="mt-3 flex flex-wrap items-start gap-x-5 gap-y-3">
-              {CINEMA_FACILITIES.map((item) => {
+              {CINEMA_FACILITIES.filter((item) => {
+                if (item.label === "F&B" || item.label === "Food Court") {
+                  return Boolean(cinema.has_fnb);
+                }
+                if (item.label === "MTicket") return cinema.m_ticket !== false;
+                if (item.label === "Ticket Cancellation") {
+                  return Boolean(cinema.cancellation_available);
+                }
+                return true;
+              }).map((item) => {
                 const Icon = item.icon;
                 return (
                   <div
@@ -1227,7 +1330,17 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     city_slug: selectedCity || undefined,
   });
 
-  const cinemas = data?.cinemas ?? [];
+  // Hide finished slots client-side (API may lag / stale process).
+  const cinemas = useMemo(() => {
+    const rows = data?.cinemas ?? [];
+    return rows
+      .map((cinema) => ({
+        ...cinema,
+        showtimes: cinema.showtimes.filter((st) => !isShowEnded(st)),
+      }))
+      .filter((cinema) => cinema.showtimes.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick re-checks ends_at vs venue now
+  }, [data?.cinemas, clockTick]);
   const availableDates = data?.available_dates ?? [];
   /** Once showtimes payload is known, dates missing from available_dates are not bookable */
   const datesAvailabilityReady = isSuccess && Boolean(data);
@@ -1337,8 +1450,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     goToSeatMap(showtime);
   };
 
-  const primaryLanguage = movie.languages[0];
-  const titleLine = buildShowtimesTitle(movie.title, movie.releaseYear, primaryLanguage);
   const backHref = `/movies/${movie.slug || movie.id}`;
   const languageLabel = languageFilters.length === 1 ? languageFilters[0] : null;
   const displayLanguage =
@@ -1349,6 +1460,16 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     formatFilters.length > 0
       ? formatFilters.join(", ")
       : formatOptions[0]?.label || "2D";
+  // Header title follows Select language and format (URL filters), not catalog[0]
+  const titleLanguage =
+    languageFilters.length > 0 ? languageFilters.join(", ") : null;
+  const titleFormat = formatFilters.length > 0 ? formatFilters.join(", ") : null;
+  const titleLine = buildShowtimesTitle(
+    movie.title,
+    movie.releaseYear,
+    titleLanguage,
+    titleFormat
+  );
 
   const openAllFiltersSheet = () => {
     setDraftPriceFilters([...priceFilters]);
@@ -1404,9 +1525,15 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             <ArrowLeft size={22} strokeWidth={2.25} />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[15px] sm:text-base font-extrabold text-[#111111] leading-tight truncate">
-              {movie.title}
-            </h1>
+            <Link
+              href={backHref}
+              className="block min-w-0 cursor-pointer hover:text-[#6900AA] transition-colors"
+              title="Go to movie page"
+            >
+              <h1 className="text-[15px] sm:text-base font-extrabold text-inherit leading-tight truncate">
+                {titleLine}
+              </h1>
+            </Link>
             {movie.duration ? (
               <p className="mt-0.5 text-[11px] sm:text-xs text-[#6B7280] font-medium truncate">
                 Movie runtime: {movie.duration}
@@ -1618,8 +1745,13 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             <X size={18} />
           </Link>
 
-          <div className="flex gap-4 sm:gap-5 pr-8">
-            <div className="relative shrink-0 w-[88px] sm:w-[110px]">
+          <div className="flex items-center gap-4 sm:gap-5 pr-8">
+            <Link
+              href={backHref}
+              className="relative shrink-0 w-[88px] sm:w-[110px] cursor-pointer"
+              title="Go to movie page"
+              aria-label={`Go to ${movie.title} page`}
+            >
               <div className="overflow-hidden rounded-md border border-white shadow-sm aspect-[2/3] bg-[#E5E5E5]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={movie.poster} alt={movie.title} className="h-full w-full object-cover" />
@@ -1629,12 +1761,18 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   {movie.certification}
                 </span>
               ) : null}
-            </div>
+            </Link>
 
-            <div className="min-w-0 flex-1 pt-0.5">
-              <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] font-extrabold text-[#222222] leading-tight">
-                {titleLine}
-              </h1>
+            <div className="min-w-0 flex-1">
+              <Link
+                href={backHref}
+                className="inline-block max-w-full cursor-pointer hover:text-[#6900AA] transition-colors"
+                title="Go to movie page"
+              >
+                <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] font-extrabold text-inherit leading-tight">
+                  {titleLine}
+                </h1>
+              </Link>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {movie.duration ? (
@@ -1954,17 +2092,14 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between text-xs text-[#6B7280] px-0.5">
-              <span>
-                Available at <strong className="text-[#111111]">{filteredCinemas.length}</strong> cinema
-                {filteredCinemas.length !== 1 ? "s" : ""}
-              </span>
-              {isFetching && <span className="text-[#F84464] animate-pulse">Updating shows…</span>}
-            </div>
+            {isFetching ? (
+              <div className="text-xs text-[#F84464] animate-pulse px-0.5">Updating shows…</div>
+            ) : null}
 
             <div className="space-y-3">
               {filteredCinemas.map((cinema) => {
                 const favorited = Boolean(favoritedIds[cinema.id]);
+                const logoSrc = resolveMediaUrl(cinema.logo || "");
 
                 return (
                   <div
@@ -1974,41 +2109,47 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                     <div className="flex flex-col gap-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1 flex items-start gap-3">
-                          {cinema.image ? (
-                            <div className="lg:hidden shrink-0 size-10 sm:size-11 overflow-hidden rounded-md border border-[#E8E8E8] bg-[#F5F5F5]">
+                          {logoSrc ? (
+                            <div className="shrink-0 size-10 sm:size-11 overflow-hidden rounded-md border border-[#E5E7EB] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={cinema.image}
+                                src={logoSrc}
                                 alt=""
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-contain p-0.5"
                               />
                             </div>
-                          ) : null}
+                          ) : (
+                            <div
+                              className="shrink-0 size-10 sm:size-11 rounded-md border border-[#E5E7EB] bg-[#F3F4F6] flex items-center justify-center text-[#9CA3AF]"
+                              aria-hidden
+                            >
+                              <Film size={18} strokeWidth={1.75} />
+                            </div>
+                          )}
                           <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => setInfoOpenId(cinema.id)}
-                              className="text-[15px] sm:text-base font-bold text-[#111111] leading-snug hover:text-[#6900AA] transition-colors cursor-pointer text-left"
-                            >
-                              {cinema.name}
-                            </button>
-                            <button
-                              type="button"
-                              aria-label="Cinema info"
-                              onClick={() => setInfoOpenId(cinema.id)}
-                              className="text-[#9CA3AF] hover:text-[#6900AA] cursor-pointer"
-                            >
-                              <Info size={15} strokeWidth={2} />
-                            </button>
-                          </div>
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => setInfoOpenId(cinema.id)}
+                                className="text-[15px] sm:text-base font-bold text-[#111111] leading-snug hover:text-[#6900AA] transition-colors cursor-pointer text-left"
+                              >
+                                {cinema.name}
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Cinema info"
+                                onClick={() => setInfoOpenId(cinema.id)}
+                                className="text-[#9CA3AF] hover:text-[#6900AA] cursor-pointer"
+                              >
+                                <Info size={15} strokeWidth={2} />
+                              </button>
+                            </div>
 
-                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#6B7280]">
-                            <span className="inline-flex items-center gap-1">
-                              <Ticket size={12} className="text-[#9CA3AF]" />
-                              M-Ticket Available
-                            </span>
-                          </div>
+                            <p className="mt-1 text-[12px] leading-snug text-[#9CA3AF]">
+                              {cinema.cancellation_available
+                                ? "Cancellation available"
+                                : "Non-cancellable"}
+                            </p>
                           </div>
                         </div>
 
@@ -2050,6 +2191,12 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                           />
                         </button>
                       </div>
+
+                      {/* Left-aligned with logo / showtimes (BMS), not indented under name column */}
+                      <CinemaAmenityBadges
+                        hasFnb={Boolean(cinema.has_fnb)}
+                        mTicket={cinema.m_ticket !== false}
+                      />
 
                       <div className="space-y-4">
                         {groupShowtimesByLangFormat(cinema.showtimes).map((group, groupIdx) => (

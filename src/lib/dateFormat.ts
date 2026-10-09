@@ -305,6 +305,50 @@ export function isVenueWallTimeReached(
   return nowRank >= targetRank;
 }
 
+const DEFAULT_SHOW_DURATION_MINUTES = 120;
+
+/** Add minutes to a venue wall clock; returns naive `YYYY-MM-DDTHH:mm:ss`. */
+export function addMinutesToVenueWall(
+  value: string | Date,
+  minutes: number
+): string | null {
+  const parts = scheduledParts(value);
+  if (!parts) return null;
+  const ms =
+    Date.UTC(parts.y, parts.m - 1, parts.d, parts.hour, parts.minute, 0) +
+    minutes * 60_000;
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+/**
+ * True when the show is finished (past ends_at, or starts_at + duration).
+ * Used to hide completed slots even if the API still returns them.
+ */
+export function isMovieShowEnded(opts: {
+  starts_at?: string | Date | null;
+  ends_at?: string | Date | null;
+  duration_minutes?: number | null;
+  booking_state?: string | null;
+  is_ended?: boolean | null;
+  now?: Date;
+}): boolean {
+  if (opts.booking_state === "ENDED" || opts.is_ended) return true;
+  const now = opts.now ?? new Date();
+  if (opts.ends_at) {
+    return isVenueWallTimeReached(opts.ends_at, now);
+  }
+  if (!opts.starts_at) return false;
+  const mins =
+    opts.duration_minutes && opts.duration_minutes > 0
+      ? opts.duration_minutes
+      : DEFAULT_SHOW_DURATION_MINUTES;
+  const endWall = addMinutesToVenueWall(opts.starts_at, mins);
+  if (!endWall) return false;
+  return isVenueWallTimeReached(endWall, now);
+}
+
 /** Convert stored HH:mm (24h) to 12-hour display, e.g. "18:57" → "6:57 PM" */
 export function formatHm12h(hm?: string | null): string {
   if (!hm?.trim()) return "";

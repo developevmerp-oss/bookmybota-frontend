@@ -37,6 +37,7 @@ import { FaMoon } from "react-icons/fa";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { useSelectedCity } from "@/lib/useSelectedCity";
+import { paymentSuccessHref } from "@/lib/paymentSuccess";
 import {
   applyBestsellerFlagsToRawSeats,
   finalizeBestsellerMarks,
@@ -1354,7 +1355,14 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       }).unwrap();
 
       toast.success(res.message || "Booking confirmed!");
-      router.push(`/movies/booking-confirmation/${res.data.booking_id}`);
+      const bookingId = res.data.booking_id;
+      router.push(
+        paymentSuccessHref({
+          module: "movies",
+          bookingId,
+          next: `/movies/booking-confirmation/${bookingId}`,
+        })
+      );
     } catch (err) {
       const msg = extractApiError(err, "Failed to confirm booking. Please try again.");
       toast.error(msg);

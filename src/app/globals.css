@@ -1410,6 +1410,7 @@ html.admin-theme .partner-shell .org-nav-item.is-active {
   background: var(--primary-soft);
   color: var(--primary);
   border-color: transparent;
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 html.admin-theme .organizer-shell header.glass-panel,
@@ -1502,6 +1503,7 @@ html.admin-theme .organizer-shell .org-nav-item.is-active,
 html.admin-theme .partner-shell .org-nav-item.is-active {
   background: var(--primary-soft) !important;
   color: var(--primary) !important;
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 html.admin-theme .organizer-shell table thead,

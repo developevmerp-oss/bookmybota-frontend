@@ -38,6 +38,7 @@ import {
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { isMovieShowEnded } from "@/lib/dateFormat";
 import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 const PAGE_BG = "#F4F2F8";
@@ -742,7 +743,15 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     const q = movieSearch.trim().toLowerCase();
     return rows
       .map((row) => {
-        let showtimes = row.showtimes;
+        let showtimes = row.showtimes.filter(
+          (st) =>
+            !isMovieShowEnded({
+              starts_at: st.starts_at,
+              ends_at: st.ends_at,
+              booking_state: st.booking_state,
+              is_ended: st.is_ended,
+            })
+        );
         if (languageFilters.length > 0) {
           showtimes = showtimes.filter((st) => languageFilters.includes(st.language));
         }

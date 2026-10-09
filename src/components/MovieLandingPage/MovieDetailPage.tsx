@@ -10,6 +10,7 @@ import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCove
 import {
   useGetPublicCinemaOffersForMovieQuery,
   useGetPublicMovieQuery,
+  useGetPublicMovieShowtimesQuery,
 } from "@/services/api";
 import {
   mapApiMovieToDetail,
@@ -20,7 +21,9 @@ import {
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import MovieLanguageFormatModal, {
-  groupsFromMovieLists,
+  allFormatsFromGroups,
+  buildLanguageFormatGroups,
+  groupsFromShowtimes,
   shouldShowLanguageFormatPicker,
 } from "@/components/MovieLandingPage/MovieLanguageFormatModal";
 import { MovieDetailShimmer } from "@/components/Shared/Shimmer";
@@ -30,6 +33,9 @@ import { formatDateCustomer } from "@/lib/dateFormat";
 /** Matches MovieDetailBanner desktop Book Tickets CTA */
 const HERO_BOOK_BTN_CLASS =
   "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity";
+
+const HERO_FORMAT_BADGE_CLASS =
+  "inline-flex items-center rounded-md border border-white/25 bg-white/15 px-2.5 py-1 text-[11px] sm:text-xs font-bold text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
 
 /** District-style: "Released 22 April 2014" / "Releasing …" / "Coming Soon" */
 function formatReleasedLine(
@@ -72,9 +78,12 @@ function mapPlatformOffersToMovieOffers(
 
 function MovieDetailBanner({
   movie,
+  formatBadges,
   onBookTickets,
 }: {
   movie: MovieDetailData;
+  /** When set, BMS-style one pill per format (from showtimes or catalog). */
+  formatBadges?: string[];
   onBookTickets: () => void;
 }) {
   const router = useRouter();
@@ -105,6 +114,11 @@ function MovieDetailBanner({
     .join(" | ");
 
   const releasedLine = formatReleasedLine(movie.releaseDate, movie.comingSoon);
+
+  const heroFormats =
+    formatBadges && formatBadges.length > 0
+      ? formatBadges
+      : (movie.formats || []).map((f) => f.trim()).filter(Boolean);
 
   const handleShare = async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -170,6 +184,26 @@ function MovieDetailBanner({
             loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
+
+          {(movie.duration || heroFormats.length > 0 || movie.certification) && (
+            <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-16 pt-8 bg-gradient-to-t from-black/75 to-transparent">
+              {movie.duration ? (
+                <p className="text-[13px] font-medium text-white/90">{movie.duration} •</p>
+              ) : null}
+              {(heroFormats.length > 0 || movie.certification) && (
+                <div className={`${movie.duration ? "mt-2" : ""} flex flex-wrap items-center gap-2`}>
+                  {heroFormats.map((fmt) => (
+                    <span key={fmt} className={HERO_FORMAT_BADGE_CLASS}>
+                      {fmt}
+                    </span>
+                  ))}
+                  {movie.certification ? (
+                    <span className={HERO_FORMAT_BADGE_CLASS}>{movie.certification}</span>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
 
           {hasTrailer ? (
             <div className="absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
@@ -280,13 +314,13 @@ function MovieDetailBanner({
                 <p className="mt-2 text-sm sm:text-base text-white/80">{metaParts.join(" · ")}</p>
               )}
 
-              {(movie.formats.length > 0 || movie.languages.length > 0) && (
+              {(heroFormats.length > 0 || movie.languages.length > 0) && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {movie.formats.length > 0 ? (
-                    <span className="inline-flex items-center rounded-md border border-white/25 bg-white/15 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-                      {movie.formats.join(", ")}
+                  {heroFormats.map((fmt) => (
+                    <span key={fmt} className={HERO_FORMAT_BADGE_CLASS + " px-3 py-1.5 text-xs sm:text-sm"}>
+                      {fmt}
                     </span>
-                  ) : null}
+                  ))}
                   {movie.languages.length > 0 ? (
                     <span className="inline-flex items-center rounded-md border border-white/25 bg-white/15 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                       {movie.languages.join(", ")}
@@ -375,6 +409,11 @@ export default function MovieDetailPage() {
     skip: !idOrSlug,
   });
 
+  const { data: showtimesData } = useGetPublicMovieShowtimesQuery(
+    { idOrSlug },
+    { skip: !idOrSlug }
+  );
+
   const movie = useMemo<MovieDetailData | null>(() => {
     if (!apiMovie) return null;
     const mapped = mapApiMovieToDetail(apiMovie);
@@ -392,6 +431,22 @@ export default function MovieDetailPage() {
       { fillCastCrew: false, fillOffers: false, fillReviews: false, fillRating: false }
     );
   }, [apiMovie, cinemaOffers]);
+
+  const langFormatGroups = useMemo(() => {
+    if (!movie) return [];
+    return buildLanguageFormatGroups(
+      groupsFromShowtimes(showtimesData?.cinemas),
+      movie.languages,
+      movie.formats || []
+    );
+  }, [movie, showtimesData?.cinemas]);
+
+  const formatBadges = useMemo(
+    () => allFormatsFromGroups(langFormatGroups),
+    [langFormatGroups]
+  );
+
+  const needsLangFormatPicker = shouldShowLanguageFormatPicker(langFormatGroups);
 
   useEffect(() => {
     const el = heroEndRef.current;
@@ -428,8 +483,6 @@ export default function MovieDetailPage() {
   }
 
   const bookHref = movie.bookHref || `/movies/${movie.slug || movie.id}/showtimes`;
-  const langFormatGroups = groupsFromMovieLists(movie.languages, movie.formats || []);
-  const needsLangFormatPicker = shouldShowLanguageFormatPicker(langFormatGroups);
 
   const handleBookTickets = () => {
     if (needsLangFormatPicker) {
@@ -450,7 +503,11 @@ export default function MovieDetailPage() {
 
   return (
     <div className="min-h-screen bg-white pb-24 lg:pb-0">
-      <MovieDetailBanner movie={movie} onBookTickets={handleBookTickets} />
+      <MovieDetailBanner
+        movie={movie}
+        formatBadges={formatBadges}
+        onBookTickets={handleBookTickets}
+      />
       {/* Sentinel: sticky bar appears only after hero fully scrolls past */}
       <div ref={heroEndRef} className="h-px w-full" aria-hidden />
 

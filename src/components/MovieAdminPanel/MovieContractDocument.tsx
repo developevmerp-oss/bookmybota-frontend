@@ -1,7 +1,7 @@
 "use client";
 
 import { mergeMovieContractHtml, type MovieContractRecord } from "@/lib/movieContractPlaceholders";
-import { formatDateTime12h } from "@/lib/dateFormat";
+import { formatDate, formatDateTime12h } from "@/lib/dateFormat";
 
 interface MovieContractDocumentProps {
   contract: MovieContractRecord;
@@ -16,11 +16,10 @@ export default function MovieContractDocument({
 
   return (
     <article className="contract-document overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
-      {/* Accent bar + document title */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-fuchsia-600 to-purple-600" aria-hidden />
-      <div className="border-b border-slate-200 bg-slate-50 px-6 sm:px-8 py-4">
+      <div className="h-1 w-full bg-[#e11d48]" aria-hidden />
+      <div className="border-b border-slate-200 bg-slate-50 px-6 sm:px-8 py-3.5">
         <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-          Cinema Platform Agreement
+          Your Contract / Agreement
         </h3>
       </div>
 
@@ -28,16 +27,16 @@ export default function MovieContractDocument({
         <div className="flex flex-wrap justify-between gap-4 mb-8 pb-6 border-b border-slate-100">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">
-              Contract Number
+              Contract
             </p>
-            <p className="text-base sm:text-lg font-bold text-slate-900 font-mono">
+            <p className="text-base sm:text-lg font-bold text-slate-900">
               {contract.contract_number}
             </p>
           </div>
           {contract.cinema_name && (
             <div className="sm:text-right">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">
-                Cinema Partner
+                Cinema
               </p>
               <p className="text-base sm:text-lg font-bold text-slate-900">
                 {contract.cinema_name}
@@ -99,38 +98,35 @@ function SignatureBlock({
   signedAt?: string | null;
   signatureUrl?: string | null;
 }) {
+  const dateLabel = signedAt ? formatDate(signedAt) : null;
+
   return (
-    <div className="rounded-lg border border-slate-200/90 bg-slate-50/60 p-5">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
-        {partyLabel}
-      </p>
-      <p className="text-sm font-semibold text-slate-900 mb-3">{cinemaName || title}</p>
+    <div className="min-w-0">
+      <p className="text-sm font-semibold text-slate-900 mb-3">{partyLabel}</p>
       {signatureUrl ? (
-        <div className="my-2">
+        <div className="mb-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={signatureUrl}
-            alt="Signature"
-            className="h-16 max-w-[200px] object-contain border border-slate-200 rounded bg-white p-1"
+            alt={`${title} signature`}
+            className="max-h-20 w-auto max-w-full object-contain object-left"
           />
         </div>
       ) : (
-        <div className="my-2 h-16 border border-dashed border-slate-300 rounded flex items-center justify-center text-xs text-slate-400">
-          Not signed yet
-        </div>
+        <p className="mb-3 text-sm text-slate-400">Signature not yet provided</p>
       )}
-      <p className="text-[11px] text-slate-500 mt-2">
-        {signedAt ? (
-          <>
-            Signed on{" "}
-            <span className="font-medium text-slate-700">
-              {formatDateTime12h(signedAt)}
-            </span>
-          </>
+      <div className="space-y-0.5 text-sm text-slate-600">
+        <p className="font-bold text-slate-900">{cinemaName || title}</p>
+        <p className="text-slate-500">{title}</p>
+        {dateLabel ? (
+          <p className="font-bold text-slate-900 pt-1">Date: {dateLabel}</p>
         ) : (
-          "Pending signature"
+          <p className="font-medium text-slate-500 pt-1">Awaiting signature + OTP</p>
         )}
-      </p>
+        {signedAt && (
+          <p className="text-xs text-slate-400">Signed {formatDateTime12h(signedAt)}</p>
+        )}
+      </div>
     </div>
   );
 }

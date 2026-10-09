@@ -43,6 +43,7 @@ export function extractApiError(error: unknown, fallback = 'Something went wrong
     if (typeof err.status === 'number') {
       if (err.status === 400) return 'Invalid request. Please check your input.';
       if (err.status === 404) return 'Resource not found.';
+      if (err.status === 409) return 'Schedule conflict — this screen already has a show in that time range.';
       if (err.status >= 500) return 'Server error. Please try again.';
     }
   }

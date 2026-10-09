@@ -194,6 +194,7 @@ export interface BusinessSettings {
   phone?: string;
   description?: string;
   cover_image_url?: string;
+  logo_url?: string;
   grace_time_minutes?: number;
   slot_interval_minutes?: number;
   online_allocation_percentage?: number;
@@ -513,7 +514,19 @@ export interface PublicMovieCinemaGroup {
   name: string;
   slug?: string;
   address?: string;
+  /** Cover / hero image */
   image?: string | null;
+  /** Square brand logo (BMS-style thumbnail beside cinema name) */
+  logo?: string | null;
+  /** Digital M-Ticket supported (always true on BookMyBota) */
+  m_ticket?: boolean;
+  /**
+   * Food & beverages available for add-on during booking.
+   * True when ACTIVE contract beverage commission > 0 and cinema has available menu items.
+   */
+  has_fnb?: boolean;
+  /** Customer ticket cancellation supported for this cinema (BMS-style label under name). */
+  cancellation_available?: boolean;
   showtimes: PublicMovieShowtimeItem[];
 }
 

@@ -19,6 +19,7 @@ import {
   movieReviewFormSchema,
   type MovieReviewFormValues,
 } from "@/lib/movieReviewFormSchema";
+import CustomerReviewCard from "@/components/Shared/CustomerReviewCard";
 
 const BRAND = "#6900AA";
 
@@ -324,39 +325,18 @@ export default function MovieReviewsSection({
               const name = review.user_name || "Guest";
               const ratingNum = Number(review.rating) || 0;
               const booked = Boolean(review.booked_on_platform);
-              const text = (review.text || "").trim();
               const accent = REVIEW_ACCENTS[index % REVIEW_ACCENTS.length];
               return (
-                <article
+                <CustomerReviewCard
                   key={review.id}
-                  className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm border-l-4"
-                  style={{ borderLeftColor: accent }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                      style={{ backgroundColor: `${accent}18`, color: accent }}
-                    >
-                      {name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1 text-sm font-bold text-[#111111] truncate">
-                      {name}
-                    </span>
-                    <span className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-[#111111]">
-                      <Star className="size-3.5 text-[#F84464]" fill="currentColor" />
-                      {formatRatingOutOf5(ratingNum)}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-400">
-                    {booked ? "Booked on BookMyBota" : "BookMyBota customer"}
-                  </p>
-                  {text ? (
-                    <p className="mt-2.5 text-sm text-slate-600 leading-relaxed line-clamp-4 whitespace-pre-wrap">
-                      {text}
-                    </p>
-                  ) : null}
-                  <p className="mt-3 text-xs text-slate-400">{timeAgo(review.created_at)}</p>
-                </article>
+                  name={name}
+                  rating={ratingNum}
+                  text={review.text}
+                  timeLabel={timeAgo(review.created_at)}
+                  bookedOnPlatform={booked}
+                  accentColor={accent}
+                  className="rounded-xl p-4 sm:p-5"
+                />
               );
             })}
           </div>

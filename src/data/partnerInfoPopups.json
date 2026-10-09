@@ -97,6 +97,23 @@
     "description": "See bookings, peak hours, and campaign performance in one place so you can grow what works."
   },
 
+  "movie.service.listings": {
+    "title": "Movie listings",
+    "description": "Add and manage movies showing at your theatre. Keep movie details, languages, formats, and availability up to date."
+  },
+  "movie.service.showtimes": {
+    "title": "Showtime scheduling",
+    "description": "Create and manage movie showtimes across your screens. Set schedules and keep your listings updated for customers."
+  },
+  "movie.service.tickets": {
+    "title": "Online ticket sales",
+    "description": "Sell movie tickets online through BookMyBota. Let customers explore showtimes, select seats, and book with ease."
+  },
+  "movie.service.scan": {
+    "title": "QR gate scanning",
+    "description": "Verify tickets instantly by scanning QR codes at the entrance. Manage admissions smoothly and prevent duplicate entries."
+  },
+
   "venue.host.auditoriums": {
     "title": "Auditoriums & Halls",
     "description": "Theaters, cultural halls, and large seated venues connect with organizers looking for trusted performance spaces."

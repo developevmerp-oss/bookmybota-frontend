@@ -2817,12 +2817,12 @@ export default function StadiumLayoutViewer({
               })()}
 
               {/* Row letter badges along the side — clicking/tapping toggles row filter */}
-              {rowMarkers.map((m) => {
+              {rowMarkers.map((m, markerIdx) => {
                 const isCurrentRow = selectedRow === m.label;
                 const markerR = isCurrentRow ? m.radius * 1.15 : m.radius;
                 return (
                   <Group
-                    key={`row-marker-${m.label}`}
+                    key={`row-marker-${m.label}-${markerIdx}`}
                     x={m.x}
                     y={m.y}
                     onClick={(e) => {

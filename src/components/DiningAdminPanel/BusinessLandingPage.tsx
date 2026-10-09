@@ -19,6 +19,13 @@ import {
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
 import { PARTNER_CATEGORY_TYPES } from "@/data/partnerCategoryTypes";
+import images from "@/Images";
+
+const PAGE_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+
+function imageSrc(imgData: string | { src: string }) {
+  return typeof imgData === "string" ? imgData : imgData.src;
+}
 
 const FEATURE_SLIDES = [
   {
@@ -51,7 +58,7 @@ const FEATURE_SLIDES = [
   },
 ];
 
-const HERO_IMAGE = FEATURE_SLIDES[1].image;
+const HERO_IMAGE = imageSrc(images.diningPartnerHero);
 
 const HOST_CATEGORIES = [
   {
@@ -162,6 +169,10 @@ export default function BusinessLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
+      pageContainerClassName={PAGE_CONTAINER}
+      pageBackgroundClassName="bg-white"
+      headerLoginPrompt="Already a partner?"
+      headerLoginVariant="dark"
       loginHref="/business/login"
       expectedRole="business_admin"
       loginTitle="Dining Login"
@@ -177,12 +188,21 @@ export default function BusinessLandingPage() {
       }
       primaryCtaLabel="List your business"
       secondaryLoginLabel="Login your business"
+      heroVariant="split"
+      heroEyebrow="FOR RESTAURANT & HOSPITALITY PARTNERS"
+      heroTitle="Your business deserves to be discovered."
+      heroDescription="Bring your venue to more guests with BookMyBota. Showcase your experience, manage bookings, and grow your presence."
+      heroMicrocopy="For restaurants, cafés, bars and pubs."
       heroImage={HERO_IMAGE}
       heroImageAlt="Dining partner on Book My Bota"
       categoryTypesTitle={`${PARTNER_CATEGORY_TYPES.dining.title} Types`}
       categoryTypes={PARTNER_CATEGORY_TYPES.dining.types}
+      categoryTypesVariant="cards"
+      categoryTypesTitleStyle="heading"
       servicesTitle="What are the services we offer?"
       servicesSubtitle="After collaborating with dining partners across the city, we're equipped to bring more guests through your door."
+      servicesHideSubtitle
+      servicesCardsVariant="bordered"
       servicesTiles={SERVICES}
       servicesFootnote="Apart from these must-haves, we also support promotions, gift-card settlements, and dedicated tools to manage tables, reviews, and guest experience."
       testimonials={TESTIMONIALS}
@@ -198,3 +218,4 @@ export default function BusinessLandingPage() {
     />
   );
 }
+

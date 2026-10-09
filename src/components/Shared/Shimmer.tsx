@@ -1080,3 +1080,129 @@ export function CustomerFullscreenShimmer({ label = "Loading" }: { label?: strin
     </Wrap>
   );
 }
+
+/**
+ * List Your Show + partner landing pages (business / movie / artist / venue / organizer).
+ * Visual shell only — matches BMS partner landing structure.
+ */
+export function ListYourShowLandingShimmer({
+  hideHeader = false,
+  variant = "bms",
+  hostOnly = false,
+}: {
+  hideHeader?: boolean;
+  /** `split` = dining-style hero; `bms` = feature slider + peek cards */
+  variant?: "bms" | "split";
+  hostOnly?: boolean;
+}) {
+  const container = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+
+  return (
+    <Wrap>
+      <div
+        className="min-h-screen bg-white"
+        aria-busy="true"
+        aria-label="Loading partner page"
+      >
+        {!hideHeader ? (
+          <div className="sticky top-0 z-10 border-b border-[#EBEBEB] bg-white">
+            <div className={`${container} flex items-center justify-between h-[72px]`}>
+              <Skeleton width={140} height={40} borderRadius={8} />
+              <div className="flex items-center gap-3">
+                <Skeleton width={110} height={14} />
+                <Skeleton width={72} height={36} borderRadius={8} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className={container}>
+          {variant === "split" ? (
+            <div className="py-8 sm:py-10 md:py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-center">
+              <div className="space-y-4">
+                <Skeleton width="85%" height={40} className="sm:!h-12" />
+                <Skeleton width="95%" height={14} count={3} />
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <Skeleton width={160} height={44} borderRadius={10} />
+                  <Skeleton width={160} height={44} borderRadius={10} />
+                </div>
+                <Skeleton width={180} height={12} />
+              </div>
+              <Skeleton
+                className="!w-full !rounded-bl-[2.5rem] sm:!rounded-bl-[4rem]"
+                height={360}
+              />
+            </div>
+          ) : (
+            <div className="pt-6 sm:pt-8 pb-4">
+              <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
+                <Skeleton
+                  className="!flex-1 !min-h-[300px] sm:!min-h-[340px] md:!min-h-[380px]"
+                  borderRadius={20}
+                  height={380}
+                />
+                <div className="hidden lg:flex gap-3 shrink-0">
+                  <Skeleton width={220} height={380} borderRadius={20} />
+                  <Skeleton width={220} height={380} borderRadius={20} />
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Skeleton circle width={40} height={40} />
+                <Skeleton circle width={40} height={40} />
+              </div>
+            </div>
+          )}
+
+          {/* Host / type cards */}
+          <div className="py-12 md:py-16 border-t border-[#F0F0F0]">
+            <div className="text-center max-w-[820px] mx-auto space-y-3">
+              <Skeleton width="55%" height={32} className="!mx-auto sm:!h-9" />
+              {!hostOnly ? null : (
+                <Skeleton width="80%" height={14} className="!mx-auto" count={2} />
+              )}
+              {variant === "split" ? (
+                <Skeleton width="40%" height={28} className="!mx-auto" />
+              ) : (
+                <Skeleton width="70%" height={14} className="!mx-auto" count={2} />
+              )}
+            </div>
+            <div className="mt-8 sm:mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {Array.from({ length: hostOnly ? 8 : 4 }).map((_, i) => (
+                <div key={i} className="overflow-hidden rounded-xl border border-[#EDEDED]">
+                  <Skeleton className="!block !w-full !rounded-none" height={160} />
+                  <div className="px-4 py-4">
+                    <Skeleton width="60%" height={18} className="!mx-auto" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Services / features */}
+          <div className="py-12 md:py-16 border-t border-[#F0F0F0]">
+            <div className="text-center max-w-[820px] mx-auto space-y-3">
+              <Skeleton width="50%" height={32} className="!mx-auto" />
+              <Skeleton width="75%" height={14} className="!mx-auto" count={2} />
+            </div>
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-[#EDEDED] bg-white p-6 flex flex-col items-center gap-3"
+                >
+                  <Skeleton circle width={40} height={40} />
+                  <Skeleton width="70%" height={18} />
+                  <Skeleton width="90%" height={12} count={2} />
+                  <Skeleton circle width={28} height={28} />
+                </div>
+              ))}
+            </div>
+            <div className="mt-10 flex justify-center">
+              <Skeleton width={180} height={44} borderRadius={10} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}

@@ -18,6 +18,13 @@ import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
 import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
+import images from "@/Images";
+
+const PAGE_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+
+function imageSrc(imgData: string | { src: string }) {
+  return typeof imgData === "string" ? imgData : imgData.src;
+}
 
 const FEATURE_SLIDES = [
   {
@@ -54,7 +61,7 @@ const FEATURE_SLIDES = [
   },
 ];
 
-const HERO_IMAGE = FEATURE_SLIDES[0].image;
+const HERO_IMAGE = imageSrc(images.venuePartnerHero);
 
 const VENUE_TYPES = [
   {
@@ -166,13 +173,17 @@ export default function VenueLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
+      pageContainerClassName={PAGE_CONTAINER}
+      pageBackgroundClassName="bg-white"
+      headerLoginPrompt="Already a partner?"
+      headerLoginVariant="dark"
       loginHref="/venue/login"
       expectedRole="venue_admin"
       loginTitle="Venue Login"
       loginSubtitle="Sign in to manage your venue and bookings"
       registerHref="/venue/register"
       registerHint={
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[0.625rem] text-slate-400">
           New venue?{" "}
           <Link href="/venue/register" className="text-[#6900AA] font-semibold">
             Register here
@@ -181,11 +192,19 @@ export default function VenueLandingPage() {
       }
       primaryCtaLabel="List your business"
       secondaryLoginLabel="Login your business"
+      heroVariant="split"
+      heroTitle={"Your venue.\nMore events. Bigger crowds."}
+      heroDescription="List your venue on BookMyBota, claim event showtimes, publish seating layouts, connect with organizers and attract more attendees across multiple cities."
       heroImage={HERO_IMAGE}
       heroImageAlt="Venue partner on Book My Bota"
       imageCards={PARTNER_VENUE_TYPE_CARDS}
+      imageCardsTitle="Venue Types"
+      imageCardsVariant="cards"
+      imageCardsTitleStyle="heading"
       servicesTitle="What are the services we offer?"
       servicesSubtitle="Tools built for venue operators — claim shows at your property, publish layouts, and stay connected to organizers using Book My Bota."
+      servicesHideSubtitle
+      servicesCardsVariant="bordered"
       servicesTiles={SERVICES}
       servicesFootnote="Complete account setup (details + documents). After Super Admin approval, sign in to manage layouts and claim events."
       testimonials={TESTIMONIALS}

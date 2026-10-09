@@ -26,7 +26,7 @@ import { useGetBookingByIdQuery, useCancelBookingMutation } from "@/services/api
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
-import { formatDateCustomer, formatDateTimeCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatWeekdayCustomer, formatInstantLocalDateTime } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 
@@ -418,7 +418,7 @@ export default function BookingDetailPage({
                 {booking.created_at && (
                   <span className="inline-flex items-center gap-1.5">
                     <Calendar size={14} style={{ color: ACCENT }} />
-                    Booked on {formatDateTimeCustomer(booking.created_at)}
+                    Booked on {formatInstantLocalDateTime(booking.created_at)}
                   </span>
                 )}
               </div>

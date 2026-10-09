@@ -12,6 +12,7 @@ import {
   venueFromEventDetail,
 } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import {
   eventCategoryBadge,
   eventFromPriceLabel,
@@ -65,14 +66,11 @@ export function eventEditorialDateParts(iso?: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const weekday = d.toLocaleString("en-GB", { weekday: "short" }).toUpperCase();
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = d.toLocaleString("en-GB", { month: "short" }).toUpperCase();
-  const time = d
-    .toLocaleString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true })
-    .toUpperCase()
-    .replace(/\s+/g, " ");
+  const dateLabel = formatDateCustomer(iso);
+  if (!dateLabel || dateLabel === "—") return null;
+  const time = formatTime12h(iso).toUpperCase().replace(/\s+/g, " ");
   return {
-    dateLabel: `${weekday}, ${day} ${month}`,
+    dateLabel: `${weekday}, ${dateLabel.toUpperCase()}`,
     timeLabel: time,
   };
 }

@@ -49,9 +49,18 @@ const authSlice = createSlice({
         const token = localStorage.getItem(tokenKey);
         const userStr = localStorage.getItem(userKey);
         if (token && userStr) {
-          state.token = token;
-          state.user = JSON.parse(userStr);
-        } else {
+          // Avoid replacing user with a new object every call — that retriggers subscribers.
+          if (state.token === token && state.user && userStr === JSON.stringify(state.user)) {
+            return;
+          }
+          try {
+            state.token = token;
+            state.user = JSON.parse(userStr);
+          } catch {
+            state.token = null;
+            state.user = null;
+          }
+        } else if (state.token != null || state.user != null) {
           state.token = null;
           state.user = null;
         }

@@ -135,18 +135,22 @@ export default function RecommendedMoviesRail() {
     [city]
   );
 
-  const { data: cityData, isLoading: cityLoading } = useGetPublicMoviesQuery(moviesQueryArg);
-  const { data: allData, isLoading: allLoading } = useGetPublicMoviesQuery(
-    { limit: 12 },
-    { skip: !hasCityFilter(city) }
-  );
+  const { data: cityData, isLoading: cityLoading, isFetching: cityFetching } =
+    useGetPublicMoviesQuery(moviesQueryArg);
+  const { data: allData, isLoading: allLoading, isFetching: allFetching } =
+    useGetPublicMoviesQuery({ limit: 12 }, { skip: !hasCityFilter(city) });
 
   const hasCity = hasCityFilter(city);
   const cityMovies = (cityData?.items ?? []).map(mapApiMovie);
   const allMovies = (allData?.items ?? []).map(mapApiMovie);
   const apiMovies = !hasCity || cityMovies.length > 0 ? cityMovies : allMovies;
-  const isLoading =
-    cityLoading || (hasCity && cityMovies.length === 0 && allLoading);
+  const waitingFallback =
+    hasCity &&
+    !cityLoading &&
+    !cityFetching &&
+    cityMovies.length === 0 &&
+    (allLoading || allFetching);
+  const isLoading = cityLoading || cityFetching || waitingFallback;
   const isEmpty = !isLoading && apiMovies.length === 0;
   // City → global → showcase when both empty (even with city selected)
   const useStatic = shouldShowShowcaseCards(isEmpty);

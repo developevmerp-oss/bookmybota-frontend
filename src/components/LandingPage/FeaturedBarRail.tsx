@@ -9,11 +9,15 @@ import { useBarSceneCatalog } from "./useBarSceneCatalog";
  * Detail-card Raise a Glass rail — same data as BarSceneRail, different card UI.
  */
 export default function FeaturedBarRail({ city }: { city: string }) {
-  const { items, isLoading, isEmpty, useStatic, seeAllHref } = useBarSceneCatalog(city);
+  const { items, isLoading, isEmpty, useStatic, seeAllHref, cityHasNoBars } =
+    useBarSceneCatalog(city);
 
   return (
     <ContentRail
       title="Raise a Glass"
+      cityNotice={
+        cityHasNoBars ? "No bars available in your city yet." : undefined
+      }
       seeAllHref={seeAllHref}
       label="featured-bars"
       cardStyle="dining"

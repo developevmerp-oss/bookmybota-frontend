@@ -35,6 +35,7 @@ import {
 } from "@/services/api";
 import { useAppDispatch } from "@/lib/hooks";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { artistHref } from "@/lib/businessPublicPath";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
@@ -254,10 +255,10 @@ function formatPromoDateTime(iso?: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const weekday = d.toLocaleString("en-GB", { weekday: "short" });
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = d.toLocaleString("en-GB", { month: "short" });
-  const time = d.toLocaleString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
-  return `${weekday}, ${day} ${month}, ${time}`;
+  const dateLabel = formatDateCustomer(iso);
+  const time = formatTime12h(iso);
+  if (!dateLabel || dateLabel === "—") return "";
+  return `${weekday}, ${dateLabel}, ${time}`;
 }
 
 function priceOnwards(event: PublicEvent) {

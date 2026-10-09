@@ -16,18 +16,32 @@ export function useHomeCatalog(city: string) {
   const hasCity = hasCityFilter(city);
   const { data: filters, isLoading: filtersLoading } = useGetPublicEventFiltersQuery();
 
-  const { data: cityEvents = [], isLoading: cityEventsLoading } = useGetPublicEventsQuery(
-    hasCity ? { city } : undefined
-  );
-  const { data: allEvents = [], isLoading: allEventsLoading } = useGetPublicEventsQuery(undefined, {
+  const {
+    data: cityEvents = [],
+    isLoading: cityEventsLoading,
+    isFetching: cityEventsFetching,
+  } = useGetPublicEventsQuery(hasCity ? { city } : undefined);
+  const {
+    data: allEvents = [],
+    isLoading: allEventsLoading,
+    isFetching: allEventsFetching,
+  } = useGetPublicEventsQuery(undefined, {
     skip: !hasCity,
   });
 
-  const { data: cityDining = [], isLoading: cityDiningLoading } = useGetBusinessesQuery({
+  const {
+    data: cityDining = [],
+    isLoading: cityDiningLoading,
+    isFetching: cityDiningFetching,
+  } = useGetBusinessesQuery({
     module: "dining",
     ...(hasCity ? { city } : {}),
   });
-  const { data: allDiningRaw = [], isLoading: allDiningLoading } = useGetBusinessesQuery(
+  const {
+    data: allDiningRaw = [],
+    isLoading: allDiningLoading,
+    isFetching: allDiningFetching,
+  } = useGetBusinessesQuery(
     { module: "dining" },
     { skip: !hasCity }
   );
@@ -46,9 +60,23 @@ export function useHomeCatalog(city: string) {
   }, [cityEvents, fallbackEvents]);
 
   const waitingEventsFallback =
-    hasCity && !cityEventsLoading && cityEvents.length === 0 && allEventsLoading;
+    hasCity &&
+    !cityEventsLoading &&
+    !cityEventsFetching &&
+    cityEvents.length === 0 &&
+    (allEventsLoading || allEventsFetching);
   const waitingDiningFallback =
-    hasCity && !cityDiningLoading && cityDining.length === 0 && allDiningLoading;
+    hasCity &&
+    !cityDiningLoading &&
+    !cityDiningFetching &&
+    cityDining.length === 0 &&
+    (allDiningLoading || allDiningFetching);
+
+  // isFetching covers city changes (RTK isLoading is only true on first ever load)
+  const isLoadingEvents =
+    cityEventsLoading || cityEventsFetching || waitingEventsFallback;
+  const isLoadingDining =
+    cityDiningLoading || cityDiningFetching || waitingDiningFallback;
 
   return {
     cities: filters?.cities || [],
@@ -64,9 +92,9 @@ export function useHomeCatalog(city: string) {
     dining,
     cityDining,
     allDining,
-    isLoadingEvents: cityEventsLoading || waitingEventsFallback,
-    isLoadingFallback: allEventsLoading,
-    isLoadingDining: cityDiningLoading || waitingDiningFallback,
+    isLoadingEvents,
+    isLoadingFallback: allEventsLoading || allEventsFetching,
+    isLoadingDining,
     isLoadingFilters: filtersLoading,
     hasCity,
   };

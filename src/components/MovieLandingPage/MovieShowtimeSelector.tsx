@@ -17,7 +17,6 @@ import {
   Info,
   ListFilter,
   MapPin,
-  MessageCircle,
   Moon,
   Navigation,
   Search,
@@ -31,8 +30,10 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
+import { FaMoon } from "react-icons/fa";
 import {
   useGetPublicMovieShowtimesQuery,
+  type MovieShowtimeTierAvailability,
   type PublicMovieCinemaGroup,
   type PublicMovieShowtimeItem,
 } from "@/services/api";
@@ -43,6 +44,11 @@ import {
   setOrDeleteParam,
   stableSearchParamsString,
 } from "@/lib/filterUrlSync";
+import {
+  formatDateCustomer,
+  isVenueWallTimeReached,
+  venueDateStr,
+} from "@/lib/dateFormat";
 
 const BRAND = "#6900AA";
 const DATE_ACTIVE_GRADIENT =
@@ -75,7 +81,13 @@ interface Props {
   onSelectShowtime?: (showtime: PublicMovieShowtimeItem, cinema: PublicMovieCinemaGroup) => void;
 }
 
-type FilterOption = { value: string; label: string; hint?: string; icon?: ReactNode };
+type FilterOption = {
+  value: string;
+  label: string;
+  hint?: string;
+  icon?: ReactNode;
+  disabled?: boolean;
+};
 
 type SortKey = "relevance" | "popularity" | "distance";
 
@@ -122,6 +134,37 @@ const SORT_OPTIONS: Array<{ value: SortKey; label: string; hint: string }> = [
   { value: "popularity", label: "Popularity", hint: "Show most popular first" },
   { value: "distance", label: "Distance", hint: "Show nearest first" },
 ];
+
+/** Exclusive end hour for each preferred-time band (venue / Ethiopia clock). */
+const PREFERRED_TIME_END_HOUR: Record<string, number> = {
+  morning: 12,
+  afternoon: 16,
+  evening: 19,
+  night: 24,
+};
+
+/** True when this band is fully in the past for the selected calendar day. */
+function isPreferredTimeBandPast(band: string, selectedDate: string, now = new Date()): boolean {
+  const today = venueDateStr(now);
+  if (!today) return false;
+  if (selectedDate > today) return false;
+  if (selectedDate < today) return true;
+  const endHour = PREFERRED_TIME_END_HOUR[band];
+  if (endHour == null) return false;
+  // Night runs until the venue calendar day rolls; never "past" on today.
+  if (endHour >= 24) return false;
+  return isVenueWallTimeReached(
+    `${selectedDate}T${String(endHour).padStart(2, "0")}:00:00`,
+    now
+  );
+}
+
+function preferredTimeOptionsForDate(selectedDate: string, now = new Date()): FilterOption[] {
+  return PREFERRED_TIME_OPTIONS.map((opt) => ({
+    ...opt,
+    disabled: isPreferredTimeBandPast(opt.value, selectedDate, now),
+  }));
+}
 
 function parseIsoDateAndHours(iso: string) {
   if (!iso) return { dateStr: "", hour: 0, displayTime: "" };
@@ -187,10 +230,55 @@ function showtimePrice(st: PublicMovieShowtimeItem) {
   return st.min_price ?? st.tier_pricing?.[0]?.price ?? null;
 }
 
-function fillStatus(iso: string): "available" | "filling" {
-  const h = showHour(iso);
-  if (h >= 18) return "filling";
+function isShowStarted(st: PublicMovieShowtimeItem): boolean {
+  if (st.booking_state === "STARTED" || st.has_started) return true;
+  if (st.booking_state === "UPCOMING" || st.booking_state === "ENDED") return false;
+  if (!st.starts_at) return false;
+  return isVenueWallTimeReached(st.starts_at);
+}
+
+type ChipFillStatus = "available" | "filling" | "started" | "soldout";
+
+function fillStatus(st: PublicMovieShowtimeItem): ChipFillStatus {
+  if (st.fill_status === "STARTED" || isShowStarted(st)) return "started";
+  if (st.fill_status === "SOLD_OUT") return "soldout";
+  if (st.fill_status === "FILLING_FAST") return "filling";
+  if (st.fill_status === "AVAILABLE") return "available";
+  // Fallback from tiers if fill_status missing
+  const tiers = st.tiers || [];
+  if (tiers.length > 0) {
+    if (tiers.every((t) => t.status === "SOLD_OUT")) return "soldout";
+    if (tiers.some((t) => t.status === "FILLING_FAST" || t.status === "SOLD_OUT")) {
+      return "filling";
+    }
+  }
   return "available";
+}
+
+function tooltipTiers(st: PublicMovieShowtimeItem): MovieShowtimeTierAvailability[] {
+  if (Array.isArray(st.tiers) && st.tiers.length > 0) return st.tiers;
+  if (Array.isArray(st.tier_pricing) && st.tier_pricing.length > 0) {
+    return st.tier_pricing.map((t) => ({
+      tier_name: t.tier_name,
+      price: Number(t.price) || 0,
+      status: "AVAILABLE" as const,
+      total_count: null,
+      available_count: null,
+    }));
+  }
+  return [];
+}
+
+function tierStatusLabel(status: string): string {
+  if (status === "FILLING_FAST") return "Filling Fast";
+  if (status === "SOLD_OUT") return "Sold Out";
+  return "Available";
+}
+
+function tierStatusClass(status: string): string {
+  if (status === "FILLING_FAST") return "text-[#EA580C]";
+  if (status === "SOLD_OUT") return "text-[#DC2626]";
+  return "text-[#16A34A]";
 }
 
 function priceInBands(price: number, bands: string[]) {
@@ -281,7 +369,8 @@ function BmsFilterDropdown({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open, onOpenChange]);
 
-  const toggle = (value: string) => {
+  const toggle = (value: string, disabled?: boolean) => {
+    if (disabled) return;
     if (values.includes(value)) onChange(values.filter((v) => v !== value));
     else onChange([...values, value]);
   };
@@ -313,29 +402,55 @@ function BmsFilterDropdown({
             ) : (
               options.map((opt) => {
                 const checked = values.includes(opt.value);
+                const disabled = Boolean(opt.disabled);
                 return (
-                  <li key={opt.value} role="option" aria-selected={checked}>
+                  <li key={opt.value} role="option" aria-selected={checked} aria-disabled={disabled}>
                     <button
                       type="button"
-                      onClick={() => toggle(opt.value)}
-                      className="w-full px-3.5 py-2.5 flex items-center gap-2.5 text-left text-[13px] text-[#333333] hover:bg-[#F7E9FF]/60 cursor-pointer"
+                      disabled={disabled}
+                      onClick={() => toggle(opt.value, disabled)}
+                      className={`w-full px-3.5 py-2.5 flex items-center gap-2.5 text-left text-[13px] ${
+                        disabled
+                          ? "cursor-not-allowed bg-white"
+                          : "text-[#333333] hover:bg-[#F7E9FF]/60 cursor-pointer"
+                      }`}
                     >
-                      {opt.icon ? <span className="shrink-0">{opt.icon}</span> : null}
+                      {opt.icon ? (
+                        <span
+                          className={`shrink-0 ${disabled ? "opacity-[0.35] grayscale" : ""}`}
+                        >
+                          {opt.icon}
+                        </span>
+                      ) : null}
                       <span className="flex-1 min-w-0">
-                        <span className="font-medium block">{opt.label}</span>
+                        <span
+                          className={`font-medium block ${
+                            disabled ? "text-[#B8B8B8]" : "text-[#333333]"
+                          }`}
+                        >
+                          {opt.label}
+                        </span>
                         {opt.hint ? (
-                          <span className="text-[11px] text-[#9CA3AF] block mt-0.5">{opt.hint}</span>
+                          <span
+                            className={`text-[11px] block mt-0.5 ${
+                              disabled ? "text-[#D0D0D0]" : "text-[#9CA3AF]"
+                            }`}
+                          >
+                            {opt.hint}
+                          </span>
                         ) : null}
                       </span>
                       <span
-                        className={`h-3.5 w-3.5 shrink-0 rounded-[2px] border flex items-center justify-center ${
-                          checked
-                            ? "border-[#6900AA] bg-[#6900AA] text-white"
-                            : "border-[#9CA3AF] bg-white"
+                        className={`h-3.5 w-3.5 shrink-0 rounded-[2px] flex items-center justify-center ${
+                          disabled
+                            ? "border-0 bg-[#E0E0E0]"
+                            : checked
+                              ? "border border-[#6900AA] bg-[#6900AA] text-white"
+                              : "border border-[#9CA3AF] bg-white"
                         }`}
                         aria-hidden
                       >
-                        {checked ? (
+                        {!disabled && checked ? (
                           <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                             <path
                               d="M2.5 6.2L4.8 8.5L9.5 3.5"
@@ -604,9 +719,22 @@ function buildShowtimesTitle(title: string, year?: string, language?: string) {
 }
 
 const TIME_COLOR = "#C58B00";
-const STATUS_DOT: Record<"available" | "filling", string> = {
+/** BMS-style muted text for disabled date / time options */
+const DISABLED_MUTED = "#C8C8C8";
+const DISABLED_MUTED_SOFT = "#D4D4D4";
+
+const STATUS_DOT: Record<ChipFillStatus, string> = {
+  started: "bg-[#F97316]",
   available: "bg-[#22C55E]",
   filling: "bg-[#EAB308]",
+  soldout: "bg-[#DC2626]",
+};
+/** Ticket outline only — matches status dot; time text stays gold */
+const STATUS_BORDER: Record<ChipFillStatus, string> = {
+  available: "#22C55E",
+  filling: "#EAB308",
+  soldout: "#DC2626",
+  started: "#F97316",
 };
 
 const TICKET_MASK = {
@@ -755,44 +883,175 @@ function CinemaInfoModal({
   );
 }
 
+/** BMS-style group key: "HINDI IMAX 2D" / "HINDI 2D" */
+function showtimeLangFormatKey(st: PublicMovieShowtimeItem): string {
+  const lang = (st.language || "").trim().toUpperCase();
+  const fmt = (st.format || st.screen_type || "").trim().toUpperCase();
+  if (lang && fmt) return `${lang} ${fmt}`;
+  if (lang) return lang;
+  if (fmt) return fmt;
+  return "SHOWS";
+}
+
+function groupShowtimesByLangFormat(showtimes: PublicMovieShowtimeItem[]) {
+  const order: string[] = [];
+  const map = new Map<string, PublicMovieShowtimeItem[]>();
+  for (const st of showtimes) {
+    const key = showtimeLangFormatKey(st);
+    if (!map.has(key)) {
+      map.set(key, []);
+      order.push(key);
+    }
+    map.get(key)!.push(st);
+  }
+  return order.map((label) => ({ label, showtimes: map.get(label)! }));
+}
+
 function ShowtimeChip({
   st,
   onClick,
+  grouped = false,
 }: {
   st: PublicMovieShowtimeItem;
   onClick: () => void;
+  /** When true, language/format are shown in the section heading — keep chip clean. */
+  grouped?: boolean;
 }) {
-  const status = fillStatus(st.starts_at);
+  const status = fillStatus(st);
+  const started = status === "started";
+  const soldOut = status === "soldout";
   const formatLabel = (st.format || st.screen_type || "").trim();
   const languageLabel = (st.language || "").trim();
-  const metaLine = [formatLabel, languageLabel ? languageLabel.toUpperCase() : ""]
-    .filter(Boolean)
-    .join(" · ");
+  const metaLine = grouped
+    ? ""
+    : [formatLabel, languageLabel ? languageLabel.toUpperCase() : ""]
+        .filter(Boolean)
+        .join(" · ");
   const minPrice = showtimePrice(st);
+  const tiers = tooltipTiers(st);
+  const borderColor = STATUS_BORDER[status];
+  const isLateNight = (() => {
+    const d = new Date(st.starts_at);
+    if (Number.isNaN(d.getTime())) return false;
+    const h = d.getHours();
+    return h >= 23 || h < 5;
+  })();
+
+  const showLateNightMoon = grouped && isLateNight;
 
   return (
-    <span className="inline-block [filter:drop-shadow(0_0_0.65px_#D1D5DB)] hover:[filter:drop-shadow(0_0_0.75px_#6900AA)] transition-[filter]">
-      <button
-        type="button"
-        onClick={onClick}
-        className="relative min-w-[104px] sm:min-w-[112px] bg-[#F7F5FB] px-3.5 py-2.5 text-center cursor-pointer"
-        style={TICKET_MASK}
-      >
-        <span
-          className={`absolute top-1.5 right-2 h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]}`}
-        />
-        <span className="block text-[13px] font-bold" style={{ color: TIME_COLOR }}>
-          {formatTime(st.starts_at)}
-        </span>
-        {metaLine ? (
-          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
-            {metaLine}
+    <span className="group/chip relative inline-block overflow-visible pt-2.5 pr-2.5">
+      {/* Hover tooltip — neutral grey border (do not inherit chip status filter) */}
+      {tiers.length > 0 ? (
+        <div
+          className="pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-40 hidden w-max max-w-[min(92vw,36rem)] -translate-x-1/2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.12)] group-hover/chip:block"
+          role="tooltip"
+        >
+          <div className="flex flex-wrap items-start justify-center gap-x-4 gap-y-2">
+            {tiers.map((tier) => (
+              <div
+                key={`${tier.tier_name}-${tier.price}`}
+                className="min-w-[4.5rem] max-w-[7.5rem] text-center px-1"
+              >
+                <div className="text-[12px] font-bold text-[#111827] tabular-nums">
+                  {tier.price > 0 ? `ETB ${tier.price}` : "—"}
+                </div>
+                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#374151] leading-tight line-clamp-2">
+                  {tier.tier_name}
+                </div>
+                <div
+                  className={`mt-0.5 text-[10px] font-semibold ${tierStatusClass(tier.status)}`}
+                >
+                  {tierStatusLabel(tier.status)}
+                </div>
+              </div>
+            ))}
+          </div>
+          <span
+            className="absolute left-1/2 top-full -mt-px h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-[#E5E7EB] bg-white"
+            aria-hidden
+          />
+        </div>
+      ) : null}
+
+      {/* Ticket + moon: moon centered on top-right corner (BMS angle) */}
+      <span className="relative inline-block overflow-visible">
+        {showLateNightMoon ? (
+          <span
+            className="pointer-events-none absolute top-0 right-0 z-20 flex size-[16px] -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-[#5A5A5A] text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+            title="Late night"
+            aria-hidden
+          >
+            <FaMoon className="text-[8px] text-white" aria-hidden />
           </span>
         ) : null}
-        {minPrice !== null ? (
-          <span className="mt-0.5 block text-[10px] font-medium text-[#6B7280]">ETB {minPrice}</span>
-        ) : null}
-      </button>
+
+        <span
+          className="inline-block transition-[filter]"
+          style={{
+            filter: `drop-shadow(0 0 0.7px ${borderColor}) drop-shadow(0 0 0.7px ${borderColor})`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClick}
+            disabled={soldOut}
+            aria-label={`${formatTime(st.starts_at)}${
+              isLateNight ? " — Late night" : ""
+            } — ${
+              status === "available"
+                ? "Available"
+                : status === "filling"
+                  ? "Fast filling"
+                  : status === "soldout"
+                    ? "Sold out"
+                    : "Started"
+            }`}
+            className={`relative min-w-[104px] sm:min-w-[112px] px-3.5 py-2.5 text-center ${
+              soldOut
+                ? "bg-[#F3F4F6] cursor-not-allowed opacity-70"
+                : started
+                  ? "bg-[#FFF7ED] cursor-pointer"
+                  : "bg-[#F7F5FB] cursor-pointer"
+            }`}
+            style={TICKET_MASK}
+          >
+            {/* Availability dot stays visible — left when moon owns the top-right corner */}
+            <span
+              className={`absolute top-1.5 h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]} ${
+                showLateNightMoon ? "left-2.5" : "right-2"
+              }`}
+            />
+            <span className="block text-[13px] font-bold" style={{ color: TIME_COLOR }}>
+              {formatTime(st.starts_at)}
+            </span>
+            {started ? (
+              <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#EA580C]">
+                Started
+              </span>
+            ) : soldOut ? (
+              <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#DC2626]">
+                Sold Out
+              </span>
+            ) : null}
+            {grouped && formatLabel && !/^2d$/i.test(formatLabel) ? (
+              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
+                {formatLabel}
+              </span>
+            ) : null}
+            {metaLine ? (
+              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
+                {metaLine}
+              </span>
+            ) : null}
+            {minPrice !== null && !grouped ? (
+              <span className="mt-0.5 block text-[10px] font-medium text-[#6B7280]">
+                ETB {minPrice}
+              </span>
+            ) : null}
+          </button>
+        </span>
+      </span>
     </span>
   );
 }
@@ -931,12 +1190,38 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     return () => window.clearTimeout(t);
   }, [showSearch]);
 
+  /** Refresh clock so bands disable when the hour rolls over while the page is open */
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setClockTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const preferredTimeOptions = useMemo(
+    () => preferredTimeOptionsForDate(selectedDate),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick refreshes past-band checks
+    [selectedDate, clockTick]
+  );
+
+  // Drop Preferred Time selections that are already past for the selected day
+  useEffect(() => {
+    const now = new Date();
+    setTimeFilters((prev) => {
+      const next = prev.filter((v) => !isPreferredTimeBandPast(v, selectedDate, now));
+      return next.length === prev.length ? prev : next;
+    });
+    setDraftTimeFilters((prev) => {
+      const next = prev.filter((v) => !isPreferredTimeBandPast(v, selectedDate, now));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [selectedDate, clockTick]);
+
   const closeSearch = () => {
     setShowSearch(false);
     setCinemaSearch("");
   };
 
-  const { data, isLoading, isFetching } = useGetPublicMovieShowtimesQuery({
+  const { data, isLoading, isFetching, isSuccess } = useGetPublicMovieShowtimesQuery({
     idOrSlug: movieIdOrSlug,
     date: selectedDate,
     city_slug: selectedCity || undefined,
@@ -944,6 +1229,17 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
 
   const cinemas = data?.cinemas ?? [];
   const availableDates = data?.available_dates ?? [];
+  /** Once showtimes payload is known, dates missing from available_dates are not bookable */
+  const datesAvailabilityReady = isSuccess && Boolean(data);
+  const isDateDisabled = (dateStr: string) =>
+    datesAvailabilityReady && !availableDates.includes(dateStr);
+
+  // If current date has no shows, jump to the first bookable date
+  useEffect(() => {
+    if (!datesAvailabilityReady || availableDates.length === 0) return;
+    if (availableDates.includes(selectedDate)) return;
+    setSelectedDate(availableDates[0]);
+  }, [datesAvailabilityReady, availableDates, selectedDate]);
 
   const languageOptions = useMemo(() => {
     const set = new Set<string>();
@@ -1012,31 +1308,37 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
     return rows;
   }, [cinemas, languageFilters, formatFilters, priceFilters, timeFilters, cinemaSearch, sortBy]);
 
-  const [seatQtyModal, setSeatQtyModal] = useState<{
+  const [lateEntryModal, setLateEntryModal] = useState<{
     showtime: PublicMovieShowtimeItem;
     cinema: PublicMovieCinemaGroup;
   } | null>(null);
-  const [seatQty, setSeatQty] = useState(2);
+
+  /** BMS flow: open seat map first — “How many seats?” modal shows on that page. */
+  const goToSeatMap = (showtime: PublicMovieShowtimeItem) => {
+    router.push(`/movies/book/${showtime.id}`);
+  };
 
   const handleShowtimeClick = (showtime: PublicMovieShowtimeItem, cinema: PublicMovieCinemaGroup) => {
     if (onSelectShowtime) {
       onSelectShowtime(showtime, cinema);
       return;
     }
-    setSeatQty(2);
-    setSeatQtyModal({ showtime, cinema });
+    if (isShowStarted(showtime)) {
+      setLateEntryModal({ showtime, cinema });
+      return;
+    }
+    goToSeatMap(showtime);
   };
 
-  const confirmSeatQty = () => {
-    if (!seatQtyModal) return;
-    const qty = Math.min(10, Math.max(1, seatQty));
-    router.push(`/movies/book/${seatQtyModal.showtime.id}?qty=${qty}`);
-    setSeatQtyModal(null);
+  const confirmLateEntryContinue = () => {
+    if (!lateEntryModal) return;
+    const { showtime } = lateEntryModal;
+    setLateEntryModal(null);
+    goToSeatMap(showtime);
   };
 
   const primaryLanguage = movie.languages[0];
   const titleLine = buildShowtimesTitle(movie.title, movie.releaseYear, primaryLanguage);
-  const languageLine = movie.languages.map((l) => l.toUpperCase()).join(", ");
   const backHref = `/movies/${movie.slug || movie.id}`;
   const languageLabel = languageFilters.length === 1 ? languageFilters[0] : null;
   const displayLanguage =
@@ -1079,11 +1381,13 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
         : "border-[#E5E5E5] text-[#333333] bg-white"
     }`;
 
-  const filterChipClass = (active: boolean) =>
-    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold cursor-pointer transition-colors ${
-      active
-        ? "border-[#6900AA] bg-[#6900AA] text-white"
-        : "border-[#6900AA]/55 bg-white text-[#6900AA]"
+  const filterChipClass = (active: boolean, disabled = false) =>
+    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold transition-colors ${
+      disabled
+        ? "border-[#E8E8E8] text-[#C8C8C8] bg-white cursor-not-allowed"
+        : active
+          ? "border-[#6900AA] bg-[#6900AA] text-white cursor-pointer"
+          : "border-[#6900AA]/55 bg-white text-[#6900AA] cursor-pointer"
     }`;
 
   return (
@@ -1162,16 +1466,23 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           {dateOptions.map((opt) => {
             const active = opt.dateStr === selectedDate;
             const hasShows = availableDates.includes(opt.dateStr);
+            const disabled = isDateDisabled(opt.dateStr);
             return (
               <button
                 key={opt.dateStr}
                 type="button"
-                onClick={() => setSelectedDate(opt.dateStr)}
-                className={`relative shrink-0 text-center cursor-pointer ${
-                  active ? "w-[3.35rem] pt-2.5" : "w-[3.15rem] py-1.5"
-                }`}
+                disabled={disabled}
+                onClick={() => {
+                  if (disabled) return;
+                  setSelectedDate(opt.dateStr);
+                }}
+                title={disabled ? "No showtimes on this date" : undefined}
+                aria-disabled={disabled}
+                className={`relative shrink-0 text-center ${
+                  disabled ? "cursor-not-allowed pointer-events-none" : "cursor-pointer"
+                } ${active && !disabled ? "w-[3.35rem] pt-2.5" : "w-[3.15rem] py-1.5"}`}
               >
-                {active ? (
+                {active && !disabled ? (
                   <span className="relative block w-full">
                     <span
                       className="pointer-events-none absolute left-[22%] top-0 z-[2] h-[0.62rem] w-[0.36rem] -translate-y-[48%] rounded-full bg-[#E9D5FF]"
@@ -1201,19 +1512,28 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                   </span>
                 ) : (
                   <>
-                    {hasShows ? (
+                    {hasShows && !disabled ? (
                       <span
                         className="absolute top-0.5 right-1 h-1.5 w-1.5 rounded-full"
                         style={{ backgroundColor: BRAND }}
                       />
                     ) : null}
-                    <span className="block text-[9px] font-bold tracking-wide text-[#333333]">
+                    <span
+                      className="block text-[9px] font-bold tracking-wide"
+                      style={{ color: disabled ? DISABLED_MUTED : "#333333" }}
+                    >
                       {opt.weekdayShort}
                     </span>
-                    <span className="mt-0.5 block text-base font-extrabold leading-none text-[#222222]">
+                    <span
+                      className="mt-0.5 block text-base font-extrabold leading-none"
+                      style={{ color: disabled ? DISABLED_MUTED : "#222222" }}
+                    >
                       {opt.dayNumber}
                     </span>
-                    <span className="mt-0.5 block text-[9px] font-semibold tracking-wide text-[#9CA3AF]">
+                    <span
+                      className="mt-0.5 block text-[9px] font-semibold tracking-wide"
+                      style={{ color: disabled ? DISABLED_MUTED : "#9CA3AF" }}
+                    >
                       {opt.monthName}
                     </span>
                   </>
@@ -1316,13 +1636,6 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                 {titleLine}
               </h1>
 
-              {languageLine ? (
-                <p className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold tracking-wide text-[#6B7280] uppercase">
-                  <MessageCircle size={13} className="text-[#9CA3AF]" />
-                  {languageLine}
-                </p>
-              ) : null}
-
               <div className="mt-3 flex flex-wrap gap-2">
                 {movie.duration ? (
                   <span className="inline-flex rounded-full border border-[#D4D4D4] bg-white px-3 py-1 text-[12px] text-[#555555]">
@@ -1360,18 +1673,27 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               {dateOptions.map((opt) => {
                 const active = opt.dateStr === selectedDate;
                 const hasShows = availableDates.includes(opt.dateStr);
+                const disabled = isDateDisabled(opt.dateStr);
                 return (
                   <button
                     key={opt.dateStr}
                     type="button"
-                    onClick={() => setSelectedDate(opt.dateStr)}
-                    className={`relative shrink-0 text-center cursor-pointer transition-transform ${
-                      active
-                        ? "w-[3.35rem] sm:w-[3.75rem] pt-2.5"
-                        : "w-[3.15rem] sm:w-[3.5rem] py-1.5 hover:opacity-80"
+                    disabled={disabled}
+                    onClick={() => {
+                      if (disabled) return;
+                      setSelectedDate(opt.dateStr);
+                    }}
+                    title={disabled ? "No showtimes on this date" : undefined}
+                    aria-disabled={disabled}
+                    className={`relative shrink-0 text-center transition-transform ${
+                      disabled
+                        ? "w-[3.15rem] sm:w-[3.5rem] py-1.5 cursor-not-allowed pointer-events-none"
+                        : active
+                          ? "w-[3.35rem] sm:w-[3.75rem] pt-2.5 cursor-pointer"
+                          : "w-[3.15rem] sm:w-[3.5rem] py-1.5 cursor-pointer hover:opacity-80"
                     }`}
                   >
-                    {active ? (
+                    {active && !disabled ? (
                       <span className="relative block w-full">
                         {/* Binder rings */}
                         <span
@@ -1403,19 +1725,28 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                       </span>
                     ) : (
                       <>
-                        {hasShows ? (
+                        {hasShows && !disabled ? (
                           <span
                             className="absolute top-0.5 right-1 h-1.5 w-1.5 rounded-full"
                             style={{ backgroundColor: BRAND }}
                           />
                         ) : null}
-                        <span className="block text-[9px] sm:text-[10px] font-bold tracking-wide text-[#333333]">
+                        <span
+                          className="block text-[9px] sm:text-[10px] font-bold tracking-wide"
+                          style={{ color: disabled ? DISABLED_MUTED : "#333333" }}
+                        >
                           {opt.weekdayShort}
                         </span>
-                        <span className="mt-0.5 block text-base sm:text-lg font-extrabold leading-none text-[#222222]">
+                        <span
+                          className="mt-0.5 block text-base sm:text-lg font-extrabold leading-none"
+                          style={{ color: disabled ? DISABLED_MUTED : "#222222" }}
+                        >
                           {opt.dayNumber}
                         </span>
-                        <span className="mt-0.5 block text-[9px] sm:text-[10px] font-semibold tracking-wide text-[#9CA3AF]">
+                        <span
+                          className="mt-0.5 block text-[9px] sm:text-[10px] font-semibold tracking-wide"
+                          style={{ color: disabled ? DISABLED_MUTED : "#9CA3AF" }}
+                        >
                           {opt.monthName}
                         </span>
                       </>
@@ -1461,9 +1792,12 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                 <BmsFilterDropdown
                   label="Preferred Time"
                   values={timeFilters}
-                  options={PREFERRED_TIME_OPTIONS}
+                  options={preferredTimeOptions}
                   open={openFilter === "time"}
-                  onOpenChange={(next) => setOpenFilter(next ? "time" : null)}
+                  onOpenChange={(next) => {
+                    if (next) setClockTick((n) => n + 1);
+                    setOpenFilter(next ? "time" : null);
+                  }}
                   onChange={setTimeFilters}
                   icon={<Clock size={15} />}
                 />
@@ -1550,6 +1884,14 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
               <span className="h-2 w-2 rounded-full bg-[#EAB308]" />
               FAST FILLING
             </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#DC2626]" />
+              SOLD OUT
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#F97316]" />
+              STARTED
+            </span>
           </div>
         </div>
       </div>
@@ -1563,14 +1905,15 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
           <div className="rounded-xl border border-[#E8E8E8] bg-white p-10 text-center space-y-3">
             <Film size={36} className="mx-auto text-[#C4C4C4]" />
             <h3 className="text-lg font-bold text-[#111111]">
-              No shows available for {selectedCity || selectedDate}
+              No shows available for{" "}
+              {selectedCity || formatDateCustomer(selectedDate)}
             </h3>
             <p className="text-xs text-[#6B7280] max-w-md mx-auto">
               {languageFilters.length || priceFilters.length || timeFilters.length || formatFilters.length || cinemaSearch
                 ? "No showtimes match your filters or search. Try clearing filters."
                 : selectedCity
-                  ? `No cinemas in ${selectedCity} have scheduled showtimes for ${selectedDate}.`
-                  : `Cinemas haven't published showtimes for ${selectedDate} yet.`}
+                  ? `No bookable showtimes left in ${selectedCity} for ${formatDateCustomer(selectedDate)}. Ended shows are hidden.`
+                  : `No bookable showtimes left for ${formatDateCustomer(selectedDate)}. Ended shows are hidden — try another date.`}
             </p>
             {(languageFilters.length > 0 ||
             priceFilters.length > 0 ||
@@ -1603,7 +1946,7 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                     onClick={() => setSelectedDate(dStr)}
                     className="px-3 py-1.5 rounded-lg bg-[#F5F5F5] hover:bg-[#EFEFEF] text-[#111111] text-xs font-bold border border-[#E5E5E5] cursor-pointer"
                   >
-                    {dStr}
+                    {formatDateCustomer(dStr)}
                   </button>
                 ))}
               </div>
@@ -1708,13 +2051,29 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                         </button>
                       </div>
 
-                      <div className="flex flex-wrap items-start gap-2.5">
-                        {cinema.showtimes.map((st) => (
-                          <ShowtimeChip
-                            key={st.id}
-                            st={st}
-                            onClick={() => handleShowtimeClick(st, cinema)}
-                          />
+                      <div className="space-y-4">
+                        {groupShowtimesByLangFormat(cinema.showtimes).map((group, groupIdx) => (
+                          <div key={group.label}>
+                            {groupIdx > 0 ? (
+                              <div
+                                className="mb-3 border-t border-dashed border-[#E5E7EB]"
+                                aria-hidden
+                              />
+                            ) : null}
+                            <p className="mb-2.5 text-[11px] sm:text-xs font-bold uppercase tracking-wide text-[#6B7280]">
+                              {group.label}
+                            </p>
+                            <div className="flex flex-wrap items-start gap-2.5 overflow-visible pt-0.5">
+                              {group.showtimes.map((st) => (
+                                <ShowtimeChip
+                                  key={st.id}
+                                  st={st}
+                                  grouped
+                                  onClick={() => handleShowtimeClick(st, cinema)}
+                                />
+                              ))}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -1743,65 +2102,55 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
                 })()
               : null}
 
-            {seatQtyModal ? (
-              <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+            {lateEntryModal ? (
+              <div className="fixed inset-0 z-[85] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
                 <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-xl overflow-hidden">
                   <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E8E8]">
-                    <h3 className="text-base font-bold text-[#222]">How many seats?</h3>
+                    <h3 className="text-base font-bold text-[#222]">
+                      Heads-up! This show has already started
+                    </h3>
                     <button
                       type="button"
-                      onClick={() => setSeatQtyModal(null)}
+                      onClick={() => setLateEntryModal(null)}
                       className="p-1.5 rounded-lg text-[#6B7280] hover:bg-[#F5F5F5] cursor-pointer"
                       aria-label="Close"
                     >
                       <X size={18} />
                     </button>
                   </div>
-                  <div className="px-5 py-4 space-y-4">
-                    <p className="text-sm text-[#6B7280]">
-                      {seatQtyModal.cinema.name} ·{" "}
-                      {seatQtyModal.showtime.starts_at
-                        ? new Date(
-                            String(seatQtyModal.showtime.starts_at).replace(" ", "T")
-                          ).toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true,
-                          })
-                        : "Showtime"}
+                  <div className="px-5 py-5 space-y-4">
+                    <p className="text-sm text-[#6B7280] leading-relaxed">
+                      You can still book tickets for{" "}
+                      <span className="font-semibold text-[#374151]">
+                        {lateEntryModal.cinema.name}
+                      </span>{" "}
+                      at{" "}
+                      <span className="font-semibold text-[#374151]">
+                        {formatTime(lateEntryModal.showtime.starts_at)}
+                      </span>
+                      . You may miss the beginning of the movie.
                     </p>
-                    <div className="grid grid-cols-5 gap-2">
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => setSeatQty(n)}
-                          className={`h-11 rounded-xl text-sm font-bold cursor-pointer transition ${
-                            seatQty === n
-                              ? "text-white shadow-sm"
-                              : "bg-[#F5F5F5] text-[#333] hover:bg-[#EDE4F7]"
-                          }`}
-                          style={
-                            seatQty === n
-                              ? { background: DATE_ACTIVE_GRADIENT }
-                              : undefined
-                          }
-                        >
-                          {n}
-                        </button>
-                      ))}
+                    <div className="flex flex-col-reverse sm:flex-row gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setLateEntryModal(null)}
+                        className="flex-1 h-11 rounded-xl border border-[#E5E7EB] bg-white text-sm font-bold text-[#374151] cursor-pointer hover:bg-[#F9FAFB] transition-colors"
+                      >
+                        Go back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={confirmLateEntryContinue}
+                        className="flex-1 h-11 rounded-xl bg-[#111111] text-white text-sm font-bold cursor-pointer hover:bg-black transition-colors"
+                      >
+                        Continue booking
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={confirmSeatQty}
-                      className="w-full h-11 rounded-xl border border-slate-900 bg-[#111111] text-white text-sm font-bold cursor-pointer hover:bg-black transition-colors"
-                    >
-                      Select seats
-                    </button>
                   </div>
                 </div>
               </div>
             ) : null}
+
           </>
         )}
       </div>
@@ -1878,16 +2227,24 @@ export default function MovieShowtimeSelector({ movieIdOrSlug, movie, onSelectSh
             Preferred Time
           </div>
           <div className="flex flex-wrap gap-2 px-4 py-3">
-            {PREFERRED_TIME_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value)}
-                className={filterChipClass(draftTimeFilters.includes(opt.value))}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {preferredTimeOptions.map((opt) => {
+              const disabled = Boolean(opt.disabled);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (disabled) return;
+                    toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value);
+                  }}
+                  className={filterChipClass(draftTimeFilters.includes(opt.value), disabled)}
+                  title={disabled ? "This time period has passed" : undefined}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="sticky bottom-0 inset-x-0 flex gap-3 border-t border-[#E8E8E8] bg-white px-4 py-3 safe-area-pb">

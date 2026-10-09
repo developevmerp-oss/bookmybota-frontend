@@ -91,7 +91,9 @@ export default function ContentRail({
             >
               {title}
             </h2>
-            {cityNotice ? <CitySectionEmptyNotice message={cityNotice} /> : null}
+            {cityNotice && !isLoading ? (
+              <CitySectionEmptyNotice message={cityNotice} />
+            ) : null}
             {!cityNotice && subtitle ? (
               <p className={`type-body mt-1 ${dark ? "text-[#B0B0B0]" : "text-[#6B6B6B]"}`}>
                 {subtitle}

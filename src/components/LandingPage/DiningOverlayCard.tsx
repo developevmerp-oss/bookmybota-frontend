@@ -7,7 +7,6 @@ import type { Business } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
-import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 import { localityFromAddress } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 
@@ -162,14 +161,7 @@ export function DiningOverlayCard({
       <OverlayBody
         name={place.name}
         locationLine={locationLine}
-        distance={
-          <DiningDistanceLabel
-            latitude={place.latitude}
-            longitude={place.longitude}
-            placeCity={place.city_name}
-            className="shrink-0 whitespace-nowrap"
-          />
-        }
+        distance={null}
         cuisine={cuisineLabel(place)}
       />
     </Link>

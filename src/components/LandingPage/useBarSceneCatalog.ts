@@ -19,7 +19,11 @@ export function useBarSceneCatalog(city: string) {
     [businessTypes]
   );
 
-  const { data: cityBarsData, isLoading: cityBarsLoading } = useGetBusinessesPagedQuery({
+  const {
+    data: cityBarsData,
+    isLoading: cityBarsLoading,
+    isFetching: cityBarsFetching,
+  } = useGetBusinessesPagedQuery({
     module: "dining",
     ...(hasCity ? { city } : {}),
     categories: [barCategory],
@@ -28,7 +32,11 @@ export function useBarSceneCatalog(city: string) {
     limit: 12,
   });
 
-  const { data: allBarsData, isLoading: allBarsLoading } = useGetBusinessesPagedQuery(
+  const {
+    data: allBarsData,
+    isLoading: allBarsLoading,
+    isFetching: allBarsFetching,
+  } = useGetBusinessesPagedQuery(
     {
       module: "dining",
       categories: [barCategory],
@@ -43,12 +51,22 @@ export function useBarSceneCatalog(city: string) {
   const allItems = allBarsData?.items ?? [];
   const items = !hasCity || cityItems.length > 0 ? cityItems : allItems;
 
+  const waitingFallback =
+    hasCity &&
+    !cityBarsLoading &&
+    !cityBarsFetching &&
+    cityItems.length === 0 &&
+    (allBarsLoading || allBarsFetching);
+
   const isLoading =
     typesLoading ||
     cityBarsLoading ||
-    (hasCity && cityItems.length === 0 && allBarsLoading);
+    cityBarsFetching ||
+    waitingFallback;
+
   const isEmpty = !isLoading && items.length === 0;
   const useStatic = shouldShowShowcaseCards(isEmpty);
+  const cityHasNoBars = hasCity && !isLoading && cityItems.length === 0;
 
   const seeAllParams = new URLSearchParams();
   if (hasCity && cityItems.length > 0) seeAllParams.set("city", city);
@@ -62,5 +80,6 @@ export function useBarSceneCatalog(city: string) {
     useStatic,
     seeAllHref,
     barCategory,
+    cityHasNoBars,
   };
 }

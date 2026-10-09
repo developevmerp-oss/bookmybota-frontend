@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, MapPin, Package, Smartphone, User } from "lucide-react";
-import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatInstantLocalDateTime } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { shortBookingCode } from "@/lib/eventTicketPdf";
 import { eventBookingQrValue } from "@/lib/eventScanToken";
@@ -55,7 +55,7 @@ function formatLongDate(value?: string) {
 
 function formatBookedOn(value?: string) {
   if (!value) return "";
-  const label = formatDateTimeCustomer(value);
+  const label = formatInstantLocalDateTime(value);
   return label === "—" ? "" : `Booked on ${label}`;
 }
 

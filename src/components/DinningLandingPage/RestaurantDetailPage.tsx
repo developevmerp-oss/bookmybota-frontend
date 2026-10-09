@@ -339,10 +339,12 @@ const getBookingDates = () => {
   return dates;
 };
 
+/** Compact strip labels only (chips). Full readable dates use formatDateCustomer elsewhere. */
 const formatDateLabel = (date: Date, idx: number) => {
-  if (idx === 0) return { top: 'Today', bottom: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) };
-  if (idx === 1) return { top: 'Tomorrow', bottom: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) };
-  return { top: date.toLocaleDateString('en-IN', { weekday: 'short' }), bottom: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) };
+  const bottom = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  if (idx === 0) return { top: 'Today', bottom };
+  if (idx === 1) return { top: 'Tomorrow', bottom };
+  return { top: date.toLocaleDateString('en-IN', { weekday: 'short' }), bottom };
 };
 
 function toLocalDateKey(d: Date) {
@@ -2249,11 +2251,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         >
                           {(() => {
                             const d = bookingDates[selectedDateIndex];
-                            const datePart = d.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            });
+                            const datePart = formatDateCustomer(d);
                             if (selectedDateIndex === 0) return `Today, ${datePart}`;
                             if (selectedDateIndex === 1) return `Tomorrow, ${datePart}`;
                             return `${d.toLocaleDateString("en-US", { weekday: "short" })}, ${datePart}`;
@@ -2268,11 +2266,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                             className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto border border-slate-500 bg-white shadow-md"
                           >
                             {bookingDates.map((d, idx) => {
-                              const datePart = d.toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              });
+                              const datePart = formatDateCustomer(d);
                               let label = datePart;
                               if (idx === 0) label = `Today, ${datePart}`;
                               else if (idx === 1) label = `Tomorrow, ${datePart}`;
@@ -3343,7 +3337,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       <div className="flex gap-0 md:gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin items-stretch">
                         <div className="md:hidden shrink-0 flex items-center pr-2 mr-1 border-r border-slate-200">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl] rotate-180">
-                            {bookingDates[selectedDateIndex]?.toLocaleDateString("en-US", { month: "short" })}
+                            {bookingDates[selectedDateIndex]?.toLocaleDateString("en-US", { month: "long" })}
                           </span>
                         </div>
                         {bookingDates.map((d, idx) => {
@@ -3354,7 +3348,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               key={idx}
                               type="button"
                               onClick={() => handleDateSelect(idx)}
-                              className={`min-w-[64px] sm:min-w-[72px] md:min-w-[78px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${
+                              className={`min-w-[72px] sm:min-w-[88px] md:min-w-[96px] shrink-0 rounded-xl px-2.5 py-2.5 text-center transition-all cursor-pointer ${
                                     selected
                                   ? 'md:border md:border-[#6900AA] md:bg-[#f7e9ff] bg-slate-900 text-white border-transparent'
                                   : 'md:border md:border-slate-200 md:bg-white md:hover:border-slate-300 border-transparent bg-transparent'
@@ -3814,7 +3808,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               <Calendar size={18} className="text-zinc-500 shrink-0 mt-0.5" strokeWidth={1.75} />
                               <p className="text-sm font-semibold text-zinc-900 leading-snug">
                                 {selectedDateIndex === 0 ? 'Today' : selectedDateIndex === 1 ? 'Tomorrow' : bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { weekday: 'short' })}{' '}
-                                {bookingDates[selectedDateIndex].toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}{' '}
+                                {formatDateCustomer(bookingDates[selectedDateIndex])}{' '}
                                 at {formatSlotLabel(selectedTime)}
                         </p>
                       </div>

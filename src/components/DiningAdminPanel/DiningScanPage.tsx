@@ -23,7 +23,7 @@ import {
 import { formatDiningOfferDiscount, calculateDiningOfferDiscountAmount } from "@/lib/diningOffers";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDateCustomer, formatDateTimeCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatWeekdayCustomer, formatInstantLocalDateTime } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import {
@@ -988,7 +988,7 @@ export default function DiningScanPage() {
             <div className="space-y-2 text-center">
               {scanned.checked_out_at && (
                 <p className="text-xs text-emerald-700">
-                  Checked out at {formatDateTimeCustomer(scanned.checked_out_at)}
+                  Checked out at {formatInstantLocalDateTime(scanned.checked_out_at)}
                 </p>
               )}
               {scanned.offer_redeemed_at ? (
@@ -998,7 +998,7 @@ export default function DiningScanPage() {
                   </p>
                   <p className="text-sm text-slate-800 mt-1">{offer?.title || "Merchant offer"}</p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {formatDateTimeCustomer(scanned.offer_redeemed_at)}
+                    {formatInstantLocalDateTime(scanned.offer_redeemed_at)}
                   </p>
                   {scanned.bill_amount != null && Number(scanned.bill_amount) > 0 && (
                     <p className="text-xs text-slate-600 mt-0.5">

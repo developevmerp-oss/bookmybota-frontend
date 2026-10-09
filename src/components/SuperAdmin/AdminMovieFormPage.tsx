@@ -588,12 +588,16 @@ export default function AdminMovieFormPage({ mode, movieId }: AdminMovieFormPage
 
           <div>
             <FieldLabel>Banner</FieldLabel>
+            <p className="mb-2 text-xs text-slate-500 leading-relaxed">
+              Same frame as the movie detail hero (<span className="font-semibold text-slate-700">2.5:1</span>).
+              Drag so title art stays inside the box — what you crop is what customers see.
+            </p>
             <CroppedImageField
               value={bannerUrl || ""}
-              aspect={16 / 9}
-              previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
-              emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
-              emptyLabel="Add banner (16:9)"
+              aspect={2.5}
+              previewClassName="w-full aspect-[5/2] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+              emptyClassName="flex flex-col items-center justify-center w-full aspect-[5/2] border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
+              emptyLabel="Add banner (2.5:1)"
               onRemove={() => setValue("banner_url", "", { shouldValidate: true, shouldDirty: true })}
               onCroppedFile={(file) => uploadField(file, "banner_url")}
             />

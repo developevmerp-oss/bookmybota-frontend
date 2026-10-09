@@ -29,6 +29,7 @@ import {
   useUpsertBusinessOperatingDateMutation,
   type DiningMealsConfig,
   type BusinessOperatingDate,
+  type Booking,
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
@@ -37,6 +38,10 @@ import { extractApiError } from "@/lib/apiErrors";
 import { formatDate } from "@/lib/dateFormat";
 
 const MEAL_KEYS = ["breakfast", "lunch", "dinner"] as const;
+
+/** Stable empty list — inline `= []` creates a new array every render and loops effects. */
+const EMPTY_OPERATING_DATES: BusinessOperatingDate[] = [];
+const EMPTY_BOOKINGS: Booking[] = [];
 
 const MEAL_META: Record<
   string,
@@ -354,18 +359,14 @@ function MonthCalendar({
 }
 
 function BusinessDashboard() {
-  const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-
-  useEffect(() => {
-    dispatch(loadFromStorage());
-  }, [dispatch]);
+  // Auth hydrate happens in BusinessDashboardPage — do not reload storage here
+  // (JSON.parse every time created a new user ref and retriggered this tree).
 
   const bizId = user?.business_id ?? "";
-  const now = new Date();
-  const [calYear, setCalYear] = useState(now.getFullYear());
-  const [calMonth, setCalMonth] = useState(now.getMonth());
-  const [selectedDate, setSelectedDate] = useState(toDateKey(now));
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [dayOpen, setDayOpen] = useState(true);
   const [openTime, setOpenTime] = useState("09:00");
   const [closeTime, setCloseTime] = useState("22:00");
@@ -378,6 +379,10 @@ function BusinessDashboard() {
   const [longitude, setLongitude] = useState<string>("");
 
   const range = useMemo(() => monthBounds(calYear, calMonth), [calYear, calMonth]);
+  const datesQueryArg = useMemo(
+    () => ({ bizId, from: range.from, to: range.to }),
+    [bizId, range.from, range.to]
+  );
 
   const { data: settings, isLoading: settingsLoading } = useGetBusinessSettingsQuery(bizId, {
     skip: !bizId,
@@ -385,11 +390,12 @@ function BusinessDashboard() {
   const { data: bookingsData, isLoading: bookingsLoading } = useGetBusinessBookingsQuery(bizId, {
     skip: !bizId,
   });
-  const { data: operatingDates = [], isLoading: datesLoading } = useGetBusinessOperatingDatesQuery(
-    { bizId, from: range.from, to: range.to },
+  const { data: operatingDatesData, isLoading: datesLoading } = useGetBusinessOperatingDatesQuery(
+    datesQueryArg,
     { skip: !bizId }
   );
-  const allBookings = bookingsData?.items ?? [];
+  const operatingDates = operatingDatesData ?? EMPTY_OPERATING_DATES;
+  const allBookings = bookingsData?.items ?? EMPTY_BOOKINGS;
   const [updateSettings, { isLoading: saving }] = useUpdateBusinessSettingsMutation();
   const [upsertOperatingDate, { isLoading: savingDate }] = useUpsertBusinessOperatingDateMutation();
 
@@ -402,45 +408,75 @@ function BusinessDashboard() {
     return map;
   }, [operatingDates]);
 
+  /** Content fingerprint — ignore Map/array identity churn from RTK. */
+  const selectedDateSyncKey = useMemo(() => {
+    const row = byDate.get(selectedDate);
+    if (!row) return `empty:${selectedDate}`;
+    return [
+      selectedDate,
+      row.is_open ? "1" : "0",
+      String(row.open_time || "").slice(0, 5),
+      String(row.close_time || "").slice(0, 5),
+      JSON.stringify(row.meals ?? null),
+    ].join("|");
+  }, [byDate, selectedDate]);
+
   useEffect(() => {
-    if (settings) {
-      setGraceTime(settings.grace_time_minutes ?? 120);
-      const interval = Number(settings.slot_interval_minutes);
-      setSlotInterval(interval === 15 || interval === 60 ? interval : 30);
-      setAllocation(settings.online_allocation_percentage ?? 50);
-      setLatitude(
-        settings.latitude != null && settings.latitude !== ""
-          ? String(settings.latitude)
-          : ""
-      );
-      setLongitude(
-        settings.longitude != null && settings.longitude !== ""
-          ? String(settings.longitude)
-          : ""
-      );
-    }
-  }, [settings]);
+    if (!settings) return;
+    const nextGrace = settings.grace_time_minutes ?? 120;
+    const intervalNum = Number(settings.slot_interval_minutes);
+    const nextInterval: 15 | 30 | 60 =
+      intervalNum === 15 || intervalNum === 60 ? intervalNum : 30;
+    const nextAlloc = settings.online_allocation_percentage ?? 50;
+    const nextLat =
+      settings.latitude != null && settings.latitude !== ""
+        ? String(settings.latitude)
+        : "";
+    const nextLng =
+      settings.longitude != null && settings.longitude !== ""
+        ? String(settings.longitude)
+        : "";
+
+    setGraceTime((prev) => (prev === nextGrace ? prev : nextGrace));
+    setSlotInterval((prev) => (prev === nextInterval ? prev : nextInterval));
+    setAllocation((prev) => (prev === nextAlloc ? prev : nextAlloc));
+    setLatitude((prev) => (prev === nextLat ? prev : nextLat));
+    setLongitude((prev) => (prev === nextLng ? prev : nextLng));
+  }, [
+    settings?.grace_time_minutes,
+    settings?.slot_interval_minutes,
+    settings?.online_allocation_percentage,
+    settings?.latitude,
+    settings?.longitude,
+  ]);
 
   useEffect(() => {
     const row = byDate.get(selectedDate);
     if (row) {
       const nextOpen = (row.open_time || "09:00").slice(0, 5);
       const nextClose = (row.close_time || "22:00").slice(0, 5);
-      setDayOpen(!!row.is_open);
-      setOpenTime(nextOpen);
-      setCloseTime(nextClose);
-      setMealPeriods(
-        row.is_open
-          ? clampMealsToWindow(row.meals || DEFAULT_MEALS, nextOpen, nextClose)
-          : row.meals || DEFAULT_MEALS
+      const nextOpenFlag = !!row.is_open;
+      const nextMeals = nextOpenFlag
+        ? clampMealsToWindow(row.meals || DEFAULT_MEALS, nextOpen, nextClose)
+        : row.meals || DEFAULT_MEALS;
+      setDayOpen((prev) => (prev === nextOpenFlag ? prev : nextOpenFlag));
+      setOpenTime((prev) => (prev === nextOpen ? prev : nextOpen));
+      setCloseTime((prev) => (prev === nextClose ? prev : nextClose));
+      setMealPeriods((prev) =>
+        JSON.stringify(prev) === JSON.stringify(nextMeals) ? prev : nextMeals
       );
     } else {
-      setDayOpen(true);
-      setOpenTime("09:00");
-      setCloseTime("22:00");
-      setMealPeriods(clampMealsToWindow(DEFAULT_MEALS, "09:00", "22:00"));
+      const nextMeals = clampMealsToWindow(DEFAULT_MEALS, "09:00", "22:00");
+      setDayOpen((prev) => (prev === true ? prev : true));
+      setOpenTime((prev) => (prev === "09:00" ? prev : "09:00"));
+      setCloseTime((prev) => (prev === "22:00" ? prev : "22:00"));
+      setMealPeriods((prev) =>
+        JSON.stringify(prev) === JSON.stringify(nextMeals) ? prev : nextMeals
+      );
     }
-  }, [selectedDate, byDate]);
+    // byDate is read for the row; selectedDateSyncKey is the stable content key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [selectedDateSyncKey]);
 
   const setDayHours = (nextOpen: string, nextClose: string) => {
     const open = (nextOpen || "09:00").slice(0, 5);

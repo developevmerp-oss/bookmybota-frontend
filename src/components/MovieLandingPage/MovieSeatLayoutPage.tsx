@@ -28,10 +28,22 @@ import {
   ShoppingBag,
   Sparkles,
   ChevronRight,
+  ChevronLeft,
+  Info,
+  Pencil,
+  Accessibility,
 } from "lucide-react";
+import { FaMoon } from "react-icons/fa";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { useSelectedCity } from "@/lib/useSelectedCity";
+import {
+  applyBestsellerFlagsToRawSeats,
+  finalizeBestsellerMarks,
+  seatHasExplicitBestsellerFlag,
+} from "@/lib/bmsBestsellerSeats";
+import { seatHasAccessibleFlag } from "@/lib/bmsAccessibleSeats";
+import MovieAccessibilitySeatModal from "@/components/MovieLandingPage/MovieAccessibilitySeatModal";
 import {
   useGetMovieShowtimeLayoutQuery,
   useCreateMovieBookingMutation,
@@ -63,21 +75,26 @@ import { isGiftCardSpendable } from "@/lib/giftCardOwnership";
 import { resolveHoldExpiresAt } from "@/lib/holdCountdown";
 import { pickContiguousBlock } from "@/lib/bmsSeatAutoSelect";
 import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
-import images from "@/Images";
+import MovieSeatQtyModal from "@/components/MovieLandingPage/MovieSeatQtyModal";
 
-const logoSrc = typeof images.logo === "string" ? images.logo : images.logo.src;
-
-/** Seat map palette (layout unchanged) */
+/** Seat map palette — BMS: available = green outline, bestseller = orange outline */
 const SEAT_AVAILABLE =
-  "bg-white text-slate-900 border border-[#cfcfcf] hover:border-slate-400 cursor-pointer";
+  "bg-white text-slate-700 border border-[#22C55E] hover:border-[#16A34A] cursor-pointer";
+const SEAT_BESTSELLER =
+  "bg-white text-slate-700 border border-[#EAB308] hover:border-[#CA8A04] cursor-pointer";
 const SEAT_SELECTED =
   "text-white border border-[#6D28D9] cursor-pointer bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)]";
 const SEAT_BOOKED =
-  "bg-white text-slate-400 border border-[#cfcfcf] cursor-not-allowed";
+  "bg-[#E5E7EB] text-white border border-[#E5E7EB] cursor-not-allowed";
 const SEAT_SELECTED_MINI =
   "border border-[#6D28D9] bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_50%,#6D28D9_100%)]";
 const SEAT_SELECTED_SWATCH =
   "border border-[#6D28D9] bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)]";
+
+function availableSeatClass(isBestseller?: boolean, withHoverScale = false) {
+  const base = isBestseller ? SEAT_BESTSELLER : SEAT_AVAILABLE;
+  return withHoverScale ? `${base} hover:scale-105` : base;
+}
 
 function formatSeatPageTime(startsAt: string): string {
   try {
@@ -112,15 +129,67 @@ function formatSeatPageDateParts(startsAt: string): { weekday: string; dayMonth:
   const d = parseShowtimeDate(startsAt);
   if (!d) return { weekday: "", dayMonth: "" };
   const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = d.toLocaleDateString("en-US", { month: "short" });
-  return { weekday, dayMonth: `${day} ${month}` };
+  const full = formatDateCustomer(startsAt);
+  // Prefer full customer date ("7 October 2026"); fall back to weekday + empty.
+  const dayMonth = full && full !== "—" ? full : "";
+  return { weekday, dayMonth };
 }
 
 function isShowtimePast(startsAt: string): boolean {
   const d = parseShowtimeDate(startsAt);
   if (!d) return false;
   return d.getTime() < Date.now();
+}
+
+function isLateNightShow(startsAt: string): boolean {
+  const d = parseShowtimeDate(startsAt);
+  if (!d) return false;
+  const h = d.getHours();
+  return h >= 23 || h < 5;
+}
+
+/** BMS ticket notch (same as showtimes list chips) */
+const SEAT_PAGE_TICKET_MASK = {
+  WebkitMaskImage:
+    "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
+  WebkitMaskSize: "51% 100%, 51% 100%",
+  WebkitMaskPosition: "0 0, 100% 0",
+  WebkitMaskRepeat: "no-repeat",
+  maskImage:
+    "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
+  maskSize: "51% 100%, 51% 100%",
+  maskPosition: "0 0, 100% 0",
+  maskRepeat: "no-repeat",
+} as const;
+
+const SEAT_PAGE_TIME_COLOR = "#C58B00";
+
+type SeatPageChipStatus = "available" | "filling" | "started" | "soldout";
+
+const SEAT_PAGE_STATUS_DOT: Record<SeatPageChipStatus, string> = {
+  started: "bg-[#F97316]",
+  available: "bg-[#22C55E]",
+  filling: "bg-[#EAB308]",
+  soldout: "bg-[#DC2626]",
+};
+
+const SEAT_PAGE_STATUS_BORDER: Record<SeatPageChipStatus, string> = {
+  available: "#22C55E",
+  filling: "#EAB308",
+  soldout: "#DC2626",
+  started: "#F97316",
+};
+
+function seatPageChipStatus(
+  fillStatus?: string | null,
+  past?: boolean
+): SeatPageChipStatus {
+  if (past) return "started";
+  const s = String(fillStatus || "").toUpperCase();
+  if (s === "SOLD_OUT") return "soldout";
+  if (s === "FILLING_FAST") return "filling";
+  if (s === "STARTED") return "started";
+  return "available";
 }
 
 const HOLD_SESSION_KEY = "bmb_movie_hold_session";
@@ -201,6 +270,10 @@ interface GridSeat {
   price: number;
   isBooked: boolean;
   isAisleGap?: boolean;
+  /** BMS: popular mid-block seats (same price, orange outline when available) */
+  isBestseller?: boolean;
+  /** Wheelchair / accessibility seat */
+  isAccessible?: boolean;
 }
 
 interface GridRow {
@@ -217,11 +290,23 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const authUser = useAppSelector((state) => (state as any).auth?.user);
   const selectedCity = useSelectedCity();
 
+  /** BMS: pick seat count on the map first; URL `qty` means the picker was confirmed. */
+  const hasQtyParam = searchParams.has("qty");
   const qty = useMemo(() => {
-    const raw = Number(searchParams.get("qty") || 1);
-    if (!Number.isFinite(raw) || raw < 1) return 1;
+    const raw = Number(searchParams.get("qty") || 2);
+    if (!Number.isFinite(raw) || raw < 1) return 2;
     return Math.min(10, Math.floor(raw));
   }, [searchParams]);
+  const [qtyModalOpen, setQtyModalOpen] = useState(!hasQtyParam);
+  const [qtyModalDismissible, setQtyModalDismissible] = useState(false);
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!searchParams.has("qty")) {
+      setQtyModalOpen(true);
+      setQtyModalDismissible(false);
+    }
+  }, [searchParams, showtimeId]);
 
   const [step, setStep] = useState<BookingStep>("seats");
   const [sessionToken, setSessionToken] = useState<string | undefined>(undefined);
@@ -246,7 +331,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const [selectedBeverages, setSelectedBeverages] = useState<Record<string, SelectedBeverage>>({});
   const [bevCategoryFilter, setBevCategoryFilter] = useState<string>("ALL");
 
-  const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("canvas");
+  const [viewMode, setViewMode] = useState<"canvas" | "grid" | "classic">("classic");
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [classicZoom, setClassicZoom] = useState(1.45);
   const [showClassicMinimap, setShowClassicMinimap] = useState(false);
@@ -289,11 +374,19 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     data: layoutData,
     isLoading,
     isError,
+    error: layoutError,
     refetch,
   } = useGetMovieShowtimeLayoutQuery({
     showtimeId,
     session_token: sessionToken,
   });
+  const layoutErrorMessage = extractApiError(
+    layoutError,
+    "We couldn’t load the seat layout for this showtime. It might have finished or been updated."
+  );
+  const showHasStarted = Boolean(
+    layoutData?.showtime?.has_started || layoutData?.showtime?.booking_state === "STARTED"
+  );
 
   const [createHold] = useCreateMovieSeatHoldMutation();
   const [releaseHold] = useReleaseMovieSeatHoldMutation();
@@ -365,6 +458,23 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const cinema = layoutData?.cinema;
   const screen = layoutData?.screen;
 
+  const seatQtyTiers = useMemo(() => {
+    const fromPublic = theaterShowtimes.find((s) => s.id === showtimeId);
+    if (fromPublic?.tiers && fromPublic.tiers.length > 0) {
+      return fromPublic.tiers.map((t) => ({
+        tier_name: t.tier_name,
+        price: Number(t.price) || 0,
+        status: t.status,
+      }));
+    }
+    const pricing = showtime?.tier_pricing || fromPublic?.tier_pricing || [];
+    return pricing.map((t) => ({
+      tier_name: t.tier_name,
+      price: Number(t.price) || 0,
+      status: "AVAILABLE" as const,
+    }));
+  }, [theaterShowtimes, showtimeId, showtime?.tier_pricing]);
+
   const bookedSet = useMemo(() => {
     const booked = layoutData?.booked_seat_identifiers ?? [];
     const held = layoutData?.held_seat_identifiers ?? [];
@@ -425,16 +535,17 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const canvasLayoutData = useMemo(() => {
     if (!hasCanvasLayout || !layoutData?.layout_template) return null;
     const rawSeats = layoutData.layout_template.seats_json || [];
+    const withBestseller = applyBestsellerFlagsToRawSeats(rawSeats);
     return {
       data: {
-        seats: rawSeats.map((s: any, idx: number) => {
+        seats: withBestseller.map((s: any, idx: number) => {
           const rowLabel = String(s.row_label || "").trim();
           const seatLabel = String(s.seat_label || "").trim();
           const secName = String(s.section_name || "Standard").trim();
           const labelId = `${rowLabel}${seatLabel}`;
 
           const isDupe =
-            rawSeats.filter(
+            withBestseller.filter(
               (o: any) =>
                 String(o.row_label || "").trim() === rowLabel &&
                 String(o.seat_label || "").trim() === seatLabel
@@ -457,6 +568,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             internalId: s.internalId,
             friendlyId,
             status: isBooked ? "BOOKED" : "AVAILABLE",
+            is_bestseller: Boolean(s.is_bestseller),
           };
         }),
         seating_config: layoutData.layout_template.seating_config,
@@ -597,6 +709,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               price,
               isBooked,
               isAisleGap,
+              isBestseller: seatHasExplicitBestsellerFlag(seat),
+              isAccessible: seatHasAccessibleFlag(seat),
             };
           });
 
@@ -609,7 +723,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         }
       });
 
-      if (rows.length > 0) return rows;
+      if (rows.length > 0) return finalizeBestsellerMarks(rows) as GridRow[];
     }
 
     const customTemplate =
@@ -637,6 +751,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           for (let i = 1; i <= seatCount; i++) {
             const labelId = `${rowLabel}${i}`;
             const seatId = isMultiSec ? `${tierName} ${labelId}` : labelId;
+            const seatIdx0 = i - 1;
             seats.push({
               id: seatId,
               row: rowLabel,
@@ -644,12 +759,15 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               tierName,
               price,
               isBooked: bookedSet.has(seatId) || bookedSet.has(labelId),
+              isAisleGap: seatIdx0 === 3 || seatIdx0 === 9,
+              isBestseller: seatHasExplicitBestsellerFlag(r.seats?.[seatIdx0] || r.seats?.[i]),
+              isAccessible: seatHasAccessibleFlag(r.seats?.[seatIdx0] || r.seats?.[i]),
             });
           }
           rows.push({ rowLabel, tierName, price, seats });
         }
       }
-      return rows;
+      return finalizeBestsellerMarks(rows) as GridRow[];
     }
 
     const tiers =
@@ -676,6 +794,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         const seats: GridSeat[] = [];
         for (let s = 1; s <= seatsPerRow; s++) {
           const seatId = `${rowLabel}${s}`;
+          const seatIdx0 = s - 1;
           seats.push({
             id: seatId,
             row: rowLabel,
@@ -683,14 +802,61 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             tierName,
             price,
             isBooked: bookedSet.has(seatId),
+            isAisleGap: seatIdx0 === 3 || seatIdx0 === 9,
           });
         }
         rows.push({ rowLabel, tierName, price, seats });
       }
     }
 
-    return rows;
+    return finalizeBestsellerMarks(rows) as GridRow[];
   }, [layoutData, showtime, bookedSet, getTierPrice]);
+
+  /** Only show Bestseller legend / orange seats when layout marks them (optional feature). */
+  const hasBestsellerSeats = useMemo(
+    () =>
+      gridRows.some((r) => r.seats.some((s) => s.isBestseller && !s.isBooked)) ||
+      Boolean(
+        (canvasLayoutData as { data?: { seats?: Array<{ is_bestseller?: boolean; status?: string }> } } | null)
+          ?.data?.seats?.some(
+            (s) => s.is_bestseller && String(s.status || "").toUpperCase() === "AVAILABLE"
+          )
+      ),
+    [gridRows, canvasLayoutData]
+  );
+
+  const accessibilityCategories = useMemo(() => {
+    const byTier = new Map<
+      string,
+      { name: string; price: number; rows: Map<string, { label: string; seatIds: string[] }> }
+    >();
+    for (const row of gridRows) {
+      for (const seat of row.seats) {
+        if (!seat.isAccessible || seat.isBooked) continue;
+        if (!byTier.has(seat.tierName)) {
+          byTier.set(seat.tierName, {
+            name: seat.tierName,
+            price: seat.price,
+            rows: new Map(),
+          });
+        }
+        const tier = byTier.get(seat.tierName)!;
+        if (!tier.rows.has(seat.row)) {
+          tier.rows.set(seat.row, { label: seat.row, seatIds: [] });
+        }
+        tier.rows.get(seat.row)!.seatIds.push(seat.id);
+      }
+    }
+    return Array.from(byTier.values()).map((t) => ({
+      name: t.name,
+      price: t.price,
+      rows: Array.from(t.rows.values()).map((r) => ({
+        label: r.label,
+        availableCount: r.seatIds.length,
+        seatIds: r.seatIds,
+      })),
+    }));
+  }, [gridRows]);
 
   const resetSeatPromos = () => {
     setPromoApplied(false);
@@ -1082,12 +1248,29 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       setStep(showtimeBeverages.length > 0 ? "beverages" : "review");
       toast.success(res.message || "Seats held. Complete your booking.");
     } catch (err) {
-      toast.error(extractApiError(err, "Could not hold seats. Please try again."));
+      const msg = extractApiError(err, "Could not hold seats. Please try again.");
+      toast.error(msg);
+      if (/show has ended/i.test(msg)) {
+        const movieKey = movie?.slug || movie?.id;
+        router.push(movieKey ? `/movies/${movieKey}/showtimes` : "/movies");
+        return;
+      }
       refetch();
     } finally {
       setHolding(false);
     }
-  }, [selectedSeats, qty, sessionToken, createHold, showtimeId, refetch, showtimeBeverages.length]);
+  }, [
+    selectedSeats,
+    qty,
+    sessionToken,
+    createHold,
+    showtimeId,
+    refetch,
+    showtimeBeverages.length,
+    movie?.slug,
+    movie?.id,
+    router,
+  ]);
 
   proceedRef.current = proceedCreateHold;
 
@@ -1173,7 +1356,13 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       toast.success(res.message || "Booking confirmed!");
       router.push(`/movies/booking-confirmation/${res.data.booking_id}`);
     } catch (err) {
-      toast.error(extractApiError(err, "Failed to confirm booking. Please try again."));
+      const msg = extractApiError(err, "Failed to confirm booking. Please try again.");
+      toast.error(msg);
+      if (/show has ended/i.test(msg)) {
+        const movieKey = movie?.slug || movie?.id;
+        router.push(movieKey ? `/movies/${movieKey}/showtimes` : "/movies");
+        return;
+      }
       refetch();
     } finally {
       setSubmitting(false);
@@ -1201,6 +1390,64 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       return showtime.starts_at;
     }
   }, [showtime?.starts_at]);
+
+  const headerTitle = useMemo(() => {
+    const title = (movie?.title || "Movie").trim();
+    const format = String(showtime?.format || "").trim();
+    const language = String(showtime?.language || "").trim();
+    let base = title;
+    if (format) base = `${base} (${format})`;
+    if (language) base = `${base} - ${language}`;
+    return base;
+  }, [movie?.title, showtime?.format, showtime?.language]);
+
+  const headerMeta = useMemo(() => {
+    const { weekday } = formatSeatPageDateParts(showtime?.starts_at || "");
+    const datePart = showDateFormatted
+      ? weekday
+        ? `${weekday}, ${showDateFormatted}`
+        : showDateFormatted
+      : "";
+    return [cinema?.name, datePart, showTimeFormatted].filter(Boolean).join(" | ");
+  }, [cinema?.name, showDateFormatted, showTimeFormatted, showtime?.starts_at]);
+
+  const openQtyEditor = () => {
+    setQtyModalDismissible(true);
+    setQtyModalOpen(true);
+  };
+
+  const applyAccessibleSeatIds = useCallback(
+    (seatIds: string[]) => {
+      const picked: MovieBookingSeatPayload[] = [];
+      for (const id of seatIds) {
+        const ctx = findGridSeatContext(id);
+        if (!ctx || ctx.seat.isBooked) continue;
+        picked.push({
+          seat_identifier: ctx.seat.id,
+          tier_name: ctx.seat.tierName,
+          row_label: ctx.seat.row,
+          seat_number: String(ctx.seat.number).padStart(2, "0"),
+          unit_price: ctx.seat.price,
+        });
+        if (picked.length >= qty) break;
+      }
+      if (picked.length === 0) {
+        toast.error("No accessible seats available in that row.");
+        return;
+      }
+      setSelectedSeats(picked);
+      if (picked.length < qty) {
+        toast.message(
+          `${picked.length}/${qty} accessible seats selected — pick more seats on the map if needed.`
+        );
+      } else {
+        toast.success(
+          `${picked.length} accessible seat${picked.length === 1 ? "" : "s"} selected`
+        );
+      }
+    },
+    [findGridSeatContext, qty]
+  );
 
   const classicMaxSeatSlots = useMemo(() => {
     let max = 1;
@@ -1568,41 +1815,96 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   const seatMapSection = (
     <section className="space-y-2 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:space-y-2">
       {(theaterShowtimes.length > 0 || showtime?.starts_at) && (
-        <div className="flex items-center gap-4 sm:gap-5 shrink-0 border-b border-slate-200 pb-3 mb-0.5">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0 border-b border-slate-200 pb-3 mb-0.5 overflow-visible">
           {(() => {
             const dateSrc = showtime?.starts_at || theaterShowtimes[0]?.starts_at || "";
             const { weekday, dayMonth } = formatSeatPageDateParts(dateSrc);
             return (
-              <div className="shrink-0 leading-tight min-w-[3.25rem]">
+              <div className="shrink-0 leading-tight w-[6.75rem] sm:w-[7.75rem] overflow-hidden pr-1">
                 <p className="text-[11px] font-medium text-slate-400">{weekday}</p>
-                <p className="text-sm font-bold text-slate-900 tracking-tight">{dayMonth}</p>
+                <p className="text-sm font-bold text-slate-900 tracking-tight truncate" title={dayMonth}>
+                  {dayMonth}
+                </p>
               </div>
             );
           })()}
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none min-w-0 flex-1">
+          <div className="flex items-center gap-3 overflow-x-auto overflow-y-visible scrollbar-none min-w-0 flex-1 py-2 pl-2.5 pr-3">
             {theaterShowtimes.map((st) => {
               const active = st.id === showtimeId;
               const past = isShowtimePast(st.starts_at) && !active;
+              const status = seatPageChipStatus(st.fill_status, past);
+              const borderColor = past ? "#D1D5DB" : SEAT_PAGE_STATUS_BORDER[status];
+              const lateNight = isLateNightShow(st.starts_at);
+              const soldOut = status === "soldout";
               return (
-                <button
+                <span
                   key={st.id}
-                  type="button"
-                  disabled={past}
-                  onClick={() => {
-                    if (st.id === showtimeId || past) return;
-                    router.push(`/movies/book/${st.id}?qty=${qty}`);
-                  }}
-                  className={`shrink-0 min-w-[5.5rem] px-3 py-2 rounded-lg text-[12px] font-semibold transition-colors ${
-                    past
-                      ? "bg-white border border-slate-200 text-slate-300 cursor-not-allowed"
-                      : active
-                        ? "bg-slate-100 border-0 text-slate-900 cursor-default"
-                        : "bg-white border border-slate-200 text-slate-800 hover:border-slate-400 cursor-pointer"
-                  }`}
-                  title={[st.format, st.language, st.screen_name].filter(Boolean).join(" • ")}
+                  className="relative inline-block shrink-0 overflow-visible px-1 pt-2 pb-0.5"
                 >
-                  {formatSeatPageTime(st.starts_at)}
-                </button>
+                  <span className="relative inline-block overflow-visible">
+                    {lateNight ? (
+                      <span
+                        className="pointer-events-none absolute top-0 right-0 z-20 flex size-[16px] -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-[#5A5A5A] text-white shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
+                        title="Late night"
+                        aria-hidden
+                      >
+                        <FaMoon className="text-[8px] text-white" aria-hidden />
+                      </span>
+                    ) : null}
+                    <span
+                      className={`inline-block transition-[filter,transform] ${
+                        active && !past && !soldOut ? "scale-[1.03]" : ""
+                      }`}
+                      style={{
+                        filter: past
+                          ? `drop-shadow(0 0 0.7px ${borderColor}) drop-shadow(0 0 0.7px ${borderColor})`
+                          : active
+                            ? `drop-shadow(0 0 1px ${borderColor}) drop-shadow(0 0 1px ${borderColor}) drop-shadow(0 0 1.5px ${borderColor}) drop-shadow(0 0 2px ${borderColor})`
+                            : `drop-shadow(0 0 0.7px ${borderColor}) drop-shadow(0 0 0.7px ${borderColor})`,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        disabled={past || soldOut}
+                        onClick={() => {
+                          if (st.id === showtimeId || past || soldOut) return;
+                          router.push(`/movies/book/${st.id}?qty=${qty}`);
+                        }}
+                        aria-pressed={active}
+                        aria-label={`${formatSeatPageTime(st.starts_at)}${
+                          lateNight ? " — Late night" : ""
+                        }${active ? " — Selected" : ""}`}
+                        title={[st.format, st.language, st.screen_name].filter(Boolean).join(" • ")}
+                        className={`relative min-w-[104px] px-3.5 py-2.5 text-center ${
+                          past || soldOut
+                            ? "bg-[#F3F4F6] cursor-not-allowed opacity-70"
+                            : active
+                              ? "bg-[#E4DFF0] cursor-default shadow-[0_2px_8px_rgba(15,23,42,0.12)]"
+                              : "bg-[#F7F5FB] cursor-pointer hover:brightness-[0.98]"
+                        }`}
+                        style={SEAT_PAGE_TICKET_MASK}
+                      >
+                        {active && !past && !soldOut ? (
+                          <span
+                            className="pointer-events-none absolute inset-x-3 bottom-1 h-0.5 rounded-full bg-[#22C55E]/70"
+                            aria-hidden
+                          />
+                        ) : null}
+                        <span
+                          className={`absolute top-1.5 h-1.5 w-1.5 rounded-full ${
+                            past ? "bg-[#D1D5DB]" : SEAT_PAGE_STATUS_DOT[status]
+                          } ${lateNight ? "left-2.5" : "right-2"}`}
+                        />
+                        <span
+                          className="block text-[13px] font-bold tabular-nums"
+                          style={{ color: past ? "#9CA3AF" : SEAT_PAGE_TIME_COLOR }}
+                        >
+                          {formatSeatPageTime(st.starts_at)}
+                        </span>
+                      </button>
+                    </span>
+                  </span>
+                </span>
               );
             })}
           </div>
@@ -1802,14 +2104,18 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                       ? SEAT_BOOKED
                                       : isSelected
                                         ? SEAT_SELECTED
-                                        : SEAT_AVAILABLE
+                                        : availableSeatClass(seat.isBestseller)
                                     }`}
-                                  title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
+                                  title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)${
+                                    seat.isBestseller && !seat.isBooked ? " • Bestseller" : ""
+                                  }`}
                                 >
                                   {seat.isBooked ? (
                                     <span className="text-[11px] leading-none font-bold text-slate-400" aria-hidden>
                                       ×
                                     </span>
+                                  ) : seat.isAccessible ? (
+                                    <Accessibility className="size-3 sm:size-3.5" aria-hidden />
                                   ) : (
                                     seatLabel
                                   )}
@@ -1914,10 +2220,12 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                     <span
                                       className={`relative flex items-center justify-center size-[4px] sm:size-[4.5px] lg:size-[5px] rounded-[0.5px] box-border ${
                                         seat.isBooked
-                                          ? "bg-white border border-slate-400"
+                                          ? "bg-[#E5E7EB] border border-[#E5E7EB]"
                                           : isSelected
                                             ? SEAT_SELECTED_MINI
-                                            : "bg-white border border-[#111111]"
+                                            : seat.isBestseller
+                                              ? "bg-white border border-[#EAB308]"
+                                              : "bg-white border border-[#22C55E]"
                                       }`}
                                     >
                                       {seat.isBooked && (
@@ -1989,17 +2297,27 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 border-t border-slate-100 bg-white py-2.5 px-4 text-xs text-slate-600 shrink-0">
+            <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-7 border-t border-slate-100 bg-white py-2.5 px-4 text-xs text-slate-600 shrink-0">
               <div className="flex items-center gap-2">
-                <div className="size-3.5 rounded-[2px] bg-white border border-[#cfcfcf]" />
+                <div className="size-3.5 rounded-[2px] bg-white border border-[#22C55E]" />
                 <span>Available</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="size-3.5 rounded-[2px] bg-white border border-[#cfcfcf] relative flex items-center justify-center">
-                  <span className="text-[9px] leading-none font-bold text-slate-400">×</span>
-                </div>
+                <div className="size-3.5 rounded-[2px] bg-[#E5E7EB]" />
                 <span>Sold</span>
               </div>
+              {hasBestsellerSeats ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="size-3.5 rounded-[2px] bg-white border border-[#EAB308]" />
+                  <span>Bestseller</span>
+                  <span
+                    className="inline-flex text-slate-400"
+                    title="Popular seats in this cinema — same price, no extra cost"
+                  >
+                    <Info className="size-3" aria-hidden />
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center gap-2">
                 <div className={`size-3.5 rounded-[2px] ${SEAT_SELECTED_SWATCH}`} />
                 <span>Selected</span>
@@ -2009,22 +2327,30 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-center gap-6 py-2 px-4 text-xs shrink-0">
+          <div className="flex flex-wrap items-center justify-center gap-5 py-2 px-4 text-xs shrink-0">
             <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-white border border-[#cfcfcf]" />
+              <div className="size-4 rounded-md bg-white border border-[#22C55E]" />
               <span className="text-slate-600">Available</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className={`size-4 rounded-md ${SEAT_SELECTED_SWATCH}`} />
-              <span className="text-slate-900 font-bold">Selected</span>
+              <div className="size-4 rounded-md bg-[#E5E7EB]" />
+              <span className="text-slate-500">Sold / Held</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="size-4 rounded-md bg-white border border-[#cfcfcf] relative">
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-400">
-                  ×
+            {hasBestsellerSeats ? (
+              <div className="flex items-center gap-1.5">
+                <div className="size-4 rounded-md bg-white border border-[#EAB308]" />
+                <span className="text-slate-600">Bestseller</span>
+                <span
+                  className="inline-flex text-slate-400"
+                  title="Popular seats in this cinema — same price, no extra cost"
+                >
+                  <Info className="size-3.5" aria-hidden />
                 </span>
               </div>
-              <span className="text-slate-500">Sold / Held</span>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <div className={`size-4 rounded-md ${SEAT_SELECTED_SWATCH}`} />
+              <span className="text-slate-900 font-bold">Selected</span>
             </div>
           </div>
 
@@ -2086,9 +2412,11 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                   ? SEAT_BOOKED
                                   : isSelected
                                     ? `${SEAT_SELECTED} z-10`
-                                    : `${SEAT_AVAILABLE} hover:scale-105`
+                                    : availableSeatClass(seat.isBestseller, true)
                                 }`}
-                              title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)`}
+                              title={`${rowGroup.tierName} • ${seat.id} (${seat.price} ETB)${
+                                seat.isBestseller && !seat.isBooked ? " • Bestseller" : ""
+                              }`}
                             >
                               {seat.isBooked ? (
                                 <span className="text-xs leading-none font-bold text-slate-400" aria-hidden>
@@ -2130,13 +2458,14 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   }
 
   if (isError || !layoutData) {
+    const ended = /show has ended/i.test(layoutErrorMessage);
     return (
       <div className="min-h-screen bg-[#F5F5F7] text-slate-900 flex flex-col items-center justify-center gap-4 px-4 text-center">
         <AlertCircle className="size-12 text-rose-500" />
-        <h2 className="text-xl font-bold text-slate-900">Showtime Layout Unavailable</h2>
-        <p className="text-sm text-slate-500 max-w-md">
-          We couldn’t load the seat layout for this showtime. It might have finished or been updated.
-        </p>
+        <h2 className="text-xl font-bold text-slate-900">
+          {ended ? "This show has ended" : "Showtime Layout Unavailable"}
+        </h2>
+        <p className="text-sm text-slate-500 max-w-md">{layoutErrorMessage}</p>
         <Link
           href="/movies"
           className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-bold shadow"
@@ -2149,9 +2478,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   return (
     <div className={`h-[100dvh] min-h-screen text-slate-900 flex flex-col overflow-hidden ${step === "seats" ? "bg-white" : "bg-[#F5F5F7]"}`}>
-      <header className="shrink-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-2.5">
-        <div className="max-w-7xl mx-auto relative flex items-center justify-between gap-3 min-h-[3.25rem]">
-          {/* Logo — left (back navigation preserved via click) */}
+      <header className="shrink-0 z-30 border-b border-slate-200 bg-white px-3 sm:px-5 py-2.5">
+        <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 min-h-[3.25rem]">
           <button
             type="button"
             onClick={() => {
@@ -2170,7 +2498,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               }
               router.push("/movies");
             }}
-            className="shrink-0 flex items-center cursor-pointer"
+            className="shrink-0 flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer"
             title={
               step === "review"
                 ? "Back to snacks"
@@ -2178,53 +2506,55 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   ? "Back to seats"
                   : "Back to showtimes"
             }
+            aria-label="Back"
           >
-            <img
-              src={logoSrc}
-              alt="Book My Bota"
-              className="h-10 sm:h-12 w-auto max-w-[10rem] sm:max-w-[14rem] object-contain object-left"
-            />
+            <ChevronLeft className="size-5" />
           </button>
 
-          {/* Mobile title between logo and profile */}
-          <div className="flex-1 min-w-0 md:hidden text-center px-2">
-            <h1 className="text-sm font-extrabold text-slate-900 leading-tight truncate">
-              {movie?.title}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm sm:text-[15px] font-bold text-slate-800 leading-tight truncate">
+              {headerTitle}
             </h1>
-            <p className="text-[10px] text-slate-500 truncate">
-              {[showDateFormatted, showTimeFormatted].filter(Boolean).join(" • ")}
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">
+              {headerMeta}
+              {screen?.name ? ` | ${screen.name}` : ""}
             </p>
           </div>
 
-          {/* Center title — desktop / tablet */}
-          <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center text-center max-w-[min(42vw,28rem)] pointer-events-none">
-            <h1 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight truncate w-full">
-              {movie?.title}
-            </h1>
-            <p className="text-[11px] text-slate-500 mt-0.5 truncate w-full">
-              {[showDateFormatted, showTimeFormatted].filter(Boolean).join(", ")}
-              {cinema?.name ? ` at ${cinema.name}` : ""}
-              {screen?.name ? ` • ${screen.name}` : ""}
-            </p>
-          </div>
+          <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
+            {step === "seats" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setAccessModalOpen(true)}
+                  className="flex size-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 hover:bg-brand-50 hover:text-brand-4 hover:border-brand-200 cursor-pointer"
+                  title="Accessibility seat selection"
+                  aria-label="Accessibility seat selection"
+                >
+                  <Accessibility className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={openQtyEditor}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-bold text-primary hover:bg-brand-50 cursor-pointer"
+                  title="Change number of tickets"
+                >
+                  <Pencil className="size-3.5 shrink-0" />
+                  <span>
+                    {qty} Ticket{qty === 1 ? "" : "s"}
+                  </span>
+                </button>
+              </>
+            ) : null}
 
-          {/* Profile — right */}
-          <div className="shrink-0 flex items-center justify-end">
             {isCustomerLoggedIn ? (
               <Link
                 href="/customer/profile"
                 className="inline-flex items-center gap-2 rounded-full"
                 title="My profile"
               >
-                <span className="w-9 h-9 rounded-full bg-[#7A00C6] text-white text-sm font-bold flex items-center justify-center">
-                  {(
-                    authUser?.name ||
-                    authUser?.email ||
-                    "U"
-                  )
-                    .toString()
-                    .charAt(0)
-                    .toUpperCase()}
+                <span className="w-9 h-9 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
+                  {(authUser?.name || authUser?.email || "U").toString().charAt(0).toUpperCase()}
                 </span>
               </Link>
             ) : (
@@ -2241,6 +2571,12 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           </div>
         </div>
       </header>
+
+      {showHasStarted ? (
+        <div className="shrink-0 px-4 py-2.5 text-center text-sm font-semibold border-b bg-[#FFF7ED] border-[#FDBA74] text-[#9A3412]">
+          Heads-up! This show has already started. You can still book seats for late entry.
+        </div>
+      ) : null}
 
       {step === "review" && secondsLeft !== null && (
         <div
@@ -2876,6 +3212,37 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           </div>
         </div>
       )}
+
+      {/* Seat count picker — required on first entry; editable from header tickets button */}
+      {step === "seats" ? (
+        <MovieSeatQtyModal
+          open={qtyModalOpen}
+          dismissible={qtyModalDismissible}
+          onClose={() => setQtyModalOpen(false)}
+          initialQty={qty}
+          tiers={seatQtyTiers}
+          onConfirm={(nextQty) => {
+            setSelectedSeats([]);
+            setQtyModalOpen(false);
+            setQtyModalDismissible(false);
+            router.replace(`/movies/book/${showtimeId}?qty=${nextQty}`);
+          }}
+        />
+      ) : null}
+
+      {step === "seats" ? (
+        <MovieAccessibilitySeatModal
+          open={accessModalOpen}
+          onClose={() => setAccessModalOpen(false)}
+          qty={qty}
+          categories={accessibilityCategories}
+          onQtyChange={(nextQty) => {
+            setSelectedSeats([]);
+            router.replace(`/movies/book/${showtimeId}?qty=${nextQty}`);
+          }}
+          onSelectSeats={applyAccessibleSeatIds}
+        />
+      ) : null}
 
       <CustomerAuthModal
         open={authModalOpen}

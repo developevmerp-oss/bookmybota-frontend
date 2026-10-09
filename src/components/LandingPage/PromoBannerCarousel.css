@@ -333,8 +333,10 @@
 }
 
 .promo-nav-btn.swiper-button-disabled {
-  opacity: 0.25;
-  pointer-events: none;
+  /* Keep arrows usable — our handlers wrap first↔last even if Swiper marks disabled. */
+  opacity: 0.85;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 /* Far left / right corners of the carousel (BMS reference) */

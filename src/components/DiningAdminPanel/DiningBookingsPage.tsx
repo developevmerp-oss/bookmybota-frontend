@@ -35,7 +35,7 @@ import {
   emptyDiningWalkInFormValues,
   type DiningWalkInFormValues,
 } from "@/lib/diningPartnerFormSchemas";
-import { formatDateCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatWeekdayCustomer, formatInstantLocalDate, formatInstantLocalTime } from "@/lib/dateFormat";
 import { formatDiningOfferDiscount } from "@/lib/diningOffers";
 
 const fieldErrorClass = "mt-1.5 text-[11px] font-semibold text-rose-500";
@@ -170,6 +170,9 @@ export default function BookingsManager() {
     } else if (sortColumn === "booking_time") {
       aVal = new Date(a.booking_time).getTime();
       bVal = new Date(b.booking_time).getTime();
+    } else if (sortColumn === "created_at") {
+      aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+      bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
     } else if (sortColumn === "table_number") {
       aVal = Number(a.table_number) || 0;
       bVal = Number(b.table_number) || 0;
@@ -226,9 +229,12 @@ export default function BookingsManager() {
                   #
                 </th>
                 {renderSortHeader("customer_name", "Customer")}
-                {renderSortHeader("booking_time", "Date & Time")}
+                {renderSortHeader("booking_time", "Reservation")}
                 {renderSortHeader("booking_source", "Source")}
+                {/* Assigned Table — hidden for now; keep for easy restore
                 {renderSortHeader("table_number", "Assigned Table")}
+                */}
+                {renderSortHeader("created_at", "Booked On")}
                 {renderSortHeader("status", "Status")}
                 <th className="py-2.5 px-3 text-[10px] uppercase tracking-wider font-semibold text-slate-400">
                   Offer
@@ -290,6 +296,7 @@ export default function BookingsManager() {
                         {booking.booking_source}
                       </span>
                     </td>
+                    {/* Assigned Table — hidden for now; keep for easy restore
                     <td className="py-2.5 px-3">
                       {booking.table_number ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
@@ -297,6 +304,21 @@ export default function BookingsManager() {
                         </span>
                       ) : (
                         <span className="text-slate-400 text-[11px] italic">Unassigned</span>
+                      )}
+                    </td>
+                    */}
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      {booking.created_at ? (
+                        <>
+                          <div className="text-xs font-bold text-slate-900">
+                            {formatInstantLocalDate(booking.created_at)}
+                          </div>
+                          <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+                            {formatInstantLocalTime(booking.created_at)}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">—</span>
                       )}
                     </td>
                     <td className="py-2.5 px-3">

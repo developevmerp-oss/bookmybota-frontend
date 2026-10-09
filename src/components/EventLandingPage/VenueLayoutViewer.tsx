@@ -13,6 +13,8 @@ type Seat = {
   coordinate_x: number;
   coordinate_y: number;
   status: string;
+  /** BMS popular seat — orange outline when available (cinema mode) */
+  is_bestseller?: boolean;
 };
 
 type Label = {
@@ -179,6 +181,7 @@ export default function VenueLayoutViewer({
           id: s.id || s.internalId || `${s.row_label || ""}${s.seat_label || ""}`,
           coordinate_x: Number(s.coordinate_x),
           coordinate_y: Number(s.coordinate_y),
+          is_bestseller: Boolean(s.is_bestseller ?? s.isBestseller ?? s.bestseller),
         }))
       );
     }
@@ -613,13 +616,19 @@ export default function VenueLayoutViewer({
                   labelText = seat.seat_label;
                 } else if (isAvailable) {
                   fill = cinemaMode ? "#ffffff" : categoryColor;
-                  stroke = cinemaMode ? "#cfcfcf" : "#ffffff";
+                  stroke = cinemaMode
+                    ? seat.is_bestseller
+                      ? "#EAB308"
+                      : "#22C55E"
+                    : "#ffffff";
                   opacity = 1;
                   labelFill = cinemaMode ? "#111111" : "#ffffff";
                   labelText = seat.seat_label;
                 } else if (cinemaMode) {
+                  fill = "#E5E7EB";
+                  stroke = "#E5E7EB";
                   labelText = "×";
-                  labelFill = "#94a3b8";
+                  labelFill = "#ffffff";
                 }
 
                 return (
@@ -797,9 +806,12 @@ export default function VenueLayoutViewer({
           {/* Legend */}
           {cinemaMode ? (
             <div className="border-t border-slate-200 pt-4 mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-[#cfcfcf]" /> Available</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-[#22C55E]" /> Available</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-[#E5E7EB]" /> Sold</div>
+              {seats.some((s) => s.is_bestseller && s.status === "AVAILABLE") ? (
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-[#EAB308]" /> Bestseller</div>
+              ) : null}
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)]" /> Selected</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-white border border-slate-300 relative flex items-center justify-center"><span className="text-[8px] leading-none text-slate-400">×</span></div> Sold / Reserved</div>
             </div>
           ) : (
             <div className="border-t border-slate-800 pt-4 mt-4 flex flex-wrap gap-4 text-xs text-slate-400">

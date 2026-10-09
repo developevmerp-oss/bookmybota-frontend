@@ -37,15 +37,15 @@ export function formatShowDateBar(iso?: string) {
   return formatEventDateLine(iso);
 }
 
-/** Reference card date: "Sat, 10 Oct onwards" */
+/** Reference card date: "Sat, 10 October 2026 onwards" */
 export function formatEventDateLine(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const weekday = d.toLocaleString("en-GB", { weekday: "short" });
-  const day = d.getDate();
-  const month = d.toLocaleString("en-GB", { month: "short" });
-  return `${weekday}, ${day} ${month} onwards`;
+  const dateLabel = formatDateCustomer(d);
+  if (!dateLabel || dateLabel === "—") return "";
+  return `${weekday}, ${dateLabel} onwards`;
 }
 
 /** Parts for the small date badge on poster images. */

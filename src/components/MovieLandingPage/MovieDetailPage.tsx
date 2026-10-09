@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChevronRight, Play, Share2, Star, ThumbsUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, Play, Share2, Star, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
 import MovieTrailerModal from "@/components/MovieLandingPage/MovieTrailerModal";
 import SafeCoverImage, { MovieImageFallback } from "@/components/Shared/SafeCoverImage";
@@ -19,12 +19,37 @@ import {
 } from "@/components/MovieLandingPage/movieCatalog";
 import MovieDetailSections from "@/components/MovieLandingPage/MovieDetailSections";
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
+import MovieLanguageFormatModal, {
+  groupsFromMovieLists,
+  shouldShowLanguageFormatPicker,
+} from "@/components/MovieLandingPage/MovieLanguageFormatModal";
 import { MovieDetailShimmer } from "@/components/Shared/Shimmer";
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
+import { formatDateCustomer } from "@/lib/dateFormat";
 
 /** Matches MovieDetailBanner desktop Book Tickets CTA */
 const HERO_BOOK_BTN_CLASS =
   "inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity";
+
+/** District-style: "Released 22 April 2014" / "Releasing …" / "Coming Soon" */
+function formatReleasedLine(
+  releaseDate?: string,
+  comingSoon?: boolean
+): string | null {
+  if (!releaseDate?.trim()) return null;
+  const raw = releaseDate.trim();
+  const lower = raw.toLowerCase();
+  if (comingSoon || lower.includes("coming")) {
+    if (/^(coming|releasing)\b/i.test(raw)) return raw;
+    return `Releasing ${raw}`;
+  }
+  // ISO / wall dates → shared customer format; already-formatted labels pass through.
+  const fromHelper = formatDateCustomer(raw);
+  const display =
+    fromHelper && fromHelper !== "—" && !/^released\b/i.test(raw) ? fromHelper : raw;
+  if (/^released\b/i.test(display)) return display;
+  return `Released ${display}`;
+}
 
 function mapPlatformOffersToMovieOffers(
   offers: Array<{
@@ -45,27 +70,22 @@ function mapPlatformOffersToMovieOffers(
   }));
 }
 
-function openPrimaryTrailer(
-  movie: MovieDetailData,
-  setUrl: (u?: string) => void,
-  setLang: (l?: string) => void,
-  setOpen: (o: boolean) => void,
-  url?: string,
-  lang?: string
-) {
-  setUrl(url || movie.trailerUrl || movie.trailers?.[0]?.trailerUrl);
-  setLang(lang || movie.trailers?.[0]?.language);
-  setOpen(true);
-}
-
-function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
+function MovieDetailBanner({
+  movie,
+  onBookTickets,
+}: {
+  movie: MovieDetailData;
+  onBookTickets: () => void;
+}) {
   const router = useRouter();
   const [trailerModalOpen, setTrailerModalOpen] = useState(false);
-  const [selectedTrailerUrl, setSelectedTrailerUrl] = useState<string | undefined>(undefined);
-  const [selectedTrailerLang, setSelectedTrailerLang] = useState<string | undefined>(undefined);
 
-  const handleOpenTrailer = (url?: string, lang?: string) => {
-    openPrimaryTrailer(movie, setSelectedTrailerUrl, setSelectedTrailerLang, setTrailerModalOpen, url, lang);
+  /** One Trailer CTA → modal; language pick happens inside when multiple trailers exist. */
+  const handleOpenTrailer = () => {
+    setTrailerModalOpen(true);
+  };
+  const handleCloseTrailer = () => {
+    setTrailerModalOpen(false);
   };
 
   const bg = movie.landscape || movie.poster;
@@ -73,16 +93,18 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
     movie.trailerUrl || (movie.trailers && movie.trailers.length > 0)
   );
 
+  // Meta row without release date — District shows release on its own line
   const metaParts = [
     movie.duration,
     movie.genres.length ? movie.genres.join(", ") : "",
     movie.certification,
-    movie.releaseDate,
   ].filter(Boolean);
 
   const mobileMetaLine = [movie.certification, movie.languages[0], movie.duration]
     .filter(Boolean)
     .join(" | ");
+
+  const releasedLine = formatReleasedLine(movie.releaseDate, movie.comingSoon);
 
   const handleShare = async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -108,13 +130,36 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
     </>
   );
 
-  const bookHref = movie.bookHref || `/movies/${movie.slug || movie.id}/showtimes`;
-
   return (
     <>
-      {/* ── Mobile / tablet — District-style hero + info below ── */}
+      {/* ── Mobile / tablet — BMS-style white top bar + hero ── */}
       <div className="lg:hidden bg-white">
-        {/* Landscape hero ~40% viewport — matches District reference height */}
+        {/* Fixed sticky header: back | title | share — stays on scroll */}
+        <div className="fixed top-0 left-0 right-0 z-40 flex items-center gap-2 border-b border-slate-200 bg-white px-2 sm:px-3 py-2.5 safe-area-pt">
+          <button
+            type="button"
+            onClick={() => router.push("/movies")}
+            aria-label="Back to movies"
+            className="flex size-10 shrink-0 items-center justify-center text-[#333333] cursor-pointer"
+          >
+            <ArrowLeft size={22} strokeWidth={2.25} />
+          </button>
+          <h1 className="min-w-0 flex-1 truncate text-[15px] sm:text-base font-semibold text-[#333333] leading-tight">
+            {movie.title}
+          </h1>
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label="Share"
+            className="flex size-10 shrink-0 items-center justify-center text-[#333333] cursor-pointer"
+          >
+            <Share2 size={20} strokeWidth={2} />
+          </button>
+        </div>
+        {/* Spacer so hero starts below the fixed header */}
+        <div className="h-[3.25rem]" aria-hidden />
+
+        {/* Landscape / poster hero */}
         <section className="relative w-full h-[min(42vh,360px)] min-h-[240px] overflow-hidden bg-[#111]">
           <SafeCoverImage
             src={bg}
@@ -124,65 +169,31 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
             fallback={<MovieImageFallback size={64} />}
             loading="eager"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
-
-          <button
-            type="button"
-            onClick={() => router.push("/movies")}
-            aria-label="Back to movies"
-            className="absolute top-3.5 left-3.5 z-10 flex h-9 w-9 items-center justify-center text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)] cursor-pointer"
-          >
-            <ArrowLeft size={24} strokeWidth={2.5} />
-          </button>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
 
           {hasTrailer ? (
             <div className="absolute inset-x-0 bottom-4 z-10 flex justify-center px-4">
-              {movie.trailers && movie.trailers.length > 1 ? (
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {movie.trailers.map((t, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleOpenTrailer(t.trailerUrl, t.language)}
-                      className="inline-flex items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-black"
-                    >
-                      <Play className="size-3.5" fill="currentColor" />
-                      {t.language}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleOpenTrailer(
-                      movie.trailerUrl || movie.trailers?.[0]?.trailerUrl,
-                      movie.trailers?.[0]?.language
-                    )
-                  }
-                  className="inline-flex items-center gap-2 rounded-full bg-black/85 px-5 py-2.5 text-[13px] font-semibold text-white cursor-pointer hover:bg-black"
-                >
-                  <Play className="size-3.5" fill="currentColor" />
-                  Watch Trailer
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleOpenTrailer}
+                className="inline-flex items-center gap-2 rounded-full bg-black/85 px-5 py-2.5 text-[13px] font-semibold text-white cursor-pointer hover:bg-black"
+              >
+                <Play className="size-3.5" fill="currentColor" />
+                Trailer
+              </button>
             </div>
           ) : null}
         </section>
 
         <div className="px-5 sm:px-8 pt-5 pb-2">
-          <h1 className="text-[26px] sm:text-[30px] font-bold text-[#111111] leading-tight tracking-tight">
-            {movie.title}
-          </h1>
-
           {mobileMetaLine ? (
-            <p className="mt-2 text-[14px] sm:text-[15px] text-[#8B95A5] font-medium leading-snug">
+            <p className="text-[14px] sm:text-[15px] text-[#8B95A5] font-medium leading-snug">
               {mobileMetaLine}
             </p>
           ) : null}
 
           {movie.genres.length > 0 ? (
-            <div className="mt-3.5 flex flex-wrap gap-2">
+            <div className={`${mobileMetaLine ? "mt-3.5" : ""} flex flex-wrap gap-2`}>
               {movie.genres.map((g) => (
                 <span
                   key={g}
@@ -194,53 +205,45 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
             </div>
           ) : null}
 
-          {movie.releaseDate ? (
-            <p className="mt-3.5 text-[14px] sm:text-[15px] text-[#8B95A5]">
-              {movie.comingSoon || movie.releaseDate.toLowerCase().includes("coming")
-                ? movie.releaseDate.startsWith("Coming") || movie.releaseDate.startsWith("Releasing")
-                  ? movie.releaseDate
-                  : `Releasing ${movie.releaseDate}`
-                : `Released ${movie.releaseDate}`}
+          {releasedLine ? (
+            <p
+              className={`${
+                mobileMetaLine || movie.genres.length > 0 ? "mt-3.5" : ""
+              } text-[14px] sm:text-[15px] text-[#8B95A5] font-normal`}
+            >
+              {releasedLine}
             </p>
           ) : null}
         </div>
       </div>
 
-      {/* ── Desktop — existing immersive banner ── */}
-      <section className="relative hidden w-full overflow-hidden lg:block">
-        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+      {/* ── Desktop — shorter hero; frame matches admin banner crop 2.5:1 ── */}
+      <section className="relative hidden w-full overflow-hidden lg:block h-[460px] xl:h-[480px]">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
           <SafeCoverImage
             src={bg}
             alt=""
-            className="h-full w-full object-cover object-center"
-            fallbackClassName="flex h-full w-full items-center justify-center bg-[#1f1f23] text-white/25"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+            fallbackClassName="absolute inset-0 flex h-full w-full items-center justify-center bg-[#1f1f23] text-white/25"
             fallback={<MovieImageFallback size={64} />}
             loading="eager"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/25" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
         </div>
 
-        <div className="relative container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10 lg:py-8">
+        <div className="relative container mx-auto flex h-full items-center px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8">
           <button
             type="button"
             onClick={handleShare}
-            className="absolute top-6 right-5 sm:top-8 sm:right-10 2xl:right-0 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/35 backdrop-blur-sm border border-white/20 px-3 py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-black/50 cursor-pointer"
+            className="absolute top-5 right-5 sm:top-6 sm:right-10 2xl:right-0 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/35 backdrop-blur-sm border border-white/20 px-3 py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-black/50 cursor-pointer"
           >
             <Share2 className="size-3.5 sm:size-4" />
             Share
           </button>
 
-          <nav className="mb-6 sm:mb-8 text-xs sm:text-sm text-white/70 flex items-center gap-1.5 flex-wrap">
-            <Link href="/movies" className="hover:text-white transition-colors">
-              Movies
-            </Link>
-            <ChevronRight className="size-3.5 opacity-70" />
-            <span className="text-white/90 truncate">{movie.title}</span>
-          </nav>
-
-          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 lg:gap-16 xl:gap-20 items-center">
-            <div className="hidden lg:block rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 aspect-[2/3] max-w-[250px] h-[380px] bg-[#F3F4F6]">
+          <div className="grid w-full grid-cols-1 lg:grid-cols-[200px_1fr] gap-6 lg:gap-12 xl:gap-16 items-center">
+            <div className="relative hidden lg:block rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 aspect-[2/3] max-w-[200px] h-[340px] bg-[#F3F4F6]">
               <SafeCoverImage
                 src={movie.poster}
                 alt={movie.title}
@@ -249,6 +252,18 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
                 fallback={<MovieImageFallback size={40} />}
                 loading="eager"
               />
+              {hasTrailer ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                  <button
+                    type="button"
+                    onClick={handleOpenTrailer}
+                    className="inline-flex items-center gap-2 rounded-full bg-black/55 backdrop-blur-md border border-white/20 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black/70 transition-colors cursor-pointer shadow-lg"
+                  >
+                    <Play className="size-3.5 fill-white text-white" />
+                    Trailer
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="min-w-0 text-white flex flex-col justify-center">
@@ -268,12 +283,12 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
               {(movie.formats.length > 0 || movie.languages.length > 0) && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {movie.formats.length > 0 ? (
-                    <span className="inline-flex items-center rounded-md bg-white/95 px-3 py-1.5 text-xs sm:text-sm font-semibold text-[#333333]">
+                    <span className="inline-flex items-center rounded-md border border-white/25 bg-white/15 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                       {movie.formats.join(", ")}
                     </span>
                   ) : null}
                   {movie.languages.length > 0 ? (
-                    <span className="inline-flex items-center rounded-md bg-white/95 px-3 py-1.5 text-xs sm:text-sm font-semibold text-[#333333]">
+                    <span className="inline-flex items-center rounded-md border border-white/25 bg-white/15 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                       {movie.languages.join(", ")}
                     </span>
                   ) : null}
@@ -281,65 +296,40 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
               )}
 
               {(movie.rating || movie.votes || movie.likes) && (
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                <div className="mt-4 flex flex-wrap items-center gap-2.5 text-sm">
                   {movie.rating && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/15 px-3 py-1.5 text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                       <Star className="size-4 text-[#EF4444]" fill="currentColor" />
                       <span className="font-bold">{movie.rating}</span>
-                      {movie.votes && <span className="text-white/80">{movie.votes}</span>}
+                      {movie.votes ? (
+                        <span className="font-medium text-white/85">{movie.votes}</span>
+                      ) : null}
                     </span>
                   )}
                   {movie.likes && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-white/15 px-3 py-1.5 text-white backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
                       <ThumbsUp className="size-4 text-[#22C55E]" fill="currentColor" />
-                      <span>{movie.likes}</span>
+                      <span className="font-medium">{movie.likes}</span>
                     </span>
                   )}
                 </div>
               )}
 
-              {movie.trailers && movie.trailers.length > 1 ? (
-                <div className="mt-5 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-white/60 mr-1 flex items-center gap-1.5">
-                    <Play className="size-3.5" fill="currentColor" /> Watch Trailer:
-                  </span>
-                  {movie.trailers.map((t, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleOpenTrailer(t.trailerUrl, t.language)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3.5 py-1.5 text-xs sm:text-sm font-semibold hover:bg-white/20 hover:border-white/50 transition-colors cursor-pointer"
-                    >
-                      <Play className="size-3 text-rose-400" fill="currentColor" />
-                      {t.language}
-                    </button>
-                  ))}
-                </div>
-              ) : hasTrailer ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleOpenTrailer(
-                      movie.trailerUrl || movie.trailers?.[0]?.trailerUrl,
-                      movie.trailers?.[0]?.language
-                    )
-                  }
-                  className="mt-5 inline-flex w-fit self-start items-center gap-2 rounded-xl border border-white/60 bg-transparent px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer"
-                >
-                  <Play className="size-3.5 text-[#C084FC]" fill="currentColor" />
-                  Watch trailer
-                </button>
+              {releasedLine ? (
+                <p className="mt-5 text-sm sm:text-[15px] font-normal text-white/85">
+                  {releasedLine}
+                </p>
               ) : null}
 
-              <div className="mt-6 sm:mt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3">
                 {movie.comingSoon ? (
                   <span className={bookClass.replace("hover:opacity-90", "opacity-80 cursor-default")}>
                     Coming Soon
                   </span>
                 ) : (
-                  <Link href={bookHref} className={bookClass}>
+                  <button type="button" onClick={onBookTickets} className={`${bookClass} cursor-pointer`}>
                     {bookLabel}
-                  </Link>
+                  </button>
                 )}
                 <MovieWishlistButton movieId={movie.id} />
               </div>
@@ -350,10 +340,18 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 
       <MovieTrailerModal
         isOpen={trailerModalOpen}
-        onClose={() => setTrailerModalOpen(false)}
+        onClose={handleCloseTrailer}
         movieTitle={movie.title}
-        initialTrailerUrl={selectedTrailerUrl}
-        initialLanguage={selectedTrailerLang}
+        initialTrailerUrl={
+          movie.trailers && movie.trailers.length > 1
+            ? undefined
+            : movie.trailerUrl || movie.trailers?.[0]?.trailerUrl
+        }
+        initialLanguage={
+          movie.trailers && movie.trailers.length > 1
+            ? undefined
+            : movie.trailers?.[0]?.language
+        }
         trailers={movie.trailers}
       />
     </>
@@ -362,10 +360,12 @@ function MovieDetailBanner({ movie }: { movie: MovieDetailData }) {
 
 export default function MovieDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const idOrSlug = String(params?.id || "");
   const headerOffset = useStickyHeaderOffset();
   const heroEndRef = useRef<HTMLDivElement>(null);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  const [langFormatOpen, setLangFormatOpen] = useState(false);
 
   const { data: apiMovie, isLoading, isError } = useGetPublicMovieQuery(idOrSlug, {
     skip: !idOrSlug,
@@ -428,22 +428,41 @@ export default function MovieDetailPage() {
   }
 
   const bookHref = movie.bookHref || `/movies/${movie.slug || movie.id}/showtimes`;
+  const langFormatGroups = groupsFromMovieLists(movie.languages, movie.formats || []);
+  const needsLangFormatPicker = shouldShowLanguageFormatPicker(langFormatGroups);
+
+  const handleBookTickets = () => {
+    if (needsLangFormatPicker) {
+      setLangFormatOpen(true);
+      return;
+    }
+    // Single option — go straight to showtimes (pre-filter when we know language/format)
+    const only = langFormatGroups[0];
+    if (only?.language && only.language !== "All" && only.formats.length === 1) {
+      const params = new URLSearchParams();
+      params.set("language", only.language);
+      params.set("format", only.formats[0]);
+      router.push(`${bookHref}?${params.toString()}`);
+      return;
+    }
+    router.push(bookHref);
+  };
 
   return (
     <div className="min-h-screen bg-white pb-24 lg:pb-0">
-      <MovieDetailBanner movie={movie} />
+      <MovieDetailBanner movie={movie} onBookTickets={handleBookTickets} />
       {/* Sentinel: sticky bar appears only after hero fully scrolls past */}
       <div ref={heroEndRef} className="h-px w-full" aria-hidden />
 
-      {/* Sticky title + Book tickets — shows after hero is done */}
+      {/* Sticky title + Book tickets — desktop only (mobile/tablet use bottom CTA) */}
       <div
-        className={`fixed left-0 right-0 z-30 w-full border-b border-slate-200 bg-white transition-transform duration-200 ${
+        className={`hidden lg:block fixed left-0 right-0 z-30 w-full border-b border-slate-200 bg-white transition-transform duration-200 ${
           showStickyBar ? "translate-y-0" : "-translate-y-full pointer-events-none"
         }`}
         style={{ top: headerOffset }}
         aria-hidden={!showStickyBar}
       >
-        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xlpx-10 2xl:px-0 flex items-center justify-between gap-4 py-3.5">
+        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 flex items-center justify-between gap-4 py-3.5">
           <h2 className="min-w-0 truncate text-base sm:text-lg xl:text-xl font-bold text-[#111111]">
             {movie.title}
           </h2>
@@ -454,12 +473,13 @@ export default function MovieDetailPage() {
               Coming Soon
             </span>
           ) : (
-            <Link
-              href={bookHref}
-              className={`${HERO_BOOK_BTN_CLASS} shrink-0 rounded-md text-xs sm:text-sm px-4 sm:px-5`}
+            <button
+              type="button"
+              onClick={handleBookTickets}
+              className={`${HERO_BOOK_BTN_CLASS} shrink-0 rounded-md text-xs sm:text-sm px-4 sm:px-5 cursor-pointer`}
             >
               Book tickets
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -473,15 +493,24 @@ export default function MovieDetailPage() {
             Coming Soon
           </span>
         ) : (
-          <Link
-            href={bookHref}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity"
+          <button
+            type="button"
+            onClick={handleBookTickets}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-[#6D28D9]/30 hover:opacity-90 transition-opacity cursor-pointer"
           >
             Book Tickets
             <ArrowRight className="size-5" strokeWidth={2.25} />
-          </Link>
+          </button>
         )}
       </div>
+
+      <MovieLanguageFormatModal
+        open={langFormatOpen}
+        onClose={() => setLangFormatOpen(false)}
+        movieTitle={movie.title}
+        showtimesPath={bookHref}
+        groups={langFormatGroups}
+      />
     </div>
   );
 }

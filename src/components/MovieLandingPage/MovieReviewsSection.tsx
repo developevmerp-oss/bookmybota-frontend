@@ -21,7 +21,15 @@ import {
 } from "@/lib/movieReviewFormSchema";
 
 const BRAND = "#6900AA";
-const REVIEW_ACCENTS = ["border-l-[#6900AA]", "border-l-amber-500", "border-l-emerald-500"];
+
+const REVIEW_ACCENTS = [
+  "#6900AA",
+  "#F84464",
+  "#0EA5E9",
+  "#F59E0B",
+  "#10B981",
+  "#EC4899",
+] as const;
 
 type Props = {
   movieId: string;
@@ -98,7 +106,11 @@ function openCustomerLogin() {
   }
 }
 
-export default function MovieReviewsSection({ movieId, movieRating, reviewsCount }: Props) {
+export default function MovieReviewsSection({
+  movieId,
+  movieRating,
+  reviewsCount,
+}: Props) {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
   const authToken = useAppSelector((s) => s.auth.token);
@@ -194,156 +206,161 @@ export default function MovieReviewsSection({ movieId, movieRating, reviewsCount
   });
 
   return (
-    <section className="py-8 sm:py-10 lg:py-0 bg-white">
+    <section className="py-8 sm:py-10 bg-white border-t border-slate-100">
       <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
-      <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
-        <div>
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">Top reviews</h2>
-          <p className="mt-1 text-sm sm:text-base text-slate-500">
-            {displayCount > 0
-              ? `Summary of ${countLabel}${avgFromList > 0 ? ` · ${avgFromList.toFixed(1)}/5` : ""}.`
-              : "Be the first to rate this movie after your show ends on BookMyBota."}
-          </p>
-        </div>
-        {reviews.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setReviewsModalOpen(true)}
-            className="inline-flex items-center gap-0.5 text-sm sm:text-base font-semibold shrink-0 cursor-pointer hover:underline"
-            style={{ color: BRAND }}
-          >
-            View Review
-            <ChevronRight className="size-4" />
-          </button>
-        )}
-      </div>
-
-      {/* Write / gate */}
-      <div className="mb-5 sm:mb-6 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-        {!isLoggedIn ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm sm:text-base text-slate-600">
-            Log in to rate this movie after your show ends.
-          </p>
-          <button
-            type="button"
-            onClick={openCustomerLogin}
-            className="rounded-xl px-4 py-2.5 text-sm font-bold text-white cursor-pointer hover:opacity-95"
-            style={{ backgroundColor: BRAND }}
-          >
-            Log in to review
-          </button>
-          </div>
-        ) : meta?.already_reviewed ? (
-          <p className="text-sm sm:text-base text-slate-600">
-            Thanks — you have already reviewed this movie.
-          </p>
-        ) : !meta?.has_booking ? (
-          <p className="text-sm sm:text-base text-slate-600">
-            Book tickets for this movie on BookMyBota to leave a review.
-          </p>
-        ) : !meta?.show_ended ? (
-          <p className="text-sm sm:text-base text-slate-600">
-            You can review this movie after your show ends.
-          </p>
-        ) : showWriteForm ? (
-          <form onSubmit={onSubmit} noValidate className="space-y-3">
-            <p className="text-sm sm:text-base font-bold text-[#111111]">Write a review</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <input
-                  {...register("user_name")}
-                  placeholder="Your name"
-                  className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 ${
-                    errors.user_name
-                      ? "border-red-400 focus:ring-red-200"
-                      : "border-slate-200 focus:border-[#6900AA] focus:ring-[#6900AA]/20"
-                  }`}
-                />
-                {errors.user_name && (
-                  <p className="mt-1 text-xs font-semibold text-red-600">{errors.user_name.message}</p>
-                )}
-              </div>
-              <div className="flex items-center">
-                <Controller
-                  name="rating"
-                  control={control}
-                  render={({ field }) => (
-                    <StarRatingInput value={Number(field.value) || 5} onChange={field.onChange} />
-                  )}
-                />
-              </div>
-            </div>
-            <textarea
-              {...register("text")}
-              placeholder="Share what you liked about the film..."
-              rows={3}
-              className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 resize-y focus:outline-none focus:ring-2 ${
-                errors.text
-                  ? "border-red-400 focus:ring-red-200"
-                  : "border-slate-200 focus:border-[#6900AA] focus:ring-[#6900AA]/20"
-              }`}
-            />
-            {errors.text && (
-              <p className="text-xs font-semibold text-red-600">{errors.text.message}</p>
-            )}
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">
+            Top reviews
+          </h2>
+          {displayCount > 0 ? (
             <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 cursor-pointer"
-              style={{ backgroundColor: BRAND }}
+              type="button"
+              onClick={() => setReviewsModalOpen(true)}
+              className="inline-flex items-center gap-0.5 text-sm sm:text-base font-semibold shrink-0 cursor-pointer hover:opacity-80"
+              style={{ color: BRAND }}
             >
-              {submitting && <Loader2 size={14} className="animate-spin" />}
-              Submit review
+              View Review
+              <ChevronRight className="size-4" />
             </button>
-          </form>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+        <p className="text-sm sm:text-base text-slate-500 mb-4 sm:mb-5">
+          {displayCount > 0
+            ? `Summary of ${countLabel}${avgFromList > 0 ? ` · ${avgFromList.toFixed(1)}/5` : ""}.`
+            : "Be the first to rate this movie after your show ends on BookMyBota."}
+        </p>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-10 text-slate-400 gap-2 text-sm">
-          <Loader2 className="size-5 animate-spin" style={{ color: BRAND }} />
-          Loading reviews…
-        </div>
-      ) : reviews.length === 0 ? null : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-          {reviews.map((review: MovieReview, i: number) => {
-            const name = review.user_name || "Guest";
-            const ratingNum = Number(review.rating) || 0;
-            const booked = Boolean(review.booked_on_platform);
-            return (
-              <article
-                key={review.id}
-                className={`rounded-2xl border border-slate-200 border-l-4 bg-white p-4 sm:p-5 shadow-sm ${
-                  REVIEW_ACCENTS[i % REVIEW_ACCENTS.length]
-                }`}
+        <div className="mb-5 sm:mb-6 rounded-xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+          {!isLoggedIn ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm sm:text-base text-slate-600">
+                Log in to rate this movie after your show ends.
+              </p>
+              <button
+                type="button"
+                onClick={openCustomerLogin}
+                className="rounded-xl px-4 py-2.5 text-sm font-bold text-white cursor-pointer hover:opacity-95"
+                style={{ backgroundColor: BRAND }}
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="inline-flex size-8 sm:size-9 items-center justify-center rounded-full bg-[#F7E9FF] text-xs sm:text-sm font-bold text-[#6900AA]">
-                    {name.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="min-w-0 flex-1 text-sm sm:text-base font-semibold text-[#111111] truncate">
-                    {name}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-sm sm:text-base font-bold text-[#111111] shrink-0">
-                    <Star className="size-3.5 text-[#F84464]" fill="currentColor" />
-                    {formatRatingOutOf5(ratingNum)}
-                  </span>
+                Log in to review
+              </button>
+            </div>
+          ) : meta?.already_reviewed ? (
+            <p className="text-sm sm:text-base text-slate-600">
+              Thanks — you have already reviewed this movie.
+            </p>
+          ) : !meta?.has_booking ? (
+            <p className="text-sm sm:text-base text-slate-600">
+              Book tickets for this movie on BookMyBota to leave a review.
+            </p>
+          ) : !meta?.show_ended ? (
+            <p className="text-sm sm:text-base text-slate-600">
+              You can review this movie after your show ends.
+            </p>
+          ) : showWriteForm ? (
+            <form onSubmit={onSubmit} noValidate className="space-y-3">
+              <p className="text-sm sm:text-base font-bold text-[#111111]">Write a review</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <input
+                    {...register("user_name")}
+                    placeholder="Your name"
+                    className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 ${
+                      errors.user_name
+                        ? "border-red-400 focus:ring-red-200"
+                        : "border-slate-200 focus:border-[#6900AA] focus:ring-[#6900AA]/20"
+                    }`}
+                  />
+                  {errors.user_name && (
+                    <p className="mt-1 text-xs font-semibold text-red-600">
+                      {errors.user_name.message}
+                    </p>
+                  )}
                 </div>
-                <p className="text-xs sm:text-sm text-slate-400 mb-2">
-                  {booked ? "Booked on BookMyBota" : "BookMyBota customer"}
-                </p>
-                {review.text?.trim() && (
-                  <p className="text-xs sm:text-sm text-slate-600 mb-2 leading-relaxed whitespace-pre-wrap">
-                    {review.text.trim()}
-                  </p>
-                )}
-                <p className="text-xs sm:text-sm text-slate-400">{timeAgo(review.created_at)}</p>
-              </article>
-            );
-          })}
+                <div className="flex items-center">
+                  <Controller
+                    name="rating"
+                    control={control}
+                    render={({ field }) => (
+                      <StarRatingInput value={Number(field.value) || 5} onChange={field.onChange} />
+                    )}
+                  />
+                </div>
+              </div>
+              <textarea
+                {...register("text")}
+                placeholder="Share what you liked about the film..."
+                rows={3}
+                className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 resize-y focus:outline-none focus:ring-2 ${
+                  errors.text
+                    ? "border-red-400 focus:ring-red-200"
+                    : "border-slate-200 focus:border-[#6900AA] focus:ring-[#6900AA]/20"
+                }`}
+              />
+              {errors.text && (
+                <p className="text-xs font-semibold text-red-600">{errors.text.message}</p>
+              )}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50 cursor-pointer"
+                style={{ backgroundColor: BRAND }}
+              >
+                {submitting && <Loader2 size={14} className="animate-spin" />}
+                Submit review
+              </button>
+            </form>
+          ) : null}
         </div>
-      )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10 text-slate-400 gap-2 text-sm">
+            <Loader2 className="size-5 animate-spin" style={{ color: BRAND }} />
+            Loading reviews…
+          </div>
+        ) : reviews.length === 0 ? null : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+            {reviews.map((review: MovieReview, index: number) => {
+              const name = review.user_name || "Guest";
+              const ratingNum = Number(review.rating) || 0;
+              const booked = Boolean(review.booked_on_platform);
+              const text = (review.text || "").trim();
+              const accent = REVIEW_ACCENTS[index % REVIEW_ACCENTS.length];
+              return (
+                <article
+                  key={review.id}
+                  className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm border-l-4"
+                  style={{ borderLeftColor: accent }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                      style={{ backgroundColor: `${accent}18`, color: accent }}
+                    >
+                      {name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-bold text-[#111111] truncate">
+                      {name}
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-[#111111]">
+                      <Star className="size-3.5 text-[#F84464]" fill="currentColor" />
+                      {formatRatingOutOf5(ratingNum)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">
+                    {booked ? "Booked on BookMyBota" : "BookMyBota customer"}
+                  </p>
+                  {text ? (
+                    <p className="mt-2.5 text-sm text-slate-600 leading-relaxed line-clamp-4 whitespace-pre-wrap">
+                      {text}
+                    </p>
+                  ) : null}
+                  <p className="mt-3 text-xs text-slate-400">{timeAgo(review.created_at)}</p>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {typeof document !== "undefined" &&
@@ -421,7 +438,8 @@ export default function MovieReviewsSection({ movieId, movieRating, reviewsCount
                             <button
                               type="button"
                               onClick={() => setExpandedReviewId(String(review.id))}
-                              className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold text-rose-600 cursor-pointer"
+                              className="absolute bottom-0 right-0 pl-8 bg-gradient-to-l from-white via-white to-transparent text-sm font-semibold cursor-pointer"
+                              style={{ color: BRAND }}
                             >
                               Read More
                             </button>

@@ -20,6 +20,10 @@ import {
   StudioZoomControls,
   type LayoutStudioFormat,
 } from "@/components/layoutStudio/LayoutStudioChrome";
+import {
+  autoAssignBestsellersToRawSeats,
+  seatHasExplicitBestsellerFlag,
+} from "@/lib/bmsBestsellerSeats";
 
 type Seat = {
   id?: string;
@@ -34,6 +38,8 @@ type Seat = {
   grid_id?: string;
   /** Per-seat display color (row/seat selection). Falls back to sectionColors / defaults. */
   color?: string | null;
+  /** BMS popular seat — orange outline on customer map when true */
+  is_bestseller?: boolean;
 };
 
 type Label = {
@@ -825,6 +831,7 @@ export default function VenueLayoutBuilder({
           coordinate_x: Number(s.coordinate_x),
           coordinate_y: Number(s.coordinate_y),
           grid_id: s.grid_id || s.section_name,
+          is_bestseller: Boolean(s.is_bestseller ?? seatHasExplicitBestsellerFlag(s)),
         }));
       }
       if (venueAdapter.initialConfig?.labels) initLabels = venueAdapter.initialConfig.labels;
@@ -839,6 +846,7 @@ export default function VenueLayoutBuilder({
           coordinate_x: Number(s.coordinate_x),
           coordinate_y: Number(s.coordinate_y),
           grid_id: s.grid_id || s.section_name,
+          is_bestseller: Boolean(s.is_bestseller ?? seatHasExplicitBestsellerFlag(s)),
         }));
       }
       if (layoutData.data.seating_config?.labels) initLabels = layoutData.data.seating_config.labels;
@@ -910,6 +918,11 @@ export default function VenueLayoutBuilder({
       return { ...zone, mapped };
     });
   }, [ticketTypes, seats]);
+
+  const bestsellerCount = useMemo(
+    () => seats.filter((s) => Boolean(s.is_bestseller)).length,
+    [seats]
+  );
 
   const assignTicketType = (typeId: string) => {
     setBulkTicketType(typeId);
@@ -1343,6 +1356,53 @@ export default function VenueLayoutBuilder({
     }
 
     setSeats(seats.map((s) => (ids.includes(s.internalId) ? { ...s, [field]: value } : s)));
+  };
+
+  const setBestsellerForSelection = (value: boolean) => {
+    const ids = getActiveSelectionIds();
+    if (ids.length === 0) return;
+    setSeats((prev) =>
+      prev.map((s) => (ids.includes(s.internalId) ? { ...s, is_bestseller: value } : s))
+    );
+    toast.success(
+      value
+        ? ids.length === 1
+          ? "Marked as Bestseller"
+          : `Marked ${ids.length} seats as Bestseller`
+        : ids.length === 1
+          ? "Removed Bestseller mark"
+          : `Cleared Bestseller on ${ids.length} seats`
+    );
+  };
+
+  const autoMarkBestsellers = () => {
+    if (seats.length === 0) {
+      toast.error("Add seats first");
+      return;
+    }
+    const next = autoAssignBestsellersToRawSeats(seats as unknown as Record<string, unknown>[]);
+    const marked = next.filter((s) => s.is_bestseller).length;
+    setSeats(
+      next.map((s) => ({
+        ...(s as unknown as Seat),
+        is_bestseller: Boolean(s.is_bestseller),
+      }))
+    );
+    toast.success(
+      marked > 0
+        ? `Auto-marked ${marked} mid-block seats as Bestseller. Save layout to apply on customer map.`
+        : "No suitable mid-block seats found to auto-mark (need 3+ seats per row/block)."
+    );
+  };
+
+  const clearAllBestsellers = () => {
+    const count = seats.filter((s) => s.is_bestseller).length;
+    if (count === 0) {
+      toast.message("No Bestseller seats to clear");
+      return;
+    }
+    setSeats((prev) => prev.map((s) => ({ ...s, is_bestseller: false })));
+    toast.success(`Cleared Bestseller from ${count} seats`);
   };
 
   const deleteSelectedSeat = () => {
@@ -3023,6 +3083,7 @@ export default function VenueLayoutBuilder({
           status: s.status || "AVAILABLE",
           grid_id: s.grid_id || s.section_name,
           color: s.color || null,
+          is_bestseller: Boolean(s.is_bestseller),
         })),
       };
       if (venueAdapter) {
@@ -3410,6 +3471,11 @@ export default function VenueLayoutBuilder({
               : "bg-white text-slate-700 border-slate-200 shadow-sm"
           }`}>
             <span>🪑 Seats: <strong>{seats.length}</strong></span>
+            {bestsellerCount > 0 ? (
+              <span className="text-amber-700">
+                ★ Bestsellers: <strong>{bestsellerCount}</strong>
+              </span>
+            ) : null}
             {selectedSeatIds.length > 1 && (
               <span className="text-rose-600 font-semibold">· {selectedSeatIds.length} selected</span>
             )}
@@ -3816,8 +3882,24 @@ export default function VenueLayoutBuilder({
                 ? (isSelected ? "#be123c" : "#991b1b")
                 : (isSelected ? "#f43f5e" : color)
             }
-            stroke={isSelected ? "#fbbf24" : (seat.status && seat.status !== "AVAILABLE" ? "#fca5a5" : "#ffffff")}
-            strokeWidth={isSelected ? 3 : (seat.status && seat.status !== "AVAILABLE" ? 2 : 1.5)}
+            stroke={
+              isSelected
+                ? "#fbbf24"
+                : seat.status && seat.status !== "AVAILABLE"
+                  ? "#fca5a5"
+                  : seat.is_bestseller
+                    ? "#EAB308"
+                    : "#ffffff"
+            }
+            strokeWidth={
+              isSelected
+                ? 3
+                : seat.status && seat.status !== "AVAILABLE"
+                  ? 2
+                  : seat.is_bestseller
+                    ? 2.5
+                    : 1.5
+            }
             dash={seat.status && seat.status !== "AVAILABLE" ? [3, 2] : undefined}
             perfectDrawEnabled={false}
             shadowForStrokeEnabled={false}
@@ -4731,10 +4813,55 @@ export default function VenueLayoutBuilder({
                   <p className="text-[11px] text-slate-500 mt-1">Seat labels stay unique — edit one seat at a time for labels.</p>
                 )}
               </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    id="seatBestseller"
+                    checked={
+                      selectedSeatIds.length > 1
+                        ? getActiveSelectionIds().every(
+                            (id) => seats.find((s) => s.internalId === id)?.is_bestseller
+                          )
+                        : Boolean(selectedSeat.is_bestseller)
+                    }
+                    onChange={(e) => setBestsellerForSelection(e.target.checked)}
+                    className="mt-0.5 rounded text-amber-500 focus:ring-amber-500"
+                  />
+                  <label htmlFor="seatBestseller" className="cursor-pointer">
+                    <span className="block text-sm font-semibold text-slate-800">Bestseller seat</span>
+                    <span className="block text-[11px] text-slate-600 mt-0.5 leading-snug">
+                      Orange outline on customer map · same price · no extra cost. Works for multi-select too.
+                    </span>
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={autoMarkBestsellers}
+                    className="px-2 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 text-[11px] font-bold hover:bg-amber-100"
+                    title="Mark popular mid-block seats in every row"
+                  >
+                    Auto-mark all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAllBestsellers}
+                    className="px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-bold hover:bg-slate-50"
+                    title="Clear every Bestseller mark on this layout"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-snug">
+                  Optional: if you never mark bestsellers, customer booking still works normally. Save layout after changes.
+                </p>
+              </div>
               <div className="pt-4 border-t border-slate-100">
                 <p className="text-xs font-medium text-slate-500 mb-3">
                   Status: <span className="text-slate-800 font-semibold">{selectedSeat.status}</span>
                   {selectedSeatIds.length > 1 ? ` · ${selectedSeatIds.length} selected` : ""}
+                  {bestsellerCount > 0 ? ` · Bestsellers: ${bestsellerCount}` : ""}
                 </p>
                 <button
                   onClick={deleteSelectedSeat}
@@ -4756,12 +4883,41 @@ export default function VenueLayoutBuilder({
               </div>
             </div>
           ) : (
-            <p className="text-slate-500 text-sm">
-              Select a seat or label on the canvas, or click a toolbar action.
-              <span className="block mt-2 text-xs text-slate-400">
-                Multi-select: Ctrl/Cmd+click seats, or use Select row / Select section after picking one seat.
-              </span>
-            </p>
+            <div className="space-y-4">
+              <p className="text-slate-500 text-sm">
+                Select a seat or label on the canvas, or click a toolbar action.
+                <span className="block mt-2 text-xs text-slate-400">
+                  Multi-select: Ctrl/Cmd+click seats, or use Select row / Select section after picking one seat.
+                </span>
+              </p>
+              {seats.length > 0 ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 space-y-2.5">
+                  <p className="text-sm font-semibold text-slate-800">Bestseller seats (optional)</p>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Mark popular seats for the customer map (orange outline, same price). Skip this if the cinema does not use bestsellers.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={autoMarkBestsellers}
+                      className="px-2 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 text-[11px] font-bold hover:bg-amber-100"
+                    >
+                      Auto-mark all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearAllBestsellers}
+                      className="px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-[11px] font-bold hover:bg-slate-50"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Marked now: <strong>{bestsellerCount}</strong> · Save layout to show on customer booking.
+                  </p>
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       )}

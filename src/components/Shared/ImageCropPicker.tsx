@@ -30,6 +30,7 @@ export function cropAspectLabel(aspect?: number): string | null {
   if (near(aspect, 16 / 10)) return "Wide · 16:10";
   if (near(aspect, 3)) return "Landing banner · 3:1";
   if (near(aspect, 21 / 9)) return "Banner · 21:9";
+  if (near(aspect, 2.5)) return "Movie banner · 2.5:1";
   if (aspect > 1) return `Horizontal · ${aspect.toFixed(2)}:1`;
   return `Vertical · 1:${(1 / aspect).toFixed(2)}`;
 }

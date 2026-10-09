@@ -8,9 +8,9 @@ import { useGetPublicEventQuery } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref, venueHref } from "@/lib/businessPublicPath";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { listingOfferBannerLabel } from "@/lib/diningOffers";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
-import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 import {
   eventPortrait,
   eventPlaceLine,
@@ -79,10 +79,10 @@ function listingDateLine(iso?: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const weekday = d.toLocaleString("en-GB", { weekday: "short" });
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = d.toLocaleString("en-GB", { month: "short" });
-  const time = d.toLocaleString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
-  return `${weekday}, ${day} ${month}, ${time}`;
+  const dateLabel = formatDateCustomer(iso);
+  const time = formatTime12h(iso);
+  if (!dateLabel || dateLabel === "—") return "";
+  return `${weekday}, ${dateLabel}, ${time}`;
 }
 
 function MediaFallback({ icon }: { icon: ReactNode }) {
@@ -449,15 +449,7 @@ export function DiningPosterCard({
                 <p className="min-w-0 flex-1 truncate text-sm tracking-wide text-gray-600 font-normal leading-snug">
                   {addressLine}
                 </p>
-              ) : (
-                <span className="min-w-0 flex-1" />
-              )}
-              <DiningDistanceLabel
-                latitude={place.latitude}
-                longitude={place.longitude}
-                placeCity={place.city_name}
-                className="shrink-0 whitespace-nowrap text-sm tracking-wide font-bold text-[#1C1C1C] leading-snug"
-              />
+              ) : null}
             </div>
           </>
         ) : locality ? (

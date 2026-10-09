@@ -445,6 +445,18 @@ export interface MovieShowtimeTierPrice {
   price: number;
 }
 
+export type MovieTierFillStatus = "AVAILABLE" | "FILLING_FAST" | "SOLD_OUT";
+export type MovieShowFillStatus = MovieTierFillStatus | "STARTED";
+
+/** Per-tier availability for BMS/District-style showtime hover tooltip */
+export interface MovieShowtimeTierAvailability {
+  tier_name: string;
+  price: number;
+  status: MovieTierFillStatus;
+  total_count?: number | null;
+  available_count?: number | null;
+}
+
 export interface MovieShowtime {
   id: string;
   movie_id: string;
@@ -472,6 +484,8 @@ export interface MovieShowtime {
   layout_name?: string | null;
 }
 
+export type MovieShowBookingState = "UPCOMING" | "STARTED" | "ENDED";
+
 export interface PublicMovieShowtimeItem {
   id: string;
   starts_at: string;
@@ -483,8 +497,15 @@ export interface PublicMovieShowtimeItem {
   screen_type?: string;
   layout_template_id?: string | null;
   tier_pricing: MovieShowtimeTierPrice[];
+  /** Enriched tiers with Available / Filling Fast / Sold Out */
+  tiers?: MovieShowtimeTierAvailability[];
+  fill_status?: MovieShowFillStatus;
   min_price?: number | null;
   max_price?: number | null;
+  /** District late-entry: true once wall-clock is past starts_at */
+  has_started?: boolean;
+  is_ended?: boolean;
+  booking_state?: MovieShowBookingState;
 }
 
 export interface PublicMovieCinemaGroup {
@@ -516,6 +537,9 @@ export interface MovieShowtimeLayoutData {
     tier_pricing: MovieShowtimeTierPrice[];
     status: string;
     is_active: boolean;
+    has_started?: boolean;
+    is_ended?: boolean;
+    booking_state?: MovieShowBookingState;
   };
   movie: {
     id: string;

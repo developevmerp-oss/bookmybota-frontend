@@ -6,6 +6,7 @@ import { ArrowRight, Calendar, MapPin } from "lucide-react";
 import type { PublicEvent } from "@/services/api";
 import { useGetPublicEventQuery } from "@/services/api";
 import { formatMoney } from "@/lib/currencyFormat";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import {
   eventDateParts,
   eventLandscape,
@@ -52,19 +53,16 @@ function CoverImage({
   );
 }
 
-/** "SAT, 18 OCT · 8:00 PM" */
+/** "SAT, 18 APRIL 2014 · 8:00 PM" */
 export function eventTicketDateTimeLine(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const weekday = d.toLocaleString("en-GB", { weekday: "short" }).toUpperCase();
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = d.toLocaleString("en-GB", { month: "short" }).toUpperCase();
-  const time = d
-    .toLocaleString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true })
-    .toUpperCase()
-    .replace(/\s+/g, " ");
-  return `${weekday}, ${day} ${month} · ${time}`;
+  const dateLabel = formatDateCustomer(iso);
+  if (!dateLabel || dateLabel === "—") return "";
+  const time = formatTime12h(iso).toUpperCase().replace(/\s+/g, " ");
+  return `${weekday}, ${dateLabel.toUpperCase()} · ${time}`;
 }
 
 export function eventCategoryBadge(raw?: string) {

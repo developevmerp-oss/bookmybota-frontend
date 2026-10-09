@@ -53,7 +53,7 @@ import {
 } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatMoney } from "@/lib/currencyFormat";
 import { parseEventLanguages } from "@/lib/eventValidation";
@@ -145,7 +145,7 @@ function dateChip(iso: string) {
   const d = new Date(iso);
   return {
     day: d.toLocaleDateString("en-US", { weekday: "short" }),
-    date: d.toLocaleDateString("en-US", { day: "2-digit", month: "short" }),
+    date: formatDateCustomer(iso),
   };
 }
 

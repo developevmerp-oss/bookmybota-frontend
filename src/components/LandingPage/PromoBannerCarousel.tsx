@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Navigation } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import type { Business, MarketingCampaign, Movie, PublicEvent } from "@/services/api";
@@ -25,6 +24,14 @@ import {
   preferCityOrAll,
 } from "./homeUtils";
 import { PromoBannerShimmer } from "@/components/Shared/Shimmer";
+import { promoBannerDotIndex, promoBannerMode, preparePromoLoopSlides } from "./promoBannerLoop";
+import {
+  promoNormalizeWrap,
+  promoSlideNext,
+  promoSlidePrev,
+  promoSlideToDot,
+  usePromoWrapAutoplay,
+} from "./promoBannerNav";
 import "./PromoBannerCarousel.css";
 
 type PromoBannerCarouselProps = {
@@ -322,25 +329,30 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
     isLoadingFallback,
   } = useHomeCatalog(city);
   const hasCity = hasCityFilter(city);
-  const { data: cityMoviesData, isLoading: loadingCityMovies } = useGetPublicMoviesQuery({
-    limit: 50,
-    ...(hasCity ? { city } : {}),
-  });
-  const { data: allMoviesData, isLoading: loadingAllMovies } = useGetPublicMoviesQuery(
-    { limit: 50 },
-    { skip: !hasCity }
-  );
+  const { data: cityMoviesData, isLoading: loadingCityMovies, isFetching: fetchingCityMovies } =
+    useGetPublicMoviesQuery({
+      limit: 50,
+      ...(hasCity ? { city } : {}),
+    });
+  const { data: allMoviesData, isLoading: loadingAllMovies, isFetching: fetchingAllMovies } =
+    useGetPublicMoviesQuery({ limit: 50 }, { skip: !hasCity });
   const movieItems = preferCityOrAll(
     cityMoviesData?.items ?? [],
     allMoviesData?.items ?? [],
     hasCity
   );
   const loadingMovies =
-    loadingCityMovies || (hasCity && (cityMoviesData?.items?.length ?? 0) === 0 && loadingAllMovies);
-  const { data: promotions = [], isLoading: loadingPromos } = useGetActiveMarketingPromotionsQuery({
-    surface: "slider",
-    ...(hasCity ? { city } : {}),
-  });
+    loadingCityMovies ||
+    fetchingCityMovies ||
+    (hasCity &&
+      (cityMoviesData?.items?.length ?? 0) === 0 &&
+      !fetchingCityMovies &&
+      (loadingAllMovies || fetchingAllMovies));
+  const { data: promotions = [], isLoading: loadingPromos, isFetching: fetchingPromos } =
+    useGetActiveMarketingPromotionsQuery({
+      surface: "slider",
+      ...(hasCity ? { city } : {}),
+    });
   const prevRef = useRef<HTMLButtonElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const swiperRef = useRef<SwiperType | null>(null);
@@ -407,8 +419,21 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
 
   const loading =
     loadingPromos ||
+    fetchingPromos ||
     (promotions.length === 0 &&
       (isLoadingEvents || loadingMovies || (hasCity && slides.length === 0 && isLoadingFallback)));
+
+  const { renderSlides, originalCount, startIndex, useWrapTrack } = useMemo(
+    () => preparePromoLoopSlides(slides),
+    [slides]
+  );
+  const multi = originalCount > 1;
+  const { pauseAutoplay, resumeAutoplay } = usePromoWrapAutoplay(
+    swiperRef,
+    multi && !loading,
+    originalCount,
+    useWrapTrack
+  );
 
   if (loading) {
     return <PromoBannerShimmer />;
@@ -416,11 +441,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
 
   if (slides.length === 0) return null;
 
-  const multi = slides.length > 1;
-  // Loop clones only — never pad the track with copied promotions (that made
-  // the same DJ Night appear in the center and side peeks at once).
-  const canLoop = slides.length >= 3;
-  const originalCount = slides.length;
+  const { edgeBounds } = promoBannerMode(originalCount, useWrapTrack);
 
   return (
     <section
@@ -428,17 +449,19 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
         multi ? "is-multi" : "is-single"
       }`}
     >
-      <div className={`relative w-full promo-banner-frame ${multi ? "" : "promo-banner-single-wrap"}`}>
+      <div
+        className={`relative w-full promo-banner-frame ${multi ? "" : "promo-banner-single-wrap"}`}
+        onMouseEnter={pauseAutoplay}
+        onMouseLeave={resumeAutoplay}
+      >
         <Swiper
-          key={`promo-dyn-${slides.map((s) => s.id).join("-")}`}
-          modules={[Autoplay, Navigation]}
+          key={`promo-dyn-${slides.map((s) => s.id).join("-")}-wrap`}
           className="promo-banner-peek w-full"
-          loop={canLoop}
-          loopAdditionalSlides={canLoop ? 1 : 0}
-          rewind={!canLoop && multi}
+          loop={false}
+          initialSlide={startIndex}
           speed={600}
           centeredSlides={multi}
-          centeredSlidesBounds={!multi}
+          centeredSlidesBounds={edgeBounds}
           grabCursor={multi}
           allowTouchMove={multi}
           slidesPerView={multi ? "auto" : 1}
@@ -454,53 +477,23 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
                 }
               : undefined
           }
-          autoplay={
-            multi
-              ? {
-                  delay: 5000,
-                  disableOnInteraction: false,
-                  pauseOnMouseEnter: true,
-                  stopOnLastSlide: false,
-                  waitForTransition: true,
-                }
-              : false
-          }
-          navigation={
-            multi
-              ? {
-                  prevEl: prevRef.current,
-                  nextEl: nextRef.current,
-                }
-              : false
-          }
-          onBeforeInit={(swiper: SwiperType) => {
-            if (!multi) return;
-            const nav = swiper.params?.navigation;
-            if (nav && typeof nav !== "boolean") {
-              nav.prevEl = prevRef.current;
-              nav.nextEl = nextRef.current;
-            }
-          }}
           onSwiper={(swiper) => {
             swiperRef.current = swiper;
-            if (!multi) return;
-            setTimeout(() => {
-              const nav = swiper.params?.navigation;
-              if (!nav || typeof nav === "boolean") return;
-              nav.prevEl = prevRef.current;
-              nav.nextEl = nextRef.current;
-              swiper.navigation?.destroy?.();
-              swiper.navigation?.init?.();
-              swiper.navigation?.update?.();
+            requestAnimationFrame(() => {
+              swiper.update();
+              if (useWrapTrack) swiper.slideTo(startIndex, 0, false);
+              setActiveDot(0);
             });
           }}
           onSlideChange={(swiper) => {
             if (!multi || originalCount <= 0) return;
-            const real = ((swiper.realIndex % originalCount) + originalCount) % originalCount;
-            setActiveDot(real);
+            setActiveDot(promoBannerDotIndex(swiper.activeIndex, originalCount));
+          }}
+          onSlideChangeTransitionEnd={(swiper) => {
+            if (useWrapTrack) promoNormalizeWrap(swiper, originalCount);
           }}
         >
-          {slides.map((slide) => (
+          {renderSlides.map((slide) => (
             <SwiperSlide key={slide.id} className="promo-banner-slide">
               <Link
                 href={slide.href}
@@ -520,6 +513,10 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
               type="button"
               aria-label="Previous banner"
               className="promo-nav-btn promo-nav-prev"
+              onClick={(e) => {
+                e.preventDefault();
+                promoSlidePrev(swiperRef.current, originalCount, useWrapTrack);
+              }}
             >
               <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
             </button>
@@ -528,6 +525,10 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
               type="button"
               aria-label="Next banner"
               className="promo-nav-btn promo-nav-next"
+              onClick={(e) => {
+                e.preventDefault();
+                promoSlideNext(swiperRef.current, originalCount, useWrapTrack);
+              }}
             >
               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
             </button>
@@ -541,10 +542,7 @@ export default function PromoBannerCarousel({ city }: PromoBannerCarouselProps) 
                   aria-selected={index === activeDot}
                   className={`promo-banner-dot ${index === activeDot ? "is-active" : ""}`}
                   onClick={() => {
-                    const swiper = swiperRef.current;
-                    if (!swiper) return;
-                    if (canLoop) swiper.slideToLoop(index);
-                    else swiper.slideTo(index);
+                    promoSlideToDot(swiperRef.current, index, originalCount, useWrapTrack);
                     setActiveDot(index);
                   }}
                 />

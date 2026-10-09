@@ -1,5 +1,5 @@
 import type { jsPDF } from "jspdf";
-import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatDateCustomer, formatTime12h, formatInstantLocalDateTime } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import {
   formatDeliveryAddress,
@@ -87,7 +87,7 @@ function formatShortDate(value?: string) {
 
 function formatBookedOn(value?: string) {
   if (!value) return "";
-  const label = formatDateTimeCustomer(value);
+  const label = formatInstantLocalDateTime(value);
   return label === "—" ? "" : `Booked ${label}`;
 }
 

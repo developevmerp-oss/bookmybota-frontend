@@ -51,8 +51,17 @@ import {
 } from "@/lib/cinemaSeatTypes";
 
 const FORMAT_OPTIONS = ["2D", "3D", "IMAX 2D", "IMAX 3D", "4DX", "Dolby Cinema", "ScreenX"];
+/** Used only when the selected movie has no languages configured. */
+const FALLBACK_LANGUAGE_OPTIONS = ["English", "Amharic"];
 
 const fieldErrorClass = "mt-1.5 text-xs text-rose-400 font-medium";
+
+function uniqueTrimmedStrings(values?: string[] | null): string[] {
+  if (!values?.length) return [];
+  return Array.from(
+    new Set(values.map((v) => String(v || "").trim()).filter(Boolean))
+  );
+}
 
 function RequiredMark() {
   return <span className="text-rose-500">*</span>;
@@ -244,8 +253,8 @@ export default function MovieShowtimesPage() {
         cinema_screen_id: initialScreen?.id || "",
         show_date: selectedDate || todayStr,
         start_time: "14:00",
-        language: "English",
-        format: "2D",
+        language: catalogMovies[0]?.languages?.[0] || "English",
+        format: catalogMovies[0]?.formats?.[0] || "2D",
         tier_pricing: initialTiers,
         price_duration: "showtime",
       })
@@ -353,6 +362,15 @@ export default function MovieShowtimesPage() {
 
   const activeMovieForForm = catalogMovies.find((m) => m.id === formMovieId);
   const activeScreenForForm = screens.find((s) => s.id === formScreenId);
+
+  const formLanguageValue = watch("language");
+  const movieLanguageOptions = useMemo(() => {
+    const fromMovie = uniqueTrimmedStrings(activeMovieForForm?.languages);
+    const opts = fromMovie.length > 0 ? [...fromMovie] : [...FALLBACK_LANGUAGE_OPTIONS];
+    const current = String(formLanguageValue || "").trim();
+    if (current && !opts.includes(current)) opts.push(current);
+    return opts;
+  }, [activeMovieForForm?.languages, formLanguageValue]);
 
   return (
     <div className="w-full space-y-6">
@@ -751,12 +769,24 @@ export default function MovieShowtimesPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Audio Language</label>
-                  <input
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                    Audio Language
+                  </label>
+                  <select
                     {...register("language")}
-                    placeholder="e.g. English, Amharic"
                     className="w-full bg-zinc-800 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500"
-                  />
+                  >
+                    {movieLanguageOptions.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
+                  {activeMovieForForm?.languages && activeMovieForForm.languages.length > 1 ? (
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      Languages from this movie — pick one for this showtime.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div>

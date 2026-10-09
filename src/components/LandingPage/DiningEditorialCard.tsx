@@ -8,7 +8,6 @@ import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 import { formatMoney } from "@/lib/currencyFormat";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
-import DiningDistanceLabel from "@/components/DinningLandingPage/DiningDistanceLabel";
 import { localityFromAddress } from "./homeUtils";
 import { useAdaptiveCard } from "./AdaptiveCardRow";
 
@@ -174,14 +173,7 @@ export function DiningEditorialCard({
         cuisine={cuisineLabel(place)}
         priceForTwo={priceForTwoLabel(idHash, place.average_cost)}
         locationLine={locationLine}
-        distance={
-          <DiningDistanceLabel
-            latitude={place.latitude}
-            longitude={place.longitude}
-            placeCity={place.city_name}
-            className="shrink-0 whitespace-nowrap text-sm tracking-wide font-semibold text-gray-600 leading-snug"
-          />
-        }
+        distance={null}
       />
     </Link>
   );

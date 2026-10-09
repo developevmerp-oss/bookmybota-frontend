@@ -40,7 +40,7 @@ export function computeGiftCardExpiryDate(
   return new Date(Date.UTC(y, m, d + days, 23, 59, 59, 999));
 }
 
-/** Display expiry as "23 Apr 2014" using UTC calendar day (matches stored expires_at). */
+/** Display expiry as "23 April 2014" using UTC calendar day (matches stored expires_at). */
 export function formatGiftCardExpiryDate(
   expiresAt: string | Date | null | undefined
 ): string {

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import type { PublicMovieCinemaGroup } from "@/services/api";
 
 export type LanguageFormatGroup = {
   language: string;
@@ -19,6 +20,80 @@ type Props = {
   groups: LanguageFormatGroup[];
 };
 
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function sortFormats(formats: string[]): string[] {
+  const rank = (fmt: string) => {
+    const u = fmt.toUpperCase();
+    if (u === "2D") return 0;
+    if (u.includes("IMAX") && u.includes("3D")) return 4;
+    if (u.includes("IMAX")) return 2;
+    if (u.includes("3D")) return 3;
+    if (u.includes("4DX")) return 5;
+    return 10;
+  };
+  return [...formats].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+/** Distinct language → formats from live showtimes (BMS: only combos that exist). */
+export function groupsFromShowtimes(
+  cinemas: PublicMovieCinemaGroup[] | undefined | null
+): LanguageFormatGroup[] {
+  if (!cinemas?.length) return [];
+
+  const byLanguage = new Map<string, { label: string; formats: Map<string, string> }>();
+
+  for (const cinema of cinemas) {
+    for (const st of cinema.showtimes) {
+      const language = (st.language || "").trim();
+      const format = (st.format || "").trim();
+      if (!language || !format) continue;
+
+      const langKey = normalizeKey(language);
+      let row = byLanguage.get(langKey);
+      if (!row) {
+        row = { label: language, formats: new Map() };
+        byLanguage.set(langKey, row);
+      }
+      const fmtKey = normalizeKey(format);
+      if (!row.formats.has(fmtKey)) row.formats.set(fmtKey, format);
+    }
+  }
+
+  const groups: LanguageFormatGroup[] = [];
+  for (const row of byLanguage.values()) {
+    const formats = sortFormats(Array.from(row.formats.values()));
+    if (formats.length) groups.push({ language: row.label, formats });
+  }
+
+  groups.sort((a, b) => a.language.localeCompare(b.language));
+  return groups;
+}
+
+/** Prefer showtime-derived groups; fall back to catalog language/format lists. */
+export function buildLanguageFormatGroups(
+  showtimeGroups: LanguageFormatGroup[],
+  languages: string[],
+  formats: string[]
+): LanguageFormatGroup[] {
+  if (showtimeGroups.length > 0) return showtimeGroups;
+  return groupsFromMovieLists(languages, formats);
+}
+
+/** Union of format labels for hero badges (2D, IMAX 2D, …). */
+export function allFormatsFromGroups(groups: LanguageFormatGroup[]): string[] {
+  const seen = new Map<string, string>();
+  for (const group of groups) {
+    for (const fmt of group.formats) {
+      const key = normalizeKey(fmt);
+      if (!seen.has(key)) seen.set(key, fmt);
+    }
+  }
+  return sortFormats(Array.from(seen.values()));
+}
+
 /** Build language → formats from flat movie lists (fallback when showtimes not loaded). */
 export function groupsFromMovieLists(
   languages: string[],
@@ -32,7 +107,7 @@ export function groupsFromMovieLists(
   }
   return langs.map((language) => ({
     language,
-    formats: fmts.length ? fmts : ["2D"],
+    formats: sortFormats(fmts.length ? fmts : ["2D"]),
   }));
 }
 

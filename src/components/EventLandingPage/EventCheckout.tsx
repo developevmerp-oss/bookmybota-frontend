@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSelectedCity } from "@/lib/useSelectedCity";
+import { paymentSuccessHref } from "@/lib/paymentSuccess";
 import {
   useCreateEventBookingMutation,
   useCreateEventSeatHoldMutation,
@@ -854,7 +855,13 @@ export default function EventCheckout({
         toast.success(result.message || `Tickets booked! Confirmation sent to ${contact.email.trim()}.`);
         onClose();
         if (result.booking_id) {
-          router.push(`/customer/event-bookings/confirmation?id=${result.booking_id}`);
+          router.push(
+            paymentSuccessHref({
+              module: "events",
+              bookingId: result.booking_id,
+              next: `/customer/event-bookings/confirmation?id=${result.booking_id}`,
+            })
+          );
         }
       }
     } catch (err) {

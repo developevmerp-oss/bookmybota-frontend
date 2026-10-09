@@ -152,8 +152,13 @@ export default function RootLayoutClient({
   const isMovieConfirmationFlow = Boolean(
     pathname?.match(/^\/movies\/booking-confirmation(\/|$)/)
   );
-  const hidePublicChromeForMovieBooking = isMovieBookFlow || isMovieConfirmationFlow;
-  const isImmersiveBookingFlow = isEventBookingFlow || isMovieBookFlow;
+  const isPaymentSuccessFlow = Boolean(
+    pathname?.match(/^\/booking\/payment-success(\/|$)/)
+  );
+  const hidePublicChromeForMovieBooking =
+    isMovieBookFlow || isMovieConfirmationFlow || isPaymentSuccessFlow;
+  const isImmersiveBookingFlow =
+    isEventBookingFlow || isMovieBookFlow || isPaymentSuccessFlow;
   const isListYourShowLanding = pathname === "/list-your-show";
   const isListYourShowSubpage = Boolean(pathname?.startsWith("/list-your-show/"));
   const isListYourShowPage = isListYourShowLanding || isListYourShowSubpage;

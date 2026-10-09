@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage, setCredentials } from "@/features/auth/authSlice";
 import { useGetBusinessSettingsQuery, useGetCinemaContractQuery } from "@/services/api";
 import SessionGuard from "@/components/Shared/SessionGuard";
+import PartnerProfileHoverMenu, {
+  MOVIE_CONTRACT_PROFILE_LINKS,
+} from "@/components/Shared/PartnerProfileHoverMenu";
 import { clearSessionForRole, readSessionForRole } from "@/lib/authStorage";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 import {
   BarChart3,
   Clapperboard,
   Film,
-  KeyRound,
   LayoutDashboard,
-  LogOut,
   Megaphone,
   Menu,
   MessageSquare,
@@ -29,6 +31,20 @@ import {
   X,
 } from "lucide-react";
 
+type NavIcon = ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+
+type NavLink = {
+  name: string;
+  href: string;
+  icon: NavIcon;
+};
+
+type NavSection = {
+  id: string;
+  label: string;
+  items: NavLink[];
+};
+
 function MovieShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -39,29 +55,58 @@ function MovieShell({ children }: { children: React.ReactNode }) {
   const { data: settings } = useGetBusinessSettingsQuery(bizId, { skip: !bizId });
   const { data: contract } = useGetCinemaContractQuery();
   const cinemaName = settings?.name || "Movie Admin";
+  const displayName = user?.name?.trim() || cinemaName;
+  const initial = (displayName.charAt(0) || "M").toUpperCase();
+  const logoSrc = settings?.logo_url ? resolveMediaUrl(settings.logo_url) : "";
 
   const hasBeveragesEnabled =
     contract?.status === "ACTIVE" && Number(contract?.beverage_commission_percent ?? 0) > 0;
 
-  const navigation = [
-    { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
-    { name: "Contract", href: "/movie/contract", icon: FileSignature },
-    { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
-    ...(hasBeveragesEnabled
-      ? [{ name: "Beverages & Snacks", href: "/movie/beverages", icon: UtensilsCrossed }]
-      : []),
-    { name: "Movies", href: "/movie/movies", icon: Film },
-    { name: "Movie Offers", href: "/movie/offers", icon: Tag },
-    { name: "Reviews", href: "/movie/reviews", icon: MessageSquare },
-    { name: "Promotions", href: "/movie/promotions", icon: Megaphone },
-    { name: "Showtimes", href: "/movie/showtimes", icon: Clapperboard },
-    { name: "Bookings", href: "/movie/bookings", icon: Ticket },
-    { name: "Revenue & Payouts", href: "/movie/settlements", icon: Wallet },
-    { name: "Accounting & Taxes", href: "/movie/accounting", icon: BarChart3 },
-    { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
-    { name: "Profile", href: "/movie/profile", icon: User },
-    { name: "Change Password", href: "/movie/change-password", icon: KeyRound },
+  const sections: NavSection[] = [
+    {
+      id: "cinema",
+      label: "Cinema",
+      items: [
+        { name: "Dashboard", href: "/movie/dashboard", icon: LayoutDashboard },
+        { name: "Contract", href: "/movie/contract", icon: FileSignature },
+        { name: "Screens & Layouts", href: "/movie/screens", icon: MonitorPlay },
+        ...(hasBeveragesEnabled
+          ? [{ name: "Beverages & Snacks", href: "/movie/beverages", icon: UtensilsCrossed }]
+          : []),
+      ],
+    },
+    {
+      id: "content",
+      label: "Content",
+      items: [
+        { name: "Movies", href: "/movie/movies", icon: Film },
+        { name: "Movie Offers", href: "/movie/offers", icon: Tag },
+        { name: "Reviews", href: "/movie/reviews", icon: MessageSquare },
+        { name: "Promotions", href: "/movie/promotions", icon: Megaphone },
+        { name: "Showtimes", href: "/movie/showtimes", icon: Clapperboard },
+      ],
+    },
+    {
+      id: "operations",
+      label: "Operations",
+      items: [
+        { name: "Bookings", href: "/movie/bookings", icon: Ticket },
+        { name: "Scan Tickets", href: "/movie/scan", icon: QrCode },
+      ],
+    },
+    {
+      id: "finance",
+      label: "Finance",
+      items: [
+        { name: "Revenue & Payouts", href: "/movie/settlements", icon: Wallet },
+        { name: "Accounting & Taxes", href: "/movie/accounting", icon: BarChart3 },
+      ],
+    },
   ];
+
+  const profileLink: NavLink = { name: "Profile", href: "/movie/profile", icon: User };
+
+  const allLinks = [...sections.flatMap((s) => s.items), profileLink];
 
   const isNavActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -70,117 +115,144 @@ function MovieShell({ children }: { children: React.ReactNode }) {
     router.push("/movie");
   };
 
-  return (
-    <div className="min-h-screen flex bg-background admin-dashboard-layout">
-      <aside className="admin-sidebar w-64 glass-panel border-r border-white/5 fixed inset-y-0 left-0 z-40 hidden md:flex flex-col overflow-hidden">
-        <Link
-          href="/movie/profile"
-          className="p-5 border-b border-white/5 block hover:bg-white/[0.03] transition-colors shrink-0"
-          title="Open profile"
+  const pageTitle =
+    allLinks.find((n) => isNavActive(n.href))?.name || "Movie Admin Panel";
+
+  const renderLink = (item: NavLink, onNavigate?: () => void) => {
+    const isActive = isNavActive(item.href);
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onNavigate}
+        className={`org-nav-item relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
+          isActive ? "is-active" : ""
+        }`}
+      >
+        <Icon size={15} className="shrink-0" strokeWidth={isActive ? 2.25 : 2} />
+        <span className="truncate leading-snug">{item.name}</span>
+      </Link>
+    );
+  };
+
+  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <nav className="admin-sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 py-2 space-y-0.5">
+      {sections.map((section, index) => (
+        <div
+          key={section.id}
+          className={index === 0 ? "" : "pt-1.5 mt-1.5 border-t border-[var(--sidebar-border)]"}
         >
-          <h2
-            className="text-xl font-bold text-white flex items-center gap-2 min-w-0"
-            title={cinemaName}
+          <p className="px-2.5 pt-1.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+            {section.label}
+          </p>
+          <div className="space-y-0.5">{section.items.map((item) => renderLink(item, onNavigate))}</div>
+        </div>
+      ))}
+      <div className="pt-1.5 mt-1.5 border-t border-[var(--sidebar-border)] space-y-0.5">
+        {renderLink(profileLink, onNavigate)}
+      </div>
+    </nav>
+  );
+
+  return (
+    <div className="min-h-screen flex bg-background admin-dashboard-layout partner-shell">
+      <aside className="admin-sidebar w-64 fixed inset-y-0 left-0 z-40 hidden md:flex flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-[var(--sidebar,#fff)]">
+        <div className="px-3 py-3 lg:px-3.5 border-b border-[var(--sidebar-border)] shrink-0">
+          <Link
+            href="/movie/profile"
+            className="flex items-center gap-2 min-w-0 rounded-lg hover:bg-muted/60 transition-colors -mx-0.5 px-0.5 py-0.5"
+            title="Open profile"
           >
-            <span className="bg-fuchsia-600 p-1.5 rounded-lg text-white shrink-0">
-              <Film size={20} />
-            </span>
-            <span className="truncate text-lg font-bold">{cinemaName}</span>
-          </h2>
-          <p className="text-xs text-zinc-500 mt-2">Profile · Movie Admin</p>
-        </Link>
-        <nav className="admin-sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 space-y-1">
-          {navigation.map((item) => {
-            const isActive = isNavActive(item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
-                  isActive
-                    ? "bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20"
-                    : "text-zinc-400 hover:bg-white/5 hover:text-white border border-transparent"
-                }`}
-              >
-                <Icon size={16} className="shrink-0" />
-                <span className="font-medium text-sm">{item.name}</span>
-              </Link>
-            );
-          })}
-        </nav>
+            {logoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoSrc}
+                alt=""
+                className="w-8 h-8 rounded-lg object-cover border border-border shrink-0 bg-white"
+              />
+            ) : (
+              <span className="bg-rose-600 p-1.5 rounded-lg text-white shrink-0">
+                <Film size={16} />
+              </span>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-base font-bold text-foreground" title={cinemaName}>
+                {cinemaName}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Movie Admin</p>
+            </div>
+          </Link>
+        </div>
+        <NavLinks />
       </aside>
 
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
             onClick={() => setMobileMenuOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
           />
-          <div className="admin-sidebar relative w-64 bg-zinc-950 border-r border-white/10 h-full flex flex-col p-4 overflow-hidden">
-            <div className="flex items-center justify-between mb-4 shrink-0">
+          <div className="admin-sidebar relative w-72 max-w-[85vw] bg-card border-r border-border h-full flex flex-col overflow-hidden shadow-lg">
+            <div className="flex items-center justify-between px-3 py-3 border-b border-border shrink-0">
               <Link
                 href="/movie/profile"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-bold text-white flex items-center gap-2 truncate min-w-0"
+                className="flex items-center gap-2 min-w-0"
               >
-                <span className="bg-fuchsia-600 p-1.5 rounded-lg text-white shrink-0">
-                  <Film size={18} />
-                </span>
-                <span className="truncate">{cinemaName}</span>
+                {logoSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoSrc}
+                    alt=""
+                    className="w-8 h-8 rounded-lg object-cover border border-border shrink-0 bg-white"
+                  />
+                ) : (
+                  <span className="bg-rose-600 p-1.5 rounded-lg text-white shrink-0">
+                    <Film size={16} />
+                  </span>
+                )}
+                <span className="truncate font-bold text-sm text-foreground">{cinemaName}</span>
               </Link>
               <button
+                type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5"
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted cursor-pointer"
+                aria-label="Close menu"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
-            <nav className="admin-sidebar-nav flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1 pr-1">
-              {navigation.map((item) => {
-                const Icon = item.icon;
-                const isActive = isNavActive(item.href);
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
-                      isActive
-                        ? "bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20"
-                        : "text-zinc-400 hover:bg-white/5 hover:text-white border border-transparent"
-                    }`}
-                  >
-                    <Icon size={16} className="shrink-0" />
-                    <span className="font-medium text-sm">{item.name}</span>
-                  </Link>
-                );
-              })}
-            </nav>
+            <NavLinks onNavigate={() => setMobileMenuOpen(false)} />
           </div>
         </div>
       )}
 
-      <main className="flex-1 md:ml-64 relative">
-        <header className="h-20 glass-panel border-b border-white/5 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30">
-          <div className="flex items-center gap-3 min-w-0">
+      <main className="flex-1 md:ml-64 relative min-w-0">
+        <header className="h-12 sm:h-14 glass-panel border-b border-border flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5"
+              className="md:hidden p-2 -ml-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted cursor-pointer"
+              aria-label="Open menu"
             >
-              <Menu size={24} />
+              <Menu size={20} />
             </button>
-            <h1 className="text-lg sm:text-xl font-semibold text-white truncate">
-              {navigation.find((n) => isNavActive(n.href))?.name || "Movie Admin Panel"}
+            <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground truncate min-w-0">
+              {pageTitle}
             </h1>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-all"
-          >
-            <LogOut size={16} />
-            <span className="hidden sm:inline">Sign Out</span>
-          </button>
+          <PartnerProfileHoverMenu
+            displayName={displayName}
+            email={user?.email}
+            initials={initial}
+            roleLabel="Movie Admin"
+            profileHref="/movie/profile"
+            changePasswordHref="/movie/profile?tab=password"
+            onLogout={handleLogout}
+            extraLinks={MOVIE_CONTRACT_PROFILE_LINKS}
+          />
         </header>
         <div className="p-4 sm:p-8">{children}</div>
       </main>

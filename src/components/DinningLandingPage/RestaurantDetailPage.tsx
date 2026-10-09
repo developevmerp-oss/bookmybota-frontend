@@ -54,6 +54,7 @@ import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import CustomerReviewCard from '@/components/Shared/CustomerReviewCard';
 import { useSelectedCity } from '@/lib/useSelectedCity';
+import { paymentSuccessHref } from '@/lib/paymentSuccess';
 import { RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
 import GuestTableAnimation from './GuestTableAnimation';
@@ -1501,12 +1502,22 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         customer_id: customerIdPayload,
       }).unwrap();
       setBookingSuccess(true);
-      setDrawerStep(4);
       if (result.booking_id) {
         setLastBookingId(result.booking_id);
       }
       setLastQrToken(result.qr_token || result.booking_id || null);
       toast.success('Booking confirmed!');
+      if (result.booking_id) {
+        router.push(
+          paymentSuccessHref({
+            module: 'dining',
+            bookingId: result.booking_id,
+            next: `/customer/bookings/confirmation?id=${result.booking_id}`,
+          })
+        );
+        return;
+      }
+      setDrawerStep(4);
     } catch {
       toast.error('Booking failed. Please try again.');
     }

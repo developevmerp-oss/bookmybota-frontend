@@ -31,17 +31,25 @@ import diningRestaurant from "./Business/dining-restaurant.jpg";
 import diningBar from "./Business/dining-bar.jpg";
 import diningPub from "./Business/dining-pub.jpg";
 import diningCafe from "./Business/dining-cafe.jpg";
+import diningPartnerHero from "./Business/dining-partner-hero.jpg";
 import concertCultural from "./Concert/concert-cultural.jpg";
 import concertTraditional from "./Concert/concert-traditional.jpg";
 import concertLiveMusic from "./Concert/concert-live-music.jpg";
+import concertPartnerHero from "./Concert/concert-partner-hero.jpg";
 import movieCinema from "./Movie/movie-cinema.jpg";
 import moviePremiere from "./Movie/movie-premiere.jpg";
+import moviePartnerHero from "./Movie/movie-partner-hero.jpg";
 import sportsFootball from "./Sports/sports-football.jpg";
 import sportsBasketball from "./Sports/sports-basketball.jpg";
 import sportsBoxing from "./Sports/sports-boxing.jpg";
+import sportsPartnerHero from "./Sports/sports-partner-hero.jpg";
 import comedyStandUp from "./Comedy/comedy-stand-up.jpg";
+import comedyPartnerHero from "./Comedy/comedy-partner-hero.jpg";
 import musicCultural from "./Music/music-cultural.jpg";
 import musicDj from "./Music/music-dj.jpg";
+import musicPartnerHero from "./Music/music-partner-hero.jpg";
+import artistPartnerHero from "./Artist/artist-partner-hero.jpg";
+import venuePartnerHero from "./Venue/venue-partner-hero.jpg";
 
 const images = {
   logo,
@@ -77,17 +85,25 @@ const images = {
   diningBar,
   diningPub,
   diningCafe,
+  diningPartnerHero,
   concertCultural,
   concertTraditional,
   concertLiveMusic,
+  concertPartnerHero,
   movieCinema,
   moviePremiere,
+  moviePartnerHero,
   sportsFootball,
   sportsBasketball,
   sportsBoxing,
+  sportsPartnerHero,
   comedyStandUp,
+  comedyPartnerHero,
   musicCultural,
   musicDj,
+  musicPartnerHero,
+  artistPartnerHero,
+  venuePartnerHero,
 };
 
 export default images;

@@ -52,6 +52,7 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks';
 import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
+import CustomerReviewCard from '@/components/Shared/CustomerReviewCard';
 import { useSelectedCity } from '@/lib/useSelectedCity';
 import { RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
 import { getPhoneValidationError, isValidPhone, sanitizePhoneInput } from '@/lib/validation';
@@ -626,7 +627,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const similarRestaurants = similarBusinesses.filter((b) => b.id !== bizId && b.slug !== resolvedParams.id);
 
   const similarScrollerRef = useRef<HTMLDivElement>(null);
-  const reviewsScrollerRef = useRef<HTMLDivElement>(null);
 
   const scrollSimilar = (direction: 'left' | 'right') => {
     if (similarScrollerRef.current) {
@@ -634,16 +634,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       similarScrollerRef.current.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth'
-      });
-    }
-  };
-
-  const scrollReviews = (direction: 'left' | 'right') => {
-    if (reviewsScrollerRef.current) {
-      const scrollAmount = 304;
-      reviewsScrollerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth',
       });
     }
   };
@@ -2740,68 +2730,24 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       No reviews yet. Be the first to leave one after your visit!
                     </p>
                   ) : (
-                    <div className="relative">
-                      {reviews.length > 1 ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => scrollReviews("left")}
-                            className="absolute left-0 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center hover:bg-slate-50 cursor-pointer"
-                            aria-label="Previous reviews"
-                          >
-                            <ChevronLeft size={18} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => scrollReviews("right")}
-                            className="absolute right-0 top-1/2 z-10 translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm flex items-center justify-center hover:bg-slate-50 cursor-pointer"
-                            aria-label="Next reviews"
-                          >
-                            <ChevronRight size={18} />
-                          </button>
-                        </>
-                      ) : null}
-
-                      <div
-                        ref={reviewsScrollerRef}
-                        className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory scroll-smooth"
-                      >
-                        {reviews.map((rev: any) => {
-                          const ratingNum = Number(rev.rating) || 0;
-                          const name = rev.user_name || "Guest";
-                          const booked = Boolean(rev.booked_on_platform);
-                          return (
-                            <article
-                              key={rev.id}
-                              className="w-[260px] sm:w-[280px] shrink-0 snap-start rounded-2xl border border-slate-200 border-l-4 border-l-[#6900AA] bg-white p-4 flex flex-col shadow-sm"
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#F7E9FF] text-sm font-bold text-[#6900AA] shrink-0">
-                                  {String(name).slice(0, 1).toUpperCase()}
-                                </span>
-                                <span className="min-w-0 flex-1 text-sm font-bold text-[#111111] truncate">
-                                  {name}
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-sm font-bold text-[#111111] shrink-0">
-                                  <Star size={14} className="fill-[#F84464] text-[#F84464]" />
-                                  {ratingNum.toFixed(1)}/5
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-400 mb-2">
-                                {booked ? "Booked on BookMyBota" : "BookMyBota customer"}
-                              </p>
-                              {rev.text?.trim() ? (
-                                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap line-clamp-4 mb-2">
-                                  {rev.text.trim()}
-                                </p>
-                              ) : null}
-                              <p className="text-xs text-slate-400 mt-auto">
-                                {reviewTimeAgo(rev.created_at)}
-                              </p>
-                            </article>
-                          );
-                        })}
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                      {reviews.map((rev: any) => {
+                        const ratingNum = Number(rev.rating) || 0;
+                        const name = rev.user_name || "Guest";
+                        const booked = Boolean(rev.booked_on_platform);
+                        return (
+                          <CustomerReviewCard
+                            key={rev.id}
+                            name={name}
+                            rating={ratingNum}
+                            text={rev.text}
+                            timeLabel={reviewTimeAgo(rev.created_at)}
+                            bookedOnPlatform={booked}
+                            accentColor="#6900AA"
+                            className="rounded-xl p-4 sm:p-5"
+                          />
+                        );
+                      })}
                     </div>
                   )}
                 </section>

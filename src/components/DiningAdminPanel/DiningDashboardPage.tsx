@@ -34,6 +34,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import BusinessLandingPage from "@/components/DiningAdminPanel/BusinessLandingPage";
+import { ListYourShowLandingShimmer } from "@/components/Shared/Shimmer";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatDate } from "@/lib/dateFormat";
 
@@ -1229,11 +1230,7 @@ export default function BusinessDashboardPage() {
   }, [dispatch]);
 
   if (checkingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
-        Loading...
-      </div>
-    );
+    return <ListYourShowLandingShimmer variant="split" />;
   }
 
   if (!user || user.role !== "business_admin") {

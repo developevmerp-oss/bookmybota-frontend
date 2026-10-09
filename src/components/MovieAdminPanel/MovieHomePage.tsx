@@ -4,6 +4,7 @@ import { useAppSelector } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import MovieLandingPage from "@/components/MovieAdminPanel/MovieLandingPage";
+import { ListYourShowLandingShimmer } from "@/components/Shared/Shimmer";
 
 export default function MovieHomePage() {
   const router = useRouter();
@@ -15,11 +16,7 @@ export default function MovieHomePage() {
   }, [isMovieAdmin, router]);
 
   if (isMovieAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
-        Loading...
-      </div>
-    );
+    return <ListYourShowLandingShimmer variant="split" />;
   }
 
   return <MovieLandingPage />;

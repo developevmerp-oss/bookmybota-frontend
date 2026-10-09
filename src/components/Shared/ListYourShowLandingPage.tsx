@@ -2,26 +2,22 @@
 
 import {
   BarChart3,
-  Building2,
-  Clapperboard,
-  Laugh,
   LayoutDashboard,
   Megaphone,
-  Mic2,
-  Music,
   ShieldCheck,
   Tag,
-  Trophy,
-  UserRound,
-  UtensilsCrossed,
   UserPlus,
 } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
+import ListYourShowHostTypesSection from "@/components/Shared/ListYourShowHostTypesSection";
+import ListYourShowServicesSection from "@/components/Shared/ListYourShowServicesSection";
 import images from "@/Images";
 
 function imageSrc(img: string | { src: string }) {
   return typeof img === "string" ? img : img.src;
 }
+
+const PAGE_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
 
 const HERO_SLIDES = [
   {
@@ -66,6 +62,7 @@ const HERO_SLIDES = [
   },
 ];
 
+/* Legacy icon host cards — kept for reference / rollback
 const HOST_CATEGORIES = [
   {
     label: "Dining",
@@ -124,6 +121,55 @@ const HOST_CATEGORIES = [
     iconSrc: imageSrc(images.hostMusicIcon),
   },
 ];
+*/
+
+/** Host cards use each partner page’s hero image (dining-types UI). */
+const HOST_IMAGE_CARDS = [
+  {
+    label: "Dining",
+    image: imageSrc(images.diningPartnerHero),
+    href: "/business",
+  },
+  {
+    label: "Movie",
+    image: imageSrc(images.moviePartnerHero),
+    href: "/movie",
+  },
+  {
+    label: "Concert",
+    image: imageSrc(images.concertPartnerHero),
+    href: "/list-your-show/concert",
+  },
+  {
+    label: "Sports",
+    image: imageSrc(images.sportsPartnerHero),
+    href: "/list-your-show/sports",
+  },
+  {
+    label: "Comedy",
+    image: imageSrc(images.comedyPartnerHero),
+    href: "/list-your-show/comedy",
+  },
+  {
+    label: "Artist",
+    image: imageSrc(images.artistPartnerHero),
+    href: "/artist",
+  },
+  {
+    label: "Venue",
+    image: imageSrc(images.venuePartnerHero),
+    href: "/venue",
+  },
+  {
+    label: "Music",
+    image: imageSrc(images.musicPartnerHero),
+    href: "/list-your-show/music",
+  },
+];
+
+const HOST_TITLE = "What can you host???";
+const HOST_SUBTITLE =
+  "As the purveyor of entertainment, Book My Bota enables your event with end to end solutions from the time you register to the completion of the event. Let's look at what you can host.";
 
 /** Platform services shared by every partner type on Book My Bota. */
 const COMMON_FEATURES = [
@@ -159,24 +205,53 @@ const COMMON_FEATURES = [
   },
 ];
 
+const FEATURES_TITLE = "Common services for every partner";
+const FEATURES_SUBTITLE =
+  "Whether you list dining, events, movies, venues, or artists — every Book My Bota partner gets access to these core platform services.";
+const FEATURES_FOOTNOTE =
+  "Category-specific tools such as table management, ticket scanning, cinema showtimes, venue layouts, and artist booking are available after you register under the partner type that fits your business.";
+
 export default function ListYourShowLandingPage() {
   return (
     <PartnerListYourShowLanding
       hostOnly
       layout="bms"
       hideBuiltInHeader
+      pageContainerClassName={PAGE_CONTAINER}
+      pageBackgroundClassName="bg-white"
       slides={HERO_SLIDES}
       registerHref="/organizer/register"
       loginHref="/login"
       primaryCtaLabel="List your business"
       secondaryLoginLabel="Login your business"
-      hostTitle="What can you host???"
-      hostSubtitle="As the purveyor of entertainment, Book My Bota enables your event with end to end solutions from the time you register to the completion of the event. Let's look at what you can host."
-      hostTiles={HOST_CATEGORIES}
-      featuresTitle="Common services for every partner"
-      featuresSubtitle="Whether you list dining, events, movies, venues, or artists — every Book My Bota partner gets access to these core platform services."
-      featuresTiles={COMMON_FEATURES}
-      featuresFootnote="Category-specific tools such as table management, ticket scanning, cinema showtimes, venue layouts, and artist booking are available after you register under the partner type that fits your business."
+      // Legacy icon host grid commented — replaced by dining-types image cards
+      // hostTitle={HOST_TITLE}
+      // hostSubtitle={HOST_SUBTITLE}
+      // hostTiles={HOST_CATEGORIES}
+      hostSection={
+        <ListYourShowHostTypesSection
+          title={HOST_TITLE}
+          subtitle={HOST_SUBTITLE}
+          cards={HOST_IMAGE_CARDS}
+          containerClassName={PAGE_CONTAINER}
+        />
+      }
+      // Legacy features grid commented — replaced by dining services-style cards (+ subtitle)
+      // featuresTitle={FEATURES_TITLE}
+      // featuresSubtitle={FEATURES_SUBTITLE}
+      // featuresTiles={COMMON_FEATURES}
+      // featuresFootnote={FEATURES_FOOTNOTE}
+      featuresSection={
+        <ListYourShowServicesSection
+          title={FEATURES_TITLE}
+          subtitle={FEATURES_SUBTITLE}
+          tiles={COMMON_FEATURES}
+          footnote={FEATURES_FOOTNOTE}
+          registerHref="/organizer/register"
+          primaryCtaLabel="List your business"
+          containerClassName={PAGE_CONTAINER}
+        />
+      }
       securityTitle="Sit back and watch your event come to life"
       securitySubtitle="Events may be all fun and games, but we take it seriously. We ensure our customer's security so that you don't have to."
     />

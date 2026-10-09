@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ArrowRight,
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
@@ -11,6 +12,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import PartnerLoginForm from "@/components/Shared/PartnerLoginForm";
+import PartnerSplitHero from "@/components/Shared/PartnerSplitHero";
+import PartnerTypeCardsSection from "@/components/Shared/PartnerTypeCardsSection";
+import ListYourShowClipSlider from "@/components/Shared/ListYourShowClipSlider";
+import { ListYourShowLandingShimmer } from "@/components/Shared/Shimmer";
 import Footer from "@/components/LandingPage/Footer";
 import { lockBodyScroll } from "@/lib/lockBodyScroll";
 import images from "@/Images";
@@ -83,16 +88,45 @@ export type PartnerListYourShowLandingProps = {
   /** Full-width hero image — replaces the carousel when set. */
   heroImage?: string;
   heroImageAlt?: string;
+  /** `split` = two-column hero with copy + rounded image (dining page). */
+  heroVariant?: "banner" | "split";
+  heroEyebrow?: string;
+  heroTitle?: string;
+  heroDescription?: string;
+  heroMicrocopy?: string;
+  /** Decorative script line on the hero image. */
+  heroImageScript?: string;
+  /** Shared container classes for page sections (e.g. dining landing). */
+  pageContainerClassName?: string;
+  pageBackgroundClassName?: string;
+  headerLoginPrompt?: string;
+  headerLoginVariant?: "default" | "dark";
   /** Image cards shown below the hero banner (detail pages). */
   imageCards?: PartnerImageCard[];
+  imageCardsTitle?: string;
+  /** `cards` = dining-style type cards; default simple image grid. */
+  imageCardsVariant?: "simple" | "cards";
+  imageCardsTitleStyle?: "eyebrow" | "heading";
   /** Round category-type chips shown after venue image cards. */
   categoryTypesTitle?: string;
   categoryTypes?: PartnerCategoryTypeItem[];
+  /** `cards` = editorial image cards (dining redesign); default round chips. */
+  categoryTypesVariant?: "round" | "cards";
+  /** `heading` = centered black section title on white (dining page). */
+  categoryTypesTitleStyle?: "eyebrow" | "heading";
+  /** Card look for category type cards (`overlay` = movie types reference). */
+  categoryTypesCardStyle?: "stacked" | "overlay";
   hostEyebrow?: string;
   servicesTitle?: string;
   servicesSubtitle?: string;
   servicesTiles?: PartnerTile[];
   servicesEyebrow?: string;
+  /** `platform` = divider grid + diagonal CTA banner (dining redesign). */
+  servicesVariant?: "cards" | "platform";
+  /** Hide the services section subtitle under the main title. */
+  servicesHideSubtitle?: boolean;
+  /** `bordered` = white cards with dining-types border + brand purple info icon. */
+  servicesCardsVariant?: "blush" | "bordered";
   featuresTitle?: string;
   featuresSubtitle?: string;
   featuresTiles?: PartnerTile[];
@@ -104,6 +138,10 @@ export type PartnerListYourShowLandingProps = {
   testimonials?: PartnerTestimonial[];
   crossLinks?: React.ReactNode;
   middleSlot?: React.ReactNode;
+  /** Replaces default host icon cards (e.g. List Your Show image-type cards). */
+  hostSection?: React.ReactNode;
+  /** Replaces default features cards (e.g. dining-style services grid). */
+  featuresSection?: React.ReactNode;
   /** When true, omit fixed logo/login bar (use site HomeHeader instead). */
   hideBuiltInHeader?: boolean;
   /** Centered logo + login bar (BookMyShow list-your-show style). */
@@ -132,11 +170,13 @@ function InfoPopupModal({
   ctaLabel,
   ctaHref,
   onClose,
+  ctaButtonColor = BRAND,
 }: {
   active: ActiveInfoPopup | null;
   ctaLabel: string;
   ctaHref: string;
   onClose: () => void;
+  ctaButtonColor?: string;
 }) {
   const data = active ? INFO_POPUPS[active.infoId] : null;
   const Icon = active?.Icon;
@@ -147,9 +187,12 @@ function InfoPopupModal({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const unlock = lockBodyScroll();
     return () => {
       window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
       unlock();
     };
   }, [active, data, onClose]);
@@ -158,10 +201,11 @@ function InfoPopupModal({
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40"
-      data-scroll-lock-container
+      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 overflow-hidden"
       onClick={onClose}
       role="presentation"
+      onWheel={(e) => e.preventDefault()}
+      onTouchMove={(e) => e.preventDefault()}
     >
       <div
         role="dialog"
@@ -206,7 +250,7 @@ function InfoPopupModal({
             href={ctaHref}
             onClick={onClose}
             className="mt-8 inline-flex h-12 w-full max-w-[280px] items-center justify-center rounded-lg text-white text-[15px] font-bold hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: BRAND }}
+            style={{ backgroundColor: ctaButtonColor }}
           >
             {ctaLabel}
           </Link>
@@ -237,10 +281,11 @@ const SERVICE_ICON_TONES = [
 const BMS_CARD_HOVER =
   "transition-[box-shadow,border-color,background-color] duration-300 ease-out hover:shadow-[6px_6px_0_rgba(26,43,72,0.06),10px_10px_18px_rgba(26,43,72,0.14)]";
 
-function BmsInfoIcon() {
+function BmsInfoIcon({ color = "#E57373" }: { color?: string }) {
   return (
     <span
-      className="mt-4 inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 border-[#E57373] text-sm sm:text-base font-bold leading-none text-[#E57373]"
+      className="mt-4 inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full border-2 text-sm sm:text-base font-bold leading-none"
+      style={{ borderColor: color, color }}
       aria-hidden
     >
       i
@@ -254,21 +299,27 @@ function BmsActionButtons({
   secondaryLoginLabel,
   onOpenLogin,
   loginHref,
+  theme = "brand",
 }: {
   registerHref: string;
   primaryCtaLabel: string;
   secondaryLoginLabel?: string;
   onOpenLogin?: () => void;
   loginHref?: string;
+  theme?: "brand" | "dark";
 }) {
   const resolvedLoginHref = loginHref ?? registerHref.replace(/\/register\/?$/, "/login");
+  const isDark = theme === "dark";
+  const primaryBg = isDark ? "#111111" : BRAND;
+  const secondaryColor = isDark ? "#111111" : BRAND;
+  const secondaryHover = isDark ? "hover:bg-[#F5F5F5]" : "hover:bg-[#F7E9FF]";
 
   return (
     <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
       <Link
         href={registerHref}
         className="inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] text-white text-[15px] sm:text-base font-semibold hover:opacity-90 transition-opacity"
-        style={{ backgroundColor: BRAND }}
+        style={{ backgroundColor: primaryBg }}
       >
         {primaryCtaLabel}
       </Link>
@@ -277,16 +328,16 @@ function BmsActionButtons({
           <button
             type="button"
             onClick={onOpenLogin}
-            className="inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] border-2 text-[15px] sm:text-base font-semibold hover:bg-[#F7E9FF] transition-colors cursor-pointer"
-            style={{ borderColor: BRAND, color: BRAND }}
+            className={`inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] border-2 text-[15px] sm:text-base font-semibold ${secondaryHover} transition-colors cursor-pointer`}
+            style={{ borderColor: secondaryColor, color: secondaryColor }}
           >
             {secondaryLoginLabel}
           </button>
         ) : (
           <Link
             href={resolvedLoginHref}
-            className="inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] border-2 text-[15px] sm:text-base font-semibold hover:bg-[#F7E9FF] transition-colors"
-            style={{ borderColor: BRAND, color: BRAND }}
+            className={`inline-flex items-center justify-center h-11 sm:h-12 min-w-[200px] px-8 rounded-[4px] border-2 text-[15px] sm:text-base font-semibold ${secondaryHover} transition-colors`}
+            style={{ borderColor: secondaryColor, color: secondaryColor }}
           >
             {secondaryLoginLabel}
           </Link>
@@ -315,8 +366,8 @@ function BmsRoundCategoryTypesGrid({
   types: PartnerCategoryTypeItem[];
 }) {
   return (
-    <section className="bg-white py-10 md:py-14 border-t border-[#F0F0F0]">
-      <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+    <section className="bg-white py-10 md:py-14 container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 border-t border-[#F0F0F0]">
+      <div>
         <h2 className="text-center text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold tracking-tight text-[#1A2B48] leading-tight">
           {title}
         </h2>
@@ -344,6 +395,124 @@ function BmsRoundCategoryTypesGrid({
         </div>
       </div>
     </section>
+  );
+}
+
+function BmsPlatformServicesGrid({
+  tiles,
+  onOpenInfo,
+}: {
+  tiles: PartnerTile[];
+  onOpenInfo: (tile: PartnerTile) => void;
+}) {
+  return (
+    <div className="mt-10 sm:mt-12 border-t border-l border-[#E8E8E8] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      {tiles.map((tile) => {
+        const { label, Icon, iconSrc, blurb } = tile;
+
+        return (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onOpenInfo(tile)}
+            className="flex flex-col items-start text-left border-r border-b border-[#E8E8E8] bg-white px-5 py-7 sm:px-7 sm:py-9 hover:bg-[#FAFAFA] cursor-pointer transition-colors"
+          >
+            <span className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#F3E8FF] text-[#6900AA]">
+              {iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={iconSrc} alt="" className="h-5 w-5 sm:h-6 sm:w-6 object-contain" />
+              ) : (
+                <Icon size={22} strokeWidth={1.75} className="text-[#6900AA]" />
+              )}
+            </span>
+            <p className="mt-4 sm:mt-5 text-[15px] sm:text-base font-bold text-[#111] leading-snug">
+              {label}
+            </p>
+            {blurb ? (
+              <p className="mt-2 text-[13px] sm:text-[14px] text-[#6B7280] leading-relaxed">
+                {blurb}
+              </p>
+            ) : null}
+            <span className="sr-only">More about {label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BmsServicesCtaBanner({
+  image,
+  imageAlt,
+  title,
+  registerHref,
+  primaryCtaLabel,
+  secondaryLoginLabel,
+  onOpenLogin,
+  loginHref,
+}: {
+  image?: string;
+  imageAlt?: string;
+  title: string;
+  registerHref: string;
+  primaryCtaLabel: string;
+  secondaryLoginLabel?: string;
+  onOpenLogin?: () => void;
+  loginHref?: string;
+}) {
+  const resolvedLoginHref = loginHref ?? registerHref.replace(/\/register\/?$/, "/login");
+  const ctaPhrase = (title || primaryCtaLabel).trim();
+  const heading = ctaPhrase.endsWith("?")
+    ? ctaPhrase
+    : `Ready to ${ctaPhrase.charAt(0).toLowerCase()}${ctaPhrase.slice(1)}?`;
+
+  return (
+    <div className="mt-10 sm:mt-12 md:mt-14 rounded-2xl sm:rounded-3xl overflow-hidden border border-[#E8E8E8] bg-[#F7F4EF]">
+      <div className="flex flex-col md:flex-row min-h-0 md:min-h-[240px] lg:min-h-[280px]">
+        {image ? (
+          <div className="relative w-full md:w-[42%] lg:w-[46%] h-[180px] sm:h-[220px] md:h-auto md:min-h-[240px] lg:min-h-[280px] shrink-0 md:[clip-path:polygon(0_0,100%_0,88%_100%,0_100%)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image}
+              alt={imageAlt || ""}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          </div>
+        ) : null}
+        <div className="relative flex-1 flex flex-col items-center justify-center text-center px-5 py-7 sm:px-8 sm:py-9 md:px-8 md:py-10 lg:px-10">
+          <h3 className="text-[1.35rem] sm:text-[1.6rem] md:text-[1.75rem] lg:text-[1.9rem] font-bold text-[#111] leading-tight tracking-tight max-w-[360px]">
+            {heading}
+          </h3>
+          <div className="mt-5 sm:mt-6 md:mt-7 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 w-full sm:w-auto">
+            <Link
+              href={registerHref}
+              className="inline-flex items-center justify-center gap-2 h-11 sm:h-12 px-5 sm:px-6 rounded-lg bg-[#111] text-white text-[14px] sm:text-[15px] font-semibold hover:bg-[#333] transition-colors"
+            >
+              {primaryCtaLabel}
+              <ArrowRight size={16} strokeWidth={2.25} />
+            </Link>
+            {secondaryLoginLabel ? (
+              onOpenLogin ? (
+                <button
+                  type="button"
+                  onClick={onOpenLogin}
+                  className="inline-flex items-center justify-center h-11 sm:h-12 px-5 sm:px-6 rounded-lg border border-[#111] bg-white text-[#111] text-[14px] sm:text-[15px] font-semibold hover:bg-[#FAFAFA] transition-colors cursor-pointer"
+                >
+                  {secondaryLoginLabel}
+                </button>
+              ) : (
+                <Link
+                  href={resolvedLoginHref}
+                  className="inline-flex items-center justify-center h-11 sm:h-12 px-5 sm:px-6 rounded-lg border border-[#111] bg-white text-[#111] text-[14px] sm:text-[15px] font-semibold hover:bg-[#FAFAFA] transition-colors"
+                >
+                  {secondaryLoginLabel}
+                </Link>
+              )
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -444,7 +613,7 @@ function BmsFeatureCardsGrid({ tiles }: { tiles: PartnerTile[] }) {
   const cardClassName = `flex flex-col items-center text-center rounded-md border border-[#E8E0E0] bg-[#FDF5F5] px-4 py-8 sm:py-10 min-h-[220px] sm:min-h-[240px] ${BMS_CARD_HOVER}`;
 
   return (
-    <div className="mt-10 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-[1000px] mx-auto">
+    <div className="mt-10 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
       {tiles.map((tile) => {
         const { label, Icon, iconSrc, infoId, blurb } = tile;
         const description = blurb || (infoId ? INFO_POPUPS[infoId]?.description : undefined);
@@ -498,13 +667,13 @@ function BmsSecuritySection({ title, subtitle }: { title: string; subtitle: stri
   return (
     <section className="bg-white py-16 md:py-20">
       <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
-        <div className="flex flex-col md:flex-row items-center md:items-center gap-10 md:gap-12 lg:gap-16">
-          <div className="w-full md:w-[42%] lg:w-[45%] shrink-0 flex items-center justify-center md:justify-start">
+        <div className="flex flex-col md:flex-row items-center md:items-center gap-10 sm:gap-12 lg:gap-16">
+          <div className="w-full sm:w-[300px] lg:w-[200px] shrink-0 flex items-center justify-center sm:justify-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={securityBgSrc()}
               alt=""
-              className="w-full max-w-[320px] sm:max-w-[380px] md:max-w-none h-[350px] object-contain"
+              className="w-full h-full object-contain"
             />
           </div>
           <div className="w-full md:flex-1 text-center md:text-left">
@@ -524,12 +693,19 @@ function BmsSecuritySection({ title, subtitle }: { title: string; subtitle: stri
 function BmsServiceCardsGrid({
   tiles,
   onOpenInfo,
+  variant = "blush",
 }: {
   tiles: PartnerTile[];
   onOpenInfo: (tile: PartnerTile) => void;
+  variant?: "blush" | "bordered";
 }) {
+  const isBordered = variant === "bordered";
+  const cardClassName = isBordered
+    ? `flex flex-col items-center text-center rounded-xl border border-[#EDEDED] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] px-4 py-10 sm:py-11 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] cursor-pointer min-h-[220px] sm:min-h-[240px] transition-shadow duration-300`
+    : `flex flex-col items-center text-center rounded-md border border-[#E8E0E0] bg-[#FDF5F5] px-4 py-10 sm:py-11 hover:bg-[#FCF0F0] cursor-pointer min-h-[220px] sm:min-h-[240px] ${BMS_CARD_HOVER}`;
+
   return (
-    <div className="mt-10 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-[1000px] mx-auto">
+    <div className="mt-10 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 ">
       {tiles.map((tile) => {
         const { label, Icon, iconSrc } = tile;
         return (
@@ -537,7 +713,7 @@ function BmsServiceCardsGrid({
             key={label}
             type="button"
             onClick={() => onOpenInfo(tile)}
-            className={`flex flex-col items-center text-center rounded-md border border-[#E8E0E0] bg-[#FDF5F5] px-4 py-10 sm:py-11 hover:bg-[#FCF0F0] cursor-pointer min-h-[220px] sm:min-h-[240px] ${BMS_CARD_HOVER}`}
+            className={cardClassName}
           >
             <span className="inline-flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center">
               {iconSrc ? (
@@ -550,10 +726,10 @@ function BmsServiceCardsGrid({
                 </>
               )}
             </span>
-            <p className="mt-5 text-[15px] sm:text-base md:text-lg font-bold text-[#1A2B48] leading-snug max-w-[260px]">
+            <p className="mt-5 text-[1rem] sm:text-[1.18rem] md:text-lg font-semibold text-[#1A2B48] leading-snug max-w-[260px]">
               {label}
             </p>
-            <BmsInfoIcon />
+            <BmsInfoIcon color={isBordered ? "#B59B2A" : "#E57373"} />
           </button>
         );
       })}
@@ -690,9 +866,25 @@ export default function PartnerListYourShowLanding({
   slides = [],
   heroImage,
   heroImageAlt = "",
+  heroVariant = "banner",
+  heroEyebrow,
+  heroTitle,
+  heroDescription,
+  heroMicrocopy,
+  heroImageScript,
+  pageContainerClassName,
+  pageBackgroundClassName,
+  headerLoginPrompt,
+  headerLoginVariant = "default",
   imageCards = [],
+  imageCardsTitle = "Venue Types",
+  imageCardsVariant = "simple",
+  imageCardsTitleStyle = "heading",
   categoryTypesTitle = "",
   categoryTypes = [],
+  categoryTypesVariant = "round",
+  categoryTypesTitleStyle = "eyebrow",
+  categoryTypesCardStyle = "stacked",
   hostTitle = "",
   hostSubtitle = "",
   hostTiles = [],
@@ -701,6 +893,9 @@ export default function PartnerListYourShowLanding({
   servicesSubtitle = "",
   servicesTiles = [],
   servicesEyebrow = "We've got you covered",
+  servicesVariant = "cards",
+  servicesHideSubtitle = false,
+  servicesCardsVariant = "blush",
   featuresTitle = "",
   featuresSubtitle = "",
   featuresTiles = [],
@@ -712,6 +907,8 @@ export default function PartnerListYourShowLanding({
   testimonials = [],
   crossLinks,
   middleSlot,
+  hostSection,
+  featuresSection,
   hideBuiltInHeader = false,
   centeredPartnerHeader = false,
   showBackButton = false,
@@ -722,12 +919,18 @@ export default function PartnerListYourShowLanding({
   onCloseLogin = () => {},
 }: PartnerListYourShowLandingProps) {
   const router = useRouter();
+  const [infoPopup, setInfoPopup] = useState<ActiveInfoPopup | null>(null);
+  /** Shimmer until client mount / first paint — no behavior change after ready. */
+  const [pageReady, setPageReady] = useState(false);
+  useEffect(() => {
+    setPageReady(true);
+  }, []);
+
+  /* Legacy BMS carousel state — kept for rollback with the commented slider UI
   const n = slides.length;
-  /** Middle copy of tripled track — starts on first real slide */
   const [index, setIndex] = useState(n);
   const [animate, setAnimate] = useState(true);
   const [paused, setPaused] = useState(false);
-  const [infoPopup, setInfoPopup] = useState<ActiveInfoPopup | null>(null);
   const [narrow, setNarrow] = useState(false);
   const jumpingRef = useRef(false);
 
@@ -738,27 +941,6 @@ export default function PartnerListYourShowLanding({
 
   const realSlide = n > 0 ? ((index % n) + n) % n : 0;
 
-  const openInfo = useCallback((tile: PartnerTile) => {
-    setInfoPopup({
-      infoId: tile.infoId,
-      iconSrc: tile.iconSrc,
-      Icon: tile.Icon,
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!loginOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseLogin();
-    };
-    window.addEventListener("keydown", onKey);
-    const unlock = lockBodyScroll();
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      unlock();
-    };
-  }, [loginOpen, onCloseLogin]);
-
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
     const sync = () => setNarrow(mq.matches);
@@ -767,7 +949,6 @@ export default function PartnerListYourShowLanding({
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  /** Keep index on middle copy after mount / slides change */
   useEffect(() => {
     if (n <= 0) return;
     setAnimate(false);
@@ -831,36 +1012,83 @@ export default function PartnerListYourShowLanding({
     }
   }, [index, n]);
 
-  const isBms = layout === "bms";
-  /** Center card slightly narrower so side peeks show more (BMS-style) */
   const slideW = narrow ? 40 : 53;
   const gapPx = narrow ? 10 : 14;
+  */
+
+  const openInfo = useCallback((tile: PartnerTile) => {
+    setInfoPopup({
+      infoId: tile.infoId,
+      iconSrc: tile.iconSrc,
+      Icon: tile.Icon,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!loginOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseLogin();
+    };
+    window.addEventListener("keydown", onKey);
+    const unlock = lockBodyScroll();
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      unlock();
+    };
+  }, [loginOpen, onCloseLogin]);
+
+  const isBms = layout === "bms";
   const headerLoginHref = loginHref ?? registerHref.replace(/\/register\/?$/, "/login");
+  const sectionContainerClass =
+    pageContainerClassName ?? "max-w-[1180px] mx-auto px-4 sm:px-6";
+  const headerContainerClass = pageContainerClassName ?? "max-w-[1200px] mx-auto px-4 sm:px-6";
+  const loginButtonClass =
+    headerLoginVariant === "dark"
+      ? "inline-flex h-9 items-center px-5 rounded-md bg-[#111] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
+      : "inline-flex h-9 items-center px-5 rounded-md border border-[#D0D0D0] text-[#333] text-sm font-semibold hover:bg-[#FAFAFA] transition-colors";
 
   const loginControl = onOpenLogin ? (
     <button
       type="button"
       onClick={onOpenLogin}
-      className="h-9 px-5 rounded-md border border-[#D0D0D0] text-[#333] text-sm font-semibold hover:bg-[#FAFAFA] transition-colors cursor-pointer"
+      className={`${loginButtonClass} cursor-pointer`}
     >
-      Login
+      Log in
     </button>
   ) : (
-    <Link
-      href={headerLoginHref}
-      className="inline-flex h-9 items-center px-5 rounded-md border border-[#D0D0D0] text-[#333] text-sm font-semibold hover:bg-[#FAFAFA] transition-colors"
-    >
-      Login
+    <Link href={headerLoginHref} className={loginButtonClass}>
+      Log in
     </Link>
   );
 
+  const headerLoginArea = headerLoginPrompt ? (
+    <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+      <span className="text-[13px] sm:text-sm text-[#555555]">{headerLoginPrompt}</span>
+      {loginControl}
+    </div>
+  ) : (
+    loginControl
+  );
+
+  if (!pageReady) {
+    return (
+      <ListYourShowLandingShimmer
+        hideHeader={hideBuiltInHeader}
+        variant={heroVariant === "split" ? "split" : "bms"}
+        hostOnly={hostOnly}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F5F5F5] flex flex-col font-sans text-[#222] overflow-x-hidden">
+    <div
+      className={`min-h-screen flex flex-col font-sans text-[#222] overflow-x-hidden ${pageBackgroundClassName ?? "bg-[#F5F5F5]"}`}
+    >
       {!hideBuiltInHeader ? (
         <header className="sticky top-0 w-full z-50 bg-white border-b border-[#EBEBEB]">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
+          <div className={headerContainerClass}>
             {centeredPartnerHeader ? (
-              <div className="flex items-center justify-between h-[72px]">
+              <div className="flex items-center justify-between h-[72px] gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   {showBackButton ? (
                     <button
@@ -881,7 +1109,7 @@ export default function PartnerListYourShowLanding({
                     />
                   </Link>
                 </div>
-                {loginControl}
+                {headerLoginArea}
               </div>
             ) : (
               <div className="flex justify-between items-center h-[72px]">
@@ -893,7 +1121,7 @@ export default function PartnerListYourShowLanding({
                     className="h-12 sm:h-14 w-auto object-contain object-left"
                   />
                 </Link>
-                {loginControl}
+                {headerLoginArea}
               </div>
             )}
           </div>
@@ -901,19 +1129,70 @@ export default function PartnerListYourShowLanding({
       ) : null}
 
       <div className="flex-1">
-        {heroImage ? (
+        {heroImage && heroVariant === "split" && heroTitle ? (
+          <PartnerSplitHero
+            containerClassName={sectionContainerClass}
+            eyebrow={heroEyebrow}
+            title={heroTitle}
+            description={heroDescription}
+            microcopy={heroMicrocopy}
+            imageScript={heroImageScript}
+            image={heroImage}
+            imageAlt={heroImageAlt}
+            registerHref={registerHref}
+            primaryCtaLabel={primaryCtaLabel}
+            secondaryLoginLabel={secondaryLoginLabel}
+            onOpenLogin={onOpenLogin}
+            loginHref={loginHref}
+          />
+        ) : heroImage ? (
           <PartnerHeroBanner image={heroImage} alt={heroImageAlt} />
         ) : null}
         {imageCards.length > 0 ? (
-          <section className="bg-white py-10 md:py-14">
-            <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
-              <BmsImageCardsGrid cards={imageCards} />
-            </div>
-          </section>
+          imageCardsVariant === "cards" ? (
+            <PartnerTypeCardsSection
+              title={imageCardsTitle}
+              types={imageCards}
+              registerHref={registerHref}
+              containerClassName={sectionContainerClass}
+              titleStyle={imageCardsTitleStyle}
+            />
+          ) : (
+            <section className="bg-white py-10 md:py-14">
+              <div className={sectionContainerClass}>
+                <BmsImageCardsGrid cards={imageCards} />
+              </div>
+            </section>
+          )
         ) : null}
         {categoryTypes.length > 0 ? (
-          <BmsRoundCategoryTypesGrid title={categoryTypesTitle} types={categoryTypes} />
+          categoryTypesVariant === "cards" ? (
+            <PartnerTypeCardsSection
+              title={categoryTypesTitle}
+              types={categoryTypes}
+              registerHref={registerHref}
+              containerClassName={sectionContainerClass}
+              titleStyle={categoryTypesTitleStyle}
+              cardStyle={categoryTypesCardStyle}
+            />
+          ) : (
+            <BmsRoundCategoryTypesGrid title={categoryTypesTitle} types={categoryTypes} />
+          )
         ) : null}
+        {/* Clip-path feature slider (active split + peek cards) */}
+        {!heroImage && slides.length > 0 ? (
+          <ListYourShowClipSlider
+            slides={slides}
+            registerHref={registerHref}
+            primaryCtaLabel={primaryCtaLabel}
+            secondaryLoginLabel={secondaryLoginLabel}
+            loginHref={loginHref}
+            onOpenLogin={onOpenLogin}
+            containerClassName={sectionContainerClass}
+          />
+        ) : null}
+
+        {/* Legacy BMS center-peek carousel — kept for rollback
         {!heroImage && slides.length > 0 ? (
         <section
           className="bg-white pt-3 sm:pt-4 pb-3 w-full overflow-hidden"
@@ -992,7 +1271,6 @@ export default function PartnerListYourShowLanding({
                           </div>
                         </div>
                         <div className="relative w-full sm:w-[44%] md:w-[46%] h-[155px] sm:h-auto sm:min-h-[280px] md:min-h-[310px] p-3 sm:p-3.5 md:p-4 flex items-center justify-center">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={s.image}
                             alt=""
@@ -1026,9 +1304,12 @@ export default function PartnerListYourShowLanding({
           </div>
         </section>
         ) : null}
+        */}
 
-        {/* What can you host */}
-        {hostTiles.length > 0 ? (
+        {/* What can you host — custom slot or legacy icon cards */}
+        {hostSection ? (
+          hostSection
+        ) : hostTiles.length > 0 ? (
         <section className="bg-white py-14 md:py-16">
           <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
             {isBms ? (
@@ -1045,7 +1326,10 @@ export default function PartnerListYourShowLanding({
         </section>
         ) : null}
 
-        {featuresTiles.length > 0 ? (
+        {/* Common services / features — custom slot or legacy cards */}
+        {featuresSection ? (
+          featuresSection
+        ) : featuresTiles.length > 0 ? (
           <section id="features" className="bg-white py-14 md:py-16 scroll-mt-24">
             <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
               {isBms ? (
@@ -1071,7 +1355,7 @@ export default function PartnerListYourShowLanding({
           </section>
         ) : null}
 
-        {featuresTiles.length > 0 && securityTitle ? (
+        {(featuresTiles.length > 0 || Boolean(featuresSection)) && securityTitle ? (
           <BmsSecuritySection title={securityTitle} subtitle={securitySubtitle} />
         ) : null}
 
@@ -1081,8 +1365,25 @@ export default function PartnerListYourShowLanding({
 
         {/* Services */}
         <section id="services" className={isBms ? "bg-white py-14 md:py-16 scroll-mt-24" : "bg-[#F7F4FB] py-14 md:py-16 scroll-mt-24"}>
-          <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
-            {isBms ? (
+          <div className={sectionContainerClass}>
+            {isBms && servicesVariant === "platform" ? (
+              <div className="max-w-3xl">
+                <h2 className="text-[1.65rem] sm:text-[2rem] md:text-[2.35rem] font-bold tracking-tight text-[#111] leading-tight">
+                  {servicesTitle}
+                </h2>
+                {servicesSubtitle && !servicesHideSubtitle ? (
+                  <p className="mt-3 text-[14px] sm:text-[15px] text-[#6B7280] leading-relaxed">
+                    {servicesSubtitle}
+                  </p>
+                ) : null}
+              </div>
+            ) : isBms && servicesHideSubtitle ? (
+              <div className="text-center max-w-[820px] mx-auto">
+                <h2 className="text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold tracking-tight text-[#1A2B48] leading-tight">
+                  {servicesTitle}
+                </h2>
+              </div>
+            ) : isBms ? (
               <BmsSectionHeading title={servicesTitle} subtitle={servicesSubtitle} />
             ) : (
               <SectionHeading
@@ -1091,8 +1392,14 @@ export default function PartnerListYourShowLanding({
                 subtitle={servicesSubtitle}
               />
             )}
-            {isBms ? (
-              <BmsServiceCardsGrid tiles={servicesTiles} onOpenInfo={openInfo} />
+            {isBms && servicesVariant === "platform" ? (
+              <BmsPlatformServicesGrid tiles={servicesTiles} onOpenInfo={openInfo} />
+            ) : isBms ? (
+              <BmsServiceCardsGrid
+                tiles={servicesTiles}
+                onOpenInfo={openInfo}
+                variant={servicesCardsVariant}
+              />
             ) : (
               <ServiceCardsGrid tiles={servicesTiles} onOpenInfo={openInfo} />
             )}
@@ -1136,17 +1443,33 @@ export default function PartnerListYourShowLanding({
                   <div className="mt-6 text-center text-[13px] text-[#888]">{crossLinks}</div>
                 ) : null}
               </>
+            ) : servicesVariant === "platform" || servicesCardsVariant === "bordered" ? (
+              <>
+                <BmsServicesCtaBanner
+                  image={heroImage}
+                  imageAlt={heroImageAlt}
+                  title={primaryCtaLabel}
+                  registerHref={registerHref}
+                  primaryCtaLabel={primaryCtaLabel}
+                  secondaryLoginLabel={secondaryLoginLabel}
+                  onOpenLogin={onOpenLogin}
+                  loginHref={loginHref}
+                />
+                {servicesFootnote ? (
+                  <p className="mt-10 sm:mt-12 text-center text-[14px] sm:text-[15px] text-[#555555] leading-relaxed max-w-[820px] mx-auto">
+                    {servicesFootnote}
+                  </p>
+                ) : null}
+              </>
             ) : (
               <>
-                {isBms ? (
-                  <BmsActionButtons
-                    registerHref={registerHref}
-                    primaryCtaLabel={primaryCtaLabel}
-                    secondaryLoginLabel={secondaryLoginLabel}
-                    onOpenLogin={onOpenLogin}
-                    loginHref={loginHref}
-                  />
-                ) : null}
+                <BmsActionButtons
+                  registerHref={registerHref}
+                  primaryCtaLabel={primaryCtaLabel}
+                  secondaryLoginLabel={secondaryLoginLabel}
+                  onOpenLogin={onOpenLogin}
+                  loginHref={loginHref}
+                />
                 {servicesFootnote ? (
                   <p className="mt-10 sm:mt-12 text-center text-[14px] sm:text-[15px] text-[#555555] leading-relaxed max-w-[820px] mx-auto">
                     {servicesFootnote}
@@ -1171,6 +1494,7 @@ export default function PartnerListYourShowLanding({
         ctaLabel={primaryCtaLabel}
         ctaHref={registerHref}
         onClose={() => setInfoPopup(null)}
+        ctaButtonColor={servicesCardsVariant === "bordered" ? "#111111" : BRAND}
       />
       ) : null}
 

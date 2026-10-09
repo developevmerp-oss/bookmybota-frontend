@@ -98,7 +98,7 @@ function ListYourShowCta({
       href={href}
       tabIndex={tabIndex}
       aria-current={active ? "page" : undefined}
-      className={`list-your-show-cta hidden lg:inline-flex shrink-0 items-center gap-1.5 h-8 px-3.5 sm:px-4 rounded-full text-[12px] sm:text-[13px] font-semibold whitespace-nowrap border border-[#6900AA] ${
+      className={`list-your-show-cta hidden lg:inline-flex shrink-0 items-center gap-1.5 h-8 px-3.5 sm:px-4 rounded-full text-[12px] sm:text-[13px] font-semibold whitespace-nowrap border border-[#111111] bg-[#111111] text-white ${
         filled ? "is-filled" : ""
       }`}
       onMouseEnter={(e) => {
@@ -136,6 +136,13 @@ export default function SubNavBar() {
   const onVenues = pathname === "/venues" || pathname.startsWith("/venues/");
   const onArtists = pathname === "/artists" || pathname.startsWith("/artists/");
   const isLandingPage = pathname === "/";
+  /** Listing pages — subnav is outside sticky header and must not stick */
+  const unstickySubnav =
+    pathname === "/dining" ||
+    pathname === "/movies" ||
+    pathname === "/events" ||
+    pathname === "/venues" ||
+    pathname === "/artists";
   const [city, setCity] = useState("");
   const [hideOnScroll, setHideOnScroll] = useState(false);
   const hideOnScrollRef = useRef(false);
@@ -268,8 +275,8 @@ export default function SubNavBar() {
         tabIndex={collapsed ? -1 : undefined}
         className={`shrink-0 transition-colors whitespace-nowrap flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem] sm:min-w-[5.25rem] md:min-w-[5.75rem] h-full px-3 sm:px-3.5 rounded-xl text-[12px] sm:text-[13px] md:text-[14px] font-semibold tracking-wide lg:inline-flex lg:flex-row lg:items-center lg:gap-1.5 lg:h-8 lg:min-w-0 lg:rounded-full lg:px-2.5 lg:text-[12px] xl:text-[13px] lg:uppercase ${
           active
-            ? "bg-[#6900AA] text-white shadow-sm"
-            : "text-[#57008E] hover:bg-[#EFD7FF] hover:text-[#6900AA]"
+            ? "bg-gradient-to-r from-[#A78BFA] to-[#6D28D9] text-white"
+            : "text-[#111111] hover:text-[#111111]"
         } ${classNameExtra}`}
       >
         <Icon
@@ -290,16 +297,18 @@ export default function SubNavBar() {
       aria-label="Browse categories"
       aria-hidden={collapsed}
       data-subnav-compact={compactMobile ? "1" : "0"}
-      className={`border-t bg-[#F7E9FF] overflow-hidden sticky top-0 z-[1] transition-[max-height,opacity,border-color,height] duration-300 ease-in-out ${
+      className={`border-t border-[#E5E7EB] bg-white z-[1] transition-[max-height,opacity,border-color,height,box-shadow] duration-300 ease-in-out ${
+        unstickySubnav ? "relative" : "sticky top-0"
+      } ${
         collapsed
-          ? "max-h-0 opacity-0 border-transparent pointer-events-none lg:max-h-0"
+          ? "max-h-0 opacity-0 border-transparent pointer-events-none overflow-hidden lg:max-h-0 shadow-none"
           : compactMobile
-            ? "max-h-11 h-11 opacity-100 border-[#E3BCFF] lg:max-h-12 lg:h-12"
-            : "max-h-[4.75rem] h-[4.75rem] opacity-100 border-[#E3BCFF] lg:max-h-12 lg:h-12"
+            ? "max-h-12 h-12 opacity-100 lg:max-h-16 lg:h-16 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+            : "max-h-[5.25rem] h-[5.25rem] opacity-100 lg:max-h-16 lg:h-16 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
       }`}
     >
-      <div className="container mx-auto px-3 sm:px-4 md:px-5 lg:px-8 h-full flex items-center justify-between gap-2 sm:gap-3 lg:gap-4">
-        <div className="flex items-stretch gap-1.5 sm:gap-2 lg:gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden h-full py-1.5 lg:py-0 lg:items-center">
+      <div className="container mx-auto px-3 sm:px-4 md:px-5 lg:px-8 h-full flex items-center justify-between gap-2 sm:gap-3 lg:gap-4 py-2">
+        <div className="flex items-stretch gap-1.5 sm:gap-2 lg:gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden h-full py-2 lg:py-2 lg:items-center">
           {/* Mobile/tablet only — wrapper wins over lg:inline-flex on the link */}
           <span className="contents lg:hidden">{renderTabLink(FOR_YOU_TAB)}</span>
           {linkTabs.map((item) => renderTabLink(item))}

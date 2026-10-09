@@ -2,65 +2,42 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  CalendarDays,
-  Clapperboard,
-  Film,
-  Popcorn,
-  QrCode,
-  Ticket,
-  Users,
-} from "lucide-react";
+import { CalendarDays, Film, QrCode, Ticket } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
 import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { PARTNER_CATEGORY_TYPES } from "@/data/partnerCategoryTypes";
+import images from "@/Images";
 
-const FEATURE_SLIDES = [
-  {
-    id: "listings",
-    title: "List movies and showtimes in one place",
-    description: "Publish screenings, manage schedules, and keep your cinema catalogue up to date.",
-    image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=900&q=80",
-    bg: "#1F2937",
-  },
-  {
-    id: "tickets",
-    title: "Sell tickets online with ease",
-    description: "Offer M-Tickets, box office pickup, and delivery options for your audience.",
-    image: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=900&q=80",
-    bg: "#7C3AED",
-  },
-  {
-    id: "scan",
-    title: "Scan tickets at the gate",
-    description: "Validate bookings quickly with QR scanning on show day.",
-    image: "https://images.unsplash.com/photo-1536440136618-849c177e76a1?w=900&q=80",
-    bg: "#0F766E",
-  },
-  {
-    id: "insights",
-    title: "Track bookings and occupancy",
-    description: "See how your shows perform and manage your cinema operations from one dashboard.",
-    image: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=900&q=80",
-    bg: "#B45309",
-  },
-];
+const PAGE_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
 
-const HERO_IMAGE = FEATURE_SLIDES[0].image;
+function imageSrc(imgData: string | { src: string }) {
+  return typeof imgData === "string" ? imgData : imgData.src;
+}
 
-const CINEMA_TYPES = [
-  { label: "Multiplex", infoId: "movie.host.multiplex", Icon: Film },
-  { label: "Single Screen", infoId: "movie.host.single", Icon: Clapperboard },
-  { label: "Drive-in", infoId: "movie.host.drivein", Icon: Popcorn },
-  { label: "Independent Cinema", infoId: "movie.host.independent", Icon: Users },
-];
+const HERO_IMAGE = imageSrc(images.moviePartnerHero);
 
 const SERVICES = [
-  { label: "Movie listings", infoId: "movie.service.listings", Icon: Film },
-  { label: "Showtime scheduling", infoId: "movie.service.showtimes", Icon: CalendarDays },
-  { label: "Online ticket sales", infoId: "movie.service.tickets", Icon: Ticket },
-  { label: "QR gate scanning", infoId: "movie.service.scan", Icon: QrCode },
+  {
+    label: "Movie listings",
+    infoId: "movie.service.listings",
+    Icon: Film,
+  },
+  {
+    label: "Showtime scheduling",
+    infoId: "movie.service.showtimes",
+    Icon: CalendarDays,
+  },
+  {
+    label: "Online ticket sales",
+    infoId: "movie.service.tickets",
+    Icon: Ticket,
+  },
+  {
+    label: "QR gate scanning",
+    infoId: "movie.service.scan",
+    Icon: QrCode,
+  },
 ];
 
 export default function MovieLandingPage() {
@@ -79,28 +56,44 @@ export default function MovieLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
+      pageContainerClassName={PAGE_CONTAINER}
+      pageBackgroundClassName="bg-white"
+      headerLoginPrompt="Already a partner?"
+      headerLoginVariant="dark"
       loginHref="/movie/login"
       expectedRole="movie_admin"
       loginTitle="Movie Login"
       loginSubtitle="Sign in to manage your cinema listings"
       registerHref="/movie/register"
       registerHint={
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[0.625rem] text-slate-400">
           New cinema partner?{" "}
           <Link href="/movie/register" className="text-[#6900AA] font-semibold">
             Register here
           </Link>
         </p>
       }
-      primaryCtaLabel="List your business"
-      secondaryLoginLabel="Login your business"
+      primaryCtaLabel="List your theatre"
+      secondaryLoginLabel="Login your theatre"
+      heroVariant="split"
+      heroEyebrow="FOR CINEMA & THEATRE PARTNERS"
+      heroTitle="Bring your theatre to more movie lovers."
+      heroDescription="List your cinema on BookMyBota, manage showtimes, sell tickets and reach more audiences with a seamless booking experience."
       heroImage={HERO_IMAGE}
-      heroImageAlt="Movie partner on Book My Bota"
+      heroImageAlt="Cinema partner on Book My Bota"
       imageCards={PARTNER_VENUE_TYPE_CARDS}
+      imageCardsTitle="Venue Types"
+      imageCardsVariant="cards"
+      imageCardsTitleStyle="heading"
       categoryTypesTitle={`${PARTNER_CATEGORY_TYPES.movie.title} Types`}
       categoryTypes={PARTNER_CATEGORY_TYPES.movie.types}
+      categoryTypesVariant="cards"
+      categoryTypesTitleStyle="heading"
+      categoryTypesCardStyle="overlay"
       servicesTitle="What can you do in the portal?"
       servicesSubtitle="The movie admin panel follows the same onboarding and approval flow as event organizers — register, upload documents, wait for approval, then manage your cinema."
+      servicesHideSubtitle
+      servicesCardsVariant="bordered"
       servicesTiles={SERVICES}
       servicesFootnote="Movie listing, showtime, and booking tools will expand in this panel as the cinema module grows on Book My Bota."
       onOpenLogin={openLogin}

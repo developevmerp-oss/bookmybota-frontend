@@ -4,6 +4,7 @@ import { useAppSelector } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import ArtistLandingPage from "@/components/ArtistAdminPanel/ArtistLandingPage";
+import { ListYourShowLandingShimmer } from "@/components/Shared/Shimmer";
 
 export default function ArtistHomePage() {
   const router = useRouter();
@@ -15,11 +16,7 @@ export default function ArtistHomePage() {
   }, [isArtist, router]);
 
   if (isArtist) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500 font-medium">
-        Loading...
-      </div>
-    );
+    return <ListYourShowLandingShimmer variant="split" />;
   }
 
   return <ArtistLandingPage />;

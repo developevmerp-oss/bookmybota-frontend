@@ -24,8 +24,15 @@ import {
   PARTNER_CATEGORY_TYPES,
   type PartnerCategoryKey,
 } from "@/data/partnerCategoryTypes";
+import images from "@/Images";
 
 type OrganizerCategory = Extract<PartnerCategoryKey, "concert" | "comedy" | "sports" | "music">;
+
+const PAGE_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+
+function imageSrc(imgData: string | { src: string }) {
+  return typeof imgData === "string" ? imgData : imgData.src;
+}
 
 const FEATURE_SLIDES = [
   {
@@ -67,11 +74,48 @@ const FEATURE_SLIDES = [
 
 const HERO_IMAGE = FEATURE_SLIDES[0].image;
 
-const CATEGORY_HERO_IMAGES: Record<OrganizerCategory, string> = {
-  concert: FEATURE_SLIDES[1].image,
-  comedy: "https://images.unsplash.com/photo-1527224857830-43d7b7b4e8f6?w=1200&q=80",
-  sports: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&q=80",
-  music: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200&q=80",
+type CategoryHeroCopy = {
+  title: string;
+  description: string;
+  primaryCtaLabel: string;
+  secondaryLoginLabel: string;
+  image: string;
+};
+
+/** Dining-style split hero copy + image per list-your-show category. */
+const CATEGORY_SPLIT_HERO: Record<OrganizerCategory, CategoryHeroCopy> = {
+  concert: {
+    title: "Bring your event to more people.",
+    description:
+      "List your events on BookMyBota, sell tickets, manage attendees and reach a wider audience with a seamless booking experience.",
+    primaryCtaLabel: "List your event",
+    secondaryLoginLabel: "Login your event",
+    image: imageSrc(images.concertPartnerHero),
+  },
+  music: {
+    title: "Take your music event to a bigger stage.",
+    description:
+      "List your concerts, live shows and music events on BookMyBota. Sell tickets, manage attendees and connect with more fans.",
+    primaryCtaLabel: "List your music event",
+    secondaryLoginLabel: "Login to manage",
+    image: imageSrc(images.musicPartnerHero),
+  },
+  sports: {
+    title: "Bring your sports event to more fans.",
+    description:
+      "List matches, tournaments and sports events on BookMyBota. Sell tickets, manage attendees and grow your audience.",
+    primaryCtaLabel: "List your sports event",
+    secondaryLoginLabel: "Login to manage",
+    image: imageSrc(images.sportsPartnerHero),
+  },
+  comedy: {
+    title: "Turn laughter into bigger audiences.",
+    description:
+      "List your stand-up comedy shows and live events on BookMyBota. Sell tickets, manage attendees and bring more comedy lovers together.",
+    primaryCtaLabel: "List your comedy event",
+    secondaryLoginLabel: "Login to manage",
+    image: imageSrc(images.comedyPartnerHero),
+  },
 };
 
 const HOST_CATEGORIES = [
@@ -192,6 +236,7 @@ export default function OrganizerLandingPage({
 } = {}) {
   const router = useRouter();
   const categoryConfig = category ? PARTNER_CATEGORY_TYPES[category] : null;
+  const splitHero = category ? CATEGORY_SPLIT_HERO[category] : null;
 
   const openLogin = () => {
     const session = readSessionForRole("event_admin");
@@ -206,32 +251,47 @@ export default function OrganizerLandingPage({
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
+      pageContainerClassName={PAGE_CONTAINER}
+      pageBackgroundClassName="bg-white"
+      headerLoginPrompt="Already a partner?"
+      headerLoginVariant="dark"
       loginHref="/organizer/login"
       expectedRole="event_admin"
       loginTitle="Event Login"
       loginSubtitle="Sign in to create and manage your events"
       registerHref="/organizer/register"
       registerHint={
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[0.625rem] text-slate-400">
           New organizer?{" "}
           <Link href="/organizer/register" className="text-[#6900AA] font-semibold">
             Register here
           </Link>
         </p>
       }
-      primaryCtaLabel="List your business"
-      secondaryLoginLabel="Login your business"
-      heroImage={category ? CATEGORY_HERO_IMAGES[category] : HERO_IMAGE}
+      primaryCtaLabel={splitHero?.primaryCtaLabel ?? "List your business"}
+      secondaryLoginLabel={splitHero?.secondaryLoginLabel ?? "Login your business"}
+      heroVariant={splitHero ? "split" : "banner"}
+      heroTitle={splitHero?.title}
+      heroDescription={splitHero?.description}
+      heroImage={splitHero?.image ?? HERO_IMAGE}
       heroImageAlt={
         categoryConfig
           ? `${categoryConfig.title} partner on Book My Bota`
           : "Event organizer partner on Book My Bota"
       }
       imageCards={PARTNER_VENUE_TYPE_CARDS}
+      imageCardsTitle="Venue Types"
+      imageCardsVariant="cards"
+      imageCardsTitleStyle="heading"
       categoryTypesTitle={categoryConfig ? `${categoryConfig.title} Types` : undefined}
       categoryTypes={categoryConfig?.types}
+      categoryTypesVariant={categoryConfig ? "cards" : "round"}
+      categoryTypesTitleStyle="heading"
+      categoryTypesCardStyle="overlay"
       servicesTitle="What are the services we offer?"
       servicesSubtitle="After successful collaborations with the best event organisers over the past decade and a half, we're well equipped to bring your vision to life."
+      servicesHideSubtitle
+      servicesCardsVariant="bordered"
       servicesTiles={SERVICES}
       servicesFootnote="Apart from these must haves for any event, we also support a host of other services like SEO for your event, custom pricing for your tickets and this and also this."
       testimonials={TESTIMONIALS}

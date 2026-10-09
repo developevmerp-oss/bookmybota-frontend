@@ -20,6 +20,13 @@ import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
 import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
+import images from "@/Images";
+
+const PAGE_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+
+function imageSrc(imgData: string | { src: string }) {
+  return typeof imgData === "string" ? imgData : imgData.src;
+}
 
 const FEATURE_SLIDES = [
   {
@@ -56,7 +63,7 @@ const FEATURE_SLIDES = [
   },
 ];
 
-const HERO_IMAGE = FEATURE_SLIDES[0].image;
+const HERO_IMAGE = imageSrc(images.artistPartnerHero);
 
 const ARTIST_TYPES = [
   {
@@ -168,13 +175,17 @@ export default function ArtistLandingPage() {
     <PartnerListYourShowLanding
       layout="bms"
       centeredPartnerHeader
+      pageContainerClassName={PAGE_CONTAINER}
+      pageBackgroundClassName="bg-white"
+      headerLoginPrompt="Already a partner?"
+      headerLoginVariant="dark"
       loginHref="/artist/login"
       expectedRole="artist_admin"
       loginTitle="Artist Admin Login"
       loginSubtitle="Sign in to manage your artist profile"
       registerHref="/artist/register"
       registerHint={
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[0.625rem] text-slate-400">
           New artist?{" "}
           <Link href="/artist/register" className="text-[#6900AA] font-semibold">
             Register here
@@ -183,11 +194,19 @@ export default function ArtistLandingPage() {
       }
       primaryCtaLabel="List your business"
       secondaryLoginLabel="Login your business"
+      heroVariant="split"
+      heroTitle="Your talent deserves a bigger stage."
+      heroDescription="Create your artist profile on BookMyBota, showcase your work, connect with event organizers, and discover new opportunities to perform."
       heroImage={HERO_IMAGE}
       heroImageAlt="Artist partner on Book My Bota"
       imageCards={PARTNER_VENUE_TYPE_CARDS}
+      imageCardsTitle="Venue Types"
+      imageCardsVariant="cards"
+      imageCardsTitleStyle="heading"
       servicesTitle="What are the services we offer?"
       servicesSubtitle="A simple partner portal focused on discovery, profile management, and trust — so you spend more time performing and less time chasing bookings."
+      servicesHideSubtitle
+      servicesCardsVariant="bordered"
       servicesTiles={SERVICES}
       servicesFootnote="Complete account setup (details + documents). After Super Admin approval, sign in to manage your artist profile, free dates, and booking inquiries."
       testimonials={TESTIMONIALS}

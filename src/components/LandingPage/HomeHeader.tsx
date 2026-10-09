@@ -190,6 +190,13 @@ export default function HomeHeader() {
   /** Mobile/tablet: hide city/profile row on scroll; keep search + category bar. */
   const [compactHeader, setCompactHeader] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  /** Listing pages — subnav scrolls away; main header stays sticky */
+  const unstickySubnav =
+    pathname === "/dining" ||
+    pathname === "/movies" ||
+    pathname === "/events" ||
+    pathname === "/venues" ||
+    pathname === "/artists";
   /** Detail pages — hide site header + subnav on mobile/tablet only */
   const hideChromeOnMobileTablet = Boolean(
     (pathname?.match(/^\/movies\/[^/]+\/?$/) && pathname !== "/movies/cinemas") ||
@@ -295,7 +302,14 @@ export default function HomeHeader() {
     return () => observer.disconnect();
   }, []);
 
+  const subNav = (
+    <Suspense fallback={null}>
+      <SubNavBar />
+    </Suspense>
+  );
+
   return (
+    <>
     <header
       className={`sticky top-0 z-50 bg-white text-[#111111] transition-transform duration-300 ease-out ${
         diningDetailNavHidden
@@ -309,7 +323,7 @@ export default function HomeHeader() {
       aria-hidden={diningDetailNavHidden || undefined}
       data-header-compact={compactHeader ? "1" : "0"}
     >
-      <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2 border-b-2 border-[#a044d9]">
+      <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2">
         {/* Mobile + tablet: city | search icon + profile (full bar only on desktop) */}
         <div className="flex items-center justify-between gap-2 min-w-0 lg:hidden">
           <button
@@ -410,9 +424,7 @@ export default function HomeHeader() {
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <SubNavBar />
-      </Suspense>
+      {!unstickySubnav ? subNav : null}
 
       <CitySelectModal
         open={cityOpen}
@@ -429,5 +441,7 @@ export default function HomeHeader() {
         onSuccess={() => setCustomer(readCustomer())}
       />
     </header>
+    {unstickySubnav ? subNav : null}
+    </>
   );
 }

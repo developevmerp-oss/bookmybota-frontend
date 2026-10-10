@@ -54,7 +54,7 @@ export default function ExploreEventOption2({
 
   return (
     <section className={`pt-8 sm:pt-10 pb-3 bg-white ${className}`}>
-      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
+      <div className="bmb-section-container">
         <div className="min-w-0 pb-4">
           <motion.h2
             className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800"

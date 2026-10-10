@@ -25,7 +25,7 @@ export type ListYourShowClipSliderProps = {
   autoplayMs?: number;
 };
 
-const DEFAULT_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+const DEFAULT_CONTAINER = "bmb-section-container";
 
 /** Exact hero image clipPath (objectBoundingBox) — provided design path. */
 const IMAGE_CLIP_PATH =
@@ -220,6 +220,14 @@ export default function ListYourShowClipSlider({
                 </p>
                 <div className="mt-5 flex flex-col gap-2.5">
                   <Link
+                    href="#contact"
+                    className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-[#111] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
+                  >
+                    Contact Us
+                    <ArrowRight size={15} strokeWidth={2.25} />
+                  </Link>
+                  {/* Previous CTAs — List your business / Login your business
+                  <Link
                     href={registerHref}
                     className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-[#111] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
                   >
@@ -244,6 +252,7 @@ export default function ListYourShowClipSlider({
                       </Link>
                     )
                   ) : null}
+                  */}
                 </div>
               </div>
             </div>
@@ -261,6 +270,14 @@ export default function ListYourShowClipSlider({
                   {activeSlide.description}
                 </p>
                 <div className="mt-6 flex flex-row flex-wrap items-center gap-3">
+                  <Link
+                    href="#contact"
+                    className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-[#111] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
+                  >
+                    Contact Us
+                    <ArrowRight size={15} strokeWidth={2.25} />
+                  </Link>
+                  {/* Previous CTAs — List your business / Login your business
                   <Link
                     href={registerHref}
                     className="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-[#111] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
@@ -286,6 +303,7 @@ export default function ListYourShowClipSlider({
                       </Link>
                     )
                   ) : null}
+                  */}
                 </div>
               </div>
 

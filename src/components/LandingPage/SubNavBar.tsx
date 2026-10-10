@@ -63,16 +63,18 @@ function tabHref(item: SubNavTab, diningHref: string, categories: Array<{ slug: 
   return "/";
 }
 
-function ListYourShowCta({
+export function ListYourShowCta({
   href,
   label,
   active,
   tabIndex,
+  className = "",
 }: {
   href: string;
   label: string;
   active: boolean;
   tabIndex?: number;
+  className?: string;
 }) {
   const btnRef = useRef<HTMLAnchorElement>(null);
   const circleRef = useRef<HTMLSpanElement>(null);
@@ -98,9 +100,9 @@ function ListYourShowCta({
       href={href}
       tabIndex={tabIndex}
       aria-current={active ? "page" : undefined}
-      className={`list-your-show-cta hidden lg:inline-flex shrink-0 items-center gap-1.5 h-8 px-3.5 sm:px-4 rounded-full text-[12px] sm:text-[13px] font-semibold whitespace-nowrap border border-[#111111] bg-[#111111] text-white ${
+      className={`list-your-show-cta inline-flex shrink-0 items-center gap-1 h-7 sm:h-8 px-2.5 sm:px-3.5 md:px-4 rounded-full text-[11px] sm:text-[12px] md:text-[13px] font-semibold whitespace-nowrap border border-[rgba(17,17,17,0.45)] bg-white text-[#111111] ${
         filled ? "is-filled" : ""
-      }`}
+      } ${className}`.trim()}
       onMouseEnter={(e) => {
         placeCircle(e.clientX, e.clientY);
         setFilled(true);
@@ -119,11 +121,12 @@ function ListYourShowCta({
   );
 }
 
-/** Desktop landing scroll: hide after this Y; show only after returning near top (hysteresis). */
-const LANDING_HIDE_AFTER_Y = 140;
-const LANDING_SHOW_BELOW_Y = 56;
+type SubNavBarProps = {
+  /** When sticky chrome is active, desktop CTA is rendered by the parent sticky bar. */
+  isStickyChrome?: boolean;
+};
 
-export default function SubNavBar() {
+export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
   const pathname = usePathname() || "";
   const searchParams = useSearchParams();
   const { data: filters } = useGetPublicEventFiltersQuery();
@@ -136,16 +139,7 @@ export default function SubNavBar() {
   const onVenues = pathname === "/venues" || pathname.startsWith("/venues/");
   const onArtists = pathname === "/artists" || pathname.startsWith("/artists/");
   const isLandingPage = pathname === "/";
-  /** Listing pages — subnav is outside sticky header and must not stick */
-  const unstickySubnav =
-    pathname === "/dining" ||
-    pathname === "/movies" ||
-    pathname === "/events" ||
-    pathname === "/venues" ||
-    pathname === "/artists";
   const [city, setCity] = useState("");
-  const [hideOnScroll, setHideOnScroll] = useState(false);
-  const hideOnScrollRef = useRef(false);
 
   useEffect(() => {
     const sync = () => {
@@ -156,39 +150,6 @@ export default function SubNavBar() {
     window.addEventListener("selected_city_changed", sync);
     return () => window.removeEventListener("selected_city_changed", sync);
   }, []);
-
-  useEffect(() => {
-    if (!isLandingPage) return;
-
-    const applyHidden = (next: boolean) => {
-      if (hideOnScrollRef.current === next) return;
-      hideOnScrollRef.current = next;
-      setHideOnScroll(next);
-    };
-
-    const syncFromScroll = () => {
-      // Mobile/tablet keep categories sticky with search (reference). Desktop landing can collapse.
-      if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
-        applyHidden(false);
-        return;
-      }
-      const y = window.scrollY;
-      if (y <= LANDING_SHOW_BELOW_Y) {
-        applyHidden(false);
-      } else if (y >= LANDING_HIDE_AFTER_Y) {
-        applyHidden(true);
-      }
-    };
-
-    const frame = requestAnimationFrame(syncFromScroll);
-    window.addEventListener("scroll", syncFromScroll, { passive: true });
-    window.addEventListener("resize", syncFromScroll, { passive: true });
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", syncFromScroll);
-      window.removeEventListener("resize", syncFromScroll);
-    };
-  }, [isLandingPage]);
 
   const diningHref =
     city && city !== "All Cities" ? `/dining?city=${encodeURIComponent(city)}` : "/dining";
@@ -229,8 +190,7 @@ export default function SubNavBar() {
     return false;
   };
 
-  const collapsed = isLandingPage && hideOnScroll;
-  /** Mobile/tablet compact: titles only (icons hide) while sticky search+subnav stay. */
+  /** Mobile/tablet compact: titles only (icons hide) while sticky subnav stays. */
   const [compactMobile, setCompactMobile] = useState(false);
 
   useEffect(() => {
@@ -272,7 +232,6 @@ export default function SubNavBar() {
       <Link
         key={label}
         href={href}
-        tabIndex={collapsed ? -1 : undefined}
         className={`shrink-0 transition-colors whitespace-nowrap flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem] sm:min-w-[5.25rem] md:min-w-[5.75rem] h-full px-3 sm:px-3.5 rounded-xl text-[12px] sm:text-[13px] md:text-[14px] font-semibold tracking-wide lg:inline-flex lg:flex-row lg:items-center lg:gap-1.5 lg:h-8 lg:min-w-0 lg:rounded-full lg:px-2.5 lg:text-[12px] xl:text-[13px] lg:uppercase ${
           active
             ? "bg-gradient-to-r from-[#A78BFA] to-[#6D28D9] text-white"
@@ -295,32 +254,54 @@ export default function SubNavBar() {
   return (
     <nav
       aria-label="Browse categories"
-      aria-hidden={collapsed}
       data-subnav-compact={compactMobile ? "1" : "0"}
-      className={`border-t border-[#E5E7EB] bg-white z-[1] transition-[max-height,opacity,border-color,height,box-shadow] duration-300 ease-in-out ${
-        unstickySubnav ? "relative" : "sticky top-0"
-      } ${
-        collapsed
-          ? "max-h-0 opacity-0 border-transparent pointer-events-none overflow-hidden lg:max-h-0 shadow-none"
-          : compactMobile
-            ? "max-h-12 h-12 opacity-100 lg:max-h-16 lg:h-16 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-            : "max-h-[5.25rem] h-[5.25rem] opacity-100 lg:max-h-16 lg:h-16 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+      className={`relative w-full min-w-0 bg-transparent transition-[max-height,height] duration-300 ease-in-out ${
+        compactMobile
+          ? "max-h-12 h-12 lg:max-h-14 lg:h-14"
+          : "max-h-[5.25rem] h-[5.25rem] lg:max-h-14 lg:h-14"
       }`}
     >
-      <div className="container mx-auto px-3 sm:px-4 md:px-5 lg:px-8 h-full flex items-center justify-between gap-2 sm:gap-3 lg:gap-4 py-2">
-        <div className="flex items-stretch gap-1.5 sm:gap-2 lg:gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden h-full py-2 lg:py-2 lg:items-center">
-          {/* Mobile/tablet only — wrapper wins over lg:inline-flex on the link */}
-          <span className="contents lg:hidden">{renderTabLink(FOR_YOU_TAB)}</span>
-          {linkTabs.map((item) => renderTabLink(item))}
+      <div
+        className={`h-full flex items-center min-w-0 w-full ${
+          isStickyChrome ? "" : "justify-between gap-2 sm:gap-3"
+        }`}
+      >
+        {/* Bounded scrollport so category chips can scroll when sticky */}
+        <div
+          className={`min-w-0 overflow-x-auto overscroll-x-contain scrollbar-none [&::-webkit-scrollbar]:hidden h-full py-1.5 lg:py-1 ${
+            isStickyChrome ? "w-full" : "flex-1"
+          }`}
+        >
+          <div
+            className={`flex h-full items-stretch gap-1.5 sm:gap-2 lg:gap-2 lg:items-center ${
+              isStickyChrome ? "w-max min-w-full justify-center" : ""
+            }`}
+          >
+            {/* Mobile/tablet only — wrapper wins over lg:inline-flex on the link */}
+            <span className="contents lg:hidden">{renderTabLink(FOR_YOU_TAB)}</span>
+            {linkTabs.map((item) => renderTabLink(item))}
+            {/* Mobile/tablet: List Your Show scrolls with categories */}
+            {ctaTab ? (
+              <span className="inline-flex lg:hidden shrink-0 items-center self-center pl-1 pr-0.5">
+                <ListYourShowCta
+                  href={ctaTab.href!}
+                  label={ctaTab.label}
+                  active={isTabActive(ctaTab)}
+                />
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        {ctaTab ? (
-          <ListYourShowCta
-            href={ctaTab.href!}
-            label={ctaTab.label}
-            active={isTabActive(ctaTab)}
-            tabIndex={collapsed ? -1 : undefined}
-          />
+        {/* Desktop (not sticky yet): List Your Show fixed on the right of the subnav */}
+        {ctaTab && !isStickyChrome ? (
+          <div className="hidden lg:flex shrink-0 items-center">
+            <ListYourShowCta
+              href={ctaTab.href!}
+              label={ctaTab.label}
+              active={isTabActive(ctaTab)}
+            />
+          </div>
         ) : null}
       </div>
     </nav>

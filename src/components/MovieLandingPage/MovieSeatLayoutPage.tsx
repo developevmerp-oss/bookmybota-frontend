@@ -2486,8 +2486,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   return (
     <div className={`h-[100dvh] min-h-screen text-slate-900 flex flex-col overflow-hidden ${step === "seats" ? "bg-white" : "bg-[#F5F5F7]"}`}>
-      <header className="shrink-0 z-30 border-b border-slate-200 bg-white px-3 sm:px-5 py-2.5">
-        <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 min-h-[3.25rem]">
+      <header className="shrink-0 z-30 border-b border-slate-200 bg-white py-2.5">
+        <div className="bmb-section-container flex items-center gap-2 sm:gap-3 min-h-[3.25rem]">
           <button
             type="button"
             onClick={() => {
@@ -2605,7 +2605,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
       <main className={`flex-1 min-h-0 ${step === "seats" ? "overflow-hidden lg:overflow-hidden" : "overflow-y-auto"}`}>
         {step === "seats" ? (
-          <div className="max-w-7xl mx-auto w-full h-full px-4 sm:px-8 py-4 sm:py-5 lg:py-3 pb-4 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden">
+          <div className="bmb-section-container w-full h-full py-4 sm:py-5 lg:py-3 pb-4 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden">
             {seatMapSection}
           </div>
         ) : step === "beverages" ? (
@@ -3089,8 +3089,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       </main>
 
       {step === "beverages" && (
-        <footer className="shrink-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <footer className="shrink-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="bmb-section-container flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-0.5">
               {totalBeverageQty > 0 ? (
                 <>
@@ -3124,8 +3124,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       )}
 
       {step === "seats" && (
-        <footer className="shrink-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <footer className="shrink-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-md py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="bmb-section-container flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                 {selectedSeats.length}/{qty} seats selected

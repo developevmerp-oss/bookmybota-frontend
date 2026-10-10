@@ -38,7 +38,7 @@ export default function GiftCardsBrowsePage() {
 
   return (
     <div className="bg-white min-h-[calc(100vh-4rem)]">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 pb-12 sm:pb-16">
+      <div className="bmb-section-container py-6 sm:py-10 pb-12 sm:pb-16">
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1a1a1a] tracking-tight">
             BookMyBota Gift Cards

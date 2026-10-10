@@ -58,7 +58,7 @@ export default function EventsNavbar({ city, cityOptions, onCityChange }: Events
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="bmb-section-container py-4">
         <div className="flex items-center justify-between gap-3 sm:gap-6">
           <Link href="/" className="shrink-0 leading-none">
             <span className="block text-[20px] sm:text-[22px] font-extrabold tracking-tight">

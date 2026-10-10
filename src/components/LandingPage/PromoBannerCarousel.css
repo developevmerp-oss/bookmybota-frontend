@@ -60,46 +60,39 @@
  * One slide: fill the content row (same horizontal inset as site container).
  * Do NOT cap width at height×aspect — that left large empty side gaps on tablet/desktop.
  */
+/* Match `.bmb-section-container` gutters: px-4 / md:px-5 / lg:px-10 / xl:px-12, max 1280px */
 .promo-banner-swiper.is-single {
   --promo-slide-w: 100%;
-  padding-left: 1.25rem; /* px-5 */
-  padding-right: 1.25rem;
+  padding-left: 1rem; /* px-4 */
+  padding-right: 1rem;
   box-sizing: border-box;
-}
-
-@media (min-width: 640px) {
-  .promo-banner-swiper.is-single {
-    padding-left: 1.25rem; /* sm:px-5 — tighter tablet gutters */
-    padding-right: 1.25rem;
-  }
 }
 
 @media (min-width: 768px) {
   .promo-banner-swiper.is-single {
-    padding-left: 1.5rem; /* md:px-6 */
-    padding-right: 1.5rem;
+    padding-left: 1.25rem; /* md:px-5 */
+    padding-right: 1.25rem;
   }
 }
 
 @media (min-width: 1024px) {
   .promo-banner-swiper.is-single {
-    padding-left: 2rem; /* lg:px-8 */
-    padding-right: 2rem;
+    padding-left: 2.5rem; /* lg:px-10 */
+    padding-right: 2.5rem;
   }
 }
 
 @media (min-width: 1280px) {
   .promo-banner-swiper.is-single {
-    padding-left: 2.5rem; /* xl:px-10 */
-    padding-right: 2.5rem;
+    padding-left: 3rem; /* xl:px-12 */
+    padding-right: 3rem;
   }
 }
 
 @media (min-width: 1536px) {
   .promo-banner-swiper.is-single {
-    /* Match container mx-auto feel on ultra-wide without looking skinny */
-    padding-left: max(2.5rem, calc((100% - 80rem) / 2));
-    padding-right: max(2.5rem, calc((100% - 80rem) / 2));
+    padding-left: max(3rem, calc((100% - 80rem) / 2));
+    padding-right: max(3rem, calc((100% - 80rem) / 2));
   }
 }
 

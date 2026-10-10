@@ -12,7 +12,7 @@ import { isArtistAdminPath, isMovieAdminPath, isVenueAdminPath } from "@/lib/aut
 function Footer() {
   return (
     <footer className="bg-slate-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="bmb-section-container py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-4">

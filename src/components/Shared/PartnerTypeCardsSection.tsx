@@ -19,7 +19,7 @@ export type PartnerTypeCardsSectionProps = {
   cardStyle?: "stacked" | "overlay";
 };
 
-const DEFAULT_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+const DEFAULT_CONTAINER = "bmb-section-container";
 
 /**
  * Shared type-card grid for partner landings (inner pages).

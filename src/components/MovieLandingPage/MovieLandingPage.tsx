@@ -61,7 +61,7 @@ import "./MovieLandingPage.css";
 import "@/components/DinningLandingPage/DiningHomePage.css";
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
-const CONTAINER = "container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0";
+const CONTAINER = "bmb-section-container";
 const EMPTY_MOVIES: Movie[] = [];
 const EMPTY_HERO_EXTRAS: Record<string, string> = {};
 
@@ -477,7 +477,7 @@ function MovieReleasesGrid({
 
   return (
     <section className="bg-white pt-6 sm:pt-8 pb-2">
-      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
+      <div className="bmb-section-container">
         <h2 className="mb-3 text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 tracking-tight sm:mb-4">
           {title}
         </h2>
@@ -1086,7 +1086,7 @@ export default function MovieLandingPage() {
       <CategoryPromoBanners
         category="MOVIES"
         city={city || ""}
-        className="container mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+        className="bmb-section-container pt-3"
       />
 
       {/* District / native spotlight hero — disabled (Dining parity). Restore: remove `false &&`. */}
@@ -1302,7 +1302,7 @@ export default function MovieLandingPage() {
         <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
         <section className="sticky z-30 w-full bg-transparent" style={{ top: headerOffset }}>
           <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
-            <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-4 pb-1">
+            <div className={`${CONTAINER} pt-4 pb-1`}>
               <div className="mb-2">
                 <div className="flex items-center gap-2 pb-1 -mx-1 px-1">
                   <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">

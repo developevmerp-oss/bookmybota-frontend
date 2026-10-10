@@ -237,7 +237,7 @@ export default function SpecialOffersRail({ city = "" }: { city?: string }) {
 
   return (
     <section id="offers" className="bg-white py-6 sm:py-8 lg:pb-5 scroll-mt-28">
-      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
+      <div className="bmb-section-container">
         <div className="flex items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
             Special Offers

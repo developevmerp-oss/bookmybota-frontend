@@ -2529,6 +2529,8 @@ export default function EventCheckout({
                   </div>
                 </div>
               ) : isPage ? (
+                null
+                /* Back + Choose seat count footer (commented out — UI only)
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -2550,6 +2552,7 @@ export default function EventCheckout({
                         : "Continue"}
                   </button>
                 </div>
+                */
               ) : (
               <>
               {ticketQty > 0 && (

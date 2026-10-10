@@ -198,7 +198,7 @@ export default function PartnerDirectorySection({
         showHeader ? "bg-white py-16 md:py-20" : "bg-[#faf7fc] py-8 md:py-10 border-t-0"
       }`}
     >
-      <div className={`${showHeader ? "max-w-6xl" : "max-w-[1600px]"} mx-auto px-4 sm:px-6 lg:px-8`}>
+      <div className="bmb-section-container">
         {showHeader ? (
           <div className="text-center max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-[#111111]">

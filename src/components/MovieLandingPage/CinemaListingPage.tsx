@@ -194,7 +194,7 @@ export default function CinemaListingPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAGE_BG }}>
-      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 sm:py-8 lg:py-10">
+      <div className="bmb-section-container py-6 sm:py-8 lg:py-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-6">
           <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] font-extrabold text-[#333333]">
             Cinema In {headingCity}

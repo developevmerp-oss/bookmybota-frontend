@@ -118,7 +118,7 @@ function NonRegisteredArtistView({
   if (showAllEvents && eventItems.length > 0) {
     return (
       <div className="min-h-screen bg-white">
-        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+        <div className="bg-white bmb-section-container py-8 sm:py-10">
           <PartnerAllEventsPanel
             items={eventItems}
             onBack={() => setShowAllEvents(false)}
@@ -143,7 +143,7 @@ function NonRegisteredArtistView({
         )}
         <div aria-hidden className="absolute inset-0 bg-white/78" />
 
-        <div className="relative z-10 container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+        <div className="relative z-10 bmb-section-container py-6 sm:py-8 md:py-10">
           <Link
             href="/artists"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B1B3A]/80 hover:text-[#6900AA]"
@@ -179,7 +179,7 @@ function NonRegisteredArtistView({
         </div>
       </header>
 
-      <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+      <div className="bg-white bmb-section-container py-8 sm:py-10">
         {eventItems.length > 0 ? (
           <PartnerLiveEventsSection
             items={eventItems}
@@ -518,7 +518,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
   if (showAllEvents && artistEventItems.length > 0) {
     return (
       <div className="min-h-screen bg-white">
-        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+        <div className="bg-white bmb-section-container py-8 sm:py-10">
           <PartnerAllEventsPanel
             items={artistEventItems}
             onBack={() => setShowAllEvents(false)}
@@ -563,7 +563,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
         )}
         <div aria-hidden className="absolute inset-0 bg-white/78" />
 
-        <div className="relative z-10 container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+        <div className="relative z-10 bmb-section-container py-6 sm:py-8 md:py-10">
           <Link
             href="/artists"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B1B3A]/80 hover:text-[#6900AA]"
@@ -663,7 +663,7 @@ export default function PublicArtistProfilePage({ artistId }: { artistId: string
         </div>
       </header>
 
-        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+        <div className="bg-white bmb-section-container py-8 sm:py-10">
           <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-10">
             {showLeftColumn ? (
               <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">

@@ -19,7 +19,7 @@ export function EventDetailShimmer() {
   return (
     <Wrap>
       <div className="min-h-screen bg-white" aria-busy="true" aria-label="Loading event">
-        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
+        <div className="bmb-section-container pt-4 sm:pt-6 lg:pt-7 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10">
           {/* Breadcrumb */}
           <div className="mb-3 sm:mb-4 flex items-center gap-2">
             <Skeleton width={40} height={12} />
@@ -188,46 +188,56 @@ export function EventBookingShimmer() {
 export function EventConfirmationShimmer() {
   return (
     <Wrap>
-      <div className="min-h-screen bg-[#F5F5F5]">
-        <div className="bg-white border-b border-slate-200">
-          <div className="max-w-[72rem] mx-auto px-3 sm:px-6 py-6 flex gap-3">
-            <Skeleton circle width={44} height={44} />
-            <div className="flex-1">
-              <Skeleton width={220} height={28} className="mb-2" />
-              <Skeleton width="80%" height={16} />
-            </div>
+      <div className="min-h-screen bg-white pb-10">
+        <div className="max-w-[64rem] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-5 flex items-start gap-4">
+          <Skeleton circle width={48} height={48} className="shrink-0" />
+          <div className="flex-1 pt-1 space-y-2">
+            <Skeleton width={260} height={28} />
+            <Skeleton width="90%" height={16} />
+            <Skeleton width="75%" height={14} />
           </div>
         </div>
-        <div className="max-w-[72rem] mx-auto px-3 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-5">
-          <div className="bg-white rounded-[0.75rem] border border-slate-100 p-5 space-y-4">
-            <div className="flex gap-4">
-              <Skeleton width={88} height={118} borderRadius={8} />
-              <div className="flex-1 space-y-2">
-                <Skeleton width={64} height={12} />
-                <Skeleton width="80%" height={24} />
-                <Skeleton width="55%" height={16} />
+        <div className="max-w-[64rem] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex flex-col sm:flex-row items-stretch gap-4 p-4 sm:p-6">
+              <div className="flex flex-1 items-center justify-center p-4 sm:p-5">
+                <Skeleton width={224} height={144} borderRadius={12} className="w-[12rem] min-[480px]:w-[14rem] sm:!w-full sm:max-w-[20rem] md:max-w-[24rem] !h-[11rem] sm:!h-[12.5rem] md:!h-[13.5rem]" />
+              </div>
+              <div className="sm:w-44 md:w-48 flex flex-col items-center gap-3 py-2 shrink-0">
+                <Skeleton width={168} height={168} borderRadius={8} />
+                <Skeleton width={100} height={16} />
+                <Skeleton width={140} height={14} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <Skeleton height={48} />
-              <Skeleton height={48} />
-              <Skeleton height={48} />
+            <div className="border-t border-dashed p-5 sm:p-6 space-y-3">
+              <Skeleton width={140} height={22} borderRadius={999} />
+              <Skeleton width="70%" height={26} />
+              <Skeleton width="55%" height={16} />
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+                <Skeleton height={52} />
+                <Skeleton height={52} />
+                <Skeleton height={52} />
+                <Skeleton height={52} />
+                <Skeleton height={52} />
+                <Skeleton height={52} />
+              </div>
             </div>
-            <Skeleton height={96} />
-            <div className="flex gap-4">
-              <Skeleton width={88} height={88} borderRadius={6} />
-              <div className="flex-1 space-y-2">
-                <Skeleton width={80} height={16} />
-                <Skeleton count={2} />
+            <div className="border-t p-5 sm:p-6 space-y-3">
+              <Skeleton width={120} height={18} />
+              <Skeleton height={14} />
+              <Skeleton height={14} />
+              <Skeleton height={48} borderRadius={12} />
+            </div>
+            <div className="border-t p-5 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Skeleton height={46} borderRadius={12} />
+                <Skeleton height={46} borderRadius={12} />
+                <Skeleton height={46} borderRadius={12} />
+                <Skeleton height={46} borderRadius={12} />
               </div>
             </div>
           </div>
-          <div className="space-y-3">
-            <Skeleton height={140} borderRadius={12} />
-            <Skeleton height={120} borderRadius={12} />
-            <Skeleton height={48} borderRadius={8} />
-            <Skeleton height={48} borderRadius={8} />
-          </div>
+          <Skeleton height={88} borderRadius={16} className="mt-6" />
         </div>
       </div>
     </Wrap>
@@ -291,7 +301,7 @@ export function EventHeroShimmer() {
           </div>
         </div>
         <div className="hidden lg:block">
-          <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-10 xl:py-12">
+          <div className="bmb-section-container py-10 xl:py-12">
             <div className="flex items-center gap-8">
               <div className="min-w-0 flex-1 space-y-3">
                 <Skeleton width={88} height={22} borderRadius={6} />
@@ -631,7 +641,7 @@ export function RestaurantDetailShimmer() {
       <div className="min-h-screen bg-white text-slate-700" aria-busy="true" aria-label="Loading restaurant">
         {/* Breadcrumb — tablet/desktop */}
         <div className="hidden md:block bg-white pt-9">
-          <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 flex items-center gap-1.5">
+          <div className="bmb-section-container flex items-center gap-1.5">
             <Skeleton width={40} height={12} />
             <Skeleton width={8} height={10} />
             <Skeleton width={48} height={12} />
@@ -640,7 +650,7 @@ export function RestaurantDetailShimmer() {
           </div>
         </div>
 
-        <div className="container mx-auto max-md:px-0 max-md:pt-0 px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-5 pb-24 md:pb-16">
+        <div className="bmb-section-container max-md:px-0 max-md:pt-0 py-5 pb-24 md:pb-16">
           {/* Title row — tablet/desktop (matches page h1 + actions + rating) */}
           <div className="hidden md:block bg-white pt-2 mb-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -759,7 +769,7 @@ export function MovieDetailShimmer() {
         <div className="w-full aspect-[2.4/1] min-h-[220px] overflow-hidden">
           <Skeleton className="!block !h-full !w-full !rounded-none" height="100%" />
         </div>
-        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 space-y-5">
+        <div className="bmb-section-container py-6 space-y-5">
           <div className="flex gap-4 sm:gap-6">
             <Skeleton width={140} height={210} borderRadius={12} className="shrink-0 sm:!w-[180px] sm:!h-[270px]" />
             <div className="flex-1 space-y-3 pt-1">
@@ -949,7 +959,7 @@ export function ArtistDetailShimmer() {
     <Wrap>
       <div className="min-h-screen bg-white" aria-busy="true" aria-label="Loading artist">
         <header className="relative w-full overflow-hidden bg-[#EDE4F7]/40">
-          <div className="relative z-10 container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+          <div className="relative z-10 bmb-section-container py-6 sm:py-8 md:py-10">
             <Skeleton width="6rem" height={16} />
             <div className="mt-5 flex flex-col items-start gap-6 sm:gap-8 md:mt-7 md:flex-row md:items-center md:gap-8 lg:gap-10">
               <div className="h-56 w-56 shrink-0 overflow-hidden rounded-2xl sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-100 lg:w-100">
@@ -965,7 +975,7 @@ export function ArtistDetailShimmer() {
             </div>
           </div>
         </header>
-        <div className="bg-white container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-8 sm:py-10">
+        <div className="bg-white bmb-section-container py-8 sm:py-10">
           <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-10">
             <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">
               <PartnerEventsSectionShimmer count={3} />
@@ -1002,15 +1012,15 @@ export function VenueDetailShimmer() {
   return (
     <Wrap>
       <div className="min-h-screen bg-white overflow-x-hidden" aria-busy="true" aria-label="Loading venue">
-        <div className="mx-auto container px-4 sm:px-6 lg:px-10 2xl:px-0 pt-5 sm:pt-6">
+        <div className="bmb-section-container pt-5 sm:pt-6">
           <Skeleton width="6.5rem" height={16} />
         </div>
-        <header className="mx-auto container px-4 sm:px-6 lg:px-10 2xl:px-0 pt-4 pb-2 sm:pt-5 sm:pb-3">
+        <header className="bmb-section-container pt-4 pb-2 sm:pt-5 sm:pb-3">
           <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl min-h-[220px] sm:min-h-[280px] md:min-h-[320px] lg:min-h-[360px] bg-slate-200">
             <Skeleton className="!absolute !inset-0 !block !h-full !w-full !rounded-2xl sm:!rounded-3xl" height="100%" />
           </div>
         </header>
-        <div className="bg-white container mx-auto px-4 sm:px-6 lg:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+        <div className="bg-white bmb-section-container py-6 sm:py-8 md:py-10">
           <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-5">
             <div className="min-w-0 flex-1 space-y-8 sm:space-y-10">
               <div className="space-y-3">
@@ -1095,7 +1105,7 @@ export function ListYourShowLandingShimmer({
   variant?: "bms" | "split";
   hostOnly?: boolean;
 }) {
-  const container = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+  const container = "bmb-section-container";
 
   return (
     <Wrap>

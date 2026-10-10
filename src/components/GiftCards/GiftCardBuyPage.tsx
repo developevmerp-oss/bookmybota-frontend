@@ -363,7 +363,7 @@ export default function GiftCardBuyPage() {
             />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_40%,rgba(155,45,227,0.35),transparent_55%)]" aria-hidden />
 
-            <div className="relative z-1 container mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-5 pb-10 sm:pb-14 md:pb-16">
+            <div className="relative z-1 bmb-section-container pt-4 sm:pt-5 pb-10 sm:pb-14 md:pb-16">
               <div className="flex items-center justify-between gap-3 mb-6 sm:mb-8">
                 <Link
                   href="/gift-cards"
@@ -400,7 +400,7 @@ export default function GiftCardBuyPage() {
           </div>
 
           {/* Form + preview — fluid container, clear gap from hero title */}
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 -mt-4 sm:-mt-6 relative z-2 pb-2">
+          <div className="bmb-section-container -mt-4 sm:-mt-6 relative z-2 pb-2">
             <form
               onSubmit={handleSubmit(onValid)}
               noValidate

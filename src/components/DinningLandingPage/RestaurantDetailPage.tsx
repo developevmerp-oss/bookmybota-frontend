@@ -1794,7 +1794,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               : "hidden md:block"
         }`}
       >
-        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
+        <div className="bmb-section-container text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
           <Link href="/" className="hover:text-rose-600 transition-colors">
             Home
           </Link>
@@ -1808,10 +1808,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <div
-        className={`container mx-auto lg:px-10 2xl:px-0 pb-24 md:pb-16 ${
+        className={`bmb-section-container pb-24 md:pb-16 ${
           isBookTableFlow
-            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 px-4 sm:px-5 md:px-6 py-5 lg:pt-4"
-            : "max-md:px-0 max-md:pt-0 px-4 sm:px-5 md:px-6 py-5"
+            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-5 lg:pt-4"
+            : "max-md:px-0 max-md:pt-0 py-5"
         }`}
       >
         {/* ── Header: title + icon actions + rating (hidden on booking success) ── */}
@@ -1902,7 +1902,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         >
           <div
             className={`min-w-0 order-1 ${
-              isBookingSuccess ? "hidden" : isBookTableFlow ? "max-lg:hidden" : ""
+              isBookingSuccess
+                ? "hidden"
+                : isBookTableFlow
+                  ? "max-lg:hidden lg:col-span-2"
+                  : ""
             }`}
           >
             <div ref={titleSentinelRef} className="h-px w-full" aria-hidden />
@@ -2202,8 +2206,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           {!hideBookingSidebar ? (
             <aside
               ref={bookingWidgetRef}
-              className={`w-full order-2 md:row-span-2 md:sticky lg:sticky z-30 self-start ${
-                isBookTableFlow ? "hidden lg:block lg:mt-3" : "hidden md:block"
+              className={`w-full md:sticky lg:sticky z-30 self-start ${
+                isBookTableFlow
+                  ? `hidden lg:block lg:order-3 ${
+                      drawerStep === 1 ? "lg:mt-[7.75rem]" : ""
+                    }`
+                  : "hidden md:block order-2 md:row-span-2"
               }`}
               style={{ top: galleryStickyTop }}
             >
@@ -2404,7 +2412,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </aside>
           ) : null}
 
-          <div className="min-w-0 order-3">
+          <div
+            className={`min-w-0 ${
+              isBookTableFlow && !hideBookingSidebar ? "lg:order-2" : "order-3"
+            }`}
+          >
             <div
               id="tab-panel-start"
               className={`space-y-4 pt-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${
@@ -4455,7 +4467,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               aria-hidden={!restaurantStickyVisible || isLightboxOpen}
             >
               <div className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-[0_4px_18px_rgba(15,23,42,0.06)]">
-                <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-1.5">
+                <div className="bmb-section-container py-1.5">
                   <div className="flex items-center gap-3 py-1.5 min-w-0">
                     <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-slate-100 shrink-0">
                       {stickyThumb ? (

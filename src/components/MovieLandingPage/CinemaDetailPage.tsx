@@ -1073,7 +1073,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-6 lg:container lg:px-10 2xl:px-0 py-0 lg:py-7 space-y-4 lg:space-y-5">
+      <div className="bmb-section-container py-0 lg:py-7 space-y-4 lg:space-y-5">
         {/* Desktop header */}
         <div className="hidden lg:block rounded-2xl border border-[#E8E2F2] bg-white/90 p-4 sm:p-5 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

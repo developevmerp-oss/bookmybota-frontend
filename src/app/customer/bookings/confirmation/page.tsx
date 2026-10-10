@@ -1,35 +1,46 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Check,
+  ArrowRight,
   Calendar,
+  Check,
   Clock,
+  Copy,
+  Home,
+  Loader2,
   MapPin,
+  Phone,
+  Share2,
+  Sparkles,
+  Ticket,
+  User,
   Users,
   UtensilsCrossed,
-  ArrowRight,
-  Loader2,
-  Bookmark,
-  Copy,
-  CheckCheck,
-  Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useGetBookingByIdQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
-import { formatDateCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
+import {
+  formatDateCustomer,
+  formatInstantLocalDateTime,
+  formatTime12h,
+  formatWeekdayCustomer,
+} from "@/lib/dateFormat";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
-function IconBox({ children }: { children: ReactNode }) {
-  return (
-    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
-      {children}
-    </div>
-  );
-}
+const CONFIRM_PAGE_MAX = "mx-auto w-full max-w-[64rem] px-4 md:px-5 lg:px-10 xl:px-12";
+const DEFAULT_DINING_IMAGE =
+  "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=800&q=80";
+
+const actionBtnSecondary =
+  "inline-flex min-h-[2.875rem] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-[0.75rem] min-[480px]:text-[0.8125rem] lg:text-[0.8125rem] xl:text-[0.875rem] font-semibold text-slate-800 transition hover:bg-slate-50";
+
+const actionBtnPrimary =
+  "inline-flex min-h-[2.875rem] w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2.5 py-2.5 text-[0.75rem] min-[480px]:text-[0.8125rem] lg:text-[0.8125rem] xl:text-[0.875rem] font-semibold text-white transition hover:bg-slate-800";
 
 function checkInWindow(bookingTime: string) {
   const start = new Date(bookingTime);
@@ -40,18 +51,52 @@ function checkInWindow(bookingTime: string) {
   return `${formatTime12h(start)} – ${formatTime12h(end)}`;
 }
 
+function DetailCell({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: typeof User;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 min-w-0">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+        <Icon size={15} strokeWidth={2} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[0.6875rem] font-medium text-slate-500 leading-tight">{label}</p>
+        <p className="mt-0.5 text-[0.875rem] sm:text-[0.9375rem] font-semibold text-slate-900 break-words leading-snug">
+          {value}
+        </p>
+        {hint ? (
+          <p className="mt-0.5 text-[0.75rem] text-slate-500 leading-snug">{hint}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ConfirmationContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const bookingId = searchParams.get("id") || "";
   const arrivalNote = searchParams.get("arrival") || "";
   const [copied, setCopied] = useState(false);
+  const [headerReady, setHeaderReady] = useState(false);
 
   useEffect(() => {
     dispatch(loadFromStorage());
   }, [dispatch]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setHeaderReady(true), 40);
+    return () => window.clearTimeout(t);
+  }, [bookingId]);
 
   const { data: booking, isLoading, error } = useGetBookingByIdQuery(bookingId, {
     skip: !bookingId,
@@ -59,9 +104,9 @@ function ConfirmationContent() {
 
   if (!bookingId) {
     return (
-      <div className="min-h-screen bg-background pt-24 text-center px-4">
-        <p className="text-muted-foreground mb-4">No booking ID provided.</p>
-        <Link href="/" className="btn-primary inline-block">
+      <div className="min-h-screen bg-white pt-24 text-center px-4">
+        <p className="text-slate-500 mb-4">No booking ID provided.</p>
+        <Link href="/" className="text-[#6900AA] font-semibold">
           Browse restaurants
         </Link>
       </div>
@@ -70,8 +115,8 @@ function ConfirmationContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pt-24 flex flex-col items-center gap-3 text-muted-foreground">
-        <Loader2 className="animate-spin text-violet-600" size={32} />
+      <div className="min-h-screen bg-white pt-24 flex flex-col items-center gap-3 text-slate-500">
+        <Loader2 className="animate-spin text-[#6900AA]" size={32} />
         Loading confirmation...
       </div>
     );
@@ -79,9 +124,9 @@ function ConfirmationContent() {
 
   if (error || !booking) {
     return (
-      <div className="min-h-screen bg-background pt-24 text-center px-4">
-        <p className="text-muted-foreground mb-4">Could not load booking details.</p>
-        <Link href="/customer/dashboard" className="btn-primary inline-block">
+      <div className="min-h-screen bg-white pt-24 text-center px-4">
+        <p className="text-slate-500 mb-4">Could not load booking details.</p>
+        <Link href="/customer/dashboard" className="text-[#6900AA] font-semibold">
           My Bookings
         </Link>
       </div>
@@ -91,6 +136,15 @@ function ConfirmationContent() {
   const qrData = booking.qr_token || booking.id;
   const windowLabel = checkInWindow(booking.booking_time);
   const appliedOffer = booking.applied_offer;
+  const guestName =
+    booking.guest_name?.trim() || booking.customer_name?.trim() || user?.name || "—";
+  const contact =
+    booking.guest_phone?.trim() || booking.customer_phone?.trim() || user?.phone || "—";
+  const cover =
+    resolveMediaUrl(booking.business_cover_image) || DEFAULT_DINING_IMAGE;
+  const bookedOn = booking.created_at
+    ? formatInstantLocalDateTime(booking.created_at)
+    : "";
 
   const copyBookingId = async () => {
     try {
@@ -103,218 +157,324 @@ function ConfirmationContent() {
     }
   };
 
+  const addToCalendar = () => {
+    if (!booking.booking_time) return;
+    const start = new Date(booking.booking_time);
+    const end = booking.end_time
+      ? new Date(booking.end_time)
+      : new Date(start.getTime() + 90 * 60000);
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+      `Table at ${booking.business_name || "Restaurant"}`
+    )}&dates=${fmt(start)}/${fmt(end)}&location=${encodeURIComponent(
+      booking.business_address || ""
+    )}`;
+    window.open(url, "_blank");
+  };
+
+  const shareBooking = async () => {
+    const text = `My table at ${booking.business_name || "this restaurant"} is confirmed. Booking ${booking.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Dining reservation", text, url: window.location.href });
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
+        toast.success("Link copied");
+      }
+    } catch {
+      /* cancelled */
+    }
+  };
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F7F6FA] pt-10 sm:pt-14 pb-16">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 50% 40% at 0% 0%, rgba(139,92,246,0.10), transparent 70%), radial-gradient(ellipse 45% 38% at 100% 100%, rgba(124,58,237,0.08), transparent 70%)",
-        }}
-        aria-hidden
-      />
+    <div className="min-h-screen bg-white pb-10 sm:pb-12">
+      <style>{`
+        @keyframes confirmCheckPop {
+          0% { transform: scale(0.4); opacity: 0; }
+          55% { transform: scale(1.12); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes confirmCheckDraw {
+          from { stroke-dashoffset: 28; }
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes confirmCheckRipple {
+          0% { transform: scale(0.85); opacity: 0.45; }
+          100% { transform: scale(1.65); opacity: 0; }
+        }
+        @keyframes confirmHeaderIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .confirm-check-pop {
+          animation: confirmCheckPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .confirm-check-draw {
+          stroke-dasharray: 28;
+          stroke-dashoffset: 28;
+          animation: confirmCheckDraw 0.4s cubic-bezier(0.65, 0, 0.35, 1) 0.28s forwards;
+        }
+        .confirm-check-ripple {
+          animation: confirmCheckRipple 0.85s ease-out 0.2s both;
+        }
+        .confirm-header-in {
+          animation: confirmHeaderIn 0.45s ease-out 0.15s both;
+        }
+      `}</style>
 
-      <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-7 sm:mb-8">
-          <div className="relative w-[72px] h-[72px] mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border border-violet-200/80 scale-125" />
-            <div className="relative w-full h-full rounded-full bg-violet-600 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(124,58,237,0.28)]">
-              <Check size={34} strokeWidth={2.8} />
-            </div>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-black mb-2 tracking-tight">
-            Booking Confirmed!
-          </h1>
-          <p className="text-slate-500 text-sm sm:text-[15px]">
-            Your table at <strong className="text-black">{booking.business_name}</strong> is
-            reserved.
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-[0_16px_50px_rgba(88,28,180,0.08)] border border-slate-100 p-4 sm:p-6 lg:p-7 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-[1.15fr_auto_0.95fr] gap-5 md:gap-0">
-            <div className="min-w-0 md:pr-6">
-              <div className="flex items-start gap-3 pb-4">
-                <IconBox>
-                  <Store size={18} />
-                </IconBox>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-400 font-medium">Restaurant</p>
-                  <p className="font-bold text-slate-900 truncate">{booking.business_name}</p>
-                  {booking.business_address && (
-                    <p className="text-sm text-slate-500 mt-0.5 flex items-start gap-1">
-                      <MapPin size={12} className="mt-1 shrink-0 text-violet-500" />
-                      <span className="break-words">{booking.business_address}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-100">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <IconBox>
-                    <Calendar size={16} />
-                  </IconBox>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-400 font-medium">Date</p>
-                    <p className="text-sm font-bold text-slate-900 break-words">
-                      {formatDateCustomer(booking.booking_time)}
-                    </p>
-                    {formatWeekdayCustomer(booking.booking_time) ? (
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {formatWeekdayCustomer(booking.booking_time)}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <IconBox>
-                    <Clock size={16} />
-                  </IconBox>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-400 font-medium">Time</p>
-                    <p className="text-sm font-bold text-slate-900">
-                      {formatTime12h(booking.booking_time)}
-                    </p>
-                    {booking.end_time ? (
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Arrive by {formatTime12h(booking.end_time)}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-100">
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <IconBox>
-                    <Users size={16} />
-                  </IconBox>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-400 font-medium">Guests</p>
-                    <p className="text-sm font-bold text-slate-900">{booking.guests ?? "—"}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2.5 min-w-0">
-                  <IconBox>
-                    <UtensilsCrossed size={16} />
-                  </IconBox>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-400 font-medium">Table</p>
-                    <p className="text-sm font-bold text-slate-900">
-                      {booking.table_number ? `Table ${booking.table_number}` : "Assigned at venue"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {arrivalNote && (
-                <div className="flex items-start gap-3 py-4 border-t border-slate-100">
-                  <IconBox>
-                    <Clock size={16} />
-                  </IconBox>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-400 font-medium">Approx. arrival</p>
-                    <p className="text-sm font-bold text-slate-900">{arrivalNote}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-start gap-3 pt-4 border-t border-slate-100">
-                <IconBox>
-                  <Bookmark size={16} />
-                </IconBox>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-400 font-medium">Booking ID</p>
-                  <div className="flex items-start gap-2">
-                    <p className="text-xs sm:text-sm font-bold text-slate-900 break-all leading-relaxed">
-                      {booking.id}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={copyBookingId}
-                      className="mt-0.5 shrink-0 text-slate-400 hover:text-violet-600 cursor-pointer"
-                      aria-label="Copy booking ID"
-                    >
-                      {copied ? <CheckCheck size={15} /> : <Copy size={15} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {appliedOffer?.title && (
-                <div className="flex items-start gap-3 pt-4 border-t border-slate-100">
-                  <IconBox>
-                    <UtensilsCrossed size={16} />
-                  </IconBox>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-400 font-medium">Dining offer (show QR at restaurant)</p>
-                    <p className="text-sm font-bold text-slate-900">{appliedOffer.title}</p>
-                    {(appliedOffer.type || appliedOffer.validity) && (
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {[appliedOffer.type, appliedOffer.validity].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="hidden md:block w-px bg-slate-100 self-stretch" />
-
-            <div className="min-w-0 md:pl-6 flex flex-col items-center text-center pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-              <p className="text-base font-bold text-slate-900">Check-in QR</p>
-              <p className="text-xs text-slate-400 mt-0.5 mb-4">Show this QR at the restaurant to claim your offer</p>
-
-              {booking.qr_token ? (
-                <div className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] rounded-2xl border border-violet-200 bg-white p-2.5">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`}
-                    alt="Booking QR code"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] rounded-2xl border border-violet-200 bg-slate-50 flex items-center justify-center text-slate-400 text-xs font-medium px-4">
-                  QR will appear once check-in scanning is enabled for this booking.
-                </div>
-              )}
-
-              {windowLabel && (
-                <div className="mt-4 w-full max-w-[260px] rounded-xl bg-violet-50 px-3 py-2.5 flex items-center gap-2.5 text-left">
-                  <Clock size={16} className="text-violet-600 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] text-slate-500 leading-tight">Check-in window</p>
-                    <p className="text-xs sm:text-sm font-bold text-slate-900">{windowLabel}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            href={`/customer/bookings/${booking.id}`}
-            className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 shadow-md shadow-violet-300/30 transition-all"
-          >
-            View booking details <ArrowRight size={16} />
-          </Link>
-          {user?.role === "customer" && (
-            <Link
-              href="/customer/dashboard"
-              className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-900 hover:bg-slate-50 transition-colors"
-            >
-              My Bookings
-            </Link>
-          )}
-        </div>
-
-        <button
-          onClick={() => router.push("/")}
-          className="w-full mt-4 text-sm font-medium text-violet-600 hover:text-violet-800 transition-colors cursor-pointer"
+      <div className={`${CONFIRM_PAGE_MAX} pt-6 sm:pt-8`}>
+        <div
+          className={`mb-5 sm:mb-6 ${headerReady ? "confirm-header-in" : "opacity-0"}`}
         >
-          Continue browsing
-        </button>
+          <div className="flex items-start gap-3.5 sm:gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            <div className="relative mt-0.5 shrink-0">
+              <span
+                className="pointer-events-none absolute inset-0 rounded-full bg-[#34A853]/25 confirm-check-ripple"
+                aria-hidden
+              />
+              <span
+                className={`relative flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#E8F5E9] text-[#2E7D32] shadow-sm ring-4 ring-[#E8F5E9]/60 ${
+                  headerReady ? "confirm-check-pop" : "opacity-0"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" aria-hidden>
+                  <path
+                    d="M5.5 12.5 L10 17 L18.5 7.5"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={headerReady ? "confirm-check-draw" : ""}
+                  />
+                </svg>
+                <span className="sr-only">Confirmed</span>
+              </span>
+            </div>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h1 className="text-[1.375rem] sm:text-[1.625rem] lg:text-[1.875rem] font-extrabold text-slate-900 leading-tight tracking-tight">
+                Your reservation is confirmed
+              </h1>
+              <p className="mt-1.5 text-[0.875rem] sm:text-[0.9375rem] text-slate-600 leading-relaxed">
+                Your table at{" "}
+                <span className="font-semibold text-slate-800">{booking.business_name}</span> is
+                reserved.
+              </p>
+              <p className="mt-1 text-[0.8125rem] sm:text-[0.875rem] text-slate-500 leading-relaxed">
+                Show the Check-in QR at the restaurant
+                {appliedOffer?.title ? " to claim your dining offer" : ""}.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Row 1: cover + QR */}
+          <div className="relative flex flex-col items-stretch gap-0 sm:flex-row sm:items-stretch">
+            <div className="relative min-h-[14rem] min-w-0 flex-1 self-stretch w-full sm:min-h-0 sm:max-w-none lg:max-w-[38rem]">
+              <div className="absolute inset-5">
+                <img
+                  src={cover}
+                  alt={booking.business_name || "Restaurant"}
+                  className="h-full w-full rounded-xl object-cover bg-slate-100"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    if (el.dataset.fallbackApplied === "1") return;
+                    el.dataset.fallbackApplied = "1";
+                    el.src = DEFAULT_DINING_IMAGE;
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="relative flex sm:w-[min(100%,17rem)] sm:shrink-0 md:w-[18rem] lg:w-[19rem]">
+              <div
+                className="hidden sm:block absolute left-0 top-5 bottom-5 w-px border-l border-dashed border-slate-300"
+                aria-hidden
+              />
+              <span
+                className="hidden sm:block absolute -left-2.5 -top-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
+                aria-hidden
+              />
+              <span
+                className="hidden sm:block absolute -left-2.5 -bottom-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
+                aria-hidden
+              />
+              <div className="flex w-full flex-1 items-center justify-center border-t border-dashed border-slate-300 px-5 py-6 sm:border-t-0 sm:px-6 sm:py-8 sm:pl-8">
+                <div className="flex w-full flex-col items-center text-center">
+                  {booking.qr_token ? (
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(qrData)}`}
+                      alt="Check-in QR code"
+                      className="h-[9.5rem] w-[9.5rem] sm:h-[10.5rem] sm:w-[10.5rem] rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm"
+                    />
+                  ) : (
+                    <div className="flex h-[9.5rem] w-[9.5rem] sm:h-[10.5rem] sm:w-[10.5rem] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 text-[0.75rem] text-slate-400 leading-snug">
+                      QR will appear once check-in scanning is enabled.
+                    </div>
+                  )}
+                  <p className="mt-4 text-[0.9375rem] font-bold text-slate-900">Check-in QR</p>
+                  <button
+                    type="button"
+                    onClick={copyBookingId}
+                    className="mt-1 inline-flex items-center gap-1.5 font-mono text-[0.8125rem] font-bold text-slate-700 hover:text-[#6900AA] cursor-pointer"
+                  >
+                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                    {booking.id.slice(0, 8).toUpperCase()}
+                  </button>
+                  <p className="mt-3 max-w-[15rem] text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
+                    Show this QR at the restaurant
+                    {appliedOffer?.title ? " to claim your offer" : " for check-in"}.
+                  </p>
+                  {windowLabel ? (
+                    <div className="mt-4 w-full max-w-[15rem] rounded-xl bg-slate-100 px-3 py-2.5 flex items-center gap-2.5 text-left">
+                      <Clock size={15} className="text-slate-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[0.6875rem] text-slate-500 leading-tight">
+                          Check-in window
+                        </p>
+                        <p className="text-[0.8125rem] font-bold text-slate-900">{windowLabel}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: dining details */}
+          <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F5E9] px-2.5 py-1 text-[0.6875rem] font-semibold text-[#2E7D32]">
+              <Check size={12} strokeWidth={3} />
+              Booking Confirmed
+            </span>
+            <h2 className="mt-3 text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-extrabold leading-snug text-slate-900">
+              {booking.business_name}
+            </h2>
+            {booking.business_address ? (
+              <p className="mt-2 flex items-start gap-1.5 text-[0.875rem] text-slate-500">
+                <MapPin size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                <span>{booking.business_address}</span>
+              </p>
+            ) : null}
+
+            <div className="mt-5 grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 sm:gap-x-6 sm:gap-y-5">
+              <DetailCell icon={User} label="Guest Name" value={guestName} />
+              <DetailCell icon={Phone} label="Contact" value={contact} />
+              <DetailCell
+                icon={Users}
+                label="Guests"
+                value={booking.guests != null ? String(booking.guests) : "—"}
+              />
+              <DetailCell
+                icon={UtensilsCrossed}
+                label="Table"
+                value={
+                  booking.table_number ? `Table ${booking.table_number}` : "Assigned at venue"
+                }
+              />
+              <DetailCell
+                icon={Calendar}
+                label="Date"
+                value={formatDateCustomer(booking.booking_time)}
+                hint={formatWeekdayCustomer(booking.booking_time) || undefined}
+              />
+              <DetailCell
+                icon={Clock}
+                label="Time"
+                value={formatTime12h(booking.booking_time)}
+                hint={
+                  booking.end_time
+                    ? `Arrive by ${formatTime12h(booking.end_time)}`
+                    : arrivalNote || undefined
+                }
+              />
+              {appliedOffer?.title ? (
+                <DetailCell
+                  icon={Ticket}
+                  label="Dining Offer"
+                  value={appliedOffer.title}
+                  hint={
+                    [appliedOffer.type, appliedOffer.validity].filter(Boolean).join(" · ") ||
+                    undefined
+                  }
+                />
+              ) : null}
+              {arrivalNote && !booking.end_time ? (
+                <DetailCell icon={Clock} label="Approx. arrival" value={arrivalNote} />
+              ) : null}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="border-t border-slate-200 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              <Link
+                href={`/customer/bookings/${booking.id}`}
+                className={actionBtnPrimary}
+              >
+                <Ticket size={16} className="shrink-0" />
+                <span className="truncate">View booking details</span>
+              </Link>
+              {user?.role === "customer" ? (
+                <Link href="/customer/dashboard" className={actionBtnSecondary}>
+                  <Ticket size={16} className="text-slate-600 shrink-0" />
+                  <span className="truncate">My Bookings</span>
+                </Link>
+              ) : null}
+              <button type="button" onClick={addToCalendar} className={actionBtnSecondary}>
+                <Calendar size={16} className="text-slate-600 shrink-0" />
+                <span className="truncate">Add to Calendar</span>
+              </button>
+              <button type="button" onClick={shareBooking} className={actionBtnSecondary}>
+                <Share2 size={16} className="text-slate-600 shrink-0" />
+                <span className="truncate">Share Booking</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-[0.6875rem] text-slate-400 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <p className="min-w-0 break-all sm:truncate" title={booking.id}>
+                Booking ID: {booking.id}
+              </p>
+              {bookedOn && bookedOn !== "—" ? (
+                <p className="shrink-0 sm:text-right">Booked on {bookedOn}</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 sm:mt-8 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="flex items-start gap-3 sm:items-center sm:gap-4 min-w-0">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F7E9FF] text-[#6900AA]">
+              <Sparkles size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[0.9375rem] sm:text-[1rem] font-bold text-slate-900">
+                Looking for more places to dine?
+              </p>
+              <p className="mt-0.5 text-[0.8125rem] sm:text-[0.875rem] text-slate-500 leading-relaxed">
+                Discover restaurants and offers across Ethiopia.
+              </p>
+            </div>
+          </div>
+          <div className="flex w-full flex-col gap-2.5 min-[480px]:flex-row min-[480px]:items-center sm:w-auto sm:shrink-0">
+            <Link
+              href="/"
+              className="inline-flex min-h-[2.875rem] w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-[0.875rem] font-semibold text-white transition hover:bg-slate-800 min-[480px]:w-auto"
+            >
+              Explore Dining
+              <ArrowRight size={16} />
+            </Link>
+            <Link
+              href="/"
+              className={`${actionBtnSecondary} min-[480px]:w-auto min-[480px]:min-w-[9.5rem]`}
+            >
+              <Home size={16} className="text-slate-600 shrink-0" />
+              Back to Home
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -324,8 +484,8 @@ export default function BookingConfirmationPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-background pt-24 flex justify-center text-muted-foreground">
-          <Loader2 className="animate-spin text-violet-600" size={32} />
+        <div className="min-h-screen bg-white pt-24 flex justify-center text-slate-500">
+          <Loader2 className="animate-spin text-[#6900AA]" size={32} />
         </div>
       }
     >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -193,14 +193,15 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
   /** Mobile/tablet compact: titles only (icons hide) while sticky subnav stays. */
   const [compactMobile, setCompactMobile] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const COMPACT_AFTER_Y = 72;
     const EXPAND_BELOW_Y = 24;
-    let compact = false;
+    const isMobileTablet = () =>
+      typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+    let compact = isMobileTablet() && window.scrollY >= COMPACT_AFTER_Y;
+    setCompactMobile(compact);
     const sync = () => {
-      const isMobileTablet =
-        typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
-      if (!isMobileTablet) {
+      if (!isMobileTablet()) {
         if (compact) {
           compact = false;
           setCompactMobile(false);
@@ -215,10 +216,18 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
       compact = next;
       setCompactMobile(next);
     };
-    sync();
     window.addEventListener("scroll", sync, { passive: true });
     window.addEventListener("resize", sync, { passive: true });
+    const raf = window.requestAnimationFrame(() => {
+      if (!isMobileTablet() || window.scrollY <= EXPAND_BELOW_Y) {
+        compact = false;
+        setCompactMobile(false);
+      } else {
+        sync();
+      }
+    });
     return () => {
+      window.cancelAnimationFrame(raf);
       window.removeEventListener("scroll", sync);
       window.removeEventListener("resize", sync);
     };
@@ -255,7 +264,7 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
     <nav
       aria-label="Browse categories"
       data-subnav-compact={compactMobile ? "1" : "0"}
-      className={`relative w-full min-w-0 bg-transparent transition-[max-height,height] duration-300 ease-in-out ${
+      className={`relative w-full min-w-0 bmb-section-container bg-transparent transition-[max-height,height] duration-300 ease-in-out ${
         compactMobile
           ? "max-h-12 h-12 lg:max-h-14 lg:h-14"
           : "max-h-[5.25rem] h-[5.25rem] lg:max-h-14 lg:h-14"

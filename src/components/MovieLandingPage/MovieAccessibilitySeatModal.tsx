@@ -3,6 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, X } from "lucide-react";
+import { formatMoney } from "@/lib/currencyFormat";
+
+export type AccessibilitySeatOption = {
+  id: string;
+  number: string;
+  isBooked: boolean;
+};
 
 export type AccessibilityCategoryOption = {
   name: string;
@@ -11,6 +18,7 @@ export type AccessibilityCategoryOption = {
     label: string;
     availableCount: number;
     seatIds: string[];
+    seats: AccessibilitySeatOption[];
   }>;
 };
 
@@ -64,6 +72,17 @@ export default function MovieAccessibilitySeatModal({
     [selectedCategory, rowLabel]
   );
 
+  const pickFromSeat = (startSeatId: string) => {
+    if (!selectedRow) return;
+    const available = selectedRow.seats.filter((s) => !s.isBooked);
+    const startIdx = available.findIndex((s) => s.id === startSeatId);
+    if (startIdx < 0) return;
+    const ids = available.slice(startIdx, startIdx + qty).map((s) => s.id);
+    if (ids.length === 0) return;
+    onSelectSeats(ids);
+    onClose();
+  };
+
   if (!open || typeof document === "undefined") return null;
 
   const selectClass =
@@ -78,10 +97,10 @@ export default function MovieAccessibilitySeatModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-white shadow-[0_20px_50px_rgba(105,0,170,0.18)] overflow-hidden"
+        className="w-full max-w-lg rounded-2xl bg-white shadow-[0_20px_50px_rgba(105,0,170,0.18)] overflow-hidden max-h-[min(92vh,640px)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <h2 id="access-seat-title" className="text-base sm:text-lg font-bold text-slate-800">
             Accessibility Seat Selection
           </h2>
@@ -95,7 +114,7 @@ export default function MovieAccessibilitySeatModal({
           </button>
         </div>
 
-        <div className="px-5 py-5 space-y-3.5">
+        <div className="px-5 py-5 space-y-3.5 overflow-y-auto min-h-0 flex-1">
           <div className="relative">
             <select
               value={qty}
@@ -129,7 +148,7 @@ export default function MovieAccessibilitySeatModal({
               <option value="">Select Category</option>
               {categories.map((c) => (
                 <option key={c.name} value={c.name}>
-                  {c.name}
+                  {c.name} - {formatMoney(c.price)}
                 </option>
               ))}
             </select>
@@ -152,7 +171,7 @@ export default function MovieAccessibilitySeatModal({
               </option>
               {(selectedCategory?.rows || []).map((r) => (
                 <option key={r.label} value={r.label}>
-                  Row {r.label} ({r.availableCount} available)
+                  {selectedCategory.name} Row {r.label}
                 </option>
               ))}
             </select>
@@ -164,7 +183,7 @@ export default function MovieAccessibilitySeatModal({
 
           {categories.length === 0 ? (
             <p className="text-center text-sm text-slate-500 pt-2">
-              No accessibility seats are available for this show.
+              No seats are available for this show.
             </p>
           ) : !categoryName ? (
             <p className="text-center text-sm text-slate-500 pt-2">
@@ -172,24 +191,61 @@ export default function MovieAccessibilitySeatModal({
             </p>
           ) : selectedCategory && selectedCategory.rows.length === 0 ? (
             <p className="text-center text-sm text-slate-500 pt-2">
-              No accessible seats left in this category.
+              No seats left in this category.
             </p>
           ) : selectedRow ? (
-            <button
-              type="button"
-              onClick={() => {
-                const ids = selectedRow.seatIds.slice(0, qty);
-                onSelectSeats(ids);
-                onClose();
-              }}
-              className="mt-1 flex w-full h-11 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold cursor-pointer hover:bg-brand-5 transition-colors"
-            >
-              Select {Math.min(qty, selectedRow.availableCount)} accessible seat
-              {Math.min(qty, selectedRow.availableCount) === 1 ? "" : "s"}
-            </button>
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-100 text-left text-slate-600">
+                    <th className="px-3 py-2.5 font-semibold">Seat Number</th>
+                    <th className="px-3 py-2.5 font-semibold">Status</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedRow.seats.map((seat) => {
+                    const booked = seat.isBooked;
+                    const canSelect = !booked && selectedRow.seatIds.includes(seat.id);
+                    return (
+                      <tr
+                        key={seat.id}
+                        className="border-t border-slate-100 hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="px-3 py-2.5 font-medium text-slate-800 tabular-nums">
+                          {seat.number}
+                        </td>
+                        <td
+                          className={`px-3 py-2.5 font-medium ${
+                            booked ? "text-slate-500" : "text-emerald-600"
+                          }`}
+                        >
+                          {booked ? "Booked" : "Available"}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          {canSelect ? (
+                            <button
+                              type="button"
+                              onClick={() => pickFromSeat(seat.id)}
+                              className="inline-flex min-w-[72px] cursor-pointer items-center justify-center rounded-md border border-[#F84464] bg-white px-3 py-1.5 text-xs font-semibold text-[#F84464] transition-colors hover:bg-[#F84464] hover:text-white"
+                            >
+                              Select
+                            </button>
+                          ) : (
+                            <span className="inline-flex min-w-[72px] items-center justify-center rounded-md bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                              Booked
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="text-center text-sm text-slate-500 pt-2">
-              Select a row to pick accessible seats.
+              Select a row to view seats.
             </p>
           )}
         </div>

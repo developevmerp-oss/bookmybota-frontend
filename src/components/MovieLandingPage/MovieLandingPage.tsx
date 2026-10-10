@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
+  Search,
   SlidersHorizontal,
   Ticket,
   X,
@@ -148,6 +149,63 @@ function FilterOptionRow({
       </span>
       <SelectionMark selected={selected} multi={multi} />
     </button>
+  );
+}
+
+function MoviesEmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  variant = "filters",
+  dimmed,
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  variant?: "filters" | "generic";
+  dimmed?: boolean;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-2xl border border-[#EDE4F5] bg-gradient-to-b from-[#FBF7FF] via-white to-white px-5 py-11 sm:px-8 sm:py-14 text-center ${
+        dimmed ? "opacity-70" : ""
+      }`}
+    >
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(105,0,170,0.10),_transparent_68%)]"
+        aria-hidden
+      />
+      <div className="relative mx-auto flex max-w-md flex-col items-center">
+        {variant === "filters" ? (
+          <div className="mb-5 w-[180px] sm:w-[220px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/movies/no-filter-results.png?v=4"
+              alt="No movies found"
+              className="mx-auto h-auto w-full object-contain select-none"
+              draggable={false}
+            />
+          </div>
+        ) : (
+          <div className="mb-5 flex size-20 items-center justify-center rounded-full bg-[#F3E8FF] text-[#6900AA] ring-1 ring-[#E8D5F8]">
+            <Clapperboard className="size-9" strokeWidth={1.75} aria-hidden />
+          </div>
+        )}
+        <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">{title}</h3>
+        <p className="mt-1.5 text-sm text-slate-500 leading-relaxed max-w-sm">{description}</p>
+        {actionLabel && onAction ? (
+          <button
+            type="button"
+            onClick={onAction}
+            className="mt-6 inline-flex cursor-pointer items-center justify-center rounded-full bg-[#6900AA] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#57008E]"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -547,8 +605,12 @@ export default function MovieLandingPage() {
   const [selectedFormats, setSelectedFormats] = useState<string[]>(() =>
     parseCsvParam(searchParams.get("format") || searchParams.get("formats"))
   );
+  const [titleSearch, setTitleSearch] = useState(() => searchParams.get("q") || "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterModalTab, setFilterModalTab] = useState<MovieFilterModalTab>("language");
+  const [draftLanguages, setDraftLanguages] = useState<string[]>([]);
+  const [draftGenres, setDraftGenres] = useState<string[]>([]);
+  const [draftFormats, setDraftFormats] = useState<string[]>([]);
   const headerOffset = useStickyHeaderOffset();
   const [isFiltersStuck, setIsFiltersStuck] = useState(false);
   const [viewAll, setViewAll] = useState<ViewAllKey>(null);
@@ -565,10 +627,27 @@ export default function MovieLandingPage() {
     }, 50);
   }, []);
 
+  const openFiltersModal = useCallback((tab: MovieFilterModalTab = "language") => {
+    setDraftLanguages([...selectedLanguages]);
+    setDraftGenres([...selectedGenres]);
+    setDraftFormats([...selectedFormats]);
+    setFilterModalTab(tab);
+    setFiltersOpen(true);
+  }, [selectedLanguages, selectedGenres, selectedFormats]);
+
   const applyFiltersAndClose = useCallback(() => {
+    setSelectedLanguages(draftLanguages);
+    setSelectedGenres(draftGenres);
+    setSelectedFormats(draftFormats);
     setFiltersOpen(false);
     scrollToMoviesListing();
-  }, [scrollToMoviesListing]);
+  }, [draftLanguages, draftGenres, draftFormats, scrollToMoviesListing]);
+
+  const resetDraftFilters = useCallback(() => {
+    setDraftLanguages([]);
+    setDraftGenres([]);
+    setDraftFormats([]);
+  }, []);
 
   useEffect(() => {
     const sentinel = filtersStickySentinelRef.current;
@@ -613,6 +692,7 @@ export default function MovieLandingPage() {
     const formatsFromUrl = parseCsvParam(
       searchParams.get("format") || searchParams.get("formats")
     );
+    const qFromUrl = searchParams.get("q") || "";
     const cityParam = searchParams.get("city");
 
     setSelectedLanguages((prev) =>
@@ -620,6 +700,7 @@ export default function MovieLandingPage() {
     );
     setSelectedGenres((prev) => (sameStringList(prev, genresFromUrl) ? prev : genresFromUrl));
     setSelectedFormats((prev) => (sameStringList(prev, formatsFromUrl) ? prev : formatsFromUrl));
+    setTitleSearch((prev) => (prev === qFromUrl ? prev : qFromUrl));
 
     if (cityParam) {
       const nextCity = cityParam === "All Cities" ? "" : cityParam;
@@ -633,15 +714,18 @@ export default function MovieLandingPage() {
     setOrDeleteCsvParam(params, "language", selectedLanguages);
     setOrDeleteCsvParam(params, "genre", selectedGenres);
     setOrDeleteCsvParam(params, "format", selectedFormats);
+    setOrDeleteParam(params, "q", titleSearch);
     setOrDeleteParam(params, "city", city);
     if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- omit searchParams so inbound URL nav is not overwritten by stale state
-  }, [selectedLanguages, selectedGenres, selectedFormats, city, pathname, router]);
+  }, [selectedLanguages, selectedGenres, selectedFormats, titleSearch, city, pathname, router]);
 
   const hasCity = hasCityFilter(city);
   const { hasCampaigns: hasMoviePromoCampaigns } = useListingPromoCampaigns("MOVIES", city);
+
+  const titleSearchTrimmed = titleSearch.trim();
 
   const moviesQueryArg = useMemo(
     () => ({
@@ -651,8 +735,9 @@ export default function MovieLandingPage() {
       ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
       ...(selectedGenres.length ? { genre: selectedGenres.join(",") } : {}),
       ...(selectedFormats.length ? { format: selectedFormats.join(",") } : {}),
+      ...(titleSearchTrimmed ? { q: titleSearchTrimmed } : {}),
     }),
-    [city, hasCity, selectedLanguages, selectedGenres, selectedFormats]
+    [city, hasCity, selectedLanguages, selectedGenres, selectedFormats, titleSearchTrimmed]
   );
 
   const unscopedMoviesQueryArg = useMemo(
@@ -662,8 +747,9 @@ export default function MovieLandingPage() {
       ...(selectedLanguages.length ? { language: selectedLanguages.join(",") } : {}),
       ...(selectedGenres.length ? { genre: selectedGenres.join(",") } : {}),
       ...(selectedFormats.length ? { format: selectedFormats.join(",") } : {}),
+      ...(titleSearchTrimmed ? { q: titleSearchTrimmed } : {}),
     }),
-    [selectedLanguages, selectedGenres, selectedFormats]
+    [selectedLanguages, selectedGenres, selectedFormats, titleSearchTrimmed]
   );
 
   const filtersQueryArg = useMemo(() => (hasCity ? { city } : undefined), [city, hasCity]);
@@ -890,7 +976,10 @@ export default function MovieLandingPage() {
   );
 
   const hasActiveFilters =
-    selectedLanguages.length > 0 || selectedGenres.length > 0 || selectedFormats.length > 0;
+    selectedLanguages.length > 0 ||
+    selectedGenres.length > 0 ||
+    selectedFormats.length > 0 ||
+    Boolean(titleSearchTrimmed);
 
   // City → global (preferCityOrAll) → showcase when both empty (even with city selected)
   const useStaticMovies = shouldShowShowcaseCards(
@@ -936,10 +1025,19 @@ export default function MovieLandingPage() {
     );
   };
 
+  const toggleDraftValue = (
+    values: string[],
+    setValues: (next: string[]) => void,
+    value: string
+  ) => {
+    setValues(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  };
+
   const clearAll = () => {
     setSelectedLanguages([]);
     setSelectedGenres([]);
     setSelectedFormats([]);
+    setTitleSearch("");
   };
 
   const selectedMovieFilterChips = useMemo(
@@ -1033,9 +1131,9 @@ export default function MovieLandingPage() {
                 <FilterOptionRow
                   key={lang}
                   label={lang}
-                  selected={selectedLanguages.includes(lang)}
+                  selected={draftLanguages.includes(lang)}
                   multi
-                  onSelect={() => toggleLanguage(lang)}
+                  onSelect={() => toggleDraftValue(draftLanguages, setDraftLanguages, lang)}
                 />
               ))}
             </div>
@@ -1050,9 +1148,9 @@ export default function MovieLandingPage() {
                 <FilterOptionRow
                   key={genre}
                   label={genre}
-                  selected={selectedGenres.includes(genre)}
+                  selected={draftGenres.includes(genre)}
                   multi
-                  onSelect={() => toggleGenre(genre)}
+                  onSelect={() => toggleDraftValue(draftGenres, setDraftGenres, genre)}
                 />
               ))}
             </div>
@@ -1067,9 +1165,9 @@ export default function MovieLandingPage() {
                 <FilterOptionRow
                   key={format}
                   label={format}
-                  selected={selectedFormats.includes(format)}
+                  selected={draftFormats.includes(format)}
                   multi
-                  onSelect={() => toggleFormat(format)}
+                  onSelect={() => toggleDraftValue(draftFormats, setDraftFormats, format)}
                 />
               ))}
             </div>
@@ -1304,14 +1402,41 @@ export default function MovieLandingPage() {
           <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
             <div className={`${CONTAINER} pt-4 pb-1`}>
               <div className="mb-2">
-                <div className="flex items-center gap-2 pb-1 -mx-1 px-1">
+                <div className="flex flex-col gap-2 pb-1 sm:flex-row sm:items-center sm:gap-3 -mx-1 px-1">
+                  <div className="relative w-full sm:w-[14rem] lg:w-[16rem] shrink-0">
+                    <Search
+                      size={15}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                    <input
+                      type="search"
+                      value={titleSearch}
+                      onChange={(e) => {
+                        setTitleSearch(e.target.value);
+                        scrollToMoviesListing();
+                      }}
+                      placeholder="Search movies"
+                      aria-label="Search movies by title"
+                      className="w-full h-9 pl-9 pr-8 rounded-full border border-slate-200 bg-white text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]"
+                    />
+                    {titleSearch ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTitleSearch("");
+                          scrollToMoviesListing();
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-[#6900AA] cursor-pointer"
+                        aria-label="Clear search"
+                      >
+                        <X size={14} />
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
                     <button
                       type="button"
-                      onClick={() => {
-                        setFilterModalTab("language");
-                        setFiltersOpen(true);
-                      }}
+                      onClick={() => openFiltersModal("language")}
                       className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] sm:text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
                         selectedMovieFilterChips.length > 0 || filtersOpen
                           ? "bg-slate-100 border-slate-400 text-slate-800"
@@ -1402,18 +1527,13 @@ export default function MovieLandingPage() {
                 {viewAllTitle}
               </h3>
               {viewAllMovies.length === 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
-                  <p className="text-sm font-semibold text-slate-800">No movies match these filters</p>
-                  {hasActiveFilters ? (
-                    <button
-                      type="button"
-                      onClick={clearAll}
-                      className="mt-4 cursor-pointer text-sm font-semibold text-[#6900AA] underline"
-                    >
-                      Clear filters
-                    </button>
-                  ) : null}
-                </div>
+                <MoviesEmptyState
+                  title="No movies match these filters"
+                  description="Try clearing filters or choosing another language."
+                  actionLabel={hasActiveFilters ? "Clear filters" : undefined}
+                  onAction={hasActiveFilters ? clearAll : undefined}
+                  variant={hasActiveFilters ? "filters" : "generic"}
+                />
               ) : (
                 <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
                   {viewAllMovies.map((movie) => (
@@ -1442,29 +1562,20 @@ export default function MovieLandingPage() {
                   </Link>
                 </div>
               ) : movies.length === 0 ? (
-                <div
-                  className={`rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center ${
-                    isFetching ? "opacity-70" : ""
-                  }`}
-                >
-                  <p className="text-sm font-semibold text-slate-800">
-                    {hasActiveFilters ? "No movies match these filters" : "No movies available yet"}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {hasActiveFilters
+                <MoviesEmptyState
+                  title={
+                    hasActiveFilters ? "No movies match these filters" : "No movies available yet"
+                  }
+                  description={
+                    hasActiveFilters
                       ? "Try clearing filters or choosing another language."
-                      : "Check back soon for the latest titles in cinemas."}
-                  </p>
-                  {hasActiveFilters ? (
-                    <button
-                      type="button"
-                      onClick={clearAll}
-                      className="mt-4 cursor-pointer text-sm font-semibold text-[#6900AA] underline"
-                    >
-                      Clear filters
-                    </button>
-                  ) : null}
-                </div>
+                      : "Check back soon for the latest titles in cinemas."
+                  }
+                  actionLabel={hasActiveFilters ? "Clear filters" : undefined}
+                  onAction={hasActiveFilters ? clearAll : undefined}
+                  variant={hasActiveFilters ? "filters" : "generic"}
+                  dimmed={isFetching}
+                />
               ) : (
                 <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
@@ -1513,7 +1624,7 @@ export default function MovieLandingPage() {
             <div className="flex items-center justify-end gap-6 px-5 py-3.5 border-t border-slate-100 shrink-0">
               <button
                 type="button"
-                onClick={clearAll}
+                onClick={resetDraftFilters}
                 className="text-base font-bold text-[#6900AA] cursor-pointer"
               >
                 Reset

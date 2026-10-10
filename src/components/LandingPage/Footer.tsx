@@ -2,24 +2,38 @@
 
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
-import { FaFacebookF, FaInstagram } from "react-icons/fa";
+import { FaFacebookF, FaInstagram, FaTiktok, FaYoutube } from "react-icons/fa";
+import images from "@/Images";
 
 const CONTAINER = "bmb-section-container";
 
+const logoOnDarkSrc =
+  typeof images.logoOnDark === "string" ? images.logoOnDark : images.logoOnDark.src;
+
+const PARTNER_CTAS: Array<{ label: string; href: string; primary?: boolean }> = [
+  { label: "List your event", href: "/organizer", primary: true },
+  { label: "List restaurant", href: "/business" },
+  { label: "Partner venue", href: "/venue" },
+  { label: "Join as artist", href: "/artist" },
+  { label: "List cinema", href: "/movie" },
+];
+
 const COLUMNS = [
   {
-    title: "Platform",
+    title: "Movies",
     links: [
-      { label: "Home", href: "/" },
-      { label: "About Us", href: "#about" },
-      { label: "Contact Us", href: "#contact" },
-      { label: "Help Centre", href: "/customer/help" },
+      { label: "Now Showing", href: "/movies" },
+      { label: "Browse Cinemas", href: "/movies/cinemas" },
+      { label: "Gift Cards", href: "/gift-cards" },
+      { label: "List your cinema", href: "/movie" },
     ],
   },
   {
     title: "Events",
     links: [
       { label: "Discover Events", href: "/events" },
+      { label: "Venues", href: "/venues" },
+      { label: "Artists", href: "/artists" },
       { label: "List your event", href: "/organizer" },
     ],
   },
@@ -31,141 +45,195 @@ const COLUMNS = [
     ],
   },
   {
-    title: "Venues & Artists",
+    title: "Partners",
     links: [
       { label: "Partner your venue", href: "/venue" },
       { label: "Join as artist", href: "/artist" },
-      { label: "List your cinema", href: "/movie" },
+      { label: "List Your Show", href: "/list-your-show" },
     ],
   },
   {
     title: "Support",
     links: [
-      { label: "Help Center", href: "/customer/help" },
-      { label: "FAQs", href: "/customer/help" },
+      { label: "Help Centre", href: "/customer/help" },
       { label: "My Bookings", href: "/customer/dashboard" },
+      { label: "My Gift Cards", href: "/customer/gift-cards" },
       { label: "My Account", href: "/customer/profile" },
+      { label: "About Us", href: "/#about" },
+      { label: "Contact Us", href: "/#contact" },
     ],
   },
-];
+] as const;
+
+const SOCIAL_LINKS = [
+  { label: "Facebook", href: "https://facebook.com", Icon: FaFacebookF },
+  { label: "Instagram", href: "https://instagram.com", Icon: FaInstagram },
+  { label: "YouTube", href: "https://youtube.com", Icon: FaYoutube },
+  { label: "TikTok", href: "https://tiktok.com", Icon: FaTiktok },
+] as const;
+
+const QUICK_LINKS = [
+  { label: "Home", href: "/" },
+  { label: "Movies", href: "/movies" },
+  { label: "Events", href: "/events" },
+  { label: "Dining", href: "/dining" },
+  { label: "Gift Cards", href: "/gift-cards" },
+] as const;
 
 export default function Footer() {
   return (
-    <footer id="contact" className="bg-[#111111] text-white">
-      <div className="border-b border-white/10">
-        <div
-          className={`${CONTAINER} py-6 sm:py-8 flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8 justify-between`}
-        >
-          <div className="min-w-0 shrink">
-            <p className="type-brand font-semibold">Partner with Book My Bota</p>
-            <p className="type-body text-[#B0B0B0] mt-1">
-              Events, dining, venues, and artists — grow with one platform.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2.5 sm:gap-3">
-            <Link
-              href="/organizer"
-              className="inline-flex items-center h-10 px-4 rounded-lg bg-[#6900AA] hover:bg-[#57008E] type-body font-medium text-white"
-            >
-              List your event
-            </Link>
-            <Link
-              href="/business"
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] type-body font-medium text-white hover:bg-white/5"
-            >
-              List restaurant
-            </Link>
-            <Link
-              href="/venue"
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
-            >
-              Partner venue
-            </Link>
-            <Link
-              href="/artist"
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
-            >
-              Join as artist
-            </Link>
-            <Link
-              href="/movie"
-              className="inline-flex items-center h-10 px-4 rounded-lg border border-[#6900AA] text-sm font-medium text-white hover:bg-white/5"
-            >
-              List cinema
-            </Link>
+    <footer id="contact" className="bg-[#0B0B0B] text-white">
+      {/* Partner CTA */}
+      <div className="border-b border-white/10 bg-[#141414]">
+        <div className={`${CONTAINER} py-7 sm:py-8`}>
+          <div className="flex flex-col gap-5">
+            <div className="max-w-2xl">
+              <p className="text-lg sm:text-xl font-semibold tracking-tight text-white">
+                Partner with Book My Bota
+              </p>
+              <p className="mt-1.5 text-sm text-[#A3A3A3] leading-relaxed">
+                Movies, events, dining, venues, and artists — grow with one platform.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              {PARTNER_CTAS.map((cta) => (
+                <Link
+                  key={cta.href}
+                  href={cta.href}
+                  className={
+                    cta.primary
+                      ? "inline-flex h-10 items-center justify-center rounded-full bg-[#6900AA] px-4 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(105,0,170,0.35)] transition-colors hover:bg-[#57008E]"
+                      : "inline-flex h-10 items-center justify-center rounded-full border border-white/20 bg-transparent px-4 text-sm font-medium text-white transition-colors hover:border-[#6900AA] hover:bg-[#6900AA]/15"
+                  }
+                >
+                  {cta.label}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className={`${CONTAINER} pt-8 sm:pt-10 pb-8`}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-8">
-          <div id="about" className="col-span-2 sm:col-span-3 lg:col-span-1">
-            <p className="type-brand font-extrabold">
-              <span className="text-white">Book My </span>
-              <span className="text-[#6900AA]">Bota</span>
+      {/* Main grid */}
+      <div className={`${CONTAINER} py-10 sm:py-12`}>
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
+          {/* Brand */}
+          <div id="about" className="lg:col-span-4 xl:col-span-3">
+            <Link href="/" className="inline-flex" aria-label="Book My Bota home">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoOnDarkSrc}
+                alt="Book My Bota"
+                className="h-12 w-auto max-w-[220px] object-contain object-left"
+              />
+            </Link>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-[#A3A3A3]">
+              Book movies, events, and dining experiences across Ethiopia.
             </p>
-            <p className="mt-3 type-body text-[#B0B0B0] leading-relaxed">
-              Discover events and dining experiences near you.
-            </p>
-            <div className="flex items-center gap-3 mt-5">
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[#B0B0B0] hover:text-white"
-                aria-label="Facebook"
-              >
-                <FaFacebookF size={16} />
-              </a>
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[#B0B0B0] hover:text-white"
-                aria-label="Instagram"
-              >
-                <FaInstagram size={18} />
-              </a>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {QUICK_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[#D4D4D4] transition-colors hover:border-[#6900AA]/50 hover:text-white"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
 
-            <h4 className="type-label font-semibold text-white mt-6 mb-3">Contact</h4>
-            <ul className="space-y-3 type-body text-[#B0B0B0]">
-              <li className="flex items-start gap-2.5">
-                <Phone size={14} className="mt-0.5 shrink-0" />
+            <div className="mt-6 flex items-center gap-2.5">
+              {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-[#D4D4D4] transition-colors hover:border-[#6900AA]/60 hover:bg-[#6900AA]/20 hover:text-white"
+                  aria-label={label}
+                >
+                  <Icon size={14} />
+                </a>
+              ))}
+            </div>
+
+            <div className="mt-7 space-y-3 text-sm text-[#A3A3A3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/80">
+                Contact
+              </p>
+              <a
+                href="tel:+251900000000"
+                className="flex items-center gap-2.5 transition-colors hover:text-white"
+              >
+                <Phone size={14} className="shrink-0 text-[#6900AA]" />
                 +251 9XX XXX XXX
-              </li>
-              <li className="flex items-start gap-2.5">
-                <Mail size={14} className="mt-0.5 shrink-0" />
+              </a>
+              <a
+                href="mailto:info@bookmybota.com"
+                className="flex items-center gap-2.5 transition-colors hover:text-white"
+              >
+                <Mail size={14} className="shrink-0 text-[#6900AA]" />
                 info@bookmybota.com
-              </li>
-              <li className="flex items-start gap-2.5">
-                <MapPin size={14} className="mt-0.5 shrink-0" />
+              </a>
+              <p className="flex items-center gap-2.5">
+                <MapPin size={14} className="shrink-0 text-[#6900AA]" />
                 Addis Ababa, Ethiopia
-              </li>
-            </ul>
+              </p>
+            </div>
           </div>
 
-          {COLUMNS.map((col) => (
-            <div key={col.title}>
-              <h4 className="type-label font-semibold text-white mb-4">{col.title}</h4>
-              <ul className="space-y-2.5">
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="type-body text-[#B0B0B0] hover:text-white">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Link columns */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 md:grid-cols-5 lg:col-span-8 xl:col-span-9">
+            {COLUMNS.map((col) => (
+              <div key={col.title} className="min-w-0">
+                <h4 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-white">
+                  {col.title}
+                </h4>
+                <ul className="space-y-2.5">
+                  {col.links.map((link) => (
+                    <li key={`${col.title}-${link.label}`}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-[#A3A3A3] transition-colors hover:text-white"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* Bottom bar */}
       <div className="border-t border-white/10">
-        <p className={`${CONTAINER} py-5 text-center type-legal text-[#B0B0B0]`}>
-          © {new Date().getFullYear()} Book My Bota. All rights reserved.
-        </p>
+        <div
+          className={`${CONTAINER} flex flex-col items-center justify-between gap-3 py-5 sm:flex-row`}
+        >
+          <p className="text-center text-xs text-[#737373] sm:text-left">
+            © {new Date().getFullYear()} Book My Bota. All rights reserved.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-[#737373]">
+            <Link href="/customer/help" className="transition-colors hover:text-white">
+              Help
+            </Link>
+            <span className="hidden text-white/20 sm:inline" aria-hidden>
+              |
+            </span>
+            <Link href="/gift-cards" className="transition-colors hover:text-white">
+              Gift Cards
+            </Link>
+            <span className="hidden text-white/20 sm:inline" aria-hidden>
+              |
+            </span>
+            <Link href="/list-your-show" className="transition-colors hover:text-white">
+              List Your Show
+            </Link>
+          </div>
+        </div>
       </div>
     </footer>
   );

@@ -2,12 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Heart, Search } from "lucide-react";
 import {
   useGetPublicRegisteredCinemasQuery,
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { cinemaHref } from "@/lib/businessPublicPath";
+import {
+  setOrDeleteParam,
+  stableSearchParamsString,
+} from "@/lib/filterUrlSync";
 import { CinemaListShimmer } from "@/components/Shared/Shimmer";
 
 const PAGE_BG = "#f5f5f5";
@@ -129,8 +134,21 @@ function CinemaCardItem({
 }
 
 export default function CinemaListingPage() {
-  const [city, setCity] = useState("");
-  const [search, setSearch] = useState("");
+  const router = useRouter();
+  const pathname = usePathname() || "/movies/cinemas";
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+
+  const [city, setCity] = useState(() => {
+    const cityParam = searchParams.get("city");
+    if (cityParam) return cityParam === "All Cities" ? "" : cityParam;
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("selected_city");
+      return stored && stored !== "All Cities" ? stored : "";
+    }
+    return "";
+  });
+  const [search, setSearch] = useState(() => searchParams.get("q") || "");
   const [favorites, setFavorites] = useState<string[]>([]);
 
   const queryArgs = useMemo(
@@ -145,17 +163,33 @@ export default function CinemaListingPage() {
 
   useEffect(() => {
     const applyCity = () => {
-      const params = new URLSearchParams(window.location.search);
-      const cityParam = params.get("city");
       const stored = localStorage.getItem("selected_city");
-      if (cityParam && cityParam !== "All Cities") setCity(cityParam);
-      else if (stored && stored !== "All Cities") setCity(stored);
-      else setCity("");
+      setCity(stored && stored !== "All Cities" ? stored : "");
     };
-    applyCity();
     window.addEventListener("selected_city_changed", applyCity);
     return () => window.removeEventListener("selected_city_changed", applyCity);
   }, []);
+
+  useEffect(() => {
+    const qFromUrl = searchParams.get("q") || "";
+    const cityParam = searchParams.get("city");
+    setSearch((prev) => (prev === qFromUrl ? prev : qFromUrl));
+    if (cityParam) {
+      const nextCity = cityParam === "All Cities" ? "" : cityParam;
+      setCity((prev) => (prev === nextCity ? prev : nextCity));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParamsKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    setOrDeleteParam(params, "q", search.trim());
+    setOrDeleteParam(params, "city", city);
+    if (stableSearchParamsString(params) === stableSearchParamsString(searchParams)) return;
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, city, pathname, router]);
 
   useEffect(() => {
     try {

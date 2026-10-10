@@ -1,13 +1,22 @@
 "use client";
 
-import { use } from "react";
+import { Suspense, use } from "react";
 import CinemaDetailPage from "@/components/MovieLandingPage/CinemaDetailPage";
+import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function CinemaDetailRoutePage({ params }: PageProps) {
+function CinemaDetailRouteInner({ params }: PageProps) {
   const { id } = use(params);
   return <CinemaDetailPage cinemaId={id} />;
+}
+
+export default function CinemaDetailRoutePage({ params }: PageProps) {
+  return (
+    <Suspense fallback={<CustomerFullscreenShimmer />}>
+      <CinemaDetailRouteInner params={params} />
+    </Suspense>
+  );
 }

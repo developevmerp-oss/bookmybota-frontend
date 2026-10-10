@@ -827,13 +827,32 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
   );
 
   const accessibilityCategories = useMemo(() => {
-    const byTier = new Map<
-      string,
-      { name: string; price: number; rows: Map<string, { label: string; seatIds: string[] }> }
-    >();
+    type RowAcc = {
+      label: string;
+      seatIds: string[];
+      seats: Array<{ id: string; number: string; isBooked: boolean }>;
+    };
+    type TierAcc = {
+      name: string;
+      price: number;
+      rows: Map<string, RowAcc>;
+    };
+
+    const useAccessibleOnly = gridRows.some((r) =>
+      r.seats.some((s) => s.isAccessible && !s.isBooked && !s.isAisleGap)
+    );
+
+    const seatSelectable = (seat: GridSeat) => {
+      if (seat.isAisleGap || seat.isBooked) return false;
+      if (useAccessibleOnly) return Boolean(seat.isAccessible);
+      return true;
+    };
+
+    const byTier = new Map<string, TierAcc>();
+
     for (const row of gridRows) {
       for (const seat of row.seats) {
-        if (!seat.isAccessible || seat.isBooked) continue;
+        if (seat.isAisleGap) continue;
         if (!byTier.has(seat.tierName)) {
           byTier.set(seat.tierName, {
             name: seat.tierName,
@@ -842,21 +861,45 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           });
         }
         const tier = byTier.get(seat.tierName)!;
-        if (!tier.rows.has(seat.row)) {
-          tier.rows.set(seat.row, { label: seat.row, seatIds: [] });
+        if (!tier.rows.has(row.rowLabel)) {
+          tier.rows.set(row.rowLabel, { label: row.rowLabel, seatIds: [], seats: [] });
         }
-        tier.rows.get(seat.row)!.seatIds.push(seat.id);
+        const rowAcc = tier.rows.get(row.rowLabel)!;
+        if (!rowAcc.seats.some((s) => s.id === seat.id)) {
+          rowAcc.seats.push({
+            id: seat.id,
+            number: String(seat.number),
+            isBooked: seat.isBooked,
+          });
+        }
+        if (seatSelectable(seat) && !rowAcc.seatIds.includes(seat.id)) {
+          rowAcc.seatIds.push(seat.id);
+        }
       }
     }
-    return Array.from(byTier.values()).map((t) => ({
-      name: t.name,
-      price: t.price,
-      rows: Array.from(t.rows.values()).map((r) => ({
-        label: r.label,
-        availableCount: r.seatIds.length,
-        seatIds: r.seatIds,
-      })),
-    }));
+
+    const sortSeats = (seats: RowAcc["seats"]) =>
+      [...seats].sort((a, b) => {
+        const na = Number.parseInt(a.number, 10);
+        const nb = Number.parseInt(b.number, 10);
+        if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb;
+        return a.number.localeCompare(b.number);
+      });
+
+    return Array.from(byTier.values())
+      .map((t) => ({
+        name: t.name,
+        price: t.price,
+        rows: Array.from(t.rows.values())
+          .filter((r) => r.seatIds.length > 0)
+          .map((r) => ({
+            label: r.label,
+            availableCount: r.seatIds.length,
+            seatIds: r.seatIds,
+            seats: sortSeats(r.seats),
+          })),
+      }))
+      .filter((t) => t.rows.length > 0);
   }, [gridRows]);
 
   const resetSeatPromos = () => {

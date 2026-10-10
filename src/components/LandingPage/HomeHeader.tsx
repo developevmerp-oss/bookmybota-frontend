@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, MapPin, Search, User } from "lucide-react";
@@ -222,10 +222,14 @@ export default function HomeHeader() {
     };
   }, [pathname]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const COMPACT_AFTER_Y = 72;
     const EXPAND_BELOW_Y = 24;
-    let compact = false;
+    // Sync from real scrollY — do not start local `compact` at false while React
+    // state may still be true from the previous route (skips setState and leaves
+    // sticky logo/login duplicated under the main header until the user scrolls).
+    let compact = window.scrollY >= COMPACT_AFTER_Y;
+    setCompactHeader(compact);
     const onScroll = () => {
       const y = window.scrollY;
       let next = compact;
@@ -235,9 +239,20 @@ export default function HomeHeader() {
       compact = next;
       setCompactHeader(next);
     };
-    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    // Parent layout also scrollTo(0) on route change — re-sync after that.
+    const raf = window.requestAnimationFrame(() => {
+      if (window.scrollY <= EXPAND_BELOW_Y) {
+        compact = false;
+        setCompactHeader(false);
+      } else {
+        onScroll();
+      }
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, [pathname]);
 
   const handleCityChange = (next: string) => {

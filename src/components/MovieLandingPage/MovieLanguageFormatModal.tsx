@@ -48,7 +48,7 @@ export function groupsFromShowtimes(
   for (const cinema of cinemas) {
     for (const st of cinema.showtimes) {
       const language = (st.language || "").trim();
-      const format = (st.format || "").trim();
+      const format = ((st.format || st.screen_type || "") as string).trim();
       if (!language || !format) continue;
 
       const langKey = normalizeKey(language);

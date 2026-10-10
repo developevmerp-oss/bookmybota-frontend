@@ -38,7 +38,18 @@ import {
   type PublicRegisteredPartner,
 } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
-import { isMovieShowEnded } from "@/lib/dateFormat";
+import {
+  isMovieShowEnded,
+  venueCalendarAddDays,
+  venueDateLabels,
+  venueDateStr,
+} from "@/lib/dateFormat";
+import {
+  cinemaGroupMatchesTarget,
+  isPreferredTimeBandPast,
+  matchesAnyNormalized,
+  normalizeFilterKey,
+} from "@/lib/movieShowtimeFilters";
 import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 const PAGE_BG = "#F4F2F8";
@@ -129,27 +140,36 @@ function formatDuration(minutes?: number | null) {
   return `${h}h ${m}m`;
 }
 
-function generateDateOptions(count = 7) {
+function buildVenueDateOptions(count = 7) {
+  const start = venueDateStr();
   const options: Array<{
     dateStr: string;
     weekdayShort: string;
     dayNumber: string;
     monthName: string;
   }> = [];
-  const today = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-
   for (let i = 0; i < count; i++) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
-    const weekdayShort = d.toLocaleDateString("en-US", { weekday: "short" });
+    const dateStr = venueCalendarAddDays(start, i);
+    const labels = venueDateLabels(dateStr);
     options.push({
-      dateStr: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-      weekdayShort,
-      dayNumber: pad(d.getDate()),
-      monthName: d.toLocaleDateString("en-US", { month: "short" }),
+      dateStr,
+      weekdayShort: labels.weekdayShort,
+      dayNumber: labels.dayNumber,
+      monthName: labels.monthName,
     });
   }
   return options;
+}
+
+function cinemaFavoriteLegacyKeys(
+  apiCinema: PublicRegisteredPartner | undefined,
+  routeKey: string
+): string[] {
+  return [apiCinema?.id, apiCinema?.slug, routeKey].filter(Boolean) as string[];
+}
+
+function isCinemaFavorited(list: string[], legacyKeys: string[]): boolean {
+  return legacyKeys.some((k) => list.includes(k));
 }
 
 function mapPartnerAddress(v: PublicRegisteredPartner) {
@@ -192,7 +212,13 @@ const STATUS_DOT: Record<"available" | "filling" | "almost", string> = {
   almost: "bg-[#EF4444]",
 };
 
-type FilterOption = { value: string; label: string; hint?: string; icon?: ReactNode };
+type FilterOption = {
+  value: string;
+  label: string;
+  hint?: string;
+  icon?: ReactNode;
+  disabled?: boolean;
+};
 
 const PRICE_BAND_OPTIONS: FilterOption[] = [
   { value: "0-200", label: "ETB 0-200" },
@@ -231,6 +257,13 @@ const TIMING_OPTIONS: FilterOption[] = [
     icon: <Moon size={18} className="text-[#6366F1]" />,
   },
 ];
+
+function preferredTimeOptionsForDate(selectedDate: string, now = new Date()): FilterOption[] {
+  return TIMING_OPTIONS.map((opt) => ({
+    ...opt,
+    disabled: isPreferredTimeBandPast(opt.value, selectedDate, now),
+  }));
+}
 
 function priceInBands(price: number, bands: string[]) {
   if (bands.length === 0) return true;
@@ -325,7 +358,8 @@ function BmsFilterDropdown({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open, onOpenChange]);
 
-  const toggle = (value: string) => {
+  const toggle = (value: string, disabled?: boolean) => {
+    if (disabled) return;
     if (values.includes(value)) onChange(values.filter((v) => v !== value));
     else onChange([...values, value]);
   };
@@ -351,33 +385,58 @@ function BmsFilterDropdown({
             ) : (
               options.map((opt) => {
                 const checked = values.includes(opt.value);
+                const disabled = Boolean(opt.disabled);
                 return (
-                  <li key={opt.value} role="option" aria-selected={checked}>
+                  <li
+                    key={opt.value}
+                    role="option"
+                    aria-selected={checked}
+                    aria-disabled={disabled}
+                  >
                     <button
                       type="button"
-                      onClick={() => toggle(opt.value)}
-                      className="w-full px-3.5 py-2.5 flex items-center gap-3 text-left text-[13px] text-[#333333] hover:bg-[#F7E9FF]/70 cursor-pointer transition-colors"
+                      disabled={disabled}
+                      onClick={() => toggle(opt.value, disabled)}
+                      className={`w-full px-3.5 py-2.5 flex items-center gap-3 text-left text-[13px] transition-colors ${
+                        disabled
+                          ? "cursor-not-allowed bg-white"
+                          : "text-[#333333] hover:bg-[#F7E9FF]/70 cursor-pointer"
+                      }`}
                     >
-                      {opt.icon ? <span className="shrink-0">{opt.icon}</span> : null}
+                      {opt.icon ? (
+                        <span className={`shrink-0 ${disabled ? "opacity-[0.35] grayscale" : ""}`}>
+                          {opt.icon}
+                        </span>
+                      ) : null}
                       <span className="flex-1 min-w-0">
-                        <span className="font-semibold block text-[#222222] leading-tight">
+                        <span
+                          className={`font-semibold block leading-tight ${
+                            disabled ? "text-[#B8B8B8]" : "text-[#222222]"
+                          }`}
+                        >
                           {opt.label}
                         </span>
                         {opt.hint ? (
-                          <span className="block mt-0.5 text-[11px] text-[#9CA3AF] font-normal leading-tight">
+                          <span
+                            className={`block mt-0.5 text-[11px] font-normal leading-tight ${
+                              disabled ? "text-[#D0D0D0]" : "text-[#9CA3AF]"
+                            }`}
+                          >
                             {opt.hint}
                           </span>
                         ) : null}
                       </span>
                       <span
                         className={`h-4 w-4 shrink-0 rounded-[3px] border flex items-center justify-center ${
-                          checked
-                            ? "border-[#6900AA] bg-[#6900AA] text-white"
-                            : "border-[#9CA3AF] bg-white"
+                          disabled
+                            ? "border-0 bg-[#E0E0E0]"
+                            : checked
+                              ? "border-[#6900AA] bg-[#6900AA] text-white"
+                              : "border-[#9CA3AF] bg-white"
                         }`}
                         aria-hidden
                       >
-                        {checked ? (
+                        {!disabled && checked ? (
                           <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                             <path
                               d="M2.5 6.2L4.8 8.5L9.5 3.5"
@@ -578,7 +637,7 @@ function MobileBottomSheet({
 
 export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
   const router = useRouter();
-  const dateOptions = useMemo(() => generateDateOptions(7), []);
+  const dateOptions = useMemo(() => buildVenueDateOptions(7), []);
   const [selectedDate, setSelectedDate] = useState(dateOptions[0]?.dateStr || "");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [favorited, setFavorited] = useState(false);
@@ -613,6 +672,11 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     (v) => v.id === cinemaId || (v.slug != null && v.slug === cinemaId)
   );
   const resolvedCinemaId = apiCinema?.id || cinemaId;
+  const favoriteStorageId = apiCinema?.id || cinemaId;
+  const favoriteLegacyKeys = useMemo(
+    () => cinemaFavoriteLegacyKeys(apiCinema, cinemaId),
+    [apiCinema, cinemaId]
+  );
   const showcase = SHOWCASE_BY_ID[cinemaId] || SHOWCASE_BY_ID[resolvedCinemaId];
 
   const cinemaName = apiCinema?.name || showcase?.name || "Cinema";
@@ -661,11 +725,11 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     try {
       const raw = localStorage.getItem("movie_cinema_favorites");
       const list = raw ? (JSON.parse(raw) as string[]) : [];
-      setFavorited(list.includes(cinemaId));
+      setFavorited(isCinemaFavorited(list, favoriteLegacyKeys));
     } catch {
       setFavorited(false);
     }
-  }, [cinemaId]);
+  }, [favoriteLegacyKeys]);
 
   const toggleFavorite = () => {
     setFavorited((prev) => {
@@ -673,9 +737,9 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
       try {
         const raw = localStorage.getItem("movie_cinema_favorites");
         const list: string[] = raw ? (JSON.parse(raw) as string[]) : [];
-        const updated = next
-          ? Array.from(new Set([...list, cinemaId]))
-          : list.filter((id) => id !== cinemaId);
+        const legacy = new Set(favoriteLegacyKeys);
+        let updated = list.filter((id) => !legacy.has(id));
+        if (next) updated = Array.from(new Set([...updated, favoriteStorageId]));
         localStorage.setItem("movie_cinema_favorites", JSON.stringify(updated));
       } catch {
         /* ignore */
@@ -683,6 +747,30 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
       return next;
     });
   };
+
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setClockTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const preferredTimeOptions = useMemo(
+    () => preferredTimeOptionsForDate(selectedDate),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick refreshes past-band checks
+    [selectedDate, clockTick]
+  );
+
+  useEffect(() => {
+    const now = new Date();
+    setTimeFilters((prev) => {
+      const next = prev.filter((v) => !isPreferredTimeBandPast(v, selectedDate, now));
+      return next.length === prev.length ? prev : next;
+    });
+    setDraftTimeFilters((prev) => {
+      const next = prev.filter((v) => !isPreferredTimeBandPast(v, selectedDate, now));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [selectedDate, clockTick]);
 
   useEffect(() => {
     if (!apiCinema || !selectedDate) {
@@ -705,7 +793,13 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
               date: selectedDate,
               city_slug: city || undefined,
             }).unwrap();
-            const group = (res.cinemas || []).find((c) => c.id === resolvedCinemaId);
+            const group = (res.cinemas || []).find((c) =>
+              cinemaGroupMatchesTarget(c, {
+                id: resolvedCinemaId,
+                slug: apiCinema?.slug ?? cinemaId,
+                routeKey: cinemaId,
+              })
+            );
             if (!group?.showtimes?.length) return null;
             return {
               movie,
@@ -726,7 +820,16 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [apiCinema, resolvedCinemaId, selectedDate, city, moviesPage?.items, loadingMovies, fetchShowtimes]);
+  }, [
+    apiCinema,
+    resolvedCinemaId,
+    cinemaId,
+    selectedDate,
+    city,
+    moviesPage?.items,
+    loadingMovies,
+    fetchShowtimes,
+  ]);
 
   const languageOptions = useMemo(() => {
     const set = new Set<string>();
@@ -738,6 +841,55 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
       .sort()
       .map((l) => ({ value: l, label: l }));
   }, [rows]);
+
+  useEffect(() => {
+    const valid = new Set(languageOptions.map((o) => normalizeFilterKey(o.value)));
+    setLanguageFilters((prev) => {
+      const next = prev.filter((v) => valid.has(normalizeFilterKey(v)));
+      return next.length === prev.length ? prev : next;
+    });
+    setDraftLanguageFilters((prev) => {
+      const next = prev.filter((v) => valid.has(normalizeFilterKey(v)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [languageOptions]);
+
+  const hasActiveFilters =
+    languageFilters.length > 0 ||
+    timeFilters.length > 0 ||
+    priceFilters.length > 0 ||
+    Boolean(movieSearch.trim());
+
+  const hasLiveShowtimes = useMemo(
+    () =>
+      rows.some((row) =>
+        row.showtimes.some(
+          (st) =>
+            !isMovieShowEnded({
+              starts_at: st.starts_at,
+              ends_at: st.ends_at,
+              booking_state: st.booking_state,
+              is_ended: st.is_ended,
+            })
+        )
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick re-checks ended shows
+    [rows, clockTick]
+  );
+
+  const nextDateStr = useMemo(() => {
+    const idx = dateOptions.findIndex((d) => d.dateStr === selectedDate);
+    if (idx < 0 || idx >= dateOptions.length - 1) return null;
+    return dateOptions[idx + 1]?.dateStr ?? null;
+  }, [dateOptions, selectedDate]);
+
+  const clearAllFilters = () => {
+    setLanguageFilters([]);
+    setTimeFilters([]);
+    setPriceFilters([]);
+    setMovieSearch("");
+    closeSearch();
+  };
 
   const filteredRows = useMemo(() => {
     const q = movieSearch.trim().toLowerCase();
@@ -753,7 +905,9 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
             })
         );
         if (languageFilters.length > 0) {
-          showtimes = showtimes.filter((st) => languageFilters.includes(st.language));
+          showtimes = showtimes.filter((st) =>
+            matchesAnyNormalized(st.language, languageFilters)
+          );
         }
         if (timeFilters.length > 0) {
           showtimes = showtimes.filter((st) => matchesPreferredTime(st.starts_at, timeFilters));
@@ -775,7 +929,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
           row.languageFormat.toLowerCase().includes(q)
         );
       });
-  }, [rows, languageFilters, timeFilters, priceFilters, movieSearch]);
+  }, [rows, languageFilters, timeFilters, priceFilters, movieSearch, clockTick]);
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     `${cinemaName} ${cinemaAddress}`
@@ -798,11 +952,13 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
     setValues(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
   };
 
-  const filterChipClass = (active: boolean) =>
-    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold cursor-pointer transition-colors ${
-      active
-        ? "border-[#6900AA] bg-[#6900AA] text-white"
-        : "border-[#6900AA]/55 bg-white text-[#6900AA]"
+  const filterChipClass = (active: boolean, disabled = false) =>
+    `inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-semibold transition-colors ${
+      disabled
+        ? "border-[#E8E8E8] text-[#C8C8C8] bg-white cursor-not-allowed"
+        : active
+          ? "border-[#6900AA] bg-[#6900AA] text-white cursor-pointer"
+          : "border-[#6900AA]/55 bg-white text-[#6900AA] cursor-pointer"
     }`;
 
   const mobilePillClass = (active: boolean) =>
@@ -1201,7 +1357,7 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
                     <BmsFilterDropdown
                       label="Select Timing"
                       values={timeFilters}
-                      options={TIMING_OPTIONS}
+                      options={preferredTimeOptions}
                       open={openFilter === "timing"}
                       onOpenChange={(next) => setOpenFilter(next ? "timing" : null)}
                       onChange={setTimeFilters}
@@ -1273,11 +1429,38 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
               <p className="text-sm font-medium">Loading showtimes…</p>
             </div>
           ) : filteredRows.length === 0 ? (
-            <div className="rounded-2xl border border-[#E8E2F2] bg-white px-5 py-16 text-center">
-              <p className="text-[#111111] font-semibold">No shows for this date</p>
-              <p className="mt-1 text-sm text-[#6B7280]">
-                Try another date, clear filters, or check back later.
-              </p>
+            <div className="rounded-2xl border border-[#E8E2F2] bg-white px-5 py-16 text-center space-y-3">
+              {hasLiveShowtimes && hasActiveFilters ? (
+                <>
+                  <p className="text-[#111111] font-semibold">No matching showtimes</p>
+                  <p className="text-sm text-[#6B7280]">
+                    No showtimes match your filters or search. Try clearing filters.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#111111] text-white text-xs font-bold hover:opacity-90 cursor-pointer"
+                  >
+                    Clear Filters
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-[#111111] font-semibold">No shows for this date</p>
+                  <p className="text-sm text-[#6B7280]">
+                    Ended showtimes are hidden. Pick another day to see what&apos;s playing.
+                  </p>
+                  {nextDateStr ? (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(nextDateStr)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#6900AA] text-[#6900AA] text-xs font-bold hover:bg-[#F7E9FF] cursor-pointer"
+                    >
+                      Try next date
+                    </button>
+                  ) : null}
+                </>
+              )}
             </div>
           ) : (
             filteredRows.map((row) => {
@@ -1415,18 +1598,24 @@ export default function CinemaDetailPage({ cinemaId }: { cinemaId: string }) {
             Preferred Time
           </div>
           <div className="flex flex-wrap gap-2 px-4 py-3">
-            {TIMING_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() =>
-                  toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value)
-                }
-                className={filterChipClass(draftTimeFilters.includes(opt.value))}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {preferredTimeOptions.map((opt) => {
+              const disabled = Boolean(opt.disabled);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (disabled) return;
+                    toggleDraftValue(draftTimeFilters, setDraftTimeFilters, opt.value);
+                  }}
+                  className={filterChipClass(draftTimeFilters.includes(opt.value), disabled)}
+                  title={disabled ? "This time period has passed" : undefined}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
 
           <div className="bg-[#F3F4F6] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-[#6B7280]">

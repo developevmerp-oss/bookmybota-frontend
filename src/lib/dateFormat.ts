@@ -274,6 +274,42 @@ export function venueDateStr(now: Date = new Date()): string {
   return `${parts.y}-${pad2(parts.m)}-${pad2(parts.d)}`;
 }
 
+/** Add calendar days to a venue YYYY-MM-DD (Ethiopia product calendar). */
+export function venueCalendarAddDays(ymd: string, days: number): string {
+  const match = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return ymd;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+}
+
+function venueYmdToUtcDate(ymd: string): Date | null {
+  const match = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+}
+
+/** Weekday / month labels for a venue calendar date (display only). */
+export function venueDateLabels(ymd: string): {
+  weekdayShort: string;
+  monthName: string;
+  dayNumber: string;
+} {
+  const match = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const dayNumber = match ? match[3] : "";
+  const dt = venueYmdToUtcDate(ymd);
+  if (!dt) {
+    return { weekdayShort: "", monthName: "", dayNumber };
+  }
+  return {
+    weekdayShort: dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }),
+    monthName: dt.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }),
+    dayNumber,
+  };
+}
+
 /**
  * True when venue "now" is at/after a stored showtime wall clock
  * (naive TIMESTAMP digits = Africa/Addis_Ababa).

@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-const DEFAULT_FALLBACK = 112;
+const DEFAULT_FALLBACK = 64;
 
 /**
- * Live height of the sticky site header (search + category subnav).
- * Re-measures when the header compacts/expands on scroll so listing
- * filter bars can stick flush underneath without a gap.
+ * Live height of the sticky site subheader (category bar, optionally with logo + profile).
+ * Re-measures on scroll/resize so listing filter bars can stick flush underneath.
  */
 export function useStickyHeaderOffset(fallback = DEFAULT_FALLBACK): number {
   const [offset, setOffset] = useState(fallback);
@@ -17,9 +16,11 @@ export function useStickyHeaderOffset(fallback = DEFAULT_FALLBACK): number {
 
     const measure = () => {
       raf = 0;
-      const header = document.querySelector("header.sticky") as HTMLElement | null;
+      const header =
+        (document.querySelector("[data-site-sticky-subheader]") as HTMLElement | null) ||
+        (document.querySelector("header.sticky") as HTMLElement | null);
       const height = header?.getBoundingClientRect().height ?? 0;
-      const next = Math.max(64, Math.round(height || fallback));
+      const next = Math.max(48, Math.round(height || fallback));
       setOffset((prev) => (prev === next ? prev : next));
     };
 
@@ -30,10 +31,11 @@ export function useStickyHeaderOffset(fallback = DEFAULT_FALLBACK): number {
 
     measure();
     window.addEventListener("resize", schedule, { passive: true });
-    // Header/subnav compact via max-height on scroll — keep sticky top in sync.
     window.addEventListener("scroll", schedule, { passive: true });
 
-    const header = document.querySelector("header.sticky");
+    const header =
+      document.querySelector("[data-site-sticky-subheader]") ||
+      document.querySelector("header.sticky");
     const ro =
       header && typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(schedule)

@@ -10,7 +10,7 @@ import images from "@/Images";
 import CitySelectModal from "./CitySelectModal";
 import SearchOverlay from "./SearchOverlay";
 import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
-import SubNavBar from "./SubNavBar";
+import SubNavBar, { ListYourShowCta } from "./SubNavBar";
 import { useAppDispatch } from "@/lib/hooks";
 import { logoutCustomer } from "@/lib/authSession";
 import { coordsForCityName, writeStoredUserGeo, USER_GEO_STORAGE_KEY } from "@/lib/geoDistance";
@@ -187,16 +187,9 @@ export default function HomeHeader() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [customer, setCustomer] = useState<StoredCustomer | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  /** Mobile/tablet: hide city/profile row on scroll; keep search + category bar. */
+  /** After scroll: sticky subheader shows logo + categories + profile. */
   const [compactHeader, setCompactHeader] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/register";
-  /** Listing pages — subnav scrolls away; main header stays sticky */
-  const unstickySubnav =
-    pathname === "/dining" ||
-    pathname === "/movies" ||
-    pathname === "/events" ||
-    pathname === "/venues" ||
-    pathname === "/artists";
   /** Detail pages — hide site header + subnav on mobile/tablet only */
   const hideChromeOnMobileTablet = Boolean(
     (pathname?.match(/^\/movies\/[^/]+\/?$/) && pathname !== "/movies/cinemas") ||
@@ -302,75 +295,136 @@ export default function HomeHeader() {
     return () => observer.disconnect();
   }, []);
 
+  const listYourShowActive =
+    pathname === "/list-your-show" || Boolean(pathname?.startsWith("/list-your-show/"));
+
   const subNav = (
     <Suspense fallback={null}>
-      <SubNavBar />
+      <SubNavBar isStickyChrome={compactHeader} />
     </Suspense>
   );
 
   return (
     <>
-    <header
-      className={`sticky top-0 z-50 bg-white text-[#111111] transition-transform duration-300 ease-out ${
-        diningDetailNavHidden
-          ? `-translate-y-full pointer-events-none ${
-              diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
-            }`
-          : hideChromeOnMobileTablet
-            ? "max-lg:hidden"
-            : "translate-y-0"
-      }`}
-      aria-hidden={diningDetailNavHidden || undefined}
-      data-header-compact={compactHeader ? "1" : "0"}
-    >
-      <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2">
-        {/* Mobile + tablet: city | search icon + profile (full bar only on desktop) */}
-        <div className="flex items-center justify-between gap-2 min-w-0 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setCityOpen(true)}
-            className="inline-flex h-9 items-center gap-1 min-w-0 text-[#111111] type-nav font-semibold hover:text-[#6900AA] transition-colors cursor-pointer"
-          >
-            <MapPin size={16} className="shrink-0 text-[#6900AA]" />
-            <span className="truncate max-w-[11rem] sm:max-w-[16rem]">{cityLabel}</span>
-            <ChevronDown size={14} className="shrink-0 opacity-80" />
-          </button>
-
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+      {/* Main header — scrolls away (not sticky) */}
+      <header
+        className={`relative z-40 bg-white text-[#111111] transition-transform duration-300 ease-out ${
+          diningDetailNavHidden
+            ? `-translate-y-full pointer-events-none ${
+                diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
+              }`
+            : hideChromeOnMobileTablet
+              ? "max-lg:hidden"
+              : "translate-y-0"
+        }`}
+        aria-hidden={diningDetailNavHidden || undefined}
+        data-header-compact={compactHeader ? "1" : "0"}
+      >
+        <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 py-2">
+          {/* Mobile + tablet: city | search icon + profile */}
+          <div className="flex items-center justify-between gap-2 min-w-0 lg:hidden">
             <button
               type="button"
-              onClick={() => setSearchOpen(true)}
-              aria-label="Search"
-              className="w-9 h-9 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0 cursor-pointer"
+              onClick={() => setCityOpen(true)}
+              className="inline-flex h-9 items-center gap-1 min-w-0 text-[#111111] type-nav font-semibold hover:text-[#6900AA] transition-colors cursor-pointer"
             >
-              <Search size={18} strokeWidth={2} />
+              <MapPin size={16} className="shrink-0 text-[#6900AA]" />
+              <span className="truncate max-w-[11rem] sm:max-w-[16rem]">{cityLabel}</span>
+              <ChevronDown size={14} className="shrink-0 opacity-80" />
             </button>
 
-            {/* Gift Cards — temporarily hidden from main header (all breakpoints)
-            <Link
-              href="/gift-cards"
-              aria-label="Gift Cards"
-              className="w-9 h-9 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0"
-            >
-              <Gift size={18} />
-            </Link>
-            */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Search"
+                className="w-9 h-9 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0 cursor-pointer"
+              >
+                <Search size={18} strokeWidth={2} />
+              </button>
 
-            <AuthSection
-              authReady={authReady}
-              customer={customer}
-              displayName={displayName}
-              initial={initial}
-              isAuthPage={isAuthPage}
-              onLogin={() => setLoginOpen(true)}
-              onLogout={handleLogout}
-            />
+              <AuthSection
+                authReady={authReady}
+                customer={customer}
+                displayName={displayName}
+                initial={initial}
+                isAuthPage={isAuthPage}
+                onLogin={() => setLoginOpen(true)}
+                onLogout={handleLogout}
+              />
+            </div>
+          </div>
+
+          {/* Desktop: logo | centered search | city + profile */}
+          <div className="hidden lg:flex items-center gap-3 lg:gap-4 min-w-0">
+            <Link href="/" className="shrink-0 flex items-center">
+              <img
+                src={logoSrc}
+                alt="Book My Bota"
+                className="h-12 lg:h-14 w-auto object-contain"
+              />
+            </Link>
+
+            <div className="flex-1 min-w-0 flex justify-center px-3 xl:px-6">
+              <NavSearchBar
+                variant="desktop"
+                onClick={() => setSearchOpen(true)}
+                className="w-full max-w-[36rem] xl:max-w-[40rem] 2xl:max-w-[44rem]"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 lg:gap-4 shrink-0">
+              <button
+                type="button"
+                onClick={() => setCityOpen(true)}
+                className="flex items-center gap-1.5 type-nav-md font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] min-w-0"
+              >
+                <MapPin size={16} className="shrink-0" />
+                <span className="truncate">{cityLabel}</span>
+                <ChevronDown size={14} className="shrink-0 opacity-80" />
+              </button>
+
+              <HeaderDivider />
+
+              <AuthSection
+                authReady={authReady}
+                customer={customer}
+                displayName={displayName}
+                initial={initial}
+                isAuthPage={isAuthPage}
+                onLogin={() => setLoginOpen(true)}
+                onLogout={handleLogout}
+              />
+            </div>
           </div>
         </div>
+      </header>
 
-        {/* Desktop: logo | centered search | city + profile (logo/city/profile stay put) */}
-        <div className="hidden lg:flex items-center gap-3 lg:gap-4 min-w-0">
-          <Link href="/" className="shrink-0 flex items-center">
+      {/* Subheader — sticky; when scrolled, also shows logo (left) + profile (right) */}
+      <div
+        data-site-sticky-subheader="1"
+        className={`sticky top-0 z-50 border-b border-[#E5E7EB] bg-white transition-shadow duration-300 ${
+          diningDetailNavHidden
+            ? `-translate-y-full pointer-events-none ${
+                diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
+              }`
+            : hideChromeOnMobileTablet
+              ? "max-lg:hidden"
+              : ""
+        } ${compactHeader ? "shadow-[0_2px_10px_rgba(0,0,0,0.08)]" : "shadow-[0_2px_8px_rgba(0,0,0,0.06)]"}`}
+        aria-hidden={diningDetailNavHidden || undefined}
+      >
+        <div className="mx-auto w-full px-3 sm:px-4 md:px-5 lg:px-8 flex items-center gap-3 sm:gap-4 lg:gap-5 min-w-0">
+          <Link
+            href="/"
+            className={`shrink-0 flex items-center overflow-hidden transition-all duration-300 ease-out ${
+              compactHeader
+                ? "opacity-100 max-w-[11rem] sm:max-w-[12rem]"
+                : "opacity-0 max-w-0 pointer-events-none"
+            }`}
+            aria-hidden={!compactHeader}
+            tabIndex={compactHeader ? undefined : -1}
+          >
             <img
               src={logoSrc}
               alt="Book My Bota"
@@ -378,38 +432,35 @@ export default function HomeHeader() {
             />
           </Link>
 
-          <div className="flex-1 min-w-0 flex justify-center px-3 xl:px-6">
-            <NavSearchBar
-              variant="desktop"
-              onClick={() => setSearchOpen(true)}
-              className="w-full max-w-[36rem] xl:max-w-[40rem] 2xl:max-w-[44rem]"
-            />
-          </div>
+          {/* Categories stay in the middle lane only — horizontal scroll inside */}
+          <div className="min-w-0 flex-1">{subNav}</div>
 
-          <div className="flex items-center gap-3 lg:gap-4 shrink-0">
+          {/* Sticky end: search + List Your Show + profile */}
+          <div
+            className={`relative z-10 shrink-0 flex items-center transition-all duration-300 ease-out ${
+              compactHeader
+                ? "opacity-100 gap-3 sm:gap-4 lg:gap-5"
+                : "opacity-0 max-w-0 overflow-hidden pointer-events-none gap-1.5 sm:gap-2"
+            }`}
+            aria-hidden={!compactHeader}
+          >
             <button
               type="button"
-              onClick={() => setCityOpen(true)}
-              className="flex items-center gap-1.5 type-nav-md font-medium text-[#111111] cursor-pointer hover:text-[#6900AA] min-w-0"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search"
+              tabIndex={compactHeader ? undefined : -1}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0 cursor-pointer"
             >
-              <MapPin size={16} className="shrink-0" />
-              <span className="truncate">{cityLabel}</span>
-              <ChevronDown size={14} className="shrink-0 opacity-80" />
+              <Search size={18} strokeWidth={2} />
             </button>
 
-            {/* Gift Cards — temporarily hidden from main header (all breakpoints)
-            <HeaderDivider />
-
-            <Link
-              href="/gift-cards"
-              className="inline-flex items-center gap-1.5 text-[#111111] type-nav-md font-semibold hover:text-[#6900AA] transition-colors whitespace-nowrap"
-            >
-              <Gift size={17} strokeWidth={2} />
-              <span>Gift Cards</span>
-            </Link>
-            */}
-
-            <HeaderDivider />
+            <div className="hidden lg:flex shrink-0 items-center">
+              <ListYourShowCta
+                href="/list-your-show"
+                label="List Your Show"
+                active={listYourShowActive}
+              />
+            </div>
 
             <AuthSection
               authReady={authReady}
@@ -423,8 +474,6 @@ export default function HomeHeader() {
           </div>
         </div>
       </div>
-
-      {!unstickySubnav ? subNav : null}
 
       <CitySelectModal
         open={cityOpen}
@@ -440,8 +489,6 @@ export default function HomeHeader() {
         onClose={() => setLoginOpen(false)}
         onSuccess={() => setCustomer(readCustomer())}
       />
-    </header>
-    {unstickySubnav ? subNav : null}
     </>
   );
 }

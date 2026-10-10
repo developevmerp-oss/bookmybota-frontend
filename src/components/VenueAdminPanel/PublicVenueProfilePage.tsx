@@ -386,7 +386,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
   if (showAllEvents && venueEvents.length > 0) {
     return (
       <div className="min-h-screen bg-white overflow-x-hidden">
-        <div className="bg-white container mx-auto px-4 sm:px-6 lg:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+        <div className="bg-white bmb-section-container py-6 sm:py-8 md:py-10">
           <PartnerAllEventsPanel
             items={venueEvents}
             onBack={() => setShowAllEvents(false)}
@@ -404,7 +404,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
         showStickyInquiry ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-0" : ""
       }`}
     >
-      <div className="mx-auto container px-4 sm:px-6 lg:px-10 2xl:px-0 pt-5 sm:pt-6">
+      <div className="bmb-section-container pt-5 sm:pt-6">
         <Link
           href="/venues"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1B1B3A]/80 hover:text-[#6900AA]"
@@ -413,7 +413,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
         </Link>
       </div>
 
-      <header className="mx-auto container px-4 sm:px-6 lg:px-10 2xl:px-0 pt-4 pb-2 sm:pt-5 sm:pb-3">
+      <header className="bmb-section-container pt-4 pb-2 sm:pt-5 sm:pb-3">
         <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl min-h-[220px] sm:min-h-[280px] md:min-h-[320px] lg:min-h-[360px]">
           {coverSrc ? (
             <img
@@ -468,7 +468,7 @@ export default function PublicVenueProfilePage({ venueId }: { venueId: string })
         </div>
       </header>
 
-      <div className="bg-white container mx-auto px-4 sm:px-6 lg:px-10 2xl:px-0 py-6 sm:py-8 md:py-10">
+      <div className="bg-white bmb-section-container py-6 sm:py-8 md:py-10">
         <div className="flex flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-5">
           <div className="min-w-0 flex-1 order-1 space-y-8 sm:space-y-10">
               {aboutText ? (

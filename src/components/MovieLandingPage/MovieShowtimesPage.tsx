@@ -67,7 +67,7 @@ export default function MovieShowtimesPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
-      <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-6 lg:container lg:px-8 py-0 lg:py-6">
+      <div className="bmb-section-container py-0 lg:py-6">
         <MovieShowtimeSelector
           movieIdOrSlug={idOrSlug}
           movie={{

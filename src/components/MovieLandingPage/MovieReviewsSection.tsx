@@ -208,7 +208,7 @@ export default function MovieReviewsSection({
 
   return (
     <section className="py-8 sm:py-10 bg-white border-t border-slate-100">
-      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
+      <div className="bmb-section-container">
         <div className="flex items-center justify-between gap-3 mb-1">
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[#111111]">
             Top reviews

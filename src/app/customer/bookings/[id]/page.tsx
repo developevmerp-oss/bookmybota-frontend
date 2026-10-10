@@ -164,7 +164,7 @@ export default function BookingDetailPage({
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] pt-8 sm:pt-10 pb-12 sm:pb-16">
-      <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0">
+      <div className="bmb-section-container">
         <Link
           href="/customer/dashboard"
           className="inline-flex items-center gap-2 text-base sm:text-lg lg:text-sm text-slate-500 hover:text-slate-800 mb-5 sm:mb-6 transition-colors"

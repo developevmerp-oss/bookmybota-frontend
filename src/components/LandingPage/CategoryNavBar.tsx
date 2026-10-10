@@ -66,7 +66,7 @@ export default function CategoryNavBar() {
 
   return (
     <nav className="sticky top-16 z-40 bg-[#1F1F1F]">
-      <div className="max-w-7xl mx-auto h-11 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      <div className="bmb-section-container h-11 flex items-center justify-between gap-4">
         <div className="flex items-center gap-5 sm:gap-7 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {LEFT.map((item) => {
             const href =

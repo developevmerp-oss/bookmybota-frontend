@@ -1,6 +1,18 @@
 "use client";
 
-import { Check, Copy, MapPin, Package, Smartphone, User } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  Calendar,
+  Check,
+  Clock,
+  Copy,
+  MapPin,
+  Package,
+  Phone,
+  Smartphone,
+  Ticket,
+  User,
+} from "lucide-react";
 import { formatDateCustomer, formatTime12h, formatInstantLocalDateTime } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
 import { shortBookingCode } from "@/lib/eventTicketPdf";
@@ -46,7 +58,277 @@ type Props = {
   posterUrl?: string | null;
   onCopyCode?: () => void;
   className?: string;
+  variant?: "default" | "confirmation";
+  children?: ReactNode;
 };
+
+function ConfirmationDetailCell({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof User;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 min-w-0">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+        <Icon size={15} strokeWidth={2} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[0.6875rem] font-medium text-slate-500 leading-tight">{label}</p>
+        <p className="mt-0.5 text-[0.875rem] sm:text-[0.9375rem] font-semibold text-slate-900 break-words leading-snug">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmationQrPanel({
+  mode,
+  booking,
+  displayCode,
+  venue,
+  onCopyCode,
+}: {
+  mode: TicketDeliveryMode;
+  booking: EventTicketCardBooking;
+  displayCode: string;
+  venue: string;
+  onCopyCode?: () => void;
+}) {
+  const qrData = eventBookingQrValue(booking);
+  const deliveryText = formatDeliveryAddress(booking);
+
+  if (mode === "PHYSICAL_DELIVERY") {
+    return (
+      <div className="flex h-full flex-col items-center justify-center text-center px-2">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F7E9FF] text-[#6900AA]">
+          <Package size={28} />
+        </span>
+        <p className="mt-4 text-[0.9375rem] font-bold text-slate-900">Home delivery</p>
+        <p className="mt-2 text-[0.8125rem] text-slate-500 leading-relaxed max-w-[14rem]">
+          Printed tickets will be couriered to your address. Track status in My Bookings.
+        </p>
+        {deliveryText && (
+          <p className="mt-3 text-[0.8125rem] font-semibold text-slate-800 leading-snug">{deliveryText}</p>
+        )}
+        <BookingCodePill code={displayCode} onCopy={onCopyCode} />
+      </div>
+    );
+  }
+
+  if (mode === "BOX_OFFICE") {
+    return (
+      <div className="flex h-full flex-col items-center text-center px-2">
+        <p className="text-[0.9375rem] font-bold text-slate-900">Box office pickup</p>
+        <p className="mt-2 text-[0.8125rem] text-slate-500 leading-relaxed">
+          Show your booking ID and photo ID at the venue box office.
+        </p>
+        {venue && (
+          <p className="mt-3 text-[0.8125rem] font-semibold text-slate-800 flex items-start gap-1.5 text-left w-full max-w-[15rem]">
+            <MapPin size={14} className="mt-0.5 shrink-0 text-slate-400" />
+            <span>{venue}</span>
+          </p>
+        )}
+        <BookingCodePill code={displayCode} onCopy={onCopyCode} />
+        {qrData && (
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(qrData)}`}
+            alt="Backup QR code"
+            className="mt-4 h-28 w-28 rounded-lg border border-slate-200 bg-white p-1"
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (!qrData) return null;
+
+  return (
+    <div className="flex h-full flex-col items-center text-center">
+      <img
+        src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(qrData)}`}
+        alt="Entry QR code"
+        className="h-[9.5rem] w-[9.5rem] sm:h-[10.5rem] sm:w-[10.5rem] rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm"
+      />
+      <p className="mt-4 text-[0.9375rem] font-bold text-slate-900">Entry QR</p>
+      {onCopyCode ? (
+        <button
+          type="button"
+          onClick={onCopyCode}
+          className="mt-1 font-mono text-[0.8125rem] font-bold text-slate-700 hover:text-[#6900AA] cursor-pointer"
+        >
+          {displayCode}
+        </button>
+      ) : (
+        <p className="mt-1 font-mono text-[0.8125rem] font-bold text-slate-700">{displayCode}</p>
+      )}
+      <p className="mt-3 max-w-[15rem] text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
+        Show this QR code at the venue entrance for admission.
+      </p>
+    </div>
+  );
+}
+
+function EventTicketCardConfirmation({
+  booking,
+  posterUrl,
+  onCopyCode,
+  className = "",
+  children,
+}: Omit<Props, "variant">) {
+  const displayCode = shortBookingCode(booking.id);
+  const venue = [booking.venue_name, booking.venue_address].filter(Boolean).join(", ");
+  const ticketMode = normalizeTicketMode(booking.ticket_mode);
+  const guestName = booking.guest_name?.trim() || "—";
+  const contact = booking.guest_phone?.trim() || "—";
+  const ticketTypeDisplay = booking.items?.length
+    ? [...new Set(booking.items.map((i) => i.ticket_type || "Ticket"))].join(", ")
+    : booking.ticket_qty
+      ? `${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`
+      : "—";
+
+  return (
+    <div
+      className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`.trim()}
+    >
+      {/* Row 1: event image + QR / barcode */}
+      <div className="relative flex flex-col items-stretch gap-0 sm:flex-row sm:items-stretch">
+        <div className="relative min-h-[14rem] min-w-0 flex-1 self-stretch w-full sm:min-h-0 sm:max-w-none lg:max-w-[38rem]">
+          <div className="absolute inset-5">
+            {posterUrl ? (
+              <img
+                src={resolveMediaUrl(posterUrl)}
+                alt={booking.event_name || "Event"}
+                className="h-full w-full rounded-xl object-cover bg-slate-100"
+              />
+            ) : (
+              <div className="h-full w-full rounded-xl bg-gradient-to-br from-slate-100 to-slate-50" />
+            )}
+          </div>
+        </div>
+
+        <div className="relative sm:w-[min(100%,17rem)] sm:shrink-0 md:w-[18rem] lg:w-[19rem]">
+          <div
+            className="hidden sm:block absolute left-0 top-5 bottom-5 w-px border-l border-dashed border-slate-300"
+            aria-hidden
+          />
+          <span
+            className="hidden sm:block absolute -left-2.5 -top-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
+            aria-hidden
+          />
+          <span
+            className="hidden sm:block absolute -left-2.5 -bottom-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
+            aria-hidden
+          />
+          <div className="border-t border-dashed border-slate-300 px-5 py-6 sm:border-t-0 sm:px-6 sm:py-8 sm:pl-8">
+            <ConfirmationQrPanel
+              mode={ticketMode}
+              booking={booking}
+              displayCode={displayCode}
+              venue={venue}
+              onCopyCode={onCopyCode}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2: event info + details */}
+      <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F5E9] px-2.5 py-1 text-[0.6875rem] font-semibold text-[#2E7D32]">
+          <Check size={12} strokeWidth={3} />
+          Booking Confirmed
+        </span>
+        <h2 className="mt-3 text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-extrabold leading-snug text-slate-900">
+          {booking.event_name}
+        </h2>
+        {venue && (
+          <p className="mt-2 flex items-start gap-1.5 text-[0.875rem] text-slate-500">
+            <MapPin size={15} className="mt-0.5 shrink-0 text-slate-400" />
+            <span>{venue}</span>
+          </p>
+        )}
+        <div className="mt-5 grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 sm:gap-x-6 sm:gap-y-5">
+          <ConfirmationDetailCell icon={User} label="Guest Name" value={guestName} />
+          <ConfirmationDetailCell icon={Ticket} label="Ticket Type" value={ticketTypeDisplay} />
+          <ConfirmationDetailCell icon={Phone} label="Contact" value={contact} />
+          <ConfirmationDetailCell
+            icon={Smartphone}
+            label="Ticket Mode"
+            value={ticketModeLabel(ticketMode)}
+          />
+          <ConfirmationDetailCell
+            icon={Calendar}
+            label="Date"
+            value={formatLongDate(booking.starts_at)}
+          />
+          <ConfirmationDetailCell
+            icon={Clock}
+            label="Time"
+            value={booking.starts_at ? `${formatTime12h(booking.starts_at)} onwards` : "—"}
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+        <p className="text-[0.9375rem] sm:text-[1rem] font-bold text-slate-900">Order Summary</p>
+        <div className="mt-4 space-y-2.5">
+          {booking.items?.map((item) => (
+            <div
+              key={item.id || `${item.ticket_type}-${item.qty}`}
+              className="flex items-start justify-between gap-4 text-[0.875rem] text-slate-600"
+            >
+              <span className="min-w-0">
+                {item.ticket_type} × {item.qty}
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-slate-800">
+                {formatMoney(Number(item.unit_price) * Number(item.qty))}
+              </span>
+            </div>
+          ))}
+          <div className="flex items-start justify-between gap-4 text-[0.875rem] text-slate-600">
+            <span>Convenience Fee</span>
+            <span className="shrink-0 font-semibold tabular-nums text-slate-800">
+              {formatMoney(booking.convenience_fee_total)}
+            </span>
+          </div>
+          {Number(booking.discount_amount) > 0 && (
+            <div className="flex items-start justify-between gap-4 text-[0.875rem] text-[#57008E]">
+              <span>Promo discount</span>
+              <span className="shrink-0 font-semibold tabular-nums">
+                −{formatMoney(booking.discount_amount)}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-slate-100 px-4 py-3.5 sm:px-5">
+          <span className="text-[0.9375rem] font-bold text-slate-900">Amount Paid</span>
+          <span className="shrink-0 text-[1.125rem] sm:text-[1.25rem] font-extrabold tabular-nums text-slate-900">
+            {formatMoney(booking.grand_total)}
+          </span>
+        </div>
+      </div>
+
+      {children ? (
+        <div className="border-t border-slate-200 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</div>
+      ) : null}
+
+      <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-[0.6875rem] text-slate-400 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <p className="min-w-0 break-all sm:truncate" title={booking.id}>
+            Booking ID: {booking.id}
+          </p>
+          {formatBookedOn(booking.created_at) && (
+            <p className="shrink-0 sm:text-right">{formatBookedOn(booking.created_at)}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function formatLongDate(value?: string) {
   if (!value) return "—";
@@ -201,7 +483,27 @@ function FulfillmentBlock({
   );
 }
 
-export function EventTicketCard({ booking, posterUrl, onCopyCode, className = "" }: Props) {
+export function EventTicketCard({
+  booking,
+  posterUrl,
+  onCopyCode,
+  className = "",
+  variant = "default",
+  children,
+}: Props) {
+  if (variant === "confirmation") {
+    return (
+      <EventTicketCardConfirmation
+        booking={booking}
+        posterUrl={posterUrl}
+        onCopyCode={onCopyCode}
+        className={className}
+      >
+        {children}
+      </EventTicketCardConfirmation>
+    );
+  }
+
   const displayCode = shortBookingCode(booking.id);
   const venue = [booking.venue_name, booking.venue_address].filter(Boolean).join(", ");
   const ticketMode = normalizeTicketMode(booking.ticket_mode);

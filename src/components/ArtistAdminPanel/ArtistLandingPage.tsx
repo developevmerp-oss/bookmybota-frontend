@@ -22,7 +22,7 @@ import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
 import images from "@/Images";
 
-const PAGE_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+const PAGE_CONTAINER = "bmb-section-container";
 
 function imageSrc(imgData: string | { src: string }) {
   return typeof imgData === "string" ? imgData : imgData.src;

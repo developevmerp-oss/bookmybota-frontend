@@ -132,7 +132,7 @@ function writeEventRecentSearches(items: string[]) {
   }
 }
 
-const CONTAINER = "container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0";
+const CONTAINER = "bmb-section-container";
 
 const EXPLORE_EVENT_CATEGORIES = [
   {
@@ -2247,7 +2247,7 @@ export default function PublicEventsPage() {
       <div ref={filtersStickySentinelRef} className="h-px w-full" aria-hidden />
       <section className="sticky z-30 w-full bg-transparent" style={{ top: headerOffset }}>
         <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
-          <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-4 pb-1">
+          <div className={`${CONTAINER} pt-4 pb-1`}>
             <div className="mb-2">
               <div className="flex items-center gap-2 pb-1 -mx-1 px-1">
                 <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
@@ -2442,7 +2442,7 @@ export default function PublicEventsPage() {
       <CategoryPromoBanners
         category={listingPromoRailCategory}
         city={city || ""}
-        className="container mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+        className="bmb-section-container pt-3"
       />
 
       {/* District / native spotlight hero — disabled (Dining parity). Restore: remove `false &&`. */}
@@ -2552,10 +2552,8 @@ export default function PublicEventsPage() {
                     </div>
 
                     <div
-                      className={`pointer-events-none relative mx-auto w-full container px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-10 xl:py-12 ${
-                        promoEvents.length > 1
-                          ? "px-14 2xl:px-0 pb-14"
-                          : "2xl:px-0"
+                      className={`pointer-events-none relative bmb-section-container py-10 xl:py-12 ${
+                        promoEvents.length > 1 ? "px-14 pb-14" : ""
                       }`}
                     >
                       <div className="flex items-center gap-8 lg:gap-8 2xl:gap-5">

@@ -78,7 +78,7 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
   return (
     <div className="min-h-screen bg-[#faf7fc]">
       <div className="bg-white border-b border-[#F3E8FF]">
-        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-9">
+        <div className="bmb-section-container py-7 sm:py-9">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
               <span

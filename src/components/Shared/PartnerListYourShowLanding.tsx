@@ -366,7 +366,7 @@ function BmsRoundCategoryTypesGrid({
   types: PartnerCategoryTypeItem[];
 }) {
   return (
-    <section className="bg-white py-10 md:py-14 container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0 border-t border-[#F0F0F0]">
+    <section className="bg-white py-10 md:py-14 bmb-section-container border-t border-[#F0F0F0]">
       <div>
         <h2 className="text-center text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold tracking-tight text-[#1A2B48] leading-tight">
           {title}
@@ -663,12 +663,20 @@ function PartnerHeroBanner({ image, alt = "" }: { image: string; alt?: string })
   );
 }
 
-function BmsSecuritySection({ title, subtitle }: { title: string; subtitle: string }) {
+function BmsSecuritySection({
+  title,
+  subtitle,
+  containerClassName = "bmb-section-container",
+}: {
+  title: string;
+  subtitle: string;
+  containerClassName?: string;
+}) {
   return (
     <section className="bg-white py-16 md:py-20">
-      <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
-        <div className="flex flex-col md:flex-row items-center md:items-center gap-10 sm:gap-12 lg:gap-16">
-          <div className="w-full sm:w-[300px] lg:w-[200px] shrink-0 flex items-center justify-center sm:justify-start">
+      <div className={containerClassName}>
+        <div className="flex flex-col md:flex-row items-center md:items-center gap-10 sm:gap-10 lg:gap-16">
+          <div className="w-[157px] sm:w-[168px] lg:w-[200px] shrink-0 flex items-center justify-center sm:justify-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={securityBgSrc()}
@@ -1039,9 +1047,8 @@ export default function PartnerListYourShowLanding({
 
   const isBms = layout === "bms";
   const headerLoginHref = loginHref ?? registerHref.replace(/\/register\/?$/, "/login");
-  const sectionContainerClass =
-    pageContainerClassName ?? "max-w-[1180px] mx-auto px-4 sm:px-6";
-  const headerContainerClass = pageContainerClassName ?? "max-w-[1200px] mx-auto px-4 sm:px-6";
+  const sectionContainerClass = pageContainerClassName ?? "bmb-section-container";
+  const headerContainerClass = pageContainerClassName ?? "bmb-section-container";
   const loginButtonClass =
     headerLoginVariant === "dark"
       ? "inline-flex h-9 items-center px-5 rounded-md bg-[#111] text-white text-sm font-semibold hover:bg-[#333] transition-colors"
@@ -1311,7 +1318,7 @@ export default function PartnerListYourShowLanding({
           hostSection
         ) : hostTiles.length > 0 ? (
         <section className="bg-white py-14 md:py-16">
-          <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+          <div className={sectionContainerClass}>
             {isBms ? (
               <BmsSectionHeading title={hostTitle} subtitle={hostSubtitle} />
             ) : (
@@ -1331,7 +1338,7 @@ export default function PartnerListYourShowLanding({
           featuresSection
         ) : featuresTiles.length > 0 ? (
           <section id="features" className="bg-white py-14 md:py-16 scroll-mt-24">
-            <div className="max-w-[1180px] mx-auto px-4 sm:px-6">
+            <div className={sectionContainerClass}>
               {isBms ? (
                 <BmsSectionHeading title={featuresTitle} subtitle={featuresSubtitle} />
               ) : (
@@ -1356,7 +1363,11 @@ export default function PartnerListYourShowLanding({
         ) : null}
 
         {(featuresTiles.length > 0 || Boolean(featuresSection)) && securityTitle ? (
-          <BmsSecuritySection title={securityTitle} subtitle={securitySubtitle} />
+          <BmsSecuritySection
+            title={securityTitle}
+            subtitle={securitySubtitle}
+            containerClassName={sectionContainerClass}
+          />
         ) : null}
 
         {!hostOnly ? (
@@ -1480,7 +1491,11 @@ export default function PartnerListYourShowLanding({
           </div>
         </section>
         {featuresTiles.length === 0 && securityTitle ? (
-          <BmsSecuritySection title={securityTitle} subtitle={securitySubtitle} />
+          <BmsSecuritySection
+            title={securityTitle}
+            subtitle={securitySubtitle}
+            containerClassName={sectionContainerClass}
+          />
         ) : null}
           </>
         ) : null}

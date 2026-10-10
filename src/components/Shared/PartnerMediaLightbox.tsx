@@ -70,7 +70,7 @@ export default function PartnerMediaLightbox({
       onClick={onClose}
     >
       <div
-        className="flex justify-between items-center max-w-7xl mx-auto w-full text-white shrink-0"
+        className="flex justify-between items-center bmb-section-container text-white shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         <span className="text-sm font-semibold tracking-wider text-slate-300 tabular-nums">
@@ -87,7 +87,7 @@ export default function PartnerMediaLightbox({
       </div>
 
       <div
-        className="flex-1 flex items-center container mx-auto px-2 sm:px-6 lg:px-10 justify-between w-full gap-1.5 sm:gap-4 my-3 sm:my-4 relative min-h-0 overflow-hidden"
+        className="flex-1 flex items-center bmb-section-container justify-between w-full gap-1.5 sm:gap-4 my-3 sm:my-4 relative min-h-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {media.length > 1 ? (

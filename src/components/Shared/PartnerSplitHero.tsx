@@ -20,7 +20,7 @@ export type PartnerSplitHeroProps = {
   loginHref?: string;
 };
 
-const DEFAULT_CONTAINER = "container mx-auto px-5 sm:px-10 lg:px-10 2xl:px-0";
+const DEFAULT_CONTAINER = "bmb-section-container";
 
 /**
  * Shared split hero used by partner landings (dining, movie, etc.).

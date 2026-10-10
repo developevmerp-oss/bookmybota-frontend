@@ -1,22 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  Armchair,
   Calendar,
   Check,
   CheckCircle2,
   Clock,
   Copy,
   Download,
+  Film,
   Loader2,
   MapPin,
+  Monitor,
+  Phone,
   Printer,
   Share2,
   Smartphone,
+  Sparkles,
   AlertCircle,
-  Armchair,
+  Ticket,
   User,
   UtensilsCrossed,
 } from "lucide-react";
@@ -26,9 +31,47 @@ import { formatMoney } from "@/lib/currencyFormat";
 import { formatDateCustomer, formatDateTimeCustomer, formatTime12h } from "@/lib/dateFormat";
 import { buildMovieTicketPdf, downloadPdfBlob } from "@/lib/movieTicketPdf";
 import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
+import { resolveMediaUrl } from "@/lib/mediaUrl";
 
 interface MovieBookingConfirmationPageProps {
   bookingId: string;
+}
+
+const CONFIRM_PAGE_MAX = "mx-auto w-full max-w-[64rem] px-4 md:px-5 lg:px-10 xl:px-12";
+
+const actionBtnSecondary =
+  "inline-flex min-h-[2.875rem] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2.5 text-[0.75rem] min-[480px]:text-[0.8125rem] lg:text-[0.8125rem] xl:text-[0.875rem] font-semibold text-slate-800 transition hover:bg-slate-50 print:hidden";
+
+const actionBtnPrimary =
+  "inline-flex min-h-[2.875rem] w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2.5 py-2.5 text-[0.75rem] min-[480px]:text-[0.8125rem] lg:text-[0.8125rem] xl:text-[0.875rem] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 print:hidden";
+
+function DetailCell({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: typeof User;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 min-w-0">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+        <Icon size={15} strokeWidth={2} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[0.6875rem] font-medium text-slate-500 leading-tight">{label}</p>
+        <p className="mt-0.5 text-[0.875rem] sm:text-[0.9375rem] font-semibold text-slate-900 break-words leading-snug">
+          {value}
+        </p>
+        {hint ? (
+          <p className="mt-0.5 text-[0.75rem] text-slate-500 leading-snug">{hint}</p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export default function MovieBookingConfirmationPage({
@@ -37,6 +80,12 @@ export default function MovieBookingConfirmationPage({
   const { data: booking, isLoading, isError } = useGetMovieBookingQuery(bookingId);
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [headerReady, setHeaderReady] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setHeaderReady(true), 40);
+    return () => window.clearTimeout(t);
+  }, [bookingId]);
 
   const showDateFormatted = useMemo(() => {
     if (!booking?.showtime_starts_at) return "";
@@ -67,6 +116,24 @@ export default function MovieBookingConfirmationPage({
   }, [booking?.created_at]);
 
   const qrValue = booking?.qr_code_token || booking?.booking_code || bookingId;
+  const poster =
+    resolveMediaUrl(booking?.movie_poster) ||
+    resolveMediaUrl(booking?.cinema_image) ||
+    "";
+  const formatMeta = [
+    booking?.showtime_format,
+    booking?.showtime_language,
+    booking?.movie_certificate,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const cinemaLine = [booking?.cinema_name, booking?.cinema_address].filter(Boolean).join(", ");
+  const screenLabel = [
+    booking?.screen_name,
+    booking?.screen_type ? `(${booking.screen_type})` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const handleCopy = async () => {
     try {
@@ -117,7 +184,7 @@ export default function MovieBookingConfirmationPage({
 
   if (isError || !booking) {
     return (
-      <div className="min-h-screen bg-[#F5F5F7] text-slate-800 flex flex-col items-center justify-center gap-4 px-4 text-center">
+      <div className="min-h-screen bg-white text-slate-800 flex flex-col items-center justify-center gap-4 px-4 text-center">
         <AlertCircle className="size-12 text-rose-500" />
         <h2 className="text-xl font-bold text-slate-900">Booking Not Found</h2>
         <p className="text-sm text-slate-500 max-w-md">
@@ -125,7 +192,7 @@ export default function MovieBookingConfirmationPage({
         </p>
         <Link
           href="/movies"
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F84464] to-[#6900AA] text-white text-sm font-bold shadow"
+          className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold"
         >
           Explore Movies
         </Link>
@@ -134,115 +201,230 @@ export default function MovieBookingConfirmationPage({
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden overflow-y-auto bg-[#F5F5F7] text-slate-900 py-8 sm:py-12 px-4 sm:px-6 pb-24">
-      <div className="max-w-xl mx-auto w-full flex flex-col items-center">
-        <div className="w-full text-center space-y-3 mb-6 sm:mb-8">
-          <div className="size-14 sm:size-16 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
-            <CheckCircle2 className="size-7 sm:size-8" />
+    <div className="min-h-screen w-full overflow-x-hidden bg-white pb-10 sm:pb-12 print:bg-white">
+      <style>{`
+        @keyframes confirmCheckPop {
+          0% { transform: scale(0.4); opacity: 0; }
+          55% { transform: scale(1.12); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes confirmCheckDraw {
+          from { stroke-dashoffset: 28; }
+          to { stroke-dashoffset: 0; }
+        }
+        @keyframes confirmCheckRipple {
+          0% { transform: scale(0.85); opacity: 0.45; }
+          100% { transform: scale(1.65); opacity: 0; }
+        }
+        @keyframes confirmHeaderIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .confirm-check-pop {
+          animation: confirmCheckPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .confirm-check-draw {
+          stroke-dasharray: 28;
+          stroke-dashoffset: 28;
+          animation: confirmCheckDraw 0.4s cubic-bezier(0.65, 0, 0.35, 1) 0.28s forwards;
+        }
+        .confirm-check-ripple {
+          animation: confirmCheckRipple 0.85s ease-out 0.2s both;
+        }
+        .confirm-header-in {
+          animation: confirmHeaderIn 0.45s ease-out 0.15s both;
+        }
+        @media print {
+          .confirm-check-pop,
+          .confirm-check-draw,
+          .confirm-check-ripple,
+          .confirm-header-in {
+            animation: none !important;
+            opacity: 1 !important;
+            stroke-dashoffset: 0 !important;
+          }
+        }
+      `}</style>
+
+      <div className={`${CONFIRM_PAGE_MAX} pt-6 sm:pt-8 print:pt-4`}>
+        <div
+          className={`mb-5 sm:mb-6 ${headerReady ? "confirm-header-in" : "opacity-0"}`}
+        >
+          <div className="flex items-start gap-3.5 sm:gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            <div className="relative mt-0.5 shrink-0">
+              <span
+                className="pointer-events-none absolute inset-0 rounded-full bg-[#34A853]/25 confirm-check-ripple"
+                aria-hidden
+              />
+              <span
+                className={`relative flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#E8F5E9] text-[#2E7D32] shadow-sm ring-4 ring-[#E8F5E9]/60 ${
+                  headerReady ? "confirm-check-pop" : "opacity-0"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" aria-hidden>
+                  <path
+                    d="M5.5 12.5 L10 17 L18.5 7.5"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={headerReady ? "confirm-check-draw" : ""}
+                  />
+                </svg>
+                <span className="sr-only">Confirmed</span>
+              </span>
+            </div>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h1 className="text-[1.375rem] sm:text-[1.625rem] lg:text-[1.875rem] font-extrabold text-slate-900 leading-tight tracking-tight">
+                Booking Confirmed!
+              </h1>
+              <p className="mt-1.5 text-[0.875rem] sm:text-[0.9375rem] text-slate-600 leading-relaxed">
+                Your digital M-Ticket is ready
+                {booking.guest_email ? (
+                  <>
+                    {" "}
+                    and a confirmation was sent to{" "}
+                    <span className="font-semibold text-slate-800">{booking.guest_email}</span>
+                  </>
+                ) : null}
+                .
+              </p>
+              <p className="mt-1 text-[0.8125rem] sm:text-[0.875rem] text-slate-500 leading-relaxed">
+                Show this QR or booking code at the cinema gate.
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Booking Confirmed!</h1>
-          <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
-            Your digital M-Ticket is ready
-            {booking.guest_email ? (
-              <>
-                {" "}
-                and a confirmation was sent to{" "}
-                <span className="font-semibold text-slate-700">{booking.guest_email}</span>
-              </>
-            ) : null}
-            . Show this QR or booking code at the cinema gate.
-          </p>
         </div>
 
-        {/* Full ticket card — height grows with content; page scrolls so QR is never cut off */}
-        <div className="w-full rounded-2xl border border-slate-200/80 bg-white shadow-lg shadow-purple-500/[0.06] ring-1 ring-slate-100 overflow-hidden print:shadow-none">
-          <div className="h-1.5 bg-gradient-to-r from-[#57008E] via-[#6900AA] to-[#F84464]" />
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:shadow-none">
+          {/* Row 1: poster + QR */}
+          <div className="relative flex flex-col items-stretch gap-0 sm:flex-row sm:items-stretch">
+            <div className="relative min-h-[14rem] min-w-0 flex-1 self-stretch w-full sm:min-h-0 sm:max-w-none lg:max-w-[38rem]">
+              <div className="absolute inset-5">
+                {poster ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={poster}
+                    alt={booking.movie_title || "Movie"}
+                    className="h-full w-full rounded-xl object-cover bg-slate-100"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400">
+                    <Film size={40} />
+                  </div>
+                )}
+              </div>
+            </div>
 
-          <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-[#6900AA] to-[#57008E] px-4 py-2.5 sm:px-6">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-white/95">
-              Book My Bota · Official M-Ticket
-            </p>
-            <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-white/90">
-              Confirmed
+            <div className="relative flex sm:w-[min(100%,17rem)] sm:shrink-0 md:w-[18rem] lg:w-[19rem]">
+              <div
+                className="hidden sm:block absolute left-0 top-5 bottom-5 w-px border-l border-dashed border-slate-300"
+                aria-hidden
+              />
+              <span
+                className="hidden sm:block absolute -left-2.5 -top-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
+                aria-hidden
+              />
+              <span
+                className="hidden sm:block absolute -left-2.5 -bottom-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
+                aria-hidden
+              />
+              <div className="flex w-full flex-1 items-center justify-center border-t border-dashed border-slate-300 px-5 py-6 sm:border-t-0 sm:px-6 sm:py-8 sm:pl-8">
+                <div className="flex w-full flex-col items-center text-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(
+                      qrValue
+                    )}`}
+                    alt={`QR ${booking.booking_code || qrValue}`}
+                    className="h-[9.5rem] w-[9.5rem] sm:h-[10.5rem] sm:w-[10.5rem] rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm"
+                  />
+                  <p className="mt-4 text-[0.9375rem] font-bold text-slate-900 inline-flex items-center gap-1.5">
+                    <Smartphone size={15} className="text-slate-500" />
+                    Entry QR
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="mt-1 inline-flex items-center gap-1.5 font-mono text-[0.8125rem] font-bold text-slate-700 hover:text-[#6900AA] cursor-pointer"
+                  >
+                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                    {booking.booking_code || qrValue}
+                  </button>
+                  <p className="mt-3 max-w-[15rem] text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
+                    Show this QR at the cinema gate. One scan per booking — keep it ready on your
+                    phone.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: movie details */}
+          <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F5E9] px-2.5 py-1 text-[0.6875rem] font-semibold text-[#2E7D32]">
+              <Check size={12} strokeWidth={3} />
+              Booking Confirmed
             </span>
-          </div>
-
-          <div className="p-4 sm:p-6 space-y-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-lg sm:text-xl font-extrabold leading-snug text-slate-900">
-                  {booking.movie_title}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {[booking.showtime_format, booking.showtime_language, booking.movie_certificate]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#E8D4FF] bg-[#FBF6FF] px-2.5 py-1.5 font-mono text-xs font-bold text-[#6900AA] cursor-pointer hover:bg-[#F7E9FF]"
-              >
-                {copied ? <Check size={12} /> : <Copy size={12} />}
-                {booking.booking_code}
-              </button>
-            </div>
-
-            <div className="mt-4 flex items-start gap-2 text-sm text-slate-600">
-              <MapPin size={15} className="mt-0.5 shrink-0 text-[#6900AA]" />
-              <div>
-                <p className="font-bold text-slate-900">{booking.cinema_name}</p>
-                {booking.cinema_address ? (
-                  <p className="text-slate-500 text-xs mt-0.5">{booking.cinema_address}</p>
-                ) : null}
-                <p className="text-xs font-semibold text-[#6900AA] mt-1">
-                  {booking.screen_name}
-                  {booking.screen_type ? ` (${booking.screen_type})` : ""}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 border-y border-slate-100">
-            <div className="px-4 sm:px-5 py-4 border-r border-slate-100">
-              <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
-                <Calendar size={11} /> Date
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{showDateFormatted}</p>
-            </div>
-            <div className="px-4 sm:px-5 py-4 sm:border-r sm:border-slate-100">
-              <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
-                <Clock size={11} /> Time
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{showTimeFormatted}</p>
-            </div>
-            {bookedOnFormatted ? (
-              <div className="px-4 sm:px-5 py-4 col-span-2 sm:col-span-1 border-t sm:border-t-0 border-slate-100">
-                <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
-                  <CheckCircle2 size={11} /> Booked on
-                </p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{bookedOnFormatted}</p>
-              </div>
+            <h2 className="mt-3 text-[1.25rem] sm:text-[1.375rem] lg:text-[1.5rem] font-extrabold leading-snug text-slate-900">
+              {booking.movie_title}
+            </h2>
+            {formatMeta ? (
+              <p className="mt-1.5 text-[0.875rem] text-slate-500">{formatMeta}</p>
             ) : null}
+            {cinemaLine ? (
+              <p className="mt-2 flex items-start gap-1.5 text-[0.875rem] text-slate-500">
+                <MapPin size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                <span>
+                  {cinemaLine}
+                  {screenLabel ? (
+                    <>
+                      {" · "}
+                      <span className="font-semibold text-slate-700">{screenLabel}</span>
+                    </>
+                  ) : null}
+                </span>
+              </p>
+            ) : null}
+
+            <div className="mt-5 grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 sm:gap-x-6 sm:gap-y-5">
+              <DetailCell icon={User} label="Ticket Holder" value={booking.guest_name || "—"} />
+              <DetailCell icon={Phone} label="Contact" value={booking.guest_phone || "—"} />
+              <DetailCell
+                icon={Ticket}
+                label="Tickets"
+                value={`${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`}
+              />
+              <DetailCell icon={Calendar} label="Date" value={showDateFormatted || "—"} />
+              <DetailCell icon={Clock} label="Time" value={showTimeFormatted || "—"} />
+              <DetailCell
+                icon={Monitor}
+                label="Screen"
+                value={screenLabel || booking.screen_name || "—"}
+              />
+              {bookedOnFormatted ? (
+                <DetailCell icon={CheckCircle2} label="Booked On" value={bookedOnFormatted} />
+              ) : null}
+            </div>
           </div>
 
-          <div className="px-4 sm:px-6 py-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400">
+          {/* Seats + order summary */}
+          <div className="border-t border-slate-200 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[0.9375rem] sm:text-[1rem] font-bold text-slate-900">
                 Seats ({booking.ticket_qty} ticket{booking.ticket_qty === 1 ? "" : "s"})
               </p>
-              <p className="text-sm font-extrabold text-emerald-600 tabular-nums">
+              <p className="text-[0.9375rem] font-extrabold tabular-nums text-slate-900">
                 {formatMoney(Number(booking.grand_total) || 0)}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {(booking.seats || []).map((seat) => (
                 <span
                   key={seat.seat_identifier}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#E8D4FF] bg-[#FBF6FF] px-2.5 py-1.5 text-xs font-bold text-slate-800"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-800"
                 >
-                  <Armchair size={13} className="text-[#F84464]" />
+                  <Armchair size={13} className="text-slate-500" />
                   {seat.seat_identifier}
                   {seat.tier_name ? (
                     <span className="font-medium text-slate-500">({seat.tier_name})</span>
@@ -251,128 +433,142 @@ export default function MovieBookingConfirmationPage({
               ))}
             </div>
 
-            <div className="flex items-center gap-3 rounded-xl bg-[#FBF6FF]/80 px-4 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F7E9FF] text-[#6900AA]">
-                <User size={16} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400">
-                  Ticket holder
-                </p>
-                <p className="text-sm font-bold text-slate-900">{booking.guest_name}</p>
+            <div className="mt-4 space-y-2.5 text-[0.875rem] text-slate-600">
+              <div className="flex items-start justify-between gap-4">
+                <span>Ticket amount</span>
+                <span className="shrink-0 font-semibold tabular-nums text-slate-800">
+                  {formatMoney(Number(booking.ticket_amount) || 0)}
+                </span>
               </div>
-              {booking.guest_phone ? (
-                <p className="ml-auto shrink-0 text-xs font-medium text-slate-500">
-                  {booking.guest_phone}
-                </p>
+              {Number(booking.beverage_total) > 0 ? (
+                <div className="flex items-start justify-between gap-4">
+                  <span>Snacks &amp; beverages</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-slate-800">
+                    {formatMoney(Number(booking.beverage_total) || 0)}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex items-start justify-between gap-4">
+                <span>Convenience Fee</span>
+                <span className="shrink-0 font-semibold tabular-nums text-slate-800">
+                  {formatMoney(Number(booking.convenience_fee_total) || 0)}
+                </span>
+              </div>
+              {Number(booking.discount_amount) > 0 ? (
+                <div className="flex items-start justify-between gap-4 text-[#57008E]">
+                  <span>Promo discount</span>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    −{formatMoney(Number(booking.discount_amount) || 0)}
+                  </span>
+                </div>
               ) : null}
             </div>
-          </div>
 
-          {/* Beverages / snacks */}
-          {booking.beverages && booking.beverages.length > 0 && (
-            <div className="px-4 sm:px-6 py-4 border-t border-slate-100 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[0.625rem] font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
-                  <UtensilsCrossed size={11} /> Snacks &amp; Beverages
-                </p>
-                <p className="text-sm font-extrabold text-emerald-600 tabular-nums">
-                  {formatMoney(Number(booking.beverage_total) || 0)}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {booking.beverages.map((bev, i) => (
-                  <span
-                    key={bev.id || i}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-slate-800"
-                  >
-                    <UtensilsCrossed size={11} className="text-amber-500" />
-                    {bev.name}
-                    {bev.quantity > 1 && <span className="font-normal text-slate-500">×{bev.quantity}</span>}
-                    <span className="font-normal text-amber-700">({formatMoney(bev.subtotal)})</span>
-                  </span>
-                ))}
-              </div>
+            <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-slate-100 px-4 py-3.5 sm:px-5">
+              <span className="text-[0.9375rem] font-bold text-slate-900">Amount Paid</span>
+              <span className="shrink-0 text-[1.125rem] sm:text-[1.25rem] font-extrabold tabular-nums text-slate-900">
+                {formatMoney(Number(booking.grand_total) || 0)}
+              </span>
             </div>
-          )}
 
-          {/* Perforation */}
-          <div className="relative h-5 flex items-center" aria-hidden>
-            <span className="absolute -left-2.5 h-5 w-5 rounded-full bg-[#F5F5F7] border border-slate-200" />
-            <span className="absolute -right-2.5 h-5 w-5 rounded-full bg-[#F5F5F7] border border-slate-200" />
-            <div className="mx-3 flex-1 border-t border-dashed border-slate-300" />
-          </div>
-
-          {/* Full QR — always fully visible; page scrolls if needed */}
-          <div className="px-4 sm:px-6 pb-6 sm:pb-8 pt-1">
-            <div className="rounded-2xl border border-[#E8D4FF] bg-gradient-to-br from-[#FBF6FF] via-white to-[#F7E9FF]/40 p-5 sm:p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5">
-                <div className="shrink-0 rounded-xl bg-white p-3 shadow-md ring-1 ring-[#E8D4FF]/60">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(
-                      qrValue
-                    )}`}
-                    alt={`QR ${booking.booking_code || qrValue}`}
-                    width={160}
-                    height={160}
-                    className="h-40 w-40 sm:h-44 sm:w-44 rounded-lg block"
-                  />
-                </div>
-                <div className="min-w-0 flex-1 text-center sm:text-left pt-0.5">
-                  <p className="text-sm font-bold text-slate-900 inline-flex items-center gap-1.5">
-                    <Smartphone size={15} className="text-[#6900AA]" />
-                    Entry QR
-                  </p>
-                  <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">
-                    Show this QR at the cinema gate. One scan per booking — keep it ready on your
-                    phone.
-                  </p>
-                  <p className="mt-3 font-mono text-xs font-bold tracking-wider text-[#6900AA]">
-                    {booking.booking_code || qrValue}
-                  </p>
+            {booking.beverages && booking.beverages.length > 0 ? (
+              <div className="mt-5 pt-4 border-t border-slate-100">
+                <p className="text-[0.8125rem] font-bold text-slate-900 inline-flex items-center gap-1.5">
+                  <UtensilsCrossed size={14} className="text-slate-500" />
+                  Snacks &amp; Beverages
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {booking.beverages.map((bev, i) => (
+                    <span
+                      key={bev.id || i}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-800"
+                    >
+                      <UtensilsCrossed size={11} className="text-slate-500" />
+                      {bev.name}
+                      {bev.quantity > 1 ? (
+                        <span className="font-normal text-slate-500">×{bev.quantity}</span>
+                      ) : null}
+                      <span className="font-normal text-slate-500">
+                        ({formatMoney(bev.subtotal)})
+                      </span>
+                    </span>
+                  ))}
                 </div>
               </div>
+            ) : null}
+          </div>
+
+          {/* Actions — same handlers */}
+          <div className="border-t border-slate-200 px-5 py-5 sm:px-6 sm:py-6 lg:px-8 print:hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => void handleDownloadPdf()}
+                disabled={downloading}
+                className={actionBtnPrimary}
+              >
+                {downloading ? (
+                  <Loader2 size={16} className="animate-spin shrink-0" />
+                ) : (
+                  <Download size={16} className="shrink-0" />
+                )}
+                <span className="truncate">
+                  {downloading ? "Preparing PDF…" : "Download Ticket (PDF)"}
+                </span>
+              </button>
+              <button type="button" onClick={handlePrint} className={actionBtnSecondary}>
+                <Printer size={16} className="text-slate-600 shrink-0" />
+                <span className="truncate">Print / Save</span>
+              </button>
+              <button type="button" onClick={handleShare} className={actionBtnSecondary}>
+                <Share2 size={16} className="text-slate-600 shrink-0" />
+                <span className="truncate">Share</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-[0.6875rem] text-slate-400 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <p className="min-w-0 break-all sm:truncate" title={booking.id}>
+                Booking ID: {booking.booking_code || booking.id}
+              </p>
+              {bookedOnFormatted ? (
+                <p className="shrink-0 sm:text-right">Booked on {bookedOnFormatted}</p>
+              ) : null}
             </div>
           </div>
         </div>
 
-        <div className="w-full flex flex-wrap items-center justify-center gap-3 mt-6 sm:mt-8 print:hidden">
-          <button
-            type="button"
-            onClick={() => void handleDownloadPdf()}
-            disabled={downloading}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[linear-gradient(135deg,#A78BFA_0%,#8B5CF6_38%,#6D28D9_72%,#4C1D95_100%)] text-white text-sm font-bold shadow-md shadow-[#6D28D9]/30 hover:opacity-95 disabled:opacity-60 cursor-pointer"
-          >
-            {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-            {downloading ? "Preparing PDF…" : "Download Ticket (PDF)"}
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-sm font-bold border border-slate-200 shadow-sm cursor-pointer"
-          >
-            <Printer className="size-4" /> Print / Save
-          </button>
-          <button
-            type="button"
-            onClick={handleShare}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-sm font-bold border border-slate-200 shadow-sm cursor-pointer"
-          >
-            <Share2 className="size-4 text-[#6900AA]" /> Share
-          </button>
-          <Link
-            href="/movies"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-sm font-bold border border-slate-200 shadow-sm"
-          >
-            Explore Movies <ArrowRight className="size-4" />
-          </Link>
-          <Link
-            href="/customer/dashboard"
-            className="w-full sm:w-auto text-center text-sm font-semibold text-[#6900AA] hover:underline mt-1"
-          >
-            View in My Bookings
-          </Link>
+        <div className="mt-6 sm:mt-8 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 print:hidden">
+          <div className="flex items-start gap-3 sm:items-center sm:gap-4 min-w-0">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F7E9FF] text-[#6900AA]">
+              <Sparkles size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[0.9375rem] sm:text-[1rem] font-bold text-slate-900">
+                Looking for more movies?
+              </p>
+              <p className="mt-0.5 text-[0.8125rem] sm:text-[0.875rem] text-slate-500 leading-relaxed">
+                Discover the latest releases and showtimes near you.
+              </p>
+            </div>
+          </div>
+          <div className="flex w-full flex-col gap-2.5 min-[480px]:flex-row min-[480px]:items-center sm:w-auto sm:shrink-0">
+            <Link
+              href="/movies"
+              className="inline-flex min-h-[2.875rem] w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-[0.875rem] font-semibold text-white transition hover:bg-slate-800 min-[480px]:w-auto"
+            >
+              Explore Movies
+              <ArrowRight size={16} />
+            </Link>
+            <Link
+              href="/customer/dashboard"
+              className={`${actionBtnSecondary} min-[480px]:w-auto min-[480px]:min-w-[10.5rem]`}
+            >
+              <Ticket size={16} className="text-slate-600 shrink-0" />
+              View in My Bookings
+            </Link>
+          </div>
         </div>
       </div>
     </div>

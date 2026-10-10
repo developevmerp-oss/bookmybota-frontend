@@ -1736,7 +1736,7 @@ export default function Home() {
       <CategoryPromoBanners
         category="DINING"
         city={activeCity || ""}
-        className="container mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+        className="bmb-section-container pt-3"
       />
 
       {/* ── 1. Hero Search Banner (centered, reference layout) ─────────────── */}
@@ -1756,7 +1756,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/30 via-slate-900/45 to-slate-900/65" />
         </div>
 
-        <div className="relative z-10 w-full mx-auto container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 min-h-[340px] sm:min-h-[380px] lg:min-h-[400px] flex flex-col items-start justify-end pt-10 sm:pt-12 pb-6 sm:pb-7 text-left">
+        <div className="relative z-10 w-full bmb-section-container min-h-[340px] sm:min-h-[380px] lg:min-h-[400px] flex flex-col items-start justify-end pt-10 sm:pt-12 pb-6 sm:pb-7 text-left">
           <div className="w-full max-w-3xl dining-hero-fade-up">
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-white leading-[1.12] tracking-tight">
               What are you in the{" "}
@@ -1919,7 +1919,7 @@ export default function Home() {
         className="w-full bg-white"
         style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
       >
-        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-8 sm:pt-10 pb-3">
+        <div className="bmb-section-container pt-8 sm:pt-10 pb-3">
           <motion.h2
             className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 mb-2 sm:mb-3 tracking-tight"
             initial={{ opacity: 0, y: 12 }}
@@ -2067,7 +2067,7 @@ export default function Home() {
         className="w-full bg-white"
         style={{ scrollMarginTop: Math.max(siteHeaderHeight, 96) + 8 }}
       >
-        <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 pt-2 sm:pt-3 pb-3">
+        <div className="bmb-section-container pt-2 sm:pt-3 pb-3">
           <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 mb-3 sm:mb-4 tracking-tight">
             Explore Dining
           </h2>
@@ -2104,7 +2104,7 @@ export default function Home() {
       {/* Explore Cuisines — only after Restaurant is selected in Explore Dining */}
       {exploreCardId === "restaurant" && cuisineCards.length > 0 && (
         <div className="w-full bg-white border-b border-slate-100">
-          <div className="container mx-auto px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 2xl:px-0 py-5 sm:py-6">
+          <div className="bmb-section-container py-5 sm:py-6">
             <section id="explore-cuisines" className="scroll-mt-24">
               <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4 md:mb-5">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight min-w-0 truncate">
@@ -2203,7 +2203,7 @@ export default function Home() {
               isFiltersStuck ? "is-stuck" : ""
             }`}
           >
-            <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-4 pb-1">
+            <div className="bmb-section-container pt-4 pb-1">
               <DiningFiltersBar
                 cuisines={cuisineOptions}
                 filters={diningFilters}
@@ -2263,7 +2263,7 @@ export default function Home() {
           </div>
         </section>
 
-      <div className="container mx-auto px-5 sm:px-0 lg:px-10 2xl:px-0 pt-2 pb-5">
+      <div className="bmb-section-container pt-2 pb-5">
         <div >
           {/* ── 5. Offer Section (commented out) ───────────────────────────── */}
           {/* {showHomeExtras && homeOfferCards.length > 0 && (

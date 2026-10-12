@@ -24,6 +24,7 @@ import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { CustomerOrdersListShimmer } from "@/components/Shared/Shimmer";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { formatDateCustomer, formatTime12h, formatWeekdayCustomer } from "@/lib/dateFormat";
 
@@ -172,7 +173,7 @@ export default function CustomerDashboard() {
       when: b.booking_time,
       endTime: b.end_time || null,
       status: b.status,
-      href: `/customer/bookings/${b.id}`,
+      href: `/customer/bookings/confirmation?id=${b.id}`,
       address: b.business_address,
       extra: b.guests != null ? `${b.guests} guests` : undefined,
       image: b.business_cover_image,
@@ -185,7 +186,7 @@ export default function CustomerDashboard() {
       title: b.event_name || "Event",
       when: String(b.starts_at || b.created_at || "").replace(" ", "T"),
       status: b.status,
-      href: `/customer/event-bookings/${b.id}`,
+      href: `/customer/event-bookings/confirmation?id=${b.id}`,
       address: [b.venue_name, b.venue_address].filter(Boolean).join(", ") || undefined,
       extra: b.ticket_qty ? `${b.ticket_qty} ticket${b.ticket_qty === 1 ? "" : "s"}` : undefined,
       image: b.poster_horizontal_url || b.poster_vertical_url,
@@ -247,9 +248,7 @@ export default function CustomerDashboard() {
   if (diningLoading || eventsLoading || moviesLoading || !user) {
     return (
       <CustomerAccountLayout>
-        <div className="flex items-center justify-center text-slate-500 py-20">
-          Loading Dashboard...
-        </div>
+        <CustomerOrdersListShimmer />
       </CustomerAccountLayout>
     );
   }
@@ -370,11 +369,11 @@ export default function CustomerDashboard() {
                   href={b.href}
                   className="group flex flex-col sm:flex-row sm:items-start gap-4 py-5 first:pt-2 last:pb-1 hover:bg-slate-50/70 -mx-2 px-2 sm:-mx-3 sm:px-3 rounded-xl transition-colors"
                 >
-                  <div className="w-full sm:w-[168px] lg:w-[188px] aspect-[16/10] sm:aspect-auto sm:h-[108px] lg:h-[118px] shrink-0 rounded-xl overflow-hidden bg-slate-100">
+                  <span className="shrink-0 inline-flex max-w-full h-[100px] sm:h-[108px] lg:h-[118px] sm:max-w-[168px] lg:max-w-[188px] rounded-xl overflow-hidden leading-none">
                     <img
                       src={resolveMediaUrl(b.image) || fallbackImage}
                       alt={b.title}
-                      className="w-full h-full object-cover"
+                      className="block h-full w-full object-cover"
                       onError={(e) => {
                         const el = e.currentTarget;
                         if (el.dataset.fallbackApplied === "1") return;
@@ -382,7 +381,7 @@ export default function CustomerDashboard() {
                         el.src = fallbackImage;
                       }}
                     />
-                  </div>
+                  </span>
 
                   <div className="flex-1 min-w-0">
                     <span
@@ -405,19 +404,19 @@ export default function CustomerDashboard() {
                         <span className="line-clamp-1">{dateTimeLine}</span>
                       </p>
                     ) : null}
-                    <p className="mt-1 text-sm text-slate-500 flex items-start gap-1.5">
-                      <QtyIcon size={14} className="shrink-0 mt-0.5 text-slate-400" />
-                      <span>{formatPartyLine(b)}</span>
-                    </p>
                   </div>
 
-                  <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 sm:pt-0.5">
+                  <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-3 sm:pt-0.5">
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${statusBadgeStyles(b.status)}`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${statusDotStyles(b.status)}`} />
                       {b.status}
                     </span>
+                    <p className="text-sm text-slate-500 flex items-center gap-1.5 sm:justify-end">
+                      <QtyIcon size={14} className="shrink-0 text-slate-400" />
+                      <span>{formatPartyLine(b)}</span>
+                    </p>
                     {b.canCancel ? (
                       <button
                         type="button"

@@ -25,6 +25,7 @@ import {
   type TicketDeliveryMode,
 } from "@/lib/eventTicketMode";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import BookingTicketPerforation from "@/components/Shared/BookingTicketPerforation";
 
 export type EventTicketCardBooking = {
   id: string;
@@ -104,12 +105,12 @@ function ConfirmationQrPanel({
 
   if (mode === "PHYSICAL_DELIVERY") {
     return (
-      <div className="flex h-full flex-col items-center justify-center text-center px-2">
+      <div className="mx-auto flex w-full max-w-[15rem] flex-col items-center text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F7E9FF] text-[#6900AA]">
           <Package size={28} />
         </span>
-        <p className="mt-4 text-[0.9375rem] font-bold text-slate-900">Home delivery</p>
-        <p className="mt-2 text-[0.8125rem] text-slate-500 leading-relaxed max-w-[14rem]">
+        <p className="mt-3 text-[0.9375rem] font-bold text-slate-900">Home delivery</p>
+        <p className="mt-2 text-[0.8125rem] text-slate-500 leading-relaxed">
           Printed tickets will be couriered to your address. Track status in My Bookings.
         </p>
         {deliveryText && (
@@ -122,13 +123,13 @@ function ConfirmationQrPanel({
 
   if (mode === "BOX_OFFICE") {
     return (
-      <div className="flex h-full flex-col items-center text-center px-2">
+      <div className="mx-auto flex w-full max-w-[15rem] flex-col items-center text-center">
         <p className="text-[0.9375rem] font-bold text-slate-900">Box office pickup</p>
         <p className="mt-2 text-[0.8125rem] text-slate-500 leading-relaxed">
           Show your booking ID and photo ID at the venue box office.
         </p>
         {venue && (
-          <p className="mt-3 text-[0.8125rem] font-semibold text-slate-800 flex items-start gap-1.5 text-left w-full max-w-[15rem]">
+          <p className="mt-3 text-[0.8125rem] font-semibold text-slate-800 flex items-start gap-1.5 text-left w-full">
             <MapPin size={14} className="mt-0.5 shrink-0 text-slate-400" />
             <span>{venue}</span>
           </p>
@@ -138,7 +139,7 @@ function ConfirmationQrPanel({
           <img
             src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(qrData)}`}
             alt="Backup QR code"
-            className="mt-4 h-28 w-28 rounded-lg border border-slate-200 bg-white p-1"
+            className="mt-3 h-28 w-28 rounded-lg border border-slate-200 bg-white p-1"
           />
         )}
       </div>
@@ -148,13 +149,13 @@ function ConfirmationQrPanel({
   if (!qrData) return null;
 
   return (
-    <div className="flex h-full flex-col items-center text-center">
+    <div className="mx-auto flex w-full max-w-[15rem] flex-col items-center text-center">
       <img
         src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(qrData)}`}
         alt="Entry QR code"
         className="h-[9.5rem] w-[9.5rem] sm:h-[10.5rem] sm:w-[10.5rem] rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm"
       />
-      <p className="mt-4 text-[0.9375rem] font-bold text-slate-900">Entry QR</p>
+      <p className="mt-3 text-[0.9375rem] font-bold text-slate-900">Entry QR</p>
       {onCopyCode ? (
         <button
           type="button"
@@ -166,7 +167,7 @@ function ConfirmationQrPanel({
       ) : (
         <p className="mt-1 font-mono text-[0.8125rem] font-bold text-slate-700">{displayCode}</p>
       )}
-      <p className="mt-3 max-w-[15rem] text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
+      <p className="mt-2 text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
         Show this QR code at the venue entrance for admission.
       </p>
     </div>
@@ -193,38 +194,28 @@ function EventTicketCardConfirmation({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`.trim()}
+      className={`relative overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`.trim()}
     >
-      {/* Row 1: event image + QR / barcode */}
-      <div className="relative flex flex-col items-stretch gap-0 sm:flex-row sm:items-stretch">
-        <div className="relative min-h-[14rem] min-w-0 flex-1 self-stretch w-full sm:min-h-0 sm:max-w-none lg:max-w-[38rem]">
-          <div className="absolute inset-5">
-            {posterUrl ? (
-              <img
-                src={resolveMediaUrl(posterUrl)}
-                alt={booking.event_name || "Event"}
-                className="h-full w-full rounded-xl object-cover bg-slate-100"
-              />
-            ) : (
-              <div className="h-full w-full rounded-xl bg-gradient-to-br from-slate-100 to-slate-50" />
-            )}
-          </div>
+      {/* Row 1: image + QR (previous UI) */}
+      <div className="relative flex flex-col gap-0 sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1 p-4 sm:p-5 flex justify-center sm:justify-start bg-white">
+          {posterUrl ? (
+            <img
+              src={resolveMediaUrl(posterUrl)}
+              alt={booking.event_name || "Event"}
+              className="block h-auto w-auto max-h-[12.5rem] sm:max-h-[15rem] md:max-h-[17rem] max-w-full sm:max-w-[min(100%,20rem)] rounded-xl"
+            />
+          ) : (
+            <div className="h-[12.5rem] w-[9rem] sm:h-[15rem] sm:w-[10.5rem] rounded-xl bg-gradient-to-br from-slate-100 to-slate-50" />
+          )}
         </div>
 
-        <div className="relative sm:w-[min(100%,17rem)] sm:shrink-0 md:w-[18rem] lg:w-[19rem]">
+        <div className="relative w-full sm:w-[min(100%,17rem)] sm:shrink-0 md:w-[18rem] lg:w-[19rem]">
           <div
             className="hidden sm:block absolute left-0 top-5 bottom-5 w-px border-l border-dashed border-slate-300"
             aria-hidden
           />
-          <span
-            className="hidden sm:block absolute -left-2.5 -top-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
-            aria-hidden
-          />
-          <span
-            className="hidden sm:block absolute -left-2.5 -bottom-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
-            aria-hidden
-          />
-          <div className="border-t border-dashed border-slate-300 px-5 py-6 sm:border-t-0 sm:px-6 sm:py-8 sm:pl-8">
+          <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:border-t-0 sm:px-6 sm:py-5 sm:pl-8">
             <ConfirmationQrPanel
               mode={ticketMode}
               booking={booking}
@@ -236,8 +227,10 @@ function EventTicketCardConfirmation({
         </div>
       </div>
 
+      <BookingTicketPerforation />
+
       {/* Row 2: event info + details */}
-      <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+      <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6 lg:px-8">
         <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F5E9] px-2.5 py-1 text-[0.6875rem] font-semibold text-[#2E7D32]">
           <Check size={12} strokeWidth={3} />
           Booking Confirmed
@@ -273,7 +266,9 @@ function EventTicketCardConfirmation({
         </div>
       </div>
 
-      <div className="border-t border-slate-200 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+      <BookingTicketPerforation />
+
+      <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6 lg:px-8">
         <p className="text-[0.9375rem] sm:text-[1rem] font-bold text-slate-900">Order Summary</p>
         <div className="mt-4 space-y-2.5">
           {booking.items?.map((item) => (
@@ -339,16 +334,6 @@ function formatBookedOn(value?: string) {
   if (!value) return "";
   const label = formatInstantLocalDateTime(value);
   return label === "—" ? "" : `Booked on ${label}`;
-}
-
-function TicketPerforation() {
-  return (
-    <div className="relative h-5 flex items-center" aria-hidden>
-      <span className="absolute -left-2.5 h-5 w-5 rounded-full bg-[#F5F5F5] border border-slate-200" />
-      <span className="absolute -right-2.5 h-5 w-5 rounded-full bg-[#F5F5F5] border border-slate-200" />
-      <div className="mx-3 flex-1 border-t border-dashed border-slate-300" />
-    </div>
-  );
 }
 
 function BookingCodePill({
@@ -516,7 +501,7 @@ export function EventTicketCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-lg shadow-purple-500/[0.06] ring-1 ring-slate-100 ${className}`.trim()}
+      className={`relative overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-lg shadow-purple-500/[0.06] ring-1 ring-slate-100 ${className}`.trim()}
     >
       <div className="h-1.5 bg-gradient-to-r from-[#57008E] via-[#6900AA] to-[#8B2FC9]" />
 
@@ -636,7 +621,7 @@ export function EventTicketCard({
         </div>
       </div>
 
-      <TicketPerforation />
+      <BookingTicketPerforation />
 
       <FulfillmentBlock
         mode={ticketMode}

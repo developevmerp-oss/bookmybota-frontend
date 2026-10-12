@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -67,8 +67,13 @@ export default function DiningBookingPolicyModal({
   focusSection = "terms",
   onClose,
 }: DiningBookingPolicyModalProps) {
-  const termsRef = useRef<HTMLDivElement>(null);
-  const cancellationRef = useRef<HTMLDivElement>(null);
+  const [activeSection, setActiveSection] =
+    useState<DiningBookingPolicySection>(focusSection);
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveSection(focusSection);
+  }, [open, focusSection]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,15 +88,6 @@ export default function DiningBookingPolicyModal({
       window.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const target = focusSection === "cancellation" ? cancellationRef.current : termsRef.current;
-    const frame = requestAnimationFrame(() => {
-      target?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open, focusSection]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -108,7 +104,7 @@ export default function DiningBookingPolicyModal({
         className="relative w-full sm:max-w-[560px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-5 sm:pt-7 pb-2 border-b border-slate-100">
+        <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-5 sm:pt-7 pb-3 border-b border-slate-100">
           <h2
             id="dining-booking-policy-title"
             className="text-[1.125rem] sm:text-[1.375rem] font-extrabold text-[#333] leading-tight pr-8"
@@ -125,31 +121,58 @@ export default function DiningBookingPolicyModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8 pt-4 max-h-[calc(90vh-4.5rem)] sm:max-h-[calc(85vh-5rem)]">
-          <div ref={termsRef} className="scroll-mt-4">
-            <h3 className="text-[1rem] sm:text-[1.0625rem] font-bold text-[#1A1A1A] mb-3">
-              Terms &amp; Conditions
-            </h3>
-            <ul className="list-disc pl-5 space-y-2.5">
-              {TERMS_ITEMS.map((item, index) => (
-                <li
-                  key={index}
-                  className="text-[0.875rem] sm:text-[0.9375rem] leading-relaxed text-[#4A4A4A]"
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="px-5 sm:px-8 pt-4 flex gap-2.5">
+          <button
+            type="button"
+            onClick={() => setActiveSection("terms")}
+            className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors cursor-pointer ${
+              activeSection === "terms"
+                ? "border-black bg-black text-white"
+                : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
+            }`}
+          >
+            Terms
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("cancellation")}
+            className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors cursor-pointer ${
+              activeSection === "cancellation"
+                ? "border-black bg-black text-white"
+                : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
+            }`}
+          >
+            Condition
+          </button>
+        </div>
 
-          <div ref={cancellationRef} className="scroll-mt-4 mt-8 pt-6 border-t border-slate-100">
-            <h3 className="text-[1rem] sm:text-[1.0625rem] font-bold text-[#1A1A1A] mb-3">
-              Cancellation Policy
-            </h3>
-            <ul className="list-disc pl-5 space-y-2.5">
-              {CANCELLATION_ITEMS.map((item, index) => renderCancellationItem(item, index))}
-            </ul>
-          </div>
+        <div className="overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8 pt-4 max-h-[calc(90vh-8.5rem)] sm:max-h-[calc(85vh-9rem)]">
+          {activeSection === "terms" ? (
+            <div>
+              <h3 className="text-[1rem] sm:text-[1.0625rem] font-bold text-[#1A1A1A] mb-3">
+                Terms &amp; Conditions
+              </h3>
+              <ul className="list-disc pl-5 space-y-2.5">
+                {TERMS_ITEMS.map((item, index) => (
+                  <li
+                    key={index}
+                    className="text-[0.875rem] sm:text-[0.9375rem] leading-relaxed text-[#4A4A4A]"
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div>
+              <h3 className="text-[1rem] sm:text-[1.0625rem] font-bold text-[#1A1A1A] mb-3">
+                Cancellation Policy
+              </h3>
+              <ul className="list-disc pl-5 space-y-2.5">
+                {CANCELLATION_ITEMS.map((item, index) => renderCancellationItem(item, index))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </div>,

@@ -8,6 +8,10 @@ import { useGetCustomerBookingsQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import {
+  CustomerAccountCardShimmer,
+  CustomerAccountShellShimmer,
+} from "@/components/Shared/Shimmer";
 import { formatDateTimeCustomer } from "@/lib/dateFormat";
 
 const FAQ_CATEGORIES = [
@@ -82,9 +86,9 @@ export default function CustomerHelpPage() {
 
   if (!user) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
-        Loading...
-      </div>
+      <CustomerAccountShellShimmer>
+        <CustomerAccountCardShimmer lines={3} />
+      </CustomerAccountShellShimmer>
     );
   }
 

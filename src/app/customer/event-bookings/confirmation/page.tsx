@@ -23,9 +23,15 @@ import {
   ticketModeConfirmationMessage,
   ticketModeLabel,
 } from "@/lib/eventTicketMode";
-import { EventConfirmationShimmer } from "@/components/Shared/Shimmer";
+import { BookingConfirmationShimmer } from "@/components/Shared/Shimmer";
 import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import { BOOKING_CONFIRM_PAGE_BG } from "@/components/Shared/BookingTicketPerforation";
+import ConfirmationPageUI1Shell from "@/components/Shared/Confirmation/ConfirmationPageUI1Shell";
+import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confirmationUiVersion";
+import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
+import { formatMoney } from "@/lib/currencyFormat";
+import { eventBookingQrValue } from "@/lib/eventScanToken";
 
 const CONFIRM_PAGE_MAX = "mx-auto w-full max-w-[64rem] px-4 md:px-5 lg:px-10 xl:px-12";
 
@@ -61,7 +67,7 @@ function ConfirmationContent() {
   );
 
   const poster = resolveMediaUrl(
-    booking?.poster_horizontal_url || booking?.poster_vertical_url
+    booking?.poster_vertical_url || booking?.poster_horizontal_url
   );
   const venue = [booking?.venue_name, booking?.venue_address].filter(Boolean).join(", ");
   const ticketMode = normalizeTicketMode(booking?.ticket_mode);
@@ -129,7 +135,7 @@ function ConfirmationContent() {
   }
 
   if (isLoading) {
-    return <EventConfirmationShimmer />;
+    return <BookingConfirmationShimmer showAside={false} />;
   }
 
   if (error || !booking) {
@@ -144,9 +150,70 @@ function ConfirmationContent() {
   }
 
   const ticketModeName = ticketModeLabel(ticketMode);
+  const whenLine = [
+    formatDateCustomer(booking.starts_at),
+    booking.starts_at ? formatTime12h(booking.starts_at) : "",
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  const ticketTypeDisplay = booking.items?.length
+    ? [...new Set(booking.items.map((i) => i.ticket_type || "Ticket"))].join(", ")
+    : booking.ticket_qty
+      ? `${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`
+      : "Ticket";
+  const amountRows = [
+    ...(booking.items || []).map((item) => ({
+      label: `${item.ticket_type} × ${item.qty}`,
+      value: formatMoney(Number(item.unit_price) * Number(item.qty)),
+    })),
+    {
+      label: "Convenience fee",
+      value: formatMoney(booking.convenience_fee_total),
+    },
+    ...(Number(booking.discount_amount) > 0
+      ? [
+          {
+            label: "Discount",
+            value: `− ${formatMoney(booking.discount_amount)}`,
+            strong: true as const,
+          },
+        ]
+      : []),
+  ];
+
+  // UI1 = BMS ticket centered (no rating). UI2 = classic EventTicketCard layout below.
+  if (CONFIRMATION_UI_VERSION === 1) {
+    return (
+      <ConfirmationPageUI1Shell
+        showAside={false}
+        backHref="/customer/dashboard"
+        pageTitle="Your Ticket"
+        tipBanner="Have your ticket QR handy on your phone while entering the venue."
+        title={booking.event_name || "Event"}
+        posterUrl={poster}
+        whenLine={whenLine}
+        venueLine={venue || undefined}
+        ticketCountLabel={`${booking.ticket_qty ?? booking.items?.reduce((a, i) => a + Number(i.qty || 0), 0) ?? 0} Ticket(s)`}
+        primaryLabel={ticketTypeDisplay}
+        secondaryLabel={booking.guest_name?.trim() || undefined}
+        bookingCode={displayCode}
+        qrValue={eventBookingQrValue(booking)}
+        totalFormatted={formatMoney(booking.grand_total)}
+        amountRows={amountRows}
+        mTicketLabel="E-Ticket"
+        cancellationNote={ticketModeConfirmationMessage(ticketMode)}
+        onDownloadPdf={downloadTickets}
+        downloading={downloading}
+        supportHref="/customer/help"
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-white pb-10 sm:pb-12">
+    <div
+      className="min-h-screen pb-10 sm:pb-12"
+      style={{ backgroundColor: BOOKING_CONFIRM_PAGE_BG }}
+    >
       <style>{`
         @keyframes confirmCheckPop {
           0% { transform: scale(0.4); opacity: 0; }
@@ -312,7 +379,7 @@ function ConfirmationContent() {
 
 export default function EventBookingConfirmationPage() {
   return (
-    <Suspense fallback={<EventConfirmationShimmer />}>
+    <Suspense fallback={<BookingConfirmationShimmer showAside={false} />}>
       <ConfirmationContent />
     </Suspense>
   );

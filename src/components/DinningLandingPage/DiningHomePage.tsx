@@ -56,6 +56,7 @@ import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQ
 // import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
+import DiningNoResultsState from "@/components/DinningLandingPage/DiningNoResultsState";
 import DiningCollectionsOption2 from "@/components/DinningLandingPage/DiningCollectionsOption2";
 import ExploreDiningCardOption2 from "@/components/DinningLandingPage/ExploreDiningCardOption2";
 import DiningOffersOption2 from "@/components/DinningLandingPage/DiningOffersOption2";
@@ -2375,48 +2376,35 @@ export default function Home() {
               ))}
             </div>
           ) : displayRestaurants.length === 0 ? (
-            <div className="text-center py-24">
-              <div className="text-5xl mb-4">🍽️</div>
-              <h3 className="text-lg font-semibold text-slate-600 mb-2">No restaurants found</h3>
-              <p className="text-slate-400 text-sm">
-                {locationCity
-                  ? `No results in ${locationCity}. Try changing your city or filter.`
-                  : "Try adjusting your search or removing the filter."}
-              </p>
-              <div className="flex items-center justify-center gap-3 mt-6 flex-wrap">
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSearchInput("");
-                    setActiveCategories([]);
-                    setExploreCardId("all-dining");
-                    setDiningFilters(DEFAULT_DINING_FILTERS);
-                    setMealOccasion("");
-                    setLocationCity("");
-                    setLocationLabel("All Cities");
-                    localStorage.removeItem("selected_city");
-                    try {
-                      sessionStorage.removeItem(USER_GEO_STORAGE_KEY);
-                    } catch {
-                      /* ignore */
-                    }
-                    window.dispatchEvent(new Event("selected_city_changed"));
-                    window.dispatchEvent(new Event("bmb_user_geo_changed"));
-                    setCurrentPage(1);
-                    setLoadedRestaurants([]);
-                  }}
-                  className="bg-[#6900AA] text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-[#57008E] transition-colors"
-                >
-                  Show all restaurants
-                </button>
-                <button
-                  onClick={() => setShowLocationDropdown(true)}
-                  className="bg-white border border-slate-200 text-slate-700 px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
-                >
-                  Change city
-                </button>
-              </div>
-            </div>
+            <DiningNoResultsState
+              title="No restaurants match these filters"
+              description={
+                locationCity
+                  ? `We couldn’t find any restaurants, pubs, bars or cafes in ${locationCity}. Try clearing filters or searching for another place.`
+                  : "We couldn’t find any restaurants, pubs, bars or cafes. Try clearing filters or searching for another place."
+              }
+              actionLabel="Clear filters"
+              onAction={() => {
+                setSearchQuery("");
+                setSearchInput("");
+                setActiveCategories([]);
+                setExploreCardId("all-dining");
+                setDiningFilters(DEFAULT_DINING_FILTERS);
+                setMealOccasion("");
+                setLocationCity("");
+                setLocationLabel("All Cities");
+                localStorage.removeItem("selected_city");
+                try {
+                  sessionStorage.removeItem(USER_GEO_STORAGE_KEY);
+                } catch {
+                  /* ignore */
+                }
+                window.dispatchEvent(new Event("selected_city_changed"));
+                window.dispatchEvent(new Event("bmb_user_geo_changed"));
+                setCurrentPage(1);
+                setLoadedRestaurants([]);
+              }}
+            />
           ) : (
             <>
             {/* ========== UI OPTION ONE (existing restaurant cards) — commented ========== */}

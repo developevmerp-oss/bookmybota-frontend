@@ -7,7 +7,6 @@ import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
-  Loader2,
   ShoppingBag,
   TrendingUp,
   User,
@@ -15,6 +14,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useGetMyGiftCardQuery } from "@/services/api";
+import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { CustomerGiftCardDetailShimmer } from "@/components/Shared/Shimmer";
 import { formatMoney } from "@/lib/currencyFormat";
 import { formatInstantLocalDateTime } from "@/lib/dateFormat";
 import { formatGiftCardExpiryDate } from "@/lib/giftCardValidity";
@@ -23,7 +24,6 @@ import {
   isGiftCardInWallet,
   isGiftCardSentGift,
 } from "@/lib/giftCardOwnership";
-import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
 import GiftCardDesignFace from "@/components/GiftCards/GiftCardDesignFace";
 import GiftCardCodeReveal from "@/components/GiftCards/GiftCardCodeReveal";
 import images from "@/Images";
@@ -72,9 +72,7 @@ export default function CustomerGiftCardDetailPage() {
         </Link>
 
         {isLoading ? (
-          <div className="flex items-center gap-2 text-slate-500 py-12 justify-center">
-            <Loader2 className="animate-spin" size={18} /> Loading…
-          </div>
+          <CustomerGiftCardDetailShimmer embedded />
         ) : isError || !card ? (
           <p className="text-center text-rose-600 py-10">Gift card not found.</p>
         ) : (

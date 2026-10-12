@@ -26,6 +26,7 @@ import { useGetBookingByIdQuery, useCancelBookingMutation } from "@/services/api
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
+import { CustomerBookingDetailShimmer } from "@/components/Shared/Shimmer";
 import { formatDateCustomer, formatTime12h, formatWeekdayCustomer, formatInstantLocalDateTime } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
@@ -127,11 +128,7 @@ export default function BookingDetailPage({
   };
 
   if (!user || isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F5F5F7] pt-24 text-center text-slate-500">
-        Loading booking...
-      </div>
-    );
+    return <CustomerBookingDetailShimmer />;
   }
 
   if (error || !booking) {

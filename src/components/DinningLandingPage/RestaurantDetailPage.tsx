@@ -692,11 +692,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [mobileTabsHeight, setMobileTabsHeight] = useState(0);
   const mobileTabsRef = useRef<HTMLDivElement>(null);
   const showMobileSectionTabs = isMobileViewport && heroPast && !isBookTableFlow;
-  /** Desktop book steps 1–3: section tabs + Book a Table (selected). */
-  const showDesktopBookTabsInline =
-    isBookTableFlow && isLgViewport && drawerStep >= 1 && drawerStep <= 3;
-  const showSectionTabs = showRestaurantSticky && heroPast && !isBookTableFlow;
-  const restaurantStickyVisible = !isBookTableFlow && showRestaurantSticky;
+  /** Desktop book: restaurant sticky carries Overview… + Book a Table (selected). */
+  const showSectionTabs =
+    (isBookTableFlow && isLgViewport) ||
+    (showRestaurantSticky && heroPast && !isBookTableFlow);
+  const restaurantStickyVisible =
+    (isBookTableFlow && isLgViewport) || (!isBookTableFlow && showRestaurantSticky);
 
   useEffect(() => {
     const measureHeader = () => {
@@ -726,13 +727,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   }, []);
 
   useEffect(() => {
-    // Mobile: always hide site chrome. Tablet book: immersive. Desktop book: keep main + sub header.
+    // Mobile: always hide site chrome. Tablet/desktop book: hide site chrome so restaurant sticky can take over.
     const hideChrome =
       isMobileViewport ||
-      (isBookTableFlow && !isLgViewport) ||
+      isBookTableFlow ||
       (!isBookTableFlow && (hideSiteNav || showRestaurantSticky));
     document.body.dataset.diningDetailNav = hideChrome ? "1" : "0";
-    if (isBookTableFlow && !isLgViewport) {
+    // Book flow: collapse site chrome from layout (all breakpoints) so restaurant sticky sits flush
+    if (isBookTableFlow) {
       document.body.dataset.diningBookImmersive = "1";
     } else {
       delete document.body.dataset.diningBookImmersive;
@@ -1594,10 +1596,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     }
     setDrawerStep(1);
     setActiveTab("Book a Table");
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      scrollToTabPanelStart();
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
     }
   };
 
@@ -1769,7 +1769,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const isBookingSuccess = isBookTableFlow && drawerStep === 4;
   const galleryStickyTop =
     isBookTableFlow && isLgViewport
-      ? (siteHeaderHeight > 0 ? siteHeaderHeight : 72) + 20
+      ? Math.max(restaurantStickyHeight, 72) + 8
       : (showRestaurantSticky
           ? Math.max(restaurantStickyHeight, 64)
           : siteHeaderHeight > 0
@@ -1790,7 +1790,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           isBookingSuccess
             ? "hidden md:block"
             : isBookTableFlow
-              ? "hidden lg:block"
+              ? "hidden"
               : "hidden md:block"
         }`}
       >
@@ -1810,18 +1810,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       <div
         className={`bmb-section-container pb-24 md:pb-16 ${
           isBookTableFlow
-            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-5 lg:pt-4"
+            ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-0 lg:pt-0 lg:pb-16"
             : "max-md:px-0 max-md:pt-0 py-5"
         }`}
       >
-        {/* ── Header: title + icon actions + rating (hidden on booking success) ── */}
+        {/* ── Header: title + icon actions + rating (hidden on book flow + success) ── */}
         <div
           className={`bg-white pt-2 mb-4 ${
-            isBookingSuccess
-              ? "hidden"
-              : isBookTableFlow
-                ? "hidden lg:block"
-                : "hidden md:block"
+            isBookingSuccess || isBookTableFlow ? "hidden" : "hidden md:block"
           }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -1892,21 +1888,19 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
         {/* ── Gallery + sticky table reservation ── */}
         <div
-          className={`grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${
-            hideBookingSidebar
-              ? ""
-              : isBookTableFlow
-                ? "lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
-                : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
+          className={`${
+            isBookTableFlow
+              ? "mx-auto w-full max-w-[56rem] xl:max-w-[64rem]"
+              : `grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${
+                  hideBookingSidebar
+                    ? ""
+                    : "md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]"
+                }`
           }`}
         >
           <div
             className={`min-w-0 order-1 ${
-              isBookingSuccess
-                ? "hidden"
-                : isBookTableFlow
-                  ? "max-lg:hidden lg:col-span-2"
-                  : ""
+              isBookingSuccess || isBookTableFlow ? "hidden" : ""
             }`}
           >
             <div ref={titleSentinelRef} className="h-px w-full" aria-hidden />
@@ -2203,24 +2197,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             <div ref={heroEndSentinelRef} className="h-px w-full" aria-hidden />
           </div>
 
-          {!hideBookingSidebar ? (
+          {!hideBookingSidebar && !isBookTableFlow ? (
             <aside
               ref={bookingWidgetRef}
-              className={`w-full md:sticky lg:sticky z-30 self-start ${
-                isBookTableFlow
-                  ? `hidden lg:block lg:order-3 ${
-                      drawerStep === 1 ? "lg:mt-[7.75rem]" : ""
-                    }`
-                  : "hidden md:block order-2 md:row-span-2"
-              }`}
+              className="w-full md:sticky lg:sticky z-30 self-start hidden md:block order-2 md:row-span-2"
               style={{ top: galleryStickyTop }}
             >
               <div className="flex flex-col gap-3 sm:gap-4">
-              {activeTab === "Book a Table" && drawerStep === 1 ? (
-                <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-sm">
-                  <GuestTableAnimation count={Number(guests)} />
-                </div>
-              ) : (
                 <div
                   ref={reserveWidgetRef}
                   className="bg-white rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)] overflow-visible p-4 sm:p-5"
@@ -2230,20 +2213,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   </h3>
 
                   <div className="mt-4 space-y-3.5">
-                    {/* {visibleOffers[0] ? (
-                      <div className="rounded-xl border border-[#6900AA]/20 bg-[#f7e9ff] px-3 py-2.5 flex items-start gap-2.5">
-                        <PartyPopper size={16} className="text-[#6900AA] shrink-0 mt-0.5" strokeWidth={2.25} />
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-[#6900AA] leading-snug">
-                            {formatDiningOfferDiscount(visibleOffers[0])}
-                            {visibleOffers.length > 1
-                              ? ` · +${visibleOffers.length - 1} more offer${visibleOffers.length > 2 ? "s" : ""}`
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-                    ) : null} */}
-
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-1.5">
                         Date
@@ -2365,49 +2334,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </button>
                   </div>
                 </div>
-              )}
-
-              {profile.address?.trim() ||
-              (Number.isFinite(Number(profile.latitude)) &&
-                Number.isFinite(Number(profile.longitude))) ? (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgba(15,23,42,0.06)] p-4 sm:p-5">
-                  <h3 className="text-xl sm:text-[1.3rem] font-semibold text-slate-900 tracking-tight leading-tight">
-                    Direction
-                  </h3>
-                  {profile.address?.trim() ? (
-                    <p className="mt-2.5 text-sm sm:text-[0.95rem] text-slate-500 leading-relaxed">
-                      {profile.address.trim()}
-                    </p>
-                  ) : null}
-                  <div className="mt-4 grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={handleCopyAddress}
-                      disabled={!profile.address?.trim()}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm sm:text-[1rem] font-bold text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {copied ? <Check size={16} strokeWidth={2.5} /> : <Copy size={16} strokeWidth={2.25} />}
-                      {copied ? "Copied" : "Copy"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const opened = openRestaurantDirections({
-                          latitude: profile.latitude,
-                          longitude: profile.longitude,
-                          address: profile.address,
-                          name: profile.name,
-                        });
-                        if (!opened) toast.error("Location not available");
-                      }}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] px-3 py-3 text-sm sm:text-[1rem] font-bold text-white hover:bg-black transition-colors cursor-pointer"
-                    >
-                      <Navigation size={16} strokeWidth={2.5} />
-                      Direction
-                    </button>
-                  </div>
-                </div>
-              ) : null}
               </div>
             </aside>
           ) : null}
@@ -2419,8 +2345,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           >
             <div
               id="tab-panel-start"
-              className={`space-y-4 pt-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${
-                isBookTableFlow ? "" : "max-md:px-5"
+              className={`space-y-4 scroll-mt-[7.5rem] md:scroll-mt-[8rem] lg:scroll-mt-[9rem] xl:scroll-mt-[9.25rem] ${
+                isBookTableFlow ? "pt-0" : "pt-4 max-md:px-5"
               }`}
             >
 
@@ -2983,7 +2909,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
 
         {/* ── 8. Book a Table flow (inline in Book a Table tab via portal) ── */}
         {activeTab === "Book a Table" && bookTableSlot && createPortal(
-          <div className="w-full bg-white flex flex-col pb-12 sm:pb-16">
+          <div
+            className="w-full bg-white flex flex-col pb-12 sm:pb-16"
+            style={
+              isBookTableFlow && isLgViewport
+                ? { paddingTop: (restaurantStickyHeight || 96) + 12 }
+                : undefined
+            }
+          >
 
             {/* Immersive book header (mobile + tablet; hidden on success) */}
             {!isBookingSuccess ? (
@@ -3005,33 +2938,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             </div>
             ) : null}
 
-            {/* Desktop booking steps: Overview / Menu / Photos / Reviews / Book a Table */}
-            {showDesktopBookTabsInline ? (
-              <div className="hidden lg:block border-b border-slate-200 mb-4">
-                <div className="flex gap-6 overflow-x-auto scrollbar-hide">
-                  {DETAIL_SECTION_TABS.map((tab) => (
-                    <button
-                      key={`book-flow-tab-${tab.id}`}
-                      type="button"
-                      onClick={() => scrollToDetailSection(tab.sectionId, tab.id)}
-                      className="py-2.5 text-sm font-semibold tracking-wide border-b-2 border-transparent text-slate-400 hover:text-slate-900 transition-all whitespace-nowrap cursor-pointer"
-                    >
-                      {tab.id}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="py-2.5 text-sm font-bold tracking-wide border-b-2 border-slate-900 text-slate-900 whitespace-nowrap cursor-default"
-                    aria-current="page"
-                  >
-                    Book a Table
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
             {/* Panel Content */}
-            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white lg:pt-0' : drawerStep === 1 ? 'pt-1 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
+            <div className={`${drawerStep === 4 ? '' : drawerStep === 3 ? 'p-4 sm:p-6 bg-white lg:pt-0' : drawerStep === 1 ? 'pt-0 pb-2 bg-white px-4 sm:px-5 lg:px-0' : 'p-5 bg-white'}`}>
               {drawerStep === 1 && (() => {
                 const mealsConfig: DiningMealsConfig = selectedOpDay?.meals || {
                   breakfast: { open: '08:00', close: '11:00', active: true },
@@ -3221,13 +3129,14 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       null;
 
                 return (
-                  <div className="space-y-5">
+                  <div className="space-y-4 lg:space-y-3">
                     {/* Desktop book intro (mobile/tablet use immersive header above) */}
                     <h4 className="hidden lg:block text-xl font-semibold text-slate-900 tracking-tight">
                       Select your booking details
                     </h4>
 
-                    <div className="space-y-5 bg-white rounded-none border-0 px-0 md:rounded-xl md:border md:border-slate-200 md:p-5 p-0">
+                    <div className="grid items-start gap-6 lg:gap-8 xl:gap-10 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">
+                    <div className="min-w-0 space-y-5 bg-white rounded-none border-0 px-0 md:rounded-xl md:border md:border-slate-200 md:p-5 p-0">
                     {/* Guests — dropdown on mobile, chips on tablet/desktop */}
                     <div>
                       <p className="md:hidden text-sm text-slate-500 mb-2">Select number of guests</p>
@@ -3590,7 +3499,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                               )}
                             </div>
                       )}
-                  </div>
+                    </div>
+
+                    <aside
+                      className="hidden lg:block sticky self-start"
+                      style={{ top: galleryStickyTop }}
+                      aria-hidden
+                    >
+                      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+                        <GuestTableAnimation count={Number(guests)} />
+                      </div>
+                    </aside>
+                    </div>
                   </div>
                 );
               })()}
@@ -4287,139 +4207,88 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                 </div>
               )}
 
-            {/* Step 1 footer — Zomato-like proceed bar */}
+            {/* Step 1 footer — terms row + proceed */}
             {drawerStep === 1 && (
-              <div className="mt-8 md:mt-8 max-md:sticky max-md:bottom-0 max-md:z-40 max-md:-mx-5 max-md:px-5 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:bg-white max-md:border-t max-md:border-slate-200">
-                <div className="md:hidden mb-3 rounded-xl bg-slate-100 px-3.5 py-3">
-                  <p className="text-sm font-bold text-slate-900 mb-1">Terms &amp; Conditions</p>
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <div className="relative mt-0.5 shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="sr-only"
-                      />
-                      <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${acceptedTerms ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-300'}`}
-                      >
-                        {acceptedTerms && (
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-xs text-slate-500 font-medium leading-relaxed">
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        className="text-slate-900 font-semibold underline cursor-pointer"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setBookingPolicyFocus("terms");
-                          setBookingPolicyOpen(true);
-                        }}
-                      >
-                        Terms &amp; Conditions
-                      </button>
-                      {' '}and{' '}
-                      <button
-                        type="button"
-                        className="text-slate-900 font-semibold underline cursor-pointer"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setBookingPolicyFocus("cancellation");
-                          setBookingPolicyOpen(true);
-                        }}
-                      >
-                        Cancellation Policy
-                      </button>
-                    </span>
-                  </label>
-                </div>
-
-                <label className="hidden md:flex items-start gap-2.5 cursor-pointer select-none mb-4">
-                    <div className="relative mt-0.5 shrink-0">
-                      <input
-                        type="checkbox"
-                        id="termsAcceptFooter"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="sr-only"
-                      />
-                      <div
-                      className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${acceptedTerms ? 'bg-[#6900AA] border-[#6900AA]' : 'bg-white border-slate-300 hover:border-slate-400'
-                          }`}
-                      >
-                        {acceptedTerms && (
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                  <span className="text-xs text-slate-500 font-medium leading-relaxed">
-                      I agree to the{' '}
-                    <button
-                      type="button"
-                      className="text-[#6900AA] font-semibold hover:underline cursor-pointer"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setBookingPolicyFocus("terms");
-                        setBookingPolicyOpen(true);
-                      }}
-                    >
-                      Terms &amp; Conditions
-                    </button>
-                      {' '}and{' '}
-                    <button
-                      type="button"
-                      className="text-[#6900AA] font-semibold hover:underline cursor-pointer"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setBookingPolicyFocus("cancellation");
-                        setBookingPolicyOpen(true);
-                      }}
-                    >
-                      Cancellation Policy
-                    </button>
-                    </span>
-                  </label>
-
+              <div className="mt-8 md:mt-8 max-md:sticky max-md:bottom-0 max-md:z-40 max-md:-mx-5 max-md:px-5 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:bg-white max-md:border-t max-md:border-slate-200 space-y-3 md:space-y-4 md:max-w-sm lg:max-w-md">
+                <div className="rounded-xl border border-black overflow-hidden bg-white">
                   <button
                     type="button"
-                    disabled={
-                      !selectedTime ||
-                      !acceptedTerms ||
-                      !selectedSlotIsAvailable ||
-                      slotsInitialLoading ||
-                      proceedChecking
-                    }
-                    onClick={() => void proceedToBooking()}
-                    className={`w-full md:max-w-sm lg:max-w-md md:self-start px-6 sm:px-8 py-3.5 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2 ${
-                      selectedTime &&
-                      acceptedTerms &&
-                      selectedSlotIsAvailable &&
-                      !slotsInitialLoading &&
-                      !proceedChecking
-                        ? 'bg-[#111111] hover:bg-black text-white cursor-pointer'
-                        : 'bg-[#cfcfcf] text-white cursor-not-allowed'
-                    }`}
+                    onClick={() => {
+                      setBookingPolicyFocus("terms");
+                      setBookingPolicyOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 transition-colors"
                   >
-                    {proceedChecking ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Checking availability…
-                      </>
-                    ) : (
-                      'Proceed to book'
-                    )}
+                    <span className="text-sm sm:text-[0.9375rem] font-bold text-black">
+                      Terms &amp; Conditions
+                    </span>
+                    <ChevronRight size={18} strokeWidth={2.25} className="text-black shrink-0" />
                   </button>
+                </div>
+
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <div className="relative mt-0.5 shrink-0">
+                    <input
+                      type="checkbox"
+                      id="termsAcceptFooter"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div
+                      className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer ${
+                        acceptedTerms
+                          ? "bg-black border-black"
+                          : "bg-white border-slate-300 hover:border-slate-400"
+                      }`}
+                    >
+                      {acceptedTerms && (
+                        <svg
+                          className="w-2.5 h-2.5 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-500 font-medium leading-relaxed">
+                    I agree to the Terms &amp; Conditions and Cancellation Policy
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  disabled={
+                    !selectedTime ||
+                    !acceptedTerms ||
+                    !selectedSlotIsAvailable ||
+                    slotsInitialLoading ||
+                    proceedChecking
+                  }
+                  onClick={() => void proceedToBooking()}
+                  className={`w-full px-6 sm:px-8 py-3.5 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2 ${
+                    selectedTime &&
+                    acceptedTerms &&
+                    selectedSlotIsAvailable &&
+                    !slotsInitialLoading &&
+                    !proceedChecking
+                      ? "bg-[#111111] hover:bg-black text-white cursor-pointer"
+                      : "bg-[#cfcfcf] text-white cursor-not-allowed"
+                  }`}
+                >
+                  {proceedChecking ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Checking availability…
+                    </>
+                  ) : (
+                    "Proceed to book"
+                  )}
+                </button>
               </div>
             )}
             </div>
@@ -4458,7 +4327,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               id="dining-restaurant-sticky"
               ref={restaurantStickyRef}
               className={`fixed top-0 left-0 right-0 z-[60] transition-all duration-300 ease-out ${
-                isBookTableFlow ? "hidden" : "hidden md:block"
+                isBookTableFlow && !isLgViewport ? "hidden" : "hidden md:block"
               } ${
                 restaurantStickyVisible && !isLightboxOpen
                   ? "translate-y-0 opacity-100"
@@ -4519,6 +4388,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                           {tab.id}
                         </button>
                       ))}
+                      {isBookTableFlow && isLgViewport ? (
+                        <button
+                          type="button"
+                          className="py-2.5 text-sm sm:text-base lg:text-sm font-bold tracking-wide border-b-2 border-slate-900 text-slate-900 whitespace-nowrap cursor-default"
+                          aria-current="page"
+                        >
+                          Book a Table
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>

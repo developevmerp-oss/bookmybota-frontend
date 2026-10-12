@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 
 export type ListYourShowClipSliderSlide = {
@@ -31,6 +31,63 @@ const DEFAULT_CONTAINER = "bmb-section-container";
 const IMAGE_CLIP_PATH =
   "M 0 0 H 1 V 1 H 0.256 C 0.171 1, 0.138 0.915, 0.118 0.776 L 0 0 Z";
 
+/** Clamp description to 2 lines with a more/less toggle when it overflows. */
+function SlideDescription({
+  text,
+  className,
+  resetKey,
+}: {
+  text: string;
+  className: string;
+  resetKey: string | number;
+}) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [needsMore, setNeedsMore] = useState(false);
+
+  useLayoutEffect(() => {
+    setExpanded(false);
+  }, [resetKey, text]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const measure = () => {
+      if (expanded) {
+        // Keep the toggle while expanded so the user can collapse.
+        return;
+      }
+      setNeedsMore(el.scrollHeight > el.clientHeight + 1);
+    };
+
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [text, resetKey, expanded, className]);
+
+  return (
+    <div className="mt-3 sm:mt-3.5 max-w-[22rem]">
+      <p
+        ref={ref}
+        className={`${className} ${expanded ? "" : "line-clamp-2"}`}
+      >
+        {text}
+      </p>
+      {needsMore || expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 inline-flex text-[0.8125rem] sm:text-[0.875rem] font-medium text-[#666] hover:underline cursor-pointer"
+        >
+          {expanded ? "less" : "more"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * List Your Show feature slider — wide active split card (clip-path image) +
  * compact portrait peek cards. Uses existing slide titles, copy, and images.
@@ -48,7 +105,7 @@ export default function ListYourShowClipSlider({
   const n = slides.length;
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
-  /** Previous slide index — animation-only, for cinematic crossfade. */
+  /** Previous slide index — animation-only, for simple crossfade. */
   const [outgoing, setOutgoing] = useState<number | null>(null);
   const [animKey, setAnimKey] = useState(0);
   const activeRef = useRef(0);
@@ -88,7 +145,7 @@ export default function ListYourShowClipSlider({
 
   useEffect(() => {
     if (outgoing === null) return;
-    const t = window.setTimeout(() => setOutgoing(null), 700);
+    const t = window.setTimeout(() => setOutgoing(null), 720);
     return () => window.clearTimeout(t);
   }, [outgoing, animKey]);
 
@@ -109,79 +166,65 @@ export default function ListYourShowClipSlider({
       onMouseLeave={() => setPaused(false)}
     >
       <style>{`
-        /* Jump / bounce — image lands from the right with spring overshoot */
-        @keyframes lysJumpIn {
+        /* Smooth image change — dissolve + gentle pan */
+        @keyframes lysImageIn {
           0% {
             opacity: 0;
-            transform: translateX(28%) translateY(-18px) scale(0.88);
-          }
-          55% {
-            opacity: 1;
-            transform: translateX(-3%) translateY(6px) scale(1.04);
-          }
-          75% {
-            transform: translateX(1.5%) translateY(-3px) scale(0.98);
+            transform: translateX(18px) scale(1.02);
           }
           100% {
             opacity: 1;
-            transform: translateX(0) translateY(0) scale(1);
+            transform: translateX(0) scale(1);
           }
         }
-        @keyframes lysJumpOut {
+        @keyframes lysImageOut {
           0% {
             opacity: 1;
-            transform: translateX(0) translateY(0) scale(1);
+            transform: translateX(0) scale(1);
           }
           100% {
             opacity: 0;
-            transform: translateX(-22%) translateY(10px) scale(0.9);
+            transform: translateX(-14px) scale(1.01);
           }
         }
-        @keyframes lysJumpCopy {
+        /* Smooth content — soft fade + rise */
+        @keyframes lysCopyIn {
           0% {
             opacity: 0;
-            transform: translateY(-22px) scale(0.94);
-          }
-          60% {
-            opacity: 1;
-            transform: translateY(5px) scale(1.02);
+            transform: translateY(10px);
           }
           100% {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            transform: translateY(0);
           }
         }
-        @keyframes lysJumpPeek {
+        @keyframes lysPeekIn {
           0% {
             opacity: 0;
-            transform: translateX(36px) translateY(-14px) scale(0.86);
-          }
-          55% {
-            opacity: 1;
-            transform: translateX(-4px) translateY(5px) scale(1.03);
+            transform: translateX(16px);
           }
           100% {
             opacity: 1;
-            transform: translateX(0) translateY(0) scale(1);
+            transform: translateX(0);
           }
         }
         .lys-hero-in {
-          animation: lysJumpIn 0.7s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+          animation: lysImageIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
         .lys-hero-out {
-          animation: lysJumpOut 0.45s cubic-bezier(0.4, 0, 0.2, 1) both;
+          animation: lysImageOut 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
         }
         .lys-copy > *:nth-child(1) {
-          animation: lysJumpCopy 0.55s cubic-bezier(0.34, 1.45, 0.64, 1) 0.04s both;
+          animation: lysCopyIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
         }
         .lys-copy > *:nth-child(2) {
-          animation: lysJumpCopy 0.55s cubic-bezier(0.34, 1.45, 0.64, 1) 0.1s both;
+          animation: lysCopyIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
         }
         .lys-copy > *:nth-child(3) {
-          animation: lysJumpCopy 0.55s cubic-bezier(0.34, 1.45, 0.64, 1) 0.16s both;
+          animation: lysCopyIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.22s both;
         }
         .lys-peek {
-          animation: lysJumpPeek 0.65s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+          animation: lysPeekIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
       `}</style>
       <div className={containerClassName}>
@@ -215,9 +258,11 @@ export default function ListYourShowClipSlider({
                 <h2 className="text-[1.35rem] font-bold text-[#1A1A1A] leading-tight tracking-tight">
                   {activeSlide.title}
                 </h2>
-                <p className="mt-3 text-[0.8125rem] text-[#666] leading-relaxed">
-                  {activeSlide.description}
-                </p>
+                <SlideDescription
+                  text={activeSlide.description}
+                  resetKey={`m-${activeSlide.id}-${animKey}`}
+                  className="text-[0.8125rem] text-[#666] leading-relaxed"
+                />
                 <div className="mt-5 flex flex-col gap-2.5">
                   <Link
                     href="#contact"
@@ -266,9 +311,11 @@ export default function ListYourShowClipSlider({
                 <h2 className="text-[1.55rem] md:text-[1.85rem] font-bold text-[#1A1A1A] leading-tight tracking-tight max-w-[22rem]">
                   {activeSlide.title}
                 </h2>
-                <p className="mt-3.5 text-[0.9rem] text-[#666] leading-relaxed max-w-[22rem]">
-                  {activeSlide.description}
-                </p>
+                <SlideDescription
+                  text={activeSlide.description}
+                  resetKey={`d-${activeSlide.id}-${animKey}`}
+                  className="text-[0.9rem] text-[#666] leading-relaxed"
+                />
                 <div className="mt-6 flex flex-row flex-wrap items-center gap-3">
                   <Link
                     href="#contact"

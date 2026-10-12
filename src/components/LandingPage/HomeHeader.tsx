@@ -223,18 +223,20 @@ export default function HomeHeader() {
   }, [pathname]);
 
   useLayoutEffect(() => {
-    const COMPACT_AFTER_Y = 72;
-    const EXPAND_BELOW_Y = 24;
+    const mainHeader = document.querySelector<HTMLElement>("[data-site-main-header]");
+    /** Compact chrome only after main header has fully scrolled away — avoids logo/profile doubling. */
+    const compactAfterY = () => Math.max(mainHeader?.offsetHeight ?? 88, 88);
+    const expandBelowY = () => 12;
     // Sync from real scrollY — do not start local `compact` at false while React
     // state may still be true from the previous route (skips setState and leaves
     // sticky logo/login duplicated under the main header until the user scrolls).
-    let compact = window.scrollY >= COMPACT_AFTER_Y;
+    let compact = window.scrollY >= compactAfterY();
     setCompactHeader(compact);
     const onScroll = () => {
       const y = window.scrollY;
       let next = compact;
-      if (y >= COMPACT_AFTER_Y) next = true;
-      else if (y <= EXPAND_BELOW_Y) next = false;
+      if (y >= compactAfterY()) next = true;
+      else if (y <= expandBelowY()) next = false;
       if (next === compact) return;
       compact = next;
       setCompactHeader(next);
@@ -242,7 +244,7 @@ export default function HomeHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     // Parent layout also scrollTo(0) on route change — re-sync after that.
     const raf = window.requestAnimationFrame(() => {
-      if (window.scrollY <= EXPAND_BELOW_Y) {
+      if (window.scrollY <= expandBelowY()) {
         compact = false;
         setCompactHeader(false);
       } else {
@@ -321,16 +323,17 @@ export default function HomeHeader() {
 
   return (
     <>
-      {/* Main header — scrolls away (not sticky) */}
+      {/* Main header — scrolls away (not sticky). Logo/profile live here only until compact. */}
       <header
-        className={`relative z-40 bg-white text-[#111111] transition-transform duration-300 ease-out ${
-          diningDetailNavHidden
-            ? `-translate-y-full pointer-events-none ${
-                diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
-              }`
-            : hideChromeOnMobileTablet
-              ? "max-lg:hidden"
-              : "translate-y-0"
+        data-site-main-header
+        className={`relative z-[60] bg-white text-[#111111] border-b border-[#E8E8E8] transition-transform duration-300 ease-out ${
+          diningBookImmersive
+            ? "hidden"
+            : diningDetailNavHidden
+              ? "-translate-y-full pointer-events-none max-md:hidden"
+              : hideChromeOnMobileTablet
+                ? "max-lg:hidden"
+                : "translate-y-0"
         }`}
         aria-hidden={diningDetailNavHidden || undefined}
         data-header-compact={compactHeader ? "1" : "0"}
@@ -348,11 +351,17 @@ export default function HomeHeader() {
               <ChevronDown size={14} className="shrink-0 opacity-80" />
             </button>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+            <div
+              className={`flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0 transition-opacity duration-200 ${
+                compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+              }`}
+              aria-hidden={compactHeader || undefined}
+            >
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
                 aria-label="Search"
+                tabIndex={compactHeader ? -1 : undefined}
                 className="w-9 h-9 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0 cursor-pointer"
               >
                 <Search size={18} strokeWidth={2} />
@@ -372,7 +381,14 @@ export default function HomeHeader() {
 
           {/* Desktop: logo | centered search | city + profile */}
           <div className="hidden lg:flex items-center gap-3 lg:gap-4 min-w-0">
-            <Link href="/" className="shrink-0 flex items-center">
+            <Link
+              href="/"
+              className={`shrink-0 flex items-center transition-opacity duration-200 ${
+                compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+              }`}
+              aria-hidden={compactHeader || undefined}
+              tabIndex={compactHeader ? -1 : undefined}
+            >
               <img
                 src={logoSrc}
                 alt="Book My Bota"
@@ -401,15 +417,22 @@ export default function HomeHeader() {
 
               <HeaderDivider />
 
-              <AuthSection
-                authReady={authReady}
-                customer={customer}
-                displayName={displayName}
-                initial={initial}
-                isAuthPage={isAuthPage}
-                onLogin={() => setLoginOpen(true)}
-                onLogout={handleLogout}
-              />
+              <div
+                className={`transition-opacity duration-200 ${
+                  compactHeader ? "opacity-0 pointer-events-none" : "opacity-100"
+                }`}
+                aria-hidden={compactHeader || undefined}
+              >
+                <AuthSection
+                  authReady={authReady}
+                  customer={customer}
+                  displayName={displayName}
+                  initial={initial}
+                  isAuthPage={isAuthPage}
+                  onLogin={() => setLoginOpen(true)}
+                  onLogout={handleLogout}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -418,14 +441,14 @@ export default function HomeHeader() {
       {/* Subheader — sticky; when scrolled, also shows logo (left) + profile (right) */}
       <div
         data-site-sticky-subheader="1"
-        className={`sticky top-0 z-50 border-b border-[#E5E7EB] bg-white transition-shadow duration-300 ${
-          diningDetailNavHidden
-            ? `-translate-y-full pointer-events-none ${
-                diningBookImmersive ? "max-lg:hidden" : "max-md:hidden"
-              }`
-            : hideChromeOnMobileTablet
-              ? "max-lg:hidden"
-              : ""
+        className={`sticky top-0 z-50 border-t border-b border-[#E8E8E8] bg-white transition-shadow duration-300 ${
+          diningBookImmersive
+            ? "hidden"
+            : diningDetailNavHidden
+              ? "-translate-y-full pointer-events-none max-md:hidden"
+              : hideChromeOnMobileTablet
+                ? "max-lg:hidden"
+                : ""
         } ${compactHeader ? "shadow-[0_2px_10px_rgba(0,0,0,0.08)]" : "shadow-[0_2px_8px_rgba(0,0,0,0.06)]"}`}
         aria-hidden={diningDetailNavHidden || undefined}
       >
@@ -434,8 +457,8 @@ export default function HomeHeader() {
             href="/"
             className={`shrink-0 flex items-center overflow-hidden transition-all duration-300 ease-out ${
               compactHeader
-                ? "opacity-100 max-w-[11rem] sm:max-w-[12rem]"
-                : "opacity-0 max-w-0 pointer-events-none"
+                ? "opacity-100 max-w-[11rem] sm:max-w-[12rem] visible"
+                : "opacity-0 max-w-0 invisible pointer-events-none"
             }`}
             aria-hidden={!compactHeader}
             tabIndex={compactHeader ? undefined : -1}
@@ -450,12 +473,12 @@ export default function HomeHeader() {
           {/* Categories stay in the middle lane only — horizontal scroll inside */}
           <div className="min-w-0 flex-1">{subNav}</div>
 
-          {/* Sticky end: search + List Your Show + profile */}
+          {/* Sticky end: search + location + List Your Show + profile — only after main header has scrolled away */}
           <div
             className={`relative z-10 shrink-0 flex items-center transition-all duration-300 ease-out ${
               compactHeader
-                ? "opacity-100 gap-3 sm:gap-4 lg:gap-5"
-                : "opacity-0 max-w-0 overflow-hidden pointer-events-none gap-1.5 sm:gap-2"
+                ? "opacity-100 gap-1.5 sm:gap-2 visible max-w-none"
+                : "opacity-0 max-w-0 overflow-hidden invisible pointer-events-none gap-0"
             }`}
             aria-hidden={!compactHeader}
           >
@@ -469,7 +492,18 @@ export default function HomeHeader() {
               <Search size={18} strokeWidth={2} />
             </button>
 
-            <div className="hidden lg:flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={() => setCityOpen(true)}
+              aria-label={city ? `Change city, ${city}` : "Select city"}
+              title={cityLabel}
+              tabIndex={compactHeader ? undefined : -1}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-[#F7E9FF] text-[#111111] flex items-center justify-center shrink-0 cursor-pointer"
+            >
+              <MapPin size={18} strokeWidth={2} />
+            </button>
+
+            <div className="hidden lg:flex shrink-0 items-center ml-0.5">
               <ListYourShowCta
                 href="/list-your-show"
                 label="List Your Show"
@@ -477,15 +511,17 @@ export default function HomeHeader() {
               />
             </div>
 
-            <AuthSection
-              authReady={authReady}
-              customer={customer}
-              displayName={displayName}
-              initial={initial}
-              isAuthPage={isAuthPage}
-              onLogin={() => setLoginOpen(true)}
-              onLogout={handleLogout}
-            />
+            <div className="ml-1 sm:ml-1.5">
+              <AuthSection
+                authReady={authReady}
+                customer={customer}
+                displayName={displayName}
+                initial={initial}
+                isAuthPage={isAuthPage}
+                onLogin={() => setLoginOpen(true)}
+                onLogout={handleLogout}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -10,7 +10,6 @@ import {
   Clock,
   Copy,
   Home,
-  Loader2,
   MapPin,
   Phone,
   Share2,
@@ -18,7 +17,6 @@ import {
   Ticket,
   User,
   Users,
-  UtensilsCrossed,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useGetBookingByIdQuery } from "@/services/api";
@@ -31,6 +29,13 @@ import {
   formatWeekdayCustomer,
 } from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
+import BookingTicketPerforation, {
+  BOOKING_CONFIRM_PAGE_BG,
+} from "@/components/Shared/BookingTicketPerforation";
+import ConfirmationPageUI1Shell from "@/components/Shared/Confirmation/ConfirmationPageUI1Shell";
+import DiningConfirmationReviewAside from "@/components/Shared/Confirmation/DiningConfirmationReviewAside";
+import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confirmationUiVersion";
+import { BookingConfirmationShimmer } from "@/components/Shared/Shimmer";
 
 const CONFIRM_PAGE_MAX = "mx-auto w-full max-w-[64rem] px-4 md:px-5 lg:px-10 xl:px-12";
 const DEFAULT_DINING_IMAGE =
@@ -114,12 +119,7 @@ function ConfirmationContent() {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-white pt-24 flex flex-col items-center gap-3 text-slate-500">
-        <Loader2 className="animate-spin text-[#6900AA]" size={32} />
-        Loading confirmation...
-      </div>
-    );
+    return <BookingConfirmationShimmer showAside />;
   }
 
   if (error || !booking) {
@@ -186,8 +186,76 @@ function ConfirmationContent() {
     }
   };
 
+  const whenLine = [
+    formatWeekdayCustomer(booking.booking_time),
+    formatDateCustomer(booking.booking_time),
+    formatTime12h(booking.booking_time),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // UI1 = BMS ticket + dining rating aside (same pattern as movie). UI2 = classic below.
+  if (CONFIRMATION_UI_VERSION === 1) {
+    const businessId = String(booking.business_id || "").trim();
+    return (
+      <ConfirmationPageUI1Shell
+        showAside={Boolean(businessId)}
+        aside={
+          businessId ? (
+            <DiningConfirmationReviewAside
+              businessId={businessId}
+              restaurantName={booking.business_name}
+            />
+          ) : undefined
+        }
+        backHref="/customer/dashboard"
+        pageTitle="Your Reservation"
+        tipBanner="Show the check-in QR at the restaurant. Have it handy on your phone."
+        title={booking.business_name || "Restaurant"}
+        posterUrl={cover}
+        whenLine={whenLine}
+        venueLine={booking.business_address || undefined}
+        offerLabel={appliedOffer?.title ? `Offer: ${appliedOffer.title}` : undefined}
+        ticketCountLabel={`${booking.guests ?? "—"} Guest${
+          Number(booking.guests) === 1 ? "" : "(s)"
+        }`}
+        primaryLabel="Reservation"
+        secondaryLabel={guestName !== "—" ? guestName : undefined}
+        bookingCode={booking.id.slice(0, 8).toUpperCase()}
+        qrValue={qrData}
+        mTicketLabel="Dine-in"
+        cancellationNote={
+          windowLabel
+            ? `Check-in window: ${windowLabel}`
+            : "Please arrive on time for your reservation."
+        }
+        supportHref="/customer/help"
+        detailsExtra={
+          <div className="mt-4 grid grid-cols-1 gap-2.5">
+            <Link
+              href={`/customer/bookings/${booking.id}`}
+              className="inline-flex w-full items-center justify-center h-11 rounded-lg bg-[#111] text-white text-[0.875rem] font-semibold"
+            >
+              View booking details
+            </Link>
+            <button
+              type="button"
+              onClick={addToCalendar}
+              className="inline-flex w-full items-center justify-center h-11 rounded-lg border border-[#E5E5E5] text-[0.875rem] font-semibold text-[#333]"
+            >
+              Add to Calendar
+            </button>
+          </div>
+        }
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white pb-10 sm:pb-12">
+    <div
+      className="min-h-screen pb-10 sm:pb-12"
+      style={{ backgroundColor: BOOKING_CONFIRM_PAGE_BG }}
+    >
       <style>{`
         @keyframes confirmCheckPop {
           0% { transform: scale(0.4); opacity: 0; }
@@ -267,40 +335,30 @@ function ConfirmationContent() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="relative overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
           {/* Row 1: cover + QR */}
-          <div className="relative flex flex-col items-stretch gap-0 sm:flex-row sm:items-stretch">
-            <div className="relative min-h-[14rem] min-w-0 flex-1 self-stretch w-full sm:min-h-0 sm:max-w-none lg:max-w-[38rem]">
-              <div className="absolute inset-5">
-                <img
-                  src={cover}
-                  alt={booking.business_name || "Restaurant"}
-                  className="h-full w-full rounded-xl object-cover bg-slate-100"
-                  onError={(e) => {
-                    const el = e.currentTarget;
-                    if (el.dataset.fallbackApplied === "1") return;
-                    el.dataset.fallbackApplied = "1";
-                    el.src = DEFAULT_DINING_IMAGE;
-                  }}
-                />
-              </div>
+          <div className="relative flex flex-col gap-0 sm:flex-row sm:items-start">
+            <div className="min-w-0 flex-1 p-4 sm:p-5 flex justify-center sm:justify-start bg-white">
+              <img
+                src={cover}
+                alt={booking.business_name || "Restaurant"}
+                className="block h-auto w-auto max-h-[12.5rem] sm:max-h-[15rem] md:max-h-[17rem] max-w-full sm:max-w-[min(100%,20rem)] rounded-xl"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  if (el.dataset.fallbackApplied === "1") return;
+                  el.dataset.fallbackApplied = "1";
+                  el.src = DEFAULT_DINING_IMAGE;
+                }}
+              />
             </div>
 
-            <div className="relative flex sm:w-[min(100%,17rem)] sm:shrink-0 md:w-[18rem] lg:w-[19rem]">
+            <div className="relative w-full sm:w-[min(100%,17rem)] sm:shrink-0 md:w-[18rem] lg:w-[19rem]">
               <div
                 className="hidden sm:block absolute left-0 top-5 bottom-5 w-px border-l border-dashed border-slate-300"
                 aria-hidden
               />
-              <span
-                className="hidden sm:block absolute -left-2.5 -top-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
-                aria-hidden
-              />
-              <span
-                className="hidden sm:block absolute -left-2.5 -bottom-2.5 h-5 w-5 rounded-full bg-white border border-slate-200"
-                aria-hidden
-              />
-              <div className="flex w-full flex-1 items-center justify-center border-t border-dashed border-slate-300 px-5 py-6 sm:border-t-0 sm:px-6 sm:py-8 sm:pl-8">
-                <div className="flex w-full flex-col items-center text-center">
+              <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:border-t-0 sm:px-6 sm:py-5 sm:pl-8">
+                <div className="mx-auto flex w-full max-w-[15rem] flex-col items-center text-center">
                   {booking.qr_token ? (
                     <img
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data=${encodeURIComponent(qrData)}`}
@@ -312,7 +370,7 @@ function ConfirmationContent() {
                       QR will appear once check-in scanning is enabled.
                     </div>
                   )}
-                  <p className="mt-4 text-[0.9375rem] font-bold text-slate-900">Check-in QR</p>
+                  <p className="mt-3 text-[0.9375rem] font-bold text-slate-900">Check-in QR</p>
                   <button
                     type="button"
                     onClick={copyBookingId}
@@ -321,12 +379,12 @@ function ConfirmationContent() {
                     {copied ? <Check size={12} /> : <Copy size={12} />}
                     {booking.id.slice(0, 8).toUpperCase()}
                   </button>
-                  <p className="mt-3 max-w-[15rem] text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
+                  <p className="mt-2 text-[0.75rem] sm:text-[0.8125rem] text-slate-500 leading-relaxed">
                     Show this QR at the restaurant
                     {appliedOffer?.title ? " to claim your offer" : " for check-in"}.
                   </p>
                   {windowLabel ? (
-                    <div className="mt-4 w-full max-w-[15rem] rounded-xl bg-slate-100 px-3 py-2.5 flex items-center gap-2.5 text-left">
+                    <div className="mt-3 w-full rounded-xl bg-slate-100 px-3 py-2.5 flex items-center gap-2.5 text-left">
                       <Clock size={15} className="text-slate-500 shrink-0" />
                       <div className="min-w-0">
                         <p className="text-[0.6875rem] text-slate-500 leading-tight">
@@ -341,8 +399,10 @@ function ConfirmationContent() {
             </div>
           </div>
 
+          <BookingTicketPerforation />
+
           {/* Row 2: dining details */}
-          <div className="border-t border-dashed border-slate-300 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+          <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6 lg:px-8">
             <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F5E9] px-2.5 py-1 text-[0.6875rem] font-semibold text-[#2E7D32]">
               <Check size={12} strokeWidth={3} />
               Booking Confirmed
@@ -364,13 +424,6 @@ function ConfirmationContent() {
                 icon={Users}
                 label="Guests"
                 value={booking.guests != null ? String(booking.guests) : "—"}
-              />
-              <DetailCell
-                icon={UtensilsCrossed}
-                label="Table"
-                value={
-                  booking.table_number ? `Table ${booking.table_number}` : "Assigned at venue"
-                }
               />
               <DetailCell
                 icon={Calendar}
@@ -405,8 +458,10 @@ function ConfirmationContent() {
             </div>
           </div>
 
+          <BookingTicketPerforation />
+
           {/* Actions */}
-          <div className="border-t border-slate-200 px-5 py-5 sm:px-6 sm:py-6 lg:px-8">
+          <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6 lg:px-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
               <Link
                 href={`/customer/bookings/${booking.id}`}
@@ -482,13 +537,7 @@ function ConfirmationContent() {
 
 export default function BookingConfirmationPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-white pt-24 flex justify-center text-slate-500">
-          <Loader2 className="animate-spin text-[#6900AA]" size={32} />
-        </div>
-      }
-    >
+    <Suspense fallback={<BookingConfirmationShimmer showAside />}>
       <ConfirmationContent />
     </Suspense>
   );

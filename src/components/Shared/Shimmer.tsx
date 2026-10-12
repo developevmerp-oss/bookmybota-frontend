@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confirmationUiVersion";
 
 const theme = {
   baseColor: "#E8E4EE",
@@ -185,55 +186,161 @@ export function EventBookingShimmer() {
   );
 }
 
-export function EventConfirmationShimmer() {
-  return (
-    <Wrap>
-      <div className="min-h-screen bg-white pb-10">
-        <div className="max-w-[64rem] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-5 flex items-start gap-4">
-          <Skeleton circle width={48} height={48} className="shrink-0" />
-          <div className="flex-1 pt-1 space-y-2">
-            <Skeleton width={260} height={28} />
-            <Skeleton width="90%" height={16} />
-            <Skeleton width="75%" height={14} />
+/**
+ * BMS-style confirmation ticket (ConfirmationPageUI1).
+ * `showAside` mirrors rating column for movie/dining.
+ */
+export function ConfirmationPageUI1Shimmer({
+  showAside = false,
+}: {
+  showAside?: boolean;
+}) {
+  const ticket = (
+    <div className="rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="flex gap-3.5 sm:gap-4 px-4 pt-4 pb-5 sm:px-5 sm:pt-5 sm:pb-6">
+        <div className="w-[5rem] sm:w-[5.75rem] shrink-0 aspect-[2/3] overflow-hidden rounded-md">
+          <Skeleton className="!block !h-full !w-full !rounded-md" height="100%" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-2 pt-1">
+          <Skeleton width="78%" height={22} />
+          <Skeleton width="55%" height={12} />
+          <Skeleton width="70%" height={12} />
+          <Skeleton width="62%" height={12} />
+          <Skeleton width={72} height={18} borderRadius={4} className="mt-1" />
+        </div>
+      </div>
+      <div className="px-6 pb-1">
+        <Skeleton height={40} borderRadius={999} />
+      </div>
+      <div className="px-4 sm:px-5 pt-6 pb-2">
+        <div className="flex items-start gap-4 sm:gap-5">
+          <Skeleton width={128} height={128} borderRadius={4} className="shrink-0 sm:!w-[8rem] sm:!h-[8rem]" />
+          <div className="min-w-0 flex-1 space-y-2 pt-1">
+            <Skeleton width="45%" height={12} />
+            <Skeleton width="70%" height={22} />
+            <Skeleton width="55%" height={14} />
+            <Skeleton width="60%" height={14} className="mt-2" />
           </div>
         </div>
-        <div className="max-w-[64rem] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="flex flex-col sm:flex-row items-stretch gap-4 p-4 sm:p-6">
-              <div className="flex flex-1 items-center justify-center p-4 sm:p-5">
-                <Skeleton width={224} height={144} borderRadius={12} className="w-[12rem] min-[480px]:w-[14rem] sm:!w-full sm:max-w-[20rem] md:max-w-[24rem] !h-[11rem] sm:!h-[12.5rem] md:!h-[13.5rem]" />
+        <Skeleton height={32} className="mt-5 !rounded-none" />
+        <div className="flex items-center justify-between py-4">
+          <Skeleton width="35%" height={16} />
+          <Skeleton width="22%" height={16} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const aside = (
+    <div className="w-full space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+        <Skeleton width="55%" height={18} />
+        <Skeleton width="80%" height={12} />
+        <div className="flex gap-1.5 pt-1">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} circle width={22} height={22} />
+          ))}
+        </div>
+        <Skeleton height={88} borderRadius={12} />
+        <Skeleton height={44} borderRadius={12} />
+      </div>
+      <div className="flex justify-center pt-4">
+        <Skeleton width={120} height={48} borderRadius={8} />
+      </div>
+    </div>
+  );
+
+  return (
+    <Wrap>
+      <div
+        className="min-h-screen w-full overflow-x-hidden pb-12"
+        style={{ backgroundColor: "#F2F2F2" }}
+        aria-busy="true"
+        aria-label="Loading confirmation"
+      >
+        <div className="mx-auto w-full max-w-[72rem] px-4 sm:px-6 lg:px-10 pt-5 sm:pt-8">
+          <div className="mb-5 sm:mb-6 flex items-center gap-2.5 sm:gap-3">
+            <Skeleton circle width={36} height={36} />
+            <Skeleton width="8rem" height={22} />
+            <Skeleton circle width={36} height={36} className="ml-auto sm:ml-0" />
+          </div>
+          <div
+            className={
+              showAside
+                ? "mx-auto flex w-full max-w-[56rem] xl:max-w-[60rem] flex-col items-stretch lg:flex-row lg:items-start lg:justify-center gap-6 sm:gap-8 lg:gap-12 xl:gap-14"
+                : "flex justify-center"
+            }
+          >
+            <div
+              className={
+                showAside
+                  ? "min-w-0 w-full lg:w-[28rem] xl:w-[30rem] lg:shrink-0 space-y-3"
+                  : "min-w-0 w-full max-w-[28rem] xl:max-w-[30rem] space-y-3"
+              }
+            >
+              <Skeleton height={44} borderRadius={8} />
+              {ticket}
+            </div>
+            {showAside ? (
+              <div className="w-full lg:w-[22rem] xl:w-[24rem] lg:shrink-0">{aside}</div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Classic confirmation (ConfirmationPageUI2) — check header + ticket card + QR */
+export function ConfirmationPageUI2Shimmer() {
+  return (
+    <Wrap>
+      <div
+        className="min-h-screen pb-10 sm:pb-12"
+        style={{ backgroundColor: "#F5F5F7" }}
+        aria-busy="true"
+        aria-label="Loading confirmation"
+      >
+        <div className="mx-auto w-full max-w-[64rem] px-4 md:px-5 lg:px-10 xl:px-12 pt-6 sm:pt-8">
+          <div className="mb-5 sm:mb-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 flex items-start gap-3.5 sm:gap-4">
+            <Skeleton circle width={48} height={48} className="shrink-0" />
+            <div className="flex-1 pt-0.5 space-y-2 min-w-0">
+              <Skeleton width="70%" height={26} className="sm:!h-8" />
+              <Skeleton width="90%" height={14} />
+              <Skeleton width="55%" height={12} />
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col sm:flex-row items-stretch">
+              <div className="min-w-0 flex-1 p-4 sm:p-5 flex justify-center sm:justify-start">
+                <Skeleton
+                  borderRadius={12}
+                  className="!w-[9rem] !h-[12.5rem] sm:!max-h-[15rem] sm:!w-[12rem] md:!w-[14rem] md:!h-[17rem]"
+                  height="100%"
+                />
               </div>
-              <div className="sm:w-44 md:w-48 flex flex-col items-center gap-3 py-2 shrink-0">
+              <div className="w-full sm:w-[min(100%,17rem)] md:w-[18rem] lg:w-[19rem] shrink-0 border-t sm:border-t-0 sm:border-l border-dashed border-slate-300 px-5 py-5 sm:pl-8 flex flex-col items-center gap-3">
                 <Skeleton width={168} height={168} borderRadius={8} />
-                <Skeleton width={100} height={16} />
-                <Skeleton width={140} height={14} />
+                <Skeleton width="40%" height={16} />
+                <Skeleton width="55%" height={14} />
               </div>
             </div>
-            <div className="border-t border-dashed p-5 sm:p-6 space-y-3">
-              <Skeleton width={140} height={22} borderRadius={999} />
-              <Skeleton width="70%" height={26} />
-              <Skeleton width="55%" height={16} />
+            <div className="border-t border-dashed border-slate-200 p-5 sm:p-6 space-y-3">
+              <Skeleton width={120} height={22} borderRadius={999} />
+              <Skeleton width="65%" height={24} />
+              <Skeleton width="50%" height={14} />
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-                <Skeleton height={52} />
-                <Skeleton height={52} />
-                <Skeleton height={52} />
-                <Skeleton height={52} />
-                <Skeleton height={52} />
-                <Skeleton height={52} />
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} height={52} borderRadius={10} />
+                ))}
               </div>
             </div>
-            <div className="border-t p-5 sm:p-6 space-y-3">
-              <Skeleton width={120} height={18} />
-              <Skeleton height={14} />
-              <Skeleton height={14} />
-              <Skeleton height={48} borderRadius={12} />
-            </div>
-            <div className="border-t p-5 sm:p-6">
+            <div className="border-t border-slate-200 p-5 sm:p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <Skeleton height={46} borderRadius={12} />
-                <Skeleton height={46} borderRadius={12} />
-                <Skeleton height={46} borderRadius={12} />
-                <Skeleton height={46} borderRadius={12} />
+                {[0, 1, 2, 3].map((i) => (
+                  <Skeleton key={i} height={46} borderRadius={12} />
+                ))}
               </div>
             </div>
           </div>
@@ -242,6 +349,28 @@ export function EventConfirmationShimmer() {
       </div>
     </Wrap>
   );
+}
+
+/**
+ * Picks UI1 / UI2 confirmation shimmer from CONFIRMATION_UI_VERSION.
+ * Pass `showAside` for movie/dining rating column on UI1.
+ */
+export function BookingConfirmationShimmer({
+  showAside = false,
+  version,
+}: {
+  showAside?: boolean;
+  /** Override; defaults to CONFIRMATION_UI_VERSION */
+  version?: 1 | 2;
+}) {
+  const v = version ?? CONFIRMATION_UI_VERSION;
+  if (v === 2) return <ConfirmationPageUI2Shimmer />;
+  return <ConfirmationPageUI1Shimmer showAside={showAside} />;
+}
+
+/** @deprecated Prefer BookingConfirmationShimmer / ConfirmationPageUI2Shimmer */
+export function EventConfirmationShimmer() {
+  return <ConfirmationPageUI2Shimmer />;
 }
 
 export function EventListShimmer() {
@@ -1086,6 +1215,298 @@ export function CustomerFullscreenShimmer({ label = "Loading" }: { label?: strin
             ))}
           </div>
         </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/* ─── Customer account (profile sidebar pages) ───────────────────────────── */
+
+/** Left account nav + main content shell — matches CustomerAccountLayout */
+export function CustomerAccountShellShimmer({
+  children,
+}: {
+  children?: ReactNode;
+}) {
+  return (
+    <Wrap>
+      <div
+        className="bg-[#f4f5f7] min-h-[calc(100vh-4rem)] pt-2 pb-4 sm:pt-3 sm:pb-6 lg:pt-4 lg:pb-8"
+        aria-busy="true"
+        aria-label="Loading account"
+      >
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
+            <aside className="hidden lg:block w-[260px] shrink-0">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 space-y-2">
+                <div className="flex items-center gap-3 px-2 py-3">
+                  <Skeleton circle width={48} height={48} />
+                  <div className="flex-1 space-y-2 min-w-0">
+                    <Skeleton width="70%" height={14} />
+                    <Skeleton width="90%" height={10} />
+                  </div>
+                </div>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <Skeleton key={i} height={40} borderRadius={12} />
+                ))}
+                <Skeleton height={40} borderRadius={12} className="mt-2" />
+              </div>
+            </aside>
+            <div className="flex-1 min-w-0 w-full">
+              {children ?? <CustomerOrdersListShimmer />}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** My Orders / Reservations list — matches dashboard booking rows */
+export function CustomerOrdersListShimmer({ rows = 4 }: { rows?: number }) {
+  return (
+    <Wrap>
+      <div
+        className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgba(15,23,42,0.04)] p-5 sm:p-6 lg:p-8"
+        aria-busy="true"
+        aria-label="Loading orders"
+      >
+        <div className="mb-6 space-y-2">
+          <Skeleton width="16rem" height={28} className="sm:!h-9" />
+          <Skeleton width="70%" height={14} />
+        </div>
+        <div className="border-b border-slate-200 mb-4 pb-3 flex gap-5 overflow-hidden">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} width={64} height={16} />
+          ))}
+        </div>
+        <div className="flex gap-2 mb-6 overflow-hidden">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} width={88} height={32} borderRadius={999} />
+          ))}
+        </div>
+        <div className="divide-y divide-slate-100">
+          {Array.from({ length: rows }).map((_, i) => (
+            <div
+              key={i}
+              className="flex flex-col sm:flex-row sm:items-start gap-4 py-5 first:pt-2"
+            >
+              <div className="w-full sm:w-[168px] lg:w-[188px] aspect-[16/10] sm:aspect-auto sm:h-[108px] lg:h-[118px] shrink-0 overflow-hidden rounded-xl">
+                <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <Skeleton width={56} height={18} borderRadius={6} />
+                <Skeleton width="55%" height={18} />
+                <Skeleton width="80%" height={12} />
+                <Skeleton width="45%" height={12} />
+                <Skeleton width="30%" height={12} />
+              </div>
+              <div className="shrink-0 flex sm:flex-col items-end gap-3">
+                <Skeleton width={88} height={24} borderRadius={999} />
+                <Skeleton width={72} height={14} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** My Profile card — matches profile personal-details layout */
+export function CustomerProfileShimmer() {
+  return (
+    <Wrap>
+      <div
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 lg:p-10"
+        aria-busy="true"
+        aria-label="Loading profile"
+      >
+        <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-200">
+          <Skeleton circle width={72} height={72} />
+          <div className="flex-1 space-y-2 min-w-0">
+            <Skeleton width="40%" height={20} />
+            <Skeleton width="55%" height={14} />
+          </div>
+        </div>
+        <div className="flex items-center justify-between mb-4">
+          <Skeleton width="10rem" height={22} />
+          <Skeleton width={64} height={16} />
+        </div>
+        <div className="space-y-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-2 sm:gap-4">
+              <Skeleton width="6rem" height={14} />
+              <Skeleton height={40} borderRadius={10} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** Simple white account card (change password / help) */
+export function CustomerAccountCardShimmer({ lines = 4 }: { lines?: number }) {
+  return (
+    <Wrap>
+      <div
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-lg space-y-4"
+        aria-busy="true"
+        aria-label="Loading"
+      >
+        <Skeleton width="10rem" height={22} />
+        <Skeleton width="80%" height={12} />
+        {Array.from({ length: lines }).map((_, i) => (
+          <Skeleton key={i} height={42} borderRadius={10} />
+        ))}
+        <Skeleton width="8rem" height={44} borderRadius={12} />
+      </div>
+    </Wrap>
+  );
+}
+
+/** Dining / generic booking detail page */
+export function CustomerBookingDetailShimmer() {
+  return (
+    <Wrap>
+      <div
+        className="min-h-screen bg-[#F5F5F7] pt-8 sm:pt-10 pb-12 sm:pb-16"
+        aria-busy="true"
+        aria-label="Loading booking"
+      >
+        <div className="bmb-section-container space-y-5 sm:space-y-6">
+          <Skeleton width="9rem" height={16} />
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2 min-w-0 flex-1">
+              <Skeleton width="14rem" height={32} className="sm:!h-9" />
+              <Skeleton width="10rem" height={14} />
+            </div>
+            <Skeleton width={96} height={28} borderRadius={999} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-5">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4">
+              <div className="flex gap-4">
+                <div className="w-28 h-36 shrink-0 overflow-hidden rounded-xl">
+                  <Skeleton className="!block !h-full !w-full !rounded-xl" height="100%" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Skeleton width="70%" height={20} />
+                  <Skeleton width="90%" height={12} count={3} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <Skeleton key={i} height={64} borderRadius={12} />
+                ))}
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <Skeleton className="!mx-auto" width={160} height={160} borderRadius={12} />
+              <Skeleton width="60%" height={14} className="!mx-auto" />
+              <Skeleton height={44} borderRadius={12} />
+              <Skeleton height={44} borderRadius={12} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** My Gift Cards wallet list — `embedded` skips outer chrome when page already has it */
+export function CustomerGiftCardsShimmer({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
+  const grid = (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="rounded-2xl border border-slate-100 p-4 space-y-3"
+        >
+          <Skeleton height={120} borderRadius={12} />
+          <Skeleton width="55%" height={16} />
+          <Skeleton width="40%" height={12} />
+        </div>
+      ))}
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <Wrap>
+        <div aria-busy="true" aria-label="Loading gift cards" className="py-2">
+          {grid}
+        </div>
+      </Wrap>
+    );
+  }
+
+  return (
+    <Wrap>
+      <div
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-5"
+        aria-busy="true"
+        aria-label="Loading gift cards"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Skeleton width="10rem" height={24} />
+          <Skeleton width={120} height={36} borderRadius={10} />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton width={88} height={36} borderRadius={999} />
+          <Skeleton width={88} height={36} borderRadius={999} />
+        </div>
+        {grid}
+      </div>
+    </Wrap>
+  );
+}
+
+/** Single gift card detail — `embedded` skips outer chrome when page already has it */
+export function CustomerGiftCardDetailShimmer({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
+  const body = (
+    <>
+      {!embedded && <Skeleton width="7rem" height={16} />}
+      <Skeleton height={160} borderRadius={16} />
+      <div className="grid grid-cols-2 gap-3">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} height={56} borderRadius={12} />
+        ))}
+      </div>
+      <Skeleton height={48} borderRadius={12} />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <Wrap>
+        <div
+          className="space-y-4 sm:space-y-5"
+          aria-busy="true"
+          aria-label="Loading gift card"
+        >
+          {body}
+        </div>
+      </Wrap>
+    );
+  }
+
+  return (
+    <Wrap>
+      <div
+        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-5"
+        aria-busy="true"
+        aria-label="Loading gift card"
+      >
+        {body}
       </div>
     </Wrap>
   );

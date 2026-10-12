@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type TransitionEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -60,11 +61,40 @@ import type { MustWatchMovieCard } from "@/components/LandingPage/useMustWatchMo
 import { useStickyHeaderOffset } from "@/lib/useStickyHeaderOffset";
 import "./MovieLandingPage.css";
 import "@/components/DinningLandingPage/DiningHomePage.css";
+import "@/components/DinningLandingPage/DiningSearchPopup.css";
 
 const FORMATS = ["2D", "3D", "4DX", "IMAX 2D"] as const;
 const CONTAINER = "bmb-section-container";
 const EMPTY_MOVIES: Movie[] = [];
 const EMPTY_HERO_EXTRAS: Record<string, string> = {};
+const MOVIE_RECENT_SEARCHES_KEY = "movie_recent_searches";
+const MOVIE_MAX_RECENT_SEARCHES = 6;
+
+function readMovieRecentSearches(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(MOVIE_RECENT_SEARCHES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMovieRecentSearches(items: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      MOVIE_RECENT_SEARCHES_KEY,
+      JSON.stringify(items.slice(0, MOVIE_MAX_RECENT_SEARCHES))
+    );
+  } catch {
+    /* ignore */
+  }
+}
 
 type MovieFilterModalTab = "language" | "genre" | "format";
 
@@ -606,6 +636,10 @@ export default function MovieLandingPage() {
     parseCsvParam(searchParams.get("format") || searchParams.get("formats"))
   );
   const [titleSearch, setTitleSearch] = useState(() => searchParams.get("q") || "");
+  const [showMovieSearchPopup, setShowMovieSearchPopup] = useState(false);
+  const [movieSearchDraft, setMovieSearchDraft] = useState("");
+  const [movieRecentSearches, setMovieRecentSearches] = useState<string[]>([]);
+  const movieSearchInputRef = useRef<HTMLInputElement>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterModalTab, setFilterModalTab] = useState<MovieFilterModalTab>("language");
   const [draftLanguages, setDraftLanguages] = useState<string[]>([]);
@@ -1040,6 +1074,63 @@ export default function MovieLandingPage() {
     setTitleSearch("");
   };
 
+  const openMovieSearchPopup = () => {
+    setFiltersOpen(false);
+    setShowMovieSearchPopup(true);
+  };
+
+  const closeMovieSearchPopup = () => {
+    setShowMovieSearchPopup(false);
+  };
+
+  const commitMovieSearch = (raw: string) => {
+    const next = raw.trim();
+    setTitleSearch(next);
+    scrollToMoviesListing();
+    if (next) {
+      const updated = [
+        next,
+        ...readMovieRecentSearches().filter((item) => item.toLowerCase() !== next.toLowerCase()),
+      ];
+      writeMovieRecentSearches(updated);
+      setMovieRecentSearches(updated.slice(0, MOVIE_MAX_RECENT_SEARCHES));
+    }
+    closeMovieSearchPopup();
+  };
+
+  const removeMovieRecentSearch = (term: string) => {
+    const updated = readMovieRecentSearches().filter(
+      (item) => item.toLowerCase() !== term.toLowerCase()
+    );
+    writeMovieRecentSearches(updated);
+    setMovieRecentSearches(updated);
+  };
+
+  useEffect(() => {
+    if (!showMovieSearchPopup) return;
+    setMovieSearchDraft(titleSearch);
+    setMovieRecentSearches(readMovieRecentSearches());
+    const focusTimer = window.setTimeout(() => movieSearchInputRef.current?.focus(), 50);
+    const scrollbarGap = window.innerWidth - document.documentElement.clientWidth;
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = "hidden";
+    if (scrollbarGap > 0) {
+      document.body.style.paddingRight = `${scrollbarGap}px`;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMovieSearchPopup();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
+      document.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMovieSearchPopup]);
+
   const selectedMovieFilterChips = useMemo(
     () => [
       ...selectedLanguages.map((lang) => ({
@@ -1402,37 +1493,7 @@ export default function MovieLandingPage() {
           <div className={`dining-filters-sticky w-full ${isFiltersStuck ? "is-stuck" : ""}`}>
             <div className={`${CONTAINER} pt-4 pb-1`}>
               <div className="mb-2">
-                <div className="flex flex-col gap-2 pb-1 sm:flex-row sm:items-center sm:gap-3 -mx-1 px-1">
-                  <div className="relative w-full sm:w-[14rem] lg:w-[16rem] shrink-0">
-                    <Search
-                      size={15}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                    />
-                    <input
-                      type="search"
-                      value={titleSearch}
-                      onChange={(e) => {
-                        setTitleSearch(e.target.value);
-                        scrollToMoviesListing();
-                      }}
-                      placeholder="Search movies"
-                      aria-label="Search movies by title"
-                      className="w-full h-9 pl-9 pr-8 rounded-full border border-slate-200 bg-white text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#6900AA] focus:ring-1 focus:ring-[#6900AA]"
-                    />
-                    {titleSearch ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTitleSearch("");
-                          scrollToMoviesListing();
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-[#6900AA] cursor-pointer"
-                        aria-label="Clear search"
-                      >
-                        <X size={14} />
-                      </button>
-                    ) : null}
-                  </div>
+                <div className="flex items-center gap-2 sm:gap-3 pb-1 -mx-1 px-1">
                   <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
                     <button
                       type="button"
@@ -1506,11 +1567,117 @@ export default function MovieLandingPage() {
                       </button>
                     ) : null}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={openMovieSearchPopup}
+                    className="dining-search-trigger shrink-0 inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-white text-slate-700 cursor-pointer"
+                    aria-label="Search movies"
+                  >
+                    <Search size={18} strokeWidth={1.75} />
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         </section>
+
+        {showMovieSearchPopup &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div className="dining-search-popup fixed inset-0 z-[220] flex items-start justify-center px-4 pt-[min(18vh,140px)]">
+              <button
+                type="button"
+                aria-label="Close search"
+                className="dining-search-popup__backdrop absolute inset-0 bg-slate-900/35 backdrop-blur-[2px]"
+                onClick={closeMovieSearchPopup}
+              />
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Search movies"
+                className="dining-search-popup__panel relative w-full max-w-[560px] bg-white rounded-2xl shadow-[0_18px_50px_rgba(15,23,42,0.18)] overflow-hidden"
+              >
+                <div className="flex items-center gap-3 px-5 sm:px-6 py-4 sm:py-[1.15rem]">
+                  <Search size={20} strokeWidth={1.75} className="text-slate-500 shrink-0" />
+                  <input
+                    ref={movieSearchInputRef}
+                    type="text"
+                    value={movieSearchDraft}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setMovieSearchDraft(next);
+                      setTitleSearch(next);
+                      scrollToMoviesListing();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitMovieSearch(movieSearchDraft);
+                      }
+                    }}
+                    placeholder="What are you looking for?"
+                    className="flex-1 min-w-0 bg-transparent text-[15px] sm:text-base text-slate-800 placeholder:text-slate-400 outline-none"
+                    aria-label="Search movies by title"
+                  />
+                  {movieSearchDraft ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMovieSearchDraft("");
+                        setTitleSearch("");
+                        scrollToMoviesListing();
+                        movieSearchInputRef.current?.focus();
+                      }}
+                      className="shrink-0 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                      aria-label="Clear search"
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="dining-search-popup__results border-t border-slate-100">
+                  <div className="px-5 sm:px-6 pt-4 pb-5">
+                    <p className="text-[15px] font-bold text-slate-900 mb-1">Recent Searches</p>
+                    {movieRecentSearches.length === 0 ? (
+                      <p className="py-3 text-sm text-slate-400">No recent searches yet</p>
+                    ) : (
+                      <ul className="divide-y divide-slate-50">
+                        {movieRecentSearches.map((term) => (
+                          <li key={term} className="flex items-center gap-3 py-3">
+                            <button
+                              type="button"
+                              onClick={() => commitMovieSearch(term)}
+                              className="flex min-w-0 flex-1 items-center gap-3 text-left cursor-pointer group"
+                            >
+                              <Search
+                                size={16}
+                                strokeWidth={1.75}
+                                className="text-slate-400 shrink-0 group-hover:text-slate-500"
+                              />
+                              <span className="truncate text-[15px] text-slate-500 group-hover:text-slate-700">
+                                {term}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeMovieRecentSearch(term)}
+                              className="shrink-0 p-1 rounded-full text-slate-300 hover:text-slate-500 hover:bg-slate-100 cursor-pointer"
+                              aria-label={`Remove ${term}`}
+                            >
+                              <X size={14} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
 
         <div className={`${CONTAINER} pt-5`}>
           {viewAll ? (

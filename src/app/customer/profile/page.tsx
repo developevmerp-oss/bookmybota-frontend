@@ -27,6 +27,10 @@ import PhoneInput from "@/components/Shared/PhoneInput";
 import CustomerAccountLayout, {
   CUSTOMER_ACCOUNT_NAV,
 } from "@/components/Shared/CustomerAccountLayout";
+import {
+  CustomerAccountShellShimmer,
+  CustomerProfileShimmer,
+} from "@/components/Shared/Shimmer";
 import { extractApiError } from "@/lib/apiErrors";
 import { logoutCustomer } from "@/lib/authSession";
 import {
@@ -228,9 +232,9 @@ export default function CustomerProfilePage() {
 
   if (!user || isLoading) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-[#f4f5f7] flex items-center justify-center text-slate-500">
-        Loading profile...
-      </div>
+      <CustomerAccountShellShimmer>
+        <CustomerProfileShimmer />
+      </CustomerAccountShellShimmer>
     );
   }
 

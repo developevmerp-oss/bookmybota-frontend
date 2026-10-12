@@ -1,13 +1,15 @@
 import { Suspense } from "react";
 import CustomerGiftCardsPage from "@/components/GiftCards/CustomerGiftCardsPage";
+import CustomerAccountLayout from "@/components/Shared/CustomerAccountLayout";
+import { CustomerGiftCardsShimmer } from "@/components/Shared/Shimmer";
 
 export default function Page() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center py-20 text-slate-500 text-sm">
-          Loading gift cards…
-        </div>
+        <CustomerAccountLayout>
+          <CustomerGiftCardsShimmer />
+        </CustomerAccountLayout>
       }
     >
       <CustomerGiftCardsPage />

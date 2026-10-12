@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const RAIL_SEE_ALL_CLASS =
-  "inline-flex items-center gap-1.5 h-9 px-3.5 sm:px-4 rounded-full bg-[#F7E9FF] text-[#6900AA] text-sm font-semibold hover:bg-[#EFD7FF] transition-colors shrink-0";
+  "inline-flex items-center gap-1.5 h-9 px-0 text-[#111111] text-sm font-semibold hover:text-black transition-colors shrink-0 bg-transparent";
 
 /** Floating rail arrow — white circle outside the card row (margin), soft shadow. */
 export const RAIL_OVERLAY_NAV_CLASS =

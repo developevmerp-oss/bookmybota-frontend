@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { CalendarDays, Gift, Loader2, Send, Ticket, User, Wallet } from "lucide-react";
+import { CustomerGiftCardsShimmer } from "@/components/Shared/Shimmer";
 import { toast } from "sonner";
 import {
   useClaimGiftCardMutation,
@@ -335,9 +336,7 @@ export default function CustomerGiftCardsPage() {
         )}
 
         {isLoading ? (
-          <div className="flex items-center gap-2 text-slate-500 py-12 justify-center">
-            <Loader2 className="animate-spin" size={18} /> Loading…
-          </div>
+          <CustomerGiftCardsShimmer embedded />
         ) : isError ? (
           <p className="text-center text-rose-600 py-10">Could not load gift cards.</p>
         ) : visibleCards.length === 0 ? (

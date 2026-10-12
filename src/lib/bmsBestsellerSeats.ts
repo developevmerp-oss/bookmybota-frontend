@@ -50,9 +50,9 @@ export function markAutoBestsellersInRow<T extends MarkableSeat>(seats: T[]): T[
  * Customer / display: only keep explicit bestseller flags (no silent auto-mark).
  * Cinemas that never set bestsellers simply show normal green available seats.
  */
-export function finalizeBestsellerMarks<T extends MarkableSeat>(
-  rows: Array<{ seats: T[] } & Record<string, unknown>>
-): Array<{ seats: T[] } & Record<string, unknown>> {
+export function finalizeBestsellerMarks<R extends { seats: T[] }, T extends MarkableSeat = MarkableSeat>(
+  rows: R[]
+): R[] {
   return rows.map((row) => ({
     ...row,
     seats: row.seats.map((s) => ({ ...s, isBestseller: Boolean(s.isBestseller) })),

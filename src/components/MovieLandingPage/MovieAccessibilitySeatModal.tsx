@@ -169,11 +169,13 @@ export default function MovieAccessibilitySeatModal({
               <option value="">
                 {selectedCategory ? "Select Row" : "Select Category First"}
               </option>
-              {(selectedCategory?.rows || []).map((r) => (
-                <option key={r.label} value={r.label}>
-                  {selectedCategory.name} Row {r.label}
-                </option>
-              ))}
+              {selectedCategory
+                ? selectedCategory.rows.map((r) => (
+                    <option key={r.label} value={r.label}>
+                      {selectedCategory.name} Row {r.label}
+                    </option>
+                  ))
+                : null}
             </select>
             <ChevronDown
               className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-4 text-slate-400"

@@ -724,7 +724,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
         }
       });
 
-      if (rows.length > 0) return finalizeBestsellerMarks(rows) as GridRow[];
+      if (rows.length > 0) return finalizeBestsellerMarks(rows);
     }
 
     const customTemplate =
@@ -768,7 +768,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
           rows.push({ rowLabel, tierName, price, seats });
         }
       }
-      return finalizeBestsellerMarks(rows) as GridRow[];
+      return finalizeBestsellerMarks(rows);
     }
 
     const tiers =
@@ -810,7 +810,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       }
     }
 
-    return finalizeBestsellerMarks(rows) as GridRow[];
+    return finalizeBestsellerMarks(rows);
   }, [layoutData, showtime, bookedSet, getTierPrice]);
 
   /** Only show Bestseller legend / orange seats when layout marks them (optional feature). */
@@ -2666,7 +2666,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
                   {/* Dynamic category filter */}
                   {(() => {
-                    const cats = ["ALL", ...Array.from(new Set(showtimeBeverages.map((b) => b.category?.toUpperCase() || "OTHER")))];
+                    const cats: string[] = ["ALL", ...Array.from(new Set<string>(showtimeBeverages.map((b) => b.category?.toUpperCase() || "OTHER")))];
                     return (
                       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                         {cats.map((cat) => (

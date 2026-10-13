@@ -100,9 +100,12 @@ export function ListYourShowCta({
       href={href}
       tabIndex={tabIndex}
       aria-current={active ? "page" : undefined}
-      className={`list-your-show-cta inline-flex shrink-0 items-center gap-1 h-7 sm:h-8 px-2.5 sm:px-3.5 md:px-4 rounded-full text-[11px] sm:text-[12px] md:text-[13px] font-semibold whitespace-nowrap border border-[rgba(17,17,17,0.45)] bg-white text-[#111111] ${
-        filled ? "is-filled" : ""
-      } ${className}`.trim()}
+      data-subnav-active={active ? "1" : undefined}
+      className={`list-your-show-cta inline-flex shrink-0 items-center gap-1 h-7 sm:h-8 lg:h-9 px-2.5 sm:px-3.5 md:px-4 lg:px-4 rounded-full text-[11px] sm:text-[12px] md:text-[13px] lg:text-[13px] font-semibold whitespace-nowrap border bg-white ${
+        active
+          ? "border-[#6900AA] text-[#6900AA] ring-1 ring-[#6900AA]/25"
+          : "border-[rgba(17,17,17,0.45)] text-[#111111]"
+      } ${filled ? "is-filled" : ""} ${className}`.trim()}
       onMouseEnter={(e) => {
         placeCircle(e.clientX, e.clientY);
         setFilled(true);
@@ -241,18 +244,20 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
       <Link
         key={label}
         href={href}
-        className={`shrink-0 transition-colors whitespace-nowrap flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem] sm:min-w-[5.25rem] md:min-w-[5.75rem] h-full px-3 sm:px-3.5 rounded-xl text-[12px] sm:text-[13px] md:text-[14px] font-semibold tracking-wide lg:inline-flex lg:flex-row lg:items-center lg:gap-1.5 lg:h-8 lg:min-w-0 lg:rounded-full lg:px-2.5 lg:text-[12px] xl:text-[13px] lg:uppercase ${
+        aria-current={active ? "page" : undefined}
+        data-subnav-active={active ? "1" : undefined}
+        className={`subnav-tab shrink-0 transition-colors whitespace-nowrap flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem] sm:min-w-[5.25rem] md:min-w-[5.75rem] h-full px-3 sm:px-3.5 rounded-xl text-[12px] sm:text-[13px] md:text-[14px] font-semibold tracking-wide lg:inline-flex lg:flex-row lg:items-center lg:gap-1.5 lg:h-auto lg:min-w-0 lg:text-[11px] xl:text-[12px] lg:uppercase lg:tracking-[0.04em] lg:font-semibold ${
           active
-            ? "bg-gradient-to-r from-[#A78BFA] to-[#6D28D9] text-white"
-            : "text-[#111111] hover:text-[#111111]"
+            ? "is-active bg-gradient-to-r from-[#A78BFA] to-[#6D28D9] text-white shadow-sm lg:rounded-full lg:px-3.5 xl:px-4 lg:py-1.5 xl:py-2"
+            : "text-[#111111] hover:text-[#111111] lg:hover:text-[#6900AA] lg:rounded-none lg:px-0.5 lg:py-0"
         } ${classNameExtra}`}
       >
         <Icon
           size={18}
-          strokeWidth={2.25}
-          className={`shrink-0 lg:!block lg:w-4 lg:h-4 transition-opacity duration-200 ${
+          strokeWidth={active ? 2.35 : 2}
+          className={`shrink-0 lg:!block lg:w-[15px] lg:h-[15px] xl:w-4 xl:h-4 transition-opacity duration-200 ${
             compactMobile ? "hidden" : "block"
-          }`}
+          } ${active ? "text-white" : ""}`}
           aria-hidden
         />
         <span className="leading-tight">{label}</span>
@@ -260,38 +265,50 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
     );
   };
 
+  // Keep the active tab visible in the horizontal strip (mobile / tablet / desktop)
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>("[data-subnav-active='1']");
+    if (!el) return;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [pathname, activeSlug, q]);
+
+  const categoryTabs = (
+    <>
+      {/* Mobile/tablet only — wrapper wins over lg:inline-flex on the link */}
+      <span className="contents lg:hidden">{renderTabLink(FOR_YOU_TAB)}</span>
+      {linkTabs.map((item) => renderTabLink(item))}
+    </>
+  );
+
   return (
     <nav
       aria-label="Browse categories"
       data-subnav-compact={compactMobile ? "1" : "0"}
-      className={`relative w-full min-w-0 bmb-section-container bg-transparent transition-[max-height,height] duration-300 ease-in-out ${
+      className={`relative w-full min-w-0 bg-transparent transition-[max-height,height] duration-300 ease-in-out ${
+        !isStickyChrome
+          ? // Desktop non-sticky: align with page sections; mobile padding unchanged (parent + reset)
+            "bmb-section-container max-lg:!px-0 max-lg:max-w-none"
+          : "max-w-full"
+      } ${
         compactMobile
           ? "max-h-12 h-12 lg:max-h-14 lg:h-14"
           : "max-h-[5.25rem] h-[5.25rem] lg:max-h-14 lg:h-14"
       }`}
     >
-      <div
-        className={`h-full flex items-center min-w-0 w-full ${
-          isStickyChrome ? "" : "justify-between gap-2 sm:gap-3"
-        }`}
-      >
-        {/* Bounded scrollport so category chips can scroll when sticky */}
-        <div
-          className={`min-w-0 overflow-x-auto overscroll-x-contain scrollbar-none [&::-webkit-scrollbar]:hidden h-full py-1.5 lg:py-1 ${
-            isStickyChrome ? "w-full" : "flex-1"
-          }`}
-        >
-          <div
-            className={`flex h-full items-stretch gap-1.5 sm:gap-2 lg:gap-2 lg:items-center ${
-              isStickyChrome ? "w-max min-w-full justify-center" : ""
-            }`}
-          >
-            {/* Mobile/tablet only — wrapper wins over lg:inline-flex on the link */}
-            <span className="contents lg:hidden">{renderTabLink(FOR_YOU_TAB)}</span>
-            {linkTabs.map((item) => renderTabLink(item))}
-            {/* Mobile/tablet: List Your Show scrolls with categories */}
+      {/* Mobile / tablet — unchanged scroll strip */}
+      <div className="flex h-full w-full min-w-0 max-w-full items-center lg:hidden">
+        <div className="min-w-0 flex-1 max-w-full overflow-x-auto overscroll-x-contain touch-pan-x scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden h-full py-1.5">
+          <div className="flex h-full w-max max-w-none items-stretch gap-1.5 sm:gap-2">
+            {categoryTabs}
             {ctaTab ? (
-              <span className="inline-flex lg:hidden shrink-0 items-center self-center pl-1 pr-0.5">
+              <span className="inline-flex shrink-0 items-center self-center pl-1 pr-0.5">
                 <ListYourShowCta
                   href={ctaTab.href!}
                   label={ctaTab.label}
@@ -301,16 +318,31 @@ export default function SubNavBar({ isStickyChrome = false }: SubNavBarProps) {
             ) : null}
           </div>
         </div>
+      </div>
 
-        {/* Desktop (not sticky yet): List Your Show fixed on the right of the subnav */}
-        {ctaTab && !isStickyChrome ? (
-          <div className="hidden lg:flex shrink-0 items-center">
+      {/* Desktop — image 1: categories left + List Your Show right; sticky: categories fill middle */}
+      <div
+        className={`hidden h-full w-full min-w-0 items-center overflow-x-auto overscroll-x-contain scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-1 lg:flex ${
+          isStickyChrome ? "justify-center" : "justify-between gap-4"
+        }`}
+      >
+        <div
+          className={`flex h-full items-center ${
+            isStickyChrome
+              ? "w-max max-w-full gap-3.5 xl:gap-5 2xl:gap-6"
+              : "min-w-0 flex-1 gap-3.5 xl:gap-5 2xl:gap-6 overflow-x-auto scrollbar-none"
+          }`}
+        >
+          {categoryTabs}
+        </div>
+        {!isStickyChrome && ctaTab ? (
+          <span className="inline-flex shrink-0 items-center self-center">
             <ListYourShowCta
               href={ctaTab.href!}
               label={ctaTab.label}
               active={isTabActive(ctaTab)}
             />
-          </div>
+          </span>
         ) : null}
       </div>
     </nav>

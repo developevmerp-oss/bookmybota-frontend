@@ -769,17 +769,17 @@ export function RestaurantDetailShimmer() {
     <Wrap>
       <div className="min-h-screen bg-white text-slate-700" aria-busy="true" aria-label="Loading restaurant">
         {/* Breadcrumb — tablet/desktop */}
-        <div className="hidden md:block bg-white pt-9">
+        <div className="hidden md:block bg-white pt-4">
           <div className="bmb-section-container flex items-center gap-1.5">
-            <Skeleton width={40} height={12} />
-            <Skeleton width={8} height={10} />
-            <Skeleton width={48} height={12} />
-            <Skeleton width={8} height={10} />
-            <Skeleton width={140} height={12} />
+            <Skeleton width={40} height={10} />
+            <Skeleton width={8} height={8} />
+            <Skeleton width={48} height={10} />
+            <Skeleton width={8} height={8} />
+            <Skeleton width={140} height={10} />
           </div>
         </div>
 
-        <div className="bmb-section-container max-md:px-0 max-md:pt-0 py-5 pb-24 md:pb-16">
+        <div className="bmb-section-container max-md:px-0 max-md:pt-0 pt-2 pb-24 md:pb-16">
           {/* Title row — tablet/desktop (matches page h1 + actions + rating) */}
           <div className="hidden md:block bg-white pt-2 mb-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">

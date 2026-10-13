@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Building2, Mic2, Search, X } from "lucide-react";
 import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
+import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
 import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
 
@@ -74,6 +75,11 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
   const searchPlaceholder =
     kind === "artist" ? "Search artists by name or type…" : "Search venues by name or type…";
   const Icon = kind === "artist" ? Mic2 : Building2;
+  const hasSearchOrFilter = Boolean(q.trim() || city.trim());
+  const clearFilters = () => {
+    setQ("");
+    setCity("");
+  };
 
   return (
     <div className="min-h-screen bg-[#faf7fc]">
@@ -147,9 +153,24 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
         isLoading={isLoading}
         showHeader={false}
         emptyMessage={
-          q.trim() || city.trim()
+          hasSearchOrFilter
             ? `No ${kind === "artist" ? "artists" : "venues"} match your search.`
             : `No ${kind === "artist" ? "artists" : "venues"} to show yet.`
+        }
+        emptyContent={
+          <ListingNoResultsState
+            kind={kind === "artist" ? "artists" : "venues"}
+            title={kind === "artist" ? "No artists found" : "No venues found"}
+            description={
+              hasSearchOrFilter
+                ? q.trim()
+                  ? `We couldn’t find any ${kind === "artist" ? "artists" : "venues"} matching “${q.trim()}”.`
+                  : `We couldn’t find any ${kind === "artist" ? "artists" : "venues"} in ${city.trim()}. Try clearing filters or searching for another name.`
+                : `No ${kind === "artist" ? "artists" : "venues"} to show yet. Check back soon.`
+            }
+            actionLabel={hasSearchOrFilter ? "Clear filters" : undefined}
+            onAction={hasSearchOrFilter ? clearFilters : undefined}
+          />
         }
       />
     </div>

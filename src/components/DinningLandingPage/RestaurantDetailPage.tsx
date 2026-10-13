@@ -53,6 +53,7 @@ import { loadFromStorage, setCredentials } from '@/features/auth/authSlice';
 import { readSessionForRole } from '@/lib/authStorage';
 import CustomerAuthModal from '@/components/Shared/CustomerAuthModal';
 import CustomerReviewCard from '@/components/Shared/CustomerReviewCard';
+import { lockBodyScroll } from '@/lib/lockBodyScroll';
 import { useSelectedCity } from '@/lib/useSelectedCity';
 import { paymentSuccessHref } from '@/lib/paymentSuccess';
 import { RestaurantDetailShimmer } from '@/components/Shared/Shimmer';
@@ -343,7 +344,7 @@ const getBookingDates = () => {
 
 /** Compact strip labels only (chips). Full readable dates use formatDateCustomer elsewhere. */
 const formatDateLabel = (date: Date, idx: number) => {
-  const bottom = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  const bottom = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   if (idx === 0) return { top: 'Today', bottom };
   if (idx === 1) return { top: 'Tomorrow', bottom };
   return { top: date.toLocaleDateString('en-IN', { weekday: 'short' }), bottom };
@@ -645,6 +646,13 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!reviewsModalOpen) return;
+    const unlock = lockBodyScroll();
+    return unlock;
+  }, [reviewsModalOpen]);
+
   useEffect(() => {
     const syncCustomerAuth = () => {
       dispatch(loadFromStorage());
@@ -1785,8 +1793,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     <div className="min-h-screen bg-white text-slate-700">
 
       {/* ── 1. Breadcrumbs (keep on success; hide on immersive mobile/tablet book) ── */}
-      <div
-        className={`bg-white pt-9 ${
+      {/* <div
+        className={`bg-white pt-4 ${
           isBookingSuccess
             ? "hidden md:block"
             : isBookTableFlow
@@ -1794,7 +1802,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
               : "hidden md:block"
         }`}
       >
-        <div className="bmb-section-container text-sm font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
+        <div className="bmb-section-container text-xs font-semibold text-slate-600 flex items-center gap-1.5  tracking-wider">
           <Link href="/" className="hover:text-rose-600 transition-colors">
             Home
           </Link>
@@ -1805,18 +1813,18 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
           <ChevronRight size={10} />
           <span className="text-slate-800 truncate max-w-[14rem] sm:max-w-none">{profile.name}</span>
         </div>
-      </div>
+      </div> */}
 
       <div
         className={`bmb-section-container pb-24 md:pb-16 ${
           isBookTableFlow
             ? "max-lg:px-0 max-lg:pt-0 max-lg:pb-0 py-0 lg:pt-0 lg:pb-16"
-            : "max-md:px-0 max-md:pt-0 py-5"
+            : "max-md:px-0 max-md:pt-0 pt-7"
         }`}
       >
         {/* ── Header: title + icon actions + rating (hidden on book flow + success) ── */}
         <div
-          className={`bg-white pt-2 mb-4 ${
+          className={`bg-white  mb-4 ${
             isBookingSuccess || isBookTableFlow ? "hidden" : "hidden md:block"
           }`}
         >
@@ -1890,7 +1898,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
         <div
           className={`${
             isBookTableFlow
-              ? "mx-auto w-full max-w-[56rem] xl:max-w-[64rem]"
+              ? ""
               : `grid items-start gap-x-5 gap-y-2 sm:gap-x-6 lg:gap-x-7 2xl:gap-x-12 ${
                   hideBookingSidebar
                     ? ""
@@ -3135,7 +3143,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                       Select your booking details
                     </h4>
 
-                    <div className="grid items-start gap-6 lg:gap-8 xl:gap-10 lg:grid-cols-[minmax(0,1fr)_260px] xl:grid-cols-[minmax(0,1fr)_280px]">
+                    <div className="grid items-start gap-6 lg:gap-8 xl:gap-10 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
                     <div className="min-w-0 space-y-5 bg-white rounded-none border-0 px-0 md:rounded-xl md:border md:border-slate-200 md:p-5 p-0">
                     {/* Guests — dropdown on mobile, chips on tablet/desktop */}
                     <div>
@@ -3212,7 +3220,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     <div>
                       <p className="md:hidden text-base font-bold text-slate-900 mb-3">Select day and time</p>
                       <p className="hidden md:block text-sm font-semibold text-slate-800 mb-3">When are you visiting?</p>
-                      <div className="flex gap-0 md:gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin items-stretch">
+                      <div className="flex gap-0 md:gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide items-stretch">
                         <div className="md:hidden shrink-0 flex items-center pr-2 mr-1 border-r border-slate-200">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl] rotate-180">
                             {bookingDates[selectedDateIndex]?.toLocaleDateString("en-US", { month: "long" })}
@@ -3502,11 +3510,11 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     </div>
 
                     <aside
-                      className="hidden lg:block sticky self-start"
+                      className="hidden lg:block sticky self-start w-full"
                       style={{ top: galleryStickyTop }}
                       aria-hidden
                     >
-                      <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-sm">
+                      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm overflow-visible">
                         <GuestTableAnimation count={Number(guests)} />
                       </div>
                     </aside>
@@ -4210,23 +4218,37 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
             {/* Step 1 footer — terms row + proceed */}
             {drawerStep === 1 && (
               <div className="mt-8 md:mt-8 max-md:sticky max-md:bottom-0 max-md:z-40 max-md:-mx-5 max-md:px-5 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:bg-white max-md:border-t max-md:border-slate-200 space-y-3 md:space-y-4 md:max-w-sm lg:max-w-md">
-                <div className="rounded-xl border border-black overflow-hidden bg-white">
+                <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setBookingPolicyFocus("terms");
                       setBookingPolicyOpen(true);
                     }}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 transition-colors"
+                    className="flex-1 min-w-0 flex items-center justify-between gap-2 rounded-xl border border-black bg-white px-3 sm:px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 transition-colors"
                   >
-                    <span className="text-sm sm:text-[0.9375rem] font-bold text-black">
+                    <span className="text-xs sm:text-sm font-bold text-black leading-snug">
                       Terms &amp; Conditions
                     </span>
-                    <ChevronRight size={18} strokeWidth={2.25} className="text-black shrink-0" />
+                    <ChevronRight size={16} strokeWidth={2.25} className="text-black shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingPolicyFocus("cancellation");
+                      setBookingPolicyOpen(true);
+                    }}
+                    className="flex-1 min-w-0 flex items-center justify-between gap-2 rounded-xl border border-black bg-white px-3 sm:px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="text-xs sm:text-sm font-bold text-black leading-snug">
+                      Cancellation Policy
+                    </span>
+                    <ChevronRight size={16} strokeWidth={2.25} className="text-black shrink-0" />
                   </button>
                 </div>
 
-                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                {/* Desktop terms checkbox — temporarily hidden
+                <label className="hidden lg:flex items-start gap-2.5 cursor-pointer select-none">
                   <div className="relative mt-0.5 shrink-0">
                     <input
                       type="checkbox"
@@ -4259,12 +4281,12 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     I agree to the Terms &amp; Conditions and Cancellation Policy
                   </span>
                 </label>
+                */}
 
                 <button
                   type="button"
                   disabled={
                     !selectedTime ||
-                    !acceptedTerms ||
                     !selectedSlotIsAvailable ||
                     slotsInitialLoading ||
                     proceedChecking
@@ -4272,7 +4294,6 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                   onClick={() => void proceedToBooking()}
                   className={`w-full px-6 sm:px-8 py-3.5 rounded-xl text-base font-semibold transition-all flex items-center justify-center gap-2 ${
                     selectedTime &&
-                    acceptedTerms &&
                     selectedSlotIsAvailable &&
                     !slotsInitialLoading &&
                     !proceedChecking
@@ -4476,11 +4497,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                     <X size={20} />
                   </button>
                 </div>
-                <div className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7">
+                <div
+                  data-scroll-lock-container
+                  className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7 overscroll-contain"
+                >
                   {reviews.map((rev: any) => {
                     const ratingNum = Number(rev.rating) || 0;
                     const name = rev.user_name || "Guest";
                     const text = (rev.text || "").trim();
+                    const timeLabel = reviewTimeAgo(rev.created_at);
                     const expanded = expandedReviewId === String(rev.id);
                     const needsMore = text.length > 180;
                     return (
@@ -4488,20 +4513,29 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         key={rev.id}
                         className="py-4 border-b border-slate-100 last:border-b-0"
                       >
-                        <div className="flex items-center gap-2.5 pr-1">
+                        <div className="flex items-start gap-2.5 pr-1">
                           <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
                             {String(name).slice(0, 1).toUpperCase()}
                           </span>
-                          <span className="min-w-0 flex-1 text-sm font-semibold text-[#111111] truncate">
-                            {name}
-                          </span>
-                          <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none">
-                            <Star size={10} className="fill-white text-white" />
-                            {Math.round(ratingNum)}
-                          </span>
+                          <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-[#111111] truncate leading-snug">
+                                {name}
+                              </p>
+                              {timeLabel ? (
+                                <p className="mt-0.5 text-xs text-slate-400 leading-snug">
+                                  {timeLabel}
+                                </p>
+                              ) : null}
+                            </div>
+                            <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none mt-0.5">
+                              <Star size={10} className="fill-white text-white" />
+                              {Math.round(ratingNum)}
+                            </span>
+                          </div>
                         </div>
                         {text ? (
-                          <div className="mt-2.5 relative">
+                          <div className="mt-2.5 relative pl-0">
                             <p
                               className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${
                                 expanded || !needsMore ? "" : "line-clamp-4"

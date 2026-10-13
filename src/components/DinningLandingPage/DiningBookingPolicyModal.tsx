@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { lockBodyScroll } from "@/lib/lockBodyScroll";
 
 export type DiningBookingPolicySection = "terms" | "cancellation";
 
@@ -46,7 +47,7 @@ type DiningBookingPolicyModalProps = {
 function renderCancellationItem(item: (typeof CANCELLATION_ITEMS)[number], index: number) {
   if (typeof item === "string") {
     return (
-      <li key={index} className="text-[0.875rem] sm:text-[0.9375rem] leading-relaxed text-[#4A4A4A]">
+      <li key={index} className="text-[0.9375rem] sm:text-[1rem] leading-[1.55] text-[#333333]">
         {item}
       </li>
     );
@@ -54,9 +55,9 @@ function renderCancellationItem(item: (typeof CANCELLATION_ITEMS)[number], index
 
   const parts = item.bold ? item.text.split(item.bold) : [item.text];
   return (
-    <li key={index} className="text-[0.875rem] sm:text-[0.9375rem] leading-relaxed text-[#4A4A4A]">
+    <li key={index} className="text-[0.9375rem] sm:text-[1rem] leading-[1.55] text-[#333333]">
       {parts[0]}
-      {item.bold && <strong className="font-semibold text-[#333]">{item.bold}</strong>}
+      {item.bold && <strong className="font-semibold text-[#111111]">{item.bold}</strong>}
       {parts[1] ?? ""}
     </li>
   );
@@ -67,33 +68,27 @@ export default function DiningBookingPolicyModal({
   focusSection = "terms",
   onClose,
 }: DiningBookingPolicyModalProps) {
-  const [activeSection, setActiveSection] =
-    useState<DiningBookingPolicySection>(focusSection);
-
-  useEffect(() => {
-    if (!open) return;
-    setActiveSection(focusSection);
-  }, [open, focusSection]);
-
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
+    const unlock = lockBodyScroll();
     return () => {
-      document.body.style.overflow = prev;
+      unlock();
       window.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);
 
   if (!open || typeof document === "undefined") return null;
 
+  const isCancellation = focusSection === "cancellation";
+  const title = isCancellation ? "Cancellation Policy" : "Terms & Conditions";
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/55"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/50 overscroll-none"
       onClick={onClose}
       role="presentation"
     >
@@ -101,77 +96,45 @@ export default function DiningBookingPolicyModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dining-booking-policy-title"
-        className="relative w-full sm:max-w-[560px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl"
+        className="relative flex w-full max-w-[560px] max-h-[min(85vh,40rem)] flex-col overflow-hidden rounded-[1.5rem] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.28)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-5 sm:pt-7 pb-3 border-b border-slate-100">
+        <div className="flex shrink-0 items-center justify-between gap-4 px-6 sm:px-8 pt-6 sm:pt-8 pb-3">
           <h2
             id="dining-booking-policy-title"
-            className="text-[1.125rem] sm:text-[1.375rem] font-extrabold text-[#333] leading-tight pr-8"
+            className="text-[1.375rem] sm:text-[1.5rem] font-bold text-[#1A1A1A] leading-tight pr-2"
           >
-            Booking Policies
+            {title}
           </h2>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="absolute top-4 right-4 sm:top-6 sm:right-6 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E8E8E8] text-[#555] hover:bg-[#ddd] cursor-pointer"
+            className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-[#E8E8E8] text-[#555555] hover:bg-[#DEDEDE] transition-colors cursor-pointer"
           >
-            <X size={16} />
+            <X size={18} strokeWidth={2.25} />
           </button>
         </div>
 
-        <div className="px-5 sm:px-8 pt-4 flex gap-2.5">
-          <button
-            type="button"
-            onClick={() => setActiveSection("terms")}
-            className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors cursor-pointer ${
-              activeSection === "terms"
-                ? "border-black bg-black text-white"
-                : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
-            }`}
-          >
-            Terms
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection("cancellation")}
-            className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors cursor-pointer ${
-              activeSection === "cancellation"
-                ? "border-black bg-black text-white"
-                : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
-            }`}
-          >
-            Condition
-          </button>
-        </div>
-
-        <div className="overflow-y-auto px-5 sm:px-8 pb-6 sm:pb-8 pt-4 max-h-[calc(90vh-8.5rem)] sm:max-h-[calc(85vh-9rem)]">
-          {activeSection === "terms" ? (
-            <div>
-              <h3 className="text-[1rem] sm:text-[1.0625rem] font-bold text-[#1A1A1A] mb-3">
-                Terms &amp; Conditions
-              </h3>
-              <ul className="list-disc pl-5 space-y-2.5">
-                {TERMS_ITEMS.map((item, index) => (
-                  <li
-                    key={index}
-                    className="text-[0.875rem] sm:text-[0.9375rem] leading-relaxed text-[#4A4A4A]"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <div
+          data-scroll-lock-container
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 sm:px-8 pb-6 sm:pb-8 pt-2 [scrollbar-width:thin] [scrollbar-color:#C8C8C8_#F0F0F0]"
+        >
+          {isCancellation ? (
+            <ul className="list-disc pl-5 space-y-3.5 marker:text-[#111111]">
+              {CANCELLATION_ITEMS.map((item, index) => renderCancellationItem(item, index))}
+            </ul>
           ) : (
-            <div>
-              <h3 className="text-[1rem] sm:text-[1.0625rem] font-bold text-[#1A1A1A] mb-3">
-                Cancellation Policy
-              </h3>
-              <ul className="list-disc pl-5 space-y-2.5">
-                {CANCELLATION_ITEMS.map((item, index) => renderCancellationItem(item, index))}
-              </ul>
-            </div>
+            <ul className="list-disc pl-5 space-y-3.5 marker:text-[#111111]">
+              {TERMS_ITEMS.map((item, index) => (
+                <li
+                  key={index}
+                  className="text-[0.9375rem] sm:text-[1rem] leading-[1.55] text-[#333333]"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>

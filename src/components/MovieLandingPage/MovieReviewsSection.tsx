@@ -20,6 +20,7 @@ import {
   type MovieReviewFormValues,
 } from "@/lib/movieReviewFormSchema";
 import CustomerReviewCard from "@/components/Shared/CustomerReviewCard";
+import { lockBodyScroll } from "@/lib/lockBodyScroll";
 
 const BRAND = "#6900AA";
 
@@ -139,6 +140,12 @@ export default function MovieReviewsSection({
   const [createReview, { isLoading: submitting }] = useCreateMovieReviewMutation();
   const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!reviewsModalOpen) return;
+    const unlock = lockBodyScroll();
+    return unlock;
+  }, [reviewsModalOpen]);
 
   const {
     register,
@@ -381,11 +388,15 @@ export default function MovieReviewsSection({
                   <X size={20} />
                 </button>
               </div>
-              <div className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7">
+              <div
+                data-scroll-lock-container
+                className="overflow-y-auto flex-1 px-5 sm:px-6 py-2 pr-6 sm:pr-7 overscroll-contain"
+              >
                 {reviews.map((review: MovieReview) => {
                   const name = review.user_name || "Guest";
                   const ratingNum = Number(review.rating) || 0;
                   const text = (review.text || "").trim();
+                  const timeLabel = timeAgo(review.created_at);
                   const expanded = expandedReviewId === String(review.id);
                   const needsMore = text.length > 180;
                   return (
@@ -393,20 +404,29 @@ export default function MovieReviewsSection({
                       key={review.id}
                       className="py-4 border-b border-slate-100 last:border-b-0"
                     >
-                      <div className="flex items-center gap-2.5 pr-1">
+                      <div className="flex items-start gap-2.5 pr-1">
                         <span className="inline-flex size-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-600 shrink-0">
                           {name.slice(0, 1).toUpperCase()}
                         </span>
-                        <span className="min-w-0 flex-1 text-sm font-semibold text-[#111111] truncate">
-                          {name}
-                        </span>
-                        <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none">
-                          <Star size={10} className="fill-white text-white" />
-                          {Math.round(ratingNum)}
-                        </span>
+                        <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-[#111111] truncate leading-snug">
+                              {name}
+                            </p>
+                            {timeLabel ? (
+                              <p className="mt-0.5 text-xs text-slate-400 leading-snug">
+                                {timeLabel}
+                              </p>
+                            ) : null}
+                          </div>
+                          <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-[#1B7A3D] px-2.5 py-1 text-xs font-bold text-white leading-none mt-0.5">
+                            <Star size={10} className="fill-white text-white" />
+                            {Math.round(ratingNum)}
+                          </span>
+                        </div>
                       </div>
                       {text ? (
-                        <div className="mt-2.5 relative">
+                        <div className="mt-2.5 relative pl-0">
                           <p
                             className={`text-sm text-[#111111] leading-relaxed whitespace-pre-wrap ${
                               expanded || !needsMore ? "" : "line-clamp-4"

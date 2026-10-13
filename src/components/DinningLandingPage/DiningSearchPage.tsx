@@ -29,6 +29,7 @@ import { stableSearchParamsString } from "@/lib/filterUrlSync";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { restaurantHref } from "@/lib/businessPublicPath";
 import { DiningSearchShimmer } from "@/components/Shared/Shimmer";
+import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 
 const DINING_LIST_LIMIT = 12;
 
@@ -514,21 +515,16 @@ function SearchContent() {
         {loadingBusinesses && loadedRestaurants.length === 0 ? (
           <DiningSearchShimmer count={6} />
         ) : filteredRestaurants.length === 0 ? (
-          <div className="text-center py-24 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 max-w-xl mx-auto">
-            <div className="text-6xl mb-5">🍽️</div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">No restaurants found</h3>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6">
-              We couldn't find any listings matching your active filters. Try adjusting your query or resetting filters to browse all venues.
-            </p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => router.push("/search")}
-                className="bg-rose-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20"
-              >
-                Browse All Venues
-              </button>
-            </div>
-          </div>
+          <ListingNoResultsState
+            kind="dining"
+            title="No restaurants found"
+            description="We couldn’t find any listings matching your active filters. Try clearing filters or searching for another place."
+            actionLabel="Clear filters"
+            onAction={() => {
+              setDiningFilters(DEFAULT_DINING_FILTERS);
+              router.push("/search");
+            }}
+          />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

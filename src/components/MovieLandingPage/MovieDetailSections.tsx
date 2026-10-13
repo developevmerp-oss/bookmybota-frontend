@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
-  Crown,
   Link2,
   RefreshCcw,
   Ticket,
@@ -565,10 +564,7 @@ function RelatedMovieCard({ movie }: { movie: Movie }) {
           {comingSoon ? (
             <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
           ) : promoted ? (
-            <span className="movies-rail-badge movies-rail-badge--promoted">
-              <Crown size={11} className="shrink-0 text-[#FCD34D]" strokeWidth={2.25} fill="#FCD34D" />
-              Promoted
-            </span>
+            <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
           ) : null}
         </Link>
 

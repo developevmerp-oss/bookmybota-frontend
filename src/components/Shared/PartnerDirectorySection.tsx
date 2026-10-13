@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Building2, MapPin } from "lucide-react";
 import type { PublicRegisteredPartner } from "@/services/api";
@@ -175,6 +176,7 @@ export default function PartnerDirectorySection({
   partners,
   isLoading,
   emptyMessage,
+  emptyContent,
   showHeader = true,
 }: {
   title: string;
@@ -183,6 +185,8 @@ export default function PartnerDirectorySection({
   partners: PublicRegisteredPartner[] | DirectoryArtist[];
   isLoading?: boolean;
   emptyMessage?: string;
+  /** Rich empty UI (e.g. ListingNoResultsState). Takes priority over emptyMessage. */
+  emptyContent?: ReactNode;
   showHeader?: boolean;
 }) {
   const artistList = partners as DirectoryArtist[];
@@ -244,9 +248,13 @@ export default function PartnerDirectorySection({
             </div>
           </>
         ) : partners.length === 0 ? (
-          <p className={`${showHeader ? "mt-12" : ""} text-center text-sm text-[#888]`}>
-            {emptyMessage || "No partners to show yet."}
-          </p>
+          emptyContent ? (
+            <div className={showHeader ? "mt-12" : ""}>{emptyContent}</div>
+          ) : (
+            <p className={`${showHeader ? "mt-12" : ""} text-center text-sm text-[#888]`}>
+              {emptyMessage || "No partners to show yet."}
+            </p>
+          )
         ) : kind === "artist" ? (
           <>
             {/* Mobile / tablet: registered rail, then event (non-registered) rail */}
@@ -262,9 +270,13 @@ export default function PartnerDirectorySection({
                 kind="artist"
               />
               {registeredArtists.length === 0 && eventArtists.length === 0 ? (
-                <p className="text-center text-sm text-[#888]">
-                  {emptyMessage || "No partners to show yet."}
-                </p>
+                emptyContent ? (
+                  emptyContent
+                ) : (
+                  <p className="text-center text-sm text-[#888]">
+                    {emptyMessage || "No partners to show yet."}
+                  </p>
+                )
               ) : null}
             </div>
             {/* Desktop: unchanged grid */}

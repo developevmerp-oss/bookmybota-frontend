@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Clapperboard, Crown } from "lucide-react";
+import { Clapperboard } from "lucide-react";
 import { useGetPublicMoviesQuery, type Movie } from "@/services/api";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { scrollRailBy, useHorizontalScrollEdges } from "@/lib/useHorizontalScrollEdges";
@@ -90,10 +90,7 @@ function MovieCard({ movie }: { movie: RailMovieCard }) {
           {movie.comingSoon ? (
             <span className="movies-rail-badge movies-rail-badge--soon">Coming Soon</span>
           ) : movie.promoted ? (
-            <span className="movies-rail-badge movies-rail-badge--promoted">
-              <Crown size={11} className="shrink-0 text-[#FCD34D]" strokeWidth={2.25} fill="#FCD34D" />
-              Promoted
-            </span>
+            <span className="movies-rail-badge movies-rail-badge--promoted">Promoted</span>
           ) : null}
         </div>
         <div className="px-3 pt-3 pb-3.5 flex flex-col gap-0.5">

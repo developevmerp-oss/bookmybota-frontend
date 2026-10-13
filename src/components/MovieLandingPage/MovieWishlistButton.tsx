@@ -11,30 +11,71 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
+import CustomerAuthModal from "@/components/Shared/CustomerAuthModal";
 import {
   clearGuestMovieWishlistIds,
   readGuestMovieWishlistIds,
-  writeGuestMovieWishlistIds,
 } from "@/lib/movieWishlist";
+
+type Appearance = "default" | "glass";
+/** Icon colors — independent of button chrome (`appearance` / `className`). */
+type Tone = "default" | "onLight" | "onDark";
 
 type Props = {
   movieId: string;
   className?: string;
-  /** `onLight` = dark outline heart on white chip; fills when saved. */
-  tone?: "default" | "onLight";
+  /** Button chrome when `className` is omitted. `glass` = frosted circle on media (dining parity). */
+  appearance?: Appearance;
+  /**
+   * Heart / loader color:
+   * - `default` — brand rose on light chips
+   * - `onLight` — dark outline on white chip
+   * - `onDark` / glass — white outline on media; rose fill when saved
+   */
+  tone?: Tone;
 };
 
 let guestWishlistSyncStarted = false;
 
+function resolveIconClasses(
+  appearance: Appearance,
+  tone: Tone,
+  saved: boolean
+): { heart: string; loader: string } {
+  const mediaOverlay = appearance === "glass" || tone === "onDark";
+
+  if (mediaOverlay) {
+    return {
+      heart: saved ? "fill-[#E11D48] text-[#E11D48]" : "fill-none text-white",
+      loader: "animate-spin text-white",
+    };
+  }
+
+  if (tone === "onLight") {
+    return {
+      heart: saved ? "fill-[#E11D48] text-[#E11D48]" : "fill-none text-[#111111]",
+      loader: "animate-spin text-[#6900AA]",
+    };
+  }
+
+  return {
+    heart: saved ? "fill-[#E11D48] text-[#E11D48]" : "fill-none text-[#B41739]",
+    loader: "animate-spin text-[#6900AA]",
+  };
+}
+
 export default function MovieWishlistButton({
   movieId,
   className,
+  appearance = "default",
   tone = "default",
 }: Props) {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((s) => s.auth.user);
-  const isCustomer = authUser?.role === "customer" && Boolean(authUser.customer_id);
+  /** Same gate as dining favourites — customer role only. */
+  const isCustomer = authUser?.role === "customer";
 
+  const [authOpen, setAuthOpen] = useState(false);
   const [guestSaved, setGuestSaved] = useState(false);
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
 
@@ -53,6 +94,7 @@ export default function MovieWishlistButton({
     setGuestSaved(readGuestMovieWishlistIds().includes(String(movieId)));
   }, [movieId, isCustomer]);
 
+  // One-time merge of legacy guest localStorage saves after customer login (dining parity)
   useEffect(() => {
     if (!isCustomer || guestWishlistSyncStarted) return;
     const guestIds = readGuestMovieWishlistIds();
@@ -85,22 +127,9 @@ export default function MovieWishlistButton({
       e.stopPropagation();
 
       if (!isCustomer) {
-        const ids = readGuestMovieWishlistIds();
-        const next = saved ? ids.filter((id) => id !== movieId) : [...ids, movieId];
-        writeGuestMovieWishlistIds(next);
-        setGuestSaved(!saved);
-        toast.success(saved ? "Removed from favorites" : "Added to favorites");
+        toast.message("Sign in to save movies to My Favourite");
+        setAuthOpen(true);
         return;
-      }
-
-      const guestIds = readGuestMovieWishlistIds();
-      if (guestIds.length > 0) {
-        try {
-          await syncWishlist({ movie_ids: guestIds }).unwrap();
-          clearGuestMovieWishlistIds();
-        } catch {
-          /* continue with toggle even if sync fails */
-        }
       }
 
       const prev = saved;
@@ -118,41 +147,45 @@ export default function MovieWishlistButton({
         toast.error(extractApiError(err, "Could not update favourites"));
       }
     },
-    [isCustomer, movieId, saved, toggleWishlist, syncWishlist]
+    [isCustomer, movieId, saved, toggleWishlist]
+  );
+
+  const defaultClass =
+    appearance === "glass"
+      ? "absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white/35 backdrop-blur-md border border-white/50 shadow-sm flex items-center justify-center hover:bg-white/50 transition-colors cursor-pointer disabled:opacity-70"
+      : "inline-flex size-11 sm:size-12 items-center justify-center rounded-xl border border-white/25 bg-white/10 hover:bg-white/20 cursor-pointer disabled:opacity-70";
+
+  const { heart: heartClass, loader: loaderClass } = resolveIconClasses(
+    appearance,
+    tone,
+    saved
   );
 
   return (
-    <button
-      type="button"
-      onClick={(e) => void handleClick(e)}
-      disabled={toggling}
-      aria-label={saved ? "Remove from favorites" : "Add to favorites"}
-      aria-pressed={saved}
-      className={
-        className ||
-        "inline-flex size-11 sm:size-12 items-center justify-center rounded-xl border border-white/25 bg-white/10 hover:bg-white/20 cursor-pointer disabled:opacity-70"
-      }
-    >
-      {toggling ? (
-        <Loader2
-          className={`size-4 sm:size-5 animate-spin ${
-            tone === "onLight" ? "text-[#6900AA]" : "text-white"
-          }`}
-        />
-      ) : (
-        <Heart
-          className={
-            saved
-              ? tone === "onLight"
-                ? "size-4 sm:size-5 fill-[#E11D48] text-[#E11D48]"
-                : "size-4 sm:size-5 fill-[#F84464] text-[#F84464]"
-              : tone === "onLight"
-                ? "size-4 sm:size-5 fill-none text-[#111111]"
-                : "size-4 sm:size-5 text-white"
-          }
-          strokeWidth={2}
-        />
-      )}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={(e) => void handleClick(e)}
+        disabled={toggling}
+        aria-label={saved ? "Remove from favorites" : "Add to favorites"}
+        aria-pressed={saved}
+        className={className || defaultClass}
+      >
+        {toggling ? (
+          <Loader2 size={16} className={loaderClass} />
+        ) : (
+          <Heart size={18} className={heartClass} strokeWidth={2.25} />
+        )}
+      </button>
+
+      <CustomerAuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onSuccess={() => {
+          setAuthOpen(false);
+          dispatch(loadFromStorage());
+        }}
+      />
+    </>
   );
 }

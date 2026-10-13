@@ -44,6 +44,7 @@ import ListingPromoSlider, {
   useListingPromoCampaigns,
 } from "@/components/LandingPage/ListingPromoSlider";
 import { MovieGridShimmer } from "@/components/Shared/Shimmer";
+import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 import {
   formatMovieCardTitle,
   isMoviePromoted,
@@ -179,63 +180,6 @@ function FilterOptionRow({
       </span>
       <SelectionMark selected={selected} multi={multi} />
     </button>
-  );
-}
-
-function MoviesEmptyState({
-  title,
-  description,
-  actionLabel,
-  onAction,
-  variant = "filters",
-  dimmed,
-}: {
-  title: string;
-  description: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  variant?: "filters" | "generic";
-  dimmed?: boolean;
-}) {
-  return (
-    <div
-      className={`relative overflow-hidden rounded-2xl border border-[#EDE4F5] bg-gradient-to-b from-[#FBF7FF] via-white to-white px-5 py-11 sm:px-8 sm:py-14 text-center ${
-        dimmed ? "opacity-70" : ""
-      }`}
-    >
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(105,0,170,0.10),_transparent_68%)]"
-        aria-hidden
-      />
-      <div className="relative mx-auto flex max-w-md flex-col items-center">
-        {variant === "filters" ? (
-          <div className="mb-5 w-[180px] sm:w-[220px]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/movies/no-filter-results.png?v=4"
-              alt="No movies found"
-              className="mx-auto h-auto w-full object-contain select-none"
-              draggable={false}
-            />
-          </div>
-        ) : (
-          <div className="mb-5 flex size-20 items-center justify-center rounded-full bg-[#F3E8FF] text-[#6900AA] ring-1 ring-[#E8D5F8]">
-            <Clapperboard className="size-9" strokeWidth={1.75} aria-hidden />
-          </div>
-        )}
-        <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">{title}</h3>
-        <p className="mt-1.5 text-sm text-slate-500 leading-relaxed max-w-sm">{description}</p>
-        {actionLabel && onAction ? (
-          <button
-            type="button"
-            onClick={onAction}
-            className="mt-6 inline-flex cursor-pointer items-center justify-center rounded-full bg-[#6900AA] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#57008E]"
-          >
-            {actionLabel}
-          </button>
-        ) : null}
-      </div>
-    </div>
   );
 }
 
@@ -1694,12 +1638,16 @@ export default function MovieLandingPage() {
                 {viewAllTitle}
               </h3>
               {viewAllMovies.length === 0 ? (
-                <MoviesEmptyState
-                  title="No movies match these filters"
-                  description="Try clearing filters or choosing another language."
+                <ListingNoResultsState
+                  kind="movies"
+                  title="No movies found"
+                  description={
+                    hasActiveFilters
+                      ? "We couldn’t find any movies matching these filters. Try clearing filters or choosing another language."
+                      : "Check back soon for the latest titles in cinemas."
+                  }
                   actionLabel={hasActiveFilters ? "Clear filters" : undefined}
                   onAction={hasActiveFilters ? clearAll : undefined}
-                  variant={hasActiveFilters ? "filters" : "generic"}
                 />
               ) : (
                 <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:gap-x-4 md:gap-y-6 lg:grid-cols-5">
@@ -1729,18 +1677,16 @@ export default function MovieLandingPage() {
                   </Link>
                 </div>
               ) : movies.length === 0 ? (
-                <MoviesEmptyState
-                  title={
-                    hasActiveFilters ? "No movies match these filters" : "No movies available yet"
-                  }
+                <ListingNoResultsState
+                  kind="movies"
+                  title="No movies found"
                   description={
                     hasActiveFilters
-                      ? "Try clearing filters or choosing another language."
+                      ? "We couldn’t find any movies matching these filters. Try clearing filters or choosing another language."
                       : "Check back soon for the latest titles in cinemas."
                   }
                   actionLabel={hasActiveFilters ? "Clear filters" : undefined}
                   onAction={hasActiveFilters ? clearAll : undefined}
-                  variant={hasActiveFilters ? "filters" : "generic"}
                   dimmed={isFetching}
                 />
               ) : (

@@ -49,8 +49,8 @@
 .movies-rail-badge {
   position: absolute;
   top: 0.75rem;
-  right: 0.75rem;
-  left: auto;
+  left: 0.75rem;
+  right: auto;
   z-index: 2;
   pointer-events: none;
   display: inline-flex;
@@ -59,7 +59,7 @@
   gap: 0.3rem;
   max-width: calc(100% - 1.5rem);
   border-radius: 9999px;
-  padding: 0.4rem 0.7rem;
+  padding: 0.25rem 0.625rem;
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -69,14 +69,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   border: 1px solid transparent;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
 
+/* Dining-parity promoted chip */
 .movies-rail-badge--promoted {
-  color: #ffffff;
-  background: #6900aa;
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 2px 10px rgba(105, 0, 170, 0.35);
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
 
 .movies-rail-badge--soon {

@@ -181,7 +181,7 @@ export default function CustomerReviewCard({
             <p className="text-sm font-bold text-[#111111] truncate leading-snug">
               {displayName}
             </p>
-            <p className="mt-0.5 flex items-center gap-1.5 text-[1rem] sm:text-xs text-gray-800 leading-none">
+            <p className="mt-0.5 flex items-center gap-1.5 text-sm sm:text-[0.9375rem] text-gray-800 leading-none">
               <span className="shrink-0">
                 {bookedOnPlatform ? "Booked on" : "Customer on"}
               </span>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Clapperboard, Crown, Star } from "lucide-react";
+import { Clapperboard, Star } from "lucide-react";
 // import { ArrowRight } from "lucide-react"; // used by commented Book Now / View Details CTA
 import MovieWishlistButton from "@/components/MovieLandingPage/MovieWishlistButton";
 import { formatMovieCardMeta } from "@/lib/movieDisplay";
@@ -65,28 +65,18 @@ export function MovieNotifyCard({ movie }: { movie: MustWatchMovieCard }) {
             </div>
           )}
 
-          {/* Status — top left on poster (Coming Soon wins over Promoted) */}
+          {/* Status — top left on poster (Coming Soon wins over Promoted); badge UI matches dining */}
           {comingSoon ? (
-            <span className="absolute top-3 left-3 z-[2] inline-flex max-w-[65%] items-center rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white backdrop-blur-[2px] shadow-sm">
+            <span className="absolute top-3 left-3 z-[2] pointer-events-none inline-flex max-w-[65%] items-center rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white backdrop-blur-[2px] shadow-sm">
               Coming Soon
             </span>
           ) : promoted ? (
-            <span className="absolute top-3 left-3 z-[2] inline-flex max-w-[65%] items-center gap-1 rounded-full bg-[#6900AA] px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white shadow-sm">
-              <Crown
-                size={11}
-                className="shrink-0 text-[#FCD34D]"
-                strokeWidth={2.25}
-                fill="#FCD34D"
-              />
+            <span className="absolute top-3 left-3 z-[2] pointer-events-none inline-flex max-w-[65%] items-center rounded-full bg-white/80 backdrop-blur-[2px] px-2.5 py-1 text-[11px] font-semibold text-slate-900 shadow-sm border border-white/60">
               Promoted
             </span>
           ) : null}
 
-          <MovieWishlistButton
-            movieId={String(movie.id)}
-            tone="onLight"
-            className="absolute top-3 right-3 z-[2] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-70"
-          />
+          <MovieWishlistButton movieId={String(movie.id)} appearance="glass" />
         </div>
 
         <div className="flex flex-col gap-1 px-3.5 pt-3 pb-3.5 min-w-0">

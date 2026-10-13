@@ -41,6 +41,7 @@ import { artistHref } from "@/lib/businessPublicPath";
 import { ShowcaseEventPosterCard } from "@/components/LandingPage/PosterCard";
 import Footer from "@/components/LandingPage/Footer";
 import ExploreEventOption2 from "@/components/EventLandingPage/ExploreEventOption2";
+import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 import {
   ArtistRailShimmer,
   CustomerRailShimmer,
@@ -2351,17 +2352,19 @@ export default function PublicEventsPage() {
           <EventListShimmer />
         ) : paged.length === 0 ? (
           hasNonCityFilters || Boolean(search.trim()) ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
-              <p className="text-sm font-semibold text-slate-800">No events match your filters</p>
-              <p className="mt-1 text-sm text-slate-500">Try another date, genre, language, or price.</p>
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="mt-4 text-sm font-semibold text-[#6900AA] underline cursor-pointer"
-              >
-                Clear filters
-              </button>
-            </div>
+            <ListingNoResultsState
+              kind="events"
+              title="No events found"
+              description={
+                search.trim()
+                  ? `We couldn’t find any events matching “${search.trim()}”.`
+                  : isCategoryBrowse
+                    ? "We couldn’t find any events in this category with your filters. Try clearing filters or searching for another event."
+                    : "We couldn’t find any events matching these filters. Try another date, category, language, or price."
+              }
+              actionLabel="Clear filters"
+              onAction={clearAllFilters}
+            />
           ) : showEventShowcase ? (
             <div className="space-y-4">
               {hasCity ? (

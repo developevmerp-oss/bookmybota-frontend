@@ -56,7 +56,7 @@ import { useGetBusinessTypesQuery, useGetBusinessesPagedQuery, useGetBusinessesQ
 // import { useGetMoodsQuery, Mood } from "@/services/api";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import DiningFiltersBar from "@/components/DinningLandingPage/DiningFiltersBar";
-import DiningNoResultsState from "@/components/DinningLandingPage/DiningNoResultsState";
+import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 import DiningCollectionsOption2 from "@/components/DinningLandingPage/DiningCollectionsOption2";
 import ExploreDiningCardOption2 from "@/components/DinningLandingPage/ExploreDiningCardOption2";
 import DiningOffersOption2 from "@/components/DinningLandingPage/DiningOffersOption2";
@@ -2376,8 +2376,9 @@ export default function Home() {
               ))}
             </div>
           ) : displayRestaurants.length === 0 ? (
-            <DiningNoResultsState
-              title="No restaurants match these filters"
+            <ListingNoResultsState
+              kind="dining"
+              title="No restaurants found"
               description={
                 locationCity
                   ? `We couldn’t find any restaurants, pubs, bars or cafes in ${locationCity}. Try clearing filters or searching for another place.`

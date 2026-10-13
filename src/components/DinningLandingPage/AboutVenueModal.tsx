@@ -39,14 +39,20 @@ export default function AboutVenueModal({
 }: Props) {
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyOverscroll = document.body.style.overscrollBehavior;
+    document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.overscrollBehavior = prevBodyOverscroll;
       document.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);
@@ -89,23 +95,25 @@ export default function AboutVenueModal({
         className="relative z-10 flex w-full max-h-[92vh] sm:max-h-[90vh] sm:max-w-[440px] md:max-w-[480px] flex-col overflow-hidden rounded-t-[1.5rem] bg-white shadow-2xl sm:rounded-[1.5rem] pb-[env(safe-area-inset-bottom)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-[#EFEFEF] bg-white px-5 py-4 sm:px-6 sm:py-5">
+        <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-4 bg-white px-6 pt-6 sm:px-8 sm:pt-8 pb-3">
           <div className="min-w-0">
             <h2
               id="about-venue-title"
-              className="text-xl font-bold text-[#111111] leading-tight"
+              className="text-[1.375rem] sm:text-[1.5rem] font-bold text-[#1A1A1A] leading-tight"
             >
               {title}
             </h2>
-            <p className="mt-0.5 text-sm text-slate-500 font-medium truncate">{name}</p>
+            {mode !== "hours" ? (
+              <p className="mt-0.5 text-sm text-slate-500 font-medium truncate">{name}</p>
+            ) : null}
           </div>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-rose-600 hover:bg-rose-50 cursor-pointer"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-[#E8E8E8] text-[#555555] hover:bg-[#DEDEDE] transition-colors cursor-pointer"
           >
-            <X size={20} strokeWidth={2.25} />
+            <X size={18} strokeWidth={2.25} />
           </button>
         </div>
 

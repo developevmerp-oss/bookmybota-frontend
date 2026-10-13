@@ -14,6 +14,7 @@ import {
   stableSearchParamsString,
 } from "@/lib/filterUrlSync";
 import { CinemaListShimmer } from "@/components/Shared/Shimmer";
+import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
 
 const PAGE_BG = "#f5f5f5";
 
@@ -251,10 +252,17 @@ export default function CinemaListingPage() {
         {isLoading && apiCinemas.length === 0 ? (
           <CinemaListShimmer count={6} />
         ) : cinemas.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg border border-slate-200">
-            <p className="text-slate-600 font-medium">No cinemas found</p>
-            <p className="text-slate-400 text-sm mt-1">Try another search or city.</p>
-          </div>
+          <ListingNoResultsState
+            kind="venues"
+            title="No cinemas found"
+            description={
+              search.trim()
+                ? `We couldn’t find any cinemas matching “${search.trim()}”. Try another search or city.`
+                : "We couldn’t find any cinemas here. Try another search or city."
+            }
+            actionLabel={search.trim() ? "Clear filters" : undefined}
+            onAction={search.trim() ? () => setSearch("") : undefined}
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {cinemas.map((cinema) => (

@@ -34,7 +34,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import BusinessLandingPage from "@/components/DiningAdminPanel/BusinessLandingPage";
-import { ListYourShowLandingShimmer } from "@/components/Shared/Shimmer";
+import { AdminListShimmer, ListYourShowLandingShimmer } from "@/components/Shared/Shimmer";
 import { extractApiError } from "@/lib/apiErrors";
 import { formatDate } from "@/lib/dateFormat";
 
@@ -591,10 +591,9 @@ function BusinessDashboard() {
 
   if (isLoading || !user) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center space-y-2">
-          <div className="mx-auto h-8 w-8 rounded-full border-2 border-rose-500/30 border-t-rose-500 animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Loading Business Dashboard...</p>
+      <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
+        <div className="max-w-7xl mx-auto">
+          <AdminListShimmer rows={6} columns={4} showTabs showToolbar={false} showPagination={false} tabCount={3} />
         </div>
       </div>
     );

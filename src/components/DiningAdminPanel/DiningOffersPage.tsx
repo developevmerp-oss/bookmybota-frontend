@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
@@ -28,6 +27,7 @@ import {
 import { MapPin } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import {
   formatDiningOfferDiscount,
   getEffectiveDiningOfferStatus,
@@ -298,7 +298,13 @@ export default function DiningOffersPage() {
   };
 
   if (!user?.business_id) {
-    return <p className="text-slate-500 p-10 text-center">Loading restaurant account...</p>;
+    return (
+      <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
+        <div className="max-w-7xl mx-auto">
+          <AdminListShimmer rows={6} columns={5} showTabs={false} showToolbar showPagination={false} />
+        </div>
+      </div>
+    );
   }
 
   const stats = [
@@ -343,29 +349,6 @@ export default function DiningOffersPage() {
   return (
     <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
       <div className="max-w-7xl mx-auto space-y-5">
-        {/* Hero */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm min-h-[200px] sm:min-h-[230px]">
-          <Image
-            src="/images/dining-offers-banner.jpg"
-            alt="Restaurant offers"
-            fill
-            className="object-cover object-right"
-            sizes="100vw"
-            priority
-          />
-          <div className="relative z-10 p-6 sm:p-8 max-w-xl">
-            <span className="inline-flex w-fit items-center rounded-full bg-rose-50 text-[#e11d48] px-3 py-1 text-[10px] font-bold uppercase tracking-wider mb-3">
-              Boost your bookings
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Restaurant Offers
-            </h1>
-            <p className="text-sm text-slate-500 mt-2 max-w-md leading-relaxed">
-              Create promo codes for bookings and walk-in redemption at your restaurant.
-            </p>
-          </div>
-        </div>
-
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
           {stats.map((stat) => {
@@ -394,8 +377,8 @@ export default function DiningOffersPage() {
         </div>
 
         {/* Toolbar + table */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="px-3 py-3 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
             <div className="flex gap-1 flex-wrap overflow-x-auto">
               {STATUS_TABS.map((t) => (
                 <button
@@ -422,41 +405,36 @@ export default function DiningOffersPage() {
               <button
                 type="button"
                 onClick={openCreate}
-                className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-sm font-semibold text-white bg-gradient-to-r from-[#f43f5e] to-[#e11d48] shadow-[0_8px_18px_rgba(225,29,72,0.28)] hover:from-[#e11d48] hover:to-[#be123c] transition-all whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-semibold text-white bg-[#e11d48] hover:bg-[#be123c] transition-colors whitespace-nowrap"
               >
-                <FaPlus size={16} />
+                <FaPlus size={14} />
                 Create Offer
               </button>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[820px]">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-100">
-                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Offer
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">
-                    Discount
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider hidden lg:table-cell">
-                    Schedule
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="py-3 px-4 text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">
-                    Actions
-                  </th>
+            <table className="w-full text-left text-sm min-w-[820px]">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-3 py-2.5 font-semibold">Offer</th>
+                  <th className="px-3 py-2.5 font-semibold hidden md:table-cell">Discount</th>
+                  <th className="px-3 py-2.5 font-semibold hidden lg:table-cell">Schedule</th>
+                  <th className="px-3 py-2.5 font-semibold">Status</th>
+                  <th className="px-3 py-2.5 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center text-slate-400 text-sm">
-                      <FaSpinner className="animate-spin inline mr-2" size={18} />
-                      Loading offers…
+                    <td colSpan={5} className="p-4">
+                      <AdminListShimmer
+                        rows={5}
+                        columns={5}
+                        showTabs={false}
+                        showToolbar={false}
+                        showPagination={false}
+                      />
                     </td>
                   </tr>
                 ) : filteredOffers.length === 0 ? (
@@ -474,18 +452,18 @@ export default function DiningOffersPage() {
                     return (
                       <tr
                         key={offer.id}
-                        className="border-b border-slate-50 hover:bg-slate-50/70 transition-colors"
+                        className="transition-colors hover:bg-slate-50/80"
                       >
-                        <td className="py-3.5 px-4">
-                          <p className="text-sm font-semibold text-slate-900">{offer.title}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{offer.type}</p>
+                        <td className="px-3 py-2.5">
+                          <p className="font-semibold text-slate-900">{offer.title}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{offer.type}</p>
                           {offer.promo_code ? (
                             <p className="text-[11px] text-[#e11d48] font-mono mt-0.5">
                               {offer.promo_code}
                             </p>
                           ) : null}
                         </td>
-                        <td className="py-3.5 px-4 hidden md:table-cell text-sm text-slate-700">
+                        <td className="px-3 py-2.5 hidden md:table-cell text-slate-500">
                           {formatDiningOfferDiscount(offer)}
                           {(offer.min_bill_amount ?? 0) > 0 && (
                             <span className="block text-[11px] text-slate-400 mt-0.5">
@@ -493,9 +471,9 @@ export default function DiningOffersPage() {
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 hidden lg:table-cell text-xs text-slate-500">
+                        <td className="px-3 py-2.5 hidden lg:table-cell text-slate-500">
                           <span className="inline-flex items-center gap-1.5">
-                            <FaCalendarAlt size={13} className="text-slate-400 shrink-0" />
+                            <FaCalendarAlt size={12} className="text-slate-400 shrink-0" />
                             {offer.start_at || offer.end_at ? (
                               <>
                                 {offer.start_at ? formatDate(offer.start_at) : "—"} –{" "}
@@ -506,10 +484,10 @@ export default function DiningOffersPage() {
                             )}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="px-3 py-2.5">
                           <StatusBadge offer={offer} />
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="px-3 py-2.5">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"

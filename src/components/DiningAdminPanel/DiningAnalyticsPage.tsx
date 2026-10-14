@@ -11,6 +11,7 @@ import { useGetAnalyticsQuery, useGetBusinessBookingsQuery } from "@/services/ap
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { formatDateTimeCustomer } from "@/lib/dateFormat";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 
 export default function AnalyticsPage() {
   const dispatch = useAppDispatch();
@@ -25,7 +26,13 @@ export default function AnalyticsPage() {
   const allBookings = bookingsData?.items ?? [];
 
   if (isLoading || !user) {
-    return <div className="text-slate-500 p-10 text-center">Loading Analytics...</div>;
+    return (
+      <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
+        <div className="max-w-7xl mx-auto">
+          <AdminListShimmer rows={5} columns={4} showTabs={false} showToolbar={false} showPagination={false} />
+        </div>
+      </div>
+    );
   }
 
   const onlineCount = stats?.sources?.find((s) => s.booking_source === "ONLINE")?.count || 0;
@@ -68,13 +75,6 @@ export default function AnalyticsPage() {
   return (
     <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Analytics Dashboard</h2>
-          <p className="text-slate-500 mt-1">
-            Track your venue&apos;s performance and booking trends.
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {countCards.map((card) => {
             const Icon = card.icon;

@@ -743,37 +743,17 @@ function buildShowtimesTitle(
   return base;
 }
 
-const TIME_COLOR = "#C58B00";
 /** BMS-style muted text for disabled date / time options */
 const DISABLED_MUTED = "#C8C8C8";
 const DISABLED_MUTED_SOFT = "#D4D4D4";
 
-const STATUS_DOT: Record<ChipFillStatus, string> = {
-  started: "bg-[#F97316]",
-  available: "bg-[#22C55E]",
-  filling: "bg-[#EAB308]",
-  soldout: "bg-[#DC2626]",
-};
-/** Ticket outline only — matches status dot; time text stays gold */
+/** Chip border + left accent — matches fill status */
 const STATUS_BORDER: Record<ChipFillStatus, string> = {
   available: "#22C55E",
   filling: "#EAB308",
   soldout: "#DC2626",
   started: "#F97316",
 };
-
-const TICKET_MASK = {
-  WebkitMaskImage:
-    "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
-  WebkitMaskSize: "51% 100%, 51% 100%",
-  WebkitMaskPosition: "0 0, 100% 0",
-  WebkitMaskRepeat: "no-repeat",
-  maskImage:
-    "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
-  maskSize: "51% 100%, 51% 100%",
-  maskPosition: "0 0, 100% 0",
-  maskRepeat: "no-repeat",
-} as const;
 
 function cinemaMapsQuery(cinema: PublicMovieCinemaGroup) {
   return [cinema.name, cinema.address].filter(Boolean).join(", ") || cinema.name;
@@ -1077,7 +1057,7 @@ function ShowtimeChip({
         </div>
       ) : null}
 
-      {/* Ticket + moon: moon centered on top-right corner (BMS angle) */}
+      {/* Rectangular chip + left accent bar (status color); moon on late-night */}
       <span className="relative inline-block overflow-visible">
         {showLateNightMoon ? (
           <span
@@ -1089,71 +1069,61 @@ function ShowtimeChip({
           </span>
         ) : null}
 
-        <span
-          className="inline-block transition-[filter]"
-          style={{
-            filter: `drop-shadow(0 0 0.7px ${borderColor}) drop-shadow(0 0 0.7px ${borderColor})`,
-          }}
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={soldOut}
+          aria-label={`${formatTime(st.starts_at)}${
+            isLateNight ? " — Late night" : ""
+          } — ${
+            status === "available"
+              ? "Available"
+              : status === "filling"
+                ? "Fast filling"
+                : status === "soldout"
+                  ? "Sold out"
+                  : "Started"
+          }`}
+          className={`relative min-w-[104px] sm:min-w-[112px] overflow-hidden border bg-white pl-4 pr-3.5 py-2 text-center ${
+            soldOut
+              ? "cursor-not-allowed opacity-70"
+              : "cursor-pointer hover:bg-[#FAFAFA]"
+          }`}
+          style={{ borderColor }}
         >
-          <button
-            type="button"
-            onClick={onClick}
-            disabled={soldOut}
-            aria-label={`${formatTime(st.starts_at)}${
-              isLateNight ? " — Late night" : ""
-            } — ${
-              status === "available"
-                ? "Available"
-                : status === "filling"
-                  ? "Fast filling"
-                  : status === "soldout"
-                    ? "Sold out"
-                    : "Started"
-            }`}
-            className={`relative min-w-[104px] sm:min-w-[112px] px-3.5 py-2.5 text-center ${
-              soldOut
-                ? "bg-[#F3F4F6] cursor-not-allowed opacity-70"
-                : started
-                  ? "bg-[#FFF7ED] cursor-pointer"
-                  : "bg-[#F7F5FB] cursor-pointer"
-            }`}
-            style={TICKET_MASK}
-          >
-            {/* Availability dot stays visible — left when moon owns the top-right corner */}
-            <span
-              className={`absolute top-1.5 h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]} ${
-                showLateNightMoon ? "left-2.5" : "right-2"
-              }`}
-            />
-            <span className="block text-[13px] font-bold" style={{ color: TIME_COLOR }}>
-              {formatTime(st.starts_at)}
+          <span
+            className="pointer-events-none absolute inset-y-0 left-0 w-[4px]"
+            style={{ backgroundColor: borderColor }}
+            aria-hidden
+          />
+          <span className="block text-[13px] font-bold tabular-nums text-[#374151]">
+            {formatTime(st.starts_at)}
+          </span>
+          {started ? (
+            <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#EA580C]">
+              Started
             </span>
-            {started ? (
-              <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#EA580C]">
-                Started
-              </span>
-            ) : soldOut ? (
-              <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#DC2626]">
-                Sold Out
-              </span>
-            ) : null}
-            {grouped && formatLabel && !/^2d$/i.test(formatLabel) ? (
-              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
-                {formatLabel}
-              </span>
-            ) : null}
-            {metaLine ? (
-              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
-                {metaLine}
-              </span>
-            ) : null}
-            {minPrice !== null && !grouped ? (
-              <span className="mt-0.5 block text-[10px] font-medium text-[#6B7280]">
-                ETB {minPrice}
-              </span>
-            ) : null}
-          </button>
-        </span>
+          ) : soldOut ? (
+            <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-wide text-[#DC2626]">
+              Sold Out
+            </span>
+          ) : null}
+          {grouped && formatLabel && !/^2d$/i.test(formatLabel) ? (
+            <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
+              {formatLabel}
+            </span>
+          ) : null}
+          {metaLine ? (
+            <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">
+              {metaLine}
+            </span>
+          ) : null}
+          {minPrice !== null && !grouped ? (
+            <span className="mt-0.5 block text-[10px] font-medium text-[#6B7280]">
+              ETB {minPrice}
+            </span>
+          ) : null}
+        </button>
       </span>
     </span>
   );

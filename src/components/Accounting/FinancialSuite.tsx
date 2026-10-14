@@ -515,17 +515,21 @@ export default function FinancialSuite({
     <div className="w-full space-y-6">
       {/* Header Toolbar */}
       <div className="admin-list-toolbar flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-rose-600/10 text-rose-500 border border-rose-500/20">
-              <Scale size={20} />
-            </span>
-            {panelTitle}
-          </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Real-time double-entry general ledger, IFRS statements, and Ethiopian Ministry of Revenues compliance.
-          </p>
-        </div>
+        {isSuperadmin ? (
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-rose-600/10 text-rose-500 border border-rose-500/20">
+                <Scale size={20} />
+              </span>
+              {panelTitle}
+            </h1>
+            <p className="text-xs text-zinc-400 mt-1">
+              Real-time double-entry general ledger, IFRS statements, and Ethiopian Ministry of Revenues compliance.
+            </p>
+          </div>
+        ) : (
+          <div className="hidden lg:block" />
+        )}
 
         {/* Global Date Filters & Sync Button */}
         <div className="flex flex-wrap items-center gap-2.5">

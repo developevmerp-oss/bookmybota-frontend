@@ -25,6 +25,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { extractApiError } from "@/lib/apiErrors";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import {
   diningTableFormSchema,
   emptyDiningTableFormValues,
@@ -91,7 +92,7 @@ export default function TableManager() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [statusTab, setStatusTab] = useState<StatusTab>("ALL");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sortKey, setSortKey] = useState<SortKey>("table_number");
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -217,35 +218,24 @@ export default function TableManager() {
   return (
     <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
       <div className="max-w-7xl mx-auto space-y-5">
-        {/* Header — matches 1st reference */}
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Table Management
-            </h2>
-            <p className="text-sm text-slate-500 mt-1.5">
-              Add physical tables and toggle them active/inactive.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center shrink-0 w-full lg:w-auto">
-            <SearchInput
-              value={q}
-              onChange={(value) => {
-                setQ(value);
-                setPage(1);
-              }}
-              placeholder="Search table number..."
-              className="w-full sm:w-64"
-            />
-            <button
-              type="button"
-              onClick={openModal}
-              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-[#e11d48] hover:bg-[#be123c] shadow-sm shadow-rose-600/20 transition-colors shrink-0"
-            >
-              <FaPlus size={14} />
-              Add Table
-            </button>
-          </div>
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center sm:justify-end">
+          <SearchInput
+            value={q}
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search table number..."
+            className="w-full sm:w-64"
+          />
+          <button
+            type="button"
+            onClick={openModal}
+            className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-[#e11d48] hover:bg-[#be123c] shadow-sm shadow-rose-600/20 transition-colors shrink-0"
+          >
+            <FaPlus size={14} />
+            Add Table
+          </button>
         </div>
 
         {/* Stats */}
@@ -392,7 +382,7 @@ export default function TableManager() {
 
         {/* Table cards / list */}
         {isLoading ? (
-          <p className="text-slate-400 text-center py-10 text-sm">Loading your floor plan...</p>
+          <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar={false} showPagination={false} />
         ) : filteredTables.length === 0 ? (
           <div className="text-center py-12 text-slate-400 text-sm font-medium rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
             {tables.length === 0
@@ -439,37 +429,50 @@ export default function TableManager() {
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden divide-y divide-slate-100">
-            {filteredTables.map((t) => (
-              <div
-                key={t.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50/70"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{t.table_number}</p>
-                    <p className="text-xs text-slate-500 inline-flex items-center gap-1 mt-0.5">
-                      <FaUserFriends size={11} />
-                      Capacity: {t.capacity} Guests
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <StatusSwitch
-                    active={t.is_active}
-                    onToggle={() => requestToggleActive(t)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteTable(t.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                    title="Delete Table"
-                  >
-                    <FaTrash size={13} />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5 font-semibold">Table</th>
+                    <th className="px-3 py-2.5 font-semibold">Capacity</th>
+                    <th className="px-3 py-2.5 font-semibold">Status</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredTables.map((t) => (
+                    <tr key={t.id} className="transition-colors hover:bg-slate-50/80">
+                      <td className="px-3 py-2.5 font-semibold text-slate-900">{t.table_number}</td>
+                      <td className="px-3 py-2.5 text-slate-500">
+                        <span className="inline-flex items-center gap-1.5">
+                          <FaUserFriends size={12} className="text-slate-400" />
+                          {t.capacity} Guests
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <StatusSwitch
+                          active={t.is_active}
+                          onToggle={() => requestToggleActive(t)}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTable(t.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Delete Table"
+                          >
+                            <FaTrash size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

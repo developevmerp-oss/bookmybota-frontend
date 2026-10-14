@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-  Calendar,
   ImagePlus,
   CreditCard,
   Loader2,
@@ -35,6 +34,7 @@ import { formatDate } from "@/lib/dateFormat";
 import { formatMoneyDisplay } from "@/lib/currencyFormat";
 import Pagination from "@/components/Shared/Pagination";
 import { CroppedImageField } from "@/components/Shared/ImageCropPicker";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { promotionTargetLabel } from "@/lib/promotionTargetLabel";
 import PlanInfoButton from "@/components/Shared/PlanInfoButton";
@@ -361,9 +361,7 @@ export default function PartnerPromotionsPage({
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64 text-slate-400">
-        <Loader2 className="animate-spin w-8 h-8 mr-2" /> Loading promotions...
-      </div>
+      <AdminListShimmer rows={5} columns={4} showTabs={false} showToolbar showPagination={false} />
     );
   }
 
@@ -673,19 +671,23 @@ export default function PartnerPromotionsPage({
       }
     >
       <div className={isDining ? "max-w-7xl mx-auto space-y-8" : "contents"}>
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <h2 className={`font-bold text-slate-800 ${isDining ? "text-2xl sm:text-3xl font-extrabold text-slate-900" : "text-2xl"}`}>
-              {title}
-            </h2>
-            <p className="text-slate-500 mt-1">{description}</p>
-          </div>
+        <div
+          className={`flex flex-col sm:flex-row gap-4 ${
+            isDining ? "sm:items-center sm:justify-end" : "sm:items-end sm:justify-between"
+          }`}
+        >
+          {!isDining ? (
+            <div>
+              <h2 className="font-bold text-slate-800 text-2xl">{title}</h2>
+              <p className="text-slate-500 mt-1">{description}</p>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={openCreate}
             className={
               isDining
-                ? "inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-[#e11d48] text-white-keep text-sm font-semibold hover:bg-[#be123c] shadow-md shadow-rose-200/70 cursor-pointer shrink-0"
+                ? "inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-[#e11d48] text-white-keep text-sm font-semibold hover:bg-[#be123c] cursor-pointer shrink-0"
                 : "inline-flex items-center gap-2 btn-primary px-4 py-2.5 rounded-xl text-sm font-semibold"
             }
           >
@@ -694,16 +696,92 @@ export default function PartnerPromotionsPage({
         </div>
 
         {campaigns.length === 0 ? (
-          <div
-            className={`rounded-2xl p-10 text-center ${
-              isDining ? "bg-slate-50 border border-slate-200" : "bg-slate-50 border border-slate-200"
-            }`}
-          >
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-10 text-center">
             <Megaphone className={`mx-auto mb-3 ${isDining ? "text-[#e11d48]" : "text-slate-400"}`} size={32} />
             <h3 className="text-lg font-bold text-slate-700 mb-2">No promotion requests yet</h3>
             <p className="text-slate-500 max-w-md mx-auto">
               Choose a marketing plan and submit a banner request. Once approved, it appears on the customer landing slider and listings.
             </p>
+          </div>
+        ) : isDining ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[720px]">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5 font-semibold">Promotion</th>
+                    <th className="px-3 py-2.5 font-semibold">Plan</th>
+                    <th className="px-3 py-2.5 font-semibold">Status</th>
+                    <th className="px-3 py-2.5 font-semibold">Schedule</th>
+                    <th className="px-3 py-2.5 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {campaigns.map((camp: MarketingCampaign) => {
+                    const cardTitle = camp.title || camp.plan_name || "Promotion";
+                    const dateLine =
+                      camp.start_date && camp.end_date
+                        ? `${formatDate(camp.start_date)} → ${formatDate(camp.end_date)}`
+                        : camp.status === "EXPIRED"
+                          ? `Ended ${formatDate(camp.end_date)}`
+                          : camp.end_date
+                            ? `Ends ${formatDate(camp.end_date)}`
+                            : "—";
+                    return (
+                      <tr key={camp.id} className="transition-colors hover:bg-slate-50/80">
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {camp.banner_image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={resolveMediaUrl(camp.banner_image_url)}
+                                alt=""
+                                className="h-10 w-16 rounded-lg object-cover border border-slate-200 shrink-0"
+                              />
+                            ) : (
+                              <span className="h-10 w-16 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                                <Megaphone size={14} className="text-slate-400" />
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900 truncate">{cardTitle}</p>
+                              {camp.amount != null ? (
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  Paid {formatMoneyDisplay(camp.amount)}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-500">{camp.plan_name || "—"}</td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {statusBadge(camp.status, true)}
+                            {paymentBadge(camp.payment_status, true)}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{dateLine}</td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center justify-end">
+                            {camp.status === "REJECTED" ? (
+                              <button
+                                type="button"
+                                onClick={() => openEdit(camp)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#e11d48] text-white-keep px-3 py-1.5 text-xs font-semibold hover:bg-[#be123c]"
+                              >
+                                <Pencil size={12} /> Fix & resubmit
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400">—</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -715,117 +793,6 @@ export default function PartnerPromotionsPage({
                 Boolean(camp.target_id)
                   ? targetLabel
                   : "";
-              const headerLabel = showTargetName || "Listing boost only";
-              const cardTitle = camp.title || camp.plan_name || "Promotion";
-              const dateLine =
-                camp.start_date && camp.end_date
-                  ? `${formatDate(camp.start_date)} → ${formatDate(camp.end_date)}`
-                  : camp.status === "EXPIRED"
-                    ? `Ended ${formatDate(camp.end_date)}`
-                    : camp.end_date
-                      ? `Ends ${formatDate(camp.end_date)}`
-                      : null;
-
-              if (isDining) {
-                return (
-                  <div
-                    key={camp.id}
-                    className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    {camp.banner_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={resolveMediaUrl(camp.banner_image_url)}
-                        alt={cardTitle}
-                        className="w-full aspect-[16/9] object-cover"
-                      />
-                    ) : (
-                      <div className="relative w-full aspect-[16/10] bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-50 flex flex-col items-center justify-center px-4 overflow-hidden">
-                        <div
-                          className="pointer-events-none absolute inset-0 opacity-40"
-                          style={{
-                            backgroundImage:
-                              "radial-gradient(circle at 20% 30%, rgba(14,165,233,0.14), transparent 45%), radial-gradient(circle at 80% 70%, rgba(99,102,241,0.12), transparent 40%)",
-                          }}
-                        />
-                        <div className="relative h-14 w-14 rounded-full bg-white border-2 border-sky-300 shadow-[0_0_0_6px_rgba(186,230,253,0.55)] flex items-center justify-center mb-3">
-                          <Megaphone size={24} className="text-sky-600" />
-                        </div>
-                        <p className="relative text-sm font-medium text-slate-700 text-center">{headerLabel}</p>
-                      </div>
-                    )}
-
-                    <div className="p-4 space-y-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {statusBadge(camp.status, true)}
-                        {paymentBadge(camp.payment_status, true)}
-                        {camp.status === "PENDING" && camp.reviewed_at ? (
-                          <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-sky-100 text-sky-800">
-                            Resubmitted
-                          </span>
-                        ) : null}
-                        <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-slate-100 text-slate-600">
-                          {camp.category || module}
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-[15px] leading-snug">{cardTitle}</h4>
-                        {camp.plan_name ? (
-                          <p className="text-xs text-slate-500 mt-0.5">{camp.plan_name}</p>
-                        ) : null}
-                      </div>
-
-                      {(camp.amount != null || camp.payment_reference) && (
-                        <div className="text-xs text-slate-600 space-y-0.5 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
-                          {camp.amount != null ? (
-                            <p>
-                              Paid: <span className="font-semibold">{formatMoneyDisplay(camp.amount)}</span>
-                            </p>
-                          ) : null}
-                          {camp.payment_reference ? (
-                            <p className="text-slate-500 truncate">Ref: {camp.payment_reference}</p>
-                          ) : null}
-                        </div>
-                      )}
-
-                      {camp.admin_note &&
-                      (camp.status === "REJECTED" || (camp.status === "PENDING" && camp.reviewed_at)) ? (
-                        <p className="text-xs text-rose-600 bg-rose-50 rounded-lg px-2 py-1">
-                          Admin: {camp.admin_note}
-                        </p>
-                      ) : null}
-
-                      {camp.status === "PENDING" ? (
-                        <p className="text-[11px] text-amber-700">
-                          {camp.reviewed_at
-                            ? "Resubmitted — waiting for Super Admin review"
-                            : "Waiting for Super Admin review"}
-                        </p>
-                      ) : camp.status === "REJECTED" ? (
-                        <p className="text-[11px] text-rose-600">
-                          Rejected — fix the creative and resubmit. Payment is kept.
-                        </p>
-                      ) : dateLine ? (
-                        <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                          <Calendar size={13} className="shrink-0 text-slate-400" />
-                          {dateLine}
-                        </p>
-                      ) : null}
-
-                      {camp.status === "REJECTED" ? (
-                        <button
-                          type="button"
-                          onClick={() => openEdit(camp)}
-                          className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[#e11d48] text-white-keep px-3 py-1.5 text-xs font-semibold hover:bg-[#be123c]"
-                        >
-                          <Pencil size={12} /> Fix & resubmit
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              }
 
               return (
                 <div key={camp.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">

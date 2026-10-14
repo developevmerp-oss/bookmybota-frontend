@@ -31,6 +31,7 @@ import {
   type DiningScanTokenValues,
 } from "@/lib/diningPartnerFormSchemas";
 import PhoneInput from "@/components/Shared/PhoneInput";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { sanitizePhoneInput } from "@/lib/validation";
 
 const SCANNER_REGION_ID = "dining-guest-qr-reader";
@@ -571,7 +572,13 @@ export default function DiningScanPage() {
   };
 
   if (!user?.business_id) {
-    return <p className="text-slate-500">Loading restaurant account...</p>;
+    return (
+      <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
+        <div className="max-w-4xl mx-auto">
+          <AdminListShimmer rows={4} columns={3} showTabs={false} showToolbar={false} showPagination={false} />
+        </div>
+      </div>
+    );
   }
 
   const offer = scanned?.applied_offer;
@@ -596,18 +603,6 @@ export default function DiningScanPage() {
   return (
     <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8">
       <div className="max-w-6xl mx-auto space-y-5 pb-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h2 className="text-2xl sm:text-[1.75rem] font-bold text-slate-900 tracking-tight">
-            Scan guest QR
-          </h2>
-          <p className="text-sm text-slate-500 mt-1 max-w-xl">
-            Scan guest QR for offers, redeem walk-in promos, or redeem a BookMyBota Gift Card against the food bill.
-          </p>
-        </div>
-        
-      </div>
-
       {/* Top row: Scanner + Manual lookup */}
       <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Scanner */}

@@ -11,11 +11,12 @@ import {
 import { useAppSelector, useAppDispatch } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
 import { FaStar, FaStarHalfAlt, FaRegStar, FaReply, FaComment } from "react-icons/fa";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/dateFormat";
 import SearchInput from "@/components/Shared/SearchInput";
 import Pagination from "@/components/Shared/Pagination";
+import { AdminListShimmer } from "@/components/Shared/Shimmer";
 import { PAGE_SIZE } from "@/lib/pagination";
 import { extractApiError } from "@/lib/apiErrors";
 import {
@@ -152,8 +153,10 @@ export default function BusinessReviewsPage() {
 
   if (!user || isLoading) {
     return (
-      <div className="flex h-[80vh] items-center justify-center text-slate-400">
-        <Loader2 className="animate-spin text-[#e11d48] mr-2" /> Loading reviews...
+      <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
+        <div className="max-w-7xl mx-auto">
+          <AdminListShimmer rows={6} columns={4} showTabs={false} showToolbar showPagination />
+        </div>
       </div>
     );
   }
@@ -161,36 +164,28 @@ export default function BusinessReviewsPage() {
   return (
     <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
       <div className="max-w-7xl mx-auto space-y-5">
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Customer Reviews</h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage your reputation. Reply to customer reviews publicly as the venue owner.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center w-full lg:w-auto">
-            <SearchInput
-              value={q}
-              onChange={(value) => {
-                setQ(value);
-                setPage(1);
-              }}
-              placeholder="Search reviewer or review text..."
-              className="w-full sm:w-64"
-            />
-            <select
-              value={ratingFilter}
-              onChange={(e) => setRatingFilter(e.target.value as typeof ratingFilter)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:outline-none focus:border-rose-400 cursor-pointer"
-            >
-              <option value="ALL">All Ratings</option>
-              <option value="5">5 Stars</option>
-              <option value="4">4 Stars</option>
-              <option value="3">3 Stars</option>
-              <option value="2">2 Stars</option>
-              <option value="1">1 Star</option>
-            </select>
-          </div>
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center sm:justify-end">
+          <SearchInput
+            value={q}
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search reviewer or review text..."
+            className="w-full sm:w-64"
+          />
+          <select
+            value={ratingFilter}
+            onChange={(e) => setRatingFilter(e.target.value as typeof ratingFilter)}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:outline-none focus:border-rose-400 cursor-pointer"
+          >
+            <option value="ALL">All Ratings</option>
+            <option value="5">5 Stars</option>
+            <option value="4">4 Stars</option>
+            <option value="3">3 Stars</option>
+            <option value="2">2 Stars</option>
+            <option value="1">1 Star</option>
+          </select>
         </div>
 
         {statsReviews.length === 0 && reviews.length === 0 ? (

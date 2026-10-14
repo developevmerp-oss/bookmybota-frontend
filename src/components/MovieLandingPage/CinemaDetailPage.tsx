@@ -54,7 +54,6 @@ import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 
 const PAGE_BG = "#F4F2F8";
 const BRAND = "#6900AA";
-const TIME_COLOR = "#C58B00";
 const DATE_ACTIVE_GRADIENT =
   "linear-gradient(180deg, #A78BFA 0%, #8B5CF6 38%, #6D28D9 72%, #4C1D95 100%)";
 
@@ -205,12 +204,6 @@ function fillStatus(iso: string): "available" | "filling" | "almost" {
   if (h >= 21) return "almost";
   return "available";
 }
-
-const STATUS_DOT: Record<"available" | "filling" | "almost", string> = {
-  available: "bg-[#22C55E]",
-  filling: "bg-[#EAB308]",
-  almost: "bg-[#EF4444]",
-};
 
 type FilterOption = {
   value: string;
@@ -487,6 +480,12 @@ function BmsFilterDropdown({
   );
 }
 
+const STATUS_BORDER: Record<"available" | "filling" | "almost", string> = {
+  available: "#22C55E",
+  filling: "#EAB308",
+  almost: "#EF4444",
+};
+
 function TicketShowtimeButton({
   st,
   selected,
@@ -499,65 +498,53 @@ function TicketShowtimeButton({
   const price = showtimePrice(st);
   const status = fillStatus(st.starts_at);
   const screenLabel = st.screen_type || st.format || "";
+  const accent = STATUS_BORDER[status];
 
   return (
-    <span
-      className={`inline-block transition-[filter] ${
-        selected
-          ? "[filter:drop-shadow(0_0_0.7px_#6900AA)]"
-          : "[filter:drop-shadow(0_0_0.65px_#C4C4C4)] hover:[filter:drop-shadow(0_0_0.7px_#6900AA)]"
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative min-w-[104px] overflow-hidden border rounded-sm pl-3.5 pr-3.5 py-2 text-center cursor-pointer transition-colors ${
+        selected ? "" : "bg-white hover:bg-[#FAFAFA]"
       }`}
+      style={
+        selected
+          ? { borderColor: accent, backgroundColor: accent }
+          : { borderColor: accent, backgroundColor: "#FFFFFF" }
+      }
     >
-      <button
-        type="button"
-        onClick={onClick}
-        className={`relative min-w-[104px] px-3.5 py-2.5 text-center cursor-pointer ${
-          selected ? "bg-[#6900AA]" : "bg-[#F7F5FB]"
-        }`}
-        style={{
-          WebkitMaskImage:
-            "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
-          WebkitMaskSize: "51% 100%, 51% 100%",
-          WebkitMaskPosition: "0 0, 100% 0",
-          WebkitMaskRepeat: "no-repeat",
-          maskImage:
-            "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
-          maskSize: "51% 100%, 51% 100%",
-          maskPosition: "0 0, 100% 0",
-          maskRepeat: "no-repeat",
-        }}
-      >
+      {!selected ? (
         <span
-          className={`absolute top-1.5 right-2 h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]} ${
-            selected ? "ring-1 ring-white/70" : ""
-          }`}
+          className="pointer-events-none absolute inset-y-0 left-0 w-[4px]"
+          style={{ backgroundColor: accent }}
+          aria-hidden
         />
+      ) : null}
+      <span
+        className={`block text-[13px] font-bold tabular-nums ${
+          selected ? "text-white" : "text-[#374151]"
+        }`}
+      >
+        {formatTime(st.starts_at)}
+      </span>
+      {price != null ? (
         <span
-          className={`block text-[13px] font-bold ${selected ? "text-white" : ""}`}
-          style={selected ? undefined : { color: TIME_COLOR }}
+          className={`mt-0.5 block text-[10px] font-semibold ${
+            selected ? "text-white/90" : "text-[#6B7280]"
+          }`}
         >
-          {formatTime(st.starts_at)}
+          ETB {price}
         </span>
-        {price != null ? (
-          <span
-            className={`mt-0.5 block text-[10px] font-semibold ${
-              selected ? "text-white/90" : "text-[#6B7280]"
-            }`}
-          >
-            ETB {price}
-          </span>
-        ) : screenLabel ? (
-          <span
-            className={`mt-0.5 block text-[10px] font-semibold uppercase tracking-wide ${
-              selected ? "text-white/90" : ""
-            }`}
-            style={selected ? undefined : { color: TIME_COLOR }}
-          >
-            {screenLabel}
-          </span>
-        ) : null}
-      </button>
-    </span>
+      ) : screenLabel ? (
+        <span
+          className={`mt-0.5 block text-[10px] font-medium uppercase tracking-wide ${
+            selected ? "text-white/90" : "text-[#9CA3AF]"
+          }`}
+        >
+          {screenLabel}
+        </span>
+      ) : null}
+    </button>
   );
 }
 

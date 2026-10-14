@@ -36,6 +36,7 @@ import {
 import PhoneInput from '@/components/Shared/PhoneInput';
 import ImageCropPicker, { CroppedImageField } from '@/components/Shared/ImageCropPicker';
 import ChangePasswordForm from '@/components/Shared/ChangePasswordForm';
+import { AdminListShimmer } from '@/components/Shared/Shimmer';
 
 const fieldErrorClass = 'mt-1.5 text-[11px] font-semibold text-rose-500';
 const labelClass = 'block text-sm font-medium text-slate-600 mb-2';
@@ -223,15 +224,22 @@ export default function ProfilePage() {
     }
   };
 
-  if (isLoading || !user) return <div className="text-slate-500 p-10 text-center">Loading Profile...</div>;
+  if (isLoading || !user) {
+    return (
+      <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
+        <div className="max-w-7xl mx-auto">
+          <AdminListShimmer rows={6} columns={3} showTabs showToolbar={false} showPagination={false} tabCount={3} />
+        </div>
+      </div>
+    );
+  }
 
   const isPasswordTab = activeTab === 'Change Password';
 
   return (
     <div className="-m-4 sm:-m-8 min-h-[calc(100vh-5rem)] bg-white p-4 sm:p-8 animate-fadeIn">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Profile</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 mb-6">
           {!isPasswordTab && (
             <button
               type="button"

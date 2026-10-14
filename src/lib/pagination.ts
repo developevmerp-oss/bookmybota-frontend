@@ -56,6 +56,11 @@ export type PagedQuery = {
   q?: string;
   page?: number;
   limit?: number;
+  date?: string;
+  status?: string;
+  source?: string;
+  sort_by?: string;
+  sort_dir?: "asc" | "desc";
 };
 
 export type PagedBizQuery = string | ({ bizId: string } & PagedQuery);
@@ -66,5 +71,14 @@ export function bizIdOf(arg: PagedBizQuery): string {
 
 export function pagedBizQuery(arg: PagedBizQuery): string {
   if (typeof arg === "string") return "";
-  return toListQuery({ q: arg.q, page: arg.page, limit: arg.limit });
+  return toListQuery({
+    q: arg.q,
+    page: arg.page,
+    limit: arg.limit,
+    date: arg.date,
+    status: arg.status,
+    source: arg.source,
+    sort_by: arg.sort_by,
+    sort_dir: arg.sort_dir,
+  });
 }

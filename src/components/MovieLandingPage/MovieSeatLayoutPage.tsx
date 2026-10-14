@@ -149,30 +149,53 @@ function isLateNightShow(startsAt: string): boolean {
   return h >= 23 || h < 5;
 }
 
-/** BMS ticket notch (same as showtimes list chips) */
-const SEAT_PAGE_TICKET_MASK = {
-  WebkitMaskImage:
-    "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
-  WebkitMaskSize: "51% 100%, 51% 100%",
-  WebkitMaskPosition: "0 0, 100% 0",
-  WebkitMaskRepeat: "no-repeat",
-  maskImage:
-    "radial-gradient(circle 6px at 0 50%, transparent 98%, #000), radial-gradient(circle 6px at 100% 50%, transparent 98%, #000)",
-  maskSize: "51% 100%, 51% 100%",
-  maskPosition: "0 0, 100% 0",
-  maskRepeat: "no-repeat",
-} as const;
-
-const SEAT_PAGE_TIME_COLOR = "#C58B00";
+/**
+ * BMS-style cinema screen — gentle curved lavender bar with light 3D edge.
+ * Width should follow the seat track so it aligns with the layout.
+ */
+function CinemaScreenArc({
+  className = "",
+  flip = false,
+}: {
+  className?: string;
+  /** When screen is below seats, flip the arc so thickness faces the seats. */
+  flip?: boolean;
+}) {
+  return (
+    <svg
+      viewBox="0 0 560 28"
+      className={className}
+      preserveAspectRatio="none"
+      aria-hidden
+      style={flip ? { transform: "scaleY(-1)" } : undefined}
+    >
+      {/* Soft under-glow / depth */}
+      <path
+        d="M28 10 C160 22 400 22 532 10 L528 20 C400 30 160 30 32 20 Z"
+        fill="#C4B0E6"
+        opacity="0.55"
+      />
+      {/* Main curved screen surface */}
+      <path
+        d="M24 6 C160 18 400 18 536 6 L532 14 C400 24 160 24 28 14 Z"
+        fill="#D2C2F0"
+        stroke="#B8A4DC"
+        strokeWidth="1"
+        strokeLinejoin="round"
+      />
+      {/* Top highlight edge */}
+      <path
+        d="M28 7 C160 18 400 18 532 7"
+        fill="none"
+        stroke="#F3EEFA"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 type SeatPageChipStatus = "available" | "filling" | "started" | "soldout";
-
-const SEAT_PAGE_STATUS_DOT: Record<SeatPageChipStatus, string> = {
-  started: "bg-[#F97316]",
-  available: "bg-[#22C55E]",
-  filling: "bg-[#EAB308]",
-  soldout: "bg-[#DC2626]",
-};
 
 const SEAT_PAGE_STATUS_BORDER: Record<SeatPageChipStatus, string> = {
   available: "#22C55E",
@@ -577,25 +600,27 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     };
   }, [layoutData, hasCanvasLayout, bookedSet]);
 
+  /** Cinema screen follows layout shape when present; otherwise BMS default = top. */
   const screenPosition = useMemo<"top" | "bottom">(() => {
     const shapes = layoutData?.layout_template?.seating_config?.shapes;
     if (Array.isArray(shapes) && shapes.length > 0) {
       const screenShape = shapes.find((s: any) =>
-        String(s.text || "").toLowerCase().includes("screen")
+        String(s.text || s.type || "").toLowerCase().includes("screen")
       );
       if (screenShape) {
         const rawSeats = Array.isArray(layoutData?.layout_template?.seats_json)
           ? layoutData.layout_template.seats_json
           : [];
         if (rawSeats.length > 0) {
-          const minY = Math.min(...rawSeats.map((s: any) => Number(s.coordinate_y ?? 0)));
-          if (Number(screenShape.y ?? 0) < minY) {
-            return "top";
-          }
+          const ys = rawSeats.map((s: any) => Number(s.coordinate_y ?? 0));
+          const minY = Math.min(...ys);
+          const maxY = Math.max(...ys);
+          const midY = (minY + maxY) / 2;
+          return Number(screenShape.y ?? 0) <= midY ? "top" : "bottom";
         }
       }
     }
-    return "bottom";
+    return "top";
   }, [layoutData]);
 
   const gridRows = useMemo<GridRow[]>(() => {
@@ -1884,7 +1909,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               const active = st.id === showtimeId;
               const past = isShowtimePast(st.starts_at) && !active;
               const status = seatPageChipStatus(st.fill_status, past);
-              const borderColor = past ? "#D1D5DB" : SEAT_PAGE_STATUS_BORDER[status];
+              /** BMS: selected = solid fill in status color + white text; idle = outline only */
+              const accent = past ? "#D1D5DB" : SEAT_PAGE_STATUS_BORDER[status];
               const lateNight = isLateNightShow(st.starts_at);
               const soldOut = status === "soldout";
               return (
@@ -1902,58 +1928,64 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                         <FaMoon className="text-[8px] text-white" aria-hidden />
                       </span>
                     ) : null}
-                    <span
-                      className={`inline-block transition-[filter,transform] ${
-                        active && !past && !soldOut ? "scale-[1.03]" : ""
-                      }`}
-                      style={{
-                        filter: past
-                          ? `drop-shadow(0 0 0.7px ${borderColor}) drop-shadow(0 0 0.7px ${borderColor})`
-                          : active
-                            ? `drop-shadow(0 0 1px ${borderColor}) drop-shadow(0 0 1px ${borderColor}) drop-shadow(0 0 1.5px ${borderColor}) drop-shadow(0 0 2px ${borderColor})`
-                            : `drop-shadow(0 0 0.7px ${borderColor}) drop-shadow(0 0 0.7px ${borderColor})`,
+                    <button
+                      type="button"
+                      disabled={past || soldOut}
+                      onClick={() => {
+                        if (st.id === showtimeId || past || soldOut) return;
+                        router.push(`/movies/book/${st.id}?qty=${qty}`);
                       }}
+                      aria-pressed={active}
+                      aria-current={active ? "true" : undefined}
+                      aria-label={`${formatSeatPageTime(st.starts_at)}${
+                        lateNight ? " — Late night" : ""
+                      }${active ? " — Selected" : ""}`}
+                      title={[st.format, st.language, st.screen_name].filter(Boolean).join(" • ")}
+                      className={`relative min-w-[104px] overflow-hidden border rounded-sm pl-3.5 pr-3.5 py-2 text-center transition-colors ${
+                        past || soldOut
+                          ? "bg-white cursor-not-allowed opacity-70"
+                          : active
+                            ? "cursor-default"
+                            : "bg-white cursor-pointer hover:bg-[#FAFAFA]"
+                      }`}
+                      style={
+                        active && !past && !soldOut
+                          ? {
+                              borderColor: accent,
+                              backgroundColor: accent,
+                            }
+                          : { borderColor: accent, backgroundColor: "#FFFFFF" }
+                      }
                     >
-                      <button
-                        type="button"
-                        disabled={past || soldOut}
-                        onClick={() => {
-                          if (st.id === showtimeId || past || soldOut) return;
-                          router.push(`/movies/book/${st.id}?qty=${qty}`);
-                        }}
-                        aria-pressed={active}
-                        aria-label={`${formatSeatPageTime(st.starts_at)}${
-                          lateNight ? " — Late night" : ""
-                        }${active ? " — Selected" : ""}`}
-                        title={[st.format, st.language, st.screen_name].filter(Boolean).join(" • ")}
-                        className={`relative min-w-[104px] px-3.5 py-2.5 text-center ${
-                          past || soldOut
-                            ? "bg-[#F3F4F6] cursor-not-allowed opacity-70"
-                            : active
-                              ? "bg-[#E4DFF0] cursor-default shadow-[0_2px_8px_rgba(15,23,42,0.12)]"
-                              : "bg-[#F7F5FB] cursor-pointer hover:brightness-[0.98]"
-                        }`}
-                        style={SEAT_PAGE_TICKET_MASK}
-                      >
-                        {active && !past && !soldOut ? (
-                          <span
-                            className="pointer-events-none absolute inset-x-3 bottom-1 h-0.5 rounded-full bg-[#22C55E]/70"
-                            aria-hidden
-                          />
-                        ) : null}
+                      {/* Left accent only when not selected (BMS selected is full fill) */}
+                      {!active || past || soldOut ? (
                         <span
-                          className={`absolute top-1.5 h-1.5 w-1.5 rounded-full ${
-                            past ? "bg-[#D1D5DB]" : SEAT_PAGE_STATUS_DOT[status]
-                          } ${lateNight ? "left-2.5" : "right-2"}`}
+                          className="pointer-events-none absolute inset-y-0 left-0 w-[4px]"
+                          style={{ backgroundColor: accent }}
+                          aria-hidden
                         />
+                      ) : null}
+                      <span
+                        className={`block text-[13px] font-bold tabular-nums ${
+                          past
+                            ? "text-[#9CA3AF]"
+                            : active
+                              ? "text-white"
+                              : "text-[#374151]"
+                        }`}
+                      >
+                        {formatSeatPageTime(st.starts_at)}
+                      </span>
+                      {st.format && !/^2d$/i.test(String(st.format)) ? (
                         <span
-                          className="block text-[13px] font-bold tabular-nums"
-                          style={{ color: past ? "#9CA3AF" : SEAT_PAGE_TIME_COLOR }}
+                          className={`mt-0.5 block text-[10px] font-medium uppercase tracking-wide ${
+                            active && !past ? "text-white/90" : "text-[#9CA3AF]"
+                          }`}
                         >
-                          {formatSeatPageTime(st.starts_at)}
+                          {st.format}
                         </span>
-                      </button>
-                    </span>
+                      ) : null}
+                    </button>
                   </span>
                 </span>
               );
@@ -2066,16 +2098,28 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   }}
                 >
                 {screenPosition === "top" && (
-                  <div className="pb-3 pt-0.5 text-center space-y-1.5" style={{ width: classicRowOuterPx }}>
-                    <p className="text-[11px] tracking-wide text-slate-500">
+                  <div className="pb-4 pt-0.5 space-y-1.5" style={{ width: classicRowOuterPx }}>
+                    <p
+                      className="text-center text-[11px] tracking-wide text-slate-500"
+                      style={{
+                        paddingLeft: classicRowLabelColPx + classicRowLabelGapPx,
+                      }}
+                    >
                       All eyes this way please
                     </p>
-                    <div
-                      className="mx-auto h-2.5 w-[72%] max-w-md bg-gradient-to-b from-[#d4c4f0] to-[#b8a0e8]"
-                      style={{
-                        clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)",
-                      }}
-                    />
+                    <div className="flex items-center">
+                      <span
+                        className="shrink-0"
+                        style={{
+                          width: classicRowLabelColPx,
+                          marginRight: classicRowLabelGapPx,
+                        }}
+                        aria-hidden
+                      />
+                      <div style={{ width: classicSeatTrackPx }}>
+                        <CinemaScreenArc className="h-6 w-full" />
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2185,14 +2229,26 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 })}
 
                 {screenPosition === "bottom" && (
-                  <div className="pt-6 pb-4 text-center space-y-1.5" style={{ width: classicRowOuterPx }}>
-                    <div
-                      className="mx-auto h-2.5 w-[72%] max-w-md bg-gradient-to-b from-[#d4c4f0] to-[#b8a0e8]"
+                  <div className="pt-6 pb-4 space-y-1.5" style={{ width: classicRowOuterPx }}>
+                    <div className="flex items-center">
+                      <span
+                        className="shrink-0"
+                        style={{
+                          width: classicRowLabelColPx,
+                          marginRight: classicRowLabelGapPx,
+                        }}
+                        aria-hidden
+                      />
+                      <div style={{ width: classicSeatTrackPx }}>
+                        <CinemaScreenArc flip className="h-6 w-full" />
+                      </div>
+                    </div>
+                    <p
+                      className="text-center text-[11px] tracking-wide text-slate-500"
                       style={{
-                        clipPath: "polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)",
+                        paddingLeft: classicRowLabelColPx + classicRowLabelGapPx,
                       }}
-                    />
-                    <p className="text-[11px] tracking-wide text-slate-500">
+                    >
                       All eyes this way please
                     </p>
                   </div>
@@ -2240,8 +2296,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 >
                   <div className="absolute inset-[8px] flex flex-col">
                     {screenPosition === "top" && (
-                      <div className="mb-1.5 flex flex-col items-center shrink-0">
-                        <div className="w-[70%] h-[3px] bg-[#b8a0e8]/80 rounded-[1px]" />
+                      <div className="mb-1.5 flex flex-col items-center shrink-0 w-full px-2">
+                        <CinemaScreenArc className="h-2.5 w-[85%]" />
                       </div>
                     )}
                     <div className="flex-1 min-h-0 flex flex-col justify-between relative">

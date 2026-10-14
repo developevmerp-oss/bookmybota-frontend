@@ -274,6 +274,13 @@ export function venueDateStr(now: Date = new Date()): string {
   return `${parts.y}-${pad2(parts.m)}-${pad2(parts.d)}`;
 }
 
+/** Venue wall-clock HH:mm (24h) for "now" comparisons (showtime scheduling). */
+export function venueTimeStr(now: Date = new Date()): string {
+  const parts = zonedParts(now, APP_VENUE_TZ);
+  if (!parts) return "";
+  return `${pad2(parts.hour)}:${pad2(parts.minute)}`;
+}
+
 /** Add calendar days to a venue YYYY-MM-DD (Ethiopia product calendar). */
 export function venueCalendarAddDays(ymd: string, days: number): string {
   const match = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);

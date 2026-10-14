@@ -1,11 +1,45 @@
 import * as yup from "yup";
+import { isVenueWallTimeReached, venueDateStr } from "@/lib/dateFormat";
 
 /** Cinema partner — schedule / edit movie showtime */
 export const movieShowtimeFormSchema = yup.object({
   movie_id: yup.string().trim().required("Please select a movie."),
   cinema_screen_id: yup.string().trim().required("Please select a cinema screen."),
-  show_date: yup.string().trim().required("Show date is required."),
-  start_time: yup.string().trim().required("Start time is required."),
+  show_date: yup
+    .string()
+    .trim()
+    .required("Show date is required.")
+    .test("not-past-date", "Show date cannot be in the past.", (value) => {
+      if (!value) return true;
+      const today = venueDateStr();
+      return !today || value >= today;
+    }),
+  start_time: yup
+    .string()
+    .trim()
+    .required("Start time is required.")
+    .test(
+      "not-past-time",
+      "Start time cannot be in the past. Choose a future time for today.",
+      function (value) {
+        const showDate = this.parent?.show_date as string | undefined;
+        if (!showDate || !value) return true;
+        const today = venueDateStr();
+        if (today && showDate < today) return true; // date field reports the error
+        if (today && showDate > today) return true;
+        const startsAt = `${showDate}T${value}:00`;
+        if (!isVenueWallTimeReached(startsAt)) return true;
+        // Editing an already-started show: allow save only if date/time were not changed.
+        const original = (this.options.context as { originalStartsAt?: string | null } | undefined)
+          ?.originalStartsAt;
+        if (original) {
+          const orig = String(original).trim();
+          const match = orig.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+          if (match && match[1] === showDate && match[2] === value) return true;
+        }
+        return false;
+      }
+    ),
   language: yup.string().trim().default("English"),
   format: yup.string().trim().default("2D"),
   tier_pricing: yup

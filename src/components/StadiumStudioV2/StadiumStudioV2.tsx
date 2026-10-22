@@ -110,6 +110,9 @@ export default function StadiumStudioV2({
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [isPlanSelected, setIsPlanSelected] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"stands" | "elements" | "pitch" | "blueprint">("stands");
+  const [blueprintArchetype, setBlueprintArchetype] = useState<"football" | "circular">("football");
+  const [blueprintTiers, setBlueprintTiers] = useState<1 | 2>(2);
+  const [blueprintBowlRadius, setBlueprintBowlRadius] = useState<number>(350);
 
   // Polygon Drawing in Progress
   const [drawingPoints, setDrawingPoints] = useState<number[]>([]);
@@ -484,6 +487,261 @@ export default function StadiumStudioV2({
     } catch (err: any) {
       toast.error(err?.message || "Failed to save layout.");
     }
+  };
+
+  const handleGenerateFromBlueprint = () => {
+    pushHistorySnapshot();
+    const px = groundConfig.x ?? CANVAS_W / 2;
+    const py = groundConfig.y ?? CANVAS_H / 2;
+    const pw = groundConfig.width ?? 440;
+    const ph = groundConfig.height ?? 290;
+
+    const newBlocks: StadiumBlockDefV2[] = [];
+    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#a855f7"];
+
+    if (blueprintArchetype === "football") {
+      const sideDepth = Math.max(80, Math.round(blueprintBowlRadius * 0.28));
+      const cornerInnerR = Math.max(180, Math.round(Math.hypot(pw, ph) / 2 * 0.88));
+      const cornerOuterR = cornerInnerR + sideDepth + 20;
+
+      const standDefs = [
+        {
+          id: `stand-north-${Date.now()}`,
+          name: "North Stand (Top)",
+          color: colors[0],
+          shape: "rectangle" as const,
+          x: Math.round(px - pw / 2),
+          y: Math.round(py - ph / 2 - sideDepth - 25),
+          width: pw,
+          height: sideDepth,
+          rotation: 0,
+        },
+        {
+          id: `stand-south-${Date.now()}`,
+          name: "South Stand (Bottom)",
+          color: colors[1],
+          shape: "rectangle" as const,
+          x: Math.round(px - pw / 2),
+          y: Math.round(py + ph / 2 + 25),
+          width: pw,
+          height: sideDepth,
+          rotation: 0,
+        },
+        {
+          id: `stand-west-${Date.now()}`,
+          name: "West Stand (Left)",
+          color: colors[2],
+          shape: "rectangle" as const,
+          x: Math.round(px - pw / 2 - sideDepth - 25),
+          y: Math.round(py - ph / 2),
+          width: sideDepth,
+          height: ph,
+          rotation: 0,
+        },
+        {
+          id: `stand-east-${Date.now()}`,
+          name: "East Stand (Right)",
+          color: colors[3],
+          shape: "rectangle" as const,
+          x: Math.round(px + pw / 2 + 25),
+          y: Math.round(py - ph / 2),
+          width: sideDepth,
+          height: ph,
+          rotation: 0,
+        },
+      ];
+
+      const cornerDefs = [
+        {
+          id: `corner-nw-${Date.now()}`,
+          name: "NW Corner Stand",
+          color: colors[4],
+          shape: "arc" as const,
+          startAngle: 203,
+          sweepAngle: 43,
+        },
+        {
+          id: `corner-ne-${Date.now()}`,
+          name: "NE Corner Stand",
+          color: colors[5],
+          shape: "arc" as const,
+          startAngle: 293,
+          sweepAngle: 43,
+        },
+        {
+          id: `corner-se-${Date.now()}`,
+          name: "SE Corner Stand",
+          color: colors[6],
+          shape: "arc" as const,
+          startAngle: 23,
+          sweepAngle: 43,
+        },
+        {
+          id: `corner-sw-${Date.now()}`,
+          name: "SW Corner Stand",
+          color: colors[7],
+          shape: "arc" as const,
+          startAngle: 113,
+          sweepAngle: 43,
+        },
+      ];
+
+      standDefs.forEach((s) => {
+        newBlocks.push({
+          ...s,
+          capacity: blueprintTiers === 2 ? 400 : 250,
+          stand_type: "seated",
+          tiers: blueprintTiers === 2 ? [
+            {
+              id: `t1-${s.id}`,
+              name: "Lower Tier",
+              color: s.color,
+              ticket_type_id: ticketTypes[0]?.id || "",
+              row_start: "A",
+              row_end: "J",
+              seats_per_row: 20,
+            },
+            {
+              id: `t2-${s.id}`,
+              name: "Upper Tier",
+              color: "#38bdf8",
+              ticket_type_id: ticketTypes[1]?.id || ticketTypes[0]?.id || "",
+              row_start: "K",
+              row_end: "T",
+              seats_per_row: 20,
+            },
+          ] : [
+            {
+              id: `t1-${s.id}`,
+              name: "Main Tier",
+              color: s.color,
+              ticket_type_id: ticketTypes[0]?.id || "",
+              row_start: "A",
+              row_end: "N",
+              seats_per_row: 25,
+            },
+          ],
+        });
+      });
+
+      cornerDefs.forEach((c) => {
+        newBlocks.push({
+          ...c,
+          x: px,
+          y: py,
+          stadiumCenterX: px,
+          stadiumCenterY: py,
+          innerRadius: cornerInnerR,
+          outerRadius: cornerOuterR,
+          width: cornerOuterR * 2,
+          height: cornerOuterR * 2,
+          rotation: 0,
+          capacity: blueprintTiers === 2 ? 300 : 180,
+          stand_type: "seated",
+          tiers: blueprintTiers === 2 ? [
+            {
+              id: `t1-${c.id}`,
+              name: "Lower Tier",
+              color: c.color,
+              ticket_type_id: ticketTypes[0]?.id || "",
+              row_start: "A",
+              row_end: "H",
+              seats_per_row: 18,
+            },
+            {
+              id: `t2-${c.id}`,
+              name: "Upper Tier",
+              color: "#c084fc",
+              ticket_type_id: ticketTypes[1]?.id || ticketTypes[0]?.id || "",
+              row_start: "J",
+              row_end: "R",
+              seats_per_row: 18,
+            },
+          ] : [
+            {
+              id: `t1-${c.id}`,
+              name: "Main Tier",
+              color: c.color,
+              ticket_type_id: ticketTypes[0]?.id || "",
+              row_start: "A",
+              row_end: "M",
+              seats_per_row: 18,
+            },
+          ],
+        });
+      });
+    } else {
+      const bowlInnerR = Math.max(160, Math.round(Math.min(pw, ph) * 0.75));
+      const bowlOuterR = bowlInnerR + Math.round(blueprintBowlRadius * 0.38);
+
+      const sectors = [
+        { name: "North Stand", deg: 248.5, color: colors[0] },
+        { name: "NE Corner", deg: 293.5, color: colors[1] },
+        { name: "East Stand", deg: 338.5, color: colors[2] },
+        { name: "SE Corner", deg: 23.5, color: colors[3] },
+        { name: "South Stand", deg: 68.5, color: colors[4] },
+        { name: "SW Corner", deg: 113.5, color: colors[5] },
+        { name: "West Stand", deg: 158.5, color: colors[6] },
+        { name: "NW Corner", deg: 203.5, color: colors[7] },
+      ];
+
+      sectors.forEach((sec, idx) => {
+        const secId = `sec-arc-${idx}-${Date.now()}`;
+        newBlocks.push({
+          id: secId,
+          name: sec.name,
+          color: sec.color,
+          shape: "arc",
+          x: px,
+          y: py,
+          stadiumCenterX: px,
+          stadiumCenterY: py,
+          innerRadius: bowlInnerR,
+          outerRadius: bowlOuterR,
+          startAngle: sec.deg,
+          sweepAngle: 43,
+          width: bowlOuterR * 2,
+          height: bowlOuterR * 2,
+          rotation: 0,
+          capacity: blueprintTiers === 2 ? 350 : 200,
+          stand_type: "seated",
+          tiers: blueprintTiers === 2 ? [
+            {
+              id: `t1-${secId}`,
+              name: "Lower Tier",
+              color: sec.color,
+              ticket_type_id: ticketTypes[0]?.id || "",
+              row_start: "A",
+              row_end: "J",
+              seats_per_row: 20,
+            },
+            {
+              id: `t2-${secId}`,
+              name: "Upper Tier",
+              color: "#38bdf8",
+              ticket_type_id: ticketTypes[1]?.id || ticketTypes[0]?.id || "",
+              row_start: "K",
+              row_end: "T",
+              seats_per_row: 20,
+            },
+          ] : [
+            {
+              id: `t1-${secId}`,
+              name: "Main Tier",
+              color: sec.color,
+              ticket_type_id: ticketTypes[0]?.id || "",
+              row_start: "A",
+              row_end: "M",
+              seats_per_row: 20,
+            },
+          ],
+        });
+      });
+    }
+
+    setBlocks(newBlocks);
+    setActiveTab("stands");
+    toast.success(`Successfully mapped ${newBlocks.length} symmetrical sections to your blueprint!`);
   };
 
   return (
@@ -1331,6 +1589,106 @@ export default function StadiumStudioV2({
                     </button>
                   </div>
                 )}
+                {/* Precision CAD Auto-Map Generator from Blueprint */}
+                <div className="p-3 bg-gradient-to-br from-amber-500/10 via-slate-950 to-amber-500/5 rounded-2xl border border-amber-400/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase font-extrabold text-amber-400 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" /> Auto-Map Accurate Layout
+                    </span>
+                    <span className="text-[9px] bg-amber-950 text-amber-300 px-2 py-0.5 rounded font-bold border border-amber-500/40">
+                      CAD PRECISION
+                    </span>
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 leading-snug">
+                    Even if your blueprint image is skewed or imperfect, this engine builds a 100% mathematically clean, symmetrical stadium map:
+                  </p>
+
+                  {/* Archetype Selector */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-300">Layout Format:</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBlueprintArchetype("football")}
+                        className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border text-center transition-all ${
+                          blueprintArchetype === "football"
+                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm"
+                            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                        }`}
+                      >
+                        ⚽ 4 Sides + 4 Corners
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBlueprintArchetype("circular")}
+                        className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border text-center transition-all ${
+                          blueprintArchetype === "circular"
+                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm"
+                            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                        }`}
+                      >
+                        ⭕ 360° Oval Bowl
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tier Selector */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-300">Tiers per Stand:</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBlueprintTiers(1)}
+                        className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border text-center transition-all ${
+                          blueprintTiers === 1
+                            ? "bg-amber-500 text-slate-950 border-amber-400"
+                            : "bg-slate-800 text-slate-300 border-slate-700"
+                        }`}
+                      >
+                        Single Tier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBlueprintTiers(2)}
+                        className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border text-center transition-all ${
+                          blueprintTiers === 2
+                            ? "bg-amber-500 text-slate-950 border-amber-400"
+                            : "bg-slate-800 text-slate-300 border-slate-700"
+                        }`}
+                      >
+                        Lower + Upper Tier
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bowl Radius Scale Slider */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-slate-400">Bowl Depth / Outer Wall:</span>
+                      <span className="font-bold text-amber-300">{blueprintBowlRadius}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={200}
+                      max={550}
+                      step={10}
+                      value={blueprintBowlRadius}
+                      onChange={(e) => setBlueprintBowlRadius(Number(e.target.value) || 350)}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                    />
+                  </div>
+
+                  {/* Generate Button */}
+                  <button
+                    type="button"
+                    onClick={handleGenerateFromBlueprint}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
+                  >
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>Generate Precision Stadium Layout</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

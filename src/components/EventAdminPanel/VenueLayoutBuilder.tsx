@@ -12,6 +12,7 @@ import { extractApiError } from "@/lib/apiErrors";
 import StadiumBlockBuilder, { StadiumSeatingConfigOutput } from "./StadiumBlockBuilder";
 import { StadiumStudioV2 } from "@/components/StadiumStudioV2";
 import { StadiumStudioV3 } from "@/components/StadiumStudioV3";
+import { StadiumStudioV4 } from "@/components/StadiumStudioV4";
 import {
   LayoutFormatSwitcher,
   LayoutStudioShell,
@@ -314,7 +315,7 @@ export default function VenueLayoutBuilder({
   const [moveEntireSection, setMoveEntireSection] = useState(false);
   const [sectionColors, setSectionColors] = useState<Record<string, string>>({});
   const [layoutMode, setLayoutMode] = useState<LayoutStudioFormat>("custom");
-  const [stadiumStudioVersion, setStadiumStudioVersion] = useState<"v3" | "v2" | "classic">("v3");
+  const [stadiumStudioVersion, setStadiumStudioVersion] = useState<"v4" | "v3" | "v2" | "classic">("v4");
 
   useEffect(() => {
     const rawMode =
@@ -3143,6 +3144,17 @@ export default function VenueLayoutBuilder({
               <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800">
                 <button
                   type="button"
+                  onClick={() => setStadiumStudioVersion("v4")}
+                  className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+                    stadiumStudioVersion === "v4"
+                      ? "bg-gradient-to-r from-purple-600 via-rose-600 to-amber-500 text-white shadow-sm ring-1 ring-white/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <span>🔥 Pro Studio V4 (Universal BMS)</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setStadiumStudioVersion("v3")}
                   className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] transition-all flex items-center gap-1.5 ${
                     stadiumStudioVersion === "v3"
@@ -3150,7 +3162,7 @@ export default function VenueLayoutBuilder({
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  <span>🎟️ Pro Studio V3 (BMS)</span>
+                  <span>🎟️ Pro Studio V3</span>
                 </button>
                 <button
                   type="button"
@@ -3177,7 +3189,9 @@ export default function VenueLayoutBuilder({
               </div>
             </div>
             <span className="text-[10px] text-slate-400 hidden sm:inline">
-              {stadiumStudioVersion === "v3"
+              {stadiumStudioVersion === "v4"
+                ? "Universal BookMyShow Architecture • Stadiums, Multiplex, Festivals, Banquets & Theatres"
+                : stadiumStudioVersion === "v3"
                 ? "BookMyShow Enterprise • Seat Matrix Painter • Turnstile Gates • Live Box-Office Potential"
                 : stadiumStudioVersion === "v2"
                 ? "CAD Precision Auto-Mapper • Polygon Stand Drawing • 4-Corner Auto-Pad"
@@ -3186,7 +3200,49 @@ export default function VenueLayoutBuilder({
           </div>
 
           <div className="flex-1 min-h-0 h-full overflow-hidden">
-            {stadiumStudioVersion === "v3" ? (
+            {stadiumStudioVersion === "v4" ? (
+              <StadiumStudioV4
+                eventId={eventId}
+                isVenueRequest={Boolean(venueAdapter)}
+                isEventOrgRequest={Boolean(!venueAdapter && eventId)}
+                ticketTypes={ticketTypes.map((tt: any) => ({
+                  id: tt.id,
+                  name: tt.name || tt.ticket_type || "Ticket",
+                  ticket_type: tt.name || tt.ticket_type || "Ticket",
+                  price: tt.price || 0,
+                  total_count: tt.total_count || 0,
+                }))}
+                initialConfig={
+                  (layoutData as any)?.data?.seating_config?.version === "v4" ||
+                  (layoutData as any)?.data?.seating_config?.layout_mode === "universal_bms" ||
+                  (layoutData as any)?.data?.seating_config?.layout_mode === "stadium"
+                    ? (layoutData as any).data.seating_config
+                    : (venueAdapter?.initialConfig as any)?.version === "v4" ||
+                      (venueAdapter?.initialConfig as any)?.layout_mode === "universal_bms" ||
+                      (venueAdapter?.initialConfig as any)?.layout_mode === "stadium"
+                    ? (venueAdapter?.initialConfig as any)
+                    : null
+                }
+                saving={isSaving}
+                onSave={async (v4Config, seatsJson) => {
+                  if (venueAdapter) {
+                    await venueAdapter.onSave({
+                      seating_config: v4Config as any,
+                      seats: seatsJson || [],
+                    });
+                    return;
+                  }
+                  if (eventId) {
+                    await saveLayout({
+                      eventId,
+                      seating_config: v4Config as any,
+                      seats: seatsJson || [],
+                    }).unwrap();
+                    refetch();
+                  }
+                }}
+              />
+            ) : stadiumStudioVersion === "v3" ? (
               <StadiumStudioV3
                 eventId={eventId}
                 isVenueRequest={Boolean(venueAdapter)}

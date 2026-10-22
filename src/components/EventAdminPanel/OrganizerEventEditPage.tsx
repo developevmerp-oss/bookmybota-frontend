@@ -27,8 +27,11 @@ export default function EditOrganizerEventPage({
   const [updateEvent, { isLoading: saving }] = useUpdateOrganizerEventMutation();
   const [submitEvent, { isLoading: submitting }] = useSubmitOrganizerEventMutation();
 
-  const editable = event?.status === "DRAFT" || event?.status === "PENDING_APPROVAL";
-  const mediaOnlyEdit = event?.status === "LIVE";
+  const editable =
+    event?.status === "DRAFT" ||
+    event?.status === "PENDING_APPROVAL" ||
+    event?.status === "LIVE";
+  const mediaOnlyEdit = false;
   const canSubmit = event?.status === "DRAFT";
   const canSellTickets = event?.status === "LIVE";
 

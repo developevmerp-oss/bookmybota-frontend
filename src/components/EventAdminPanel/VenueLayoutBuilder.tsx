@@ -10,6 +10,7 @@ import {
 import { useGetOrganizerEventQuery, useUpdateEventLayoutMutation, useGetEventLayoutQuery } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
 import StadiumBlockBuilder, { StadiumSeatingConfigOutput } from "./StadiumBlockBuilder";
+import { StadiumStudioV2 } from "@/components/StadiumStudioV2";
 import {
   LayoutFormatSwitcher,
   LayoutStudioShell,
@@ -312,6 +313,7 @@ export default function VenueLayoutBuilder({
   const [moveEntireSection, setMoveEntireSection] = useState(false);
   const [sectionColors, setSectionColors] = useState<Record<string, string>>({});
   const [layoutMode, setLayoutMode] = useState<LayoutStudioFormat>("custom");
+  const [stadiumStudioVersion, setStadiumStudioVersion] = useState<"v2" | "classic">("v2");
 
   useEffect(() => {
     const rawMode =
@@ -3132,46 +3134,126 @@ export default function VenueLayoutBuilder({
       />
 
       {layoutMode === "stadium" ? (
-        <div className="flex-1 min-h-0 h-full flex flex-col p-2 bg-slate-950 overflow-hidden">
-          <StadiumBlockBuilder
-            eventId={eventId}
-            isVenueRequest={Boolean(venueAdapter)}
-            isEventOrgRequest={Boolean(!venueAdapter && eventId)}
-            ticketTypes={ticketTypes.map((tt: any) => ({
-              id: tt.id,
-              name: tt.name || tt.ticket_type || "Ticket",
-              ticket_type: tt.name || tt.ticket_type || "Ticket",
-              price: tt.price || 0,
-              total_count: tt.total_count || 0,
-            }))}
-            initialConfig={
-              (layoutData as any)?.data?.seating_config?.layout_mode === "stadium" ||
-              Array.isArray((layoutData as any)?.data?.seating_config?.blocks)
-                ? (layoutData as any).data.seating_config
-                : (venueAdapter?.initialConfig as any)?.layout_mode === "stadium" ||
-                  Array.isArray((venueAdapter?.initialConfig as any)?.blocks)
-                ? (venueAdapter?.initialConfig as any)
-                : null
-            }
-            saving={isSaving}
-            onSave={async (stadiumConfig) => {
-              if (venueAdapter) {
-                await venueAdapter.onSave({
-                  seating_config: stadiumConfig as any,
-                  seats: [],
-                });
-                return;
-              }
-              if (eventId) {
-                await saveLayout({
-                  eventId,
-                  seating_config: stadiumConfig,
-                  seats: [],
-                }).unwrap();
-                refetch();
-              }
-            }}
-          />
+        <div className="flex-1 min-h-0 h-full flex flex-col bg-slate-950 overflow-hidden">
+          {/* Studio Version Switcher Banner */}
+          <div className="h-9 px-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs shrink-0 select-none">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Studio Engine:</span>
+              <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setStadiumStudioVersion("v2")}
+                  className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+                    stadiumStudioVersion === "v2"
+                      ? "bg-amber-500 text-slate-950 shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <span>✨ Pro Studio V2 (New)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStadiumStudioVersion("classic")}
+                  className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] transition-all flex items-center gap-1.5 ${
+                    stadiumStudioVersion === "classic"
+                      ? "bg-slate-700 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <span>🏛️ Classic Builder</span>
+                </button>
+              </div>
+            </div>
+            <span className="text-[10px] text-slate-400 hidden sm:inline">
+              {stadiumStudioVersion === "v2"
+                ? "Polygon Stand Drawing • 4-Corner Auto-Pad • Blueprint Alignment Layer"
+                : "Classic Stadium Blocks Editor"}
+            </span>
+          </div>
+
+          <div className="flex-1 min-h-0 h-full overflow-hidden">
+            {stadiumStudioVersion === "v2" ? (
+              <StadiumStudioV2
+                eventId={eventId}
+                isVenueRequest={Boolean(venueAdapter)}
+                isEventOrgRequest={Boolean(!venueAdapter && eventId)}
+                ticketTypes={ticketTypes.map((tt: any) => ({
+                  id: tt.id,
+                  name: tt.name || tt.ticket_type || "Ticket",
+                  ticket_type: tt.name || tt.ticket_type || "Ticket",
+                  price: tt.price || 0,
+                  total_count: tt.total_count || 0,
+                }))}
+                initialConfig={
+                  (layoutData as any)?.data?.seating_config?.layout_mode === "stadium" ||
+                  Array.isArray((layoutData as any)?.data?.seating_config?.blocks)
+                    ? (layoutData as any).data.seating_config
+                    : (venueAdapter?.initialConfig as any)?.layout_mode === "stadium" ||
+                      Array.isArray((venueAdapter?.initialConfig as any)?.blocks)
+                    ? (venueAdapter?.initialConfig as any)
+                    : null
+                }
+                saving={isSaving}
+                onSave={async (stadiumConfig, seatsJson) => {
+                  if (venueAdapter) {
+                    await venueAdapter.onSave({
+                      seating_config: stadiumConfig as any,
+                      seats: seatsJson || [],
+                    });
+                    return;
+                  }
+                  if (eventId) {
+                    await saveLayout({
+                      eventId,
+                      seating_config: stadiumConfig as any,
+                      seats: seatsJson || [],
+                    }).unwrap();
+                    refetch();
+                  }
+                }}
+              />
+            ) : (
+              <StadiumBlockBuilder
+                eventId={eventId}
+                isVenueRequest={Boolean(venueAdapter)}
+                isEventOrgRequest={Boolean(!venueAdapter && eventId)}
+                ticketTypes={ticketTypes.map((tt: any) => ({
+                  id: tt.id,
+                  name: tt.name || tt.ticket_type || "Ticket",
+                  ticket_type: tt.name || tt.ticket_type || "Ticket",
+                  price: tt.price || 0,
+                  total_count: tt.total_count || 0,
+                }))}
+                initialConfig={
+                  (layoutData as any)?.data?.seating_config?.layout_mode === "stadium" ||
+                  Array.isArray((layoutData as any)?.data?.seating_config?.blocks)
+                    ? (layoutData as any).data.seating_config
+                    : (venueAdapter?.initialConfig as any)?.layout_mode === "stadium" ||
+                      Array.isArray((venueAdapter?.initialConfig as any)?.blocks)
+                    ? (venueAdapter?.initialConfig as any)
+                    : null
+                }
+                saving={isSaving}
+                onSave={async (stadiumConfig) => {
+                  if (venueAdapter) {
+                    await venueAdapter.onSave({
+                      seating_config: stadiumConfig as any,
+                      seats: [],
+                    });
+                    return;
+                  }
+                  if (eventId) {
+                    await saveLayout({
+                      eventId,
+                      seating_config: stadiumConfig,
+                      seats: [],
+                    }).unwrap();
+                    refetch();
+                  }
+                }}
+              />
+            )}
+          </div>
         </div>
       ) : (
         <>

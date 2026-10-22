@@ -1442,6 +1442,79 @@ function BlockPanel({
                 </div>
               </div>
 
+              {/* Rotate Ring Arc Slider & Quick Rotate Buttons */}
+              <div className="space-y-1.5 pt-1 border-t border-sky-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-sky-900 flex items-center gap-1">
+                    🔄 Rotate Arc ({Math.round(block.startAngle ?? 0)}°)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      title="Rotate -15°"
+                      onClick={() =>
+                        onUpdate({
+                          ...block,
+                          startAngle: ((block.startAngle ?? 0) - 15 + 360) % 360,
+                        })
+                      }
+                      className="px-1.5 py-0.5 rounded bg-white hover:bg-sky-100 border border-slate-300 text-[10px] font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      ↺ -15°
+                    </button>
+                    <button
+                      type="button"
+                      title="Rotate +15°"
+                      onClick={() =>
+                        onUpdate({
+                          ...block,
+                          startAngle: ((block.startAngle ?? 0) + 15) % 360,
+                        })
+                      }
+                      className="px-1.5 py-0.5 rounded bg-white hover:bg-sky-100 border border-slate-300 text-[10px] font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      ↻ +15°
+                    </button>
+                    <button
+                      type="button"
+                      title="Rotate +45°"
+                      onClick={() =>
+                        onUpdate({
+                          ...block,
+                          startAngle: ((block.startAngle ?? 0) + 45) % 360,
+                        })
+                      }
+                      className="px-1.5 py-0.5 rounded bg-white hover:bg-sky-100 border border-slate-300 text-[10px] font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      ↻ +45°
+                    </button>
+                    <button
+                      type="button"
+                      title="Rotate +90°"
+                      onClick={() =>
+                        onUpdate({
+                          ...block,
+                          startAngle: ((block.startAngle ?? 0) + 90) % 360,
+                        })
+                      }
+                      className="px-1.5 py-0.5 rounded bg-white hover:bg-sky-100 border border-slate-300 text-[10px] font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      ↻ +90°
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={360}
+                  value={Math.round(block.startAngle ?? 0)}
+                  onChange={(e) =>
+                    onUpdate({ ...block, startAngle: Number(e.target.value) || 0 })
+                  }
+                  className="w-full h-1.5 bg-sky-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                />
+              </div>
+
               {/* Angle & Radius Inputs */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -3611,6 +3684,18 @@ export default function StadiumBlockBuilder({
                     <Group
                       key={block.id}
                       id={block.id}
+                      ref={isSelected ? (n) => { selectedRef.current = n; } : undefined}
+                      onTransformEnd={(e) => {
+                        const node = e.target;
+                        const rot = node.rotation();
+                        node.rotation(0);
+                        const currentStart = block.startAngle ?? 0;
+                        const newStart = Math.round((currentStart + rot + 3600) % 360);
+                        updateBlock({
+                          ...block,
+                          startAngle: newStart,
+                        });
+                      }}
                       onClick={() => {
                         setSelectedId(block.id);
                         setSelectedElementId(null);

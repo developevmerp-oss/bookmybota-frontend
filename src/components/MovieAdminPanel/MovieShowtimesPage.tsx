@@ -34,7 +34,13 @@ import {
   type MovieShowtime,
 } from "@/services/api";
 import { extractApiError } from "@/lib/apiErrors";
-import { formatDate, formatTime12h, venueDateStr } from "@/lib/dateFormat";
+import {
+  formatDate,
+  formatTime12h,
+  isVenueWallTimeReached,
+  venueDateStr,
+  venueTimeStr,
+} from "@/lib/dateFormat";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import ConfirmDialog from "@/components/Shared/ConfirmDialog";
 import {
@@ -101,6 +107,22 @@ function parseIsoDateAndHours(iso: string) {
 
 const SHOW_BUFFER_MINUTES = 20;
 const DEFAULT_DURATION_MINUTES = 120;
+
+/** Default start HH:mm — 14:00 when future day; next 15‑min slot when scheduling today. */
+function defaultStartTimeForDate(showDate: string): string {
+  const today = venueDateStr();
+  if (!showDate || !today || showDate > today) return "14:00";
+  const nowHm = venueTimeStr();
+  if (!nowHm) return "14:00";
+  const [hh, mm] = nowHm.split(":").map((n) => Number(n));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return "14:00";
+  // At least one minute ahead, then round up to the next 15-minute mark.
+  let totalMins = hh * 60 + mm + 1;
+  totalMins = Math.ceil(totalMins / 15) * 15;
+  if (totalMins >= 24 * 60) totalMins = 23 * 60 + 45;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(totalMins / 60))}:${pad(totalMins % 60)}`;
+}
 
 /** Wall-clock rank from naive showtime string (venue local digits). */
 function wallMs(iso?: string | null): number | null {
@@ -312,6 +334,7 @@ export default function MovieShowtimesPage() {
     resolver: yupResolver(movieShowtimeFormSchema) as any,
     defaultValues: emptyMovieShowtimeFormValues({ show_date: todayStr }),
     mode: "onSubmit",
+    context: { originalStartsAt: editingShowtime?.starts_at ?? null },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -377,11 +400,13 @@ export default function MovieShowtimesPage() {
       const initialScreen = screens[0];
       const initialTiers = buildScreenTierPricing(initialScreen);
       lastSyncedScreenIdRef.current = initialScreen?.id || "";
+      const createDate = selectedDate || todayStr;
       reset(
         emptyMovieShowtimeFormValues({
           movie_id: pMovieId,
           cinema_screen_id: initialScreen?.id || "",
-          show_date: selectedDate || todayStr,
+          show_date: createDate,
+          start_time: defaultStartTimeForDate(createDate),
           tier_pricing: initialTiers,
         })
       );
@@ -411,12 +436,13 @@ export default function MovieShowtimesPage() {
     const initialScreen = screens[0];
     const initialTiers = buildScreenTierPricing(initialScreen);
     lastSyncedScreenIdRef.current = initialScreen?.id || "";
+    const createDate = selectedDate || todayStr;
     reset(
       emptyMovieShowtimeFormValues({
         movie_id: catalogMovies[0]?.id || "",
         cinema_screen_id: initialScreen?.id || "",
-        show_date: selectedDate || todayStr,
-        start_time: "14:00",
+        show_date: createDate,
+        start_time: defaultStartTimeForDate(createDate),
         language: catalogMovies[0]?.languages?.[0] || "English",
         format: catalogMovies[0]?.formats?.[0] || "2D",
         tier_pricing: initialTiers,
@@ -463,6 +489,17 @@ export default function MovieShowtimesPage() {
     }
 
     const startsAt = `${values.show_date}T${values.start_time}:00`;
+    if (isVenueWallTimeReached(startsAt)) {
+      const orig = editingShowtime?.starts_at
+        ? String(editingShowtime.starts_at).match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/)
+        : null;
+      const unchanged =
+        !!orig && orig[1] === values.show_date && orig[2] === values.start_time;
+      if (!unchanged) {
+        toast.error("Cannot schedule a showtime in the past. Choose a future start time.");
+        return;
+      }
+    }
     const duration =
       catalogMovies.find((m) => m.id === values.movie_id)?.duration_minutes ||
       DEFAULT_DURATION_MINUTES;
@@ -993,7 +1030,22 @@ export default function MovieShowtimesPage() {
                   </label>
                   <input
                     type="date"
-                    {...register("show_date")}
+                    min={venueDateStr() || todayStr}
+                    {...register("show_date", {
+                      onChange: (e) => {
+                        const nextDate = String(e.target.value || "");
+                        const currentTime = getValues("start_time");
+                        if (
+                          nextDate &&
+                          currentTime &&
+                          isVenueWallTimeReached(`${nextDate}T${currentTime}:00`)
+                        ) {
+                          setValue("start_time", defaultStartTimeForDate(nextDate), {
+                            shouldValidate: true,
+                          });
+                        }
+                      },
+                    })}
                     className={modalInputClass}
                   />
                   {errors.show_date && <p className={fieldErrorClass}>{errors.show_date.message}</p>}
@@ -1005,6 +1057,11 @@ export default function MovieShowtimesPage() {
                   </label>
                   <input
                     type="time"
+                    min={
+                      formShowDate && formShowDate === (venueDateStr() || todayStr)
+                        ? venueTimeStr() || undefined
+                        : undefined
+                    }
                     {...register("start_time")}
                     className={modalInputClass}
                   />

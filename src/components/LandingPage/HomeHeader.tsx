@@ -505,12 +505,12 @@ export default function HomeHeader() {
                 "mx-auto flex flex-nowrap gap-2 sm:gap-3 px-3 sm:px-4 md:px-5 lg:block lg:px-0"
           }`}
         >
-          {/* Desktop sticky only — logo left */}
+          {/* Desktop sticky only — logo left (same size as main header logo) */}
           <Link
             href="/"
-            className={`shrink-0 items-center overflow-hidden ${
+            className={`shrink-0 items-center ${
               compactHeader
-                ? "hidden lg:flex max-w-[10.5rem] xl:max-w-[12rem] animate-bmb-sticky-chrome"
+                ? "hidden lg:flex animate-bmb-sticky-chrome"
                 : "hidden"
             }`}
             aria-hidden={!compactHeader}
@@ -519,7 +519,7 @@ export default function HomeHeader() {
             <img
               src={logoSrc}
               alt="Book My Bota"
-              className="h-10 xl:h-11 w-auto max-w-full object-contain"
+              className="hh-12 lg:h-14 w-auto object-contain"
             />
           </Link>
 

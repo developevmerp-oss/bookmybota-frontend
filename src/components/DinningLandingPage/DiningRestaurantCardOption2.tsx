@@ -192,9 +192,9 @@ export default function DiningRestaurantCardOption2({
   return (
     <Link
       href={restaurantHref(place)}
-      className={`group block w-full overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300 ${className}`}
+      className={`group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300 ${className}`}
     >
-      <div className="relative aspect-[5/4] w-full overflow-hidden bg-[#F3F4F6]">
+      <div className="relative aspect-[5/4] w-full shrink-0 overflow-hidden bg-[#F3F4F6]">
         <CoverMedia src={cover} alt={place.name} />
 
         {isPromoted ? (
@@ -216,61 +216,62 @@ export default function DiningRestaurantCardOption2({
         ) : null}
       </div>
 
-      <div className="px-3.5 sm:px-4 pt-3 sm:pt-3.5 pb-3.5 sm:pb-4 flex flex-col gap-2 sm:gap-2.5 min-w-0">
-        {/* Title + rating */}
-        <div className="flex items-start justify-between gap-3 min-w-0">
-          <h3 className="min-w-0 flex-1 text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug line-clamp-2">
-            {place.name}
-          </h3>
-          {hasRating && rating != null ? (
-            <div className="shrink-0 flex flex-col items-end pt-0.5 leading-none">
-              <span className="inline-flex items-center gap-1">
-                <Star
-                  size={14}
-                  className="fill-[#F5B301] text-[#F5B301] sm:size-[15px]"
-                  strokeWidth={0}
-                />
-                <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
-                  {rating.toFixed(1)}
+      <div className="px-3.5 sm:px-4 pt-3 sm:pt-3.5 pb-3.5 sm:pb-4 flex flex-1 flex-col gap-2 sm:gap-2.5 min-w-0">
+          {/* Title + cuisine — tighter gap only between these two */}
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center justify-between gap-4 sm:gap-5 min-w-0">
+            <h3
+              className="min-w-0 flex-1 truncate text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug"
+              title={place.name}
+            >
+              {place.name}
+            </h3>
+            {hasRating && rating != null ? (
+              <div className="shrink-0 flex flex-col items-end justify-center leading-none">
+                <span className="inline-flex items-center gap-1">
+                  <Star
+                    size={14}
+                    className="fill-[#F5B301] text-[#F5B301] sm:size-[15px]"
+                    strokeWidth={0}
+                  />
+                  <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
+                    {rating.toFixed(1)}
+                  </span>
                 </span>
+                {reviewsCount > 0 ? (
+                  <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
+                    ({formatReviewCount(reviewsCount)})
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] sm:text-[0.75rem] font-bold px-2 py-0.5 rounded">
+                New
               </span>
-              {reviewsCount > 0 ? (
-                <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
-                  ({formatReviewCount(reviewsCount)})
-                </span>
-              ) : null}
-            </div>
-          ) : (
-            <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] sm:text-[0.75rem] font-bold px-2 py-0.5 rounded">
-              New
-            </span>
-          )}
+            )}
+          </div>
+          <p className="truncate text-xs sm:text-sm text-slate-600 leading-snug">
+            {cuisine}
+          </p>
         </div>
 
-        {/* Cuisine */}
-        <p className="truncate text-xs sm:text-sm text-slate-500 font-medium leading-snug">
-          {cuisine}
-        </p>
-
-        {/* Distance + address — address vertically centered with icon when no distance */}
-        <div
-          className={`flex gap-2.5 min-w-0 ${distanceLabel ? "items-start" : "items-center"}`}
-        >
+        {/* Distance + address — reserved height keeps cards even with/without distance */}
+        <div className="flex min-h-[2.75rem] items-start gap-2.5 min-w-0">
           <MetaIcon>
             <MapPin size={14} strokeWidth={2.25} />
           </MetaIcon>
           <div className="min-w-0 flex-1 leading-snug">
             {distanceLabel ? (
               <>
-                <p className="text-sm sm:text-[0.95rem] font-semibold text-slate-500">
+                <p className="text-sm sm:text-sm  text-slate-600">
                   {distanceLabel}
                 </p>
-                <p className="truncate text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                <p className="truncate text-xs sm:text-sm text-slate-600  mt-0.5">
                   {addressLine}
                 </p>
               </>
             ) : (
-              <p className="truncate text-xs sm:text-sm text-slate-500 font-medium">
+              <p className="truncate text-xs sm:text-sm text-slate-600 pt-1.5">
                 {addressLine}
               </p>
             )}
@@ -282,7 +283,7 @@ export default function DiningRestaurantCardOption2({
           <MetaIcon>
             <Users size={14} strokeWidth={2.25} />
           </MetaIcon>
-          <p className="truncate text-xs sm:text-sm text-slate-600 font-medium leading-snug">
+          <p className="truncate text-xs sm:text-sm text-slate-600  leading-snug">
             {priceForTwo}
           </p>
         </div>
@@ -318,45 +319,50 @@ export function ShowcaseDiningRestaurantCard({
     compact: true,
   })} for 2`;
   const reviews = [86, 124, 156, 98][idHash % 4];
-  const shell = `group block w-full overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300 ${className}`;
+  const shell = `group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[#E8E8E8] bg-white shadow-[0_2px_10px_rgba(17,17,17,0.06)] hover:shadow-[0_10px_28px_rgba(17,17,17,0.1)] hover:-translate-y-0.5 transition-[box-shadow,transform] duration-300 ${className}`;
 
   const body = (
     <>
-      <div className="relative aspect-[5/4] w-full overflow-hidden bg-[#F3F4F6]">
+      <div className="relative aspect-[5/4] w-full shrink-0 overflow-hidden bg-[#F3F4F6]">
         <CoverMedia src={image} alt={name} />
       </div>
-      <div className="px-3.5 sm:px-4 pt-3 sm:pt-3.5 pb-3.5 sm:pb-4 flex flex-col gap-2 sm:gap-2.5 min-w-0">
-        <div className="flex items-start justify-between gap-3 min-w-0">
-          <h3 className="min-w-0 flex-1 text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug line-clamp-2">
-            {name}
-          </h3>
-          {hasRating ? (
-            <div className="shrink-0 flex flex-col items-end pt-0.5 leading-none">
-              <span className="inline-flex items-center gap-1">
-                <Star size={14} className="fill-[#F5B301] text-[#F5B301]" strokeWidth={0} />
-                <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
-                  {parsedRating.toFixed(1)}
+      <div className="px-3.5 sm:px-4 pt-3 sm:pt-3.5 pb-3.5 sm:pb-4 flex flex-1 flex-col gap-2 sm:gap-2.5 min-w-0">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center justify-between gap-4 sm:gap-5 min-w-0">
+            <h3
+              className="min-w-0 flex-1 truncate text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug"
+              title={name}
+            >
+              {name}
+            </h3>
+            {hasRating ? (
+              <div className="shrink-0 flex flex-col items-end justify-center leading-none">
+                <span className="inline-flex items-center gap-1">
+                  <Star size={14} className="fill-[#F5B301] text-[#F5B301]" strokeWidth={0} />
+                  <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
+                    {parsedRating.toFixed(1)}
+                  </span>
                 </span>
+                <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
+                  ({formatReviewCount(reviews)})
+                </span>
+              </div>
+            ) : (
+              <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] font-bold px-2 py-0.5 rounded">
+                New
               </span>
-              <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
-                ({formatReviewCount(reviews)})
-              </span>
-            </div>
-          ) : (
-            <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] font-bold px-2 py-0.5 rounded">
-              New
-            </span>
-          )}
+            )}
+          </div>
+          <p className="truncate text-xs sm:text-sm text-slate-500 font-medium leading-snug">
+            {cuisineLabel(cuisine)}
+          </p>
         </div>
-        <p className="truncate text-xs sm:text-sm text-slate-500 font-medium leading-snug">
-          {cuisineLabel(cuisine)}
-        </p>
-        <div className="flex items-start gap-2.5 min-w-0">
+        <div className="flex min-h-[2.75rem] items-start gap-2.5 min-w-0">
           <MetaIcon>
             <MapPin size={14} strokeWidth={2.25} />
           </MetaIcon>
           <div className="min-w-0 flex-1 leading-snug">
-            <p className="truncate text-xs sm:text-sm text-slate-500 font-medium">
+            <p className="truncate text-xs sm:text-sm text-slate-500 font-medium pt-1.5">
               {locality || "Addis Ababa"}
             </p>
           </div>

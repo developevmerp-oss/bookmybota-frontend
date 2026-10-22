@@ -130,6 +130,8 @@ export interface StadiumSeatingConfigOutputV4 {
   groundConfig: BMSStageGroundDefV4;
   sections: BMSSectionDefV4[];
   amenities: BMSAmenityPOIV4[];
+  blueprintUrl?: string | null;
+  blueprintOpacity?: number;
   metadata?: {
     totalCapacity: number;
     seatedCapacity: number;

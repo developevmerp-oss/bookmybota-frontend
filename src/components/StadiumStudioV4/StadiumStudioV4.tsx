@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Stage, Layer, Rect, Circle, Line, Text, Group, Arc, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Circle, Line, Text, Group, Arc, Transformer, Image as KonvaImage } from "react-konva";
+import useImage from "use-image";
 import Konva from "konva";
 import { toast } from "sonner";
 import {
@@ -21,6 +22,7 @@ import {
   GeneratedSeatV4,
 } from "./SeatingGeneratorEngineV4";
 import BMSArchetypeSelectorModal from "./BMSArchetypeSelectorModal";
+import BMSBlueprintAutoDetectorModal from "./BMSBlueprintAutoDetectorModal";
 import BMSV4Toolbar from "./BMSV4Toolbar";
 import BMSV4LiveInspector from "./BMSV4LiveInspector";
 import BMSV4MiniMap from "./BMSV4MiniMap";
@@ -81,6 +83,14 @@ export default function StadiumStudioV4({
   const [selectedAmenityId, setSelectedAmenityId] = useState<string | null>(null);
   const [isArchetypeModalOpen, setIsArchetypeModalOpen] = useState(false);
   const [painterSection, setPainterSection] = useState<BMSSectionDefV4 | null>(null);
+  const [isBlueprintDetectorOpen, setIsBlueprintDetectorOpen] = useState(false);
+  const [blueprintUrl, setBlueprintUrl] = useState<string | null>(
+    initialConfig?.blueprintUrl || null
+  );
+  const [blueprintOpacity, setBlueprintOpacity] = useState<number>(
+    initialConfig?.blueprintOpacity ?? 0.45
+  );
+  const [blueprintImg] = useImage(blueprintUrl || "", "anonymous");
 
   // ── 3. ZOOM & PAN STATE ──
   const [zoom, setZoom] = useState(0.85);
@@ -308,6 +318,8 @@ export default function StadiumStudioV4({
         groundConfig,
         sections,
         amenities,
+        blueprintUrl,
+        blueprintOpacity,
         metadata: {
           totalCapacity: capacitySummary.totalCapacity,
           seatedCapacity: capacitySummary.seatedCapacity,
@@ -389,6 +401,10 @@ export default function StadiumStudioV4({
         setToolMode={setToolMode}
         archetype={archetype}
         onOpenArchetypeModal={() => setIsArchetypeModalOpen(true)}
+        onOpenBlueprintDetector={() => setIsBlueprintDetectorOpen(true)}
+        hasBlueprint={Boolean(blueprintUrl)}
+        blueprintOpacity={blueprintOpacity}
+        setBlueprintOpacity={setBlueprintOpacity}
         onAddSection={handleAddSection}
         onAddAmenity={handleAddAmenity}
         zoom={zoom}
@@ -449,6 +465,19 @@ export default function StadiumStudioV4({
                 shadowBlur={30}
                 shadowColor="rgba(0,0,0,0.8)"
               />
+
+              {/* Background Blueprint Plan Image if loaded */}
+              {blueprintImg && (
+                <KonvaImage
+                  image={blueprintImg}
+                  x={0}
+                  y={0}
+                  width={CANVAS_W}
+                  height={CANVAS_H}
+                  opacity={blueprintOpacity}
+                  listening={false}
+                />
+              )}
 
               {/* 1. Ground / Pitch / Stage / Screen Center Focal */}
               <Group
@@ -973,6 +1002,23 @@ export default function StadiumStudioV4({
           }}
         />
       )}
+
+      {/* ── AI BLUEPRINT AUTO-DETECTOR MODAL ── */}
+      <BMSBlueprintAutoDetectorModal
+        open={isBlueprintDetectorOpen}
+        onClose={() => setIsBlueprintDetectorOpen(false)}
+        onApplyLayout={({ archetype: newArch, blueprintUrl: bUrl, groundConfig: newGround, sections: newSecs, amenities: newAmens }) => {
+          pushHistorySnapshot();
+          setArchetype(newArch);
+          setBlueprintUrl(bUrl);
+          setBlueprintOpacity(0.45);
+          setGroundConfig(newGround);
+          setSections(newSecs);
+          setAmenities(newAmens);
+          setSelectedSectionId(null);
+          setSelectedAmenityId(null);
+        }}
+      />
     </div>
   );
 }

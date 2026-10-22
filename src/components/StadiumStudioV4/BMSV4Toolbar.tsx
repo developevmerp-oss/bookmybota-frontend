@@ -28,6 +28,10 @@ interface BMSV4ToolbarProps {
   setToolMode: (mode: BMSToolModeV4) => void;
   archetype: BMSVenueArchetype;
   onOpenArchetypeModal: () => void;
+  onOpenBlueprintDetector: () => void;
+  hasBlueprint: boolean;
+  blueprintOpacity: number;
+  setBlueprintOpacity: (val: number) => void;
   onAddSection: (type: "seated_grid" | "curved_stand" | "general_admission" | "table_cluster") => void;
   onAddAmenity: (type: "gate" | "restroom" | "food_beverage" | "sound_booth" | "emergency_exit") => void;
   zoom: number;
@@ -47,6 +51,10 @@ export default function BMSV4Toolbar({
   setToolMode,
   archetype,
   onOpenArchetypeModal,
+  onOpenBlueprintDetector,
+  hasBlueprint,
+  blueprintOpacity,
+  setBlueprintOpacity,
   onAddSection,
   onAddAmenity,
   zoom,
@@ -66,6 +74,39 @@ export default function BMSV4Toolbar({
     <div className="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between text-white shrink-0 select-none">
       {/* Left: Archetype selector button & Mode controls */}
       <div className="flex items-center gap-3">
+        {/* AI Blueprint Auto-Detector Button */}
+        <button
+          type="button"
+          onClick={onOpenBlueprintDetector}
+          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-rose-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-purple-950/40 border border-purple-400/30 transition-all cursor-pointer group"
+          title="Upload venue blueprint image/PDF to auto-detect and draw stands"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
+          <span>✨ Auto-Draw Blueprint</span>
+        </button>
+
+        {/* Blueprint Opacity Slider if active */}
+        {hasBlueprint && (
+          <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800 text-[11px]">
+            <span className="text-slate-400">Blueprint:</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={blueprintOpacity}
+              onChange={(e) => setBlueprintOpacity(parseFloat(e.target.value))}
+              className="w-16 accent-rose-500 cursor-pointer"
+              title={`Blueprint opacity: ${Math.round(blueprintOpacity * 100)}%`}
+            />
+            <span className="font-mono text-slate-300 w-7 text-right">
+              {Math.round(blueprintOpacity * 100)}%
+            </span>
+          </div>
+        )}
+
+        <div className="h-6 w-px bg-slate-800" />
+
         <button
           type="button"
           onClick={onOpenArchetypeModal}

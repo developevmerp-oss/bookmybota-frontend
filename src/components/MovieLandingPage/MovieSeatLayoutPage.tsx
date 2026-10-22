@@ -33,7 +33,7 @@ import {
   Pencil,
   Accessibility,
 } from "lucide-react";
-import { FaMoon } from "react-icons/fa";
+import { FaMoon, FaUniversalAccess } from "react-icons/fa";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { useSelectedCity } from "@/lib/useSelectedCity";
@@ -79,21 +79,21 @@ import { CustomerFullscreenShimmer } from "@/components/Shared/Shimmer";
 import MovieSeatQtyModal from "@/components/MovieLandingPage/MovieSeatQtyModal";
 import images from "@/Images";
 
-/** Seat map palette — available dark border, sold ×, purple bestseller glow, purple selected */
+/** Seat map palette — Best Seats (blue glow), Available, Occupied (×), Selected (purple glow) */
 const SEAT_AVAILABLE =
-  "bg-white text-slate-800 border border-[#9CA3AF] hover:border-[#6900AA] cursor-pointer";
+  "bg-white text-slate-800 border border-[#4B5563] hover:border-[#6900AA] cursor-pointer";
 const SEAT_BESTSELLER =
-  "text-slate-800 border border-[#B794F4] cursor-pointer bg-[radial-gradient(circle_at_center,#FFFFFF_22%,#F3E8FF_72%,#E9D5FF_100%)] hover:border-[#6900AA]";
+  "text-slate-800 border border-[#5BA3D9] cursor-pointer bg-[radial-gradient(circle_at_center,#FFFFFF_18%,#C5E4F7_58%,#7EB8E8_100%)] shadow-[0_0_8px_2px_rgba(91,163,217,0.4)] hover:border-[#3B82F6]";
 const SEAT_SELECTED =
-  "text-white border border-[#6e52fa] bg-[#6e52fa] cursor-pointer shadow-[0_0_0_3px_rgba(110,82,250,0.22),0_0_10px_2px_rgba(110,82,250,0.35)]";
+  "text-white border border-[#7B61FF] bg-[#7B61FF] cursor-pointer shadow-[0_0_0_3px_rgba(123,97,255,0.22),0_0_12px_3px_rgba(123,97,255,0.4)]";
 const SEAT_BOOKED =
   "bg-white text-slate-300 border border-[#E0E0E0] cursor-not-allowed";
 const SEAT_SELECTED_MINI =
-  "border border-[#6e52fa] bg-[#6e52fa]";
+  "border border-[#7B61FF] bg-[#7B61FF]";
 const SEAT_SELECTED_SWATCH =
-  "border border-[#6e52fa] bg-[#6e52fa] shadow-[0_0_0_2px_rgba(110,82,250,0.2)]";
+  "border border-[#7B61FF] bg-[#7B61FF] shadow-[0_0_0_2px_rgba(123,97,255,0.22),0_0_8px_2px_rgba(123,97,255,0.35)]";
 const SEAT_BESTSELLER_SWATCH =
-  "bg-[radial-gradient(circle_at_center,#FFFFFF_22%,#F3E8FF_72%,#E9D5FF_100%)] border border-[#B794F4]";
+  "bg-[radial-gradient(circle_at_center,#FFFFFF_18%,#C5E4F7_58%,#7EB8E8_100%)] border border-[#5BA3D9] shadow-[0_0_6px_1px_rgba(91,163,217,0.4)]";
 
 function availableSeatClass(isBestseller?: boolean, withHoverScale = false) {
   const base = isBestseller ? SEAT_BESTSELLER : SEAT_AVAILABLE;
@@ -1574,6 +1574,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     }, 1600);
   }, []);
 
+  /** Full-hall fit (width + height) — used as zoom-out floor. */
   const getClassicFitZoom = useCallback(() => {
     const viewport = classicViewportRef.current;
     const content = classicContentRef.current;
@@ -1585,6 +1586,20 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     const zh = (viewport.clientHeight - pad * 2) / baseH;
     return Math.min(1, Math.max(0.4, Math.min(zw, zh)));
   }, [classicContentSize.h, classicContentSize.w]);
+
+  /**
+   * Preferred open zoom: fill available width (wider / larger seats like reference),
+   * allow vertical scroll when the hall is tall — do not shrink to fit height.
+   */
+  const getClassicPreferredZoom = useCallback(() => {
+    const viewport = classicViewportRef.current;
+    const content = classicContentRef.current;
+    if (!viewport || !content) return 1.45;
+    const pad = 12;
+    const baseW = Math.max(content.offsetWidth, classicContentSize.w, 1);
+    const zw = (viewport.clientWidth - pad * 2) / baseW;
+    return Math.min(1.55, Math.max(1.15, zw));
+  }, [classicContentSize.w]);
 
   /** Desktop: allow full-hall fit. Mobile/tablet: keep previous section zoom. */
   const getClassicMinZoom = useCallback(() => {
@@ -1637,11 +1652,12 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     setStickyRowLabels(next);
   }, [viewMode]);
 
+  /** Horizontally center; always open at the top (screen / first rows). */
   const centerClassicScroll = useCallback(() => {
     const el = classicViewportRef.current;
     if (!el) return;
     el.scrollLeft = Math.max(0, (el.scrollWidth - el.clientWidth) / 2);
-    el.scrollTop = Math.max(0, (el.scrollHeight - el.clientHeight) / 2);
+    el.scrollTop = 0;
     updateClassicViewport();
     requestAnimationFrame(() => syncStickyRowLabels());
   }, [updateClassicViewport, syncStickyRowLabels]);
@@ -1704,9 +1720,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     if (lastClassicFitKeyRef.current === fitKey) return;
     lastClassicFitKeyRef.current = fitKey;
 
-    const isDesktop =
-      typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
-    const initialZoom = isDesktop ? getClassicFitZoom() : 1.45;
+    const initialZoom = getClassicPreferredZoom();
     classicZoomRef.current = initialZoom;
     setClassicZoom(initialZoom);
     const id = requestAnimationFrame(() => {
@@ -1721,7 +1735,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     classicSeatTrackPx,
     classicContentSize.w,
     classicContentSize.h,
-    getClassicFitZoom,
+    getClassicPreferredZoom,
     centerClassicScroll,
     updateClassicViewport,
     syncStickyRowLabels,
@@ -2045,10 +2059,10 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               onPointerMove={handleClassicPointerMove}
               onPointerUp={handleClassicPointerUp}
               onPointerCancel={handleClassicPointerUp}
-              className="absolute inset-0 overflow-auto overscroll-contain bg-white select-none [-webkit-overflow-scrolling:touch] touch-pan-x touch-pan-y scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="absolute inset-0 overflow-auto overscroll-contain bg-white select-none [-webkit-overflow-scrolling:touch] touch-pan-x touch-pan-y scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              {/* Centering shell: keeps the seat map in the middle when it fits */}
-              <div className="min-h-full min-w-full w-max flex items-center justify-center">
+              {/* Shell: top-aligned so the screen starts in view; horizontally centered */}
+              <div className="min-h-full min-w-full w-max flex items-start justify-center">
               <div
                 style={{
                   width: Math.max((classicContentSize.w || classicSeatTrackPx + 40) * classicZoom, 1),
@@ -2058,7 +2072,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               >
                 <div
                   ref={classicContentRef}
-                  className={`absolute top-0 left-0 px-4 sm:px-8 pt-4 sm:pt-5 w-max space-y-5 sm:space-y-5 lg:space-y-6 ${
+                  className={`absolute top-0 left-0 px-2 sm:px-4 pt-4 sm:pt-5 w-max space-y-5 sm:space-y-5 lg:space-y-6 ${
                     selectedSeats.length > 0
                       ? "pb-24 sm:pb-20 lg:pb-10"
                       : "pb-20 sm:pb-16 lg:pb-8"
@@ -2313,8 +2327,8 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                                           : isSelected
                                             ? SEAT_SELECTED_MINI
                                             : seat.isBestseller
-                                              ? "border border-[#B794F4] bg-[#F3E8FF]"
-                                              : "bg-white border border-[#9CA3AF]"
+                                              ? "border border-[#5BA3D9] bg-[#C5E4F7]"
+                                              : "bg-white border border-[#4B5563]"
                                       }`}
                                     >
                                       {seat.isBooked && (
@@ -2388,33 +2402,35 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
             {/* Legend hides when Proceed bar is visible (seat selected) */}
             {selectedSeats.length === 0 ? (
-              <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-7 border-t border-slate-100 bg-white py-2.5 px-4 text-xs text-slate-600 shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="size-3.5 rounded-md bg-white border border-[#9CA3AF]" />
-                  <span>Available</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative size-3.5 rounded-md bg-white border border-[#E0E0E0] flex items-center justify-center">
-                    <span className="text-[10px] leading-none text-[#C4C4C4]" aria-hidden>
-                      ×
-                    </span>
-                  </div>
-                  <span>Sold</span>
-                </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 lg:gap-7 border-t border-slate-100 bg-white py-1 px-3 sm:py-1.5 lg:py-2.5 lg:px-4 text-[11px] lg:text-xs text-slate-800 shrink-0">
                 {hasBestsellerSeats ? (
-                  <div className="flex items-center gap-1.5">
-                    <div className={`size-3.5 rounded-md ${SEAT_BESTSELLER_SWATCH}`} />
-                    <span>Bestseller</span>
-                    <span
-                      className="inline-flex text-slate-400"
-                      title="Popular seats in this cinema — same price, no extra cost"
-                    >
-                      <Info className="size-3" aria-hidden />
+                  <div className="flex items-center gap-1 sm:gap-1.5">
+                    <div className={`size-3 lg:size-3.5 rounded-md ${SEAT_BESTSELLER_SWATCH}`} />
+                    <span className="inline-flex items-center gap-0.5 lg:gap-1">
+                      Best Seats
+                      <span
+                        className="inline-flex text-slate-400"
+                        title="Popular seats in this cinema — same price, no extra cost"
+                      >
+                        <Info className="size-2.5 lg:size-3" aria-hidden />
+                      </span>
                     </span>
                   </div>
                 ) : null}
-                <div className="flex items-center gap-2">
-                  <div className={`size-3.5 rounded-md ${SEAT_SELECTED_SWATCH}`} />
+                <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2">
+                  <div className="size-3 lg:size-3.5 rounded-md bg-white border border-[#4B5563]" />
+                  <span>Available</span>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2">
+                  <div className="relative size-3 lg:size-3.5 rounded-md bg-white border border-[#E0E0E0] flex items-center justify-center">
+                    <span className="text-[9px] lg:text-[10px] leading-none text-[#C4C4C4]" aria-hidden>
+                      ×
+                    </span>
+                  </div>
+                  <span>Occupied</span>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2">
+                  <div className={`size-3 lg:size-3.5 rounded-md ${SEAT_SELECTED_SWATCH}`} />
                   <span>Selected</span>
                 </div>
               </div>
@@ -2424,39 +2440,41 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
       ) : (
         <>
           {selectedSeats.length === 0 ? (
-            <div className="flex flex-wrap items-center justify-center gap-5 py-2 px-4 text-xs shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="size-4 rounded-md bg-white border border-[#9CA3AF]" />
-                <span className="text-slate-600">Available</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="relative size-4 rounded-md bg-white border border-[#E0E0E0] flex items-center justify-center">
-                  <span className="text-[11px] leading-none text-[#C4C4C4]" aria-hidden>
-                    ×
-                  </span>
-                </div>
-                <span className="text-slate-500">Sold / Held</span>
-              </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 lg:gap-5 py-1 px-3 sm:py-1.5 lg:py-2 lg:px-4 text-[11px] lg:text-xs text-slate-800 shrink-0">
               {hasBestsellerSeats ? (
-                <div className="flex items-center gap-1.5">
-                  <div className={`size-4 rounded-md ${SEAT_BESTSELLER_SWATCH}`} />
-                  <span className="text-slate-600">Bestseller</span>
-                  <span
-                    className="inline-flex text-slate-400"
-                    title="Popular seats in this cinema — same price, no extra cost"
-                  >
-                    <Info className="size-3.5" aria-hidden />
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  <div className={`size-3 lg:size-4 rounded-md ${SEAT_BESTSELLER_SWATCH}`} />
+                  <span className="inline-flex items-center gap-0.5 lg:gap-1">
+                    Best Seats
+                    <span
+                      className="inline-flex text-slate-400"
+                      title="Popular seats in this cinema — same price, no extra cost"
+                    >
+                      <Info className="size-2.5 lg:size-3.5" aria-hidden />
+                    </span>
                   </span>
                 </div>
               ) : null}
-              <div className="flex items-center gap-2">
-                <div className={`size-4 rounded-md ${SEAT_SELECTED_SWATCH}`} />
-                <span className="text-slate-900 font-bold">Selected</span>
+              <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2">
+                <div className="size-3 lg:size-4 rounded-md bg-white border border-[#4B5563]" />
+                <span>Available</span>
+              </div>
+              <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2">
+                <div className="relative size-3 lg:size-4 rounded-md bg-white border border-[#E0E0E0] flex items-center justify-center">
+                  <span className="text-[9px] lg:text-[11px] leading-none text-[#C4C4C4]" aria-hidden>
+                    ×
+                  </span>
+                </div>
+                <span>Occupied</span>
+              </div>
+              <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2">
+                <div className={`size-3 lg:size-4 rounded-md ${SEAT_SELECTED_SWATCH}`} />
+                <span className="font-medium">Selected</span>
               </div>
             </div>
           ) : null}
 
-          <div className="bg-white p-4 sm:p-6 overflow-x-auto space-y-6 lg:flex-1 lg:min-h-0 lg:overflow-auto">
+          <div className="bg-white p-4 sm:p-6 overflow-x-auto space-y-6 lg:flex-1 lg:min-h-0 lg:overflow-auto scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {screenPosition === "top" && (
               <div className="pb-8 pt-2 text-center space-y-3">
                 <p className="text-xs uppercase tracking-widest font-extrabold text-slate-500 flex items-center justify-center gap-2">
@@ -2582,9 +2600,9 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
   return (
     <div className={`h-[100dvh] min-h-screen text-slate-900 flex flex-col overflow-hidden ${step === "seats" ? "bg-white" : "bg-[#F5F5F7]"}`}>
-      <header className="shrink-0 z-30 border-b border-slate-200 bg-white py-2.5 sm:py-3">
-        <div className="bmb-section-container relative flex items-center justify-between gap-3 min-h-[3.25rem]">
-          {/* Left end — back + logo */}
+      <header className="shrink-0 z-30 border-b border-slate-200 bg-white">
+        <div className="bmb-section-container relative flex items-center justify-between gap-2 sm:gap-3 min-h-[3.25rem] lg:min-h-[3.75rem] py-2.5">
+          {/* Left — back (mobile/tablet only) + logo (desktop only, like main navbar) */}
           <div className="relative z-10 flex shrink-0 items-center gap-1 sm:gap-1.5">
             <button
               type="button"
@@ -2604,7 +2622,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                 }
                 router.push("/movies");
               }}
-              className="shrink-0 flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer"
+              className="lg:hidden shrink-0 flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer -ml-1"
               title={
                 step === "review"
                   ? "Back to snacks"
@@ -2616,18 +2634,22 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
             >
               <ChevronLeft className="size-5" />
             </button>
-            <Link href="/" className="shrink-0 flex items-center" title="Book My Bota">
+            <Link
+              href="/"
+              className="hidden lg:flex shrink-0 items-center"
+              title="Book My Bota"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logoSrc}
                 alt="Book My Bota"
-                className="h-8 sm:h-9 lg:h-10 w-auto object-contain"
+                className="h-12 lg:h-14 w-auto object-contain"
               />
             </Link>
           </div>
 
-          {/* Center — movie title + theater / date / time / screen */}
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-[1] hidden w-[min(56%,40rem)] -translate-x-1/2 -translate-y-1/2 text-center md:block">
+          {/* Desktop center — movie title + theater / date / time / screen */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-[1] hidden w-[min(52%,42rem)] xl:w-[min(50%,46rem)] -translate-x-1/2 -translate-y-1/2 text-center lg:block">
             <h1 className="truncate text-sm font-bold leading-tight text-slate-900 sm:text-[15px] md:text-base">
               {headerTitle}
             </h1>
@@ -2636,19 +2658,19 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
               {screen?.name ? ` | ${screen.name}` : ""}
             </p>
           </div>
-          {/* Mobile / tablet title between logo and actions */}
-          <div className="min-w-0 flex-1 px-1 text-center md:hidden">
-            <h1 className="truncate text-sm font-bold leading-tight text-slate-900">
+
+          {/* Mobile / tablet — back + title + theater (left-aligned, like reference) */}
+          <div className="min-w-0 flex-1 lg:hidden">
+            <h1 className="truncate text-[15px] sm:text-base font-bold leading-tight text-slate-900">
               {headerTitle}
             </h1>
-            <p className="mt-0.5 truncate text-[11px] text-slate-500">
-              {headerMeta}
-              {screen?.name ? ` | ${screen.name}` : ""}
+            <p className="mt-0.5 truncate text-[12px] text-slate-500">
+              {[cinema?.name, screen?.name].filter(Boolean).join(" | ")}
             </p>
           </div>
 
-          {/* Right end — accessibility, tickets, profile */}
-          <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {/* Right end — desktop only (hidden on mobile / tablet) */}
+          <div className="relative z-10 ml-auto hidden lg:flex shrink-0 items-center gap-1.5 sm:gap-2">
             {step === "seats" ? (
               <>
                 <button
@@ -2658,7 +2680,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                   title="Accessibility seat selection"
                   aria-label="Accessibility seat selection"
                 >
-                  <Accessibility className="size-4" />
+                  <FaUniversalAccess className="size-[18px]" aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -2724,7 +2746,7 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
 
       <main className={`flex-1 min-h-0 ${step === "seats" ? "overflow-hidden lg:overflow-hidden" : "overflow-y-auto"}`}>
         {step === "seats" ? (
-          <div className="bmb-section-container w-full h-full py-4 sm:py-5 lg:py-3 pb-4 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden">
+          <div className="mx-auto w-full max-w-[1600px] px-2 sm:px-3 lg:px-4 xl:px-5 h-full py-3 sm:py-4 lg:py-2 pb-3 flex flex-col min-h-0 overflow-y-auto lg:overflow-hidden scrollbar-hide [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {seatMapSection}
           </div>
         ) : step === "beverages" ? (

@@ -1293,14 +1293,15 @@ export default function StadiumStudioV3({
                   return newBox;
                 }}
               />
-            </Layer>
 
-            {/* 4. POLYGON DRAWING TOOL IN PROGRESS */}
-            <PolygonDrawingTool
-              points={drawingPoints}
-              cursorPos={cursorPos}
-              onClosePolygon={finishPolygonStand}
-            />
+              {/* 4. POLYGON DRAWING TOOL IN PROGRESS */}
+              <PolygonDrawingTool
+                isDrawing={toolMode === "draw_polygon"}
+                points={drawingPoints}
+                cursorPos={cursorPos}
+                onClosePolygon={finishPolygonStand}
+              />
+            </Layer>
           </Stage>
 
           {/* BOTTOM-LEFT RADAR MINI-MAP */}
@@ -1530,11 +1531,14 @@ export default function StadiumStudioV3({
                     {/* 4-Corner Alignment Pad for fine nudging */}
                     <CornerAlignPad
                       block={selectedBlock as any}
-                      groundConfig={groundConfig}
-                      onUpdateBlock={(updated) => {
+                      pitchX={groundConfig.x ?? CANVAS_W / 2}
+                      pitchY={groundConfig.y ?? CANVAS_H / 2}
+                      pitchW={groundConfig.width ?? 440}
+                      pitchH={groundConfig.height ?? 290}
+                      onUpdate={(up: any) => {
                         pushHistorySnapshot();
-                        setBlocks((p) =>
-                          p.map((b) => (b.id === selectedBlock.id ? { ...b, ...updated } : b))
+                        setBlocks((prev) =>
+                          prev.map((b) => (b.id === up.id ? ({ ...b, ...up } as any) : b))
                         );
                       }}
                     />

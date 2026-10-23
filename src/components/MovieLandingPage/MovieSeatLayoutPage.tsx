@@ -1149,10 +1149,22 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
     [selectedSeats]
   );
 
+  const convFeePct = Number(layoutData?.pricing_policy?.convenience_fee_percent ?? 0);
+  const convVatPct = Number(layoutData?.pricing_policy?.convenience_fee_vat_percent ?? 15);
+
+  const convenienceFeeBase = useMemo(() => {
+    if (selectedSeats.length === 0 || convFeePct <= 0) return 0;
+    return money((ticketSubtotal * convFeePct) / 100);
+  }, [selectedSeats.length, ticketSubtotal, convFeePct]);
+
+  const convenienceFeeTax = useMemo(() => {
+    if (convenienceFeeBase <= 0 || convVatPct <= 0) return 0;
+    return money((convenienceFeeBase * convVatPct) / 100);
+  }, [convenienceFeeBase, convVatPct]);
+
   const convenienceFee = useMemo(() => {
-    if (selectedSeats.length === 0) return 0;
-    return money(Math.max(10, ticketSubtotal * 0.03));
-  }, [selectedSeats.length, ticketSubtotal]);
+    return money(convenienceFeeBase + convenienceFeeTax);
+  }, [convenienceFeeBase, convenienceFeeTax]);
 
   const beverageSubtotal = useMemo(
     () => money(Object.values(selectedBeverages).reduce((sum, b) => sum + b.price * b.quantity, 0)),
@@ -2914,7 +2926,14 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       </div>
                     )}
                     <div className="flex justify-between text-slate-500">
-                      <span>Convenience fee</span>
+                      <div>
+                        <span>Convenience fee{convFeePct > 0 ? ` (${convFeePct}%)` : ""}</span>
+                        {convenienceFeeTax > 0 && (
+                          <p className="text-[10px] text-slate-400">
+                            Base: {formatMoney(convenienceFeeBase)} + {convVatPct}% VAT ({formatMoney(convenienceFeeTax)})
+                          </p>
+                        )}
+                      </div>
                       <span className="text-slate-900 font-semibold">+{formatMoney(convenienceFee)}</span>
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm font-extrabold">
@@ -3184,7 +3203,14 @@ export default function MovieSeatLayoutPage({ showtimeId }: MovieSeatLayoutPageP
                       </div>
                     )}
                     <div className="flex justify-between text-slate-500">
-                      <span>Convenience fee</span>
+                      <div>
+                        <span>Convenience fee{convFeePct > 0 ? ` (${convFeePct}%)` : ""}</span>
+                        {convenienceFeeTax > 0 && (
+                          <p className="text-[10px] text-slate-400">
+                            Base: {formatMoney(convenienceFeeBase)} + {convVatPct}% VAT ({formatMoney(convenienceFeeTax)})
+                          </p>
+                        )}
+                      </div>
                       <span className="text-slate-900 font-semibold">+{formatMoney(convenienceFee)}</span>
                     </div>
                     {discountAmount > 0 && (

@@ -747,7 +747,14 @@ export default function ConfirmationPageUI1({
                 </div>
 
                 <div className="flex items-center justify-between gap-3 py-4 text-[0.9375rem] text-[#111]">
-                  <span className="font-medium">Total Amount</span>
+                  <div>
+                    <span className="font-medium">Total Amount</span>
+                    {Number(booking.convenience_fee_total || 0) > 0 && (
+                      <p className="text-[11px] text-[#777] font-normal">
+                        Includes {formatMoney(Number(booking.convenience_fee_total))} convenience fee &amp; VAT
+                      </p>
+                    )}
+                  </div>
                   <span className="font-bold tabular-nums">
                     {formatMoney(Number(booking.grand_total) || 0)}
                   </span>

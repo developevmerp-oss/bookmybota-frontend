@@ -541,6 +541,12 @@ export interface PublicMovieShowtimesResponse {
 }
 
 export interface MovieShowtimeLayoutData {
+  pricing_policy?: {
+    convenience_fee_percent?: number;
+    convenience_fee_vat_percent?: number;
+    ticket_vat_percent?: number;
+    currency?: string;
+  };
   showtime: {
     id: string;
     starts_at: string;

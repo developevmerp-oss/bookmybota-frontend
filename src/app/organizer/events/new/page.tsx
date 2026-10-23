@@ -62,10 +62,9 @@ export default function NewOrganizerEventPage() {
       if (id) {
         await submitEvent({ id, body: payload }).unwrap();
       } else {
-        const created = await createEvent(payload).unwrap();
+        const created = await createEvent({ ...payload, submit_for_approval: true } as EventFormPayload).unwrap();
         id = created.id;
         setDraftId(id);
-        await submitEvent({ id, body: {} as EventFormPayload }).unwrap();
       }
       toast.success(
         payload.promotion_request

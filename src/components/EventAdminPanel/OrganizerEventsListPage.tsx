@@ -201,7 +201,7 @@ export default function OrganizerEventsPage() {
                           href={`/organizer/events/${event.id}`}
                           className="text-sm font-semibold text-primary hover:opacity-80"
                         >
-                          {event.status === "DRAFT" || event.status === "PENDING_APPROVAL"
+                          {event.status === "DRAFT" || event.status === "PENDING_APPROVAL" || event.status === "LIVE"
                             ? "Edit"
                             : "View"}
                         </Link>

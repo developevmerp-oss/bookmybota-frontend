@@ -4016,6 +4016,10 @@ export default function EventForm({
             This event is live. You can update <strong>posters</strong>, <strong>gallery</strong>, and{" "}
             <strong>YouTube</strong> only. Venue, tickets, artists, documents, and other fields stay locked.
           </div>
+        ) : event?.status === "LIVE" ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
+            This event is live. You can update posters, gallery images, media, and event details. Changes will apply immediately.
+          </div>
         ) : null}
         <section className="org-card p-6 space-y-5">
           <h3 className="portal-heading text-lg font-semibold">Posters</h3>
@@ -5212,7 +5216,7 @@ export default function EventForm({
                 ? "Saving..."
                 : mediaOnlyEdit
                   ? "Save media"
-                  : event?.status === "PENDING_APPROVAL"
+                  : event?.status === "PENDING_APPROVAL" || event?.status === "LIVE"
                     ? "Save changes"
                     : "Save draft"}
             </button>
@@ -5279,6 +5283,15 @@ export default function EventForm({
                 <span className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800">
                   Changes sent to Super Admin
                 </span>
+              ) : event?.status === "LIVE" ? (
+                <button
+                  type="button"
+                  disabled={saving || submitting}
+                  onClick={() => void runSaveDraft()}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
               ) : null}
             </div>
           </div>

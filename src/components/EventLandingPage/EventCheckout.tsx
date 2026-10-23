@@ -534,6 +534,7 @@ export default function EventCheckout({
   const recommendedId = timesForDate[0]?.id;
   const selectedShowtime = showtimes.find((s) => s.id === showtimeId);
   const conveniencePct = Number(event.convenience_fee_percent) || 0;
+  const convenienceVatPct = Number((event as any).convenience_fee_vat_percent ?? 15);
 
   const selectedLines = useMemo(() => {
     const lines = [];
@@ -595,7 +596,12 @@ export default function EventCheckout({
   const ticketAmount = moneySum(selectedLines.map((l) => l.unit * l.qty));
   const discountAmount = !isOrganizer && appliedPromo ? appliedPromo.discount_amount : 0;
   const netTicketAmount = moneySum([Math.max(0, ticketAmount - discountAmount)]);
-  const convenienceFee = moneySum([(ticketAmount * conveniencePct) / 100]);
+  const convenienceFeeBase = moneySum([(ticketAmount * conveniencePct) / 100]);
+  const convenienceFeeTax =
+    convenienceFeeBase > 0 && convenienceVatPct > 0
+      ? moneySum([(convenienceFeeBase * convenienceVatPct) / 100])
+      : 0;
+  const convenienceFee = moneySum([convenienceFeeBase, convenienceFeeTax]);
   const orderTotal = moneySum([netTicketAmount, convenienceFee]);
   const giftCardAmount =
     !isOrganizer && appliedGiftCard ? Number(appliedGiftCard.amount_applicable) || 0 : 0;
@@ -2293,7 +2299,14 @@ export default function EventCheckout({
                     <span className="font-semibold text-slate-900">{formatMoney(ticketAmount)}</span>
                   </div>
                   <div className="flex justify-between text-[0.9375rem] text-slate-600">
-                    <span>Convenience fees{conveniencePct ? ` (${conveniencePct}%)` : ""}</span>
+                    <div>
+                      <span>Convenience fees{conveniencePct ? ` (${conveniencePct}%)` : ""}</span>
+                      {convenienceFeeTax > 0 && (
+                        <p className="text-[10px] text-slate-400">
+                          Base: {formatMoney(convenienceFeeBase)} + {convenienceVatPct}% VAT ({formatMoney(convenienceFeeTax)})
+                        </p>
+                      )}
+                    </div>
                     <span className="font-semibold text-slate-900">{formatMoney(convenienceFee)}</span>
                   </div>
                   {discountAmount > 0 && (

@@ -3913,19 +3913,125 @@ export default function StadiumBlockBuilder({
 
   const handleOptimizeSpacingAntiOverlap = () => {
     setBlocks((prev) =>
-      prev.map((block) => ({
-        ...block,
-        tiers: block.tiers.map((t) => ({
-          ...t,
-          seats_per_row: Math.min(t.seats_per_row || 14, 14),
-          row_end:
-            (t.row_start || "A") === "A" && t.row_end && t.row_end > "E"
-              ? "D"
-              : t.row_end || "D",
-        })),
-      }))
+      prev.map((block) => {
+        if (block.id === "euro-north") {
+          return {
+            ...block,
+            x: 540,
+            y: 155,
+            width: 520,
+            height: 185,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 24, 24),
+            })),
+          };
+        }
+        if (block.id === "euro-south") {
+          return {
+            ...block,
+            x: 540,
+            y: 860,
+            width: 520,
+            height: 185,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 24, 24),
+            })),
+          };
+        }
+        if (block.id === "euro-west") {
+          return {
+            ...block,
+            x: 235,
+            y: 440,
+            width: 195,
+            height: 320,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 18, 18),
+            })),
+          };
+        }
+        if (block.id === "euro-east") {
+          return {
+            ...block,
+            x: 1170,
+            y: 440,
+            width: 195,
+            height: 320,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 18, 18),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-nw") {
+          return {
+            ...block,
+            startAngle: 205,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-ne") {
+          return {
+            ...block,
+            startAngle: 313,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-se") {
+          return {
+            ...block,
+            startAngle: 25,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        if (block.id === "euro-corner-sw") {
+          return {
+            ...block,
+            startAngle: 133,
+            sweepAngle: 22,
+            innerRadius: 440,
+            outerRadius: 575,
+            tiers: block.tiers.map((t) => ({
+              ...t,
+              seats_per_row: Math.min(t.seats_per_row || 10, 10),
+            })),
+          };
+        }
+        return {
+          ...block,
+          tiers: block.tiers.map((t) => ({
+            ...t,
+            seats_per_row: Math.min(t.seats_per_row || 14, 14),
+            row_end:
+              (t.row_start || "A") === "A" && t.row_end && t.row_end > "E"
+                ? "D"
+                : t.row_end || "D",
+          })),
+        };
+      })
     );
-    toast.success("🛡️ Stand capacities optimized! Seats now have clean breathing room with zero overlap.");
+    toast.success("🛡️ Stand capacities & spacing optimized! Zero overlap across all sections.");
   };
 
   return (
@@ -5721,10 +5827,10 @@ export default function StadiumBlockBuilder({
                           turf_color: "#15803d",
                           track_color: "#1e293b",
                           shape: "rectangle",
-                          x: 470,
-                          y: 390,
-                          width: 660,
-                          height: 420,
+                          x: 520,
+                          y: 425,
+                          width: 560,
+                          height: 350,
                           rotation: 0,
                         });
                         setPitchLabel("NATIONAL FOOTBALL ARENA");
@@ -5744,12 +5850,12 @@ export default function StadiumBlockBuilder({
                             color: "#0284c7",
                             stand_level: "multi",
                             shape: "rectangle",
-                            x: 470,
-                            y: 135,
-                            width: 660,
-                            height: 205,
+                            x: 540,
+                            y: 155,
+                            width: 520,
+                            height: 185,
                             rotation: 0,
-                            capacity: 4000,
+                            capacity: 3200,
                             tiers: [
                               {
                                 id: "tier-en-upper",
@@ -5758,7 +5864,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "I",
                                 row_end: "N",
-                                seats_per_row: 30,
+                                seats_per_row: 24,
                               },
                               {
                                 id: "tier-en-vip",
@@ -5767,7 +5873,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: vipTicket,
                                 row_start: "G",
                                 row_end: "H",
-                                seats_per_row: 22,
+                                seats_per_row: 18,
                               },
                               {
                                 id: "tier-en-lower",
@@ -5776,7 +5882,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "F",
-                                seats_per_row: 28,
+                                seats_per_row: 22,
                               },
                             ],
                           },
@@ -5788,12 +5894,12 @@ export default function StadiumBlockBuilder({
                             color: "#dc2626",
                             stand_level: "multi",
                             shape: "rectangle",
-                            x: 470,
+                            x: 540,
                             y: 860,
-                            width: 660,
-                            height: 205,
+                            width: 520,
+                            height: 185,
                             rotation: 0,
-                            capacity: 4000,
+                            capacity: 3200,
                             tiers: [
                               {
                                 id: "tier-es-lower",
@@ -5802,7 +5908,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "F",
-                                seats_per_row: 28,
+                                seats_per_row: 22,
                               },
                               {
                                 id: "tier-es-vip",
@@ -5811,7 +5917,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: vipTicket,
                                 row_start: "G",
                                 row_end: "H",
-                                seats_per_row: 22,
+                                seats_per_row: 18,
                               },
                               {
                                 id: "tier-es-upper",
@@ -5820,7 +5926,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "I",
                                 row_end: "N",
-                                seats_per_row: 30,
+                                seats_per_row: 24,
                               },
                             ],
                           },
@@ -5832,13 +5938,13 @@ export default function StadiumBlockBuilder({
                             color: "#ea580c",
                             stand_level: "multi",
                             shape: "rectangle",
-                            x: 205,
-                            y: 380,
-                            width: 215,
-                            height: 440,
+                            x: 235,
+                            y: 440,
+                            width: 195,
+                            height: 320,
                             rotation: 0,
                             tier_split_direction: "horizontal",
-                            capacity: 3200,
+                            capacity: 2600,
                             tiers: [
                               {
                                 id: "tier-ew-upper",
@@ -5847,7 +5953,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "I",
                                 row_end: "N",
-                                seats_per_row: 24,
+                                seats_per_row: 18,
                               },
                               {
                                 id: "tier-ew-vip",
@@ -5856,7 +5962,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: vipTicket,
                                 row_start: "G",
                                 row_end: "H",
-                                seats_per_row: 18,
+                                seats_per_row: 14,
                               },
                               {
                                 id: "tier-ew-lower",
@@ -5865,7 +5971,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "F",
-                                seats_per_row: 22,
+                                seats_per_row: 16,
                               },
                             ],
                           },
@@ -5877,13 +5983,13 @@ export default function StadiumBlockBuilder({
                             color: "#9333ea",
                             stand_level: "multi",
                             shape: "rectangle",
-                            x: 1180,
-                            y: 380,
-                            width: 215,
-                            height: 440,
+                            x: 1170,
+                            y: 440,
+                            width: 195,
+                            height: 320,
                             rotation: 0,
                             tier_split_direction: "horizontal",
-                            capacity: 3200,
+                            capacity: 2600,
                             tiers: [
                               {
                                 id: "tier-ee-lower",
@@ -5892,7 +5998,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "F",
-                                seats_per_row: 22,
+                                seats_per_row: 16,
                               },
                               {
                                 id: "tier-ee-vip",
@@ -5901,7 +6007,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: vipTicket,
                                 row_start: "G",
                                 row_end: "H",
-                                seats_per_row: 18,
+                                seats_per_row: 14,
                               },
                               {
                                 id: "tier-ee-upper",
@@ -5910,7 +6016,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "I",
                                 row_end: "N",
-                                seats_per_row: 24,
+                                seats_per_row: 18,
                               },
                             ],
                           },
@@ -5922,18 +6028,18 @@ export default function StadiumBlockBuilder({
                             color: "#0ea5e9",
                             stand_level: "multi",
                             shape: "arc",
-                            innerRadius: 460,
-                            outerRadius: 585,
-                            startAngle: 198,
-                            sweepAngle: 44,
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 205,
+                            sweepAngle: 22,
                             stadiumCenterX: cx,
                             stadiumCenterY: cy,
                             x: cx,
                             y: cy,
-                            width: 1170,
-                            height: 1170,
+                            width: 1150,
+                            height: 1150,
                             rotation: 0,
-                            capacity: 1200,
+                            capacity: 1000,
                             tiers: [
                               {
                                 id: "tier-cnw-lower",
@@ -5942,7 +6048,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "D",
-                                seats_per_row: 12,
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-cnw-upper",
@@ -5951,7 +6057,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "E",
                                 row_end: "H",
-                                seats_per_row: 14,
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -5963,18 +6069,18 @@ export default function StadiumBlockBuilder({
                             color: "#0ea5e9",
                             stand_level: "multi",
                             shape: "arc",
-                            innerRadius: 460,
-                            outerRadius: 585,
-                            startAngle: 298,
-                            sweepAngle: 44,
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 313,
+                            sweepAngle: 22,
                             stadiumCenterX: cx,
                             stadiumCenterY: cy,
                             x: cx,
                             y: cy,
-                            width: 1170,
-                            height: 1170,
+                            width: 1150,
+                            height: 1150,
                             rotation: 0,
-                            capacity: 1200,
+                            capacity: 1000,
                             tiers: [
                               {
                                 id: "tier-cne-lower",
@@ -5983,7 +6089,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "D",
-                                seats_per_row: 12,
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-cne-upper",
@@ -5992,7 +6098,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "E",
                                 row_end: "H",
-                                seats_per_row: 14,
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -6004,18 +6110,18 @@ export default function StadiumBlockBuilder({
                             color: "#ef4444",
                             stand_level: "multi",
                             shape: "arc",
-                            innerRadius: 460,
-                            outerRadius: 585,
-                            startAngle: 18,
-                            sweepAngle: 44,
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 25,
+                            sweepAngle: 22,
                             stadiumCenterX: cx,
                             stadiumCenterY: cy,
                             x: cx,
                             y: cy,
-                            width: 1170,
-                            height: 1170,
+                            width: 1150,
+                            height: 1150,
                             rotation: 0,
-                            capacity: 1200,
+                            capacity: 1000,
                             tiers: [
                               {
                                 id: "tier-cse-lower",
@@ -6024,7 +6130,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "D",
-                                seats_per_row: 12,
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-cse-upper",
@@ -6033,7 +6139,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "E",
                                 row_end: "H",
-                                seats_per_row: 14,
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -6045,18 +6151,18 @@ export default function StadiumBlockBuilder({
                             color: "#ef4444",
                             stand_level: "multi",
                             shape: "arc",
-                            innerRadius: 460,
-                            outerRadius: 585,
-                            startAngle: 118,
-                            sweepAngle: 44,
+                            innerRadius: 440,
+                            outerRadius: 575,
+                            startAngle: 133,
+                            sweepAngle: 22,
                             stadiumCenterX: cx,
                             stadiumCenterY: cy,
                             x: cx,
                             y: cy,
-                            width: 1170,
-                            height: 1170,
+                            width: 1150,
+                            height: 1150,
                             rotation: 0,
-                            capacity: 1200,
+                            capacity: 1000,
                             tiers: [
                               {
                                 id: "tier-csw-lower",
@@ -6065,7 +6171,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: defaultTicket,
                                 row_start: "A",
                                 row_end: "D",
-                                seats_per_row: 12,
+                                seats_per_row: 10,
                               },
                               {
                                 id: "tier-csw-upper",
@@ -6074,7 +6180,7 @@ export default function StadiumBlockBuilder({
                                 ticket_type_id: premiumTicket,
                                 row_start: "E",
                                 row_end: "H",
-                                seats_per_row: 14,
+                                seats_per_row: 12,
                               },
                             ],
                           },
@@ -6087,10 +6193,10 @@ export default function StadiumBlockBuilder({
                             type: "gate",
                             icon: "🚪",
                             color: "#15803d",
-                            x: 410,
-                            y: 320,
-                            width: 50,
-                            height: 50,
+                            x: 465,
+                            y: 365,
+                            width: 45,
+                            height: 45,
                             rotation: 0,
                           },
                           {
@@ -6099,10 +6205,10 @@ export default function StadiumBlockBuilder({
                             type: "gate",
                             icon: "🚪",
                             color: "#15803d",
-                            x: 1140,
-                            y: 320,
-                            width: 50,
-                            height: 50,
+                            x: 1090,
+                            y: 365,
+                            width: 45,
+                            height: 45,
                             rotation: 0,
                           },
                           {
@@ -6111,10 +6217,10 @@ export default function StadiumBlockBuilder({
                             type: "gate",
                             icon: "🚪",
                             color: "#15803d",
-                            x: 1140,
-                            y: 830,
-                            width: 50,
-                            height: 50,
+                            x: 1090,
+                            y: 790,
+                            width: 45,
+                            height: 45,
                             rotation: 0,
                           },
                           {
@@ -6123,10 +6229,10 @@ export default function StadiumBlockBuilder({
                             type: "gate",
                             icon: "🚪",
                             color: "#15803d",
-                            x: 410,
-                            y: 830,
-                            width: 50,
-                            height: 50,
+                            x: 465,
+                            y: 790,
+                            width: 45,
+                            height: 45,
                             rotation: 0,
                           },
                         ];
@@ -6134,7 +6240,7 @@ export default function StadiumBlockBuilder({
                         setBlocks(euroBlocks);
                         setElements(euroElements);
                         setSelectedId(euroBlocks[0].id);
-                        toast.success("Generated Modern Football Arena (4 Stands + 4 Corner Arcs)!");
+                        toast.success("Generated Modern Football Arena with zero overlap!");
                       }}
                       className="w-full p-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-sky-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md shadow-sky-700/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                     >

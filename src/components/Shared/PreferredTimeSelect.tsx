@@ -57,7 +57,7 @@ function ScrollColumn({
       ref={listRef}
       role="listbox"
       aria-label={ariaLabel}
-      className="h-[216px] min-w-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D8B4FE]"
+      className="h-[216px] min-w-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {options.map((opt) => {
         const selected = opt === value;

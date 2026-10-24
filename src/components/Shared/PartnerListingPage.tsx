@@ -1,16 +1,43 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Building2, Mic2, Search, X } from "lucide-react";
-import { useGetPublicRegisteredVenuesQuery } from "@/services/api";
-import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Search, X } from "lucide-react";
+import {
+  useGetPublicArtistDirectoryQuery,
+  useGetPublicVenuesPagedQuery,
+  type PublicRegisteredPartner,
+} from "@/services/api";
+import { PartnerCard } from "@/components/Shared/PartnerDirectorySection";
 import ListingNoResultsState from "@/components/Shared/ListingNoResultsState";
-import { preferCityOrAll } from "@/components/LandingPage/homeUtils";
-import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
-
-const BRAND = "#6900AA";
 
 type PartnerListingKind = "artist" | "venue";
+
+const PAGE_LIMIT = 20;
+const SEARCH_DEBOUNCE_MS = 350;
+const GRID_CLASS =
+  "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5";
+
+function useDebouncedValue(value: string, delay: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
+function CardShimmer({ count }: { count: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-[1.75rem] overflow-hidden bg-[#E5E7EB] animate-pulse min-h-[340px] sm:min-h-[380px]"
+        />
+      ))}
+    </>
+  );
+}
 
 export default function PartnerListingPage({ kind }: { kind: PartnerListingKind }) {
   const [q, setQ] = useState("");
@@ -31,50 +58,85 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
     };
   }, []);
 
-  const searchArg = useMemo(() => {
-    const trimmed = q.trim();
-    return trimmed ? { q: trimmed } : {};
-  }, [q]);
+  const searchTerm = useDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS);
+  const cityTerm = useDebouncedValue(city.trim(), SEARCH_DEBOUNCE_MS);
+  const filterKey = `${searchTerm}|${cityTerm}`;
 
-  const cityQueryArgs = useMemo(
-    () => ({
-      ...searchArg,
-      ...(city.trim() ? { city: city.trim() } : {}),
-    }),
-    [searchArg, city]
+  /** Page is tied to the filters it was loaded for, so a new search starts at page 1. */
+  const [paging, setPaging] = useState({ key: filterKey, page: 1 });
+  const page = paging.key === filterKey ? paging.page : 1;
+
+  const queryArgs = {
+    q: searchTerm || undefined,
+    city: cityTerm || undefined,
+    page,
+    limit: PAGE_LIMIT,
+  };
+  const venuesQuery = useGetPublicVenuesPagedQuery(queryArgs, { skip: kind !== "venue" });
+  const artistsQuery = useGetPublicArtistDirectoryQuery(queryArgs, { skip: kind !== "artist" });
+  const { currentData, isFetching, isError, refetch } =
+    kind === "artist" ? artistsQuery : venuesQuery;
+
+  /** Loaded pages for the current filters; reset whenever the filters change. */
+  const [pages, setPages] = useState<{ key: string; byPage: Record<number, PublicRegisteredPartner[]> }>(
+    { key: filterKey, byPage: {} }
   );
 
-  const artistsCatalog = usePublicArtistsCatalog({
-    q: q.trim() || undefined,
-    city: city.trim() || undefined,
-  });
+  // Stash each page as it arrives (render-time update, guarded so it runs once per response).
+  if (currentData && (pages.key !== filterKey || pages.byPage[page] !== currentData.items)) {
+    setPages({
+      key: filterKey,
+      byPage: {
+        ...(pages.key === filterKey ? pages.byPage : {}),
+        [page]: currentData.items,
+      },
+    });
+  }
 
-  const venuesCityQuery = useGetPublicRegisteredVenuesQuery(cityQueryArgs, {
-    skip: kind !== "venue",
-  });
-  const venuesAllQuery = useGetPublicRegisteredVenuesQuery(searchArg, {
-    skip: kind !== "venue" || !city.trim(),
-  });
+  const partners = useMemo(() => {
+    if (pages.key !== filterKey) return [];
+    const seen = new Set<string>();
+    const out: PublicRegisteredPartner[] = [];
+    for (let p = 1; p <= page; p += 1) {
+      for (const item of pages.byPage[p] ?? []) {
+        const id = String(item.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push(item);
+      }
+    }
+    return out;
+  }, [pages, filterKey, page]);
 
-  const cityVenues = venuesCityQuery.data ?? [];
-  const allVenues = venuesAllQuery.data ?? [];
-  const venuePartners = preferCityOrAll(cityVenues, allVenues, Boolean(city.trim()));
+  const hasNext = Boolean(currentData?.meta.has_next);
+  const initialLoading = partners.length === 0 && (isFetching || !currentData) && !isError;
+  const loadingMore = partners.length > 0 && isFetching;
 
-  const partners = kind === "artist" ? artistsCatalog.artists : venuePartners;
-  const isLoading =
-    kind === "artist"
-      ? artistsCatalog.isLoading
-      : venuesCityQuery.isLoading ||
-        (Boolean(city.trim()) && cityVenues.length === 0 && venuesAllQuery.isLoading);
+  const loadMore = useCallback(() => {
+    setPaging({ key: filterKey, page: page + 1 });
+  }, [filterKey, page]);
 
-  const title = kind === "artist" ? "Artists" : "Venues";
-  const subtitle =
-    kind === "artist"
-      ? "Browse registered and event artists — open a profile for details and live shows."
-      : "Browse all registered venues, check free dates, and send a booking inquiry.";
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasNext || isFetching || isError) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    // Recreated after every page so a sentinel that is still on screen triggers the next load.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMore();
+      },
+      { rootMargin: "600px 0px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNext, isFetching, isError, loadMore, partners.length]);
+
+  const plural = kind === "artist" ? "artists" : "venues";
   const searchPlaceholder =
-    kind === "artist" ? "Search artists by name or type…" : "Search venues by name or type…";
-  const Icon = kind === "artist" ? Mic2 : Building2;
+    kind === "artist"
+      ? "Search artists by name, type, or city…"
+      : "Search venues by name, type, or city…";
   const hasSearchOrFilter = Boolean(q.trim() || city.trim());
   const clearFilters = () => {
     setQ("");
@@ -83,96 +145,96 @@ export default function PartnerListingPage({ kind }: { kind: PartnerListingKind 
 
   return (
     <div className="min-h-screen bg-[#faf7fc]">
+      <h1 className="sr-only">{kind === "artist" ? "Artists" : "Venues"}</h1>
       <div className="bg-white border-b border-[#F3E8FF]">
-        <div className="bmb-section-container py-7 sm:py-9">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <span
-                className="mt-1 inline-flex h-11 w-11 items-center justify-center rounded-xl text-white shrink-0"
-                style={{ backgroundColor: BRAND }}
+        <div className="bmb-section-container py-5 sm:py-6">
+          <div className="relative">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              className="w-full h-11 pl-10 pr-9 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-[#6900AA]/40"
+            />
+            {q ? (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-slate-700"
+                aria-label="Clear search"
               >
-                <Icon size={22} />
-              </span>
-              <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-[#111111]">
-                  {title}
-                </h1>
-                <p className="mt-1.5 text-sm sm:text-base text-[#5c5c5c] max-w-2xl">{subtitle}</p>
-                {!isLoading ? (
-                  <p className="mt-2 text-xs font-semibold text-[#6900AA]">
-                    {partners.length} {kind === "artist" ? "artist" : "venue"}
-                    {partners.length === 1 ? "" : "s"}
-                    {city.trim() ? ` · ${city.trim()}` : ""}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile / tablet / desktop: search first, then city (reference order) */}
-          <div className="mt-6 flex flex-col lg:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search
-                size={16}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-[#6900AA]/40"
-              />
-            </div>
-            <div className="relative lg:w-56">
-              <input
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Filter by city (optional)"
-                className="w-full h-11 px-4 pr-9 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-[#6900AA]/40"
-              />
-              {city.trim() ? (
-                <button
-                  type="button"
-                  onClick={() => setCity("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-slate-700"
-                  aria-label="Clear city filter"
-                >
-                  <X size={14} />
-                </button>
-              ) : null}
-            </div>
+                <X size={14} />
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
 
-      <PartnerDirectorySection
-        title={kind === "artist" ? "All artists" : "All venues"}
-        subtitle=""
-        kind={kind}
-        partners={partners}
-        isLoading={isLoading}
-        showHeader={false}
-        emptyMessage={
-          hasSearchOrFilter
-            ? `No ${kind === "artist" ? "artists" : "venues"} match your search.`
-            : `No ${kind === "artist" ? "artists" : "venues"} to show yet.`
-        }
-        emptyContent={
-          <ListingNoResultsState
-            kind={kind === "artist" ? "artists" : "venues"}
-            title={kind === "artist" ? "No artists found" : "No venues found"}
-            description={
-              hasSearchOrFilter
-                ? q.trim()
-                  ? `We couldn’t find any ${kind === "artist" ? "artists" : "venues"} matching “${q.trim()}”.`
-                  : `We couldn’t find any ${kind === "artist" ? "artists" : "venues"} in ${city.trim()}. Try clearing filters or searching for another name.`
-                : `No ${kind === "artist" ? "artists" : "venues"} to show yet. Check back soon.`
-            }
-            actionLabel={hasSearchOrFilter ? "Clear filters" : undefined}
-            onAction={hasSearchOrFilter ? clearFilters : undefined}
-          />
-        }
-      />
+      <section id="partners" className="scroll-mt-24 py-8 md:py-10">
+        <div className="bmb-section-container">
+          {initialLoading ? (
+            <div className={GRID_CLASS}>
+              <CardShimmer count={10} />
+            </div>
+          ) : isError && partners.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="text-sm text-[#5c5c5c]">We couldn’t load {plural} right now.</p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mt-3 inline-flex rounded-full border border-[#6900AA] px-4 py-2 text-sm font-semibold text-[#6900AA] hover:bg-[#F7E9FF]"
+              >
+                Try again
+              </button>
+            </div>
+          ) : partners.length === 0 ? (
+            <ListingNoResultsState
+              kind={plural}
+              title={kind === "artist" ? "No artists found" : "No venues found"}
+              description={
+                hasSearchOrFilter
+                  ? q.trim()
+                    ? `We couldn’t find any ${plural} matching “${q.trim()}”.`
+                    : `We couldn’t find any ${plural} in ${city.trim()}. Try clearing filters or searching for another name.`
+                  : `No ${plural} to show yet. Check back soon.`
+              }
+              actionLabel={hasSearchOrFilter ? "Clear filters" : undefined}
+              onAction={hasSearchOrFilter ? clearFilters : undefined}
+            />
+          ) : (
+            <>
+              <div className={GRID_CLASS}>
+                {partners.map((p) => (
+                  <PartnerCard key={p.id} partner={p} kind={kind} />
+                ))}
+                {loadingMore ? <CardShimmer count={5} /> : null}
+              </div>
+
+              <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+
+              {isError ? (
+                <div className="mt-6 text-center">
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="inline-flex rounded-full border border-[#6900AA] px-4 py-2 text-sm font-semibold text-[#6900AA] hover:bg-[#F7E9FF]"
+                  >
+                    Couldn’t load more — try again
+                  </button>
+                </div>
+              ) : (
+                <p className="sr-only" aria-live="polite">
+                  {loadingMore ? `Loading more ${plural}` : ""}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

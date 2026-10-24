@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useLayoutEffect, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, MapPin, Search, User } from "lucide-react";
 // Gift — re-add when restoring Gift Cards in main header
 import { toast } from "sonner";
@@ -86,47 +86,219 @@ function NavSearchBar({
 }
 
 function CustomerDropdown({
-  children,
   onLogout,
   showGiftCards = false,
+  initial,
+  displayName,
+  avatarOnly = false,
 }: {
-  children: React.ReactNode;
   onLogout: (e: React.MouseEvent) => void;
   showGiftCards?: boolean;
+  initial: string;
+  displayName: string;
+  avatarOnly?: boolean;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  const [isPinnedByClick, setIsPinnedByClick] = useState(false);
+
+  // Auto-close when pathname changes (route navigated)
+  useEffect(() => {
+    setIsOpen(false);
+    setIsPinnedByClick(false);
+  }, [pathname]);
+
+  const cancelClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    // If pinned by click, do not dismiss on mouse leave
+    if (isPinnedByClick) return;
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => {
+      setIsOpen(false);
+    }, 600);
+  };
+
+  const handleMouseEnter = () => {
+    cancelClose();
+    setIsOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    scheduleClose();
+  };
+
+  const handleToggleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelClose();
+    if (isPinnedByClick) {
+      // If already pinned by click, clicking again closes it
+      setIsOpen(false);
+      setIsPinnedByClick(false);
+    } else {
+      // Pin it open so it will never close on mouse move
+      setIsOpen(true);
+      setIsPinnedByClick(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setIsPinnedByClick(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        setIsPinnedByClick(false);
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const handleItemClick = (href: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+      setIsOpen(false);
+      setIsPinnedByClick(false);
+      return;
+    }
+    router.push(href);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsPinnedByClick(false);
+    }, 150);
+  };
+
+  const handleLogoutClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOpen(false);
+    setIsPinnedByClick(false);
+    onLogout(e);
+  };
+
   return (
-    <div className="relative group">
-      {children}
-      <div className="absolute right-0 top-full pt-1 w-64 z-[60] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-        <div className="rounded-xl border border-[#E3BCFF] bg-white shadow-lg py-1.5 overflow-hidden">
-          <Link href="/customer/profile" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Profile</Link>
-          <Link href="/customer/change-password" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Change Password</Link>
-          <Link href="/customer/dashboard" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Orders / Reservations</Link>
-          <Link href="/customer/favourite" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">My Favourite</Link>
-          {showGiftCards && (
+    <div
+      ref={containerRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="relative inline-block text-left"
+    >
+      <button
+        type="button"
+        onClick={handleToggleClick}
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        aria-label="User account menu"
+        className="inline-flex items-center gap-2 rounded-full relative z-10 shrink-0 cursor-pointer select-none focus:outline-none"
+      >
+        <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#7A00C6] text-white type-nav-md font-bold flex items-center justify-center transition-transform hover:scale-105 shadow-sm">
+          {initial}
+        </span>
+        {!avatarOnly && (
+          <span className="hidden lg:inline type-nav-md font-semibold text-[#111111] whitespace-nowrap">
+            {displayName}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          className="absolute right-0 top-full pt-1.5 w-64 z-[100] before:absolute before:-top-10 before:-left-36 before:right-0 before:h-12 before:content-['']"
+        >
+          <div className="rounded-xl border border-[#E3BCFF] bg-white shadow-xl py-1.5 overflow-hidden ring-1 ring-black/5">
             <Link
-              href="/customer/gift-cards"
+              href="/customer/profile"
+              onClick={handleItemClick("/customer/profile")}
               className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
             >
-              My Gift Cards
+              My Profile
             </Link>
-          )}
-          <Link href="/customer/help" className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors">Help Centre</Link>
-          <Link
-            href="/customer/offers"
-            className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
-          >
-            Offers
-          </Link>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="block w-full text-left px-4 py-2.5 type-nav-md font-medium text-red-600 hover:bg-[#F7E9FF] transition-colors cursor-pointer"
-          >
-            Log out
-          </button>
+            <Link
+              href="/customer/change-password"
+              onClick={handleItemClick("/customer/change-password")}
+              className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
+            >
+              Change Password
+            </Link>
+            <Link
+              href="/customer/dashboard"
+              onClick={handleItemClick("/customer/dashboard")}
+              className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
+            >
+              My Orders / Reservations
+            </Link>
+            <Link
+              href="/customer/favourite"
+              onClick={handleItemClick("/customer/favourite")}
+              className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
+            >
+              My Favourite
+            </Link>
+            {showGiftCards && (
+              <Link
+                href="/customer/gift-cards"
+                onClick={handleItemClick("/customer/gift-cards")}
+                className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
+              >
+                My Gift Cards
+              </Link>
+            )}
+            <Link
+              href="/customer/help"
+              onClick={handleItemClick("/customer/help")}
+              className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
+            >
+              Help Centre
+            </Link>
+            <Link
+              href="/customer/offers"
+              onClick={handleItemClick("/customer/offers")}
+              className="block px-4 py-2.5 type-nav-md font-medium text-[#111111] hover:bg-[#F7E9FF] transition-colors"
+            >
+              Offers
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogoutClick}
+              className="block w-full text-left px-4 py-2.5 type-nav-md font-medium text-red-600 hover:bg-[#F7E9FF] transition-colors cursor-pointer"
+            >
+              Log out
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -157,21 +329,13 @@ function AuthSection({
 
   if (customer) {
     return (
-      <CustomerDropdown onLogout={onLogout} showGiftCards>
-        <Link
-          href="/customer/profile"
-          className="inline-flex items-center gap-2 rounded-full relative z-10 shrink-0"
-        >
-          <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#7A00C6] text-white type-nav-md font-bold flex items-center justify-center">
-            {initial}
-          </span>
-          {!avatarOnly && (
-            <span className="hidden lg:inline type-nav-md font-semibold text-[#111111] max-w-[8rem] truncate whitespace-nowrap">
-              {displayName}
-            </span>
-          )}
-        </Link>
-      </CustomerDropdown>
+      <CustomerDropdown
+        onLogout={onLogout}
+        showGiftCards
+        initial={initial}
+        displayName={displayName}
+        avatarOnly={avatarOnly}
+      />
     );
   }
 
@@ -353,7 +517,7 @@ export default function HomeHeader() {
       {/* Main header — scrolls away (not sticky). Logo/profile live here only until compact. */}
       <header
         data-site-main-header
-        className={`relative z-[60] w-full overflow-x-clip bg-white text-[#111111] border-b border-[#E8E8E8] transition-transform duration-300 ease-out ${
+        className={`relative z-[60] w-full overflow-visible bg-white text-[#111111] border-b border-[#E8E8E8] transition-transform duration-300 ease-out ${
           diningBookImmersive
             ? "hidden"
             : diningDetailNavHidden

@@ -14,9 +14,10 @@ import {
   Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useGetEventBookingByIdQuery } from "@/services/api";
-import { useAppDispatch } from "@/lib/hooks";
+import { useGetEventBookingByIdQuery, useGetPublicEventReviewsQuery } from "@/services/api";
+import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+import { readSessionForRole } from "@/lib/authStorage";
 import { buildEventTicketPdf, downloadPdfBlob, shortBookingCode } from "@/lib/eventTicketPdf";
 import {
   normalizeTicketMode,
@@ -28,6 +29,7 @@ import { EventTicketCard } from "@/components/EventBooking/EventTicketCard";
 import { resolveMediaUrl } from "@/lib/mediaUrl";
 import { BOOKING_CONFIRM_PAGE_BG } from "@/components/Shared/BookingTicketPerforation";
 import ConfirmationPageUI1Shell from "@/components/Shared/Confirmation/ConfirmationPageUI1Shell";
+import EventConfirmationReviewAside from "@/components/Shared/Confirmation/EventConfirmationReviewAside";
 import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confirmationUiVersion";
 import { formatDateCustomer, formatTime12h } from "@/lib/dateFormat";
 import { formatMoney } from "@/lib/currencyFormat";
@@ -60,6 +62,64 @@ function ConfirmationContent() {
   const { data: booking, isLoading, error } = useGetEventBookingByIdQuery(bookingId, {
     skip: !bookingId,
   });
+
+  const user = useAppSelector((state) => state.auth.user);
+  const eventId = String(booking?.event_id || "").trim();
+  const { data: eventReviews = [] } = useGetPublicEventReviewsQuery(eventId, {
+    skip: !eventId,
+  });
+
+  const customerSession = readSessionForRole("customer");
+  const loggedInCustomerId = (user?.id ?? customerSession?.user?.id)
+    ? String(user?.id ?? customerSession?.user?.id)
+    : null;
+  const loggedInName = String(
+    user?.name || customerSession?.user?.name || ""
+  ).trim().toLowerCase();
+
+  const alreadyReviewed = useMemo(() => {
+    if (!eventReviews.length) return false;
+    if (loggedInCustomerId) {
+      const matchById = eventReviews.some(
+        (r: any) => r.customer_id != null && String(r.customer_id) === loggedInCustomerId
+      );
+      if (matchById) return true;
+    }
+    if (loggedInName) {
+      const matchByName = eventReviews.some(
+        (r: any) => String(r.user_name || "").trim().toLowerCase() === loggedInName
+      );
+      if (matchByName) return true;
+    }
+    return false;
+  }, [eventReviews, loggedInCustomerId, loggedInName]);
+
+  const isEventEnded = useMemo(() => {
+    if (!booking) return false;
+    const endsAt = booking.ends_at;
+    if (endsAt) {
+      try {
+        const raw = String(endsAt).replace(" ", "T");
+        const t = new Date(raw.includes("T") ? raw : `${raw}T00:00:00`).getTime();
+        if (!Number.isNaN(t)) return Date.now() >= t;
+      } catch {
+        // ignore
+      }
+    }
+    const startsAt = booking.starts_at;
+    if (startsAt) {
+      try {
+        const raw = String(startsAt).replace(" ", "T");
+        const t = new Date(raw.includes("T") ? raw : `${raw}T00:00:00`).getTime();
+        if (!Number.isNaN(t)) return Date.now() >= t + 3 * 60 * 60 * 1000;
+      } catch {
+        // ignore
+      }
+    }
+    return false;
+  }, [booking?.ends_at, booking?.starts_at]);
+
+  const canShowReview = Boolean(eventId) && isEventEnded && !alreadyReviewed;
 
   const displayCode = useMemo(
     () => (booking ? shortBookingCode(booking.id) : ""),
@@ -113,9 +173,9 @@ function ConfirmationContent() {
     setDownloading(true);
     try {
       const blob = await buildEventTicketPdf(booking, { posterUrl: poster });
-      const filename = `${(booking.event_name || "ticket").replace(/[^\w\-]+/g, "_")}-ticket.pdf`;
+      const filename = `BookMyBota-Event-${displayCode || booking.id.slice(0, 8).toUpperCase()}.pdf`;
       downloadPdfBlob(blob, filename);
-      toast.success("Ticket PDF downloaded — save it for venue entry.");
+      toast.success("Ticket PDF downloaded");
     } catch {
       toast.error("Could not download the ticket PDF.");
     } finally {
@@ -161,10 +221,28 @@ function ConfirmationContent() {
     : booking.ticket_qty
       ? `${booking.ticket_qty} ticket${booking.ticket_qty === 1 ? "" : "s"}`
       : "Ticket";
+  const groupedItems = useMemo(() => {
+    if (!booking.items?.length) return [];
+    const map = new Map<string, { ticket_type: string; qty: number; totalPrice: number }>();
+    for (const item of booking.items) {
+      const type = item.ticket_type || "Ticket";
+      const qty = Number(item.qty || 0);
+      const total = Number(item.unit_price || 0) * qty;
+      const existing = map.get(type);
+      if (existing) {
+        existing.qty += qty;
+        existing.totalPrice += total;
+      } else {
+        map.set(type, { ticket_type: type, qty, totalPrice: total });
+      }
+    }
+    return Array.from(map.values());
+  }, [booking.items]);
+
   const amountRows = [
-    ...(booking.items || []).map((item) => ({
+    ...groupedItems.map((item) => ({
       label: `${item.ticket_type} × ${item.qty}`,
-      value: formatMoney(Number(item.unit_price) * Number(item.qty)),
+      value: formatMoney(item.totalPrice),
     })),
     {
       label: "Convenience fee",
@@ -181,14 +259,21 @@ function ConfirmationContent() {
       : []),
   ];
 
-  // UI1 = BMS ticket centered (no rating). UI2 = classic EventTicketCard layout below.
+  // UI1 = BMS ticket + optional rating aside when event ended. UI2 = classic EventTicketCard layout below.
   if (CONFIRMATION_UI_VERSION === 1) {
     return (
       <ConfirmationPageUI1Shell
-        showAside={false}
+        showAside={canShowReview}
+        aside={
+          canShowReview ? (
+            <EventConfirmationReviewAside
+              eventId={eventId}
+              eventName={booking.event_name}
+            />
+          ) : undefined
+        }
         backHref="/customer/dashboard"
         pageTitle="Your Ticket"
-        tipBanner="Have your ticket QR handy on your phone while entering the venue."
         title={booking.event_name || "Event"}
         posterUrl={poster}
         whenLine={whenLine}
@@ -205,6 +290,8 @@ function ConfirmationContent() {
         onDownloadPdf={downloadTickets}
         downloading={downloading}
         supportHref="/customer/help"
+        showQr={true}
+        directDetails={true}
       />
     );
   }

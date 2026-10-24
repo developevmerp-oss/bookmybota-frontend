@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
-import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import {
   PARTNER_CATEGORY_TYPES,
   type PartnerCategoryKey,
@@ -279,10 +278,6 @@ export default function OrganizerLandingPage({
           ? `${categoryConfig.title} partner on Book My Bota`
           : "Event organizer partner on Book My Bota"
       }
-      imageCards={PARTNER_VENUE_TYPE_CARDS}
-      imageCardsTitle="Venue Types"
-      imageCardsVariant="cards"
-      imageCardsTitleStyle="heading"
       categoryTypesTitle={categoryConfig ? `${categoryConfig.title} Types` : undefined}
       categoryTypes={categoryConfig?.types}
       categoryTypesVariant={categoryConfig ? "cards" : "round"}

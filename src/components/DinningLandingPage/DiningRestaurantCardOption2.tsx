@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { MapPin, Star, Users, Utensils } from "lucide-react";
 import type { Business } from "@/services/api";
@@ -10,14 +10,6 @@ import { formatMoney } from "@/lib/currencyFormat";
 import { listingOfferBannerLabel } from "@/lib/diningOffers";
 import { localityFromAddress } from "@/components/LandingPage/homeUtils";
 import DiningWishlistButton from "@/components/DinningLandingPage/DiningWishlistButton";
-import {
-  coordsForCityName,
-  formatDistanceKm,
-  haversineKm,
-  parseCoords,
-} from "@/lib/geoDistance";
-import { useSelectedCity } from "@/lib/useSelectedCity";
-import { useUserGeo } from "@/lib/useUserGeo";
 
 /**
  * Offer ribbon: flush to left image edge, solid purple → fully transparent on the right
@@ -68,20 +60,29 @@ function CoverMedia({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-function cuisineLabel(place: Business | string | undefined): string {
+function cuisineTagsList(place: Business | string | undefined): string[] {
   const raw =
     typeof place === "string"
       ? place
       : place?.cuisine || place?.type_name || "";
   if (Array.isArray(raw) && raw.length) {
-    return raw.filter(Boolean).slice(0, 3).join(" • ");
+    const list = raw
+      .map(String)
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    return list.length ? list : ["Dining"];
   }
   const tags = String(raw)
-    .split(/[,·|/]/)
+    .split(/[,·•|/]/)
     .map((c) => c.trim())
     .filter(Boolean)
     .slice(0, 3);
-  return tags.length ? tags.join(" • ") : "Dining";
+  return tags.length ? tags : ["Dining"];
+}
+
+function cuisineLabel(place: Business | string | undefined): string {
+  return cuisineTagsList(place).join(" • ");
 }
 
 function formatReviewCount(n: number): string {
@@ -93,40 +94,6 @@ function formatReviewCount(n: number): string {
   return `${n} review${n === 1 ? "" : "s"}`;
 }
 
-function MetaIcon({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700">
-      {children}
-    </span>
-  );
-}
-
-function useCardDistanceLabel(
-  latitude?: number | string | null,
-  longitude?: number | string | null,
-  placeCity?: string | null
-): string | null {
-  const selectedCity = useSelectedCity().trim();
-  const { coords: liveCoords } = useUserGeo({
-    selectedCity: selectedCity || null,
-    autoDetect: true,
-  });
-
-  const userCoords = useMemo(() => {
-    if (selectedCity) return coordsForCityName(selectedCity) ?? liveCoords;
-    return liveCoords;
-  }, [selectedCity, liveCoords]);
-
-  const placeCoords = useMemo(
-    () => parseCoords(latitude, longitude) ?? coordsForCityName(placeCity) ?? null,
-    [latitude, longitude, placeCity]
-  );
-
-  return useMemo(() => {
-    if (!userCoords || !placeCoords) return null;
-    return formatDistanceKm(haversineKm(userCoords, placeCoords)) || null;
-  }, [userCoords, placeCoords]);
-}
 
 export type DiningRestaurantCardOption2Props = {
   place: Business;
@@ -182,12 +149,7 @@ export default function DiningRestaurantCardOption2({
       ? formatMoney(costNum, { compact: true })
       : formatMoney([1200, 1500, 2000, 2400, 1800][idHash % 5], { compact: true })
   } for 2`;
-  const cuisine = cuisineLabel(place);
-  const distanceLabel = useCardDistanceLabel(
-    place.latitude,
-    place.longitude,
-    place.city_name
-  );
+  const cuisines = cuisineTagsList(place);
 
   return (
     <Link
@@ -217,75 +179,65 @@ export default function DiningRestaurantCardOption2({
       </div>
 
       <div className="px-3.5 sm:px-4 pt-3 sm:pt-3.5 pb-3.5 sm:pb-4 flex flex-1 flex-col gap-2 sm:gap-2.5 min-w-0">
-          {/* Title + cuisine — tighter gap only between these two */}
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center justify-between gap-4 sm:gap-5 min-w-0">
-            <h3
-              className="min-w-0 flex-1 truncate text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug"
-              title={place.name}
-            >
-              {place.name}
-            </h3>
-            {hasRating && rating != null ? (
-              <div className="shrink-0 flex flex-col items-end justify-center leading-none">
-                <span className="inline-flex items-center gap-1">
-                  <Star
-                    size={14}
-                    className="fill-[#F5B301] text-[#F5B301] sm:size-[15px]"
-                    strokeWidth={0}
-                  />
-                  <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
-                    {rating.toFixed(1)}
-                  </span>
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <h3
+            className="min-w-0 flex-1 text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug"
+            title={place.name}
+          >
+            {place.name}
+          </h3>
+
+          {hasRating && rating != null ? (
+            <div className="shrink-0 flex flex-col items-end justify-center leading-none pt-0.5">
+              <span className="inline-flex items-center gap-1">
+                <Star
+                  size={14}
+                  className="fill-[#F5B301] text-[#F5B301] sm:size-[15px]"
+                  strokeWidth={0}
+                />
+                <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
+                  {rating.toFixed(1)}
                 </span>
-                {reviewsCount > 0 ? (
-                  <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
-                    ({formatReviewCount(reviewsCount)})
-                  </span>
-                ) : null}
-              </div>
-            ) : (
-              <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] sm:text-[0.75rem] font-bold px-2 py-0.5 rounded">
-                New
               </span>
-            )}
-          </div>
-          <p className="truncate text-xs sm:text-sm text-slate-600 leading-snug">
-            {cuisine}
-          </p>
+              {reviewsCount > 0 ? (
+                <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
+                  ({formatReviewCount(reviewsCount)})
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] sm:text-[0.75rem] font-bold px-2 py-0.5 rounded mt-0.5">
+              New
+            </span>
+          )}
         </div>
 
-        {/* Distance + address — reserved height keeps cards even with/without distance */}
-        <div className="flex min-h-[2.75rem] items-start gap-2.5 min-w-0">
-          <MetaIcon>
-            <MapPin size={14} strokeWidth={2.25} />
-          </MetaIcon>
-          <div className="min-w-0 flex-1 leading-snug">
-            {distanceLabel ? (
-              <>
-                <p className="text-sm sm:text-sm  text-slate-600">
-                  {distanceLabel}
-                </p>
-                <p className="truncate text-xs sm:text-sm text-slate-600  mt-0.5">
-                  {addressLine}
-                </p>
-              </>
-            ) : (
-              <p className="truncate text-xs sm:text-sm text-slate-600 pt-1.5">
-                {addressLine}
-              </p>
-            )}
-          </div>
+        {/* Location / address — distance removed, clean inline icon */}
+        <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
+          <MapPin size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
+          <p className="truncate text-xs sm:text-sm leading-snug" title={addressLine}>
+            {addressLine}
+          </p>
         </div>
 
         {/* Cost for 2 */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <MetaIcon>
-            <Users size={14} strokeWidth={2.25} />
-          </MetaIcon>
-          <p className="truncate text-xs sm:text-sm text-slate-600  leading-snug">
+        <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
+          <Users size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
+          <p className="truncate text-xs sm:text-sm leading-snug">
             {priceForTwo}
           </p>
+        </div>
+
+        {/* Cuisine chips — placed after price for 2 */}
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0 pt-0.5">
+          {cuisines.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center rounded-full bg-[#EFF4F2] px-2.5 py-0.5 text-[11px] sm:text-xs font-medium text-[#2E6852] border border-[#CDDBD4]"
+            >
+              {tag}
+            </span>
+          ))}
         </div>
       </div>
     </Link>
@@ -327,53 +279,56 @@ export function ShowcaseDiningRestaurantCard({
         <CoverMedia src={image} alt={name} />
       </div>
       <div className="px-3.5 sm:px-4 pt-3 sm:pt-3.5 pb-3.5 sm:pb-4 flex flex-1 flex-col gap-2 sm:gap-2.5 min-w-0">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center justify-between gap-4 sm:gap-5 min-w-0">
-            <h3
-              className="min-w-0 flex-1 truncate text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug"
-              title={name}
-            >
-              {name}
-            </h3>
-            {hasRating ? (
-              <div className="shrink-0 flex flex-col items-end justify-center leading-none">
-                <span className="inline-flex items-center gap-1">
-                  <Star size={14} className="fill-[#F5B301] text-[#F5B301]" strokeWidth={0} />
-                  <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
-                    {parsedRating.toFixed(1)}
-                  </span>
+        <div className="flex items-start justify-between gap-3 min-w-0">
+          <h3
+            className="min-w-0 flex-1 text-[0.95rem] sm:text-base md:text-lg font-semibold text-[#111111] tracking-tight leading-snug"
+            title={name}
+          >
+            {name}
+          </h3>
+
+          {hasRating ? (
+            <div className="shrink-0 flex flex-col items-end justify-center leading-none pt-0.5">
+              <span className="inline-flex items-center gap-1">
+                <Star size={14} className="fill-[#F5B301] text-[#F5B301]" strokeWidth={0} />
+                <span className="text-sm sm:text-[0.95rem] font-bold text-[#111111]">
+                  {parsedRating.toFixed(1)}
                 </span>
-                <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
-                  ({formatReviewCount(reviews)})
-                </span>
-              </div>
-            ) : (
-              <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] font-bold px-2 py-0.5 rounded">
-                New
               </span>
-            )}
-          </div>
-          <p className="truncate text-xs sm:text-sm text-slate-500 font-medium leading-snug">
-            {cuisineLabel(cuisine)}
+              <span className="mt-1 text-[0.65rem] sm:text-[0.7rem] font-medium text-slate-400">
+                ({formatReviewCount(reviews)})
+              </span>
+            </div>
+          ) : (
+            <span className="shrink-0 inline-flex items-center bg-slate-100 text-slate-600 text-[0.7rem] font-bold px-2 py-0.5 rounded mt-0.5">
+              New
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
+          <MapPin size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
+          <p className="truncate text-xs sm:text-sm leading-snug" title={locality || "Addis Ababa"}>
+            {locality || "Addis Ababa"}
           </p>
         </div>
-        <div className="flex min-h-[2.75rem] items-start gap-2.5 min-w-0">
-          <MetaIcon>
-            <MapPin size={14} strokeWidth={2.25} />
-          </MetaIcon>
-          <div className="min-w-0 flex-1 leading-snug">
-            <p className="truncate text-xs sm:text-sm text-slate-500 font-medium pt-1.5">
-              {locality || "Addis Ababa"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2.5 min-w-0">
-          <MetaIcon>
-            <Users size={14} strokeWidth={2.25} />
-          </MetaIcon>
-          <p className="truncate text-xs sm:text-sm text-slate-600 font-medium leading-snug">
+
+        <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
+          <Users size={14} strokeWidth={2} className="shrink-0 text-slate-500" />
+          <p className="truncate text-xs sm:text-sm leading-snug">
             {priceForTwo}
           </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0 pt-0.5">
+          {cuisineTagsList(cuisine).map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center rounded-full bg-[#EFF4F2] px-2.5 py-0.5 text-[11px] sm:text-xs font-medium text-[#2E6852] border border-[#CDDBD4]"
+            >
+              {tag}
+            </span>
+          ))}
         </div>
       </div>
     </>

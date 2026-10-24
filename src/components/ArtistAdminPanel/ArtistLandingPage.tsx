@@ -18,7 +18,6 @@ import {
 import PartnerListYourShowLanding from "@/components/Shared/PartnerListYourShowLanding";
 import PartnerDirectorySection from "@/components/Shared/PartnerDirectorySection";
 import { homePathForRole, readSessionForRole } from "@/lib/authStorage";
-import { PARTNER_VENUE_TYPE_CARDS } from "@/data/partnerVenueTypeCards";
 import { usePublicArtistsCatalog } from "@/lib/usePublicArtistsCatalog";
 import images from "@/Images";
 
@@ -199,10 +198,6 @@ export default function ArtistLandingPage() {
       heroDescription="Create your artist profile on BookMyBota, showcase your work, connect with event organizers, and discover new opportunities to perform."
       heroImage={HERO_IMAGE}
       heroImageAlt="Artist partner on Book My Bota"
-      imageCards={PARTNER_VENUE_TYPE_CARDS}
-      imageCardsTitle="Venue Types"
-      imageCardsVariant="cards"
-      imageCardsTitleStyle="heading"
       servicesTitle="What are the services we offer?"
       servicesSubtitle="A simple partner portal focused on discovery, profile management, and trust — so you spend more time performing and less time chasing bookings."
       servicesHideSubtitle

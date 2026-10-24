@@ -75,7 +75,7 @@ const PLAN_FORM_DEFAULTS: AdminMarketingPlanValues = {
   listing_boost: true,
   landing_slider: false,
   category_rail: false,
-  allows_item_target: false,
+  allows_item_target: true,
   max_targets: 1,
 };
 

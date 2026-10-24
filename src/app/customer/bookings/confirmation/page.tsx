@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,9 +19,10 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useGetBookingByIdQuery } from "@/services/api";
+import { useGetBookingByIdQuery, useGetReviewsQuery } from "@/services/api";
 import { useAppDispatch, useAppSelector } from "@/lib/hooks";
 import { loadFromStorage } from "@/features/auth/authSlice";
+import { readSessionForRole } from "@/lib/authStorage";
 import {
   formatDateCustomer,
   formatInstantLocalDateTime,
@@ -36,6 +37,8 @@ import ConfirmationPageUI1Shell from "@/components/Shared/Confirmation/Confirmat
 import DiningConfirmationReviewAside from "@/components/Shared/Confirmation/DiningConfirmationReviewAside";
 import { CONFIRMATION_UI_VERSION } from "@/components/Shared/Confirmation/confirmationUiVersion";
 import { BookingConfirmationShimmer } from "@/components/Shared/Shimmer";
+import { formatMoney } from "@/lib/currencyFormat";
+import { buildTicketCardPdf, downloadPdfBlob } from "@/lib/confirmationTicketPdf";
 
 const CONFIRM_PAGE_MAX = "mx-auto w-full max-w-[64rem] px-4 md:px-5 lg:px-10 xl:px-12";
 const DEFAULT_DINING_IMAGE =
@@ -93,6 +96,7 @@ function ConfirmationContent() {
   const arrivalNote = searchParams.get("arrival") || "";
   const [copied, setCopied] = useState(false);
   const [headerReady, setHeaderReady] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     dispatch(loadFromStorage());
@@ -106,6 +110,72 @@ function ConfirmationContent() {
   const { data: booking, isLoading, error } = useGetBookingByIdQuery(bookingId, {
     skip: !bookingId,
   });
+
+  const businessId = String(booking?.business_id || "").trim();
+  const { data: diningReviewsData } = useGetReviewsQuery(businessId, {
+    skip: !businessId,
+  });
+
+  const customerSession = readSessionForRole("customer");
+  const loggedInCustomerId = (user?.id ?? customerSession?.user?.id)
+    ? String(user?.id ?? customerSession?.user?.id)
+    : null;
+  const loggedInName = String(
+    user?.name || customerSession?.user?.name || ""
+  ).trim().toLowerCase();
+
+  const alreadyReviewed = useMemo(() => {
+    if (diningReviewsData?.eligibility?.already_reviewed) return true;
+    const items = diningReviewsData?.items ?? [];
+    if (!items.length) return false;
+    if (loggedInCustomerId) {
+      const matchById = items.some(
+        (r) => r.customer_id != null && String(r.customer_id) === loggedInCustomerId
+      );
+      if (matchById) return true;
+    }
+    if (loggedInName) {
+      const matchByName = items.some(
+        (r) => String(r.user_name || "").trim().toLowerCase() === loggedInName
+      );
+      if (matchByName) return true;
+    }
+    return false;
+  }, [
+    diningReviewsData?.eligibility?.already_reviewed,
+    diningReviewsData?.items,
+    loggedInCustomerId,
+    loggedInName,
+  ]);
+
+  const isVisitEnded = useMemo(() => {
+    if (diningReviewsData?.eligibility?.visit_ended) {
+      return true;
+    }
+    if (booking?.status === "COMPLETED" || booking?.checked_out_at) {
+      return true;
+    }
+    if (booking?.booking_time) {
+      try {
+        const raw = String(booking.booking_time).replace(" ", "T");
+        const t = new Date(raw.includes("T") ? raw : `${raw}T00:00:00`).getTime();
+        if (!Number.isNaN(t)) {
+          // 90 minutes after reservation start time
+          return Date.now() >= t + 90 * 60 * 1000;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return false;
+  }, [
+    diningReviewsData?.eligibility?.visit_ended,
+    booking?.status,
+    booking?.checked_out_at,
+    booking?.booking_time,
+  ]);
+
+  const canShowReview = Boolean(businessId) && isVisitEnded && !alreadyReviewed;
 
   if (!bookingId) {
     return (
@@ -194,14 +264,50 @@ function ConfirmationContent() {
     .filter(Boolean)
     .join(" · ");
 
+  const downloadDiningPdf = async () => {
+    if (!booking || downloading) return;
+    setDownloading(true);
+    try {
+      const blob = await buildTicketCardPdf({
+        filenameTitle: "Dining",
+        title: booking.business_name || "Restaurant",
+        posterUrl: cover,
+        tag: "Dine-in",
+        whenLine,
+        venueLine: booking.business_address || undefined,
+        offerLabel: appliedOffer?.title ? `Offer: ${appliedOffer.title}` : undefined,
+        ticketCountLabel: `${booking.guests ?? "—"} Guest${
+          Number(booking.guests) === 1 ? "" : "(s)"
+        }`,
+        primaryLabel: "RESERVATION",
+        secondaryLabel: guestName !== "—" ? guestName : undefined,
+        bookingCode: booking.id.slice(0, 8).toUpperCase(),
+        showQr: false,
+        cancellationNote: windowLabel
+          ? `Check-in window: ${windowLabel}`
+          : "Please arrive on time for your reservation.",
+        totalFormatted: undefined,
+        amountRows: [],
+      });
+      downloadPdfBlob(
+        blob,
+        `BookMyBota-Dining-${booking.id.slice(0, 8).toUpperCase()}.pdf`
+      );
+      toast.success("Reservation PDF downloaded");
+    } catch {
+      toast.error("Could not prepare the reservation PDF.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   // UI1 = BMS ticket + dining rating aside (same pattern as movie). UI2 = classic below.
   if (CONFIRMATION_UI_VERSION === 1) {
-    const businessId = String(booking.business_id || "").trim();
     return (
       <ConfirmationPageUI1Shell
-        showAside={Boolean(businessId)}
+        showAside={canShowReview}
         aside={
-          businessId ? (
+          canShowReview ? (
             <DiningConfirmationReviewAside
               businessId={businessId}
               restaurantName={booking.business_name}
@@ -210,7 +316,6 @@ function ConfirmationContent() {
         }
         backHref="/customer/dashboard"
         pageTitle="Your Reservation"
-        tipBanner="Show the check-in QR at the restaurant. Have it handy on your phone."
         title={booking.business_name || "Restaurant"}
         posterUrl={cover}
         whenLine={whenLine}
@@ -219,10 +324,12 @@ function ConfirmationContent() {
         ticketCountLabel={`${booking.guests ?? "—"} Guest${
           Number(booking.guests) === 1 ? "" : "(s)"
         }`}
-        primaryLabel="Reservation"
+        primaryLabel="RESERVATION"
         secondaryLabel={guestName !== "—" ? guestName : undefined}
         bookingCode={booking.id.slice(0, 8).toUpperCase()}
         qrValue={qrData}
+        showQr={false}
+        directDetails={true}
         mTicketLabel="Dine-in"
         cancellationNote={
           windowLabel
@@ -230,18 +337,14 @@ function ConfirmationContent() {
             : "Please arrive on time for your reservation."
         }
         supportHref="/customer/help"
+        onDownloadPdf={downloadDiningPdf}
+        downloading={downloading}
         detailsExtra={
-          <div className="mt-4 grid grid-cols-1 gap-2.5">
-            <Link
-              href={`/customer/bookings/${booking.id}`}
-              className="inline-flex w-full items-center justify-center h-11 rounded-lg bg-[#111] text-white text-[0.875rem] font-semibold"
-            >
-              View booking details
-            </Link>
+          <div className="mt-2.5">
             <button
               type="button"
               onClick={addToCalendar}
-              className="inline-flex w-full items-center justify-center h-11 rounded-lg border border-[#E5E5E5] text-[0.875rem] font-semibold text-[#333]"
+              className="inline-flex w-full items-center justify-center h-11 rounded-xl border border-[#E5E5E5] bg-white hover:bg-slate-50 text-[0.875rem] font-semibold text-[#333] transition-colors cursor-pointer"
             >
               Add to Calendar
             </button>

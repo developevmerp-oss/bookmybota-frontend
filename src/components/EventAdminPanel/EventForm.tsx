@@ -76,6 +76,10 @@ import {
 } from "@/lib/dateFormat";
 import { extractApiError } from "@/lib/apiErrors";
 import {
+  LANDING_PROMO_BANNER_ASPECT,
+  LANDING_PROMO_BANNER_SIZE_HINT,
+} from "@/lib/landingPromoBanner";
+import {
   getTicketCapacitySummary,
   validateShowtimeTickets,
 } from "@/lib/eventTicketLayoutValidation";
@@ -4313,10 +4317,10 @@ export default function EventForm({
                             </label>
                             <CroppedImageField
                               value={promoBannerUrl || ""}
-                              aspect={16 / 9}
+                              aspect={LANDING_PROMO_BANNER_ASPECT}
                               disabled={uploading}
-                              previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
-                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                              previewClassName="w-full aspect-[3/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
                               onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
                               onCroppedFile={(file) =>
                                 uploadCropped(file, (url) =>
@@ -4326,10 +4330,15 @@ export default function EventForm({
                               emptyContent={
                                 <>
                                   <ImagePlus className="text-slate-400 mb-2" size={28} />
-                                  <span className="text-xs portal-muted">Add 16:9 promo banner</span>
+                                  <span className="text-xs portal-muted">Add 3:1 promo banner</span>
                                 </>
                               }
                             />
+                            <p className="text-[11px] text-slate-500 leading-relaxed">
+                              Crop to <span className="font-semibold text-slate-600">3:1</span> — recommended{" "}
+                              <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
+                              Same size as the home page promotion slider.
+                            </p>
 
                             <div className="space-y-1.5 pt-1">
                               <label className="text-sm font-semibold text-slate-600">
@@ -4355,10 +4364,10 @@ export default function EventForm({
                             </label>
                             <CroppedImageField
                               value={promoBannerUrl || ""}
-                              aspect={16 / 9}
+                              aspect={LANDING_PROMO_BANNER_ASPECT}
                               disabled={uploading}
-                              previewClassName="w-full aspect-[16/9] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
-                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[16/9] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
+                              previewClassName="w-full aspect-[3/1] rounded-xl border border-slate-200 overflow-hidden bg-slate-100"
+                              emptyClassName="flex flex-col items-center justify-center w-full aspect-[3/1] rounded-xl border border-dashed border-slate-300 hover:border-rose-400 bg-slate-50"
                               onRemove={() => setValue("promo_banner_url", "", { shouldDirty: true })}
                               onCroppedFile={(file) =>
                                 uploadCropped(file, (url) =>
@@ -4368,10 +4377,14 @@ export default function EventForm({
                               emptyContent={
                                 <>
                                   <ImagePlus className="text-slate-400 mb-2" size={28} />
-                                  <span className="text-xs portal-muted">Optional promo banner</span>
+                                  <span className="text-xs portal-muted">Optional 3:1 promo banner</span>
                                 </>
                               }
                             />
+                            <p className="text-[11px] text-slate-500 leading-relaxed">
+                              Crop to <span className="font-semibold text-slate-600">3:1</span> — recommended{" "}
+                              <span className="font-semibold text-slate-600">{LANDING_PROMO_BANNER_SIZE_HINT}</span>.
+                            </p>
                           </div>
                         )}
 

@@ -608,6 +608,8 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     return map;
   }, [operatingDates]);
   const [createBooking, { isLoading: isCreatingBooking }] = useCreateBookingMutation();
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const isSubmittingBookingRef = useRef(false);
   const [checkAvailabilityQuery] = useLazyCheckAvailabilityQuery();
   const {
     data: reviewsData,
@@ -1123,9 +1125,26 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerStep, authUser]);
 
+  const prevDrawerStepRef = useRef(drawerStep);
+  useEffect(() => {
+    if (prevDrawerStepRef.current !== drawerStep) {
+      prevDrawerStepRef.current = drawerStep;
+      if (typeof window !== 'undefined' && activeTab === 'Book a Table') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const timer = window.setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 60);
+        return () => window.clearTimeout(timer);
+      }
+    }
+  }, [drawerStep, activeTab]);
+
   useEffect(() => {
     if (drawerStep !== 3) return;
     resetConfirmForm({ name, phone, arrivalTime });
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
     // Sync once when opening confirm step so typing is not reset.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerStep]);
@@ -1412,6 +1431,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
     setDrawerStep(3);
     setName(customer.name || '');
     setPhone(customer.phone || '');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleDateSelect = (idx: number) => {
@@ -1446,6 +1468,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   const [copied, setCopied] = useState(false);
 
   const submitBooking = async (customerName: string, customerPhone: string, approxArrival: string) => {
+    if (isSubmittingBookingRef.current) return;
     if (!selectedTime) {
       toast.error('Please select a time slot first.');
       setDrawerStep(1);
@@ -1462,6 +1485,10 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       toast.error(phoneErr);
       return;
     }
+
+    isSubmittingBookingRef.current = true;
+    setIsSubmittingBooking(true);
+
     try {
       // Final soft check right before create (slot grid already filtered)
       const bookingDateTime = getBookingISO();
@@ -1530,6 +1557,9 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
       setDrawerStep(4);
     } catch {
       toast.error('Booking failed. Please try again.');
+    } finally {
+      setIsSubmittingBooking(false);
+      isSubmittingBookingRef.current = false;
     }
   };
 
@@ -1539,6 +1569,7 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
   };
 
   const onConfirmBooking = async (data: ConfirmBookingValues) => {
+    if (isSubmittingBookingRef.current) return;
     setName(data.name);
     setPhone(data.phone);
     setArrivalTime(data.arrivalTime);
@@ -3929,11 +3960,15 @@ export default function RestaurantPage({ params }: { params: Promise<{ id: strin
                         <div className="flex flex-col items-start gap-3">
                           <button
                             type="submit"
-                            disabled={isCreatingBooking}
-                            aria-busy={isCreatingBooking || undefined}
-                            className="w-full max-w-sm sm:max-w-md py-3.5 rounded-xl bg-[#111111] hover:bg-black text-white text-sm font-bold transition-colors cursor-pointer shadow-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                            disabled={isSubmittingBooking || isCreatingBooking}
+                            aria-busy={isSubmittingBooking || isCreatingBooking || undefined}
+                            className={`w-full max-w-sm sm:max-w-md py-3.5 rounded-xl text-white text-sm font-bold transition-all shadow-sm inline-flex items-center justify-center gap-2 ${
+                              isSubmittingBooking || isCreatingBooking
+                                ? "bg-zinc-700 opacity-60 cursor-not-allowed"
+                                : "bg-[#111111] hover:bg-black cursor-pointer"
+                            }`}
                           >
-                            {isCreatingBooking ? (
+                            {isSubmittingBooking || isCreatingBooking ? (
                               <>
                                 <Loader2 size={16} className="animate-spin" />
                                 Confirming…

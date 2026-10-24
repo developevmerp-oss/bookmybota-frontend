@@ -6,8 +6,10 @@ import {
   normalizeTicketMode,
   ticketModeHeaderTag,
   ticketModeLabel,
+  ticketModeConfirmationMessage,
 } from "@/lib/eventTicketMode";
 import { eventBookingQrValue } from "@/lib/eventScanToken";
+import { buildTicketCardPdf, type TicketCardPdfAmountRow } from "./confirmationTicketPdf";
 
 const BRAND: [number, number, number] = [105, 0, 170];
 const BRAND_DARK: [number, number, number] = [87, 0, 142];
@@ -618,71 +620,85 @@ export async function buildEventTicketPdf(
   booking: EventTicketPdfBooking,
   options?: { posterUrl?: string | null }
 ): Promise<Blob> {
-  const { jsPDF } = await import("jspdf");
-
-  const qrRaw = eventBookingQrValue(booking);
-  const qrUrl = qrRaw
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(qrRaw)}`
-    : null;
-  const [posterData, qrDataUrl] = await Promise.all([
-    options?.posterUrl ? urlToDataUrl(options.posterUrl) : Promise.resolve(null),
-    qrUrl ? urlToDataUrl(qrUrl) : Promise.resolve(null),
-  ]);
-
-  const ticketLabel = booking.items?.length
-    ? booking.items.map((i) => `${i.ticket_type || "Ticket"} × ${i.qty}`).join(", ")
-    : "—";
-
   const mode = normalizeTicketMode(booking.ticket_mode);
-  const assets: PdfAssets = {
-    posterData,
-    qrDataUrl,
-    ticketLabel,
-    venue: [booking.venue_name, booking.venue_address].filter(Boolean).join(", "),
-    displayCode: shortBookingCode(booking.id),
-    modeLabel: ticketModeLabel(mode),
-  };
+  const displayCode = shortBookingCode(booking.id);
+  const qrRaw = eventBookingQrValue(booking);
+  const poster = options?.posterUrl || null;
 
-  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
+  const totalTickets =
+    booking.items?.reduce((acc, it) => acc + Number(it.qty || 0), 0) || 1;
 
-  const cardW = pageW - CARD_MARGIN * 2;
-  const contentX = CARD_MARGIN + CARD_PAD;
-  const contentW = cardW - CARD_PAD * 2;
-  const cardTop = 18;
+  // Group items by ticket type
+  const map = new Map<string, { ticket_type: string; qty: number; totalPrice: number }>();
+  for (const item of booking.items || []) {
+    const type = item.ticket_type || "Ticket";
+    const qty = Number(item.qty || 0);
+    const total = Number(item.unit_price || 0) * qty;
+    const existing = map.get(type);
+    if (existing) {
+      existing.qty += qty;
+      existing.totalPrice += total;
+    } else {
+      map.set(type, { ticket_type: type, qty, totalPrice: total });
+    }
+  }
 
-  const cardH = measureCardHeight(doc, booking, assets, contentW, Boolean(posterData), mode);
-  const cardX = CARD_MARGIN;
+  const amountRows: TicketCardPdfAmountRow[] = [
+    ...Array.from(map.values()).map((item) => ({
+      label: `${item.ticket_type} × ${item.qty}`,
+      value: formatMoney(item.totalPrice),
+    })),
+  ];
 
-  doc.setFillColor(...PAGE_BG);
-  doc.rect(0, 0, pageW, pageH, "F");
+  if (Number(booking.convenience_fee_total) > 0) {
+    amountRows.push({
+      label: "Convenience fee",
+      value: formatMoney(booking.convenience_fee_total),
+    });
+  }
 
-  doc.setFillColor(...WHITE);
-  doc.setDrawColor(...BORDER);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(cardX, cardTop, cardW, cardH, 5, 5, "FD");
+  if (Number(booking.discount_amount) > 0) {
+    amountRows.push({
+      label: "Discount",
+      value: `− ${formatMoney(booking.discount_amount)}`,
+      strong: true,
+    });
+  }
 
-  doc.setDrawColor(220, 220, 225);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(cardX + 1.5, cardTop + 1.5, cardW - 3, cardH - 3, 4, 4, "S");
+  const whenLine = booking.starts_at
+    ? [
+        formatDateCustomer(booking.starts_at),
+        formatTime12h(booking.starts_at),
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
 
-  const ctx: LayoutCtx = { contentX, contentW, cardX, cardW, cardTop };
-  drawCardHeader(doc, ctx);
-  drawTicketContent(doc, booking, assets, ctx);
+  const venueLine = [booking.venue_name, booking.venue_address]
+    .filter(Boolean)
+    .join(", ");
 
-  const footerY = cardTop + cardH + 8;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...SLATE_400);
-  doc.text(
-    "Non-transferable · Present valid ID if requested · bookmybota.com",
-    pageW / 2,
-    footerY,
-    { align: "center", maxWidth: cardW }
-  );
+  const ticketTypes = Array.from(map.values())
+    .map((item) => `${item.ticket_type}${item.qty > 1 ? ` (${item.qty})` : ""}`)
+    .join(", ");
 
-  return doc.output("blob");
+  return buildTicketCardPdf({
+    filenameTitle: "Event",
+    title: booking.event_name || "Event",
+    posterUrl: poster,
+    tag: ticketModeLabel(mode) || "E-Ticket",
+    whenLine,
+    venueLine: venueLine || undefined,
+    ticketCountLabel: `${totalTickets} Ticket${totalTickets === 1 ? "" : "(s)"}`,
+    primaryLabel: ticketTypes || "EVENT PASS",
+    secondaryLabel: booking.guest_name?.trim() || undefined,
+    bookingCode: displayCode,
+    qrValue: qrRaw,
+    showQr: true,
+    cancellationNote: ticketModeConfirmationMessage(mode),
+    totalFormatted: formatMoney(booking.grand_total),
+    amountRows,
+  });
 }
 
 export function downloadPdfBlob(blob: Blob, filename: string) {

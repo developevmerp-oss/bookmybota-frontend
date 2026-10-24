@@ -23,6 +23,8 @@ import {
 } from "./types";
 import { BMS_ARCHETYPE_PRESETS } from "./BMSArchetypePresets";
 
+import { analyzeBlueprintImage } from "@/lib/blueprintVisionEngine";
+
 interface BMSBlueprintAutoDetectorModalProps {
   open: boolean;
   onClose: () => void;
@@ -71,76 +73,42 @@ export default function BMSBlueprintAutoDetectorModal({
     }
 
     setIsScanning(true);
-    setScanStep("Reading blueprint pixel matrix & geometry vectors...");
+    setScanStep("Scanning blueprint pixel matrix & color vectors...");
 
     try {
-      // 1. Load image into hidden HTMLImage to calculate real aspect ratio and focal metrics
-      const img = new Image();
-      img.src = previewUrl;
-      await new Promise((resolve) => {
-        img.onload = resolve;
-        img.onerror = resolve;
-      });
+      await new Promise((r) => setTimeout(r, 400));
+      setScanStep("Analyzing geometric center focal point (pitch, court, stage)...");
 
-      setScanStep("Detecting center focal point (pitch, stage, or screen)...");
-      await new Promise((r) => setTimeout(r, 700));
+      const result = await analyzeBlueprintImage(previewUrl);
 
-      // Analyze image characteristics
-      const imgW = img.width || 1600;
-      const imgH = img.height || 1200;
-      const aspect = imgW / imgH;
+      await new Promise((r) => setTimeout(r, 600));
+      setScanStep(
+        result.detectionMetrics.pitchFound
+          ? `Detected central ${result.detectionMetrics.pitchType} turf. Tracing concentric bowl contours...`
+          : "Analyzing architectural edge vectors & concentric seating boundaries..."
+      );
 
-      // Smart classification heuristics:
-      // Aspect ratio > 1.6 + wide -> Cinema Screen or Festival Stage
-      // Aspect ratio between 1.1 and 1.5 -> Stadium or Arena
-      // Aspect ratio close to 1.0 -> Circular Stadium or Auditorium
-      let detected: BMSVenueArchetype = "stadium";
-      let detectedConfidence = 94;
+      await new Promise((r) => setTimeout(r, 600));
+      setScanStep(
+        `Synthesized ${result.sections.length} tailored stand sectors (~${result.detectionMetrics.estimatedSeats.toLocaleString()} seats)...`
+      );
 
-      if (aspect > 1.7) {
-        detected = "cinema";
-        detectedConfidence = 96;
-      } else if (aspect >= 1.2 && aspect <= 1.5) {
-        detected = "stadium";
-        detectedConfidence = 98;
-      } else if (aspect < 1.1) {
-        detected = "auditorium";
-        detectedConfidence = 92;
-      }
-
-      setDetectedArchetype(detected);
-      setConfidence(detectedConfidence);
-
-      setScanStep("Traced stand contours: Generating curved concentric rows & turnstile gates...");
-      await new Promise((r) => setTimeout(r, 800));
-
-      // Load base preset for the detected archetype
-      const preset = BMS_ARCHETYPE_PRESETS[detected];
-
-      // Auto-scale and fit coordinates to canvas (1600 x 1200)
-      const scaleX = 1600 / imgW;
-      const scaleY = 1200 / imgH;
-
-      const fittedSections: BMSSectionDefV4[] = preset.defaultSections.map((sec, idx) => ({
-        ...sec,
-        id: `auto_sec_${Date.now()}_${idx}`,
-      }));
-
-      setScanStep("Finalizing layout synthesis...");
       await new Promise((r) => setTimeout(r, 400));
 
+      setDetectedArchetype(result.archetype);
+      setConfidence(result.confidence);
       setIsScanning(false);
 
       onApplyLayout({
-        archetype: detected,
+        archetype: result.archetype,
         blueprintUrl: previewUrl,
-        groundConfig: preset.defaultGround,
-        sections: fittedSections,
-        amenities: preset.defaultAmenities,
+        groundConfig: result.groundConfig,
+        sections: result.sections,
+        amenities: result.amenities,
       });
 
       toast.success(
-        `Auto-drawn ${preset.title} layout from blueprint with ${detectedConfidence}% confidence!`
+        `Auto-drawn dynamic ${result.detectionMetrics.bowlShape.replace(/_/g, " ")} layout directly from your blueprint image!`
       );
       onClose();
     } catch (err: any) {
